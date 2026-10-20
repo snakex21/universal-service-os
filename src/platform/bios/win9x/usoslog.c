@@ -45,6 +45,18 @@
  *          event lines per session, then a counter
  *   START  Startup folders, Run keys, WIN.INI load= / run=, SYSTEM.INI
  *          shell=, AUTOEXEC.BAT / CONFIG.SYS (start record and every 6th)
+ *   DISK   every drive letter (GetDriveType, file system, label, volume
+ *          serial, free space); in the start record also C:\WINDOWS\IOS.LOG
+ *          (copied to LOGS, its real mode / MS-DOS compatibility lines),
+ *          the IOS / KRNL386 / port driver lines of C:\BOOTLOG.TXT, the
+ *          registry (Enum\Root\SCSIAdapter, Enum\SCSI\* drive letter /
+ *          Removable / HardwareID, Class\SCSIAdapter PortDriver) and one
+ *          USOSDBG /D snapshot (SeaBIOS USB disk service record, channel 1,
+ *          USOSUSB.MPD status page). A disk watcher thread diffs
+ *          GetLogicalDrives every 250 ms (+drive / -drive) and the volume
+ *          serials of removable letters every 2 s (media changed); each
+ *          change is written at once as a "disk change" record with one
+ *          USOSDBG /D snapshot (at most one per 2 s)
  *
  * Wheel record: a few seconds after the wheel was used (at most one per
  * WHEEL_REC_GAP s, WHEEL_REC_MAX per session) a short record with the MOUSE
@@ -56,14 +68,18 @@
  *
  * Options (testing): /once (one full snapshot, then exit), /out <file>,
  * /first <s>, /every <s>, /nonet (no active network tests), /nodbg (no
- * USOSDBG), /nohook (no journal hook), /dbgfile <file> (decode a saved
- * USOSDBG /L output instead of running USOSDBG: host tests).
+ * USOSDBG), /nohook (no journal hook), /nodisk (no DISK section, no disk
+ * watcher), /dbgfile <file> (decode a saved USOSDBG /L output instead of
+ * running USOSDBG: host tests).
  *
  * Compatibility: Windows 95 (OSR2 and later; the 4.00.950 retail too as
  * far as the APIs go), 98, 98 SE, Me; NT 4.0, 2000, XP for reuse. Static
  * imports are the Windows 95 subset of KERNEL32 / USER32 / ADVAPI32 only.
  * Looked up at run time, each part skipped with a log line when missing:
  * WSOCK32.DLL (Winsock 1.1; absent without TCP/IP: no network tests),
+ * the drive APIs (GetLogicalDrives, GetDriveTypeA, GetVolumeInformationA,
+ * GetDiskFreeSpaceA, SetErrorMode: Windows 95 KERNEL32, looked up so the
+ * static list stays the checked one),
  * IPHLPAPI.DLL (98 and later: resolver view and IP / UDP / TCP / ICMP
  * counters; on 95 the registry sections stand in), Toolhelp32 (not on NT
  * 4.0: no process list there). On the NT family USOSDBG (Win16, DPMI,
@@ -275,6 +291,10 @@ static DWORD ev_len, ev_lost;
 
 static char obuf[393216];
 static DWORD olen, olost;
+static char dbuf[65536];                /* the disk watcher thread's records */
+static DWORD dlen, dlost;
+static DWORD disk_tid;
+static CRITICAL_SECTION file_cs;        /* rotation and append of the log file */
 
 static PFN_SNAP p_snap;
 static PFN_PROC p_first, p_next;
@@ -377,8 +397,19 @@ static DWORD decval(const char *p)
 
 /* ------------------------------------------------------------------ */
 /* output buffer: one snapshot, written in one go                      */
+static int on_disk_thread(void)
+{
+    return disk_tid && GetCurrentThreadId() == disk_tid;
+}
+
 static void oput(const char *s, DWORD n)
 {
+    if (on_disk_thread()) {
+        if (dlen + n + 2 > sizeof(dbuf)) { dlost += n; return; }
+        mcpy(dbuf + dlen, s, n);
+        dlen += n;
+        return;
+    }
     if (olen + n + 2 > sizeof(obuf)) { olost += n; return; }
     mcpy(obuf + olen, s, n);
     olen += n;
@@ -444,7 +475,11 @@ static void flush_out(void)
 {
     HANDLE f;
     DWORD w, size;
-    if (olost) o("(output truncated: %lu bytes lost)", olost);
+    int disk = on_disk_thread();
+    char *buf = disk ? dbuf : obuf;
+    DWORD *len = disk ? &dlen : &olen, *lost = disk ? &dlost : &olost;
+    if (*lost) o("(output truncated: %lu bytes lost)", *lost);
+    EnterCriticalSection(&file_cs);
     CreateDirectoryA("C:\\USOS9X", 0);
     CreateDirectoryA(LOGDIR, 0);
     f = CreateFileA(out_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
@@ -465,12 +500,13 @@ static void flush_out(void)
     f = CreateFileA(out_path, GENERIC_WRITE, FILE_SHARE_READ, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
     if (f != INVALID_HANDLE_VALUE) {
         SetFilePointer(f, 0, 0, FILE_END);
-        WriteFile(f, obuf, olen, &w, 0);
+        WriteFile(f, buf, *len, &w, 0);
         FlushFileBuffers(f);
         CloseHandle(f);
     }
-    olen = 0;
-    olost = 0;
+    LeaveCriticalSection(&file_cs);
+    *len = 0;
+    *lost = 0;
 }
 
 /* whole small file into Buf (NUL-terminated), returns length or -1 */
@@ -1674,6 +1710,372 @@ static void sec_net_config(void)
     dump_file("[NET] HOSTS", "C:\\WINDOWS\\HOSTS", 2048);
 }
 
+/* --- DISK: drive letters, IOS, SCSI registry, USOSDBG DISK -------------- */
+/* docs/usb9x-hotswap-design-2026-10-19.md section 4. The drive APIs are
+ * the Windows 95 KERNEL32 ones, looked up at run time like Toolhelp32 (the
+ * static import list stays as it is). Floppy letters (A:, B:) and network
+ * letters are never asked for a volume (no seek, no hang on a dead
+ * server); critical errors are failed, not shown (SetErrorMode), so an
+ * empty card reader or CD drive gives an error code, not a dialog.
+ * GetDiskFreeSpaceA reports at most 2 GiB on 95 OSR2 / 98 / Me (the Ex
+ * call is not used): "free" is a lower bound there. */
+typedef DWORD (WINAPI *PFN_DRIVES)(void);
+typedef UINT (WINAPI *PFN_DTYPE)(LPCSTR);
+typedef BOOL (WINAPI *PFN_VOLINFO)(LPCSTR, LPSTR, DWORD, DWORD *, DWORD *, DWORD *, LPSTR, DWORD);
+typedef BOOL (WINAPI *PFN_FREE)(LPCSTR, DWORD *, DWORD *, DWORD *, DWORD *);
+typedef UINT (WINAPI *PFN_ERRMODE)(UINT);
+static PFN_DRIVES p_drives;
+static PFN_DTYPE p_dtype;
+static PFN_VOLINFO p_volinfo;
+static PFN_FREE p_free;
+static PFN_ERRMODE p_errmode;
+
+#define DBGTMPD     LOGDIR "\\USOSDBGD.TMP"
+#define DISK_SNAP_MS 2000               /* at most one USOSDBG DISK snapshot per 2 s */
+#define DISK_VOL_EVERY 8                /* removable volume serials every 8 ticks (2 s) */
+
+static CRITICAL_SECTION dbg_cs;         /* one USOSDBG at a time (worker / disk watcher) */
+static void header(const char *kind);
+static int opt_nodisk;
+
+static void disk_api_load(HMODULE k32)
+{
+    if (!k32) return;
+    p_drives = (PFN_DRIVES)GetProcAddress(k32, "GetLogicalDrives");
+    p_dtype = (PFN_DTYPE)GetProcAddress(k32, "GetDriveTypeA");
+    p_volinfo = (PFN_VOLINFO)GetProcAddress(k32, "GetVolumeInformationA");
+    p_free = (PFN_FREE)GetProcAddress(k32, "GetDiskFreeSpaceA");
+    p_errmode = (PFN_ERRMODE)GetProcAddress(k32, "SetErrorMode");
+    if (p_errmode) p_errmode(0x0001 /* SEM_FAILCRITICALERRORS */);
+}
+
+static const char *drive_type_name(UINT t)
+{
+    switch (t) {
+    case 0: return "unknown";
+    case 1: return "no-root";
+    case 2: return "removable";
+    case 3: return "fixed";
+    case 4: return "remote";
+    case 5: return "cdrom";
+    case 6: return "ramdisk";
+    }
+    return "?";
+}
+
+typedef struct {
+    UINT type;
+    int vol;                    /* 1 volume read, 0 failed (err), -1 not asked */
+    DWORD serial, err;
+    char fs[16], label[16];
+} DRIVEINFO;
+
+/* the volume of a letter is asked only for local non-floppy letters */
+static int vol_wanted(int i, UINT t)
+{
+    return !(t == 4 || t == 1 || (t == 2 && i < 2));
+}
+
+static void drive_info(int i, DRIVEINFO *d, int with_vol)
+{
+    char root[4];
+    DWORD maxc = 0, flags = 0;
+    root[0] = (char)('A' + i); root[1] = ':'; root[2] = '\\'; root[3] = 0;
+    mset(d, 0, sizeof(*d));
+    d->type = p_dtype ? p_dtype(root) : 0;
+    d->vol = -1;
+    if (!with_vol || !p_volinfo || !vol_wanted(i, d->type)) return;
+    if (p_volinfo(root, d->label, sizeof(d->label), &d->serial, &maxc, &flags, d->fs, sizeof(d->fs))) d->vol = 1;
+    else { d->vol = 0; d->err = GetLastError(); d->label[0] = d->fs[0] = 0; d->serial = 0; }
+}
+
+/* "removable FAT32 serial 1A2B-3C4D label "X"" */
+static void drive_text(char *t, const DRIVEINFO *d)
+{
+    int n = wsprintfA(t, "%s", (LPSTR)drive_type_name(d->type));
+    if (d->vol < 0) wsprintfA(t + n, " (volume not asked)");
+    else if (!d->vol) wsprintfA(t + n, " no volume (error %lu)", d->err);
+    else wsprintfA(t + n, " %s serial %04lX-%04lX label \"%s\"", (LPSTR)(d->fs[0] ? d->fs : "?"), d->serial >> 16,
+                   d->serial & 0xFFFF, (LPSTR)d->label);
+}
+
+/* cluster count * cluster size in MiB without 64-bit arithmetic */
+static DWORD clusters_mib(DWORD clusters, DWORD cl)
+{
+    if (!cl) return 0;
+    if (cl >= 0x100000UL) return clusters * (cl >> 20);
+    return clusters / (0x100000UL / cl);
+}
+
+static void sec_drives(void)
+{
+    DWORD mask;
+    int i;
+    if (!p_drives) { o("[DISK] GetLogicalDrives not available"); return; }
+    mask = p_drives();
+    o("[DISK] drive letters (GetLogicalDrives %08lX):", mask);
+    for (i = 0; i < 26; i++) {
+        DRIVEINFO d;
+        char t[200], root[4];
+        DWORD spc = 0, bps = 0, fc = 0, tc = 0;
+        int n;
+        if (!(mask & (1UL << i))) continue;
+        drive_info(i, &d, 1);
+        drive_text(t, &d);
+        n = lstrlenA(t);
+        root[0] = (char)('A' + i); root[1] = ':'; root[2] = '\\'; root[3] = 0;
+        if (d.vol == 1 && p_free && p_free(root, &spc, &bps, &fc, &tc))
+            wsprintfA(t + n, "  free %lu/%lu MiB (%lu B clusters)",
+                      clusters_mib(fc, spc * bps), clusters_mib(tc, spc * bps), spc * bps);
+        else if (d.vol == 1)
+            wsprintfA(t + n, "  free space: error %lu", GetLastError());
+        o("[DISK] %c: %s", 'A' + i, (LPSTR)t);
+    }
+}
+
+/* lines of a text file that contain one of Keys (case-insensitive) */
+static void grep_lines(const char *label, const char *buf, int n, const char *const *keys, int max)
+{
+    char l[300];
+    int i = 0, k, shown = 0, total = 0;
+    while (i < n) {
+        int j = 0, m;
+        while (i < n && buf[i] != '\n' && buf[i] != '\r') { if (j < (int)sizeof(l) - 1) l[j++] = buf[i]; i++; }
+        while (i < n && (buf[i] == '\n' || buf[i] == '\r')) i++;
+        l[j] = 0;
+        for (m = 0; m < j; m++) if ((BYTE)l[m] < 32) l[m] = ' ';
+        for (k = 0; keys[k]; k++) if (has_text(l, keys[k])) break;
+        if (!keys[k]) continue;
+        total++;
+        if (shown < max) { o("    | %s", (LPSTR)l); shown++; }
+    }
+    if (total > shown) o("%s (%d more matching lines not shown)", (LPSTR)label, total - shown);
+    if (!total) o("%s (no matching line)", (LPSTR)label);
+}
+
+static char disk_fb[65536];
+
+static void copy_file(const char *to, const char *buf, int n)
+{
+    HANDLE f;
+    DWORD w = 0;
+    f = CreateFileA(to, GENERIC_WRITE, FILE_SHARE_READ, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (f == INVALID_HANDLE_VALUE) { o("[DISK]   copy to %s failed, error %lu", (LPSTR)to, GetLastError()); return; }
+    WriteFile(f, buf, (DWORD)n, &w, 0);
+    FlushFileBuffers(f);
+    CloseHandle(f);
+    o("[DISK]   copied to %s (%lu bytes)", (LPSTR)to, w);
+}
+
+static void sec_ios(void)
+{
+    static const char *const ios_keys[] = { "real mode", "real-mode", "compatibility", "MS-DOS compat", 0 };
+    static const char *const boot_keys[] = { "[IOS]", "KRNL386", "IOSUBSYS", ".MPD", ".PDR", 0 };
+    DWORD size;
+    int n;
+    size = file_size("C:\\WINDOWS\\IOS.LOG");
+    if (size == 0xFFFFFFFFUL) {
+        o("[DISK] C:\\WINDOWS\\IOS.LOG: none (no unit in MS-DOS compatibility mode logged)");
+    } else {
+        n = read_file("C:\\WINDOWS\\IOS.LOG", disk_fb, sizeof(disk_fb), 0);
+        o("[DISK] C:\\WINDOWS\\IOS.LOG: %lu bytes%s", size, (LPSTR)(size >= sizeof(disk_fb) ? " (first 64 KiB read)" : ""));
+        if (n > 0) {
+            copy_file(LOGDIR "\\IOS.LOG", disk_fb, n);
+            o("[DISK] IOS.LOG real mode / MS-DOS compatibility lines:");
+            grep_lines("[DISK] IOS.LOG", disk_fb, n, ios_keys, 40);
+        }
+    }
+    size = file_size("C:\\BOOTLOG.TXT");
+    if (size == 0xFFFFFFFFUL) {
+        o("[DISK] C:\\BOOTLOG.TXT: none");
+    } else {
+        DWORD from = size > sizeof(disk_fb) - 1 ? size - (sizeof(disk_fb) - 1) : 0;
+        n = read_file("C:\\BOOTLOG.TXT", disk_fb, sizeof(disk_fb), from);
+        o("[DISK] C:\\BOOTLOG.TXT: %lu bytes, IOS / KRNL386 / port driver lines from +%lu:", size, from);
+        if (n > 0) grep_lines("[DISK] BOOTLOG.TXT", disk_fb, n, boot_keys, 80);
+    }
+}
+
+/* one value of Key as text (string, dword, binary bytes); "-" missing */
+static void reg_value_text(HKEY k, const char *name, char *t, int cap)
+{
+    DWORD type = 0, dl = sizeof(rdata) - 1, j;
+    int m = 0;
+    if (RegQueryValueExA(k, (LPSTR)name, 0, &type, rdata, &dl) != ERROR_SUCCESS) { lstrcpyA(t, "-"); return; }
+    rdata[dl < sizeof(rdata) ? dl : sizeof(rdata) - 1] = 0;
+    if (type == REG_SZ || type == REG_EXPAND_SZ) { t[0] = '"'; lstrcpynA(t + 1, (char *)rdata, cap - 2); lstrcatA(t, "\""); return; }
+    if (type == REG_DWORD && dl == 4) { wsprintfA(t, "dword:%08lX", *(DWORD *)rdata); return; }
+    m = wsprintfA(t, "hex:");
+    for (j = 0; j < dl && j < 16 && m < cap - 4; j++) m += wsprintfA(t + m, "%02X", (unsigned)rdata[j]);
+}
+
+static void sec_scsi_registry(void)
+{
+    HKEY k, k2, k3;
+    DWORD i, j, nl;
+    char a[128], b[128], path[400], v1[64], v2[64], v3[300];
+    FILETIME ft;
+    o("[DISK] registry Enum\\Root\\SCSIAdapter:");
+    reg_dump_sub(HKEY_LOCAL_MACHINE, "HKLM", "Enum\\Root\\SCSIAdapter", 32, 16);
+    o("[DISK] registry Enum\\SCSI (CurrentDriveLetterAssignment, Removable, HardwareID):");
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Enum\\SCSI", 0, KEY_READ, &k) != ERROR_SUCCESS) {
+        o("  [HKLM\\Enum\\SCSI] (missing)");
+    } else {
+        for (i = 0; i < 64; i++) {
+            nl = sizeof(a);
+            if (RegEnumKeyExA(k, i, a, &nl, 0, 0, 0, &ft) != ERROR_SUCCESS) break;
+            if (RegOpenKeyExA(k, a, 0, KEY_READ, &k2) != ERROR_SUCCESS) continue;
+            for (j = 0; j < 16; j++) {
+                nl = sizeof(b);
+                if (RegEnumKeyExA(k2, j, b, &nl, 0, 0, 0, &ft) != ERROR_SUCCESS) break;
+                if (RegOpenKeyExA(k2, b, 0, KEY_READ, &k3) != ERROR_SUCCESS) continue;
+                reg_value_text(k3, "CurrentDriveLetterAssignment", v1, sizeof(v1));
+                reg_value_text(k3, "Removable", v2, sizeof(v2));
+                reg_value_text(k3, "HardwareID", v3, sizeof(v3));
+                o("  SCSI\\%s\\%s  letter %s  removable %s  hwid %s", (LPSTR)a, (LPSTR)b, (LPSTR)v1, (LPSTR)v2, (LPSTR)v3);
+                RegCloseKey(k3);
+            }
+            RegCloseKey(k2);
+        }
+        RegCloseKey(k);
+    }
+    o("[DISK] registry Services\\Class\\SCSIAdapter (PortDriver):");
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Services\\Class\\SCSIAdapter", 0, KEY_READ, &k) !=
+        ERROR_SUCCESS) {
+        o("  [HKLM\\System\\CurrentControlSet\\Services\\Class\\SCSIAdapter] (missing)");
+        return;
+    }
+    for (i = 0; i < 64; i++) {
+        nl = sizeof(a);
+        if (RegEnumKeyExA(k, i, a, &nl, 0, 0, 0, &ft) != ERROR_SUCCESS) break;
+        wsprintfA(path, "System\\CurrentControlSet\\Services\\Class\\SCSIAdapter\\%s", (LPSTR)a);
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, path, 0, KEY_READ, &k2) != ERROR_SUCCESS) continue;
+        reg_value_text(k2, "PortDriver", v1, sizeof(v1));
+        reg_value_text(k2, "DriverDesc", v3, sizeof(v3));
+        o("  SCSIAdapter\\%s  PortDriver %s  DriverDesc %s", (LPSTR)a, (LPSTR)v1, (LPSTR)v3);
+        RegCloseKey(k2);
+    }
+    RegCloseKey(k);
+}
+
+/* USOSDBG /L <tmp> /D: the DISK section from one snapshot, lines indented */
+static char dbgd_text[32768];
+
+static void run_usosdbg_disk(const char *why)
+{
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char cmd[300];
+    DWORD t0, w;
+    int n, ended;
+    if (opt_nodbg || opt_dbgfile[0]) { o("[DISK] USOSDBG DISK snapshot skipped (%s)", (LPSTR)(opt_nodbg ? "/nodbg" : "/dbgfile")); return; }
+    if (is_nt) { o("[DISK] USOSDBG DISK snapshot skipped: Windows NT family"); return; }
+    if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[DISK] %s missing", (LPSTR)DBGEXE); return; }
+    EnterCriticalSection(&dbg_cs);
+    DeleteFileA(DBGTMPD);
+    wsprintfA(cmd, "%s /L %s /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);
+    mset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    t0 = GetTickCount();
+    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, "C:\\USOS9X", &si, &pi)) {
+        LeaveCriticalSection(&dbg_cs);
+        o("[DISK] %s: CreateProcess failed, error %lu", (LPSTR)cmd, GetLastError());
+        return;
+    }
+    CloseHandle(pi.hThread);
+    w = WaitForSingleObject(pi.hProcess, 10000);
+    CloseHandle(pi.hProcess);
+    ended = 0;
+    for (;;) {                          /* a Win16 task's handle may signal early: the END line decides */
+        n = read_file(DBGTMPD, dbgd_text, sizeof(dbgd_text), 0);
+        if (n > 0 && has_text(dbgd_text, "USOSDBG END")) { ended = 1; break; }
+        if (GetTickCount() - t0 > 12000) break;
+        Sleep(250);
+    }
+    LeaveCriticalSection(&dbg_cs);
+    o("[DISK] USOSDBG DISK snapshot (%s): %s  (%lu ms, wait %s, %s)", (LPSTR)why, (LPSTR)cmd, GetTickCount() - t0,
+      (LPSTR)(w == WAIT_OBJECT_0 ? "exited" : "timeout"), (LPSTR)(ended ? "complete" : "INCOMPLETE"));
+    if (n > 0) otext("  ", dbgd_text, (DWORD)n);
+    else o("[DISK]   no output file");
+}
+
+static void sec_disk(void)
+{
+    if (opt_nodisk) { o("[DISK] skipped (/nodisk)"); return; }
+    sec_drives();
+    sec_ios();
+    sec_scsi_registry();
+    run_usosdbg_disk("start");
+}
+
+/* the watcher thread: GetLogicalDrives every WATCH_MS (as the process
+ * watcher), removable volume serials every DISK_VOL_EVERY ticks; volume
+ * calls can wait for the drive, so they run here, not on the main thread
+ * (the journal hook's thread). A change is written at once as its own
+ * record (with ev() lines for the PROC timeline) and followed by a USOSDBG
+ * DISK snapshot, at most one per DISK_SNAP_MS; one that falls inside the
+ * interval is taken when it ends. */
+
+DWORD WINAPI disk_watch(LPVOID arg)
+{
+    DRIVEINFO cur[26];
+    DWORD mask = 0, last_snap = 0, ticks = 0;
+    int i, pending = 0, have_snap = 0;
+    (void)arg;
+    disk_tid = GetCurrentThreadId();
+    if (!p_drives) return 0;
+    mask = p_drives();
+    for (i = 0; i < 26; i++) if (mask & (1UL << i)) drive_info(i, &cur[i], 1);
+    for (;;) {
+        DWORD now, m;
+        int changed = 0;
+        Sleep(WATCH_MS);
+        ticks++;
+        now = GetTickCount();
+        m = p_drives();
+        for (i = 0; i < 26; i++) {
+            DWORD bit = 1UL << i;
+            char t[200];
+            if ((m & bit) && !(mask & bit)) {
+                drive_info(i, &cur[i], 1);
+                drive_text(t, &cur[i]);
+                if (!changed++) { header("disk change"); }
+                o("[DISK] +drive %c: %s", 'A' + i, (LPSTR)t);
+                ev("+drive %c: %s", 'A' + i, (LPSTR)t);
+            } else if (!(m & bit) && (mask & bit)) {
+                if (!changed++) { header("disk change"); }
+                o("[DISK] -drive %c:", 'A' + i);
+                ev("-drive %c:", 'A' + i);
+            } else if ((m & bit) && ticks % DISK_VOL_EVERY == 0 && cur[i].type == 2 && i >= 2) {
+                DRIVEINFO d;
+                drive_info(i, &d, 1);
+                if (d.vol != cur[i].vol || d.serial != cur[i].serial) {
+                    char was[200];
+                    drive_text(was, &cur[i]);
+                    drive_text(t, &d);
+                    if (!changed++) { header("disk change"); }
+                    o("[DISK] media %c: changed: %s (was %s)", 'A' + i, (LPSTR)t, (LPSTR)was);
+                    ev("media %c: changed: %s (was %s)", 'A' + i, (LPSTR)t, (LPSTR)was);
+                    mcpy(&cur[i], &d, sizeof(d));
+                }
+            }
+        }
+        mask = m;
+        if (changed) pending = 1;
+        if (pending && (!have_snap || now - last_snap >= DISK_SNAP_MS)) {
+            if (!changed) { header("disk change (delayed snapshot)"); }
+            run_usosdbg_disk(changed ? "drive change" : "drive change, delayed by the 2 s limit");
+            last_snap = GetTickCount();
+            have_snap = 1;
+            pending = 0;
+            changed = 1;
+        }
+        if (changed) flush_out();
+    }
+}
+
 /* --- PROC / START -------------------------------------------------------- */
 static PROCREC snap_procs[MAXP];     /* worker thread only */
 static HWND snap_wins[MAXW];
@@ -1772,6 +2174,8 @@ static void start_record(void)
 {
     header("start");
     sec_sys();
+    sec_disk();
+    flush_out();
     sec_start(1);
     sec_proc();
     flush_out();
@@ -1783,10 +2187,13 @@ static void snapshot(void)
     snap_no++;
     header("snapshot");
     sec_sys();
+    if (!opt_nodisk) sec_drives();
     sec_mouse();
     sec_wheel();
     find_usosnet(0);
+    EnterCriticalSection(&dbg_cs);
     run_usosdbg(stats_pa);
+    LeaveCriticalSection(&dbg_cs);
     flush_out();                        /* the mouse part is safe even if a test hangs */
     sec_net_config();
     sec_usns(0);
@@ -1874,6 +2281,7 @@ static void parse_args(void)
         else if (!lstrcmpiA(arg, "/nonet")) opt_nonet = 1;
         else if (!lstrcmpiA(arg, "/nodbg")) opt_nodbg = 1;
         else if (!lstrcmpiA(arg, "/nohook")) opt_nohook = 1;
+        else if (!lstrcmpiA(arg, "/nodisk")) opt_nodisk = 1;
         else if (!lstrcmpiA(arg, "/out")) want = 1;
         else if (!lstrcmpiA(arg, "/first")) want = 2;
         else if (!lstrcmpiA(arg, "/every")) want = 3;
@@ -1899,7 +2307,10 @@ void __cdecl usos_entry(void)
     mutex = CreateMutexA(0, FALSE, "USOSLOG-instance");
     if (!opt_once && mutex && GetLastError() == ERROR_ALREADY_EXISTS) ExitProcess(0);
     InitializeCriticalSection(&ev_cs);
+    InitializeCriticalSection(&file_cs);
+    InitializeCriticalSection(&dbg_cs);
     k32 = GetModuleHandleA("KERNEL32.DLL");
+    disk_api_load(k32);
     if (k32) {
         p_snap = (PFN_SNAP)GetProcAddress(k32, "CreateToolhelp32Snapshot");
         p_first = (PFN_PROC)GetProcAddress(k32, "Process32First");
@@ -1912,6 +2323,10 @@ void __cdecl usos_entry(void)
     timer = SetTimer(0, 0, WATCH_MS, 0);
     th = CreateThread(0, 0, worker, 0, 0, &tid);
     if (!th) ExitProcess(1);
+    if (!opt_once && !opt_nodisk && p_drives) {
+        HANDLE dt = CreateThread(0, 0, disk_watch, 0, 0, &tid);
+        if (dt) CloseHandle(dt);
+    }
     while (GetMessageA(&msg, 0, 0, 0) > 0) {
         if (msg.message == WM_CANCELJOURNAL) { g_hook = 0; g_cancels++; continue; }
         if (msg.message == WM_TIMER && !msg.hwnd) {

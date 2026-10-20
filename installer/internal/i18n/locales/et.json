@@ -157,6 +157,9 @@
   "installer.components.no_release": "See paigaldaja järk ei tea oma GitHubi väljalaset, seega ei saa see alla laadida. Valige olemasolevad failid või jätke vahele.",
   "installer.components.checking": "Kontrollin, millised komponendid kettal on…",
   "installer.components.check_failed": "Ketta komponente ei õnnestunud kontrollida: %s",
+  "installer.components.legacy.name": "Windows 95/98/Me/NT 4.0 ühilduvuspakett (umbes 150 MB)",
+  "installer.components.legacy.need": "Microsofti teegid (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), mille pakett pärast paigaldust Windows 95, 98, Me ja NT 4.0 süsteemi paigaldab.",
+  "installer.components.legacy.skip_note": "Ilma selleta paigaldab pakett ainult selle, mille ise DATA\\Addons kausta panete. Saate selle hiljem lisada USOS-i värskendamise või parandamisega.",
   "installer.components.winpe.name": "WinPE 10 abiline (umbes 440 MB)",
   "installer.components.winpe.need": "Vajalik Windows Vista ja Windows 7 paigaldamiseks UEFI-režiimis.",
   "installer.components.winpe.skip_note": "Ilma selleta ei saa Windows Vistat ja Windows 7 UEFI-režiimis paigaldada. Saate selle hiljem lisada funktsiooniga Uuenda USOS või Paranda.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Pärast installimist logi domeeni {1} sisse kasutajana {0} vastuseprofiilis määratud parooliga.",
   "boot.lx.logon_autologon": "Pärast installimist logib Windows automaatselt sisse kasutajana {0}.",
   "boot.lx.logon_setup_asks": "Windowsi installiprogramm küsib installimise ajal kasutajanime ja parooli; USOS neid ei määra.",
-  "boot.lx.logon_answer_file": "Pärast installimist logi sisse oma vastusefaili {0} kontoga."
+  "boot.lx.logon_answer_file": "Pärast installimist logi sisse oma vastusefaili {0} kontoga.",
+  "boot.profile.field.display_bpp": "Värvisügavus",
+  "boot.profile.help.display_legacy": "Rakendatakse pärast paigaldamist päris riistvaral. Automaatne valib saadaoleva režiimi kuni 1920x1080 ja vajadusel turvaliselt madalama. Muutmata säilitab sätted. Automaatne värvisügavus eelistab 32 bitti, muidu 16."
 }

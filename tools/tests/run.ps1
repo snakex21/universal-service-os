@@ -71,6 +71,7 @@ function Run-Unit {
     Invoke-PythonStep 'tools/tests/legacy_bios/test_win9x_u9fix.py' 'Windows 9x U9FIX tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_dosnet_aliases.py' 'XP DOSNET alias tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_nt5_source.py' 'NT5 source identity tests failed.'
+    Invoke-PythonStep 'tools/tests/addons/test_legacy_pack.py' 'Legacy compatibility pack tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_nt5_media_markers.py' 'NT5 local media marker tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_drive_letters.py' 'XP drive letter tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_source_io.py' 'XP source I/O tests failed.'
@@ -102,6 +103,7 @@ function Run-Unit {
     Invoke-PythonStep 'tools/tests/test_xp_reproducible.py' 'XP cabinet/hive reproducibility tests failed.'
     # Answer profiles (docs/answer-profiles.md): rendered WINNT.SIF / autounattend.xml goldens.
     Invoke-PythonStep 'tools/tests/test_answer_render.py' 'Answer renderer goldens failed.'
+    Invoke-PythonStep 'tools/tests/addons/test_legacy_flow.py' 'Legacy pack flow tests failed.'
     Invoke-PythonStep 'tools/tests/test_xp_user_settings.py' 'usos-xp.ini tests failed.'
     # Every Python test module (unittest and pytest style) in one pytest run:
     # it lists every failing test instead of stopping at the first module.

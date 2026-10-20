@@ -264,7 +264,7 @@ int main(void) {
         src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
         igb = (DRV / 'src/usosnet_igb.c').read_text(encoding='latin-1')
         hdr = (DRV / 'src/usosnet.h').read_text(encoding='latin-1')
-        self.assertIn('#define USOSNET_MINOR 4', hdr)
+        self.assertIn('#define USOSNET_MINOR 5', hdr)
         poll = re.search(r'static void IgbRxPoll\(PADAPTER A\)\n\{(.*?)\n\}', igb, re.S).group(1)
         self.assertIn('USNS_ST_FRAME_ERR', poll)          # only frame errors drop
         self.assertNotIn('L4E', poll)
@@ -281,6 +281,70 @@ int main(void) {
         free = re.search(r'static void FreeAll\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
         self.assertLess(free.index('Magic = 0'), free.index('DmaFree(A, &A->StatsMem)'))
 
+
+class ErrorLogBudget(unittest.TestCase):
+    """98 SE fresh install (X470, 2026-10-20): NDIS.VXD 4.10.2222 counts error
+    log entries per adapter from the first one for 30 s; before Init_Complete
+    the 5th removes the adapter (CONFIGMG Call_At_Appy_Time -> Remove_SubTree)
+    and the first shows a notice. NDISLOG.TXT had USN1..USN4 at 3 s, no USN5.
+    The real LogBudget() is compiled on the host against that model."""
+
+    def test_diaglog_uses_budget_only(self):
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        diag = re.search(r'static void DiagLog\(PADAPTER A, ULONG Event, ULONG Sec\)\r?\n\{(.*?)\r?\n\}', src, re.S).group(1)
+        self.assertNotIn('NdisWriteErrorLogEntry', diag)
+        self.assertEqual(diag.count('LOG10(0x55534E3'), 5)
+        self.assertEqual(src.count('NdisWriteErrorLogEntry('), 1)      # only inside LOG10
+        self.assertNotIn('sec == 3 ||', src)
+
+    HARNESS = r"""#include <stdio.h>
+typedef unsigned long ULONG; typedef unsigned char BOOLEAN;
+#define TRUE 1
+#define FALSE 0
+@CONSTS@
+typedef struct { ULONG TimerCount, LogWindowStart, LogWindowUsed, LogSkipped; } ADAPTER, *PADAPTER;
+@FN@
+int main(void) {
+    ADAPTER a = {0}; ULONG t, ndis_start = 0, ndis_count = 0, written = 0, first = 0; int k, bad = 0;
+    unsigned seed = 1;
+    for (t = 1; t < 400UL * TICKS_PER_SEC; t++) {
+        a.TimerCount = t;
+        /* NDIS.VXD: timer started by the first entry, at 30 s count reset if <= 5 */
+        if (ndis_count && t - ndis_start >= 30UL * TICKS_PER_SEC) ndis_count = 0;
+        seed = seed * 1103515245u + 12345u;
+        for (k = 0; k < (int)((seed >> 16) % 3); k++) {   /* bursts of requests */
+            if (!LogBudget(&a)) continue;
+            if (!ndis_count) ndis_start = t;
+            if (++ndis_count >= 5) { printf("removed at %lu\n", t); bad = 1; }
+            if (!first) first = t;
+            written++;
+        }
+    }
+    if (first < LOG_QUIET_SEC * TICKS_PER_SEC) { printf("early %lu\n", first); bad = 1; }
+    if (written < 40) { printf("only %lu\n", written); bad = 1; }
+    printf("written %lu skipped %lu\n", written, a.LogSkipped);
+    return bad;
+}
+"""
+
+    def test_budget_host_model(self):
+        import subprocess, tempfile
+        cc = _host_cc()
+        if not cc:
+            self.skipTest('no host C compiler')
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        hdr = (DRV / 'src/usosnet.h').read_text(encoding='latin-1')
+        fn = re.search(r'static BOOLEAN LogBudget\(PADAPTER A\)\r?\n\{.*?\r?\n\}', src, re.S).group(0)
+        consts = ''.join(m.group(0) + '\n' for m in re.finditer(
+            r'#define (LOG_QUIET_SEC|LOG_WINDOW_SEC|LOG_WINDOW_MAX|TICK_MS|TICKS_PER_SEC)\b[^\r\n]*', hdr))
+        with tempfile.TemporaryDirectory() as d:
+            c = Path(d) / 'b.c'
+            c.write_text(self.HARNESS.replace('@CONSTS@', consts).replace('@FN@', fn))
+            exe = Path(d) / 'b.exe'
+            r = subprocess.run([cc, '-o', str(exe), str(c)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(exe)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
 
 if __name__ == '__main__':
     unittest.main()

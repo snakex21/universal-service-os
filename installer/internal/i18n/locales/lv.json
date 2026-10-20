@@ -160,6 +160,9 @@
   "installer.components.no_release": "Šī instalētāja versija nezina savu GitHub laidienu, tāpēc nevar lejupielādēt. Izvēlieties failus, kas jums jau ir, vai izlaidiet.",
   "installer.components.checking": "Pārbauda, kādas komponentes ir diskā…",
   "installer.components.check_failed": "Neizdevās pārbaudīt diska komponentes: %s",
+  "installer.components.legacy.name": "Windows 95/98/Me/NT 4.0 saderības pakotne (apmēram 150 MB)",
+  "installer.components.legacy.need": "Microsoft bibliotēkas (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), ko pakotne pēc instalēšanas instalē Windows 95, 98, Me un NT 4.0.",
+  "installer.components.legacy.skip_note": "Bez tās pakotne instalē tikai to, ko jūs pats ievietojat DATA\\Addons. Varat to pievienot vēlāk ar USOS atjaunināšanu vai labošanu.",
   "installer.components.winpe.name": "WinPE 10 palīgs (apmēram 440 MB)",
   "installer.components.winpe.need": "Nepieciešams Windows Vista un Windows 7 instalēšanai UEFI režīmā.",
   "installer.components.winpe.skip_note": "Bez tā Windows Vista un Windows 7 nevar instalēt UEFI režīmā. To var pievienot vēlāk ar Atjaunināt USOS vai Labot.",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "Pēc instalēšanas piesakieties domēnā {1} kā {0} ar atbilžu profilā iestatīto paroli.",
   "boot.lx.logon_autologon": "Pēc instalēšanas Windows automātiski piesakās kā {0}.",
   "boot.lx.logon_setup_asks": "Windows iestatīšana instalēšanas laikā vaicā lietotājvārdu un paroli; USOS tos neiestata.",
-  "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}."
+  "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}.",
+  "boot.profile.field.display_bpp": "Krāsu dziļums",
+  "boot.profile.help.display_legacy": "Tiek lietots pēc instalēšanas uz īstās aparatūras. Automātiski izvēlas pieejamu režīmu līdz 1920x1080 ar drošu pāreju uz zemāku. Bez izmaiņām saglabā iestatījumus. Automātiskais dziļums: 32 biti, ja pieejami, citādi 16."
 }

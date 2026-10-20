@@ -151,6 +151,7 @@ mkdir -p "$setup_dir"
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" call "%%USOS_DIR%%\\usos-users.cmd"\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" del /f /q "%%USOS_DIR%%\\usos-users.cmd"\r\n'
     if [ "$NT5_SYSTEM" = windows-2000 ]; then
+        printf 'if exist "%%USOS_DIR%%\\USOSLAN.EXE" if exist "%%USOS_DIR%%\\LAN.REG" %%SystemRoot%%\\regedit.exe /s "%%USOS_DIR%%\\LAN.REG"\r\n'
         printf 'rem VESA display (usosvbe + framebuf.dll, w2k_stage.sh 11.; DATA vesa-off.txt: none).\r\n'
         printf 'if exist "%%USOS_DIR%%\\vesa.cmd" call "%%USOS_DIR%%\\vesa.cmd"\r\n'
     fi

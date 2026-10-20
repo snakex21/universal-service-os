@@ -341,6 +341,12 @@ nt3_stage_profile() {
         [ ! -f "$work/$file" ] || mv "$work/$file" "$usos/$file" || fail "cannot copy $file"
     done
     [ ! -f "$usos/INTL.TXT" ] || nt3_stage_intl
+    if [ -n "${nt3:-}" ] && [ -z "${nt31:-}" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
+        . "$LIB/display_profile.sh"
+        nt3_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
+        usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt3_display_request" || fail 'cannot stage NT3 hardware display request'
+        log "DISPLAY request=$nt3_display_request apply=hardware-service vm=deferred"
+    fi
 }
 
 # The CD files GUI Setup would copy for the chosen locale and keyboard
@@ -748,6 +754,43 @@ done
 
 usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
+. "$LIB/network_setup.sh"
+usos_net_answer_config "$ANSWER_SIF" NT4 > "$work/network.ini" || fail 'invalid LAN metadata'
+usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+rm -f "$work/network.ini"
+# Keep the requested $OEM$/$1 layout. NT4 is explicitly copied from it by
+# CMDLINES: unlike NT5, do not assume that NT4 maps $1 to the system drive.
+. "$LIB/legacy_addons.sh"
+usos_addons_config "$ANSWER_SIF" > "$work/addons.ini" || fail 'invalid addon selection'
+addon_lang=XX;case "$lang" in 0415) addon_lang=PL ;; *09) addon_lang=EN ;; esac
+addon_root="$ls_dir/I386/\$OEM\$/\$1"
+if [ -z "$tse" ]; then
+    usos_addons_stage "$work/addons.ini" "$addon_root" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" NT4 "$addon_lang" "${SP_EXE:+6a}" || fail 'cannot stage NT4 legacy pack'
+fi
+rm -f "$work/addons.ini"
+if [ -f "$addon_root/USOS/ADDONS/USOSADD.EXE" ]; then
+    # Both OEM search locations can run this command; COPY.OK makes it once-only.
+    for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
+        printf '".\\ADDONS.CMD"\r\n' >> "$oem/CMDLINES.TXT"
+        crlf > "$oem/ADDONS.CMD" <<'ADDONSCMD'
+@echo off
+rem NT4 CMDLINES copy only; packages start after POST.CMD on hardware.
+if exist C:\USOS\ADDONS\COPY.OK goto addonscopied
+if not exist C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\ADDONS\USOSADD.EXE goto addoncopyfailed
+if exist C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\NT4\ADDONS.LOG type C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\NT4\ADDONS.LOG >> C:\USOS\NT4\ADDONS.LOG
+%SystemRoot%\system32\xcopy.exe C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\ADDONS C:\USOS\ADDONS /E /I >> C:\USOS\NT4\ADDONS.LOG 2>&1
+if errorlevel 1 goto addoncopyfailed
+if not exist C:\USOS\ADDONS\USOSADD.EXE goto addoncopyfailed
+if not exist C:\USOS\ADDONS\LEGACY.INI goto addoncopyfailed
+if not exist C:\USOS\ADDONS\SELECT.INI goto addoncopyfailed
+echo ok > C:\USOS\ADDONS\COPY.OK
+goto addonscopied
+:addoncopyfailed
+echo addon OEM copy incomplete; OS Setup continues >> C:\USOS\NT4\ADDONS.LOG
+:addonscopied
+ADDONSCMD
+    done
+fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
@@ -1005,6 +1048,10 @@ echo sp package without -x, running it with -u -z >> C:\USOS\NT4\POST.LOG
 start /wait C:\USOS\NT4\SP6I386.EXE -u -z
 echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
+if exist C:\USOS\NT4\USOSLAN.EXE if exist C:\USOS\NT4\LAN.REG %SystemRoot%\regedit.exe /s C:\USOS\NT4\LAN.REG
+echo LAN first-desktop registration processed >> C:\USOS\NT4\POST.LOG
+if exist C:\USOS\ADDONS\USOSADD.EXE if exist C:\USOS\ADDONS\ADDONS.REG %SystemRoot%\regedit.exe /s C:\USOS\ADDONS\ADDONS.REG
+echo addons hardware-desktop Run registration processed >> C:\USOS\NT4\POST.LOG
 echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\VERSION.REG "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows
@@ -1020,6 +1067,28 @@ printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${ts
 # easily): a 128-bit CD with a Standard Encryption SP6a switches to the
 # SP6a's own schannel.dll and runs update.exe again.
 if [ "$crypto" = high ]; then printf 'high\r\n' > "$usos/CRYPTOHI.TXT"; fi
+fi
+
+# Preserve the installation VM's basic mode. The persistent hardware helper
+# defers in QEMU and removes its Run value only after hardware processing.
+# No request in a USOS-made answer (user decision 2026-10-20): auto, the
+# highest tested mode up to 1920x1080, only with the VESA miniport. The first
+# start keeps VESA.REG's 1024x768x16; USOSRES applies at the first hardware
+# logon (CDS_TEST, rollback). A user's own answer file gets no request.
+nt4_display_request=
+if [ -z "$nt3" ] && [ -z "$nt31" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
+    . "$LIB/display_profile.sh"
+    nt4_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
+    [ -f "$usos/VESA.REG" ] || fail 'display request needs the VESA miniport'
+elif [ -z "$nt3" ] && [ -z "$nt31" ] && [ "$ANSWER_KIND" != USER ] && [ -f "$usos/VESA.REG" ] && [ -f "$LIB/USOSRES.EXE" ]; then
+    . "$LIB/display_profile.sh"
+    nt4_display_request=autoxauto
+    log 'DISPLAY no request in the answer, default auto (up to 1920x1080)'
+fi
+if [ -n "$nt4_display_request" ]; then
+    usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt4_display_request" || fail 'cannot stage hardware display request'
+    usos_display_run_reg NT4 | sed '1d' >> "$usos/VESA.REG" || fail 'cannot register hardware display helper'
+    log "DISPLAY request=$nt4_display_request apply=hardware-logon vm=deferred"
 fi
 
 for file in "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32"; do

@@ -206,7 +206,9 @@ def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, n
         for variant, name in (("NT4", "nt4/USOSNVME.SYS"), ("NT351", "nt3/USOSNVME.SYS"), ("NT31", "nt3/USOSNVME31.SYS")):
             add("usr/lib/usos/" + name, (ROOT / "tools/nt/usosnvme/bin" / variant / "i386/usosnvme.sys").read_bytes())
         # and this checkout's USOSNT3.EXE (registers usosnvme on NT 3.5x).
-        add("usr/lib/usos/nt3/USOSNT3.EXE", (ROOT / "tools/nt3/usosnt3/bin/i386/usosnt3.exe").read_bytes())
+        sys.path.insert(0, str(ROOT/"tools"))
+        from build_windows_usos_res import build_nt3
+        add("usr/lib/usos/nt3/USOSNT3.EXE", build_nt3(ROOT).read_bytes())
     # --lib NAME=FILE: a file of this checkout (a driver or tool built
     # before build.bat) as /usr/lib/usos/NAME, e.g. nt3/USOSNT3.EXE=tools/nt3/usosnt3/bin/i386/usosnt3.exe.
     for spec in libs or []:

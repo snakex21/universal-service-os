@@ -581,6 +581,7 @@ def main() -> int:
             ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
             ("tools/w9x_csmwrap_prepare.sh", "usr/lib/usos/w9x_csmwrap_prepare.sh"),
             ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
+            ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
@@ -596,6 +597,9 @@ def main() -> int:
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
+            ("tools/display_profile.sh", "usr/lib/usos/display_profile.sh"),
+            ("tools/w9x_logon.sh", "usr/lib/usos/w9x_logon.sh"),
+            ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -665,7 +669,6 @@ def main() -> int:
             # NT 3.5 (docs/nt35-2026-10-09.md): usosrst without the per-CPU DPC calls.
             ("tools/w2k/usosrst/bin/nt35/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST35.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
-            ("tools/nt3/usosnt3/bin/i386/usosnt3.exe", "usr/lib/usos/nt3/USOSNT3.EXE"),
             ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
             # VESA miniport, NT 3.x build (build-nt3.cmd; with the CD's own
             # framebuf.dll, docs/nt3-vesa-2026-10-14.md).
@@ -685,6 +688,8 @@ def main() -> int:
         # the answer template, the X470 registry values and the XP path's
         # community driver set (the files of tools/xp_driver_overlay.py
         # SELECTED); FIRST.CMD installs them at the first logon in the VM.
+        # Windows Me, stock user USOS: the empty-password list (tools/w9x_logon.sh).
+        put(entries, Entry("usr/lib/usos/w9x/USOSME.PWL", stat.S_IFREG | 0o644, (root / "src/platform/bios/win9x/usosme.pwl").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready_unattended.xml", stat.S_IFREG | 0o644, (root / "tools/posready_unattended.xml").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/X470.REG", stat.S_IFREG | 0o644, (root / "tools/posready_x470.reg").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/FIRST.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_first.cmd").read_bytes()))
@@ -775,6 +780,34 @@ def main() -> int:
         from build_windows_usos_reg import build as build_usos_reg
         usos_reg = build_usos_reg(root, root / "zig-out/windows-usos-reg")
         put(entries, Entry("usr/lib/usos/usos-reg.exe", stat.S_IFREG | 0o644, usos_reg.read_bytes()))
+        from build_windows_usos_res import build as build_usos_res, build_collector as build_vbe_collector, build_nt3
+        usos_res = build_usos_res(root, root / "zig-out/windows-usos-res")
+        put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
+        nt3_post = build_nt3(root)
+        put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        res9x_out = root / "zig-out/windows-usos-res/9x"
+        res9x = build_usos_res(root, res9x_out, win9x=True)
+        collector = build_vbe_collector(root, res9x_out)
+        for name, source in (("USOSRES.EXE", res9x), ("USOSVBI.EXE", collector)):
+            put(entries, Entry("usr/lib/usos/w9x-display/"+name, stat.S_IFREG | 0o644, source.read_bytes()))
+        from build_windows_usos_lan import build as build_lan, stage_driver as stage_lan_driver
+        lan_out = root / "zig-out/windows-usos-lan"
+        lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
+        for file in lan_files:
+            put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        from build_usosadd import build as build_addons_runner
+        from build_legacy_stage import build as build_addons_planner
+        addons_out = root / "zig-out/legacy-pack"
+        addons_runner = build_addons_runner(addons_out)
+        addons_planner = build_addons_planner(root, root / "zig-out/legacy-stage-linux")
+        put(entries, Entry("usr/lib/usos/addons/USOSADD.EXE", stat.S_IFREG | 0o644, addons_runner.read_bytes()))
+        put(entries, Entry("usr/lib/usos/addons/legacy-stage-plan", stat.S_IFREG | 0o755, addons_planner.read_bytes()))
+        from addons.legacy_manifest import Manifest as AddonsManifest, validate as validate_addons
+        if errors := validate_addons(AddonsManifest.load(root / "src/addons/legacy-pack.ini")):
+            raise ValueError("Invalid legacy pack: " + "; ".join(errors))
+        addon_text = (root / "src/addons/legacy-pack.ini").read_text(encoding="utf-8").replace("\r\n", "\n").replace("\n", "\r\n")
+        for addon_lang, codepage in (("PL", "cp1250"), ("EN", "cp1252")):
+            put(entries, Entry("usr/lib/usos/addons/LEGACY." + addon_lang, stat.S_IFREG | 0o644, addon_text.encode(codepage, errors="replace")))
         reader_out = root / "zig-out/windows-source-mount"
         build_source_reader(root, reader_out)
         vendor = root / "tools/vendor/imdisk/2.1.2"

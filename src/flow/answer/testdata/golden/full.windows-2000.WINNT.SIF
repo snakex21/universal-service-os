@@ -31,7 +31,14 @@ ProductID=AAAAA-BBBBB-CCCCC-DDDDD-EEEEE
 [Identification]
 JoinWorkgroup=WORKGROUP
 [Networking]
-InstallDefaultComponents=Yes
+InstallDefaultComponents=No
+[NetClients]
+MS_MSClient=USOS.MSClient
+[USOS.MSClient]
+[NetProtocols]
+MS_TCPIP=USOS.TCPIP
+[USOS.TCPIP]
+[NetServices]
 [RegionalSettings]
 LanguageGroup="2"
 SystemLocale=00000415

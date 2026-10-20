@@ -434,3 +434,44 @@ golden tests):
 Release blockers in the audit's view: G7 (for the XP package), G14 (for
 the stick payload and the XP package), G15 and G16 need a maintainer
 decision before 1.0 is published; the rest are documentation completions.
+
+## 8. Legacy compatibility pack (Windows 95/98/Me/NT 4.0), 2026-09-30
+
+Branch `feature/legacy-compat-pack`, design and full per-package table in
+[design/legacy-compat-pack.md](design/legacy-compat-pack.md) §3; the
+manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
+`license` for every package.
+
+- **In the stick payload / git:** only USOS's own files: the runner
+  `USOSADD.EXE` (GPL-3.0-or-later, built with OpenWatcom 2.0 without its C
+  library, like `USOSKEY.DRV`), the manifest, the host tools. The Microsoft
+  files below live only in a release asset.
+- **Microsoft runtimes with redistribution terms** (DirectX 8.0/9.0c, VB6
+  and VC6 runtimes, Windows Installer 2.0, MDAC 2.8 SP1, MSLU, .NET 1.1/2.0
+  with the Polish language packs and .NET 1.1 SP1; 13 packages,
+  `source=release` in the manifest): their terms allow redistribution
+  *with an application that uses them*, which a stand-alone installer pack
+  does not clearly meet. **Maintainer decision (2026-09-30): ship them**,
+  unmodified, in the separate release asset
+  `USOS-<version>-Legacy-pack-MS.zip` (embedded in the full installer,
+  downloaded by the online one; SHA-256 in `SHA256SUMS` and compiled into
+  the installer; never in git), at the maintainer's own risk, for the same
+  reason as the Windows 7/Vista update files (§5, preservation: the
+  original downloads are gone, archive copies may disappear), not covered
+  by any USOS licence, removed on request of the rights holder.
+  `third-party.json` id `microsoft-legacy-pack-redist`. For these the
+  shipped file is the permanent source, not a bridge.
+- **Additional release class, maintainer decision 2026-10-20:** IE, DCOM,
+  DUN, WMP and NT4 SP6a/SRP join that separate asset, with per-file notices
+  and hashes in the manifest. This records the maintainer's decision,
+  not a new redistribution grant. No asset was built in the integration
+  task. RDP, DSClient, other hotfixes and community repacks of Microsoft
+  files (NUSB, Movie Maker 98) remain **user-supplied only**.
+- **Third-party freeware without a licence text** (Adaptec ASPI, HP printing
+  wizard, WinMeDOS, a WMP skin, the Dell/Inside Out NT4 USB driver):
+  **user-supplied only**. WinMeDOS and MSCONFIG-on-95 are marked as bridges
+  "do zastąpienia własną implementacją".
+- **KernelEx 4.0 Final 2** (GPL-2.0): optional bundled classification under
+  the 2026-10-20 decision, currently `status=missing` because matching
+  source was not found locally. No binary is bundled until source and
+  notices are supplied (then add a `third-party.json` entry).

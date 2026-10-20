@@ -157,6 +157,9 @@
   "installer.components.no_release": "Αυτή η έκδοση του προγράμματος εγκατάστασης δεν γνωρίζει την έκδοσή της στο GitHub, οπότε δεν μπορεί να κάνει λήψη. Επιλέξτε αρχεία που ήδη έχετε ή παραλείψτε.",
   "installer.components.checking": "Έλεγχος των στοιχείων της μονάδας…",
   "installer.components.check_failed": "Δεν ήταν δυνατός ο έλεγχος των στοιχείων της μονάδας: %s",
+  "installer.components.legacy.name": "Πακέτο συμβατότητας Windows 95/98/Me/NT 4.0 (περίπου 150 MB)",
+  "installer.components.legacy.need": "Βιβλιοθήκες Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) που εγκαθιστά το πακέτο στα Windows 95, 98, Me και NT 4.0 μετά την εγκατάσταση.",
+  "installer.components.legacy.skip_note": "Χωρίς αυτό, το πακέτο εγκαθιστά μόνο ό,τι βάλετε εσείς στο DATA\\Addons. Μπορείτε να το προσθέσετε αργότερα με Ενημέρωση USOS ή Επιδιόρθωση.",
   "installer.components.winpe.name": "Βοηθητικό WinPE 10 (περίπου 440 MB)",
   "installer.components.winpe.need": "Απαιτείται για την εγκατάσταση των Windows Vista και Windows 7 σε λειτουργία UEFI.",
   "installer.components.winpe.skip_note": "Χωρίς αυτό, τα Windows Vista και Windows 7 δεν εγκαθίστανται σε λειτουργία UEFI. Μπορείτε να το προσθέσετε αργότερα με Ενημέρωση USOS ή Επισκευή.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Μετά την εγκατάσταση συνδεθείτε στον τομέα {1} ως {0} με τον κωδικό πρόσβασης του προφίλ απαντήσεων.",
   "boot.lx.logon_autologon": "Μετά την εγκατάσταση τα Windows συνδέονται αυτόματα ως {0}.",
   "boot.lx.logon_setup_asks": "Η Εγκατάσταση των Windows ζητά όνομα χρήστη και κωδικό πρόσβασης κατά την εγκατάσταση· το USOS δεν τα ορίζει.",
-  "boot.lx.logon_answer_file": "Μετά την εγκατάσταση συνδεθείτε με τον λογαριασμό από το αρχείο απαντήσεών σας {0}."
+  "boot.lx.logon_answer_file": "Μετά την εγκατάσταση συνδεθείτε με τον λογαριασμό από το αρχείο απαντήσεών σας {0}.",
+  "boot.profile.field.display_bpp": "Βάθος χρώματος",
+  "boot.profile.help.display_legacy": "Εφαρμόζεται μετά την εγκατάσταση στο πραγματικό υλικό. Η αυτόματη επιλογή βρίσκει διαθέσιμη λειτουργία έως 1920x1080 με ασφαλή υποβάθμιση. Χωρίς αλλαγή διατηρεί τις ρυθμίσεις. Αυτόματο βάθος: 32 bit όπου διατίθεται, αλλιώς 16."
 }

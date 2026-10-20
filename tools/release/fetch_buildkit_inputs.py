@@ -43,6 +43,12 @@ FIXED = [
     # OpenWatcom 2.0 for the Windows 3.x USB keyboard driver (tools/build_win3_usb_keyboard.py).
     {'id': 'openwatcom', 'file': 'ow-snapshot-2026-09-01.tar.xz', 'url': 'https://github.com/open-watcom/open-watcom-v2/releases/download/2026-09-01-Build/ow-snapshot.tar.xz',
      'sha256': 'bac354f3c75ffa49ff8d70a44e475de7e7c1823fff04b80c14787bd0792c9bdf', 'license': 'Sybase Open Watcom Public License 1.0 (build tool only; nothing linked into USOS)', 'version': '2.0 2026-09-01-Build'},
+    # innoextract for the legacy pack: WinSPatcher 98/NT (Inno Setup) contents
+    # (tools/addons/import_winspatcher.py, stage_legacy_pack.py); tool only.
+    {'id': 'innoextract', 'file': 'innoextract-1.9-windows.zip', 'url': 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip',
+     'sha256': '6989342c9b026a00a72a38f23b62a8e6a22cc5de69805cf47d68ac2fec993065', 'license': 'Zlib (build/staging tool only; nothing linked into USOS)', 'version': '1.9'},
+    {'id': 'innoextract-source', 'file': 'innoextract-1.9.tar.gz', 'url': 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9.tar.gz',
+     'sha256': '6344a69fc1ed847d4ed3e272e0da5998948c6b828cb7af39c6321aba6cf88126', 'license': 'Zlib', 'version': '1.9'},
 ]
 GO_MODULES = ['golang.org/x/sys@v0.47.0']
 # Fetched into the repository itself (git-ignored), not into CACHE. GitHub

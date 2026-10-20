@@ -1,0 +1,181 @@
+USOS 3.1.2-usos9 patch 10/10 (2026-10-15): NVMe runtime re-arm after an OS stopped the controller
+
+Windows 98 SE on the ASRock X470 boots from an NVMe disk (CSMWrap SeaBIOS
+INT 13h, then the USOS 9x miniport usosnvme.mpd). For the APM power-off
+98's VMM returns to real mode and WIN.COM re-executes itself from disk
+("WIN.COM /z"), which then calls INT 15h 5300h..5307h. usosnvme.mpd
+rebuilt the admin queue in its own memory at start (CC.EN = 0, new
+AQA/ASQ/ACQ) and on the exit to real mode flushes, sets CC.SHN and
+disables the controller. SeaBIOS's queues no longer exist, every INT 13h
+read timed out (5 s each), the exec failed and 98 stopped at "It's now
+safe to turn off your computer" without calling APM.
+
+Own code from the NVMe 1.4 base specification (3.1 controller registers,
+7.6.1 controller initialisation, 5.3/5.4 create I/O CQ/SQ, 6.15 FUA):
+- hw/nvme.c nvme_runtime_rearm(), before every INT 13h read/write:
+  * BAR 0 read from PCI config space (the OS may have moved it; a 64-bit
+    BAR above 4 GiB is refused);
+  * controller enabled, ready, no shutdown requested or reported, no fatal
+    status, ASQ/ACQ = our POST pages: used as it is (the normal case,
+    costs one config read and a few register reads);
+  * enabled and ready with another admin queue: a live OS driver owns it;
+    refused at once (ringing our doorbells would make the controller fetch
+    stale OS queue slots; before, the call timed out after 5 s);
+  * otherwise (disabled, not ready, CC.SHN set, SHST reported, fatal):
+    memory decoding + bus mastering on, CC = 0, wait RDY = 0, admin and I/O
+    queue memory allocated at POST (ZoneHigh) cleared, head/tail/phase
+    reset, doorbell pointers recomputed, AQA/ASQ/ACQ written, CC.EN, wait
+    RDY = 1, CREATE I/O CQ 1 and SQ 1 on the same pages. No allocation at
+    runtime. Logged as "USOS NVME" (dprintf level 1, csmwrap.ini serial).
+- After a re-arm every write carries FUA, so a sector written after the OS
+  handed the disk back is on the medium before an APM power-off (SeaBIOS
+  never sends FLUSH; the OS driver flushed and shut down before the exit).
+- struct nvme_ctrl keeps the PCI BDF (struct pci_device is POST-only
+  temporary memory) and the re-arm flag.
+
+diff -ruN a/seabios/src/hw/nvme-int.h b/seabios/src/hw/nvme-int.h
+--- a/seabios/src/hw/nvme-int.h
++++ b/seabios/src/hw/nvme-int.h
+@@ -104,6 +104,11 @@
+ 
+     struct nvme_sq io_sq;
+     struct nvme_cq io_cq;
++
++    /* USOS: kept for the runtime re-arm (struct pci_device is POST-only). */
++    u16 bdf;
++    /* USOS: set after a runtime re-arm; writes then use FUA. */
++    u8 rearmed;
+ };
+ 
+ struct nvme_namespace {
+diff -ruN a/seabios/src/hw/nvme.c b/seabios/src/hw/nvme.c
+--- a/seabios/src/hw/nvme.c
++++ b/seabios/src/hw/nvme.c
+@@ -465,6 +465,8 @@
+     io_read->dword[10] = (u32)lba;
+     io_read->dword[11] = (u32)(lba >> 32);
+     io_read->dword[12] = (1U << 31 /* limited retry */) | (count - 1);
++    if (write && ns->ctrl->rearmed)
++        io_read->dword[12] |= 1U << 30; /* FUA: an OS handed us the disk */
+ 
+     nvme_commit_sqe(&ns->ctrl->io_sq);
+ 
+@@ -766,6 +768,7 @@
+ 
+     ctrl->reg = reg;
+     ctrl->pci = pci;
++    ctrl->bdf = pci->bdf;
+ 
+     if (nvme_controller_enable(ctrl)) {
+         goto err_free_ctrl;
+@@ -798,10 +801,110 @@
+     }
+ }
+ 
++/* USOS: runtime re-arm. An OS driver that exits to real mode may leave the
++   controller shut down (CC.SHN) or disabled - the Windows 9x miniport
++   usosnvme.mpd does that when Windows 98 returns to WIN.COM for its APM
++   power-off, after it rebuilt the admin queue in its own memory at start.
++   Then every INT 13h read timed out. Before each transfer: a controller
++   that is enabled, ready, not shutting down and runs OUR admin queue is
++   used as it is; one that is enabled with another admin queue belongs to a
++   live OS driver and is refused (ringing our doorbells there would make it
++   fetch stale OS queue slots); a stopped one is reset and gets our admin
++   queue and I/O queue pair 1 back in the pages allocated at POST. */
++static void
++nvme_rearm_queue(struct nvme_ctrl *ctrl, struct nvme_queue *q, u16 q_idx,
++                 void *entries, u32 entry_size)
++{
++    q->dbl = (u32 *)((char *)ctrl->reg + 0x1000 + q_idx * ctrl->doorbell_stride);
++    memset(entries, 0, entry_size * (q->mask + 1));
++}
++
++/* I/O CQ 1 / SQ 1 again, same pages and length as at POST (both queues of
++   the pair have the same length, nvme_io_queue_length). */
++static int
++nvme_rearm_create_io(struct nvme_ctrl *ctrl, u8 opc, void *entries, u32 dw11)
++{
++    struct nvme_sqe *cmd = nvme_get_next_sqe(&ctrl->admin_sq, opc, NULL,
++                                             entries, NULL);
++    if (!cmd)
++        return -1;
++    cmd->dword[10] = (ctrl->io_cq.common.mask << 16) | 1;
++    cmd->dword[11] = dw11;
++    nvme_commit_sqe(&ctrl->admin_sq);
++    struct nvme_cqe cqe = nvme_wait(&ctrl->admin_sq);
++    return nvme_is_cqe_success(&cqe) ? 0 : -1;
++}
++
++static int
++nvme_runtime_rearm(struct nvme_ctrl *ctrl)
++{
++    u32 bar = pci_config_readl(ctrl->bdf, PCI_BASE_ADDRESS_0);
++    if ((bar & 6) == 4 && pci_config_readl(ctrl->bdf, PCI_BASE_ADDRESS_1))
++        return -1;                           /* moved above 4 GiB */
++    bar &= ~0xFU;
++    if (bar && bar != (u32)ctrl->reg)
++        ctrl->reg = (void *)bar;             /* the OS moved BAR 0 */
++    struct nvme_reg volatile *reg = ctrl->reg;
++    u32 cc = reg->cc, csts = reg->csts;
++
++    if ((cc & (NVME_CC_EN | NVME_CC_SHN_MASK)) == NVME_CC_EN
++        && (csts & (NVME_CSTS_RDY | NVME_CSTS_FATAL | NVME_CSTS_SHST_MASK))
++           == NVME_CSTS_RDY) {
++        if ((u32)reg->asq == (u32)ctrl->admin_sq.sqe && !(reg->asq >> 32)
++            && (u32)reg->acq == (u32)ctrl->admin_cq.cqe && !(reg->acq >> 32))
++            return 0;
++        dprintf(1, "USOS NVME: controller runs other queues, not touched\n");
++        return -1;
++    }
++    dprintf(1, "USOS NVME: re-arm (cc %08x csts %08x)\n", cc, csts);
++
++    u16 cmd = pci_config_readw(ctrl->bdf, PCI_COMMAND);
++    pci_config_writew(ctrl->bdf, PCI_COMMAND,
++                      cmd | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER);
++    reg->cc = 0;
++    if (nvme_wait_csts_rdy(ctrl, 0))
++        return -1;
++
++    ctrl->doorbell_stride = 4U << ((reg->cap >> 32) & 0xF);
++    nvme_rearm_queue(ctrl, &ctrl->admin_sq.common, 0, ctrl->admin_sq.sqe,
++                     sizeof(struct nvme_sqe));
++    nvme_rearm_queue(ctrl, &ctrl->admin_cq.common, 1, ctrl->admin_cq.cqe,
++                     sizeof(struct nvme_cqe));
++    nvme_rearm_queue(ctrl, &ctrl->io_sq.common, 2, ctrl->io_sq.sqe,
++                     sizeof(struct nvme_sqe));
++    nvme_rearm_queue(ctrl, &ctrl->io_cq.common, 3, ctrl->io_cq.cqe,
++                     sizeof(struct nvme_cqe));
++    ctrl->admin_sq.head = ctrl->admin_sq.tail = 0;
++    ctrl->io_sq.head = ctrl->io_sq.tail = 0;
++    ctrl->admin_cq.head = ctrl->io_cq.head = 0;
++    ctrl->admin_cq.phase = ctrl->io_cq.phase = 1;
++
++    reg->aqa = ctrl->admin_cq.common.mask << 16 | ctrl->admin_sq.common.mask;
++    reg->asq = (u32)ctrl->admin_sq.sqe;
++    reg->acq = (u32)ctrl->admin_cq.cqe;
++    reg->cc = NVME_CC_EN | (NVME_CQE_SIZE_LOG << 20)
++        | (NVME_SQE_SIZE_LOG << 16);
++    if (nvme_wait_csts_rdy(ctrl, 1))
++        return -1;
++
++    if (nvme_rearm_create_io(ctrl, NVME_SQE_OPC_ADMIN_CREATE_IO_CQ,
++                             ctrl->io_cq.cqe, 1)
++        || nvme_rearm_create_io(ctrl, NVME_SQE_OPC_ADMIN_CREATE_IO_SQ,
++                                ctrl->io_sq.sqe, (1 << 16) | 1)) {
++        dprintf(1, "USOS NVME: re-arm failed\n");
++        return -1;
++    }
++    ctrl->rearmed = 1;
++    dprintf(1, "USOS NVME: re-armed\n");
++    return 0;
++}
++
+ static int
+ nvme_cmd_readwrite(struct nvme_namespace *ns, struct disk_op_s *op, int write)
+ {
+     int i;
++    if (nvme_runtime_rearm(ns->ctrl))
++        return DISK_RET_EBADTRACK;
+     for (i = 0; i < op->count;) {
+         u16 blocks_remaining = op->count - i;
+         char *op_buf = op->buf_fl + i * ns->block_size;

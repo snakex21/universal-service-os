@@ -26,6 +26,7 @@ if "%WORK%"=="" set "WORK=%TEMP%\usosvbe-nt3-build"
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" || exit /b 2
 xcopy /e /i /q "%HERE%src\mini" "%WORK%\mini" >nul || exit /b 3
+copy /y "%REPO%\tools\display_modes.h" "%WORK%\mini\display_modes.h" >nul || exit /b 3
 set "SUBSYSTEM_VERSION=4.00"
 set "C_DEFINES=-DUSOSVBE_NT3"
 cmd /c "call "%WDKROOT%\bin\setenv.bat" %WDKROOT% fre x86 WXP no_oacr && set "BUILD_ALT_DIR=fre" && cd /d "%WORK%\mini" && build -cZ"

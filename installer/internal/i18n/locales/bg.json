@@ -157,6 +157,9 @@
   "installer.components.no_release": "Тази компилация на инсталатора не знае изданието си в GitHub и не може да изтегля. Изберете файлове, които вече имате, или пропуснете.",
   "installer.components.checking": "Проверка кои компоненти има устройството…",
   "installer.components.check_failed": "Компонентите на устройството не можаха да бъдат проверени: %s",
+  "installer.components.legacy.name": "Пакет за съвместимост с Windows 95/98/Me/NT 4.0 (около 150 MB)",
+  "installer.components.legacy.need": "Библиотеки на Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), които пакетът инсталира в Windows 95, 98, Me и NT 4.0 след инсталацията.",
+  "installer.components.legacy.skip_note": "Без него пакетът инсталира само това, което сами поставите в DATA\\Addons. Можете да го добавите по-късно чрез Актуализиране на USOS или Поправка.",
   "installer.components.winpe.name": "Помощен образ WinPE 10 (около 440 MB)",
   "installer.components.winpe.need": "Нужен за инсталиране на Windows Vista и Windows 7 в режим UEFI.",
   "installer.components.winpe.skip_note": "Без него Windows Vista и Windows 7 не могат да се инсталират в режим UEFI. Можете да го добавите по-късно с „Обнови USOS“ или „Поправи“.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "След инсталирането влезте в домейна {1} като {0} с паролата от профила с отговори.",
   "boot.lx.logon_autologon": "След инсталирането Windows влиза автоматично като {0}.",
   "boot.lx.logon_setup_asks": "Инсталацията на Windows пита за потребителско име и парола по време на инсталирането; USOS не ги задава.",
-  "boot.lx.logon_answer_file": "След инсталирането влезте с акаунта от вашия файл с отговори {0}."
+  "boot.lx.logon_answer_file": "След инсталирането влезте с акаунта от вашия файл с отговори {0}.",
+  "boot.profile.field.display_bpp": "Дълбочина на цвета",
+  "boot.profile.help.display_legacy": "Прилага се след инсталацията на реалния хардуер. Автоматично: наличен режим до 1920x1080 с безопасно понижаване. Без промяна запазва настройките. Автоматичен цвят: 32 бита, ако са налични, иначе 16."
 }

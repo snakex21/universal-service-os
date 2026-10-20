@@ -157,6 +157,9 @@
   "installer.components.no_release": "Denne udgave af installationsprogrammet kender ikke sin GitHub-udgivelse og kan derfor ikke hente. Vælg filer, du allerede har, eller spring over.",
   "installer.components.checking": "Kontrollerer, hvilke komponenter drevet har…",
   "installer.components.check_failed": "Drevets komponenter kunne ikke kontrolleres: %s",
+  "installer.components.legacy.name": "Kompatibilitetspakke til Windows 95/98/Me/NT 4.0 (ca. 150 MB)",
+  "installer.components.legacy.need": "Microsoft-biblioteker (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), som pakken installerer i Windows 95, 98, Me og NT 4.0 efter installationen.",
+  "installer.components.legacy.skip_note": "Uden den installerer pakken kun det, du selv lægger i DATA\\Addons. Du kan tilføje den senere med Opdater USOS eller Reparer.",
   "installer.components.winpe.name": "WinPE 10-hjælper (ca. 440 MB)",
   "installer.components.winpe.need": "Nødvendig for at installere Windows Vista og Windows 7 i UEFI-tilstand.",
   "installer.components.winpe.skip_note": "Uden den kan Windows Vista og Windows 7 ikke installeres i UEFI-tilstand. Du kan tilføje den senere med Opdater USOS eller Reparer.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Log på domænet {1} som {0} efter installationen med adgangskoden fra svarprofilen.",
   "boot.lx.logon_autologon": "Efter installationen logger Windows automatisk på som {0}.",
   "boot.lx.logon_setup_asks": "Windows Installation spørger om brugernavn og adgangskode under installationen; USOS angiver dem ikke.",
-  "boot.lx.logon_answer_file": "Log på efter installationen med kontoen fra din svarfil {0}."
+  "boot.lx.logon_answer_file": "Log på efter installationen med kontoen fra din svarfil {0}.",
+  "boot.profile.field.display_bpp": "Farvedybde",
+  "boot.profile.help.display_legacy": "Anvendes efter installation på den rigtige hardware. Automatisk vælger en tilgængelig tilstand op til 1920x1080 med sikkert tilbagefald. Uændret bevarer indstillingerne. Automatisk farvedybde foretrækker 32 bit, ellers 16."
 }

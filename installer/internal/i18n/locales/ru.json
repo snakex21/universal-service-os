@@ -160,6 +160,9 @@
   "installer.components.no_release": "Эта сборка установщика не знает своего выпуска на GitHub и не может скачивать. Выберите уже имеющиеся файлы или пропустите.",
   "installer.components.checking": "Проверка компонентов на накопителе…",
   "installer.components.check_failed": "Не удалось проверить компоненты накопителя: %s",
+  "installer.components.legacy.name": "Пакет совместимости для Windows 95/98/Me/NT 4.0 (около 150 МБ)",
+  "installer.components.legacy.need": "Библиотеки Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), которые пакет устанавливает в Windows 95, 98, Me и NT 4.0 после установки системы.",
+  "installer.components.legacy.skip_note": "Без него пакет установит только то, что вы сами положите в DATA\\Addons. Его можно добавить позже через обновление USOS или восстановление.",
   "installer.components.winpe.name": "Вспомогательный образ WinPE 10 (около 440 МБ)",
   "installer.components.winpe.need": "Нужен для установки Windows Vista и Windows 7 в режиме UEFI.",
   "installer.components.winpe.skip_note": "Без него Windows Vista и Windows 7 нельзя установить в режиме UEFI. Его можно добавить позже через «Обновить USOS» или «Восстановить».",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "После установки войдите в домен {1} как {0} с паролем, заданным в профиле ответов.",
   "boot.lx.logon_autologon": "После установки Windows автоматически входит как {0}.",
   "boot.lx.logon_setup_asks": "Программа установки Windows запросит имя пользователя и пароль во время установки; USOS их не задаёт.",
-  "boot.lx.logon_answer_file": "После установки войдите с учётной записью из вашего файла ответов {0}."
+  "boot.lx.logon_answer_file": "После установки войдите с учётной записью из вашего файла ответов {0}.",
+  "boot.profile.field.display_bpp": "Глубина цвета",
+  "boot.profile.help.display_legacy": "Применяется после установки на реальном оборудовании. Автоматически выбирается доступный режим до 1920x1080 с безопасным переходом на меньший. Без изменений сохраняет настройки. Автоматическая глубина: 32 бита, если доступны, иначе 16."
 }

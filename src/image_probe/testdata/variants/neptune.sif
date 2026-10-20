@@ -1,6 +1,4 @@
 ; Synthetic source metadata, values verified in the supplied media
-[Version]
-DriverVer=12/10/1999,5.50.5111.1
 [SetupData]
 MajorVersion=5
 MinorVersion=0

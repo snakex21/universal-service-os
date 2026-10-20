@@ -157,6 +157,9 @@
   "installer.components.no_release": "This installer build does not know its GitHub release, so it cannot download. Choose files you already have, or skip.",
   "installer.components.checking": "Checking which components the drive has…",
   "installer.components.check_failed": "Could not check the drive's components: %s",
+  "installer.components.legacy.name": "Windows 95/98/Me/NT 4.0 compatibility pack (about 150 MB)",
+  "installer.components.legacy.need": "Microsoft runtimes (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) that the legacy pack installs into Windows 95, 98, Me and NT 4.0 after Setup.",
+  "installer.components.legacy.skip_note": "Without it, the legacy pack installs only what you put into DATA\\Addons yourself. You can add it later with Update USOS or Repair.",
   "installer.components.winpe.name": "WinPE 10 helper (about 440 MB)",
   "installer.components.winpe.need": "Needed to install Windows Vista and Windows 7 in UEFI mode.",
   "installer.components.winpe.skip_note": "Without it, Windows Vista and Windows 7 cannot be installed in UEFI mode. You can add it later with Update USOS or Repair.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "After the installation log on to the domain {1} as {0} with the password set in the answer profile.",
   "boot.lx.logon_autologon": "After the installation Windows logs on automatically as {0}.",
   "boot.lx.logon_setup_asks": "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
-  "boot.lx.logon_answer_file": "After the installation log on with the account from your answer file {0}."
+  "boot.lx.logon_answer_file": "After the installation log on with the account from your answer file {0}.",
+  "boot.profile.field.display_bpp": "Color depth",
+  "boot.profile.help.display_legacy": "Applied after installation on the real hardware. Automatic chooses up to 1920x1080; unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit."
 }

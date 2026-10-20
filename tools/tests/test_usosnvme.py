@@ -6,6 +6,8 @@ from pathlib import Path
 import json, sys, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+import sys
+sys.path.insert(0, str(ROOT/"tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_nt52_driver_imports import pe  # noqa: E402
 from check_nt4_driver_imports import parse  # noqa: E402
@@ -152,7 +154,8 @@ class Nt3Flow(unittest.TestCase):
         src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
         self.assertIn('DIR "USOSNVME.SYS"', src)
         self.assertIn('set_dword("usosnvme", NULL, "Start", 0);', src)
-        self.assertIn(b'USOSNVME.SYS', (ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe').read_bytes())
+        from build_windows_usos_res import build_nt3
+        self.assertIn(b'USOSNVME.SYS', build_nt3(ROOT).read_bytes())
 
 
 class Nt6Flow(unittest.TestCase):

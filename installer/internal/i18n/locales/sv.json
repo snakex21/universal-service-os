@@ -157,6 +157,9 @@
   "installer.components.no_release": "Den här versionen av installationsprogrammet känner inte till sin GitHub-version och kan därför inte ladda ned. Välj filer du redan har, eller hoppa över.",
   "installer.components.checking": "Kontrollerar vilka komponenter enheten har…",
   "installer.components.check_failed": "Det gick inte att kontrollera enhetens komponenter: %s",
+  "installer.components.legacy.name": "Kompatibilitetspaket för Windows 95/98/Me/NT 4.0 (cirka 150 MB)",
+  "installer.components.legacy.need": "Microsoft-bibliotek (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) som paketet installerar i Windows 95, 98, Me och NT 4.0 efter installationen.",
+  "installer.components.legacy.skip_note": "Utan det installerar paketet bara det du själv lägger i DATA\\Addons. Du kan lägga till det senare med Uppdatera USOS eller Reparera.",
   "installer.components.winpe.name": "WinPE 10-hjälpare (cirka 440 MB)",
   "installer.components.winpe.need": "Behövs för att installera Windows Vista och Windows 7 i UEFI-läge.",
   "installer.components.winpe.skip_note": "Utan den kan Windows Vista och Windows 7 inte installeras i UEFI-läge. Du kan lägga till den senare med Uppdatera USOS eller Reparera.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Logga in på domänen {1} som {0} efter installationen med lösenordet från svarsprofilen.",
   "boot.lx.logon_autologon": "Efter installationen loggar Windows in automatiskt som {0}.",
   "boot.lx.logon_setup_asks": "Windows installationsprogram frågar efter användarnamn och lösenord under installationen; USOS anger dem inte.",
-  "boot.lx.logon_answer_file": "Logga in efter installationen med kontot från din svarsfil {0}."
+  "boot.lx.logon_answer_file": "Logga in efter installationen med kontot från din svarsfil {0}.",
+  "boot.profile.field.display_bpp": "Färgdjup",
+  "boot.profile.help.display_legacy": "Används efter installation på den riktiga maskinvaran. Automatiskt väljer ett tillgängligt läge upp till 1920x1080 med säker återgång. Oförändrat behåller inställningarna. Automatiskt färgdjup föredrar 32 bitar, annars 16."
 }

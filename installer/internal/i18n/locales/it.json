@@ -157,6 +157,9 @@
   "installer.components.no_release": "Questa build del programma di installazione non conosce la sua release GitHub, quindi non può scaricare. Scegli file che hai già oppure salta.",
   "installer.components.checking": "Verifica dei componenti presenti sull'unità…",
   "installer.components.check_failed": "Impossibile verificare i componenti dell'unità: %s",
+  "installer.components.legacy.name": "Pacchetto di compatibilità Windows 95/98/Me/NT 4.0 (circa 150 MB)",
+  "installer.components.legacy.need": "Librerie Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) che il pacchetto installa in Windows 95, 98, Me e NT 4.0 dopo l'installazione.",
+  "installer.components.legacy.skip_note": "Senza di esso il pacchetto installa solo ciò che metti tu in DATA\\Addons. Puoi aggiungerlo in seguito con Aggiorna USOS o Ripara.",
   "installer.components.winpe.name": "Assistente WinPE 10 (circa 440 MB)",
   "installer.components.winpe.need": "Necessario per installare Windows Vista e Windows 7 in modalità UEFI.",
   "installer.components.winpe.skip_note": "Senza di esso Windows Vista e Windows 7 non possono essere installati in modalità UEFI. Puoi aggiungerlo più tardi con Aggiorna USOS o Ripara.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Dopo l'installazione accedi al dominio {1} come {0} con la password impostata nel profilo di risposte.",
   "boot.lx.logon_autologon": "Dopo l'installazione Windows accede automaticamente come {0}.",
   "boot.lx.logon_setup_asks": "Il programma di installazione di Windows chiede nome utente e password durante l'installazione; USOS non li imposta.",
-  "boot.lx.logon_answer_file": "Dopo l'installazione accedi con l'account del tuo file di risposte {0}."
+  "boot.lx.logon_answer_file": "Dopo l'installazione accedi con l'account del tuo file di risposte {0}.",
+  "boot.profile.field.display_bpp": "Profondità colore",
+  "boot.profile.help.display_legacy": "Applicata dopo l’installazione sull’hardware reale. Automatico sceglie una modalità disponibile fino a 1920x1080 con ripiego sicuro. Invariato conserva le impostazioni. Profondità automatica: 32 bit se disponibili, altrimenti 16."
 }

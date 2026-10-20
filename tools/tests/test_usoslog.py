@@ -79,7 +79,8 @@ class Layout(unittest.TestCase):
 class Sources(unittest.TestCase):
     def test_usosdbg_log_mode(self):
         dbg = (SRC / 'usosdbg.c').read_text(encoding='utf-8')
-        self.assertIn('USOSDBG 1.6', dbg)
+        self.assertIn('USOSDBG 1.8', dbg)
+        self.assertIn("else if (c == 'D') disk_only = 1;", dbg)   # USOSLOG's disk snapshots
         self.assertIn('USOSDBG END', dbg)
         self.assertIn('if (!log_mode || log_pci) show_pci();', dbg)
         # the knock (C202h rate commands) only from the W key, never in log mode
@@ -173,7 +174,7 @@ def c2_record(entries, count=None, head=None, magic=0x47523243):
 
 
 class Usosdbg(unittest.TestCase):
-    """USOSDBG 1.6: the C2 ring (CSMWrap patch 0020) and the NIC / IRQ /
+    """USOSDBG 1.6 / 1.7: the C2 ring (CSMWrap patch 0020) and the NIC / IRQ /
     $PIR section; the decoders run on the host with crafted memory."""
 
     @classmethod
@@ -359,6 +360,55 @@ class Watcher(unittest.TestCase):
         self.assertIn('wait_s(opt_every);', work)
         self.assertNotIn('Sleep(opt_', work)
 
+    def test_disk_contract(self):
+        '''DISK (docs/usb9x-hotswap-design-2026-10-19.md section 4): the drive
+        APIs at run time (the static list stays the Windows 95 one), the start
+        record parts, the watcher thread and the USOSDBG /D rate limit.'''
+        log = (SRC / 'usoslog.c').read_text(encoding='utf-8').replace('\r\n', '\n')
+        for api in ('GetLogicalDrives', 'GetDriveTypeA', 'GetVolumeInformationA', 'GetDiskFreeSpaceA', 'SetErrorMode'):
+            self.assertIn(f'GetProcAddress(k32, "{api}")', log)
+        self.assertNotIn('GetDiskFreeSpaceEx', log)
+        self.assertIn('p_errmode(0x0001 /* SEM_FAILCRITICALERRORS */)', log)
+        self.assertIn('return !(t == 4 || t == 1 || (t == 2 && i < 2));', log)    # no floppy seek, no network wait
+        start = grab(log, r'^static void start_record\(void\)\n\{.*?\n\}\n')
+        self.assertIn('sec_disk();\n    flush_out();', start)
+        disk = grab(log, r'^static void sec_disk\(void\)\n\{.*?\n\}\n')
+        for part in ('sec_drives();', 'sec_ios();', 'sec_scsi_registry();', 'run_usosdbg_disk("start");'):
+            self.assertIn(part, disk)
+        ios = grab(log, r'^static void sec_ios\(void\)\n\{.*?\n\}\n')
+        self.assertIn('copy_file(LOGDIR "\\\\IOS.LOG", disk_fb, n);', ios)
+        self.assertIn('"real mode", "real-mode", "compatibility"', ios)
+        self.assertIn('"[IOS]", "KRNL386"', ios)
+        reg = grab(log, r'^static void sec_scsi_registry\(void\)\n\{.*?\n\}\n')
+        for key in ('"Enum\\\\Root\\\\SCSIAdapter"', '"Enum\\\\SCSI"', '"CurrentDriveLetterAssignment"', '"Removable"',
+                    '"HardwareID"', '"System\\\\CurrentControlSet\\\\Services\\\\Class\\\\SCSIAdapter"', '"PortDriver"'):
+            self.assertIn(key, reg)
+        self.assertNotIn('RegSetValue', log)
+        self.assertNotIn('RegCreateKey', log)
+        dbg = grab(log, r'^static void run_usosdbg_disk\(const char \*why\)\n\{.*?\n\}\n')
+        self.assertIn('wsprintfA(cmd, "%s /L %s /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);', dbg)
+        self.assertIn('EnterCriticalSection(&dbg_cs);', dbg)
+        self.assertIn('si.wShowWindow = SW_HIDE;', dbg)
+        snap = grab(log, r'^static void snapshot\(void\)\n\{.*?\n\}\n')
+        self.assertIn('EnterCriticalSection(&dbg_cs);\n    run_usosdbg(stats_pa);\n    LeaveCriticalSection(&dbg_cs);', snap)
+        self.assertIn('#define DISK_SNAP_MS 2000', log)
+        watch = grab(log, r'^DWORD WINAPI disk_watch\(LPVOID arg\)\n\{.*?\n\}\n')
+        self.assertIn('disk_tid = GetCurrentThreadId();', watch)
+        self.assertIn('Sleep(WATCH_MS);', watch)
+        self.assertIn('if (pending && (!have_snap || now - last_snap >= DISK_SNAP_MS)) {', watch)
+        for line in ('o("[DISK] +drive %c: %s"', 'o("[DISK] -drive %c:"', 'o("[DISK] media %c: changed: %s (was %s)"',
+                     'ev("+drive %c: %s"', 'ev("-drive %c:"'):
+            self.assertIn(line, watch)
+        self.assertIn('ticks % DISK_VOL_EVERY == 0 && cur[i].type == 2 && i >= 2', watch)
+        main = grab(log, r'^void __cdecl usos_entry\(void\)\n\{.*?\n\}\n')
+        self.assertIn('if (!opt_once && !opt_nodisk && p_drives) {', main)
+        self.assertLess(main.index('InitializeCriticalSection(&dbg_cs);'), main.index('CreateThread(0, 0, worker'))
+        # its own output buffer, one writer of the file at a time
+        self.assertIn('if (on_disk_thread()) {', log)
+        flush = grab(log, r'^static void flush_out\(void\)\n\{.*?\n\}\n')
+        self.assertIn('EnterCriticalSection(&file_cs);', flush)
+        self.assertIn('LeaveCriticalSection(&file_cs);', flush)
+
 
 def build(tmp: Path) -> Path:
     import build_win9x_support as b
@@ -403,7 +453,7 @@ class Binary(unittest.TestCase):
     @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
     def test_host_run_decodes_usosdbg_dump(self):
         page = usns_bytes()
-        lines = ['USOSDBG 1.6 log mode  tick:1  pci:no (first run only)',
+        lines = ['USOSDBG 1.8 log mode  tick:1  pci:no (first run only)',
                  'WHEEL USOSMOUS: wanted:yes  knock answered ID:03  wheel:ON',
                  'USNS 1A2B3000: version 1 size 1400']
         lines += ['USNS+%03X:%s' % (r, page[r:r + 64].hex().upper()) for r in range(0, len(page), 64)]
@@ -427,6 +477,8 @@ class Binary(unittest.TestCase):
         self.assertIn('last DNS frame received: 90 bytes', text)
         self.assertIn('[PROC] processes', text)
         self.assertIn('[NET] active tests skipped (/nonet)', text)
+        self.assertIn('[DISK] drive letters (GetLogicalDrives ', text)
+        self.assertRegex(text, r'\[DISK\] C: fixed \S+ serial [0-9A-F]{4}-[0-9A-F]{4} label "[^"]*"  free \d+/\d+ MiB')
 
     @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
     def test_host_watcher_sees_short_console_process(self):
@@ -467,6 +519,53 @@ class Binary(unittest.TestCase):
                                r'\S+  <- console / DOS box')
         self.assertRegex(text, ts + r'-window [0-9A-F]{8} class "ConsoleWindowClass" pid [0-9A-F]{8} \S+  shown \d+ ms'
                                r'  <- console / DOS box')
+
+
+    @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
+    def test_host_disk_watcher_sees_subst_letter(self):
+        '''The disk watcher: a SUBST letter added and removed while it runs
+        gives one "disk change" record each (+drive / -drive), written at
+        once, with the USOSDBG DISK snapshot line (skipped here: /nodbg).'''
+        import string
+        import time
+        used = {c for c in string.ascii_uppercase if os.path.exists(c + ':\\')}
+        free = [c for c in 'RSTUVWXY' if c not in used]
+        if not free:
+            self.skipTest('no free drive letter for SUBST')
+        letter = free[-1]
+        target = self.tmp / 'substdir'
+        target.mkdir(exist_ok=True)
+        out = self.tmp / 'disk.txt'
+        log = subprocess.Popen([str(self.exe), '/first', '600', '/every', '600', '/nonet', '/nohook', '/nodbg',
+                                '/out', str(out)])
+        added = False
+        text = ''
+        try:
+            time.sleep(2)
+            r = subprocess.run(['subst', f'{letter}:', str(target)], capture_output=True, text=True)
+            if r.returncode:
+                self.skipTest('subst failed: ' + r.stdout + r.stderr)
+            added = True
+            time.sleep(2)
+            subprocess.run(['subst', f'{letter}:', '/d'], check=True, capture_output=True)
+            added = False
+            t0 = time.time()
+            while time.time() - t0 < 20:
+                text = out.read_text(encoding='latin-1') if out.exists() else ''
+                if f'[DISK] -drive {letter}:' in text:
+                    break
+                time.sleep(0.5)
+        finally:
+            if added:
+                subprocess.run(['subst', f'{letter}:', '/d'], capture_output=True)
+            log.kill()
+            log.wait()
+        self.assertIn('=== USOSLOG 1.0 start', text)
+        self.assertIn('[DISK] drive letters (GetLogicalDrives', text)
+        self.assertEqual(text.count('=== USOSLOG 1.0 disk change'), 2, text[-3000:])
+        self.assertRegex(text, r'\[DISK\] \+drive %s: fixed \S+ serial [0-9A-F]{4}-[0-9A-F]{4} label' % letter)
+        self.assertIn(f'[DISK] -drive {letter}:', text)
+        self.assertEqual(text.count('[DISK] USOSDBG DISK snapshot skipped (/nodbg)'), 3)   # start + 2 changes
 
 
 if __name__ == '__main__':

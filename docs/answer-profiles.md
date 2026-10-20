@@ -165,6 +165,12 @@ rendered for the Server releases of the same schema level.
   driver offers that mode. Without a display driver (the VGA driver, e.g.
   XP through CSMWrap without a GOP-capable driver) Windows keeps its basic
   mode; "Automatic" writes nothing.
+  This describes XP/2003. For Windows 2000, NT 3.5/3.51, NT 4 and 95/98/Me,
+  an explicit `display=auto` or one of the existing sizes requests a mode
+  at the first hardware boot/logon; `display_bpp=auto|32|16` chooses depth.
+  An omitted display request keeps the previous defaults. See
+  [display-from-profile-2026-10-20.md](display-from-profile-2026-10-20.md)
+  for validation, fallback and the NT 3.5 miniport rebuild requirement.
 
 ### Options (typed, stage 1, 2026-10-12)
 

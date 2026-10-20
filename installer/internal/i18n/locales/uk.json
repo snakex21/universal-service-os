@@ -160,6 +160,9 @@
   "installer.components.no_release": "Ця збірка інсталятора не знає свого випуску на GitHub, тому не може завантажувати. Виберіть файли, які вже маєте, або пропустіть.",
   "installer.components.checking": "Перевірка компонентів на носії…",
   "installer.components.check_failed": "Не вдалося перевірити компоненти носія: %s",
+  "installer.components.legacy.name": "Пакет сумісності для Windows 95/98/Me/NT 4.0 (близько 150 МБ)",
+  "installer.components.legacy.need": "Бібліотеки Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), які пакет встановлює у Windows 95, 98, Me та NT 4.0 після встановлення системи.",
+  "installer.components.legacy.skip_note": "Без нього пакет встановить лише те, що ви самі покладете в DATA\\Addons. Його можна додати пізніше через оновлення USOS або відновлення.",
   "installer.components.winpe.name": "Допоміжний образ WinPE 10 (близько 440 МБ)",
   "installer.components.winpe.need": "Потрібен для встановлення Windows Vista і Windows 7 у режимі UEFI.",
   "installer.components.winpe.skip_note": "Без нього Windows Vista і Windows 7 не можна встановити в режимі UEFI. Його можна додати пізніше через «Оновити USOS» або «Відновити».",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "Після встановлення увійдіть у домен {1} як {0} з паролем, заданим у профілі відповідей.",
   "boot.lx.logon_autologon": "Після встановлення Windows автоматично входить як {0}.",
   "boot.lx.logon_setup_asks": "Програма встановлення Windows запитає ім'я користувача та пароль під час встановлення; USOS їх не задає.",
-  "boot.lx.logon_answer_file": "Після встановлення увійдіть з обліковим записом із вашого файлу відповідей {0}."
+  "boot.lx.logon_answer_file": "Після встановлення увійдіть з обліковим записом із вашого файлу відповідей {0}.",
+  "boot.profile.field.display_bpp": "Глибина кольору",
+  "boot.profile.help.display_legacy": "Застосовується після встановлення на справжньому обладнанні. Автоматично вибирається доступний режим до 1920x1080 з безпечним переходом на менший. Без змін зберігає налаштування. Автоматична глибина: 32 біти, якщо доступні, інакше 16."
 }

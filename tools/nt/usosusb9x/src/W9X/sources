@@ -1,0 +1,21 @@
+# usosusb for Windows 95 OSR2 / 98 / 98 SE / Me: usosusb.mpd, a SCSI miniport
+# loaded by SCSIPORT.PDR (docs/usb9x-hotswap-design-2026-10-19.md, stage 1).
+# Built like usosnvme's W9X variant: SCSIPORT.SYS imports only, PE 4.00 set
+# by build.cmd, which also copies usosuds_slot.c / usosuds.h from
+# src/platform/bios/win9x into the work copy (..\ next to usosusb.c).
+TARGETNAME=usosusb
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+INCLUDES=..
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+# The stock 9x miniports have no discardable INIT section.
+LINKER_FLAGS=$(LINKER_FLAGS) /MERGE:INIT=.text
+SOURCES=..\usosusb.c \
+        ..\usosuds_slot.c \
+        ..\usosusb.rc

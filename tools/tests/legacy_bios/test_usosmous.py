@@ -124,9 +124,11 @@ class UsosMouse(unittest.TestCase):
             i += n + 3
         # Module name MOUSE (USER imports the mouse driver by it), DDK
         # ordinals; USOSATTACH and USOSPAUSE (Me, called by USOSKEY.DRV by
-        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only) last.
+        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only), then
+        # USOSVMDMODE (USOSKEY.DRV) and USOSVMDINFO (USOSDBG.EXE).
         self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
-                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8})
+                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8,
+                                 'USOSVMDMODE': 9, 'USOSVMDINFO': 10})
 
     def test_mouse_driver_imports_kernel_only(self):
         # KERNEL loads mouse.drv right after keyboard.drv, before DISPLAY, GDI
@@ -162,9 +164,12 @@ class UsosMouse(unittest.TestCase):
         me = install[install.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'):install.index(':CSMREG')]
         self.assertIn('COPY /Y C:\\USOS9X\\USOSKEY.DRV C:\\WINDOWS\\SYSTEM', me)
         self.assertIn('COPY /Y C:\\USOS9X\\USOSMOUS.DRV C:\\WINDOWS\\SYSTEM', me)
-        # 95 / 98 / 98 SE: unchanged, no first-sign-in INF.
+        # 95 / 98 / 98 SE: no first-sign-in mouse INF; the shared [USOS.CsmReg]
+        # block names it only when the Me block wrote it.
         nine_x = install[install.index(':CSMREG\n'):install.index(':AUTODONE')]
-        self.assertNotIn('USOSMOUS.INF', nine_x)
+        self.assertNotIn('>C:\\USOS9X\\USOSMOUS.INF', nine_x)
+        self.assertNotIn('>>C:\\USOS9X\\USOSMOUS.INF', nine_x)
+        self.assertIn('IF NOT EXIST C:\\USOS9X\\USOSMOUS.INF GOTO MOUSRO\nECHO HKLM,%%USOSRO%%,USOSMouse,', nine_x)
         sys.path.insert(0, str(ROOT / 'tools'))
         import build_win9x_support
         self.assertIn('USOSMOUS.DRV', build_win9x_support.FILES)
@@ -326,7 +331,10 @@ class MeBridge(unittest.TestCase):
     def test_me_guard_pauses_before_attach_and_until_the_hook(self):
         attach = self.body(self.key, 'attach_mouse')
         self.assertIn('mouse_export("USOSATTACH")', attach)          # by name: other mouse drivers have none
-        self.assertIn('mouse_guard = mouse_export("USOSPAUSE") != 0;', attach)
+        # The guard is armed through USOSPAUSE, except when USOSVMD.VXD is
+        # deployed (then the VxD owns the DOS-box mouse; see test_usosvmd.py).
+        self.assertIn('mouse_export("USOSPAUSE") != 0', attach)
+        self.assertIn('!usosvmd_on()', attach)
         self.assertLess(attach.index('mouse_pause(1)'), attach.index('attach)();'))
         start = self.body(self.key, 'start')
         self.assertIn('(win9x && vkd_entry) || mouse_guard', start)
@@ -370,6 +378,11 @@ class MeBridge(unittest.TestCase):
         install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
         return install[install.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'):install.index(':CSMREG\n')]
 
+    def csm_reg(self):
+        """The [USOS.CsmReg] / [Strings] block every 9x shares (USOS answer)."""
+        install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
+        return install[install.index(':CSMREGS\n'):install.index(':AUTODONE\n')]
+
     @staticmethod
     def echo_output(block, target):
         """What the block's ECHO lines append to (or create as) target,
@@ -392,19 +405,47 @@ class MeBridge(unittest.TestCase):
                                '[USOS.MeMouse.Ini]', 'system.ini,boot,"mouse.drv=*","mouse.drv=usosmous.drv"',
                                'system.ini,386Enh,"mouse=*",'])
         batch = self.echo_output(me, 'C:\\WIN9X\\MSBATCH.INF')
-        self.assertEqual(batch[0], 'system.ini,boot,drivers,,usoskey.drv')        # still in [USOS.Csm]
-        self.assertEqual(batch[1:], [
+        self.assertEqual(batch, ['system.ini,boot,drivers,,usoskey.drv'])        # still in [USOS.Csm]
+        self.assertIn('ECHO system.ini,boot,drivers,,usoskey.drv>>C:\\%U9SRC%\\MSBATCH.INF\nGOTO CSMREGS\n', me)
+        reg = self.csm_reg()
+        # (echo_output ignores the IF lines: IgnorePnPBIOS 98/98 SE only, USOSMouse
+        # with USOSMOUS.INF (Me), USOSUsb Me + U9UDS=1, USOSVmd U9VMD=1, USOSLog U9LOG=1)
+        self.assertEqual(self.echo_output(reg, 'C:\\WIN9X\\MSBATCH.INF'), [
             '[USOS.CsmReg]',
+            'HKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Detect",IgnorePnPBIOS,,"1"',
             'HKLM,%USOSRO%,USOSMouse,,"%USOSMC%"',
+            'HKLM,%USOSRO%,USOSUsb,,"%USOSUC%"',
+            'HKLM,%USOSRO%,USOSVmd,,"%USOSVC%"',
+            'HKLM,%USOSRN%,USOSLog,,"C:\\USOS9X\\USOSLOG.EXE"',
             '[Strings]',
             'USOSRO="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"',
-            'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"'])
+            'USOSRN="Software\\Microsoft\\Windows\\CurrentVersion\\Run"',
+            'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"',
+            'USOSUC="regedit /s C:\\USOS9X\\USOSUSB.REG"',
+            'USOSVC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSVMD.INF"'])
+        lines = reg.splitlines()
+        for want, gate in (('ECHO HKLM,%%USOSRO%%,USOSUsb,', 'IF NOT "%U9UDS%"=="1"'),
+                           ('ECHO HKLM,%%USOSRO%%,USOSVmd,', 'IF NOT EXIST C:\\USOS9X\\USOSVMD.INF'),
+                           ('ECHO HKLM,%%USOSRN%%,USOSLog,', 'IF NOT EXIST C:\\USOS9X\\USOSLOG.EXE'),
+                           ('ECHO HKLM,%%USOSRO%%,USOSMouse,', 'IF NOT EXIST C:\\USOS9X\\USOSMOUS.INF')):
+            i = next(n for n, l in enumerate(lines) if l.startswith(want))
+            self.assertEqual(lines[i - 1].split(' GOTO ')[0], gate, want)
+        self.assertEqual(lines[lines.index('ECHO HKLM,%%USOSRO%%,USOSUsb,,"%%USOSUC%%">>C:\\%U9SRC%\\MSBATCH.INF') - 2],
+                         'IF NOT "%U9SYS%"=="ME" GOTO UDSRO')
+        self.assertIn('IF NOT "%U9VMD%"=="1" GOTO VMDRO', reg)
+        self.assertIn('IF NOT "%U9LOG%"=="1" GOTO LOGRO', reg)
+        for line in lines:
+            self.assertLess(len(line.replace('%U9SRC%', 'WIN9X')), 128, line)
+            if line.startswith('IF '):
+                self.assertNotIn('>', line, line)
         # [Install] AddReg names USOS.CsmReg, [USOS.Csm] is the last section.
         msbatch = (ROOT / 'src/flow/answer/msbatch.zig').read_text(encoding='utf-8')
         self.assertIn('AddReg=USOS.RunOnce,USOS.CsmReg', msbatch)
         self.assertIn('std.mem.endsWith(u8, me, "[USOS.Csm]', msbatch)
-        # The user's own answer file: nothing appended.
+        # The user's own answer file: nothing appended (Me block and the shared block).
         self.assertLess(me.index('IF "%U9ANS%"=="USER" GOTO AUTODONE'), me.index('>>C:\\%U9SRC%\\MSBATCH.INF'))
+        install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
+        self.assertIn(':CSMREG\nIF "%U9ANS%"=="USER" GOTO AUTODONE\n:CSMREGS\n', install)
         # Every line fits COMMAND.COM's batch line (127 characters, expanded).
         for line in me.splitlines():
             self.assertLessEqual(len(line.replace('%U9SRC%', 'WIN9X').replace('%%', '%')), 127, line)

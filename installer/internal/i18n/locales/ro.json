@@ -160,6 +160,9 @@
   "installer.components.no_release": "Această versiune a programului de instalare nu își cunoaște versiunea de pe GitHub, deci nu poate descărca. Alegeți fișiere pe care le aveți deja sau omiteți.",
   "installer.components.checking": "Se verifică ce componente are unitatea…",
   "installer.components.check_failed": "Componentele unității nu au putut fi verificate: %s",
+  "installer.components.legacy.name": "Pachet de compatibilitate Windows 95/98/Me/NT 4.0 (circa 150 MB)",
+  "installer.components.legacy.need": "Biblioteci Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) pe care pachetul le instalează în Windows 95, 98, Me și NT 4.0 după instalare.",
+  "installer.components.legacy.skip_note": "Fără el, pachetul instalează doar ce puneți singur în DATA\\Addons. Îl puteți adăuga mai târziu cu Actualizare USOS sau Reparare.",
   "installer.components.winpe.name": "Ajutor WinPE 10 (aproximativ 440 MB)",
   "installer.components.winpe.need": "Necesar pentru instalarea Windows Vista și Windows 7 în modul UEFI.",
   "installer.components.winpe.skip_note": "Fără el, Windows Vista și Windows 7 nu pot fi instalate în modul UEFI. Îl puteți adăuga mai târziu cu Actualizare USOS sau Reparare.",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "După instalare conectați-vă la domeniul {1} ca {0} cu parola setată în profilul de răspuns.",
   "boot.lx.logon_autologon": "După instalare Windows se conectează automat ca {0}.",
   "boot.lx.logon_setup_asks": "Programul de instalare Windows cere numele de utilizator și parola în timpul instalării; USOS nu le setează.",
-  "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}."
+  "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}.",
+  "boot.profile.field.display_bpp": "Adâncime de culoare",
+  "boot.profile.help.display_legacy": "Se aplică după instalare pe hardware-ul real. Automat alege un mod disponibil până la 1920x1080, cu revenire sigură la unul inferior. Neschimbat păstrează setările. Adâncime automată: 32 de biți dacă sunt disponibili, altfel 16."
 }

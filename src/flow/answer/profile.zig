@@ -55,6 +55,15 @@ pub const Field = enum {
     no_network_oobe,
     protect_pc,
     network_location,
+    network,
+    dialup,
+    ip,
+    gateway,
+    dns,
+    home_page,
+    addons_preset,
+    addons_options,
+    addons_exclude,
     disable_wer,
     edition,
     systems,
@@ -65,6 +74,7 @@ pub const Field = enum {
     theme,
     no_balloon_tips,
     display,
+    display_bpp,
     disable_uac,
     no_sidebar,
     no_welcome_center,
@@ -186,6 +196,8 @@ pub const Display = enum {
     }
 };
 
+pub const DisplayBpp = enum { auto, @"32", @"16" };
+
 fn enumByName(comptime E: type, name: []const u8) ?E {
     inline for (@typeInfo(E).@"enum".fields) |f| {
         if (std.ascii.eqlIgnoreCase(name, f.name)) return @enumFromInt(f.value);
@@ -259,6 +271,9 @@ pub const Profile = struct {
     protect_pc: ProtectPc = .off,
     /// Vista/7: answer of the network location page (Work: no HomeGroup).
     network_location: NetworkLocation = .work,
+    addons_preset: @import("addons_profile.zig").Preset = .praca,
+    addons_options: Text(512) = .{},
+    addons_exclude: Text(512) = .{},
     /// Vista+: Windows Error Reporting off (ErrorReportingCore/DisableWER).
     disable_wer: bool = false,
     /// Systems that offer this profile (applies.zig): normalized, lower
@@ -274,6 +289,9 @@ pub const Profile = struct {
     theme: Theme = .default,
     no_balloon_tips: bool = false,
     display: Display = .auto,
+    /// Explicit auto differs from an old profile with no display request.
+    display_explicit: bool = false,
+    display_bpp: DisplayBpp = .auto,
     disable_uac: bool = false,
     no_sidebar: bool = false,
     no_welcome_center: bool = false,
@@ -288,6 +306,13 @@ pub const Profile = struct {
     workgroup: Text(15) = .{},
     /// Empty/off: unchanged; auto: exact detected beta build; or YYYY-MM-DD.
     beta_clock: Text(10) = .{},
+    /// Legacy LAN defaults; other families ignore these fields.
+    network: @import("network_values.zig").Mode = .on,
+    dialup: @import("network_values.zig").Mode = .off,
+    ip: Text(18) = .{}, // empty = DHCP
+    gateway: Text(15) = .{},
+    dns: Text(47) = .{},
+    home_page: Text(200) = .{}, // empty = about:blank
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -657,6 +682,8 @@ pub fn checkName(value: []const u8) ?Problem {
 
 /// The first problem of a complete profile (null: valid).
 pub fn validate(p: *const Profile) ?Issue {
+    if (!@import("addons_profile.zig").validList(p.addons_options.slice())) return .{ .field = .addons_options, .problem = .bad_choice };
+    if (!@import("addons_profile.zig").validList(p.addons_exclude.slice())) return .{ .field = .addons_exclude, .problem = .bad_choice };
     if (checkName(p.name.slice())) |problem| return .{ .field = .name, .problem = problem };
     if (checkAccount(p.user.slice())) |problem| return .{ .field = .user, .problem = problem };
     if (p.user2.len > 0) {
@@ -676,6 +703,11 @@ pub fn validate(p: *const Profile) ?Issue {
     }
     if (checkWorkgroup(p.workgroup.slice())) |problem| return .{ .field = .workgroup, .problem = problem };
     if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return .{ .field = .beta_clock, .problem = .bad_choice };
+    const net = @import("network_values.zig");
+    if (!net.validIp(p.ip.slice())) return .{ .field = .ip, .problem = .bad_choice };
+    if (!net.validGateway(p.ip.slice(), p.gateway.slice())) return .{ .field = .gateway, .problem = .bad_choice };
+    if (!net.validDns(p.dns.slice())) return .{ .field = .dns, .problem = .bad_choice };
+    if (!net.validHome(p.home_page.slice())) return .{ .field = .home_page, .problem = .bad_choice };
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
 }
@@ -873,9 +905,37 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             p.beta_clock.set(value) catch return .{ .field = field, .problem = .too_long };
         },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_preset => p.addons_preset = enumByName(@import("addons_profile.zig").Preset, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_options, .addons_exclude => {
+            if (!@import("addons_profile.zig").validList(value)) return .{ .field = field, .problem = .bad_choice };
+            const target = if (field == .addons_options) &p.addons_options else &p.addons_exclude;
+            target.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .network => p.network = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .dialup => p.dialup = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .ip => {
+            if (!@import("network_values.zig").validIp(value)) return .{ .field = field, .problem = .bad_choice };
+            p.ip.set(if (std.ascii.eqlIgnoreCase(value, "dhcp")) "dhcp" else value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .gateway => {
+            if (value.len > 0 and @import("network_values.zig").address(value) == null) return .{ .field = field, .problem = .bad_choice };
+            p.gateway.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .dns => {
+            if (!@import("network_values.zig").validDns(value)) return .{ .field = field, .problem = .bad_choice };
+            p.dns.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .home_page => {
+            if (!@import("network_values.zig").validHome(value)) return .{ .field = field, .problem = .bad_choice };
+            p.home_page.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
-        .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .display => {
+            p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice };
+            p.display_explicit = value.len > 0;
+        },
+        .display_bpp => p.display_bpp = if (value.len == 0) .auto else enumByName(DisplayBpp, value) orelse return .{ .field = field, .problem = .bad_choice },
         .systems => {
             var normalized: Text(160) = .{};
             if (normalizeSystems(value, &normalized)) |problem| return .{ .field = field, .problem = problem };
@@ -927,6 +987,9 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         boolText(p.bypass_secure_boot), boolText(p.bypass_ram),    boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
+    if (p.addons_preset != .praca) try w.print("addons_preset={s}\r\n", .{@tagName(p.addons_preset)});
+    if (p.addons_options.len > 0) try w.print("addons_options={s}\r\n", .{p.addons_options.slice()});
+    if (p.addons_exclude.len > 0) try w.print("addons_exclude={s}\r\n", .{p.addons_exclude.slice()});
     try w.print("edition={s}\r\n", .{p.edition.slice()});
     for (p.system_editions[0..p.system_edition_count]) |*entry| try w.print("edition.{s}={s}\r\n", .{ entry.system.slice(), entry.edition.slice() });
     // Written only when set: a profile without them stays readable by the
@@ -936,11 +999,17 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         if (p.flagValue(field)) try w.print("{s}=yes\r\n", .{@tagName(field)});
     }
     if (p.theme != .default) try w.print("theme={s}\r\n", .{@tagName(p.theme)});
-    if (p.display != .auto) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display != .auto or p.display_explicit) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display_bpp != .auto) try w.print("display_bpp={s}\r\n", .{@tagName(p.display_bpp)});
     // Typed options (options.zig) and the workgroup, only when set (the
     // editor saves through here: before 2026-10-14 they were dropped).
     if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
     if (p.beta_clock.len > 0) try w.print("beta_clock={s}\r\n", .{p.beta_clock.slice()});
+    if (p.network == .off) try w.writeAll("network=off\r\n");
+    if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
+    inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
+        if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
+    }
     for (options.table) |o| {
         if (o.legacy) continue;
         const value = p.opts[@intFromEnum(o.opt)];
@@ -1012,6 +1081,38 @@ pub fn importXpIni(text: []const u8, out: *Profile) ?ParseResult {
 }
 
 // ------------------------------------------------------------ tests
+
+test "network profile round trip validates subnet gateway and data URL" {
+    var p = Profile{};
+    const text = "[profile]\nname=LAN\nuser=Tester\nnetwork=on\ndialup=on\nip=192.168.1.20/24\ngateway=192.168.1.1\ndns=1.1.1.1,8.8.8.8\nhome_page=http://example.test/?a=1&b=2\n";
+    try std.testing.expect(parse(text, &p) == .ok);
+    var buf: [8192]u8 = undefined;
+    const saved = try write(&p, &buf);
+    var q = Profile{};
+    try std.testing.expect(parse(saved, &q) == .ok);
+    try std.testing.expectEqualStrings(p.ip.slice(), q.ip.slice());
+    try std.testing.expectEqualStrings(p.home_page.slice(), q.home_page.slice());
+    try std.testing.expect(q.network == .on and q.dialup == .on);
+    try q.gateway.set("10.0.0.1");
+    try std.testing.expect(validate(&q) != null);
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=DHCP\n", &q) == .ok);
+    try std.testing.expectEqualStrings("dhcp", q.ip.slice());
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=192.168.1.255/24\n", &q) == .invalid);
+}
+
+test "legacy pack choices round trip and reject commands or unknown presets" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=retro\naddons_options=kernelex,rdp51-pl\naddons_exclude=dotnet20\n", &p) == .ok);
+    var buffer: [8192]u8 = undefined;
+    const text = try write(&p, &buffer);
+    var q = Profile{};
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expect(q.addons_preset == .retro);
+    try std.testing.expectEqualStrings("kernelex,rdp51-pl", q.addons_options.slice());
+    try std.testing.expectEqualStrings("dotnet20", q.addons_exclude.slice());
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_options=x&cmd\n", &q) == .invalid);
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=unknown\n", &q) == .invalid);
+}
 
 test "profile round trip keeps every field; keys only with remember_key" {
     var p = Profile{};
@@ -1097,6 +1198,25 @@ test "profile round trip keeps typed options and the workgroup; every option at 
     try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
 }
 
+test "display absent, explicit auto and depth survive profile round trips" {
+    var p: Profile = undefined;
+    var q: Profile = undefined;
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(parse("name=A\nuser=Bob\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expect(std.mem.indexOf(u8, try write(&p, &buffer), "display=") == null);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=auto\ndisplay_bpp=16\n", &p) == .ok);
+    try std.testing.expect(p.display_explicit);
+    const written = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, written, "display=auto\r\ndisplay_bpp=16\r\n") != null);
+    try std.testing.expect(parse(written, &q) == .ok);
+    try std.testing.expect(q.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.@"16", q.display_bpp);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=\ndisplay_bpp=\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.auto, p.display_bpp);
+}
+
 test "profile parse errors name the field and line, never the value" {
     var p: Profile = undefined;
     const cases = [_]struct { text: []const u8, field: ?Field, problem: Problem, line: u32 }{
@@ -1117,6 +1237,7 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nsystems=windows-9x,windows-96\n", .field = .systems, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ntheme=aero\n", .field = .theme, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ndisplay=800x600\n", .field = .display, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\ndisplay_bpp=24\n", .field = .display_bpp, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nskip_games=maybe\n", .field = .skip_games, .problem = .bad_boolean, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },

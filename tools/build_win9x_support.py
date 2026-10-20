@@ -45,6 +45,15 @@
                 build bin/W9X/usosnvme.mpd; usosnvme9x.inf). Only for an
                 NVMe target with DATA's nvme-experimental.txt
                 (tools/w9x_nvme.sh); otherwise removed from C:\\USOS9X
+  USOSUSB.MPD, USOSUSB.INF, USOSUSB.REG
+                USOSUSB for Windows 9x (USOS, GPL-3.0-or-later): the USB stick
+                SCSI miniport on CSMWrap's SeaBIOS USB disk service
+                (tools/nt/usosusb9x: bin/W9X/usosusb.mpd, usosusb.inf; usosusb.reg =
+                REGEDIT4 fragment of its Root\\SCSIAdapter devnode with the
+                class instance placeholder @CLASSIDX@). On by default (X470 Me
+                PASS 2026-10-19), off with DATA's usb-storage-off.txt
+                (tools/w9x_csmwrap_target.sh fills in the class instance;
+                otherwise removed from C:\\USOS9X)
 
 Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
 nothing runs them unless EFI/USOS/win9x/diag.flag exists):
@@ -53,12 +62,18 @@ nothing runs them unless EFI/USOS/win9x/diag.flag exists):
                 V86-vs-physical page map, xHCI and bridge PCI state, live
                 (src/platform/bios/win9x/usosdbg.c, OpenWatcom like USOSKEY.DRV)
 
-Built only with --usoslog (into zig-out/win9x-usoslog, copied by hand):
-  USOSLOG.EXE   Win32, no window: silent logger for test installs, started from
-                the Startup folder; mouse (via USOSDBG.EXE /L), usosnet 0.4
-                statistics, DNS / TCP / HTTP tests, processes, startup entries
-                into C:\\USOS9X\\LOGS\\USOSLOG.TXT (src/platform/bios/win9x/usoslog.c,
-                OpenWatcom wcc386 / wlink, PE 4.00; tools/tests/test_usoslog.py)
+Staged for the CSMWrap flow since 2026-10-19 (X470 Windows Me pass):
+  USOSVMD.VXD   the USB mouse in MS-DOS boxes, a VMOUSE minidriver
+                (src/platform/win9x/usosvmd.asm, built with the MS-DOS support
+                by tools/build_win3_usb_keyboard.py); 98 / 98 SE / Me, on by
+                default, DATA vmd-off.txt turns it off (tools/w9x_csmwrap_target.sh)
+  USOSLOG.EXE   Win32, no window: silent logger, started from the machine Run
+                key (USOS answer; DATA logging-off.txt turns it off); mouse (via
+                USOSDBG.EXE /L), usosnet 0.4 statistics, DNS / TCP / HTTP tests,
+                processes, startup entries, USB disk record into
+                C:\\USOS9X\\LOGS\\USOSLOG.TXT (src/platform/bios/win9x/usoslog.c,
+                OpenWatcom wcc386 / wlink, PE 4.00; tools/tests/test_usoslog.py).
+                --usoslog builds only USOSDBG.EXE and USOSLOG.EXE (in-place kits).
 
 Also built, not staged (copied by hand):
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
@@ -90,8 +105,9 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
     # Under CSMWrap: VBMOUSE in MS-DOS mode only (DOSSTART.BAT calls DOSMOUSE).
     'DOSMOUSE.BAT', 'INWIN.COM') + (
     # Under CSMWrap: CONFIG.SYS loads it first (dos_native_iso.zig, INSTALL.BAT).
-    'CREGFIX.SYS',)
-BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
+    'CREGFIX.SYS', 'USOSLAN.EXE')
+BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT',
+          'USOSVMD.VXD')
 # Everything on the stick (the payload list and the release check use it).
 STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
                    'CREGFIX.TXT') + (
@@ -100,8 +116,14 @@ STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XH
     # them unless EFI/USOS/win9x/diag.flag exists (USOSDIAG BOOT, INSTALL.BAT).
     'USOSDIAG.COM', 'USOSDBG.EXE') + (
     # NVMe targets with nvme-experimental.txt only (tools/w9x_nvme.sh).
-    'USOSNVME.MPD', 'USOSNVME.INF')
+    'USOSNVME.MPD', 'USOSNVME.INF') + (
+    # USB sticks (default; DATA usb-storage-off.txt turns them off, tools/w9x_csmwrap_target.sh).
+    'USOSUSB.MPD', 'USOSUSB.INF', 'USOSUSB.REG') + (
+    # CSMWrap flow: mouse in MS-DOS boxes (98/98 SE/Me) and the silent logger.
+    'USOSVMD.VXD', 'USOSLOG.EXE')
 USOSNVME = ROOT / 'tools/nt/usosnvme'
+USOSUSB = ROOT / 'tools/nt/usosusb9x'
+USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.
@@ -334,7 +356,14 @@ def build_usoslog(out: Path, work: Path) -> Path:
     subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usoslog.lnk'), 'file', str(obj),
                     'name', str(exe), 'option', 'map=' + str(work / 'usoslog.map')], env=env, check=True, cwd=work)
     spec = importlib_util_spec('pe_nt4_version', ROOT / 'tools/nt4/pe_nt4_version.py')
-    data = spec.set_nt4(exe.read_bytes(), 4, 0)
+    # wlink stamps the link time into the COFF header: a fixed TimeDateStamp
+    # keeps the staged payload reproducible (set_nt4 recomputes the checksum).
+    raw = bytearray(exe.read_bytes())
+    pe = int.from_bytes(raw[0x3C:0x40], 'little')
+    if raw[pe:pe + 4] != b'PE\0\0':
+        raise ValueError('USOSLOG.EXE has no PE header')
+    raw[pe + 8:pe + 12] = (0).to_bytes(4, 'little')
+    data = spec.set_nt4(bytes(raw), 4, 0)
     exe.write_bytes(data)
     if data[:2] != b'MZ' or b'USOSLOG' not in data:
         raise ValueError('USOSLOG.EXE is not the expected PE program')
@@ -423,6 +452,24 @@ def stage_usosnvme(out: Path) -> None:
     (out / 'USOSNVME.INF').write_bytes(dos_text(inf))
 
 
+def stage_usosusb(out: Path, source: Path = USOSUSB) -> None:
+    """usosusb.mpd (the 9x SCSIPORT.PDR build) + its INF + its REGEDIT4 devnode fragment."""
+    missing = [name for name in USOSUSB_FILES if not (source / name).is_file()]
+    if missing:
+        raise ValueError('USOSUSB miniport not built yet: missing %s in %s' % (', '.join(missing), source))
+    mpd = (source / USOSUSB_FILES[0]).read_bytes()
+    pe = int.from_bytes(mpd[0x3c:0x40], 'little') if len(mpd) >= 0x40 else 0
+    if mpd[:2] != b'MZ' or mpd[pe:pe + 4] != b'PE\0\0' or b'SCSIPORT.SYS' not in mpd.upper() or \
+            b'ntoskrnl' in mpd.lower():
+        raise ValueError('unexpected usosusb.mpd (not a PE miniport importing SCSIPORT.SYS)')
+    reg = (source / USOSUSB_FILES[2]).read_text(encoding='ascii')
+    if not reg.startswith('REGEDIT4') or '@CLASSIDX@' not in reg:
+        raise ValueError('usosusb.reg must be a REGEDIT4 fragment with the @CLASSIDX@ class instance placeholder')
+    (out / 'USOSUSB.MPD').write_bytes(mpd)
+    (out / 'USOSUSB.INF').write_bytes(dos_text((source / USOSUSB_FILES[1]).read_text(encoding='ascii')))
+    (out / 'USOSUSB.REG').write_bytes(dos_text(reg))
+
+
 def build(root: Path = ROOT, out: Path | None = None) -> None:
     out = out or root / 'zig-out/dos-native/win9x'
     out.mkdir(parents=True, exist_ok=True)
@@ -433,6 +480,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     dosmouse_bat(out)
     build_diag(out, work)
     build_usosdbg(out, work)
+    build_usoslog(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:
@@ -442,6 +490,9 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     stage_xhci98(out)
     stage_cregfix(out)
     stage_usosnvme(out)
+    stage_usosusb(out)
+    from build_windows_usos_lan import build as build_lan
+    shutil.copyfile(build_lan(root, work / 'network')['USOSLAN9X.EXE'], out / 'USOSLAN.EXE')
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():
@@ -457,7 +508,7 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path)
     p.add_argument('--usoslog', action='store_true',
-                   help='only USOSDBG.EXE and USOSLOG.EXE (test-install logger, not staged)')
+                   help='only USOSDBG.EXE and USOSLOG.EXE (for in-place kits)')
     a = p.parse_args()
     if a.usoslog:
         o = a.out or ROOT / 'zig-out/win9x-usoslog'

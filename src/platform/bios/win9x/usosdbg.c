@@ -36,6 +36,13 @@
  *         after the call, result) and what followed the last IntelliMouse
  *         knock (rates 200, 100, 80): a later C201h reset / C205h init
  *         and its caller
+ *   VMD   USOSVMD.VXD / VMOUSE mode (1.7): C:\USOS9X\USOSVMD.ON, what
+ *         USOSMOUS.DRV decided (USOSVMDINFO: VMOUSE / USOSVMD APIs, the
+ *         VxD's mode, its V86 callback, the VMOUSE event callback, the
+ *         direct INT 15h path) and the VxD's own status block (loaded,
+ *         VMOUSE version and mouse type, callbacks from SeaBIOS and how many
+ *         came while a DOS VM was current, the last VM handle and packet,
+ *         packets posted to VMOUSE, ring drops, error bits)
  *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
@@ -55,10 +62,16 @@
  *         ports); every bridge above an xHCI bus: bus numbers, windows,
  *         bridge control. Same format as USOSDIAG.COM's PCI section (DOS,
  *         C:\USOS9X\DIAG.LOG), so the two can be compared line by line
+ *   DISK  from CSMWrap 3.1.2-usos16 (patch 0021) on: SeaBIOS's USB disk
+ *         service record (USOS UDSK in the first MiB): the UDS device
+ *         table (state, BIOS number, VID:PID, port, capacity, counters,
+ *         last op / CSW / sense), the BIOS disk table, the event ring; the
+ *         channel 1 words after the CSMPPrxy mailbox and the USOSUSB.MPD
+ *         status page they point to (docs/usb9x-hotswap-design-2026-10-19.md)
  * S appends the current screen to C:\USOS9X\USOSDBG.LOG, Esc quits.
  *
  * Log mode (1.5 on, for USOSLOG.EXE, no window shown, no key needed):
- *   USOSDBG.EXE /L <file> [/F] [/N <hex>]
+ *   USOSDBG.EXE /L <file> [/F] [/D] [/N <hex>]
  * takes two snapshots one second apart (so the "+n" deltas are per second),
  * writes the second one to <file> (created anew) and exits. Without /F the
  * PCI section (xHCI MMIO mapping) is left out: DPMI 0800h mappings cannot
@@ -67,6 +80,8 @@
  * (registry UsosnetStatsPa) as USNS+ooo: hex lines. The wheel knock (W) is
  * never sent in log mode; the C204h ID question is asked once per run as
  * on the first display.
+ * /D writes the DISK section only, from one snapshot (USOSLOG on a
+ * drive change).
  * Nothing is written to any device: configuration space and xHCI registers
  * are only read.
  *
@@ -74,6 +89,7 @@
  * this file plus import records. Built with tools/build_win9x_support.py.
  */
 #include <windows.h>
+#include "usosuds.h"
 
 #define LINES 144
 #define WIDTH 256
@@ -129,6 +145,30 @@ typedef struct {
     WSREC rec[16];
 } WSLOG;
 
+/* USOSMOUS.DRV USOSVMDINFO (version 1) with USOSVMD.VXD's status block. */
+typedef struct {
+    BYTE version, checked, flag, vmouse_api, vxd_api, vxd_mode, active, cb_ok;
+    DWORD vxd_cb;
+    WORD direct_err, vxd_status, wheel_only_polls;
+    BYTE vxd[64];
+} VMDINFO;
+
+/* USOSVMD.VXD status block (PM API function 2, src/platform/win9x/
+ * usosvmd.asm), 64 bytes. */
+typedef struct {
+    WORD sig;
+    BYTE version, mode;
+    WORD vmd_version;
+    BYTE type_init, type_now;
+    DWORD cb, sb, callbacks, foreign, posted, own_drop, shared_put, shared_drop, last_vm;
+    BYTE last[4];
+    WORD err, type_changes;
+    DWORD ticks;
+    WORD attach;
+    DWORD sys_vm;
+    WORD reclaims;
+} VXDSTAT;
+
 /* CSMWrap patch 0018: SeaBIOS's usb_mouse_diag (version 1, natural
  * alignment, 310 bytes). */
 typedef struct {
@@ -181,6 +221,7 @@ static WORD id_result;
 static DWORD mdiag_at;              /* physical address of the 0018 record, 0 not found */
 static BYTE mdiag_scanned;
 static BYTE log_mode, log_pci;      /* /L, /F */
+static BYTE disk_only;              /* /D: the DISK section only, one snapshot */
 static char log_path[128];
 static DWORD net_pa;                /* /N */
 static WORD e_cmdseg, e_cmdoff;     /* command tail (InitTask ES:BX) */
@@ -646,6 +687,43 @@ static void show_wheelscroll(void)
     }
 }
 
+static LPCSTR vmd_mode_name(BYTE m)
+{
+    return m == 0 ? "no VMOUSE" : m == 1 ? "minidriver (posts to VMOUSE)" : m == 2 ? "observer (VMOUSE has another mouse)" : "no answer";
+}
+
+static void show_vmd(void)
+{
+    OFSTRUCT of;
+    HINSTANCE mouse = GetModuleHandle("MOUSE");
+    FARPROC info = mouse ? GetProcAddress(mouse, "USOSVMDINFO") : 0;
+    BOOL flag = OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) != HFILE_ERROR;
+    VMDINFO FAR *v;
+    VXDSTAT FAR *x;
+    if (!info) {
+        wsprintf(line(), "VMD  USOSVMD.ON:%s  USOSMOUS.DRV without USOSVMDINFO (older driver or another mouse.drv)", (LPSTR)(flag ? "yes" : "no"));
+        return;
+    }
+    v = (VMDINFO FAR *)((DWORD (FAR PASCAL *)(void))info)();
+    wsprintf(line(), "VMD  USOSVMD.ON:%s  decided:%s  VMOUSE API:%s  USOSVMD API:%s  VxD mode:%s  VMOUSE mode:%s  event callback:%s  C207h -> %04X:%04X  direct INT15 error:%u  wheel polls:%u",
+             (LPSTR)(flag ? "yes" : "no"), (LPSTR)(v->checked ? "yes" : "not yet"), (LPSTR)(v->vmouse_api ? "yes" : "no"),
+             (LPSTR)(v->vxd_api ? "yes (loaded)" : "no (not loaded)"), (LPSTR)vmd_mode_name(v->vxd_mode),
+             (LPSTR)(v->active ? "ON" : "off"), (LPSTR)(v->cb_ok ? "accepted" : "no"),
+             HIWORD(v->vxd_cb), LOWORD(v->vxd_cb), v->direct_err, v->wheel_only_polls);
+    if (v->vxd_status < sizeof(VXDSTAT)) {
+        wsprintf(line(), "VMD  USOSVMD.VXD status: %s", (LPSTR)(v->vxd_api ? "PM API 2 failed" : "VxD not loaded"));
+        return;
+    }
+    x = (VXDSTAT FAR *)v->vxd;
+    wsprintf(line(), "VMD  VxD v%u mode:%s  VMOUSE %u.%02u  mouse type at init:%02X now:%02X (2 = ours, 4 = PS/2)  changes:%u reclaims:%u  callback %04X:%04X  block %08lX  attach:%u  err:%04X",
+             (WORD)x->version, (LPSTR)vmd_mode_name(x->mode), (WORD)HIBYTE(x->vmd_version), (WORD)LOBYTE(x->vmd_version),
+             (WORD)x->type_init, (WORD)x->type_now, x->type_changes, x->reclaims, HIWORD(x->cb), LOWORD(x->cb), x->sb, x->attach, x->err);
+    wsprintf(line(), "VMD  BIOS callbacks:%lu  from a DOS VM:%lu  last VM %08lX (system VM %08lX)  last %02X %02X %02X %02X  posted:%lu  own ring full:%lu  shared ring put:%lu full:%lu  ticks:%lu",
+             x->callbacks, x->foreign, x->last_vm, x->sys_vm, (WORD)x->last[0], (WORD)x->last[1], (WORD)x->last[2], (WORD)x->last[3],
+             x->posted, x->own_drop, x->shared_put, x->shared_drop, x->ticks);
+    wsprintf(line(), "VMD  err bits: 1 no V86 callback  2 VMOUSE had a mouse at init  4 bad block  8 type changed later  10 own ring full  20 shared ring full  40 VMOUSE absent  80 DDB tail damaged (v3)");
+}
+
 static void show_ivt(void)
 {
     static const BYTE ints[6] = { 0x08, 0x09, 0x15, 0x16, 0x1C, 0x2F };
@@ -1038,24 +1116,544 @@ static void show_net(void)
     }
 }
 
+/* ---------------------------------------------------------- DISK */
+/* USB disk service (docs/usb9x-hotswap-design-2026-10-19.md section 4):
+ * SeaBIOS's "USOS" "UDSK" record (CSMWrap 3.1.2-usos16 patch 0021, first
+ * MiB, 16-byte aligned), the channel 1 words after the "CSMPPrxy" mailbox
+ * in the F-segment, and the USOSUSB.MPD status page at channel req_phys +
+ * UDS_MP_STATUS_OFFSET (layouts: usosuds.h). Every value is untrusted:
+ * counts are clamped, nothing is read outside the first MiB or the status
+ * page; only reads. The record and the page are copied first (one
+ * consistent view) and the copy's signature is cleared, so a later scan
+ * (this or another USOSDBG) never finds a copy in a Win16 data segment.
+ * The status page is mapped per run (one DPMI 0800h page, a cached mapping
+ * over the miniport's uncached block: read only). */
+typedef char uds_diag_size_check[sizeof(struct uds_diag) == 984 ? 1 : -1];
+typedef char uds_dev_size_check[sizeof(struct uds_diag_dev) == 64 ? 1 : -1];
+typedef char uds_disk_size_check[sizeof(struct uds_diag_disk) == 12 ? 1 : -1];
+typedef char uds_mp_size_check[sizeof(struct uds_mp_status) == 104 ? 1 : -1];
+typedef char uds_ring_size_check[sizeof(struct uds_mp_ring) == 528 ? 1 : -1];
+typedef char uds_media_size_check[sizeof(struct uds_diag_media) == 16 ? 1 : -1];
+
+/* DISK-DECODE-BEGIN (compiled on the host by tools/tests/usb9x/test_usosdbg_disk.py) */
+static const char *uds_state_name(BYTE s)
+{
+    switch (s) {
+    case UDS_DEV_EMPTY: return "empty";
+    case UDS_DEV_PRESENT: return "present";
+    case UDS_DEV_GONE: return "GONE (removed)";
+    case UDS_DEV_EJECTED: return "ejected";
+    case UDS_DEV_FAILED: return "FAILED (see events)";
+    }
+    return "?";
+}
+
+static const char *uds_status_name(DWORD s)
+{
+    if (s == UDS_S_PENDING) return "pending";
+    switch ((WORD)(s > 0xFF ? 0xFF : s)) {
+    case UDS_S_OK: return "ok";
+    case UDS_S_CHECK: return "check condition";
+    case UDS_S_NODEV: return "no device";
+    case UDS_S_GONE: return "gone";
+    case UDS_S_TIMEOUT: return "timeout";
+    case UDS_S_PHASE: return "phase error";
+    case UDS_S_BADREQ: return "bad request";
+    case UDS_S_OWNED: return "owned by INT 13h";
+    case UDS_S_HWFAIL: return "xHCI failed";
+    }
+    return "?";
+}
+
+static const char *uds_why_name(DWORD w)
+{
+    static const char *const n[11] = { "ok", "magic", "version", "size", "op", "dev", "lun", "cdb", "dir", "len",
+                                       "addr" };
+    return w <= UDS_WHY_ADDR ? n[(WORD)w] : "?";
+}
+
+static const char *uds_ev_name(BYTE e)
+{
+    static const char *const n[18] = { "?", "present", "GONE", "reset", "eject", "badreq", "HWFAIL", "TIMEOUT",
+                                       "PHASE", "REGFAIL", "stall", "plugged in", "PLUG FAILED", "connect",
+                                       "unplugged", "connected, not set up at POST", "media", "watch armed" };
+    return e <= UDS_EV_ARM ? n[e] : "?";
+}
+
+/* UDS_AF_*: why a stick plugged in at runtime was not brought up */
+static const char *uds_af_name(BYTE r)
+{
+    static const char *const n[12] = { "?", "port reset", "Enable Slot", "Address Device", "device descriptor",
+                                       "config descriptor", "not a USB stick (no bulk-only mass storage)",
+                                       "SET_CONFIGURATION", "Configure Endpoint", "both hot-plug slots in use",
+                                       "device table full", "EP0 packet size" };
+    return r <= UDS_AF_MPS ? n[r] : "?";
+}
+
+/* UDS_FS_*: what the media check found, and whether Windows 9x reads it */
+static const char *uds_fs_name(BYTE f)
+{
+    switch (f) {
+    case UDS_FS_UNREAD: return "not checked";
+    case UDS_FS_READFAIL: return "sector read failed";
+    case UDS_FS_NOSIG: return "no 55AA signature (blank or not a PC disk) - 9x cannot use it";
+    case UDS_FS_FAT12: return "FAT12 - 9x reads it";
+    case UDS_FS_FAT16: return "FAT16 - 9x reads it";
+    case UDS_FS_FAT32: return "FAT32 - 9x reads it (95 OSR2 and later)";
+    case UDS_FS_NTFS: return "NTFS - 9x cannot read it (format the stick FAT32)";
+    case UDS_FS_EXFAT: return "exFAT - 9x cannot read it (format the stick FAT32)";
+    case UDS_FS_GPT: return "GPT partition table - 9x cannot read it (use MBR + FAT32)";
+    case UDS_FS_OTHER: return "MBR, unknown file system - 9x probably cannot read it";
+    }
+    return "?";
+}
+
+static const char *uds_phase_name(BYTE r)
+{
+    switch (r) {
+    case 1: return "CBW";
+    case 2: return "data";
+    case 3: return "CSW";
+    case 4: return "CSW signature/tag";
+    case 5: return "CSW status 2";
+    }
+    return "?";
+}
+
+/* the result byte as the UDS_EV_* comment defines it */
+static void uds_ev_result(LPSTR t, BYTE e, BYTE r)
+{
+    switch (e) {
+    case UDS_EV_PRESENT: wsprintf(t, "luns %u", (WORD)r); break;
+    case UDS_EV_GONE: wsprintf(t, "during op %02Xh", (WORD)r); break;
+    case UDS_EV_RESET: wsprintf(t, "%s", (LPSTR)(r == 0 ? "ok" : r == 1 ? "failed" : "?")); break;
+    case UDS_EV_BADREQ: wsprintf(t, "why %u %s", (WORD)r, (LPSTR)uds_why_name(r)); break;
+    case UDS_EV_HWFAIL:
+        wsprintf(t, "%s", (LPSTR)(r == 1 ? "registers all ones" : r == 2 ? "halted / host system error" : "?"));
+        break;
+    case UDS_EV_TIMEOUT:
+    case UDS_EV_PHASE:
+    case UDS_EV_STALL: wsprintf(t, "phase %u %s", (WORD)r, (LPSTR)uds_phase_name(r)); break;
+    case UDS_EV_REGFAIL: wsprintf(t, "%s", (LPSTR)(r == 1 ? "table full" : r == 2 ? "INQUIRY failed" : "?")); break;
+    case UDS_EV_ATTACH: wsprintf(t, "luns %u", (WORD)r); break;
+    case UDS_EV_ATTFAIL: wsprintf(t, "%u %s", (WORD)r, (LPSTR)uds_af_name(r)); break;
+    case UDS_EV_CONNECT:
+    case UDS_EV_UNCLAIMED: wsprintf(t, "link state %u", (WORD)r); break;
+    case UDS_EV_DETACH: wsprintf(t, "%s", (LPSTR)(r ? "replugged at once" : "port empty")); break;
+    case UDS_EV_MEDIA: wsprintf(t, "%s", (LPSTR)uds_fs_name(r)); break;
+    case UDS_EV_ARM: wsprintf(t, "%u xHCI", (WORD)r); break;
+    default: wsprintf(t, "result %u", (WORD)r); break;
+    }
+}
+
+/* SeaBIOS block.h DTYPE_* */
+static const char *uds_dtype_name(BYTE t)
+{
+    switch (t) {
+    case 0x00: return "none";
+    case 0x10: return "floppy";
+    case 0x20: return "ATA";
+    case 0x21: return "ATAPI";
+    case 0x30: return "ramdisk";
+    case 0x40: return "CD emulation";
+    case 0x50: return "AHCI";
+    case 0x51: return "AHCI ATAPI";
+    case 0x60: return "virtio-scsi";
+    case 0x61: return "virtio-blk";
+    case 0x70: return "USB MSC";
+    case 0x71: return "USB MSC (32)";
+    case 0x72: return "UAS";
+    case 0x73: return "UAS (32)";
+    case 0x80: return "LSI SCSI";
+    case 0x81: return "ESP SCSI";
+    case 0x82: return "MegaRAID";
+    case 0x83: return "PVSCSI";
+    case 0x84: return "MPT SCSI";
+    case 0x90: return "SD card";
+    case 0x91: return "NVMe";
+    }
+    return "?";
+}
+
+/* SeaBIOS USB_*SPEED */
+static const char *uds_speed_name(BYTE s)
+{
+    switch (s) {
+    case 0: return "full";
+    case 1: return "low";
+    case 2: return "high";
+    case 3: return "super";
+    }
+    return "?";
+}
+
+static const char *scsi_op_name(BYTE op)
+{
+    switch (op) {
+    case 0x00: return "TEST UNIT READY";
+    case 0x03: return "REQUEST SENSE";
+    case 0x12: return "INQUIRY";
+    case 0x1A: return "MODE SENSE(6)";
+    case 0x1B: return "START STOP UNIT";
+    case 0x1E: return "PREVENT ALLOW";
+    case 0x23: return "READ FORMAT CAPACITIES";
+    case 0x25: return "READ CAPACITY(10)";
+    case 0x28: return "READ(10)";
+    case 0x2A: return "WRITE(10)";
+    case 0x2F: return "VERIFY(10)";
+    case 0x35: return "SYNCHRONIZE CACHE";
+    case 0x5A: return "MODE SENSE(10)";
+    case 0x88: return "READ(16)";
+    case 0x8A: return "WRITE(16)";
+    case 0x9E: return "READ CAPACITY(16)";
+    }
+    return "";
+}
+
+/* Count blocks of Bs bytes in MiB (Bs a power of two up to 1 MiB, else
+ * FFFFFFFFh = unknown; FFFFFFFEh = does not fit) */
+static DWORD uds_mib(DWORD lo, DWORD hi, DWORD bs)
+{
+    WORD k, sh;
+    for (k = 0; k <= 20 && (1UL << k) != bs; k++) ;
+    if (k > 20) return 0xFFFFFFFFUL;
+    sh = 20 - k;
+    if (sh == 0) return hi ? 0xFFFFFFFEUL : lo;
+    if (hi >> sh) return 0xFFFFFFFEUL;
+    return (lo >> sh) | (hi << (32 - sh));
+}
+
+static void uds_mib_text(LPSTR t, DWORD mib)
+{
+    if (mib == 0xFFFFFFFFUL) wsprintf(t, "? MiB");
+    else if (mib == 0xFFFFFFFEUL) wsprintf(t, "too big");
+    else wsprintf(t, "%lu MiB", mib);
+}
+
+/* the record (a copy) found at At; Chan = the CSMPPrxy+48 address found in
+ * the F-segment, 0 none */
+/* version 2 (CSMWrap 3.1.2-usos17, hot-swap): the port watch and the media check */
+static void show_disk_v2(const struct uds_diag *d, WORD devs)
+{
+    WORD i, c;
+    char b[24];
+    if (!d->pool) {
+        wsprintf(line(), "DISK hot-swap: off (no runtime pool: csmwrap.ini without int13_boot_disk_only)");
+    } else {
+        LPSTR l = line();
+        wsprintf(l, "DISK hot-swap: watch %s  passes %lu  plugged in %lu  unplugged %lu  failed %lu",
+                 (LPSTR)(d->armed ? "armed" : "not armed yet (no channel 1 request)"), (DWORD)d->watch_passes,
+                 (DWORD)d->attaches, (DWORD)d->detaches, (DWORD)d->attach_fails);
+        if (d->attach_fails)
+            wsprintf(l + lstrlen(l), " (last: %s)", (LPSTR)uds_af_name(d->last_fail));
+        wsprintf(l + lstrlen(l), "  pool %08lX used %u%u", (DWORD)d->pool, (WORD)(d->pool_used & 1),
+                 (WORD)((d->pool_used >> 1) & 1));
+    }
+    c = d->ctls > UDS_DIAG_CTLS ? UDS_DIAG_CTLS : d->ctls;
+    for (i = 0; i < c; i++) {
+        const struct uds_diag_ctl *x = &d->ctl[i];
+        wsprintf(line(), "DISK  xHCI%u: ports %lu  connected at POST %08lX  set up at POST %08lX  connected now %08lX (bit 0 = port 1)",
+                 i, (DWORD)x->ports, (DWORD)x->ccs_post, (DWORD)x->busy_arm, (DWORD)x->ccs_now);
+    }
+    for (i = 0; i < devs; i++) {
+        const struct uds_diag_media *m = &d->media[i];
+        if (d->dev[i].state == UDS_DEV_EMPTY) continue;
+        if (m->ctl == 0xFF) wsprintf(b, "-");
+        else wsprintf(b, "xHCI%u", (WORD)m->ctl);
+        wsprintf(line(), "DISK  dev %u media: %s  MBR types %02X %02X %02X %02X  volume at LBA %lu  sector 0 FNV %08lX  %s  %s",
+                 i, (LPSTR)uds_fs_name(m->fs), (WORD)m->types[0], (WORD)m->types[1], (WORD)m->types[2],
+                 (WORD)m->types[3], (DWORD)m->part_lba, (DWORD)m->hash0,
+                 (LPSTR)(m->attach ? "plugged in after boot" : "present at POST"), (LPSTR)b);
+    }
+}
+
+static void show_disk_record(const struct uds_diag *d, DWORD at, DWORD chan)
+{
+    WORD i, n, devs, disks, first;
+    DWORD events;
+    char a[48], b[96], c[20];   /* b: an event result, up to 70 characters (usos17 media names) */
+    LPSTR l = 0;
+    if (d->version != 1 && d->version != UDS_DIAG_VERSION) {
+        wsprintf(line(), "DISK USOSUDSK at %05lX: version %u not decoded (USOSDBG knows version %u)", at,
+                 (WORD)d->version, (WORD)UDS_DIAG_VERSION);
+        return;
+    }
+    if (!d->channel) wsprintf(a, " (no channel 1 request served yet)");
+    else if (!chan) wsprintf(a, " (no CSMPPrxy found)");
+    else if ((DWORD)d->channel == chan) wsprintf(a, " (= CSMPPrxy+48)");
+    else wsprintf(a, " (CSMPPrxy+48 is %05lX: DIFFERS)", chan);
+    wsprintf(line(), "DISK USOSUDSK at %05lX: version %u  devs %u  disks %u  services %lu  badreq %lu  last why %lu %s  events %lu (next slot %u)  channel %08lX%s",
+             at, (WORD)d->version, (WORD)d->devs, (WORD)d->disks, (DWORD)d->services, (DWORD)d->badreq,
+             (DWORD)d->last_why, (LPSTR)uds_why_name(d->last_why), (DWORD)d->events, (WORD)d->next_event,
+             (DWORD)d->channel, (LPSTR)a);
+    devs = d->devs > UDS_MAX_DEVS ? UDS_MAX_DEVS : d->devs;
+    if (d->devs > UDS_MAX_DEVS)
+        wsprintf(line(), "DISK  devs %u > %u: the first %u shown", (WORD)d->devs, UDS_MAX_DEVS, UDS_MAX_DEVS);
+    if (!devs) wsprintf(line(), "DISK  no entry in the UDS table (no stick without a BIOS number at POST)");
+    for (i = 0; i < devs; i++) {
+        const struct uds_diag_dev *v = &d->dev[i];
+        DWORD lo = (DWORD)v->last_lba_lo + 1, hi = (DWORD)v->last_lba_hi + (lo == 0 ? 1 : 0);
+        if (v->bios_drive) wsprintf(b, "BIOS %02Xh", (WORD)v->bios_drive);
+        else wsprintf(b, "not mapped");
+        uds_mib_text(a, uds_mib(lo, hi, (DWORD)v->block_size));
+        if (v->last_lba_hi) wsprintf(c, "%lX%08lX", (DWORD)v->last_lba_hi, (DWORD)v->last_lba_lo);
+        else wsprintf(c, "%lX", (DWORD)v->last_lba_lo);
+        wsprintf(line(), "DISK  dev %u: %s  %s  luns %u  port %u  %04X:%04X  slot %u  %s speed  gen %lu  block %lu  %s (last LBA %s)",
+                 i, (LPSTR)uds_state_name(v->state), (LPSTR)b, (WORD)v->luns, (WORD)v->port, (WORD)v->vid,
+                 (WORD)v->pid, (WORD)v->slotid, (LPSTR)uds_speed_name(v->speed), (DWORD)v->generation,
+                 (DWORD)v->block_size, (LPSTR)a, (LPSTR)c);
+        wsprintf(line(), "DISK  dev %u: requests %lu  checks %lu  timeouts %lu  resets %lu  gone %lu  refused %lu  in %lu KiB  out %lu KiB",
+                 i, (DWORD)v->requests, (DWORD)v->checks, (DWORD)v->timeouts, (DWORD)v->resets, (DWORD)v->gone,
+                 (DWORD)v->refused, (DWORD)v->kib_in, (DWORD)v->kib_out);
+        wsprintf(line(), "DISK  dev %u: last op %02Xh %s  CSW %u  sense %X/%02X/%02X  status %u %s",
+                 i, (WORD)v->last_op, (LPSTR)scsi_op_name(v->last_op), (WORD)v->last_csw, (WORD)v->last_key,
+                 (WORD)v->last_asc, (WORD)v->last_ascq, (WORD)v->last_status,
+                 (LPSTR)uds_status_name((DWORD)v->last_status));
+    }
+    disks = d->disks > UDS_DIAG_DISKS ? UDS_DIAG_DISKS : d->disks;
+    wsprintf(line(), "DISK BIOS disk table: %u entr%s%s", (WORD)d->disks, (LPSTR)(d->disks == 1 ? "y" : "ies"),
+             (LPSTR)(d->disks > UDS_DIAG_DISKS ? " (more than 8: 8 shown)" :
+                     d->disks ? "" : " (filled at the first channel 1 request)"));
+    for (i = 0; i < disks; i++) {
+        const struct uds_diag_disk *k = &d->disk[i];
+        if (!k->bios) continue;
+        if (k->uds) wsprintf(b, "  UDS stick %u", (WORD)(k->uds - 1));
+        else b[0] = 0;
+        uds_mib_text(a, uds_mib((DWORD)k->sectors_lo, (DWORD)k->sectors_hi, 512));
+        if (k->sectors_hi)
+            wsprintf(line(), "DISK  %02Xh %s (%02Xh)%s  %lX%08lX sectors (%s)", (WORD)k->bios,
+                     (LPSTR)uds_dtype_name(k->dtype), (WORD)k->dtype, (LPSTR)b, (DWORD)k->sectors_hi,
+                     (DWORD)k->sectors_lo, (LPSTR)a);
+        else
+            wsprintf(line(), "DISK  %02Xh %s (%02Xh)%s  %lu sectors (%s)", (WORD)k->bios,
+                     (LPSTR)uds_dtype_name(k->dtype), (WORD)k->dtype, (LPSTR)b, (DWORD)k->sectors_lo, (LPSTR)a);
+    }
+    /* the ring, oldest first: the last min(events, 16) before next_event */
+    events = (DWORD)d->events;
+    n = events < UDS_DIAG_EVENTS ? (WORD)events : UDS_DIAG_EVENTS;
+    first = (WORD)((d->next_event - n) & (UDS_DIAG_EVENTS - 1));
+    wsprintf(line(), "DISK events: %lu since boot, last %u (oldest first; ms = SeaBIOS timer)", events, n);
+    for (i = 0; i < n; i++) {
+        const struct uds_diag_event *e = &d->ev[(first + i) & (UDS_DIAG_EVENTS - 1)];
+        if (i % 2 == 0) { l = line(); wsprintf(l, "DISK "); }
+        uds_ev_result(b, e->event, e->result);
+        if (e->dev == 0xFF) wsprintf(a, "-");
+        else if (e->dev >= 0xF0) wsprintf(a, "xHCI%u", (WORD)(e->dev & 0x0F));
+        else wsprintf(a, "%u", (WORD)e->dev);
+        wsprintf(l + lstrlen(l), " #%lu %lums dev %s port %u %s (%s);", events - n + i, (DWORD)e->ms, (LPSTR)a,
+                 (WORD)e->port, (LPSTR)uds_ev_name(e->event), (LPSTR)b);
+    }
+    if (d->version >= 2) show_disk_v2(d, devs);
+}
+
+/* channel 1 (a copy) of the CSMPPrxy mailbox at F-segment offset Off */
+static void show_disk_channel(const struct uds_channel *c, WORD off)
+{
+    DWORD m = (DWORD)c->magic;
+    wsprintf(line(), "DISK channel at F%04X (CSMPPrxy+48): magic %08lX (%s)  req_phys %08lX  doorbell %lu  done %lu%s",
+             off + UDS_CH1_OFFSET, m, (LPSTR)(m == UDS_CH1_MAGIC ? "UDS1" : "not UDS1: CSMWrap before usos16"),
+             (DWORD)c->req_phys, (DWORD)c->doorbell, (DWORD)c->done,
+             (LPSTR)(c->doorbell != c->done ? "  (request in flight)" : ""));
+}
+
+/* the USOSUSB.MPD status page (a copy) at physical At */
+static void show_disk_mp(const struct uds_mp_status *s, DWORD at)
+{
+    WORD i, n;
+    LPSTR l = 0;
+    if (s->sig[0] != UDS_MP_SIG0 || s->sig[1] != UDS_MP_SIG1) {
+        wsprintf(line(), "DISK USOSUSB.MPD status at %08lX: no USOSUMPS signature (%08lX %08lX)", at,
+                 (DWORD)s->sig[0], (DWORD)s->sig[1]);
+        return;
+    }
+    l = line();
+    wsprintf(l, "DISK USOSUSB.MPD %u.%u status at %08lX: version %u  slots %u  srbs %lu  posted %lu  polled %lu  errors %lu  enums %lu  last status %lu %s",
+             (WORD)s->mp_major, (WORD)s->mp_minor, at, (WORD)s->version, (WORD)s->slots, (DWORD)s->srbs,
+             (DWORD)s->posted, (DWORD)s->polled, (DWORD)s->errors, (DWORD)s->enums, (DWORD)s->last_status,
+             (LPSTR)uds_status_name((DWORD)s->last_status));
+    if (s->version >= 2)
+        wsprintf(l + lstrlen(l), "  not ready (empty slot) %lu", (DWORD)s->notready);
+    if (s->version != 1 && s->version != UDS_MP_VERSION) {
+        wsprintf(line(), "DISK  status version %u: slots not decoded (USOSDBG knows version %u)", (WORD)s->version,
+                 (WORD)UDS_MP_VERSION);
+        return;
+    }
+    n = s->slots > UDS_MP_SLOTS ? UDS_MP_SLOTS : s->slots;
+    for (i = 0; i < n; i++) {
+        const struct uds_mp_slot *t = &s->slot[i];
+        char dev[8];
+        if (t->dev == 0xFF) wsprintf(dev, "none");
+        else wsprintf(dev, "%u", (WORD)t->dev);
+        if (i % 2 == 0) { l = line(); wsprintf(l, "DISK "); }
+        wsprintf(l + lstrlen(l), " slot %u: dev %s %s%s gen %lu srbs %lu last op %02Xh SRB status %02X sense %X/%02X/%02X;",
+                 i, (LPSTR)dev, (LPSTR)(t->present ? "present" : "absent"), (LPSTR)(t->ua_pending ? " UA pending" : ""),
+                 (DWORD)t->generation, (DWORD)t->srbs, (WORD)t->last_op, (WORD)t->last_srb_status, (WORD)t->last_key,
+                 (WORD)t->last_asc, (WORD)t->last_ascq);
+    }
+}
+static const char *uds_op_name(BYTE op)
+{
+    switch (op) {
+    case 0x00: return "TEST UNIT READY";
+    case 0x03: return "REQUEST SENSE";
+    case 0x12: return "INQUIRY";
+    case 0x1A: return "MODE SENSE(6)";
+    case 0x1B: return "START STOP";
+    case 0x1E: return "PREVENT/ALLOW";
+    case 0x25: return "READ CAPACITY";
+    case 0x28: return "READ(10)";
+    case 0x2A: return "WRITE(10)";
+    case 0x2F: return "VERIFY(10)";
+    case 0x35: return "SYNC CACHE";
+    case 0x5A: return "MODE SENSE(10)";
+    }
+    return "";
+}
+
+/* the USOSUSB.MPD 1.1 request ring (a copy): the last Max entries, oldest first */
+static void show_disk_ring(const struct uds_mp_ring *r, DWORD at, WORD max)
+{
+    WORD i, n;
+    DWORD count = (DWORD)r->count;
+    if (r->sig[0] != UDS_MP_SIG0 || r->sig[1] != UDS_MP_RSIG1) {
+        wsprintf(line(), "DISK request ring at %08lX: no URNG signature (USOSUSB.MPD 1.0?)", at);
+        return;
+    }
+    n = count < UDS_MP_RING ? (WORD)count : UDS_MP_RING;
+    if (n > max) n = max;
+    wsprintf(line(), "DISK request ring at %08lX: %lu requests, last %u (oldest first; CRC-32 of the data, as zip)", at,
+             count, n);
+    for (i = 0; i < n; i++) {
+        const struct uds_mp_rent *e = &r->ent[((WORD)(r->next % UDS_MP_RING) + UDS_MP_RING - n + i) % UDS_MP_RING];
+        wsprintf(line(), "DISK  #%lu slot %u %02Xh %s  LBA %lu  %lu bytes  CRC %08lX  SRB %02X  uds %u %s",
+                 count - n + i, (WORD)e->slot, (WORD)e->op, (LPSTR)uds_op_name(e->op), (DWORD)e->lba, (DWORD)e->bytes,
+                 (DWORD)e->crc, (WORD)e->srb_status, (WORD)e->uds_status, (LPSTR)uds_status_name((DWORD)e->uds_status));
+    }
+}
+/* DISK-DECODE-END */
+
+static struct uds_diag disk_rec;
+static struct uds_mp_status disk_mp;
+static struct uds_mp_ring disk_ring;
+static struct uds_channel disk_ch;
+
+static void fcopy(void *dst, const BYTE FAR *src, WORD n)
+{
+    BYTE *d = (BYTE *)dst;
+    while (n--) *d++ = *src++;
+}
+
+/* the record: the first MiB in 64 KiB windows, 16-byte steps; returns the
+ * first match, *Matches = how many */
+static DWORD find_udsk(WORD *matches)
+{
+    DWORD at = 0;
+    WORD w, off;
+    *matches = 0;
+    for (w = 0; w < 16; w++) {
+        BYTE FAR *p = physical((DWORD)w << 16, 0x10000L);
+        if (!p) return 0;
+        for (off = w ? 0 : 0x500; ; off += 16) {
+            DWORD FAR *q = (DWORD FAR *)(p + off);
+            if (q[0] == UDS_DIAG_SIG0 && q[1] == UDS_DIAG_SIG1 && p[off + 8] && p[off + 8] < 16) {
+                if (!*matches) at = ((DWORD)w << 16) + off;
+                (*matches)++;
+            }
+            if (off == 0xFFF0) break;
+        }
+    }
+    return at;
+}
+
+static void show_disk(void)
+{
+    BYTE FAR *f;
+    DWORD at, chan = 0, req;
+    WORD off, matches = 0, choff = 0;
+    BYTE ch_found = 0;
+    at = find_udsk(&matches);
+    /* the CSMPPrxy mailbox: F-segment, 8-byte aligned, channel 1 at +48 */
+    f = physical(0xF0000L, 0x10000L);
+    if (f) {
+        for (off = 0; off <= 0xFFF8 - UDS_CH1_OFFSET - sizeof(struct uds_channel); off += 8) {
+            BYTE FAR *p = f + off;
+            if (p[0] == 'C' && p[1] == 'S' && p[2] == 'M' && p[3] == 'P' && p[4] == 'P' && p[5] == 'r' &&
+                p[6] == 'x' && p[7] == 'y') {
+                fcopy(&disk_ch, p + UDS_CH1_OFFSET, sizeof(disk_ch));
+                ch_found = 1;
+                choff = off;
+                chan = 0xF0000L + off + UDS_CH1_OFFSET;
+                break;
+            }
+        }
+    }
+    if (!at) {
+        wsprintf(line(), "DISK: no USOSUDSK record (CSMWrap before 3.1.2-usos16)");
+    } else {
+        BYTE FAR *r = at + sizeof(disk_rec) <= 0x100000L ? physical(at, sizeof(disk_rec)) : 0;
+        if (!r) {
+            wsprintf(line(), "DISK USOSUDSK at %05lX: the record runs past 1 MiB, not read", at);
+        } else {
+            fcopy(&disk_rec, r, sizeof(disk_rec));
+            disk_rec.sig[0] = 0;            /* the copy must not match a later scan */
+            show_disk_record(&disk_rec, at, chan);
+            if (matches > 1)
+                wsprintf(line(), "DISK  (%u USOSUDSK signatures in the first MiB: the first one shown)", matches);
+        }
+    }
+    if (!f) { wsprintf(line(), "DISK channel: F0000-FFFFF not mapped (DPMI 0800h refused)"); return; }
+    if (!ch_found) { wsprintf(line(), "DISK channel: no CSMPPrxy mailbox in F0000-FFFFF"); return; }
+    show_disk_channel(&disk_ch, choff);
+    if (disk_ch.magic != UDS_CH1_MAGIC) return;
+    req = (DWORD)disk_ch.req_phys;
+    if (!req) {
+        wsprintf(line(), "DISK USOSUSB.MPD: no request block (req_phys 0: miniport not loaded or not started)");
+        return;
+    }
+    if (req > 0xFFFFD000UL) {
+        wsprintf(line(), "DISK USOSUSB.MPD: req_phys %08lX out of range, not read", req);
+        return;
+    }
+    {
+        DWORD st = req + UDS_MP_STATUS_OFFSET, page = st & 0xFFFFF000UL;
+        WORD in = (WORD)(st & 0xFFF);
+        BYTE FAR *p = physical(page, in + sizeof(disk_mp) > 0x1000 ? 0x2000 : 0x1000);
+        if (!p) { wsprintf(line(), "DISK USOSUSB.MPD status at %08lX: DPMI 0800h refused", st); return; }
+        fcopy(&disk_mp, p + in, sizeof(disk_mp));
+        show_disk_mp(&disk_mp, st);
+        if (disk_mp.sig[0] == UDS_MP_SIG0 && disk_mp.sig[1] == UDS_MP_SIG1 && disk_mp.version >= 2 &&
+            in + (UDS_MP_RING_OFFSET - UDS_MP_STATUS_OFFSET) + sizeof(disk_ring) <= 0x1000) {
+            fcopy(&disk_ring, p + in + (UDS_MP_RING_OFFSET - UDS_MP_STATUS_OFFSET), sizeof(disk_ring));
+            show_disk_ring(&disk_ring, req + UDS_MP_RING_OFFSET, 16);
+        }
+    }
+}
+
 /* ---------------------------------------------------------- UI */
 static void refresh(void)
 {
     nlines = 0;
+    if (disk_only) {
+        wsprintf(line(), "USOSDBG 1.8 log mode (disk)  tick:%lu", GetTickCount());
+        show_disk();
+        return;
+    }
     if (log_mode)
-        wsprintf(line(), "USOSDBG 1.6 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
+        wsprintf(line(), "USOSDBG 1.8 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
     else
-        wsprintf(line(), "USOSDBG 1.6  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
+        wsprintf(line(), "USOSDBG 1.8  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
                  GetTickCount(), snapshots);
     show_key();
     show_mouse();
     show_wheel();
     show_wheelscroll();
+    show_vmd();
     show_ivt();
     show_map();
     show_irq();
     if (!log_mode || log_pci) show_pci();
     show_net();
+    show_disk();
     if (window) InvalidateRect(window, 0, TRUE);
 }
 
@@ -1127,7 +1725,7 @@ static DWORD hexval(LPSTR p)
     }
 }
 
-/* "/L file /F /N hex" from the command tail (ends at CR or NUL) */
+/* "/L file /F /D /N hex" from the command tail (ends at CR or NUL) */
 static void parse_args(void)
 {
     char FAR *t = (char FAR *)MAKELP(e_cmdseg, e_cmdoff);
@@ -1148,6 +1746,7 @@ static void parse_args(void)
         } else if (arg[0] == '/' || arg[0] == '-') {
             char c = arg[1] & ~0x20;
             if (c == 'F') log_pci = 1;
+            else if (c == 'D') disk_only = 1;
             else if (c == 'L' || c == 'N') opt = c;
         }
     }
@@ -1175,6 +1774,10 @@ static void run_log(HINSTANCE inst)
     HWND w;
     DWORD t0;
     refresh();
+    if (disk_only) {                    /* no counters to compare: one snapshot */
+        write_log();
+        return;
+    }
     wc.style = 0;
     wc.lpfnWndProc = (WNDPROC)DefWindowProc;
     wc.cbClsExtra = 0;

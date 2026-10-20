@@ -163,6 +163,9 @@
   "installer.components.no_release": "Ta različica namestitvenega programa ne pozna svoje izdaje na GitHubu, zato ne more prenašati. Izberite datoteke, ki jih že imate, ali preskočite.",
   "installer.components.checking": "Preverjam, katere komponente ima pogon…",
   "installer.components.check_failed": "Komponent pogona ni bilo mogoče preveriti: %s",
+  "installer.components.legacy.name": "Paket združljivosti za Windows 95/98/Me/NT 4.0 (približno 150 MB)",
+  "installer.components.legacy.need": "Microsoftove knjižnice (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), ki jih paket po namestitvi namesti v Windows 95, 98, Me in NT 4.0.",
+  "installer.components.legacy.skip_note": "Brez njega paket namesti le tisto, kar sami postavite v DATA\\Addons. Dodate ga lahko pozneje s Posodobitvijo USOS ali Popravilom.",
   "installer.components.winpe.name": "Pomočnik WinPE 10 (približno 440 MB)",
   "installer.components.winpe.need": "Potreben za namestitev sistemov Windows Vista in Windows 7 v načinu UEFI.",
   "installer.components.winpe.skip_note": "Brez njega sistemov Windows Vista in Windows 7 ni mogoče namestiti v načinu UEFI. Dodate ga lahko pozneje z Posodobi USOS ali Popravi.",
@@ -1357,5 +1360,7 @@
   "boot.lx.logon_domain_profile_password": "Po namestitvi se prijavite v domeno {1} kot {0} z geslom, nastavljenim v profilu odgovorov.",
   "boot.lx.logon_autologon": "Po namestitvi se Windows samodejno prijavi kot {0}.",
   "boot.lx.logon_setup_asks": "Namestitveni program Windows med namestitvijo vpraša za uporabniško ime in geslo; USOS ju ne nastavi.",
-  "boot.lx.logon_answer_file": "Po namestitvi se prijavite z računom iz svoje datoteke odgovorov {0}."
+  "boot.lx.logon_answer_file": "Po namestitvi se prijavite z računom iz svoje datoteke odgovorov {0}.",
+  "boot.profile.field.display_bpp": "Barvna globina",
+  "boot.profile.help.display_legacy": "Uporabi se po namestitvi na pravi strojni opremi. Samodejno izbere razpoložljivi način do 1920x1080 z varnim prehodom na nižjega. Nespremenjeno ohrani nastavitve. Samodejna globina: 32 bitov, če je na voljo, sicer 16."
 }

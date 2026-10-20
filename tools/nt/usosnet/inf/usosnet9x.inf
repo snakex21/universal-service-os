@@ -13,7 +13,7 @@ Signature="$CHICAGO$"
 Class=Net
 ClassGUID={4d36e972-e325-11ce-bfc1-08002be10318}
 Provider=%USOS%
-DriverVer=10/18/2026,0.4.0.0
+DriverVer=10/20/2026,0.5.0.0
 
 [Manufacturer]
 %Intel%=Intel

@@ -157,6 +157,9 @@
   "installer.components.no_release": "Esta compilación del instalador no conoce su versión de GitHub, así que no puede descargar. Elija archivos que ya tenga u omita.",
   "installer.components.checking": "Comprobando qué componentes tiene la unidad…",
   "installer.components.check_failed": "No se pudieron comprobar los componentes de la unidad: %s",
+  "installer.components.legacy.name": "Paquete de compatibilidad de Windows 95/98/Me/NT 4.0 (unos 150 MB)",
+  "installer.components.legacy.need": "Bibliotecas de Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) que el paquete instala en Windows 95, 98, Me y NT 4.0 después de la instalación.",
+  "installer.components.legacy.skip_note": "Sin él, el paquete solo instala lo que usted ponga en DATA\\Addons. Puede añadirlo más tarde con Actualizar USOS o Reparar.",
   "installer.components.winpe.name": "Asistente WinPE 10 (unos 440 MB)",
   "installer.components.winpe.need": "Necesario para instalar Windows Vista y Windows 7 en modo UEFI.",
   "installer.components.winpe.skip_note": "Sin él, Windows Vista y Windows 7 no se pueden instalar en modo UEFI. Puede añadirlo más tarde con Actualizar USOS o Reparar.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Tras la instalación, inicie sesión en el dominio {1} como {0} con la contraseña definida en el perfil de respuestas.",
   "boot.lx.logon_autologon": "Tras la instalación, Windows inicia sesión automáticamente como {0}.",
   "boot.lx.logon_setup_asks": "El programa de instalación de Windows pide el nombre de usuario y la contraseña durante la instalación; USOS no los define.",
-  "boot.lx.logon_answer_file": "Tras la instalación, inicie sesión con la cuenta de su archivo de respuestas {0}."
+  "boot.lx.logon_answer_file": "Tras la instalación, inicie sesión con la cuenta de su archivo de respuestas {0}.",
+  "boot.profile.field.display_bpp": "Profundidad de color",
+  "boot.profile.help.display_legacy": "Se aplica tras instalar en el equipo real. Automático elige un modo disponible de hasta 1920x1080 con una alternativa segura. Sin cambios conserva los ajustes. La profundidad automática prefiere 32 bits si están disponibles; si no, 16."
 }

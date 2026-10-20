@@ -160,6 +160,9 @@
   "installer.components.no_release": "Ova inačica instalacijskog programa ne zna svoje izdanje na GitHubu pa ne može preuzimati. Odaberite datoteke koje već imate ili preskočite.",
   "installer.components.checking": "Provjeravam koje komponente pogon ima…",
   "installer.components.check_failed": "Nije moguće provjeriti komponente pogona: %s",
+  "installer.components.legacy.name": "Paket kompatibilnosti za Windows 95/98/Me/NT 4.0 (oko 150 MB)",
+  "installer.components.legacy.need": "Microsoftove biblioteke (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) koje paket nakon instalacije instalira u Windows 95, 98, Me i NT 4.0.",
+  "installer.components.legacy.skip_note": "Bez njega paket instalira samo ono što sami stavite u DATA\\Addons. Možete ga dodati kasnije putem Ažuriranja USOS-a ili Popravka.",
   "installer.components.winpe.name": "WinPE 10 pomoćnik (oko 440 MB)",
   "installer.components.winpe.need": "Potreban za instalaciju sustava Windows Vista i Windows 7 u UEFI načinu.",
   "installer.components.winpe.skip_note": "Bez njega se Windows Vista i Windows 7 ne mogu instalirati u UEFI načinu. Možete ga dodati kasnije putem Ažuriraj USOS ili Popravi.",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "Nakon instalacije prijavite se u domenu {1} kao {0} lozinkom postavljenom u profilu odgovora.",
   "boot.lx.logon_autologon": "Nakon instalacije Windows se automatski prijavljuje kao {0}.",
   "boot.lx.logon_setup_asks": "Instalacija sustava Windows tijekom instalacije traži korisničko ime i lozinku; USOS ih ne postavlja.",
-  "boot.lx.logon_answer_file": "Nakon instalacije prijavite se računom iz svoje datoteke odgovora {0}."
+  "boot.lx.logon_answer_file": "Nakon instalacije prijavite se računom iz svoje datoteke odgovora {0}.",
+  "boot.profile.field.display_bpp": "Dubina boje",
+  "boot.profile.help.display_legacy": "Primjenjuje se nakon instalacije na stvarnom hardveru. Automatski bira dostupan način do 1920x1080 uz siguran povratak na niži. Bez promjene zadržava postavke. Automatska dubina: 32 bita ako je dostupno, inače 16."
 }

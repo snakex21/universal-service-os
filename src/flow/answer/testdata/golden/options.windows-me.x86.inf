@@ -32,12 +32,35 @@ ComputerName="USOS-9X"
 Workgroup="USOSLAB"
 Description="Tester"
 Display=0
-Clients=
-Protocols=
+PrimaryLogon=Windows
+Clients=VREDIR
+Protocols=MSTCP
 Services=
 
+[VREDIR]
+ValidatedLogon=0
+
+[MSTCP]
+DHCP=1
+DNS=1
+Hostname=USOS-9X
+
+[OptionalComponents]
+"Dial-Up Networking"=0
+"Dial-Up Server"=0
+"Direct Cable Connection"=0
+;USOS-NETWORK=on
+;USOS-IP=dhcp
+;USOS-GATEWAY=
+;USOS-DNS=
+;USOS-HOME=about:blank
+;USOS-DIALUP=off
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
+
 [Install]
-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 
@@ -52,6 +75,26 @@ HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
 HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
+
+[USOS.Lan]
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",EnableAutodial,0x00010001,0
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",ProxyEnable,0x00010001,0
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",GlobalUserOffline,0x00010001,0
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",NoNetAutodial,0x00010001,1
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",EnableAutodial,0x00010001,0
+HKCU,"Software\Microsoft\Internet Connection Wizard",Completed,1,01,00,00,00
+HKCU,"Software\Microsoft\Internet Explorer\Main","Start Page",,"about:blank"
+HKCU,"Software\Microsoft\Internet Explorer\Main","First Home Page",,"about:blank"
+HKCU,"Software\Microsoft\Internet Explorer\Main",RunOnceHasShown,0x00010001,1
+HKCU,"Software\Microsoft\Internet Explorer\Main",RunOnceComplete,0x00010001,1
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",AutoAdminLogon,,"1"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultUserName,,"Tester"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultPassword,,""
+HKLM,"System\CurrentControlSet\Services\VxD\MSTCP",EnableDNS,,"1"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSLan,,"C:\USOS9X\USOSLAN.EXE"
+
+[USOS.Addons]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.Memory]
 system.ini,386Enh,,"MaxPhysPage=40000"
@@ -72,5 +115,5 @@ HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
 HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
 
 ; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines
-; (Me) or the USOS.CsmReg section (98, 98 SE); missing, it is skipped.
+; (Me) and the USOS.CsmReg section (every 9x); missing, it is skipped.
 [USOS.Csm]

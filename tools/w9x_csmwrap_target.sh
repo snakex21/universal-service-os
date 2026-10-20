@@ -56,6 +56,37 @@ DIAG_FLAG=${W9X_DIAG_FLAG:-$ESP_DIR/win9x/diag.flag}
 # (tools/w9x_csmwrap_prepare.sh): usosnvme.mpd (tools/w9x_nvme.sh) instead
 # of MS-DOS compatibility mode, unless the disk fails w9x_nvme_check.
 NVME_DRIVER=${W9X_NVME_DRIVER:-0}
+# With usosnvme.mpd the boot disk is the only BIOS hard disk (csmwrap.ini
+# int13_boot_disk_only = true, CSMWrap patch 0014): a USB stick or another
+# disk with a BIOS number shifts the 9x INT 13h units / DOS letters (X470: Me
+# stops with "cannot find KRNL386.EXE") and gets IOS MBR stamps written at
+# every boot (docs/usb9x-hotswap-design-2026-10-19.md section 2). This empty
+# flag on the USOS stick keeps the old mapping (the stick through INT 13h).
+INT13_ALL_FLAG=${W9X_INT13_ALL_FLAG:-$ESP_DIR/win9x/int13-all-disks.flag}
+# 1 (tools/w9x_csmwrap_prepare.sh: the default, 0 with DATA's 9x
+# usb-storage-off.txt): USB sticks in Windows through USOSUSB.MPD
+# (tools/nt/usosusb9x, docs/usb9x-hotswap-design-2026-10-19.md; X470 Windows
+# Me PASS 2026-10-19 with hot-swap). It talks to the SeaBIOS USB disk service
+# of CSMWrap >= 3.1.2-usos17 and only offers sticks without a BIOS number, so
+# the boot disk becomes the only BIOS hard disk on SATA targets too. Never
+# together with xhci98 (one xHCI owner). Windows 95: on as well (same
+# SCSIPORT miniport and real-mode REGEDIT import as 98; not run on 95 yet).
+USB_STORAGE=${W9X_USB_STORAGE:-0}
+# 1 (prepare.sh default, 0 with DATA's vmd-off.txt): the USB mouse in MS-DOS
+# boxes through USOSVMD.VXD, a VMOUSE minidriver (docs/dos-mouse-2026-10-18.md;
+# X470 Windows Me PASS 2026-10-19 with v3.1). 98 / 98 SE / Me with the USOS
+# answer only; never on 95 (not tested there).
+VMD=${W9X_VMD:-0}
+# 1 (prepare.sh default, 0 with DATA's logging-off.txt): USOSLOG.EXE, the
+# silent logger (docs/usoslog.md), starts with Windows from the machine Run
+# key and writes C:\USOS9X\LOGS (USOS answer only).
+LOGGING=${W9X_LOGGING:-0}
+# Services\Class\SCSIAdapter\<n> of USOSUSB's Root devnode (@CLASSIDX@ in
+# USOSUSB.REG). The 9x class installer gives each new SCSI adapter the lowest
+# free number from 0000; 0090 is reached only after 90 SCSI adapter instances,
+# so it cannot meet one Setup or a later driver install writes. Fixed, so a
+# second import overwrites the same key instead of adding one.
+USOSUSB_CLASSIDX=0090
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -223,6 +254,54 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# Display: the answer's ;USOS-DISPLAY= request, else (user decision
+# 2026-10-20) auto = the highest validated mode up to 1920x1080 for every
+# USOS-made answer. A user's own answer file (copied 1:1) gets no request.
+# Setup and the first start keep the INF's safe mode; USOSRES applies the
+# mode at the first hardware sign-in (CDS_TEST, rollback; defers in the VM).
+display_request=
+if grep -q '^;USOS-DISPLAY=' "$ANSWER_INF"; then
+    . "$LIB/display_profile.sh"
+    display_request=$(usos_display_from_answer "$ANSWER_INF") || fail 'invalid display request'
+elif [ "$ANSWER_KIND" != USER ] && [ -f "$LIB/w9x-display/USOSRES.EXE" ] && [ -f "$LIB/w9x-display/USOSVBI.EXE" ]; then
+    . "$LIB/display_profile.sh"
+    display_request=autoxauto
+    log 'display: no request in the answer, default auto (up to 1920x1080)'
+fi
+if [ -n "$display_request" ]; then
+    usos_display_stage "$work/c/USOS9X" "$LIB/w9x-display/USOSRES.EXE" "$display_request" || fail 'cannot stage 9x display request'
+    cp "$LIB/w9x-display/USOSVBI.EXE" "$work/c/USOS9X/USOSVBI.EXE" || fail 'cannot stage VBE reader'
+    usos_display_9x_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/display-answer.inf" || fail 'cannot register hardware display request'
+    cp "$work/display-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage display answer'
+    log "display: request=$display_request, validated VBE/INF mode at hardware logon"
+fi
+# Me, stock user USOS: the empty-password list (tools/w9x_logon.sh), so the
+# first start after Setup signs in without the Windows password dialog.
+# INSTALL.BAT copies C:\USOS9X\USOS.PWL into C:\WINDOWS before Setup.
+rm -f "$work/c/USOS9X/USOS.PWL"
+if [ -f "$LIB/w9x_logon.sh" ] && [ -f "$LIB/w9x/USOSME.PWL" ]; then
+    . "$LIB/w9x_logon.sh"
+    if usos_w9x_pwl_wanted "$work/c/USOS9X/MSBATCH.INF" "$SYSTEM_TAG" "$ANSWER_KIND"; then
+        usos_w9x_pwl_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/pwl-answer.inf" || fail 'cannot add the password list to the answer'
+        cp "$work/pwl-answer.inf" "$work/c/USOS9X/MSBATCH.INF" && cp "$LIB/w9x/USOSME.PWL" "$work/c/USOS9X/USOS.PWL" ||
+            fail 'cannot stage the password list'
+        log 'logon: Me user USOS, empty-password list staged (no first-start password dialog)'
+    fi
+fi
+. "$LIB/network_setup.sh"
+usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
+usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+rm -f "$work/network.ini"
+. "$LIB/legacy_addons.sh"
+usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
+addon_os=$SYSTEM_TAG;[ "$addon_os" != 98 ] || addon_os=98FE
+addon_lang=XX
+if [ -x "$LIB/addons/legacy-stage-plan" ]; then addon_lang=$("$LIB/addons/legacy-stage-plan" language "$work/c/$SETUP_FOLDER/SETUP.TXT") || addon_lang=XX; fi
+usos_addons_stage "$work/addons.ini" "$work/c" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" "$addon_os" "$addon_lang" || fail 'cannot stage legacy pack'
+rm -f "$work/addons.ini"
+if [ ! -f "$work/c/USOS/ADDONS/USOSADD.EXE" ]; then
+    sed '/^HKLM,.*USOSAddons,,/d' "$work/c/USOS9X/MSBATCH.INF" > "$work/MSBATCH.NEW" && mv "$work/MSBATCH.NEW" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot drop missing addon runner'
+fi
 for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done
@@ -290,6 +369,132 @@ if [ "$NVME_DRIVER" = 1 ]; then
     fi
 fi
 [ "$nvme_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSNVME.MPD" "$work/c/USOS9X/USOSNVME.INF"
+# USB sticks through USOSUSB.MPD (default; off: usb-storage-off.txt): USOSUSB.MPD,
+# .INF and .REG (class instance filled in) stay in C:\USOS9X, U9ENV.BAT gets
+# U9UDS=1 (U9USB is xhci98's). INSTALL.BAT then: 95/98/98 SE: AUTOEXEC.BAT
+# calls USBREG.BAT, which once Setup made the registry copies the MPD into
+# C:\WINDOWS\SYSTEM\IOSUBSYS and imports USOSUSB.REG with real-mode REGEDIT
+# (one attempt, USBREG.RUN / USBREG.OK); Me (no real-mode AUTOEXEC.BAT): the
+# MPD into IOSUBSYS before Setup, the REG by machine RunOnce regedit /s.
+uds_ok=0
+if [ "$USB_STORAGE" = 1 ]; then
+    if [ -e "$XHCI98_FLAG" ]; then
+        log 'usb storage: USOSUSB.MPD skipped: win9x/xhci98.flag chose xhci98 (one xHCI owner); no USB stick in Windows'
+    elif [ "$SYSTEM_TAG:$ANSWER_KIND" = ME:USER ]; then
+        # Me imports USOSUSB.REG through INSTALL.BAT's lines in the USOS answer.
+        log "usb storage: USOSUSB.MPD skipped: Windows Me with the user's own answer file (no RunOnce import)"
+    elif [ ! -f "$work/c/USOS9X/USOSUSB.MPD" ] || [ ! -f "$work/c/USOS9X/USOSUSB.INF" ] ||
+        [ ! -f "$work/c/USOS9X/USOSUSB.REG" ]; then
+        log 'usb storage: USOSUSB.MPD is not in this payload; no USB stick in Windows'
+    elif ! head -n 1 "$work/c/USOS9X/USOSUSB.REG" | grep -q '^REGEDIT4'; then
+        log 'usb storage: USOSUSB.REG is not a REGEDIT4 file; USOSUSB.MPD skipped'
+    else
+        sed "s/@CLASSIDX@/$USOSUSB_CLASSIDX/g" "$work/c/USOS9X/USOSUSB.REG" > "$work/USOSUSB.REG" &&
+            cp "$work/USOSUSB.REG" "$work/c/USOS9X/USOSUSB.REG" || fail 'cannot write USOSUSB.REG'
+        if [ "$SYSTEM_TAG" != ME ]; then
+            U='C:\USOS9X\'
+            A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
+            R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
+            sed 's/$/\r/' > "$work/c/USOS9X/USBREG.BAT" <<EOF || fail 'cannot write USBREG.BAT'
+@ECHO OFF
+REM USOS: USB stick miniport USOSUSB.MPD (off: DATA usb-storage-off.txt).
+REM Runs from AUTOEXEC.BAT before Windows starts, at most once (USBREG.RUN).
+IF EXIST ${U}USBREG.OK GOTO END
+IF EXIST ${U}USBREG.RUN GOTO END
+IF NOT EXIST ${U}USOSUSB.REG GOTO END
+IF NOT EXIST ${U}USOSUSB.MPD GOTO END
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM\IOSUBSYS\NUL GOTO END
+IF NOT EXIST $A GOTO END
+COPY /Y ${U}USOSUSB.MPD C:\WINDOWS\SYSTEM\IOSUBSYS > NUL
+IF NOT EXIST C:\WINDOWS\SYSTEM\IOSUBSYS\USOSUSB.MPD GOTO END
+ECHO run> ${U}USBREG.RUN
+C:
+CD \WINDOWS
+$A -S -R -H SYSTEM.DAT
+$A -S -R -H USER.DAT
+$R ${U}USOSUSB.REG
+$R /E ${U}USBCHK.REG HKEY_LOCAL_MACHINE\Enum\Root\SCSIAdapter
+$A +S +R +H SYSTEM.DAT
+$A +S +R +H USER.DAT
+ECHO ok> ${U}USBREG.OK
+CD \\
+:END
+EOF
+        fi
+        printf 'SET U9UDS=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+        uds_ok=1
+        log 'usb storage: USOSUSB.MPD (default; usb-storage-off.txt turns it off), Services\Class\SCSIAdapter\'"$USOSUSB_CLASSIDX"'; needs CSMWrap >= 3.1.2-usos17 (USB disk service, hot-swap) on this disk'
+    fi
+fi
+[ "$uds_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSUSB.MPD" "$work/c/USOS9X/USOSUSB.INF" "$work/c/USOS9X/USOSUSB.REG"
+# The mouse in MS-DOS boxes (VMD=1): USOSVMD.VXD stays in C:\USOS9X with the
+# switch file USOSVMD.ON (USOSMOUS.DRV enters VMOUSE mode only with it) and
+# USOSVMD.INF, which machine RunOnce runs once after Setup (MSBATCH.INF
+# [USOS.CsmReg], INSTALL.BAT): SYSTEM.INI [386Enh] device=*vmouse and
+# device=C:\USOS9X\USOSVMD.VXD, the X470 Me end state. Effective from the next
+# start, like the Me mouse.drv switch. U9FIX /CSM (95/98) deletes only
+# mouse=*vmouse lines, never these. Off on the installed system: delete the
+# two device= lines (USOSVMD.ON alone only switches USOSMOUS's VMOUSE mode).
+vmd_ok=0
+if [ "$VMD" = 1 ]; then
+    if [ "$SYSTEM_TAG" = 95 ]; then
+        log 'dos-box mouse: USOSVMD.VXD off on Windows 95 (not tested there)'
+    elif [ "$ANSWER_KIND" = USER ]; then
+        log "dos-box mouse: USOSVMD.VXD skipped: the user's own answer file (no RunOnce for USOSVMD.INF)"
+    elif [ ! -f "$work/c/USOS9X/USOSVMD.VXD" ] || [ ! -f "$work/c/USOS9X/USOSMOUS.DRV" ]; then
+        log 'dos-box mouse: USOSVMD.VXD or USOSMOUS.DRV is not in this payload'
+    else
+        printf 'USOSVMD.VXD (VMOUSE mode) on. Delete this file to switch USOSMOUS off; the VxD itself loads from the SYSTEM.INI device= lines.\r\n' \
+            > "$work/c/USOS9X/USOSVMD.ON" || fail 'cannot write USOSVMD.ON'
+        sed 's/$/\r/' > "$work/c/USOS9X/USOSVMD.INF" <<'EOF' || fail 'cannot write USOSVMD.INF'
+; USOS: the USB mouse in MS-DOS boxes (USOSVMD.VXD, a VMOUSE minidriver).
+; Machine RunOnce runs it once after Setup; effective from the next start.
+; Off: delete both device= lines in SYSTEM.INI [386Enh].
+[Version]
+Signature="$CHICAGO$"
+[DefaultInstall]
+UpdateInis=USOS.Vmd.Ini
+[USOS.Vmd.Ini]
+system.ini,386Enh,,"device=*vmouse"
+system.ini,386Enh,,"device=C:\USOS9X\USOSVMD.VXD"
+EOF
+        printf 'SET U9VMD=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+        vmd_ok=1
+        log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF (default; vmd-off.txt turns it off)'
+    fi
+fi
+[ "$vmd_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"
+# The silent logger (LOGGING=1, USOS answer): USOSLOG.EXE starts from the
+# machine Run key (MSBATCH.INF [USOS.CsmReg], INSTALL.BAT) at every start, no
+# window; C:\USOS9X\LOGS. A Run value, not a Startup folder shortcut: the
+# folder name depends on the Windows language and exists only after Setup.
+log_ok=0
+if [ "$LOGGING" = 1 ]; then
+    if [ "$ANSWER_KIND" = USER ]; then
+        log "logging: USOSLOG.EXE not started automatically: the user's own answer file"
+    elif [ ! -f "$work/c/USOS9X/USOSLOG.EXE" ]; then
+        log 'logging: USOSLOG.EXE is not in this payload'
+    else
+        printf 'SET U9LOG=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+        log_ok=1
+        log 'logging: USOSLOG.EXE from the machine Run key, C:\USOS9X\LOGS (default; logging-off.txt turns it off)'
+    fi
+fi
+[ "$log_ok" = 1 ] || log 'logging: USOSLOG.EXE stays in C:\USOS9X (not started)'
+# The boot disk is the only BIOS hard disk with usosnvme.mpd (NVMe) and with
+# USOSUSB.MPD (every target: it offers only sticks without a BIOS number).
+int13_only=off
+if [ "$nvme_ok" = 1 ] || [ "$uds_ok" = 1 ]; then
+    if [ -e "$INT13_ALL_FLAG" ]; then
+        log 'int13: every disk keeps a BIOS number (win9x/int13-all-disks.flag)'
+        [ "$uds_ok" != 1 ] || log 'usb storage: USOSUSB.MPD will offer no stick: with win9x/int13-all-disks.flag the stick is a BIOS disk (INT 13h owns it)'
+    else
+        int13_only=on
+        log 'int13: only the boot disk is a BIOS hard disk (csmwrap.ini int13_boot_disk_only)'
+    fi
+fi
 
 case "$SYSTEM_TAG:$TIME_ZONE" in
     98SE:?*|98:?*|95:?*)
@@ -350,7 +555,7 @@ blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 # has no IRQ steering miniport for current chipsets and takes PCI IRQs from
 # the BIOS, so CSMWrap routes PCI INTx to 8259 IRQs for it (csmwrap.ini
 # pci_irq_routing = true, CSMWrap 3.1.2-usos12 patch 0015).
-TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
+TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on USOS_INT13_BOOT_DISK_ONLY=$int13_only sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
 [ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 12 ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'

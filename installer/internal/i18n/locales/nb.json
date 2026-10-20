@@ -157,6 +157,9 @@
   "installer.components.no_release": "Denne versjonen av installasjonsprogrammet kjenner ikke GitHub-utgivelsen sin og kan derfor ikke laste ned. Velg filer du allerede har, eller hopp over.",
   "installer.components.checking": "Kontrollerer hvilke komponenter stasjonen har…",
   "installer.components.check_failed": "Kunne ikke kontrollere stasjonens komponenter: %s",
+  "installer.components.legacy.name": "Kompatibilitetspakke for Windows 95/98/Me/NT 4.0 (ca. 150 MB)",
+  "installer.components.legacy.need": "Microsoft-biblioteker (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) som pakken installerer i Windows 95, 98, Me og NT 4.0 etter installasjonen.",
+  "installer.components.legacy.skip_note": "Uten den installerer pakken bare det du selv legger i DATA\\Addons. Du kan legge den til senere med Oppdater USOS eller Reparer.",
   "installer.components.winpe.name": "WinPE 10-hjelper (ca. 440 MB)",
   "installer.components.winpe.need": "Nødvendig for å installere Windows Vista og Windows 7 i UEFI-modus.",
   "installer.components.winpe.skip_note": "Uten den kan ikke Windows Vista og Windows 7 installeres i UEFI-modus. Du kan legge den til senere med Oppdater USOS eller Reparer.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Logg på domenet {1} som {0} etter installasjonen med passordet fra svarprofilen.",
   "boot.lx.logon_autologon": "Etter installasjonen logger Windows automatisk på som {0}.",
   "boot.lx.logon_setup_asks": "Windows installasjonsprogram spør etter brukernavn og passord under installasjonen; USOS angir dem ikke.",
-  "boot.lx.logon_answer_file": "Logg på etter installasjonen med kontoen fra svarfilen din {0}."
+  "boot.lx.logon_answer_file": "Logg på etter installasjonen med kontoen fra svarfilen din {0}.",
+  "boot.profile.field.display_bpp": "Fargedybde",
+  "boot.profile.help.display_legacy": "Brukes etter installasjon på den faktiske maskinvaren. Automatisk velger en tilgjengelig modus opptil 1920x1080 med trygg tilbakeføring. Uendret beholder innstillingene. Automatisk fargedybde foretrekker 32 bit, ellers 16."
 }

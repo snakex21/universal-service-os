@@ -1,0 +1,323 @@
+USOS CSMWrap patch 0018 (2026-10-18): USB mouse wheel diagnostics record
+
+Windows Me on the X470 (CSMWrap 3.1.2-usos13): the USB mouse moves and
+clicks, the wheel does nothing. Patch 0016 decides at setup between the HID
+report protocol (wheel) and the boot protocol; nothing showed which one it
+took and why. With this patch SeaBIOS keeps a small record in its low
+memory zone (VARLOW, 16-byte aligned, signature "USOS" "MWHL" written at
+setup, version 1), read by USOSDBG.EXE from the first MiB:
+- per mouse (first 4): interface number, wMaxPacketSize, report or boot
+  protocol, a reason code when boot (long item, bad report ID, nested Push,
+  Pop without Push, too many report IDs, field too big, a report longer
+  than one packet, no relative X / Y / wheel / button 1, X without report
+  ID, no HID descriptor, descriptor too long, no memory, GET_DESCRIPTOR or
+  SET_PROTOCOL failed), report ID, wDescriptorLength, the parsed layout;
+- the first 160 bytes of the first mouse's report descriptor;
+- the IntelliMouse state (device ID, last two sample rates), the number of
+  packets, of packets with a nonzero wheel value and of skipped packets of
+  other report IDs, the last raw packet and its wheel value.
+hid_parse_mouse returns these reason codes instead of -1; every decision is
+the same as in 0016 (0 = report protocol, any negative value = boot). The
+record is only written, never read by the BIOS; the keyboard path, the PS/2
+BIOS INT 15h C2xxh behaviour and the packets passed on are unchanged.
+
+Own code. Applies after 0001-0010, 0012, 0014-0017, patch -p1 from the top
+of the tree. Part of a MODIFIED CSMWrap made by the USOS project (SeaBIOS
+LGPLv3).
+
+diff -ruN a/seabios/src/hw/usb-hid.c b/seabios/src/hw/usb-hid.c
+--- a/seabios/src/hw/usb-hid.c
++++ b/seabios/src/hw/usb-hid.c
+@@ -34,6 +34,7 @@
+     struct mouse_node *next;
+     u8 report;          // 1 = report protocol (layout below), 0 = boot
+     u8 report_id;       // 0 = the device uses no report IDs
++    u8 diag;            // slot in usb_mouse_diag.dev (0xff: none)
+     struct hid_loc loc[6];
+ };
+ 
+@@ -44,6 +45,65 @@
+ // and the device ID (0 standard PS/2 mouse, 3 IntelliMouse with wheel).
+ u8 usb_mouse_rate1 VARLOW, usb_mouse_rate2 VARLOW, usb_mouse_id VARLOW;
+ 
++// USOS (usb-mouse-wheel diagnostics): what the mouse setup decided and the
++// last packet, for USOSDBG.EXE (it scans the first MiB in 16-byte steps for
++// the signature). Written at setup and per packet; never read back by the
++// BIOS. The signature is set at setup, so the image copy never has it.
++#define USB_MOUSE_DIAG_DEVS 4
++#define USB_MOUSE_DIAG_DESC 160
++struct usb_mouse_diag_dev {
++    u8 iface, maxpacket, report, report_id;
++    s8 result;          // 0 report protocol, < 0 why boot (USB_MD_*)
++    u8 pad;
++    u16 desclen;        // wDescriptorLength of the HID descriptor
++    struct hid_loc loc[6];
++};
++struct usb_mouse_diag {
++    u32 sig[2];         // "USOS" "MWHL" (two immediates: no string in the image)
++    u8 version;         // 1
++    u8 count;           // mice set up (all, also beyond DEVS)
++    u8 wheel;           // usb_mouse_wheel
++    u8 id;              // usb_mouse_id (3 after the knock)
++    u8 rate1, rate2;    // last two sample rates (after the knock: 100, 80)
++    u8 last_dev;        // slot of the last packet's mouse
++    s8 last_z;          // its wheel value (IntelliMouse sign)
++    u32 packets;        // packets handled, all mice
++    u32 zpackets;       // of them with a nonzero wheel value
++    u32 skipped;        // report protocol packets of another report ID
++    u8 last_raw[16];    // the last packet as read (maxpacket bytes valid)
++    struct usb_mouse_diag_dev dev[USB_MOUSE_DIAG_DEVS];
++    u16 desc_got;       // bytes of dev[0]'s report descriptor in desc
++    u8 desc[USB_MOUSE_DIAG_DESC];
++};
++struct usb_mouse_diag usb_mouse_diag VARLOW __aligned(16);
++
++// Why a mouse stays in the boot protocol (usb_mouse_diag_dev.result).
++#define USB_MD_LONGITEM   -1    // long item or truncated item
++#define USB_MD_BADID      -2    // Report ID 0 or > 255
++#define USB_MD_PUSH       -3    // nested Push
++#define USB_MD_POP        -4    // Pop without Push
++#define USB_MD_MANYIDS    -5    // more than 8 input report IDs
++#define USB_MD_BIGFIELD   -6    // Report Size > 32 or Report Count > 255
++#define USB_MD_LONGREPORT -7    // an input report longer than one packet
++#define USB_MD_NOX        -8
++#define USB_MD_NOY        -9
++#define USB_MD_NOWHEEL    -10
++#define USB_MD_NOBUTTON   -11
++#define USB_MD_XNOID      -12   // report IDs, but X in a report without one
++#define USB_MD_NOHIDDESC  -20   // no HID class descriptor naming a report
++#define USB_MD_DESCLEN    -21   // report descriptor longer than MAX_REPORT_DESC
++#define USB_MD_NOMEM      -22
++#define USB_MD_GETDESC    -23   // GET_DESCRIPTOR (report) failed
++#define USB_MD_SETPROTO   -30   // SET_PROTOCOL (report) failed
++
++static void
++usb_mouse_diag_rates(void)
++{
++    SET_LOW(usb_mouse_diag.id, GET_LOW(usb_mouse_id));
++    SET_LOW(usb_mouse_diag.rate1, GET_LOW(usb_mouse_rate1));
++    SET_LOW(usb_mouse_diag.rate2, GET_LOW(usb_mouse_rate2));
++}
++
+ static int
+ add_pipe_node(struct pipe_node **list
+               , struct usbdevice_s *usbdev
+@@ -166,7 +226,7 @@
+         u8 p = *d++;
+         int sz = (p & 3) == 3 ? 4 : p & 3;
+         if (p == 0xfe || d + sz > end)
+-            return -1;                          // long item, truncated
++            return USB_MD_LONGITEM;             // long item, truncated
+         u32 v = 0;
+         for (i = sz; i--; )
+             v = (v << 8) | d[i];
+@@ -179,19 +239,19 @@
+         case 0x74: rsize = v; break;
+         case 0x84:
+             if (!v || v > 255)
+-                return -1;
++                return USB_MD_BADID;
+             id = v; has_ids = 1; break;
+         case 0x94: rcount = v; break;
+         case 0xa4:                              // push (one level)
+             if (pushed)
+-                return -1;
++                return USB_MD_PUSH;
+             saved[0] = page; saved[1] = lneg; saved[2] = rsize;
+             saved[3] = rcount; saved[4] = id;
+             pushed = 1;
+             break;
+         case 0xb4:                              // pop
+             if (!pushed)
+-                return -1;
++                return USB_MD_POP;
+             page = saved[0]; lneg = saved[1]; rsize = saved[2];
+             rcount = saved[3]; id = saved[4];
+             pushed = 0;
+@@ -205,12 +265,12 @@
+                 ;
+             if (slot == nids) {
+                 if (nids >= ARRAY_SIZE(ids))
+-                    return -1;
++                    return USB_MD_MANYIDS;
+                 ids[nids] = id;
+                 offs[nids++] = 0;
+             }
+             if (rsize > 32 || rcount > 255)
+-                return -1;
++                return USB_MD_BIGFIELD;
+             for (i = 0; i < rcount && (v & 3) == 2; i++) {   // data, variable
+                 u32 u = range ? (umin + i <= umax ? umin + i : umax)
+                     : nu ? usage[i < nu ? i : nu - 1] : 0;
+@@ -241,17 +301,25 @@
+     // each packet starts a report and its first byte is the report ID.
+     for (i = 0; i < nids; i++)
+         if ((has_ids ? 8 : 0) + offs[i] > maxbits)
+-            return -1;
+-    if (!m->loc[0].size || !m->loc[1].size || !m->loc[2].size
+-        || !m->loc[3].size || (has_ids && !fid[0]))
+-        return -1;
++            return USB_MD_LONGREPORT;
++    if (!m->loc[0].size)
++        return USB_MD_NOX;
++    if (!m->loc[1].size)
++        return USB_MD_NOY;
++    if (!m->loc[2].size)
++        return USB_MD_NOWHEEL;
++    if (!m->loc[3].size)
++        return USB_MD_NOBUTTON;
++    if (has_ids && !fid[0])
++        return USB_MD_XNOID;
+     m->report_id = has_ids ? fid[0] : 0;
+     return 0;
+ }
+ 
+ // Read the interface's HID report descriptor and parse it.
+ static int
+-usb_mouse_layout(struct usbdevice_s *usbdev, struct mouse_node *m, int maxpacket)
++usb_mouse_layout(struct usbdevice_s *usbdev, struct mouse_node *m, int maxpacket
++                 , int slot)
+ {
+     struct usb_interface_descriptor *iface = usbdev->iface;
+     u8 *p = (void*)iface + iface->bLength, *end = (void*)iface + usbdev->imax;
+@@ -264,11 +332,15 @@
+         }
+         p += p[0];
+     }
+-    if (rlen <= 0 || rlen > MAX_REPORT_DESC)
+-        return -1;
++    if (slot < USB_MOUSE_DIAG_DEVS)
++        SET_LOW(usb_mouse_diag.dev[slot].desclen, rlen);
++    if (rlen <= 0)
++        return USB_MD_NOHIDDESC;
++    if (rlen > MAX_REPORT_DESC)
++        return USB_MD_DESCLEN;
+     u8 *desc = malloc_tmphigh(rlen);
+     if (!desc)
+-        return -1;
++        return USB_MD_NOMEM;
+     memset(desc, 0, rlen);                      // a short answer reads as 0
+     struct usb_ctrlrequest req;
+     req.bRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
+@@ -277,8 +349,17 @@
+     req.wIndex = iface->bInterfaceNumber;
+     req.wLength = rlen;
+     int ret = usb_send_default_control(usbdev->defpipe, &req, desc);
+-    if (!ret)
++    if (ret) {
++        ret = USB_MD_GETDESC;
++    } else {
++        if (slot == 0) {
++            int i, n = rlen < USB_MOUSE_DIAG_DESC ? rlen : USB_MOUSE_DIAG_DESC;
++            for (i = 0; i < n; i++)
++                SET_LOW(usb_mouse_diag.desc[i], desc[i]);
++            SET_LOW(usb_mouse_diag.desc_got, n);
++        }
+         ret = hid_parse_mouse(desc, rlen, m, maxpacket * 8);
++    }
+     free(desc);
+     return ret;
+ }
+@@ -305,9 +386,33 @@
+     memset(m, 0, sizeof(*m));
+     u16 ifnum = usbdev->iface->bInterfaceNumber;
+ 
++    int slot = GET_LOW(usb_mouse_diag.count), i;
++    if (!slot) {
++        SET_LOW(usb_mouse_diag.sig[0], 0x534f5355);
++        SET_LOW(usb_mouse_diag.sig[1], 0x4c48574d);
++        SET_LOW(usb_mouse_diag.version, 1);
++    }
++    if (slot < 255)
++        SET_LOW(usb_mouse_diag.count, slot + 1);
++    m->diag = slot < USB_MOUSE_DIAG_DEVS ? slot : 0xff;
++
+     // A wheel in the report descriptor: report protocol, else "boot".
+-    if (!usb_mouse_layout(usbdev, m, epdesc->wMaxPacketSize)
+-        && !set_protocol(usbdev->defpipe, 1, ifnum)) {
++    int lret = usb_mouse_layout(usbdev, m, epdesc->wMaxPacketSize, slot);
++    if (!lret && set_protocol(usbdev->defpipe, 1, ifnum))
++        lret = USB_MD_SETPROTO;
++    if (slot < USB_MOUSE_DIAG_DEVS) {
++        SET_LOW(usb_mouse_diag.dev[slot].iface, ifnum);
++        SET_LOW(usb_mouse_diag.dev[slot].maxpacket, epdesc->wMaxPacketSize);
++        SET_LOW(usb_mouse_diag.dev[slot].result, lret);
++        SET_LOW(usb_mouse_diag.dev[slot].report, !lret);
++        SET_LOW(usb_mouse_diag.dev[slot].report_id, m->report_id);
++        for (i = 0; i < 6; i++) {
++            SET_LOW(usb_mouse_diag.dev[slot].loc[i].off, m->loc[i].off);
++            SET_LOW(usb_mouse_diag.dev[slot].loc[i].size, m->loc[i].size);
++            SET_LOW(usb_mouse_diag.dev[slot].loc[i].sgn, m->loc[i].sgn);
++        }
++    }
++    if (!lret) {
+         m->report = 1;
+     } else {
+         m->report = 0;
+@@ -323,8 +428,10 @@
+         free(m);
+         return -1;
+     }
+-    if (m->report)
++    if (m->report) {
+         usb_mouse_wheel = 1;
++        SET_LOW(usb_mouse_diag.wheel, 1);
++    }
+     m->next = mice;
+     mice = m;
+ 
+@@ -599,6 +706,11 @@
+ {
+     u8 buttons;
+     s8 x, y, z = 0;
++    int i;
++    for (i = 0; i < 16; i++)
++        SET_LOW(usb_mouse_diag.last_raw[i], data[i]);
++    SET_LOW(usb_mouse_diag.packets, GET_LOW(usb_mouse_diag.packets) + 1);
++    SET_LOW(usb_mouse_diag.last_dev, GET_GLOBALFLAT(node->diag));
+     if (!GET_GLOBALFLAT(node->report)) {
+         dprintf(9, "Got mouse b=%x x=%x y=%x\n", data[0], data[1], data[2]);
+         buttons = data[0];
+@@ -607,11 +719,14 @@
+     } else {
+         u8 rid = GET_GLOBALFLAT(node->report_id);
+         if (rid) {
+-            if (data[0] != rid)
++            if (data[0] != rid) {
++                SET_LOW(usb_mouse_diag.skipped
++                        , GET_LOW(usb_mouse_diag.skipped) + 1);
+                 return;                         // another report of the device
++            }
+             data++;
+         }
+-        int i, val[6];
++        int val[6];
+         for (i = 0; i < 6; i++) {
+             struct hid_loc *l = &node->loc[i];
+             u8 size = GET_GLOBALFLAT(l->size);
+@@ -622,6 +737,10 @@
+         y = -val[1];
+         // HID: wheel up is positive; IntelliMouse PS/2: up is negative.
+         z = -val[2];
++        SET_LOW(usb_mouse_diag.last_z, z);
++        if (z)
++            SET_LOW(usb_mouse_diag.zpackets
++                    , GET_LOW(usb_mouse_diag.zpackets) + 1);
+         buttons = (val[3] != 0) | ((val[4] != 0) << 1) | ((val[5] != 0) << 2);
+     }
+     u8 flag = ((buttons & 0x7) | (1<<3)
+@@ -685,12 +804,14 @@
+             SET_LOW(usb_mouse_id, 3);
+         SET_LOW(usb_mouse_rate1, GET_LOW(usb_mouse_rate2));
+         SET_LOW(usb_mouse_rate2, param[0]);
++        usb_mouse_diag_rates();
+         return 0;
+     case PSMOUSE_CMD_RESET_BAT:
+         // Self test passed, id of a standard AT mouse.
+         SET_LOW(usb_mouse_id, 0);
+         SET_LOW(usb_mouse_rate1, 0);
+         SET_LOW(usb_mouse_rate2, 0);
++        usb_mouse_diag_rates();
+         param[0] = 0xaa;
+         param[1] = 0x00;
+         return 0;

@@ -160,6 +160,9 @@
   "installer.components.no_release": "Ova verzija instalatera ne zna svoje izdanje na GitHubu, pa ne može da preuzima. Izaberite datoteke koje već imate ili preskočite.",
   "installer.components.checking": "Proveravam koje komponente uređaj ima…",
   "installer.components.check_failed": "Nije moguće proveriti komponente uređaja: %s",
+  "installer.components.legacy.name": "Paket kompatibilnosti za Windows 95/98/Me/NT 4.0 (oko 150 MB)",
+  "installer.components.legacy.need": "Microsoft biblioteke (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) koje paket posle instalacije instalira u Windows 95, 98, Me i NT 4.0.",
+  "installer.components.legacy.skip_note": "Bez njega paket instalira samo ono što sami stavite u DATA\\Addons. Možete ga dodati kasnije preko Ažuriranja USOS-a ili Popravke.",
   "installer.components.winpe.name": "WinPE 10 pomoćnik (oko 440 MB)",
   "installer.components.winpe.need": "Potreban za instalaciju Windows Vista i Windows 7 u UEFI režimu.",
   "installer.components.winpe.skip_note": "Bez njega se Windows Vista i Windows 7 ne mogu instalirati u UEFI režimu. Možete ga dodati kasnije preko Ažuriraj USOS ili Popravi.",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "Posle instalacije prijavite se na domen {1} kao {0} lozinkom podešenom u profilu odgovora.",
   "boot.lx.logon_autologon": "Posle instalacije Windows se automatski prijavljuje kao {0}.",
   "boot.lx.logon_setup_asks": "Instalacija Windowsa tokom instalacije traži korisničko ime i lozinku; USOS ih ne podešava.",
-  "boot.lx.logon_answer_file": "Posle instalacije prijavite se nalogom iz svoje datoteke odgovora {0}."
+  "boot.lx.logon_answer_file": "Posle instalacije prijavite se nalogom iz svoje datoteke odgovora {0}.",
+  "boot.profile.field.display_bpp": "Dubina boje",
+  "boot.profile.help.display_legacy": "Primenjuje se posle instalacije na stvarnom hardveru. Automatski bira dostupan režim do 1920x1080 uz bezbedan prelazak na niži. Bez promene čuva podešavanja. Automatska dubina: 32 bita ako je dostupno, inače 16."
 }

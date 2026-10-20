@@ -1,0 +1,26 @@
+USOS CSMWrap patch 0017 (2026-10-18): SeaBIOS romfile-only options off
+
+SeaBIOS built as a CSM has no romfile source: QEMU fw_cfg needs
+CONFIG_QEMU_HARDWARE (off for CSM), CBFS needs CONFIG_COREBOOT_FLASH and
+multiboot CONFIG_MULTIBOOT (both coreboot only); src/fw/csm.c adds only
+"etc/extra-pci-roots-list". Three default-on features only act on a
+romfile and are dead code in CSMWrap:
+- CONFIG_BOOTSPLASH: "bootsplash.jpg"/"bootsplash.bmp" (jpeg.c, bmp.c and
+  the splash half of bootsplash.c; the text console stays),
+- CONFIG_SERCON: "etc/sercon-port" (the serial console in 16-bit code;
+  INT 14h serial ports and the csmwrap.ini serial debug output stay),
+- CONFIG_HOST_BIOS_GEOMETRY: "bios-geometry".
+Turning them off frees ROM and F-segment space for later patches; the
+behaviour on every machine is unchanged. Part of a MODIFIED CSMWrap made by
+the USOS project (SeaBIOS LGPLv3).
+
+diff -ruN a/seabios-config b/seabios-config
+--- a/seabios-config
++++ b/seabios-config
+@@ -3,3 +3,6 @@
+ # CONFIG_VGAHOOKS is not set
+ # CONFIG_TCGBIOS is not set
+ CONFIG_VGA_COREBOOT=y
++# CONFIG_BOOTSPLASH is not set
++# CONFIG_SERCON is not set
++# CONFIG_HOST_BIOS_GEOMETRY is not set

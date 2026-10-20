@@ -160,6 +160,9 @@
   "installer.components.no_release": "Toto sestavení instalátoru nezná své vydání na GitHubu, proto nemůže stahovat. Vyberte soubory, které už máte, nebo přeskočte.",
   "installer.components.checking": "Zjišťuji, které komponenty jednotka má…",
   "installer.components.check_failed": "Komponenty jednotky se nepodařilo zkontrolovat: %s",
+  "installer.components.legacy.name": "Balíček kompatibility Windows 95/98/Me/NT 4.0 (asi 150 MB)",
+  "installer.components.legacy.need": "Knihovny Microsoft (DirectX, Instalační služba systému Windows, MDAC, VB6/VC6, MSLU, .NET), které balíček po instalaci nainstaluje do Windows 95, 98, Me a NT 4.0.",
+  "installer.components.legacy.skip_note": "Bez něj balíček nainstaluje jen to, co sami vložíte do DATA\\Addons. Můžete ho přidat později přes Aktualizaci USOS nebo Opravu.",
   "installer.components.winpe.name": "Pomocník WinPE 10 (asi 440 MB)",
   "installer.components.winpe.need": "Potřebný pro instalaci Windows Vista a Windows 7 v režimu UEFI.",
   "installer.components.winpe.skip_note": "Bez něj nelze Windows Vista a Windows 7 nainstalovat v režimu UEFI. Můžete ho přidat později pomocí Aktualizovat USOS nebo Opravit.",
@@ -1354,5 +1357,7 @@
   "boot.lx.logon_domain_profile_password": "Po instalaci se přihlaste do domény {1} jako {0} heslem nastaveným v profilu odpovědí.",
   "boot.lx.logon_autologon": "Po instalaci se Windows přihlásí automaticky jako {0}.",
   "boot.lx.logon_setup_asks": "Instalační program Windows se během instalace zeptá na uživatelské jméno a heslo; USOS je nenastavuje.",
-  "boot.lx.logon_answer_file": "Po instalaci se přihlaste účtem ze svého souboru odpovědí {0}."
+  "boot.lx.logon_answer_file": "Po instalaci se přihlaste účtem ze svého souboru odpovědí {0}.",
+  "boot.profile.field.display_bpp": "Barevná hloubka",
+  "boot.profile.help.display_legacy": "Použije se po instalaci na skutečném hardwaru. Automaticky vybere dostupný režim do 1920x1080 a bezpečně přejde na nižší. Beze změny zachová nastavení. Automatická hloubka: 32 bitů, jsou-li dostupné, jinak 16."
 }

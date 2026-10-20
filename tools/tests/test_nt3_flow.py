@@ -14,6 +14,8 @@ from test_nt4_flow import function_text
 from test_w9x_phase1_qemu import sh
 
 ROOT = Path(__file__).resolve().parents[2]
+import sys
+sys.path.insert(0, str(ROOT/"tools"))
 TARGET = ROOT / 'tools/nt4_csmwrap_target.sh'
 QEMU_INSTALL = ROOT / 'tools/nt4_qemu_install.sh'
 PREPARE = ROOT / 'tools/w9x_csmwrap_prepare.sh'
@@ -246,12 +248,13 @@ class Nt3AutochkStandIn(unittest.TestCase):
 class Nt3MicroLinux(unittest.TestCase):
     def test_file_list(self):
         text = BUILD.read_text(encoding='utf-8')
+        self.assertIn('nt3_post = build_nt3(root)', text)
+        self.assertIn('"usr/lib/usos/nt3/USOSNT3.EXE"', text)
         for pair in (
             ('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys', 'usr/lib/usos/nt3/AHCINT.SYS'),
             ('tools/w2k/usosrst/bin/nt351/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST.SYS'),
             ('tools/w2k/usosrst/bin/nt35/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST35.SYS'),
             ('tools/nt4/usosusb/bin/i386/usosusb.sys', 'usr/lib/usos/nt3/USOSUSB.SYS'),
-            ('tools/nt3/usosnt3/bin/i386/usosnt3.exe', 'usr/lib/usos/nt3/USOSNT3.EXE'),
             ('tools/nt3/usosachk/bin/i386/usosachk.exe', 'usr/lib/usos/nt3/USOSACHK.EXE'),
         ):
             self.assertIn(f'("{pair[0]}", "{pair[1]}")', text)
@@ -605,7 +608,13 @@ class Nt3AnswerProfile(unittest.TestCase):
                              'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegSetValueExW', 'RegUnLoadKeyA',
                              'RegisterServiceCtrlHandlerA', 'SetServiceStatus', 'StartServiceCtrlDispatcherA'},
         }
-        _, imports = pe(ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe')
+        from build_windows_usos_res import build_nt3
+        binary = build_nt3(ROOT)
+        data = binary.read_bytes()
+        import struct
+        opt = struct.unpack_from('<I', data, 0x3c)[0]+24
+        self.assertEqual(struct.unpack_from('<HH', data, opt+48), (3, 10))
+        _, imports = pe(binary)
         missing = [f'{m}!{n}' for m, n in imports if n not in nt31.get(m.lower(), set())]
         self.assertEqual(missing, [])
 

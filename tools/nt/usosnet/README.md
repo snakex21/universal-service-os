@@ -77,8 +77,19 @@ although the link is up or the timer found frames -> the chip is masked
 
 `NdisWriteErrorLogEntry` (code `NDIS_ERROR_CODE_DRIVER_FAILURE`; Windows
 9x: `C:\WINDOWS\NDISLOG.TXT`, Windows 2000 / XP: System event log) at
-3, 10, 30, 60 s and every 5 min, on a link change, on the IRQ watchdog
+30 and 65 s and every 5 min, on a link change, on the IRQ watchdog
 switch and on a TX stall (descriptors pending 3 s); at most 40 rounds.
+
+0.5 budget (X470 98 SE fresh install, 2026-10-20): NDIS.VXD of 98 SE and
+Me counts an adapter's error log entries for 30 s from the first one;
+before VxD Init_Complete the first entry shows a "device not working
+properly" notice and the fifth removes the adapter's devnode (CONFIGMG
+Call_At_Appy_Time -> Remove_SubTree): no network. 0.4 wrote USN1..USN5
+at 3 s. The driver now writes nothing in the first 30 s and at most 4
+entries per 31 s window (`LogBudget`, `LOG_*` in `usosnet.h`); entries
+over the budget are skipped (the first round's USN5, then whole
+rounds inside one window), never queued.
+
 Each round, 10 dwords per entry:
 
 | tag | values after the tag |

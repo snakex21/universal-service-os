@@ -1,0 +1,515 @@
+USOS 3.1.2-usos11 patch 0012 (2026-10-17): HPET and AMD GPIO hidden from Windows 2000 in the legacy DSDT/SSDT copies (Windows 2000 ACPI flow only)
+
+Windows 2000 SP4 with the ACPI HAL on the ASRock X470 (no CSM) stopped in
+kernel phase 1. Diagnostic rounds (Codex, 2026-10-16/17, one-shot BSP NMI
+snapshot, not part of this patch) found a page fault in acpi.sys's early
+boot IRQ arbitration (C0000005 at acpi.sys RVA 9AAA, later STOP 1E) for a
+device holding a boot interrupt before the PCI IRQ routing interface
+exists: first the HPET (PNP0103), then, with the HPET hidden, the AMD GPIO
+controller _SB.GPIO (AMDI0030, IRQ 7 level/active-low/shared, MMIO
+FED81500). Windows 2000 has a driver for neither. With both hidden the
+X470 reached the 2000 desktop (user report 2026-10-17, firmware built
+from Codex's diagnostic series, same table result as this patch).
+
+Only with csmwrap.ini acpi_legacy_fadt = true (written only for the
+Windows 2000 ACPI flow, tools/xp_csmwrap_esp.sh), in the private DSDT/SSDT
+copies that patch 0006 already makes for that flow (RSDT view only; the
+firmware tables and the XSDT view are unchanged):
+
+- src/usos_w2k_hide.inc (new, own code from the ACPI 6.5 AML grammar,
+  chapter 20; not an interpreter, nothing is executed): a Device whose
+  TermList is flat (NameOp / MethodOp terms only), with exactly one _HID
+  (Name, string or EISA ID integer), at most one _CID (Name: one ID or a
+  Package of IDs) and exactly one _STA (Name with an integer or a method
+  without arguments) qualifies if its _HID or a _CID entry is PNP0103,
+  AMDI0030 or AMD0030. Its _STA becomes 0 in place: Name -> Zero / prefix
+  with value 0, method body -> Return (Zero) padded with Noop. Lengths,
+  names and resources stay; only _STA bytes and the checksum change.
+  _HID/_CID methods, duplicates, devices inside If/Method bodies and
+  anything unrecognised are left alone.
+- src/usos_acpi10.c aml_legacy_copy(): dry run on the firmware table
+  (never writes; only a table with a valid checksum; a malformed package
+  length anywhere on the walked path counts the whole table as 0), so a
+  table is copied when it has QWord windows above 4 GiB (patch 0006) or a
+  device to hide. On the copy the same walk must find the same devices,
+  else the copy is restored and nothing is hidden. Logged as
+  "USOS W2KHIDE"; result flags USOS_ACPI10_HPET_HIDDEN 0x200 and
+  USOS_ACPI10_GPIO_HIDDEN 0x400.
+
+On the X470 DSDT (local dump, not distributed) the copy differs only in
+the HPET _STA body (31 bytes), the GPIO _STA body (17 bytes) and the
+checksum: byte-identical to the table Codex's X470-tested firmware gave
+(SHA-256 9a918db5...). QEMU q35: nothing to hide (its DSDT has no
+PNP0103/AMDI0030 device in a recognised shape), behaviour as usos10.
+
+Not in this patch: the 0011 tick watcher (diagnostic, dropped from the
+usos11 series, file kept in 3.1.2-usos10/patches), Codex's NMI snapshot
+helper and its csmwrap.ini options, and the Intel GPIO rules (INT34xx /
+INTC10xx; held back until tested on real Intel boards).
+
+diff --git a/src/usos_acpi10.c b/src/usos_acpi10.c
+index a4b1123..18c44cc 100644
+--- a/src/usos_acpi10.c
++++ b/src/usos_acpi10.c
+@@ -246,6 +246,9 @@ static unsigned fill_fadt(const struct usos_acpi10_ops *ops, uint8_t *f, uint32_
+  * alone. Windows written at run time by the AML (CreateQWordField) are not
+  * covered.
+  */
++/* Patch 0012: HPET / AMD GPIO hidden from Windows 2000 in the same copies. */
++#include "usos_w2k_hide.inc"
++
+ #define AML_BUFFER_OP 0x11u
+ #define RES_QWORD_ADDR 0x8Au
+ #define RES_QWORD_BODY 43u
+@@ -374,7 +377,11 @@ static uint32_t aml_legacy_copy(const struct usos_acpi10_ops *ops, uint32_t phys
+     if (!t || !sig_is(t, sig))
+         return 0;
+     unsigned hits = aml_legacy_filter(t, len, false);
+-    if (hits == 0)
++    /* Patch 0012: dry run on the firmware table (no writes); only tables
++     * with a valid checksum, so a damaged table is never rewritten. */
++    unsigned kinds = 0;
++    unsigned hidden = table_valid(t, len, sig) ? usos_w2k_hide(t, len, false, &kinds) : 0;
++    if (hits == 0 && hidden == 0)
+         return 0;
+     uint64_t cphys = ops->alloc(ops->ctx, len);
+     uint8_t *copy = cphys ? ops->map(ops->ctx, cphys, len) : NULL;
+@@ -384,6 +391,23 @@ static uint32_t aml_legacy_copy(const struct usos_acpi10_ops *ops, uint32_t phys
+         return 0;
+     }
+     copy_bytes(copy, t, len);
++    if (hidden) {
++        /* Same bytes as the dry run, so the same devices; else no hiding. */
++        unsigned again = 0;
++        if (usos_w2k_hide(copy, len, true, &again) != hidden || again != kinds) {
++            copy_bytes(copy, t, len);
++            LOG("USOS W2KHIDE: %s copy differs from the dry run, nothing hidden\n", sig);
++            hidden = 0;
++        } else {
++            if (kinds & W2KH_HPET)
++                *flags |= USOS_ACPI10_HPET_HIDDEN;
++            if (kinds & W2KH_GPIO)
++                *flags |= USOS_ACPI10_GPIO_HIDDEN;
++            LOG("USOS W2KHIDE: %u device(s) hidden in the legacy %s copy (%s%s%s)\n", hidden, sig,
++                (kinds & W2KH_HPET) ? "HPET" : "", kinds == (W2KH_HPET | W2KH_GPIO) ? ", " : "",
++                (kinds & W2KH_GPIO) ? "AMD GPIO" : "");
++        }
++    }
+     aml_legacy_filter(copy, len, true);
+     fix_table_checksum(copy);
+     *flags |= USOS_ACPI10_AML_FILTERED;
+diff --git a/src/usos_acpi10.h b/src/usos_acpi10.h
+index 76f7fab..37417ac 100644
+--- a/src/usos_acpi10.h
++++ b/src/usos_acpi10.h
+@@ -65,6 +65,8 @@ struct usos_acpi10_ops {
+ #define USOS_ACPI10_SKIPPED_HIGH    0x40u  /* XSDT entries above 4 GiB left out */
+ #define USOS_ACPI10_FADT_LEGACY     0x80u  /* RSDT FADT cut to revision 1, 116 bytes */
+ #define USOS_ACPI10_AML_FILTERED    0x100u /* DSDT/SSDT copy: QWord windows above 4 GiB cleared */
++#define USOS_ACPI10_HPET_HIDDEN     0x200u /* legacy DSDT/SSDT copy: HPET (PNP0103) _STA returns 0 */
++#define USOS_ACPI10_GPIO_HIDDEN     0x400u /* legacy DSDT/SSDT copy: AMD GPIO (AMDI0030/AMD0030) _STA returns 0 */
+ 
+ /*
+  * rsdp: CSMWrap's writable RSDP copy (20 bytes for revision 0, else
+diff --git a/src/usos_w2k_hide.inc b/src/usos_w2k_hide.inc
+new file mode 100644
+index 0000000..7a9cf39
+--- a/src/usos_w2k_hide.inc
++++ b/src/usos_w2k_hide.inc
+@@ -0,0 +1,396 @@
++/*
++ * USOS patch 0012 (CSMWrap 3.1.2-usos11, MODIFIED by USOS, LGPL-2.1-or-later
++ * as CSMWrap): devices Windows 2000 must not see, hidden in the private
++ * legacy DSDT/SSDT copies of patch 0006 (csmwrap.ini acpi_legacy_fadt = true,
++ * written only for the Windows 2000 ACPI flow).
++ *
++ * Windows 2000 has no driver for an HPET (PNP0103) or an AMD GPIO controller
++ * (AMDI0030 / AMD0030). On the ASRock X470 both are enabled devices with a
++ * boot interrupt in _CRS (the GPIO one IRQ 7, level, active low, shared), and
++ * the 2000 SP4 acpi.sys stops with a page fault in its early IRQ arbitration
++ * for them, before the PCI IRQ routing interface exists (USOS diagnosis
++ * 2026-10-16/17, docs/windows-2000-acpi-x470-2026-10-12.md). An OS that is
++ * not given such a device never arbitrates it, so in the copy the device's
++ * _STA returns 0 (ACPI 6.5 6.3.7: not present, not enabled, not shown).
++ *
++ * Own code from the ACPI 6.5 specification, chapter 20 (AML grammar):
++ * - a bounded recognizer, not an AML interpreter: nothing is executed;
++ * - a device qualifies only if its TermList is flat (NameOp and MethodOp
++ *   terms only), it has exactly one _STA (a Name with an integer, or a
++ *   method without arguments) and its _HID, or one of its _CID entries, is
++ *   one of the IDs below as a literal string or EISA ID integer; _HID/_CID
++ *   methods, duplicates and anything else leave the device unchanged;
++ * - only the _STA value or method body changes, in place: lengths, names,
++ *   resources and every other byte stay; the caller fixes the checksum;
++ * - a dry run (apply = false) never writes; any malformed package length
++ *   makes the whole table count 0, so nothing is changed in that table.
++ * The firmware tables and the XSDT view stay as they are.
++ */
++#define W2KH_HDR_LEN 36u
++#define W2KH_HPET 1u
++#define W2KH_GPIO 2u
++
++static const struct { const char *id; unsigned kind; } w2kh_ids[] = {
++    { "PNP0103", W2KH_HPET },   /* HPET */
++    { "AMDI0030", W2KH_GPIO },  /* AMD GPIO controller (X470 _SB.GPIO) */
++    { "AMD0030", W2KH_GPIO },   /* older name of the same controller */
++};
++
++/* PkgLength (20.2.4) at p: value, 0 if invalid or past n; *bytes = its size. */
++static uint32_t w2kh_pkg(const uint8_t *p, uint32_t n, uint32_t *bytes)
++{
++    if (n == 0)
++        return 0;
++    uint32_t extra = p[0] >> 6;
++    if (n <= extra || (extra && (p[0] & 0x30u)))
++        return 0;
++    uint32_t v = p[0] & (extra ? 0x0Fu : 0x3Fu);
++    for (uint32_t i = 0; i < extra; i++)
++        v |= (uint32_t)p[1 + i] << (4 + 8 * i);
++    *bytes = extra + 1;
++    return v >= *bytes && v <= n ? v : 0;
++}
++
++static bool w2kh_seg(const uint8_t *p, uint32_t n)
++{
++    if (n < 4)
++        return false;
++    for (uint32_t i = 0; i < 4; i++) {
++        uint8_t c = p[i];
++        if (!(c == '_' || (c >= 'A' && c <= 'Z') || (i && c >= '0' && c <= '9')))
++            return false;
++    }
++    return true;
++}
++
++static bool w2kh_is(const uint8_t *seg, const char *s)
++{
++    return seg[0] == (uint8_t)s[0] && seg[1] == (uint8_t)s[1] &&
++           seg[2] == (uint8_t)s[2] && seg[3] == (uint8_t)s[3];
++}
++
++/* NameString (20.2.2): its size, 0 if invalid. */
++static uint32_t w2kh_name(const uint8_t *p, uint32_t n)
++{
++    uint32_t i = 0, count = 1;
++    if (n == 0)
++        return 0;
++    if (p[0] == '\\')
++        i = 1;
++    else
++        while (i < n && p[i] == '^')
++            i++;
++    if (i == n)
++        return 0;
++    if (p[i] == 0x00)
++        return i + 1;                      /* NullName */
++    if (p[i] == 0x2E) {                    /* DualNamePrefix */
++        count = 2;
++        i++;
++    } else if (p[i] == 0x2F) {             /* MultiNamePrefix */
++        if (++i == n || p[i] == 0)
++            return 0;
++        count = p[i++];
++    }
++    if (count > (n - i) / 4)
++        return 0;
++    for (uint32_t j = 0; j < count; j++, i += 4)
++        if (!w2kh_seg(p + i, n - i))
++            return 0;
++    return i;
++}
++
++/* Size of a DataRefObject without references: integers, String, Buffer,
++ * Package, VarPackage; 0 for anything else. */
++static uint32_t w2kh_data(const uint8_t *p, uint32_t n)
++{
++    uint32_t len, bytes;
++    if (n == 0)
++        return 0;
++    switch (p[0]) {
++    case 0x00: case 0x01: case 0xFF: return 1;   /* Zero, One, Ones */
++    case 0x0A: len = 2; break;                    /* BytePrefix */
++    case 0x0B: len = 3; break;                    /* WordPrefix */
++    case 0x0C: len = 5; break;                    /* DWordPrefix */
++    case 0x0E: len = 9; break;                    /* QWordPrefix */
++    case 0x0D:                                    /* StringPrefix */
++        for (uint32_t i = 1; i < n; i++)
++            if (p[i] == 0)
++                return i + 1;
++        return 0;
++    case 0x11: case 0x12: case 0x13:              /* Buffer, Package, VarPackage */
++        len = w2kh_pkg(p + 1, n - 1, &bytes);
++        return len ? len + 1 : 0;
++    default:
++        return 0;
++    }
++    return len <= n ? len : 0;
++}
++
++/* Integer constant of size n at p (Zero/One/Ones/Byte..QWord). */
++static bool w2kh_int(const uint8_t *p, uint32_t n, uint64_t *v)
++{
++    uint32_t w;
++    switch (p[0]) {
++    case 0x00: *v = 0; return n == 1;
++    case 0x01: *v = 1; return n == 1;
++    case 0xFF: *v = ~0ull; return n == 1;
++    case 0x0A: w = 1; break;
++    case 0x0B: w = 2; break;
++    case 0x0C: w = 4; break;
++    case 0x0E: w = 8; break;
++    default: return false;
++    }
++    if (n != 1 + w)
++        return false;
++    *v = 0;
++    for (uint32_t i = 0; i < w; i++)
++        *v |= (uint64_t)p[1 + i] << (8 * i);
++    return true;
++}
++
++/* EISA ID integer of a 7-character "AAA####" ID (ACPI 6.5 6.1.5), 0 if the
++ * ID has another shape (e.g. the 8-character ACPI ID AMDI0030). */
++static uint32_t w2kh_eisa(const char *s)
++{
++    uint8_t h[4];
++    for (int i = 0; i < 3; i++)
++        if (s[i] < 'A' || s[i] > 'Z')
++            return 0;
++    for (int i = 3; i < 7; i++) {
++        char c = s[i];
++        if (c >= '0' && c <= '9') h[i - 3] = (uint8_t)(c - '0');
++        else if (c >= 'A' && c <= 'F') h[i - 3] = (uint8_t)(c - 'A' + 10);
++        else return 0;
++    }
++    if (s[7] != 0)
++        return 0;
++    uint32_t a = (uint32_t)(s[0] - 0x40), b = (uint32_t)(s[1] - 0x40), c = (uint32_t)(s[2] - 0x40);
++    uint8_t b0 = (uint8_t)((a << 2) | (b >> 3));
++    uint8_t b1 = (uint8_t)(((b & 7u) << 5) | c);
++    uint8_t b2 = (uint8_t)((h[0] << 4) | h[1]);
++    uint8_t b3 = (uint8_t)((h[2] << 4) | h[3]);
++    return (uint32_t)b0 | (uint32_t)b1 << 8 | (uint32_t)b2 << 16 | (uint32_t)b3 << 24;
++}
++
++/* Kind of one ID object (String or integer) of size n, 0 = not ours. */
++static unsigned w2kh_id(const uint8_t *p, uint32_t n)
++{
++    uint64_t v;
++    bool is_int = w2kh_int(p, n, &v);
++    for (uint32_t r = 0; r < sizeof(w2kh_ids) / sizeof(w2kh_ids[0]); r++) {
++        const char *id = w2kh_ids[r].id;
++        if (p[0] == 0x0D) {
++            uint32_t i = 0;
++            while (id[i] && i + 1 < n && p[1 + i] == (uint8_t)id[i])
++                i++;
++            if (!id[i] && n == i + 2 && p[1 + i] == 0)
++                return w2kh_ids[r].kind;
++        } else if (is_int) {
++            uint32_t e = w2kh_eisa(id);
++            if (e && v == e)
++                return w2kh_ids[r].kind;
++        }
++    }
++    return 0;
++}
++
++/* _CID value: one ID, or a Package of IDs (6.1.2). Kinds of every entry;
++ * *ok = false for a shape we do not recognise. */
++static unsigned w2kh_cid(const uint8_t *p, uint32_t n, bool *ok)
++{
++    uint64_t v;
++    *ok = true;
++    if (p[0] != 0x12) {
++        if (p[0] == 0x0D || w2kh_int(p, n, &v))
++            return w2kh_id(p, n);
++        *ok = false;
++        return 0;
++    }
++    uint32_t bytes, len = w2kh_pkg(p + 1, n - 1, &bytes);
++    if (!len || len + 1 != n || len < bytes + 1) {
++        *ok = false;
++        return 0;
++    }
++    const uint8_t *q = p + 1 + bytes;
++    uint32_t left = len - bytes, count = q[0], kinds = 0;
++    q++, left--;
++    for (uint32_t e = 0; e < count && left; e++) {
++        uint32_t sz = w2kh_data(q, left);
++        if (!sz || q[0] == 0x11 || q[0] == 0x12 || q[0] == 0x13) {
++            *ok = false;
++            return 0;
++        }
++        kinds |= w2kh_id(q, sz);
++        q += sz;
++        left -= sz;
++    }
++    if (left) {
++        *ok = false;
++        return 0;
++    }
++    return kinds;
++}
++
++/*
++ * Device TermList [p, p + n): true if it is flat (NameOp/MethodOp only) with
++ * exactly one _STA and an ID of ours in _HID or _CID. *sta and *width = the
++ * _STA integer object or method body, *method = which.
++ */
++static bool w2kh_device(uint8_t *p, uint32_t n, unsigned *kind, uint8_t **sta, uint32_t *width, bool *method)
++{
++    unsigned hids = 0, cids = 0, stas = 0, k = 0;
++    for (uint32_t i = 0; i < n;) {
++        if (p[i] == 0x08) {                               /* NameOp */
++            if (n - i < 6 || !w2kh_seg(p + i + 1, n - i - 1))
++                return false;
++            uint8_t *seg = p + i + 1, *val = seg + 4;
++            uint32_t sz = w2kh_data(val, n - i - 5);
++            if (!sz)
++                return false;
++            uint64_t v;
++            if (w2kh_is(seg, "_HID")) {
++                if (++hids != 1 || !(val[0] == 0x0D || w2kh_int(val, sz, &v)))
++                    return false;
++                k |= w2kh_id(val, sz);
++            } else if (w2kh_is(seg, "_CID")) {
++                bool ok;
++                if (++cids != 1)
++                    return false;
++                k |= w2kh_cid(val, sz, &ok);
++                if (!ok)
++                    return false;
++            } else if (w2kh_is(seg, "_STA")) {
++                if (++stas != 1 || !w2kh_int(val, sz, &v))
++                    return false;
++                *sta = val;
++                *width = sz;
++                *method = false;
++            }
++            i += 5 + sz;
++        } else if (p[i] == 0x14) {                        /* MethodOp */
++            uint32_t bytes, len = w2kh_pkg(p + i + 1, n - i - 1, &bytes);
++            if (!len || len < bytes + 5 || !w2kh_seg(p + i + 1 + bytes, len - bytes))
++                return false;
++            uint8_t *seg = p + i + 1 + bytes;
++            if (w2kh_is(seg, "_HID") || w2kh_is(seg, "_CID"))
++                return false;                             /* would need AML execution */
++            if (w2kh_is(seg, "_STA")) {
++                /* MethodFlags: ArgCount 0; body at least Return(Zero). */
++                if (++stas != 1 || (seg[4] & 7u) || len < bytes + 7)
++                    return false;
++                *sta = seg + 5;
++                *width = len - bytes - 5;
++                *method = true;
++            }
++            i += 1 + len;
++        } else {
++            return false;
++        }
++    }
++    *kind = k;
++    return hids == 1 && stas == 1 && k != 0;
++}
++
++/* _STA already returns 0? */
++static bool w2kh_sta_zero(const uint8_t *sta, uint32_t width, bool method)
++{
++    if (method)
++        return width >= 2 && sta[0] == 0xA4 && sta[1] == 0x00;
++    uint64_t v;
++    return w2kh_int(sta, width, &v) && v == 0;
++}
++
++static void w2kh_sta_clear(uint8_t *sta, uint32_t width, bool method)
++{
++    if (method) {
++        sta[0] = 0xA4;                                    /* ReturnOp */
++        sta[1] = 0x00;                                    /* Zero */
++        for (uint32_t j = 2; j < width; j++)
++            sta[j] = 0xA3;                                /* NoopOp */
++    } else if (width == 1) {
++        sta[0] = 0x00;                                    /* Zero */
++    } else {
++        for (uint32_t j = 1; j < width; j++)              /* prefix stays */
++            sta[j] = 0x00;
++    }
++}
++
++/*
++ * AML table t (len bytes, header included): number of devices whose _STA is
++ * (with apply: was) made to return 0; *kinds |= W2KH_* of those. 0 and no
++ * change when the table has a malformed package length on the walked path.
++ */
++static unsigned usos_w2k_hide(uint8_t *t, uint32_t len, bool apply, unsigned *kinds)
++{
++    unsigned hits = 0, seen = 0;
++    if (len < W2KH_HDR_LEN)
++        return 0;
++    for (uint32_t i = W2KH_HDR_LEN; i < len;) {
++        uint8_t *p = t + i;
++        uint32_t n = len - i, bytes, size, name;
++        if (n >= 2 && p[0] == 0x5B && p[1] == 0x82) {     /* DeviceOp */
++            size = w2kh_pkg(p + 2, n - 2, &bytes);
++            name = size ? w2kh_name(p + 2 + bytes, size - bytes) : 0;
++            if (!name)
++                return 0;
++            uint8_t *body = p + 2 + bytes + name, *sta = 0;
++            uint32_t width = 0;
++            unsigned kind = 0;
++            bool method = false;
++            if (w2kh_device(body, size - bytes - name, &kind, &sta, &width, &method)) {
++                if (!w2kh_sta_zero(sta, width, method)) {
++                    hits++;
++                    seen |= kind;
++                    if (apply)
++                        w2kh_sta_clear(sta, width, method);
++                }
++                i += 2 + size;
++            } else {
++                i += 2 + bytes + name;                    /* look at nested devices */
++            }
++            continue;
++        }
++        if (p[0] == 0x10) {                               /* ScopeOp: enter */
++            size = w2kh_pkg(p + 1, n - 1, &bytes);
++            name = size ? w2kh_name(p + 1 + bytes, size - bytes) : 0;
++            if (!name)
++                return 0;
++            i += 1 + bytes + name;
++            continue;
++        }
++        if (p[0] == 0x08 && n >= 6 && w2kh_seg(p + 1, n - 1)) {   /* NameOp */
++            size = w2kh_data(p + 5, n - 5);
++            i += size ? 5 + size : 1;
++            continue;
++        }
++        uint32_t head = 0;
++        if (p[0] == 0x14 || p[0] == 0xA0 || p[0] == 0xA1 || p[0] == 0xA2)
++            head = 1;                     /* Method, If, Else, While: skip */
++        else if (n >= 2 && p[0] == 0x5B &&
++                 (p[1] == 0x81 || p[1] == 0x83 || p[1] == 0x84 || p[1] == 0x85 ||
++                  p[1] == 0x86 || p[1] == 0x87))
++            head = 2;                     /* Field, Processor, PowerResource,
++                                             ThermalZone, IndexField, BankField */
++        if (head) {
++            size = w2kh_pkg(p + head, n - head, &bytes);
++            if (!size)
++                return 0;
++            i += head + size;
++            continue;
++        }
++        if (n >= 2 && p[0] == 0x5B && (p[1] == 0x01 || p[1] == 0x80)) {
++            /* Mutex: NameString SyncFlags; OperationRegion: NameString
++             * RegionSpace, then two TermArgs walked as data below. */
++            name = w2kh_name(p + 2, n - 2);
++            if (name && n - 2 - name >= 1) {
++                i += 2 + name + 1;
++                continue;
++            }
++        }
++        size = w2kh_data(p, n);
++        i += size ? size : 1;
++    }
++    *kinds |= seen;
++    return hits;
++}

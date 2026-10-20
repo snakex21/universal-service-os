@@ -60,7 +60,7 @@ const Iso = struct {
 };
 
 pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image_directory: []const u8, image_name: []const u8, graphics: ?vbe.Session) !void {
-    try @import("windows_iso_config.zig").validateName(image_name);
+    try @import("catalog").windows_iso_config.validateName(image_name);
     // The ESP helper is read before any bulk NTFS read of the ISO: a plain
     // `reader` call after bulk reads never returned in QEMU/SeaBIOS (the DOS
     // paths read their ESP files first too).

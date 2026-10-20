@@ -285,11 +285,6 @@ show_protected=yes	windows-xp	+----- usos-reg.txt -----
 show_protected=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_protected=yes	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 show_protected=yes	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
-show_protected=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_protected=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_protected=yes	windows-2000	+
-show_protected=yes	windows-2000	+----- usos-reg.txt -----
-show_protected=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_protected=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 show_protected=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
 show_protected=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -299,8 +294,8 @@ show_protected=yes	windows-server-2003	+----- usos-reg.txt -----
 show_protected=yes	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_protected=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 show_protected=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
-show_protected=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg
-show_protected=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+show_protected=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+show_protected=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 show_protected=yes	windows-me	+
 show_protected=yes	windows-me	+[USOS.Profile]
 show_protected=yes	windows-me	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",Hidden,1,01,00,00,00
@@ -440,11 +435,6 @@ no_tips=yes	windows-xp	+----- usos-reg.txt -----
 no_tips=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 no_tips=yes	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Applets\Tour|RunCount|dword|0
 no_tips=yes	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\CleanupWiz|NoRun|dword|1
-no_tips=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-no_tips=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-no_tips=yes	windows-2000	+
-no_tips=yes	windows-2000	+----- usos-reg.txt -----
-no_tips=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 no_tips=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Tips|Show|dword|0
 no_tips=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 no_tips=yes	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -1733,11 +1723,6 @@ numlock=on	windows-xp	+----- usos-reg.txt -----
 numlock=on	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 numlock=on	windows-xp	+DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
 numlock=on	windows-xp	+USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
-numlock=on	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-numlock=on	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-numlock=on	windows-2000	+
-numlock=on	windows-2000	+----- usos-reg.txt -----
-numlock=on	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 numlock=on	windows-2000	+DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
 numlock=on	windows-2000	+USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
 numlock=on	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -2036,11 +2021,6 @@ numlock=off	windows-xp	+----- usos-reg.txt -----
 numlock=off	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 numlock=off	windows-xp	+DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|0
 numlock=off	windows-xp	+USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|0
-numlock=off	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-numlock=off	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-numlock=off	windows-2000	+
-numlock=off	windows-2000	+----- usos-reg.txt -----
-numlock=off	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 numlock=off	windows-2000	+DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|0
 numlock=off	windows-2000	+USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|0
 numlock=off	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -2170,11 +2150,6 @@ windows_update=no_restart	windows-xp	+
 windows_update=no_restart	windows-xp	+----- usos-reg.txt -----
 windows_update=no_restart	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 windows_update=no_restart	windows-xp	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
-windows_update=no_restart	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=no_restart	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=no_restart	windows-2000	+
-windows_update=no_restart	windows-2000	+----- usos-reg.txt -----
-windows_update=no_restart	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 windows_update=no_restart	windows-2000	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
 windows_update=no_restart	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 windows_update=no_restart	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -2358,11 +2333,6 @@ windows_update=notify	windows-xp	+; USOS answer profile: registry set for usos-r
 windows_update=notify	windows-xp	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|0
 windows_update=notify	windows-xp	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions|dword|2
 windows_update=notify	windows-xp	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
-windows_update=notify	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=notify	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=notify	windows-2000	+
-windows_update=notify	windows-2000	+----- usos-reg.txt -----
-windows_update=notify	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 windows_update=notify	windows-2000	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|0
 windows_update=notify	windows-2000	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions|dword|2
 windows_update=notify	windows-2000	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
@@ -2492,11 +2462,6 @@ windows_update=off	windows-xp	+
 windows_update=off	windows-xp	+----- usos-reg.txt -----
 windows_update=off	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 windows_update=off	windows-xp	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|1
-windows_update=off	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=off	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-windows_update=off	windows-2000	+
-windows_update=off	windows-2000	+----- usos-reg.txt -----
-windows_update=off	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 windows_update=off	windows-2000	+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|1
 windows_update=off	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 windows_update=off	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -3039,11 +3004,6 @@ autologon=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winl
 autologon=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultUserName|sz|Jan
 autologon=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultPassword|sz|
 autologon=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoLogonCount|del|
-autologon=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-autologon=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-autologon=yes	windows-2000	+
-autologon=yes	windows-2000	+----- usos-reg.txt -----
-autologon=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 autologon=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoAdminLogon|sz|1
 autologon=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultUserName|sz|Jan
 autologon=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultPassword|sz|
@@ -3402,11 +3362,6 @@ shortcut_suffix_off=yes	windows-xp	+
 shortcut_suffix_off=yes	windows-xp	+----- usos-reg.txt -----
 shortcut_suffix_off=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 shortcut_suffix_off=yes	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
-shortcut_suffix_off=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-shortcut_suffix_off=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-shortcut_suffix_off=yes	windows-2000	+
-shortcut_suffix_off=yes	windows-2000	+----- usos-reg.txt -----
-shortcut_suffix_off=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 shortcut_suffix_off=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
 shortcut_suffix_off=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 shortcut_suffix_off=yes	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -3415,18 +3370,18 @@ shortcut_suffix_off=yes	windows-server-2003	+----- usos-reg.txt -----
 shortcut_suffix_off=yes	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 shortcut_suffix_off=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
 shortcut_suffix_off=yes	windows-nt-4	+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
-shortcut_suffix_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg
-shortcut_suffix_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+shortcut_suffix_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-95	+
 shortcut_suffix_off=yes	windows-95	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-95	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
-shortcut_suffix_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg
-shortcut_suffix_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+shortcut_suffix_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-98-se	+
 shortcut_suffix_off=yes	windows-98-se	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-98-se	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
-shortcut_suffix_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg
-shortcut_suffix_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+shortcut_suffix_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-me	+
 shortcut_suffix_off=yes	windows-me	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-me	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
@@ -4996,29 +4951,24 @@ visual_effects=performance	windows-server-2025	+          <Order>8</Order>
 visual_effects=performance	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 visual_effects=performance	windows-server-2025	+        </RunSynchronousCommand>
 visual_effects=performance	windows-server-2025	+      </RunSynchronous>
-visual_effects=performance	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-2000	+
-visual_effects=performance	windows-2000	+----- usos-reg.txt -----
-visual_effects=performance	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 visual_effects=performance	windows-2000	+USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
 visual_effects=performance	windows-2000	+USER\Control Panel\Desktop|DragFullWindows|sz|0
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop|DragFullWindows|sz|0
-visual_effects=performance	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg
-visual_effects=performance	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+visual_effects=performance	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-95	+
 visual_effects=performance	windows-95	+[USOS.Profile]
 visual_effects=performance	windows-95	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
 visual_effects=performance	windows-95	+HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
-visual_effects=performance	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg
-visual_effects=performance	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+visual_effects=performance	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-98-se	+
 visual_effects=performance	windows-98-se	+[USOS.Profile]
 visual_effects=performance	windows-98-se	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
 visual_effects=performance	windows-98-se	+HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
-visual_effects=performance	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg
-visual_effects=performance	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+visual_effects=performance	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-me	+
 visual_effects=performance	windows-me	+[USOS.Profile]
 visual_effects=performance	windows-me	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
@@ -5032,11 +4982,6 @@ font_smoothing=yes	windows-xp	+DEFAULT\Control Panel\Desktop|FontSmoothing|sz|2
 font_smoothing=yes	windows-xp	+USER\Control Panel\Desktop|FontSmoothing|sz|2
 font_smoothing=yes	windows-xp	+DEFAULT\Control Panel\Desktop|FontSmoothingType|dword|2
 font_smoothing=yes	windows-xp	+USER\Control Panel\Desktop|FontSmoothingType|dword|2
-font_smoothing=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-font_smoothing=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-font_smoothing=yes	windows-2000	+
-font_smoothing=yes	windows-2000	+----- usos-reg.txt -----
-font_smoothing=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 font_smoothing=yes	windows-2000	+DEFAULT\Control Panel\Desktop|FontSmoothing|sz|2
 font_smoothing=yes	windows-2000	+USER\Control Panel\Desktop|FontSmoothing|sz|2
 font_smoothing=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -5336,11 +5281,6 @@ mouse_accel_off=yes	windows-xp	+; USOS answer profile: registry set for usos-reg
 mouse_accel_off=yes	windows-xp	+USER\Control Panel\Mouse|MouseSpeed|sz|0
 mouse_accel_off=yes	windows-xp	+USER\Control Panel\Mouse|MouseThreshold1|sz|0
 mouse_accel_off=yes	windows-xp	+USER\Control Panel\Mouse|MouseThreshold2|sz|0
-mouse_accel_off=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-mouse_accel_off=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-mouse_accel_off=yes	windows-2000	+
-mouse_accel_off=yes	windows-2000	+----- usos-reg.txt -----
-mouse_accel_off=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 mouse_accel_off=yes	windows-2000	+USER\Control Panel\Mouse|MouseSpeed|sz|0
 mouse_accel_off=yes	windows-2000	+USER\Control Panel\Mouse|MouseThreshold1|sz|0
 mouse_accel_off=yes	windows-2000	+USER\Control Panel\Mouse|MouseThreshold2|sz|0
@@ -5355,22 +5295,22 @@ mouse_accel_off=yes	windows-server-2003	+USER\Control Panel\Mouse|MouseThreshold
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseSpeed|sz|0
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseThreshold1|sz|0
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseThreshold2|sz|0
-mouse_accel_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg
-mouse_accel_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+mouse_accel_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-95	+
 mouse_accel_off=yes	windows-95	+[USOS.Profile]
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
-mouse_accel_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg
-mouse_accel_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+mouse_accel_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-98-se	+
 mouse_accel_off=yes	windows-98-se	+[USOS.Profile]
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
-mouse_accel_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg
-mouse_accel_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+mouse_accel_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-me	+
 mouse_accel_off=yes	windows-me	+[USOS.Profile]
 mouse_accel_off=yes	windows-me	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
@@ -5606,11 +5546,6 @@ sticky_keys_off=yes	windows-xp	+
 sticky_keys_off=yes	windows-xp	+----- usos-reg.txt -----
 sticky_keys_off=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 sticky_keys_off=yes	windows-xp	+USER\Control Panel\Accessibility\StickyKeys|Flags|sz|506
-sticky_keys_off=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-sticky_keys_off=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-sticky_keys_off=yes	windows-2000	+
-sticky_keys_off=yes	windows-2000	+----- usos-reg.txt -----
-sticky_keys_off=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 sticky_keys_off=yes	windows-2000	+USER\Control Panel\Accessibility\StickyKeys|Flags|sz|506
 sticky_keys_off=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 sticky_keys_off=yes	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -6050,11 +5985,6 @@ last_access_off=yes	windows-xp	+
 last_access_off=yes	windows-xp	+----- usos-reg.txt -----
 last_access_off=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 last_access_off=yes	windows-xp	+HKLM\SYSTEM\CurrentControlSet\Control\FileSystem|NtfsDisableLastAccessUpdate|dword|1
-last_access_off=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-last_access_off=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-last_access_off=yes	windows-2000	+
-last_access_off=yes	windows-2000	+----- usos-reg.txt -----
-last_access_off=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 last_access_off=yes	windows-2000	+HKLM\SYSTEM\CurrentControlSet\Control\FileSystem|NtfsDisableLastAccessUpdate|dword|1
 last_access_off=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 last_access_off=yes	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -7385,11 +7315,6 @@ user_script=yes	windows-xp	+----- usos-reg.txt -----
 user_script=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 user_script=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS1UserReg|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.reg regedit.exe /s %d:\Scripts\first-logon.reg
 user_script=yes	windows-xp	+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS2UserScript|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.cmd call %d:\Scripts\first-logon.cmd
-user_script=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-user_script=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-user_script=yes	windows-2000	+
-user_script=yes	windows-2000	+----- usos-reg.txt -----
-user_script=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 user_script=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS1UserReg|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.reg regedit.exe /s %d:\Scripts\first-logon.reg
 user_script=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS2UserScript|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.cmd call %d:\Scripts\first-logon.cmd
 user_script=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
@@ -7475,6 +7400,8 @@ workgroup=USOSLAB	windows-2000	-JoinWorkgroup=WORKGROUP
 workgroup=USOSLAB	windows-2000	+JoinWorkgroup=USOSLAB
 workgroup=USOSLAB	windows-server-2003	-JoinWorkgroup=WORKGROUP
 workgroup=USOSLAB	windows-server-2003	+JoinWorkgroup=USOSLAB
+workgroup=USOSLAB	windows-nt-4	-JoinWorkgroup=WORKGROUP
+workgroup=USOSLAB	windows-nt-4	+JoinWorkgroup=USOSLAB
 workgroup=USOSLAB	windows-95	-Workgroup="WORKGROUP"
 workgroup=USOSLAB	windows-95	+Workgroup="USOSLAB"
 workgroup=USOSLAB	windows-98-se	-Workgroup="WORKGROUP"

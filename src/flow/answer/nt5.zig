@@ -86,8 +86,18 @@ fn tweakLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
         first = false;
     }
     if (!first) try w.writeAll("\n");
-    if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
+    if (family == .windows_2000) {
+        if (@import("display_profile.zig").requested(p)) try w.print("display={s}\ndisplay_bpp={s}\n", .{ @tagName(p.display), @tagName(p.display_bpp) });
+    } else if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
     try optionLines(p, family, w);
+    if (family == .windows_2000) {
+        const network = @import("network_defaults.zig");
+        try w.print("network={s}\n", .{@tagName(p.network)});
+        if (p.network == .on) {
+            try w.print("ip={s}\ngateway={s}\ndns={s}\nhome_page={s}\n", .{ network.ip(p), p.gateway.slice(), p.dns.slice(), network.home(p) });
+            try network.ntRegistry(p, "reg=", w);
+        }
+    }
 }
 
 /// The typed options (options.zig), only when set: workgroup=, run= (a
@@ -138,7 +148,7 @@ test "NT5 render: automatic language keeps the usos-xp.ini keys" {
     try std.testing.expectEqualStrings("user=Tester\nuser2=\ncomputer=\norg=\nkey=\ntimezone=\npassword=\nfamily=xp\n", text);
 }
 
-var buffer_for_test: [1024]u8 = undefined;
+var buffer_for_test: [8192]u8 = undefined;
 
 test "NT5 render: tweaks per family, none for 2000" {
     var p = Profile{};
@@ -152,7 +162,8 @@ test "NT5 render: tweaks per family, none for 2000" {
     const w2k3 = try render(&p, .windows_2003, "", &buffer_for_test);
     try std.testing.expect(std.mem.endsWith(u8, w2k3, "family=2003\ntweaks=messenger,outlook_express,balloons,extensions,hidden,autorun\ndisplay=1280x1024\n"));
     const w2k = try render(&p, .windows_2000, "", &buffer_for_test);
-    try std.testing.expect(std.mem.indexOf(u8, w2k, "tweaks") == null and std.mem.indexOf(u8, w2k, "display") == null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "tweaks") == null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "display=1280x1024\ndisplay_bpp=auto\n") != null);
     p.theme = .basic;
     const basic = try render(&p, .windows_xp, "", &buffer_for_test);
     try std.testing.expect(std.mem.indexOf(u8, basic, "classic_theme") == null);

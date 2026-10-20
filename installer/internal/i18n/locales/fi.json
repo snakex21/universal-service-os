@@ -157,6 +157,9 @@
   "installer.components.no_release": "Tämä asennusohjelman versio ei tunne GitHub-julkaisuaan, joten se ei voi ladata. Valitse tiedostot, jotka sinulla jo on, tai ohita.",
   "installer.components.checking": "Tarkistetaan aseman komponentteja…",
   "installer.components.check_failed": "Aseman komponentteja ei voitu tarkistaa: %s",
+  "installer.components.legacy.name": "Windows 95/98/Me/NT 4.0 -yhteensopivuuspaketti (noin 150 Mt)",
+  "installer.components.legacy.need": "Microsoftin kirjastot (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), jotka paketti asentaa Windows 95:een, 98:aan, Me:hen ja NT 4.0:aan asennuksen jälkeen.",
+  "installer.components.legacy.skip_note": "Ilman sitä paketti asentaa vain sen, minkä itse laitat DATA\\Addons-kansioon. Voit lisätä sen myöhemmin USOS-päivityksellä tai korjauksella.",
   "installer.components.winpe.name": "WinPE 10 -apuohjelma (noin 440 Mt)",
   "installer.components.winpe.need": "Tarvitaan Windows Vistan ja Windows 7:n asentamiseen UEFI-tilassa.",
   "installer.components.winpe.skip_note": "Ilman sitä Windows Vistaa ja Windows 7:ää ei voi asentaa UEFI-tilassa. Voit lisätä sen myöhemmin toiminnoilla Päivitä USOS tai Korjaa.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Kirjaudu asennuksen jälkeen toimialueelle {1} käyttäjänä {0} vastausprofiilissa asetetulla salasanalla.",
   "boot.lx.logon_autologon": "Asennuksen jälkeen Windows kirjautuu automaattisesti käyttäjänä {0}.",
   "boot.lx.logon_setup_asks": "Windowsin asennus kysyy käyttäjänimen ja salasanan asennuksen aikana; USOS ei aseta niitä.",
-  "boot.lx.logon_answer_file": "Kirjaudu asennuksen jälkeen vastaustiedostosi {0} tilillä."
+  "boot.lx.logon_answer_file": "Kirjaudu asennuksen jälkeen vastaustiedostosi {0} tilillä.",
+  "boot.profile.field.display_bpp": "Värisyvyys",
+  "boot.profile.help.display_legacy": "Otetaan käyttöön asennuksen jälkeen oikealla laitteistolla. Automaattinen valitsee saatavilla olevan tilan enintään 1920x1080 ja turvallisen varatilan. Ei muutoksia säilyttää asetukset. Automaattinen värisyvyys suosii 32 bittiä, muuten 16."
 }

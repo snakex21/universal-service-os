@@ -24,3 +24,7 @@ export USOSPAUSE.7 resident
 export USOSWHEELINFO.8 resident
 segment type code fixed
 segment type data fixed
+# USOSKEY.DRV (task time): is the USOSVMD.VXD / VMOUSE mode active? (then
+# its DOS-box guard stays off). USOSDBG.EXE: the VMOUSE-mode diagnostics.
+export USOSVMDMODE.9 resident
+export USOSVMDINFO.10 resident

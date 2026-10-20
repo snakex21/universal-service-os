@@ -157,6 +157,9 @@
   "installer.components.no_release": "Cette version du programme d'installation ne connaît pas sa version GitHub et ne peut donc pas télécharger. Choisissez des fichiers que vous avez déjà, ou ignorez.",
   "installer.components.checking": "Vérification des composants présents sur le support…",
   "installer.components.check_failed": "Impossible de vérifier les composants du support : %s",
+  "installer.components.legacy.name": "Pack de compatibilité Windows 95/98/Me/NT 4.0 (environ 150 Mo)",
+  "installer.components.legacy.need": "Bibliothèques Microsoft (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET) que le pack installe dans Windows 95, 98, Me et NT 4.0 après l'installation.",
+  "installer.components.legacy.skip_note": "Sans lui, le pack n'installe que ce que vous placez vous-même dans DATA\\Addons. Vous pourrez l'ajouter plus tard avec Mettre à jour USOS ou Réparer.",
   "installer.components.winpe.name": "Assistant WinPE 10 (environ 440 Mo)",
   "installer.components.winpe.need": "Nécessaire pour installer Windows Vista et Windows 7 en mode UEFI.",
   "installer.components.winpe.skip_note": "Sans lui, Windows Vista et Windows 7 ne peuvent pas être installés en mode UEFI. Vous pourrez l'ajouter plus tard avec Mettre à jour USOS ou Réparer.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Après l'installation, connectez-vous au domaine {1} en tant que {0} avec le mot de passe défini dans le profil de réponses.",
   "boot.lx.logon_autologon": "Après l'installation, Windows ouvre automatiquement la session de {0}.",
   "boot.lx.logon_setup_asks": "Le programme d'installation de Windows demande le nom d'utilisateur et le mot de passe pendant l'installation ; USOS ne les définit pas.",
-  "boot.lx.logon_answer_file": "Après l'installation, connectez-vous avec le compte de votre fichier de réponses {0}."
+  "boot.lx.logon_answer_file": "Après l'installation, connectez-vous avec le compte de votre fichier de réponses {0}.",
+  "boot.profile.field.display_bpp": "Profondeur des couleurs",
+  "boot.profile.help.display_legacy": "Appliqué après installation sur le matériel réel. Automatique choisit un mode disponible jusqu’à 1920x1080 avec repli sans risque. Inchangé conserve les réglages. La profondeur automatique préfère 32 bits si disponibles, sinon 16."
 }

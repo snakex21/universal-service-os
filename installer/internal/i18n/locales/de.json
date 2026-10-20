@@ -157,6 +157,9 @@
   "installer.components.no_release": "Dieser Build des Installationsprogramms kennt sein GitHub-Release nicht und kann daher nichts herunterladen. Wählen Sie vorhandene Dateien oder überspringen Sie.",
   "installer.components.checking": "Prüfe, welche Komponenten das Laufwerk hat…",
   "installer.components.check_failed": "Die Komponenten des Laufwerks konnten nicht geprüft werden: %s",
+  "installer.components.legacy.name": "Kompatibilitätspaket für Windows 95/98/Me/NT 4.0 (ca. 150 MB)",
+  "installer.components.legacy.need": "Microsoft-Laufzeitbibliotheken (DirectX, Windows Installer, MDAC, VB6/VC6, MSLU, .NET), die das Paket nach dem Setup in Windows 95, 98, Me und NT 4.0 installiert.",
+  "installer.components.legacy.skip_note": "Ohne es installiert das Paket nur, was Sie selbst in DATA\\Addons ablegen. Sie können es später mit USOS aktualisieren oder Reparieren hinzufügen.",
   "installer.components.winpe.name": "WinPE-10-Hilfsabbild (ca. 440 MB)",
   "installer.components.winpe.need": "Wird benötigt, um Windows Vista und Windows 7 im UEFI-Modus zu installieren.",
   "installer.components.winpe.skip_note": "Ohne es lassen sich Windows Vista und Windows 7 nicht im UEFI-Modus installieren. Sie können es später mit „USOS aktualisieren“ oder „Reparieren“ hinzufügen.",
@@ -1351,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Nach der Installation an der Domäne {1} als {0} mit dem im Antwortprofil festgelegten Kennwort anmelden.",
   "boot.lx.logon_autologon": "Nach der Installation meldet sich Windows automatisch als {0} an.",
   "boot.lx.logon_setup_asks": "Windows Setup fragt während der Installation nach Benutzername und Kennwort; USOS legt sie nicht fest.",
-  "boot.lx.logon_answer_file": "Nach der Installation mit dem Konto aus Ihrer Antwortdatei {0} anmelden."
+  "boot.lx.logon_answer_file": "Nach der Installation mit dem Konto aus Ihrer Antwortdatei {0} anmelden.",
+  "boot.profile.field.display_bpp": "Farbtiefe",
+  "boot.profile.help.display_legacy": "Wird nach der Installation auf der echten Hardware angewendet. Automatisch wählt einen verfügbaren Modus bis 1920x1080 mit sicherem Rückfall. Unverändert behält die Einstellungen bei. Automatische Farbtiefe: 32 Bit, falls verfügbar, sonst 16."
 }
