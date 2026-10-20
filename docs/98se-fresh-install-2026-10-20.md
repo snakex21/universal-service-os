@@ -20,6 +20,10 @@ Evidence:
   nothing afterwards (no USN5, no rounds at 10 / 30 / 60 s). The working Me
   installs log USN1..USN5 every round. `(0000)` in the notice is the
   `Class\Net` instance, not an error code. `DhcpInfo00` empty.
+* USOSLOG (`C:\USOS9X\LOGS\USOSLOG.TXT`, 100 s and 180 s after the
+  first sign-in): the I211 at 04:00.0 has PCI command 0000 (memory and bus
+  master off) and BAR0 00000000, although the driver had mapped its MMIO
+  (`UsosnetMmio`): the device had been removed and its resources freed.
 * NDIS.VXD 4.10.2222 (`C:\WINDOWS\SYSTEM\NDIS.VXD`, read-only, disassembled
   locally): `NdisWriteErrorLogEntry` keeps a per-adapter count and a 30 s
   timer started by the first entry. Until NDIS has seen VxD
@@ -67,3 +71,5 @@ length) is the evidence.
 Not verified: the collector on a running 98 SE desktop; whether the X470's
 VBE list (CSMWrap) passes the `2 * pitch * height` memory rule for
 1920x1080. If it does not, the log now says which mode failed and why.
+
+Build with both fixes: B261020-111448-1F997795 (970ed65a).
