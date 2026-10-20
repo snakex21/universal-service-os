@@ -135,6 +135,19 @@ w9x_add_display_ids() {
             }
         }'
 }
+# MSBATCH.INF $1 -> stdout with [USOS.ChannelBar] (98 FE, IE 4) in the
+# [Install] AddReg list, placed before [USOS.Csm] (INSTALL.BAT appends to
+# the end). Fails without exactly one AddReg line in [Install].
+w9x_98fe_channelbar_answer() {
+    awk 'function add() {if(done++)return
+             bs = sprintf("%c", 92)
+             printf "[USOS.ChannelBar]\r\nHKCU,\"Software%sMicrosoft%sInternet Explorer%sMain\",Show_ChannelBand,,\"no\"\r\n\r\n", bs, bs, bs}
+         {sub(/\r$/, ""); low=tolower($0)}
+         /^\[/ {install=(low=="[install]"); if(low=="[usos.csm]")add()}
+         install && low~/^addreg=/ {if(low!~/usos\.channelbar/)$0=$0 ",USOS.ChannelBar";n++}
+         {printf "%s\r\n",$0}
+         END {if(n!=1)exit 1; if(!done){printf "\r\n";add()}}' "$1"
+}
 
 for tool in dd od mkfs.fat mcopy mmd mdel mattrib mdir syslinux mount umount losetup blockdev awk sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
@@ -516,6 +529,36 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         rm -f "$work/c/USOS9X/VESA95.BAT" "$work/c/USOS9X/VESA95.REG"
         log 'display: no VESA95.BAT (Standard VGA stays)'
     fi
+    # 95 Setup ignores MSBATCH.INF [Install] AddReg (X470 2026-10-20: no
+    # USOSRES / USOSLAN / USOSLOG Run value, no IE/ICW defaults): REG95.BAT
+    # (tools/w9x_reg95.sh) imports the same values once before the first
+    # desktop. A user's own answer file gets none (as on 98, 1:1).
+    rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+    if [ "$ANSWER_KIND" = USER ]; then
+        log "answer registry: none for the user's own answer file"
+    else
+        reg95_log=
+        [ "$log_ok" != 1 ] || reg95_log='C:\USOS9X\USOSLOG.EXE'
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log"; then
+            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once)"
+        else
+            rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+            log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
+        fi
+    fi
+fi
+# Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
+# 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand
+# (REG_SZ, "yes"/"no", the value its own checkbox writes); 98 SE is not
+# changed here. A user's own answer file stays 1:1.
+if [ "$SYSTEM_TAG" = 98 ] && [ "$ANSWER_KIND" != USER ]; then
+    if w9x_98fe_channelbar_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/channelbar-answer.inf"; then
+        cp "$work/channelbar-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage the Channel Bar answer'
+        log 'IE 4: Channel Bar off at the first sign-in (Show_ChannelBand=no)'
+    else
+        log 'IE 4: Channel Bar left as Setup sets it (no [Install] AddReg line)'
+    fi
+    rm -f "$work/channelbar-answer.inf"
 fi
 
 # The boot floppy runs INSTALL.BAT from C: (A: stays the CD's DOS: SYS,
