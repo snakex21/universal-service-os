@@ -125,7 +125,10 @@ w9x_reg95_convert() {
                 else if (fv == 65537) {
                     v = hexval(n >= 5 ? f[5] : "0")
                     if (v < 0) { skip(line, "dword"); continue }
-                    emit(key, f[3], sprintf("dword:%08x", v))
+                    # 4 binary bytes, as the 9x readers take a DWORD (and as 95 itself
+                    # stores EnableAutodial); real-mode REGEDIT "hex:" is proven on the
+                    # X470 (USOSUSB.REG), "dword:" there is not.
+                    emit(key, f[3], sprintf("hex:%02x,%02x,%02x,%02x", v % 256, int(v / 256) % 256, int(v / 65536) % 256, int(v / 16777216) % 256))
                 } else if (fv == 1) {
                     data = ""
                     for (i = 5; i <= n; i++) {

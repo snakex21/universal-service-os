@@ -90,7 +90,8 @@ class Reg95(unittest.TestCase):
         self.assertNotIn('[-', reg)                                     # 95 REGEDIT deletes nothing
         # HKCU = HKEY_USERS\.Default (95 without profiles; real-mode REGEDIT).
         self.assertIn('[HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings]\r\n'
-                      '"EnableAutodial"=dword:00000000\r\n"NoNetAutodial"=dword:00000001\r\n', reg)
+                      '"EnableAutodial"=hex:00,00,00,00\r\n"NoNetAutodial"=hex:01,00,00,00\r\n', reg)
+        self.assertNotIn('dword:', reg)                                # 4 binary bytes (real-mode REGEDIT)
         self.assertIn('[HKEY_USERS\\.Default\\Software\\Microsoft\\Internet Connection Wizard]\r\n"Completed"=hex:01,00,00,00\r\n', reg)
         self.assertIn('"Start Page"="about:blank"\r\n', reg)
         self.assertIn('"DefaultPassword"=""\r\n', reg)
@@ -99,7 +100,7 @@ class Reg95(unittest.TestCase):
         for name, exe in (('USOSLan', 'USOSLAN'), ('USOSDisplay', 'USOSRES'), ('USOSLog', 'USOSLOG')):
             self.assertIn('"%s"="C:\\\\USOS9X\\\\%s.EXE"\r\n' % (name, exe), run)
         self.assertIn('"Quote"="say \\"hi\\""\r\n', reg)
-        self.assertIn('"Hex"=dword:0001e000\r\n', reg)
+        self.assertIn('"Hex"=hex:00,e0,01,00\r\n', reg)
         self.assertIn('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\{00000000-0000-0000-0000-000000000001}]\r\n@="x"\r\n', reg)
         # Not expressible: listed as comments, not imported.
         comments = [l for l in reg.split('\r\n') if l.startswith(';')]
