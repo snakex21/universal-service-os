@@ -74,8 +74,8 @@ INT13_ALL_FLAG=${W9X_INT13_ALL_FLAG:-$ESP_DIR/win9x/int13-all-disks.flag}
 USB_STORAGE=${W9X_USB_STORAGE:-0}
 # 1 (prepare.sh default, 0 with DATA's vmd-off.txt): the USB mouse in MS-DOS
 # boxes through USOSVMD.VXD, a VMOUSE minidriver (docs/dos-mouse-2026-10-18.md;
-# X470 Windows Me PASS 2026-10-19 with v3.1). 98 / 98 SE / Me with the USOS
-# answer only; never on 95 (not tested there).
+# X470 Windows Me PASS 2026-10-19 with v3.1, 98 FE / 98 SE PASS later). 95 /
+# 98 / 98 SE / Me with the USOS or a profile answer, not a user's own file.
 VMD=${W9X_VMD:-0}
 # 1 (prepare.sh default, 0 with DATA's logging-off.txt): USOSLOG.EXE, the
 # silent logger (docs/usoslog.md), starts with Windows from the machine Run
@@ -450,11 +450,13 @@ fi
 # start, like the Me mouse.drv switch. U9FIX /CSM (95/98) deletes only
 # mouse=*vmouse lines, never these. Off on the installed system: delete the
 # two device= lines (USOSVMD.ON alone only switches USOSMOUS's VMOUSE mode).
+# Windows 95 ignores MSBATCH.INF [Install] AddReg, so the RunOnce value comes
+# from REG95.REG instead (w9x_reg95.sh, below), which also keeps VMOUSE off
+# the PS/2 mouse devnode 95 Setup detects (VMOUSE's own PS/2 init). Without
+# REG95.BAT the VMD files are removed again there.
 vmd_ok=0
 if [ "$VMD" = 1 ]; then
-    if [ "$SYSTEM_TAG" = 95 ]; then
-        log 'dos-box mouse: USOSVMD.VXD off on Windows 95 (not tested there)'
-    elif [ "$ANSWER_KIND" = USER ]; then
+    if [ "$ANSWER_KIND" = USER ]; then
         log "dos-box mouse: USOSVMD.VXD skipped: the user's own answer file (no RunOnce for USOSVMD.INF)"
     elif [ ! -f "$work/c/USOS9X/USOSVMD.VXD" ] || [ ! -f "$work/c/USOS9X/USOSMOUS.DRV" ]; then
         log 'dos-box mouse: USOSVMD.VXD or USOSMOUS.DRV is not in this payload'
@@ -475,7 +477,11 @@ system.ini,386Enh,,"device=C:\USOS9X\USOSVMD.VXD"
 EOF
         printf 'SET U9VMD=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
         vmd_ok=1
-        log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF (default; vmd-off.txt turns it off)'
+        if [ "$SYSTEM_TAG" = 95 ]; then
+            log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF from REG95.REG, PS/2 mouse devnode off (default; vmd-off.txt turns it off)'
+        else
+            log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF (default; vmd-off.txt turns it off)'
+        fi
     fi
 fi
 [ "$vmd_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"
@@ -539,11 +545,18 @@ if [ "$SYSTEM_TAG" = 95 ]; then
     else
         reg95_log=
         [ "$log_ok" != 1 ] || reg95_log='C:\USOS9X\USOSLOG.EXE'
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log"; then
+        reg95_vmd=
+        [ "$vmd_ok" != 1 ] || reg95_vmd='C:\USOS9X\USOSVMD.INF'
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd"; then
             log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once)"
         else
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
+            if [ "$vmd_ok" = 1 ]; then
+                vmd_ok=0
+                rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"
+                log 'dos-box mouse: USOSVMD.VXD removed again (no REG95.BAT for its RunOnce and the PS/2 devnode)'
+            fi
         fi
     fi
 fi

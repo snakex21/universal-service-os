@@ -526,8 +526,8 @@ usos_w9x_csmwrap_prepare() {
     #   usb-storage-off.txt  no USOSUSB.MPD: no USB sticks in Windows, a stick
     #                        keeps INT 13h (docs/usb9x-hotswap-design-2026-10-19.md;
     #                        the old opt-in usb-storage-experimental.txt is not needed)
-    #   vmd-off.txt          no USOSVMD.VXD (mouse in MS-DOS boxes; 98/98 SE/Me only,
-    #                        never on 95: not tested there)
+    #   vmd-off.txt          no USOSVMD.VXD (mouse in MS-DOS boxes; 95/98/98 SE/Me,
+    #                        95 through REG95.REG, tools/w9x_reg95.sh)
     #   logging-off.txt      no USOSLOG.EXE autostart (silent logger, C:\USOS9X\LOGS)
     usb9x=0
     vmd9x=0

@@ -1,5 +1,5 @@
 """Windows 9x CSMWrap flow defaults since the X470 Windows Me pass (2026-10-19):
-USOSVMD.VXD (mouse in MS-DOS boxes; 98 / 98 SE / Me, never 95) and USOSLOG.EXE (silent
+USOSVMD.VXD (mouse in MS-DOS boxes; 95 / 98 / 98 SE / Me) and USOSLOG.EXE (silent
 logger from the machine Run key), each with a DATA opt-out file (vmd-off.txt,
 logging-off.txt; usb-storage-off.txt is in test_w9x_usb_storage_flag.py).
 
@@ -80,11 +80,23 @@ class TargetBlocks(unittest.TestCase):
                     self.assertIn('vmd-off.txt turns it off', err)
                     self.assertIn('logging-off.txt turns it off', err)
 
-    def test_never_on_95(self):
-        err = self.run_block(tag='95')
+    def test_on_95_too(self):
+        # 95 (2026-10-20): same files; the RunOnce value and the PS/2 devnode
+        # flags come from REG95.REG (test_w9x_reg95.py), not [USOS.CsmReg].
+        for answer in ('USOS', 'PROFILE'):
+            with self.subTest(answer=answer):
+                self.setUp()
+                err = self.run_block(tag='95', answer=answer)
+                self.assertEqual(self.names(), ['U9ENV.BAT', 'USOSLOG.EXE', 'USOSMOUS.DRV', 'USOSVMD.INF',
+                                                'USOSVMD.ON', 'USOSVMD.VXD'])
+                self.assertEqual(self.env(), U9ENV + b'SET U9VMD=1\r\nSET U9LOG=1\r\n')
+                self.assertEqual((self.c / 'USOSVMD.INF').read_bytes(), VMD_INF)
+                self.assertIn('RunOnce USOSVMD.INF from REG95.REG, PS/2 mouse devnode off', err)
+                self.assertNotIn('not tested there', err)
+        self.setUp()
+        err = self.run_block(tag='95', answer='USER')
         self.assertEqual(self.names(), ['U9ENV.BAT', 'USOSLOG.EXE', 'USOSMOUS.DRV'])
-        self.assertEqual(self.env(), U9ENV + b'SET U9LOG=1\r\n')    # the logger runs on 95 too
-        self.assertIn('USOSVMD.VXD off on Windows 95 (not tested there)', err)
+        self.assertIn("user's own answer file", err)
 
     def test_user_answer(self):
         err = self.run_block(tag='98SE', answer='USER')

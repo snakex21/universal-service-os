@@ -10,7 +10,7 @@
 # USER.DAT, no MSBATCH.INF line in SETUPLOG.TXT). So USOSRES (display mode),
 # USOSLAN, USOSLOG never started and the IE / ICW defaults were missing.
 #
-# w9x_reg95_write <C:\USOS9X folder> <MSBATCH.INF> [usoslog]
+# w9x_reg95_write <C:\USOS9X folder> <MSBATCH.INF> [usoslog] [vmd inf]
 # converts the AddReg sections named in [Install] into REG95.REG (REGEDIT4,
 # real-mode REGEDIT syntax: HKCU -> HKEY_USERS\.Default, which is HKCU on 95
 # without user profiles and the template of a new profile; HKCR ->
@@ -26,6 +26,24 @@
 # Windows 95 additions (no AddReg line on 98 does these):
 #   * usoslog argument: the USOSLOG.EXE Run value (INSTALL.BAT appends it as
 #     [USOS.CsmReg] at DOS time, after this conversion).
+#   * vmd inf argument (C:\USOS9X\USOSVMD.INF: the mouse in MS-DOS boxes,
+#     docs/dos-mouse-2026-10-18.md "Windows 95"), two values 98 / Me do not
+#     need. (a) The machine RunOnce value USOSVmd that runs the INF (rundll
+#     setupx InstallHinfSection, UpdateInis: SYSTEM.INI [386Enh]
+#     device=*vmouse and device=C:\USOS9X\USOSVMD.VXD); INSTALL.BAT's
+#     [USOS.CsmReg] line for it is lost on 95 like every AddReg. (b)
+#     CSConfigFlags 6 (do not create, do not start) in hardware profile 0001
+#     for Root\*PNP0F0E\0000, the PS/2 port mouse that 95 Setup's detection
+#     adds with Class\Mouse DevLoader *vmouse, MouseType PS2. 98 SE has the
+#     same devnode without a Driver value, so its VMOUSE never sees it. On
+#     95, once device=*vmouse loads VMOUSE, CONFIGMG would start the devnode
+#     and VMOUSE's PS/2 init (INT 15h C205h..C200h with its own C207h
+#     callback, a V86 INT 15h hook, IRQ 12) would run whatever USOSVMD
+#     claimed: the BIOS-mouse probing that hung the X470 with mouse=*vmouse,
+#     and a hook that swallows USOSMOUS.DRV's own C2xx calls. 95 OSR2
+#     CONFIGMG.VXD reads CSConfigFlags from Config\<CurrentConfig>\Enum\<id>:
+#     bit 2 = devnode not created, bit 4 = problem 22 (disabled) before the
+#     start. Overwrite only; without that devnode the profile key is unused.
 #   * the LAN policy (an ICW "Completed" line present): the desktop
 #     "Internet" icon opens Internet Explorer 3 instead of ICWCONN1.EXE
 #     (95 OSR2's {FBF23B42-...} Shell\Open\Command until the wizard ran;
@@ -48,7 +66,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -105,7 +123,7 @@ w9x_reg95_convert() {
         emit(key, name, data)
     }
     BEGIN {
-        usoslog = ENVIRON["W9X_REG95_LOG"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
+        usoslog = ENVIRON["W9X_REG95_LOG"]; vmd = ENVIRON["W9X_REG95_VMD"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
         runkey = "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
     }
     { sub(/\r$/, "") }
@@ -173,6 +191,11 @@ w9x_reg95_convert() {
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
         if (icw) emit("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command", "", "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\"")
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
+        if (vmd != "") {
+            emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", "USOSVmd",
+                 "\"" esc("rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 " vmd) "\"")
+            emit("HKEY_LOCAL_MACHINE\\Config\\0001\\Enum\\Root\\*PNP0F0E\\0000", "CSConfigFlags", "hex:06,00,00,00")
+        }
         printf "\r\n"
         for (i = 1; i <= nskip; i++) printf "; USOS: not converted (%s)\r\n", skipped[i]
     }' "$1"
@@ -199,10 +222,10 @@ EOF
 }
 
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
-    w9x_reg95_convert "$inf" "$usoslog" > "$dir/REG95.REG" || return 1
+    w9x_reg95_convert "$inf" "$usoslog" "$vmd" >"$dir/REG95.REG" || return 1
     grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
     if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'

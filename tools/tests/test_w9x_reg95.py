@@ -93,6 +93,23 @@ class Reg95(unittest.TestCase):
         run = reg[reg.index('[%s]\r\n' % RUN):].split('\r\n\r\n')[0]
         self.assertEqual(re.findall(r'^"(\w+)"=', run, flags=re.M), ['USOSLog', 'USOSDisplay', 'USOSLan'])
 
+    def test_vmd_values(self):
+        # The mouse in MS-DOS boxes on 95: the RunOnce of USOSVMD.INF (95
+        # Setup drops [USOS.CsmReg]) and VMOUSE kept off the PS/2 devnode.
+        _, files, _ = self.write(ANSWER_95, '', 'C:\\USOS9X\\USOSVMD.INF')
+        reg = files['REG95.REG'].decode('ascii')
+        ro = '[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce]\r\n'
+        self.assertEqual(reg.count(ro), 1)
+        self.assertIn(ro + '"USOSVmd"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\USOSVMD.INF"\r\n', reg)
+        self.assertIn('[HKEY_LOCAL_MACHINE\\Config\\0001\\Enum\\Root\\*PNP0F0E\\0000]\r\n"CSConfigFlags"=hex:06,00,00,00\r\n', reg)
+        self.assertNotIn('USOSLog', reg)                               # empty logger argument
+        self.assertNotIn('[-', reg)
+        self.assertEqual(reg.count('\n'), reg.count('\r\n'))
+        self.assertLess(reg.index('CSConfigFlags'), reg.index('; USOS: not converted'))
+        _, files, _ = self.write(ANSWER_95)
+        self.assertNotIn(b'USOSVmd', files['REG95.REG'])
+        self.assertNotIn(b'CSConfigFlags', files['REG95.REG'])
+
     def test_start_page_file(self):
         _, files, _ = self.write(ANSWER_95)
         page = files['START.HTM']
@@ -189,16 +206,19 @@ def target_block(start, end):
 
 
 class Wiring(unittest.TestCase):
-    def run_block(self, tag, kind='USOS', log_ok='1', answer=None):
+    def run_block(self, tag, kind='USOS', log_ok='1', answer=None, vmd_ok='0', lib=None):
         tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-reg95block-'))
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         (tmp / 'c/USOS9X').mkdir(parents=True)
+        for name in ('USOSVMD.VXD', 'USOSVMD.ON', 'USOSVMD.INF'):
+            (tmp / 'c/USOS9X' / name).write_bytes(b'stand-in')
         (tmp / 'c/USOS9X/MSBATCH.INF').write_bytes((answer or DEFAULT_INF.read_text(encoding='ascii').replace('\n', '\r\n')).encode('ascii'))
         text = TARGET.read_text(encoding='utf-8')
         helper = text[text.index('w9x_98fe_channelbar_answer() {'):text.index('\nfor tool in ')]
         block = target_block('if [ "$SYSTEM_TAG" = 95 ]; then\n    if [ -r "$LIB/w9x_vesa95.sh" ]', '# The boot floppy runs INSTALL.BAT')
         script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { echo "FAIL $*"; exit 9; }\n' + helper + '\n'
-                  f'SYSTEM_TAG={tag}\nANSWER_KIND={kind}\nlog_ok={log_ok}\nLIB="{(ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block)
+                  f'SYSTEM_TAG={tag}\nANSWER_KIND={kind}\nlog_ok={log_ok}\nvmd_ok={vmd_ok}\n'
+                  f'LIB="{(lib or ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block)
         rc, out, err = sh(script, {})
         self.assertEqual(rc, 0, out + err)
         return tmp / 'c/USOS9X', out
@@ -215,6 +235,29 @@ class Wiring(unittest.TestCase):
         self.assertNotIn(b'"USOSLog"=', (d / 'REG95.REG').read_bytes())
         build = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
         self.assertIn('("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh")', build)
+
+    def test_vmd_on_95_through_reg95(self):
+        d, _ = self.run_block('95', vmd_ok='1')
+        reg = (d / 'REG95.REG').read_bytes()
+        self.assertIn(b'"USOSVmd"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\USOSVMD.INF"\r\n', reg)
+        self.assertIn(b'[HKEY_LOCAL_MACHINE\\Config\\0001\\Enum\\Root\\*PNP0F0E\\0000]\r\n"CSConfigFlags"=hex:06,00,00,00\r\n', reg)
+        self.assertTrue((d / 'USOSVMD.VXD').exists())
+        d, _ = self.run_block('95', vmd_ok='0')
+        reg = (d / 'REG95.REG').read_bytes()
+        self.assertNotIn(b'USOSVmd', reg)
+        self.assertNotIn(b'PNP0F0E', reg)
+        # No REG95.BAT (here: no w9x_reg95.sh): the VMD files go, nothing half on.
+        nolib = Path(tempfile.mkdtemp(prefix='usos-w9x-nolib-'))
+        self.addCleanup(shutil.rmtree, nolib, ignore_errors=True)
+        (nolib / 'w9x_vesa95.sh').write_bytes((ROOT / 'tools/w9x_vesa95.sh').read_bytes())
+        d, out = self.run_block('95', vmd_ok='1', lib=nolib)
+        self.assertFalse((d / 'REG95.BAT').exists())
+        for name in ('USOSVMD.VXD', 'USOSVMD.ON', 'USOSVMD.INF'):
+            self.assertFalse((d / name).exists(), name)
+        self.assertIn('USOSVMD.VXD removed again', out)
+        # 98 SE keeps its files (its RunOnce comes from [USOS.CsmReg]).
+        d, _ = self.run_block('98SE', vmd_ok='1')
+        self.assertTrue((d / 'USOSVMD.VXD').exists())
 
     def test_autoexec_calls_reg95_after_vesa95_before_the_bridge(self):
         lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
