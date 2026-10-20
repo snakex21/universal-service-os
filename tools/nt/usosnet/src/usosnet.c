@@ -40,6 +40,31 @@ void __outbyte(unsigned short Port, unsigned char Data);
 #undef NdisQueryBuffer
 EXPORT VOID NdisQueryBuffer(IN PNDIS_BUFFER Buffer, OUT PVOID *VirtualAddress OPTIONAL, OUT PUINT Length);
 
+#if USOSNET_NDIS4
+/* NDIS 3.0 / 4.0 exports (NT4 SP6a NDIS.SYS, 95 OSR2 NDIS.VXD 4.0; still
+ * exported by later NDIS.SYS), not declared by the WDK 7.1 ndis.h. */
+EXPORT VOID EthFilterDprIndicateReceive(IN PETH_FILTER Filter, IN NDIS_HANDLE MacReceiveContext,
+                                        IN PCHAR Address, IN PVOID HeaderBuffer, IN UINT HeaderBufferSize,
+                                        IN PVOID LookaheadBuffer, IN UINT LookaheadBufferSize, IN UINT PacketSize);
+EXPORT VOID EthFilterDprIndicateReceiveComplete(IN PETH_FILTER Filter);
+EXPORT VOID NdisOverrideBusNumber(IN NDIS_HANDLE WrapperConfigurationContext,
+                                  IN NDIS_HANDLE MiniportAdapterHandle OPTIONAL, IN ULONG BusNumber);
+/* The Ethernet filter of the miniport block: 0xD8 in WDK 7.1 (FILTERDBS) and
+ * the EthDB that the NDIS 3 macros of 95 OSR2 NE2000.SYS and NT4 SP6a
+ * E100B.SYS pass to EthFilterDprIndicateReceive (checked by
+ * tools/tests/test_usosnet.py on the built binary). The NDIS 5 handler
+ * pointers behind it are not part of the 4.0 miniport block. */
+#define USOSNET_ETHDB_OFFSET 0xD8
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);
+#define USOSNET_ETHDB(H) (((PNDIS_MINIPORT_BLOCK)(H))->EthDB)
+/* MajorNdisVersion 4: the NDIS 3.0 part + ReturnPacket / SendPackets /
+ * AllocateComplete; 95 OSR2 NDIS.VXD wants at least 0x48 bytes. */
+#define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CoCreateVcHandler)
+C_ASSERT(USOSNET_CHARS_SIZE == 0x48);
+#else
+#define USOSNET_CHARS_SIZE sizeof(NDIS_MINIPORT_CHARACTERISTICS)
+#endif
+
 NDIS_HANDLE g_Wrapper;
 
 /* counters of the last halted adapter, written as UsosnetLast* at the next
@@ -76,7 +101,9 @@ static const NDIS_OID g_Oids[] = {
     OID_802_3_PERMANENT_ADDRESS, OID_802_3_CURRENT_ADDRESS, OID_802_3_MULTICAST_LIST,
     OID_802_3_MAXIMUM_LIST_SIZE, OID_802_3_RCV_ERROR_ALIGNMENT, OID_802_3_XMIT_ONE_COLLISION,
     OID_802_3_XMIT_MORE_COLLISIONS,
+#if !USOSNET_NDIS4
     OID_PNP_CAPABILITIES, OID_PNP_SET_POWER, OID_PNP_QUERY_POWER,
+#endif
 };
 
 static const char g_VendorDesc[] = "USOS Ethernet (usosnet)";
@@ -189,7 +216,17 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
     NDIS_STRING kPll = NDIS_STRING_CONST("UsosnetPllTries");
     NDIS_STRING kSva = NDIS_STRING_CONST("UsosnetStatsVa");
     NDIS_STRING kSpa = NDIS_STRING_CONST("UsosnetStatsPa");
+    NDIS_STRING kNdis = NDIS_STRING_CONST("UsosnetNdis");
+    NDIS_STRING kLoc = NDIS_STRING_CONST("UsosnetPciLocation");
+    NDIS_STRING kAsg = NDIS_STRING_CONST("UsosnetAssign");
+    NDIS_STRING kIrqSt = NDIS_STRING_CONST("UsosnetIrqStatus");
     if (!Cfg) return;
+    /* NDIS version the driver registered with (0x0400 / 0x0500); PCI
+     * location 0x80000000 | bus << 8 | slot when found by the NT4 bus scan */
+    CfgPut(Cfg, &kNdis, USOSNET_NDIS_MAJOR << 8);
+    CfgPut(Cfg, &kLoc, A->Legacy ? 0x80000000UL | (A->PciBus << 8) | A->PciSlot : 0);
+    CfgPut(Cfg, &kAsg, A->AssignStatus);
+    CfgPut(Cfg, &kIrqSt, A->IrqStatus);
     CfgPut(Cfg, &kSva, A->Stats ? (ULONG)(ULONG_PTR)A->Stats : 0);
     CfgPut(Cfg, &kSpa, A->Stats ? A->StatsMem.Pa : 0);
     CfgPut(Cfg, &kVer, (USOSNET_MAJOR << 16) | USOSNET_MINOR);
@@ -373,7 +410,7 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
     }
     A->LogCount++;
     A->Chip->Ops->Diag(A, r);
-    NdisReadPciSlotInformation(A->Handle, 0, 4, &pci, 4);   /* bit 19 = PCI status INTx pending */
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, 4, &pci, 4);   /* bit 19 = PCI status INTx pending */
     LOG10(0x55534E31UL, Sec, DiagFlags(A, Event), A->IsrCalls, A->IsrCount, A->DpcCount,
           A->RxOk, A->RxByTimer, A->TxOk, A->TxDone);
     LOG10(0x55534E32UL, Sec, A->TxErr, A->TxFull, A->RxErr, A->HwTpr, A->HwGprc, A->HwGptc,
@@ -514,11 +551,72 @@ void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status)
     A->CurRx = Frame;
     A->CurRxLen = Len;
     A->RxOk++;
+#if USOSNET_NDIS4
+    EthFilterDprIndicateReceive(USOSNET_ETHDB(A->Handle), (NDIS_HANDLE)A, (PCHAR)Frame, Frame, ETH_HDR,
+                                Frame + ETH_HDR, Len - ETH_HDR, Len - ETH_HDR);
+#else
     NdisMEthIndicateReceive(A->Handle, (NDIS_HANDLE)A, (PCHAR)Frame, ETH_HDR,
                             Frame + ETH_HDR, Len - ETH_HDR, Len - ETH_HDR);
+#endif
     A->CurRx = NULL;
     A->CurRxClasses = 0;
 }
+
+void UsIndicateRxComplete(PADAPTER A)
+{
+#if USOSNET_NDIS4
+    EthFilterDprIndicateReceiveComplete(USOSNET_ETHDB(A->Handle));
+#else
+    NdisMEthIndicateReceiveComplete(A->Handle);
+#endif
+}
+
+static const USOSNET_CHIP *FindChip(ULONG VenDev)
+{
+    UINT i;
+    for (i = 0; i < sizeof(g_Chips) / sizeof(g_Chips[0]); i++)
+        if (g_Chips[i].Vendor == (VenDev & 0xFFFF) && g_Chips[i].Device == (VenDev >> 16)) return &g_Chips[i];
+    return NULL;
+}
+
+#if USOSNET_NDIS4
+/* NT4 (no PnP): every PCI bus, device and function for the first supported
+ * card. NT4's NdisReadPciSlotInformation reads HAL bus data of the bus in
+ * the miniport block with the slot number as given; NdisOverrideBusNumber
+ * sets that bus (also the one NdisMPciAssignResources, NdisMMapIoSpace and
+ * NdisMRegisterInterrupt use). Found: PciBus / PciSlot, bus left selected. */
+static BOOLEAN LegacyFind(PADAPTER A, NDIS_HANDLE Wcc)
+{
+    ULONG bus, dev, fn, id, hdr, slot;
+    for (bus = 0; bus < 256; bus++) {
+        NdisOverrideBusNumber(Wcc, A->Handle, bus);
+        for (dev = 0; dev < 32; dev++) {
+            for (fn = 0; fn < 8; fn++) {
+                slot = dev | (fn << 5);
+                id = 0xFFFFFFFF;
+                if (NdisReadPciSlotInformation(A->Handle, slot, 0, &id, 4) != 4 ||
+                    (id & 0xFFFF) == 0 || (id & 0xFFFF) == 0xFFFF) {
+                    if (fn == 0) break;
+                    continue;
+                }
+                if (FindChip(id)) {
+                    A->PciBus = bus;
+                    A->PciSlot = slot;
+                    UsLog(A, "nt4 scan: bus %x slot %x", bus, slot);
+                    return TRUE;
+                }
+                if (fn == 0) {
+                    hdr = 0;
+                    NdisReadPciSlotInformation(A->Handle, slot, 0x0C, &hdr, 4);
+                    if (!(hdr & 0x00800000UL)) break;   /* not multi-function */
+                }
+            }
+        }
+    }
+    NdisOverrideBusNumber(Wcc, A->Handle, 0);
+    return FALSE;
+}
+#endif
 
 /* ------------------------------------------------------------------ */
 /* miniport handlers                                                   */
@@ -537,6 +635,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UCHAR resBuf[sizeof(NDIS_RESOURCE_LIST) + 12 * sizeof(CM_PARTIAL_RESOURCE_DESCRIPTOR)];
     PNDIS_RESOURCE_LIST res = (PNDIS_RESOURCE_LIST)resBuf;
     UINT resLen = sizeof(resBuf);
+    PNDIS_RESOURCE_LIST rl = NULL;
     PVOID netAddr;
     UINT netAddrLen;
     NDIS_STRING kPoll = NDIS_STRING_CONST("PollMode");
@@ -573,32 +672,51 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
                          NDIS_ATTRIBUTE_BUS_MASTER, NdisInterfacePci);
 
+#if USOSNET_NDIS4
+    /* 95 OSR2 (PnP): the devnode's resources, PCI slot numbers are ignored.
+     * NT4: NDIS.SYS 4.0 answers NOT_SUPPORTED; find the card, then let the
+     * HAL assign (claim) its resources for this slot. */
+    NdisMQueryAdapterResources(&st, WrapperConfigurationContext, res, &resLen);
+    if (st == NDIS_STATUS_SUCCESS) {
+        rl = res;
+    } else {
+        A->Legacy = TRUE;
+        if (!LegacyFind(A, WrapperConfigurationContext)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+        A->AssignStatus = NdisMPciAssignResources(MiniportAdapterHandle, A->PciSlot, &rl);
+        if (A->AssignStatus != NDIS_STATUS_SUCCESS) rl = NULL;  /* BAR0 / interrupt line below */
+        UsLog(A, "nt4 assign %x list %x", A->AssignStatus, rl ? rl->Count : 0);
+    }
+#endif
+
     /* PCI identity; memory decode + bus master on, INTx not disabled */
     cfg32 = 0;
-    NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0, &cfg32, 4);
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0, &cfg32, 4);
     A->VendorId = (USHORT)(cfg32 & 0xFFFF);
     A->DeviceId = (USHORT)(cfg32 >> 16);
-    NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 8, &cfg32, 4);
+    A->Chip = FindChip(cfg32);
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 8, &cfg32, 4);
     A->RevId = (UCHAR)cfg32;
-    for (i = 0; i < sizeof(g_Chips) / sizeof(g_Chips[0]); i++)
-        if (g_Chips[i].Vendor == A->VendorId && g_Chips[i].Device == A->DeviceId) A->Chip = &g_Chips[i];
     UsLog(A, "pci %x rev %x", cfg32 = ((ULONG)A->VendorId << 16) | A->DeviceId, A->RevId);
     if (!A->Chip) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
-    NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 4, &cfg32, 4);
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 4);
     cfg32 = (cfg32 & 0xFFFF) | 0x0006;
     cfg32 &= ~0x0400UL;
-    NdisWritePciSlotInformation(MiniportAdapterHandle, 0, 4, &cfg32, 2);
-    NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0x10, &bar0, 4);
+    NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x10, &bar0, 4);
     A->Stage = ST_PCI;
 
     /* BAR0 (CSR, 128 KiB) from config space; a 64-bit BAR has its high half at 0x14 */
     bar0hi = 0;
-    if ((bar0 & 7) == 4) NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0x14, &bar0hi, 4);
+    if ((bar0 & 7) == 4) NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x14, &bar0hi, 4);
     A->Bar0High = bar0hi;
 
     /* resources: the memory range at BAR0; else the first one of >= 128 KiB */
+#if !USOSNET_NDIS4
     NdisMQueryAdapterResources(&st, WrapperConfigurationContext, res, &resLen);
-    if (st == NDIS_STATUS_SUCCESS) {
+    if (st == NDIS_STATUS_SUCCESS) rl = res;
+#endif
+    if (rl) {
+        res = rl;
         for (i = 0; i < res->Count; i++) {
             PCM_PARTIAL_RESOURCE_DESCRIPTOR d = &res->PartialDescriptors[i];
             if (d->Type == CmResourceTypeMemory && d->u.Memory.Length >= 0x20000 &&
@@ -628,7 +746,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         A->MmioLen = 0x20000;
     }
     if (!A->IrqLevel && !A->IrqVector) {
-        NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0x3C, &cfg32, 4);
+        NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x3C, &cfg32, 4);
         A->IrqLevel = A->IrqVector = cfg32 & 0xFF;
     }
     UsLog(A, "bar0 %x irq %x", NdisGetPhysicalAddressLow(A->MmioPa), A->IrqVector);
@@ -677,8 +795,21 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (!A->PollMode) {
         st = NdisMRegisterInterrupt(&A->Interrupt, MiniportAdapterHandle, A->IrqVector, A->IrqLevel,
                                     TRUE, TRUE, NdisInterruptLevelSensitive);
+        A->IrqStatus = st;
+#if USOSNET_NDIS4
+        /* NT4 without a HAL-assigned interrupt (config-space line only) or a
+         * refused line: the 20 ms timer carries RX / TX (PollMode 2) */
+        if (st != NDIS_STATUS_SUCCESS) {
+            UsLog(A, "irq register failed %x: poll", st, 0);
+            A->PollMode = 2;
+            st = NDIS_STATUS_SUCCESS;
+        } else {
+            A->IrqRegistered = TRUE;
+        }
+#else
         if (st != NDIS_STATUS_SUCCESS) goto fail;
         A->IrqRegistered = TRUE;
+#endif
     }
     A->Stage = ST_IRQ;
 
@@ -883,7 +1014,7 @@ static NDIS_STATUS MpQuery(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLe
     ULONG v64[2];
     const void *src = &v;
     ULONG len = 4;
-    USHORT ver = 0x0500;   /* NDIS 5.0 */
+    USHORT ver = USOSNET_NDIS_MAJOR << 8;   /* NDIS 4.0 / 5.0 */
     NDIS_HARDWARE_STATUS hw = NdisHardwareStatusReady;
     NDIS_MEDIUM med = NdisMedium802_3;
     BOOLEAN counter = FALSE;
@@ -1000,7 +1131,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     NdisMInitializeWrapper(&g_Wrapper, DriverObject, RegistryPath, NULL);
     if (!g_Wrapper) return NDIS_STATUS_FAILURE;
     UsZero(&mc, sizeof(mc));
-    mc.MajorNdisVersion = 5;
+    mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;
     mc.MinorNdisVersion = 0;
     mc.CheckForHangHandler = MpCheckForHang;
     mc.DisableInterruptHandler = MpDisableInterrupt;
@@ -1014,7 +1145,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     mc.SendHandler = MpSend;
     mc.SetInformationHandler = MpSet;
     mc.TransferDataHandler = MpTransferData;
-    st = NdisMRegisterMiniport(g_Wrapper, &mc, sizeof(mc));
+    st = NdisMRegisterMiniport(g_Wrapper, &mc, USOSNET_CHARS_SIZE);
     if (st != NDIS_STATUS_SUCCESS) {
         NdisTerminateWrapper(g_Wrapper, NULL);
         return st;

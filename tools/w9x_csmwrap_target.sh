@@ -74,8 +74,8 @@ INT13_ALL_FLAG=${W9X_INT13_ALL_FLAG:-$ESP_DIR/win9x/int13-all-disks.flag}
 USB_STORAGE=${W9X_USB_STORAGE:-0}
 # 1 (prepare.sh default, 0 with DATA's vmd-off.txt): the USB mouse in MS-DOS
 # boxes through USOSVMD.VXD, a VMOUSE minidriver (docs/dos-mouse-2026-10-18.md;
-# X470 Windows Me PASS 2026-10-19 with v3.1). 98 / 98 SE / Me with the USOS
-# answer only; never on 95 (not tested there).
+# X470 Windows Me PASS 2026-10-19 with v3.1, 98 FE / 98 SE PASS later). 95 /
+# 98 / 98 SE / Me with the USOS or a profile answer, not a user's own file.
 VMD=${W9X_VMD:-0}
 # 1 (prepare.sh default, 0 with DATA's logging-off.txt): USOSLOG.EXE, the
 # silent logger (docs/usoslog.md), starts with Windows from the machine Run
@@ -134,6 +134,19 @@ w9x_add_display_ids() {
                 }
             }
         }'
+}
+# MSBATCH.INF $1 -> stdout with [USOS.ChannelBar] (98 FE, IE 4) in the
+# [Install] AddReg list, placed before [USOS.Csm] (INSTALL.BAT appends to
+# the end). Fails without exactly one AddReg line in [Install].
+w9x_98fe_channelbar_answer() {
+    awk 'function add() {if(done++)return
+             bs = sprintf("%c", 92)
+             printf "[USOS.ChannelBar]\r\nHKCU,\"Software%sMicrosoft%sInternet Explorer%sMain\",Show_ChannelBand,,\"no\"\r\n\r\n", bs, bs, bs}
+         {sub(/\r$/, ""); low=tolower($0)}
+         /^\[/ {install=(low=="[install]"); if(low=="[usos.csm]")add()}
+         install && low~/^addreg=/ {if(low!~/usos\.channelbar/)$0=$0 ",USOS.ChannelBar";n++}
+         {printf "%s\r\n",$0}
+         END {if(n!=1)exit 1; if(!done){printf "\r\n";add()}}' "$1"
 }
 
 for tool in dd od mkfs.fat mcopy mmd mdel mattrib mdir syslinux mount umount losetup blockdev awk sync wc; do
@@ -437,11 +450,13 @@ fi
 # start, like the Me mouse.drv switch. U9FIX /CSM (95/98) deletes only
 # mouse=*vmouse lines, never these. Off on the installed system: delete the
 # two device= lines (USOSVMD.ON alone only switches USOSMOUS's VMOUSE mode).
+# Windows 95 ignores MSBATCH.INF [Install] AddReg, so the RunOnce value comes
+# from REG95.REG instead (w9x_reg95.sh, below), which also keeps VMOUSE off
+# the PS/2 mouse devnode 95 Setup detects (VMOUSE's own PS/2 init). Without
+# REG95.BAT the VMD files are removed again there.
 vmd_ok=0
 if [ "$VMD" = 1 ]; then
-    if [ "$SYSTEM_TAG" = 95 ]; then
-        log 'dos-box mouse: USOSVMD.VXD off on Windows 95 (not tested there)'
-    elif [ "$ANSWER_KIND" = USER ]; then
+    if [ "$ANSWER_KIND" = USER ]; then
         log "dos-box mouse: USOSVMD.VXD skipped: the user's own answer file (no RunOnce for USOSVMD.INF)"
     elif [ ! -f "$work/c/USOS9X/USOSVMD.VXD" ] || [ ! -f "$work/c/USOS9X/USOSMOUS.DRV" ]; then
         log 'dos-box mouse: USOSVMD.VXD or USOSMOUS.DRV is not in this payload'
@@ -462,7 +477,11 @@ system.ini,386Enh,,"device=C:\USOS9X\USOSVMD.VXD"
 EOF
         printf 'SET U9VMD=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
         vmd_ok=1
-        log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF (default; vmd-off.txt turns it off)'
+        if [ "$SYSTEM_TAG" = 95 ]; then
+            log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF from REG95.REG, PS/2 mouse devnode off (default; vmd-off.txt turns it off)'
+        else
+            log 'dos-box mouse: USOSVMD.VXD + USOSVMD.ON, SYSTEM.INI device= lines by RunOnce USOSVMD.INF (default; vmd-off.txt turns it off)'
+        fi
     fi
 fi
 [ "$vmd_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"
@@ -516,6 +535,49 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         rm -f "$work/c/USOS9X/VESA95.BAT" "$work/c/USOS9X/VESA95.REG"
         log 'display: no VESA95.BAT (Standard VGA stays)'
     fi
+    # 95 Setup ignores MSBATCH.INF [Install] AddReg (X470 2026-10-20: no
+    # USOSRES / USOSLAN / USOSLOG Run value, no IE/ICW defaults): REG95.BAT
+    # (tools/w9x_reg95.sh) imports the same values once before the first
+    # desktop. A user's own answer file gets none (as on 98, 1:1).
+    rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+    if [ "$ANSWER_KIND" = USER ]; then
+        log "answer registry: none for the user's own answer file"
+        [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || log 'usosnet4: NET95.REG unused (no REG95); the card comes from PnP + USOSNET.INF'
+    else
+        reg95_log=
+        [ "$log_ok" != 1 ] || reg95_log='C:\USOS9X\USOSLOG.EXE'
+        reg95_vmd=
+        [ "$vmd_ok" != 1 ] || reg95_vmd='C:\USOS9X\USOSVMD.INF'
+        # usosnet4 adapter + TCP/IP + client (tools/network_setup.sh
+        # usos_net_w95_stage): imported with REG95.REG, checked into NET.
+        reg95_net=
+        [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || reg95_net="$work/c/USOS9X/NET/NET95.REG"
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net"; then
+            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
+            [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
+        else
+            rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+            log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
+            if [ "$vmd_ok" = 1 ]; then
+                vmd_ok=0
+                rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"
+                log 'dos-box mouse: USOSVMD.VXD removed again (no REG95.BAT for its RunOnce and the PS/2 devnode)'
+            fi
+        fi
+    fi
+fi
+# Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
+# 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand
+# (REG_SZ, "yes"/"no", the value its own checkbox writes); 98 SE is not
+# changed here. A user's own answer file stays 1:1.
+if [ "$SYSTEM_TAG" = 98 ] && [ "$ANSWER_KIND" != USER ]; then
+    if w9x_98fe_channelbar_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/channelbar-answer.inf"; then
+        cp "$work/channelbar-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage the Channel Bar answer'
+        log 'IE 4: Channel Bar off at the first sign-in (Show_ChannelBand=no)'
+    else
+        log 'IE 4: Channel Bar left as Setup sets it (no [Install] AddReg line)'
+    fi
+    rm -f "$work/channelbar-answer.inf"
 fi
 
 # The boot floppy runs INSTALL.BAT from C: (A: stays the CD's DOS: SYS,

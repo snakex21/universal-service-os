@@ -1,0 +1,21 @@
+# usosnet4.sys: the same source as ..\src (usosnet.sys; build.cmd copies its
+# files next to these), registered as an NDIS 4.0 miniport (USOSNET_NDIS4=1,
+# see usosnet.h) for Windows 95 OSR2 (NDIS.VXD 4.0) and Windows NT 4.0
+# (NDIS.SYS 4.0), which refuse NDIS 5.0. Same rule as ..\src\sources:
+# imports from NDIS.SYS only. WDK 7.1 needs NDIS50_MINIPORT for its headers;
+# the characteristics size and the receive indication are the 4.0 ones
+# (usosnet.c). build.cmd sets the PE version to 4.00.
+TARGETNAME=usosnet4
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+C_DEFINES=$(C_DEFINES) -DNDIS_MINIPORT_DRIVER=1 -DNDIS50_MINIPORT=1 -DUSOSNET_NDIS4=1
+TARGETLIBS=$(DDK_LIB_PATH)\ndis.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=usosnet.c \
+        usosnet_igb.c \
+        usosnet4.rc

@@ -1,11 +1,17 @@
-# usosnet - USOS own Ethernet driver (NDIS 5.0 miniport)
+# usosnet - USOS own Ethernet driver (NDIS 5.0 / 4.0 miniport)
 
 Copyright (C) 2026 Maksymilian and the USOS Authors, GPL-3.0-or-later.
 Design: `docs/usosnet-design-2026-10-18.md`.
 
 One `usosnet.sys` for Windows 98 / 98 SE / Me (NDIS.VXD) and
-Windows 2000 / XP / Server 2003 x86. Round 1 backend: Intel igb family
+Windows 2000 / XP / Server 2003 x86, and `usosnet4.sys`, the NDIS 4.0 build
+of the same source, for Windows 95 OSR2 and Windows NT 4.0 SP6a (design:
+`docs/usosnet-ndis4-2026-10-20.md`). Round 1 backend: Intel igb family
 (I211 8086:1539, I210 8086:1533/157B, 82576 8086:10C9 = QEMU `-device igb`).
+
+Status 2026-10-20: `usosnet4.sys` 0.5 builds and passes the host tests
+(imports against the 95 OSR2 and NT4 SP6a NDIS export tables, NDIS 4.0
+registration); **not run yet** on QEMU or hardware.
 
 Status 2026-10-18: 0.3 runs on the X470 under Windows Me (DHCP lease,
 ping to the gateway and the internet answer; DNS fails, see 0.4). 0.4
@@ -17,8 +23,13 @@ yet** on QEMU or hardware.
 * `src/usosnet.c` - NDIS core (init, OIDs, send / receive, ISR / DPC,
   diagnostics), `src/usosnet_igb.c` - igb backend, `src/usosnet.h`.
 * `inf/usosnet9x.inf` - Windows 98 / 98 SE / Me (copy as `USOSNET.INF`, 8.3).
-* `inf/usosnet.inf` - Windows 2000 / XP / 2003 x86.
-* `bin/i386/usosnet.sys` - committed build (our own code only).
+* `inf/usosnet.inf` - Windows 2000 / XP / 2003 x86 (NT4: its IDs only).
+* `inf/usosnet95.inf` - Windows 95 OSR2, with `usosnet4.sys` staged as
+  `USOSNET.SYS` (copy as `USOSNET.INF`).
+* `src4/` - `sources` + `usosnet4.rc` of the NDIS 4.0 build (`USOSNET_NDIS4=1`);
+  `build.cmd` copies the `src` files next to them.
+* `bin/i386/usosnet.sys`, `bin/i386/usosnet4.sys` - committed builds (our own
+  code only).
 
 ## Build
 
@@ -27,7 +38,19 @@ yet** on QEMU or hardware.
 
 WDK 7.1, `fre x86 WXP`, `TARGETTYPE=MINIPORT` linked against `ndis.lib`
 only; `tools\nt4\pe_nt4_version.py` sets PE 4.00. `tools/tests/test_usosnet.py`
-checks the binary and the INFs.
+checks the binaries and the INFs. `USOSNET_ONLY=4` / `=5` builds one of them.
+
+NDIS 4.0 build differences (all `#if USOSNET_NDIS4` in `src/usosnet.c`):
+MajorNdisVersion 4 with the 0x48-byte characteristics, receive indication
+through the exported `EthFilterDprIndicateReceive(Complete)` with the filter
+at miniport block + 0xD8, NT4 bus scan (`NdisOverrideBusNumber`) +
+`NdisMPciAssignResources` when `NdisMQueryAdapterResources` is not
+supported, polling (PollMode 2) when `NdisMRegisterInterrupt` fails. Extra
+diagnostics in the adapter key: `UsosnetNdis` (0x400 / 0x500),
+`UsosnetPciLocation` (0x80000000 | bus << 8 | slot, NT4 scan),
+`UsosnetAssign`, `UsosnetIrqStatus`. NT4 keeps them in
+`HKLM\SYSTEM\CurrentControlSet\Services\NDISLoop1\Parameters`, its
+error log entries go to the System event log (source NDISLoop).
 
 ## Registry parameters (Advanced tab)
 

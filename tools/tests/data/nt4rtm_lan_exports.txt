@@ -43,6 +43,7 @@ OpenProcess
 ReadFile
 SetEvent
 SetFilePointer
+Sleep
 WriteFile
 lstrcatA
 lstrcmpA

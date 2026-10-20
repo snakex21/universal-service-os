@@ -65,7 +65,7 @@ nothing runs them unless EFI/USOS/win9x/diag.flag exists):
 Staged for the CSMWrap flow since 2026-10-19 (X470 Windows Me pass):
   USOSVMD.VXD   the USB mouse in MS-DOS boxes, a VMOUSE minidriver
                 (src/platform/win9x/usosvmd.asm, built with the MS-DOS support
-                by tools/build_win3_usb_keyboard.py); 98 / 98 SE / Me, on by
+                by tools/build_win3_usb_keyboard.py); 95 / 98 / 98 SE / Me, on by
                 default, DATA vmd-off.txt turns it off (tools/w9x_csmwrap_target.sh)
   USOSLOG.EXE   Win32, no window: silent logger, started from the machine Run
                 key (USOS answer; DATA logging-off.txt turns it off); mouse (via
@@ -274,10 +274,10 @@ USOSLOG_IMPORTS = {
         'IsBadReadPtr', 'LeaveCriticalSection', 'LoadLibraryA', 'MoveFileA', 'ReadFile', 'SetFilePointer', 'Sleep',
         'WaitForSingleObject', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA', 'lstrlenA'},
     'user32.dll': {
-        'CallNextHookEx', 'DispatchMessageA', 'EnumWindows', 'GetClassNameA', 'GetCursorPos', 'GetForegroundWindow',
-        'GetMessageA', 'GetSystemMetrics', 'GetWindowLongA', 'GetWindowTextA', 'GetWindowThreadProcessId',
-        'IsWindowVisible', 'KillTimer', 'PeekMessageA', 'PostThreadMessageA', 'SetTimer', 'SetWindowsHookExA',
-        'SystemParametersInfoA', 'UnhookWindowsHookEx', 'WindowFromPoint', 'wsprintfA', 'wvsprintfA'},
+        'CallNextHookEx', 'CreateWindowExA', 'DefWindowProcA', 'DispatchMessageA', 'EnumWindows', 'GetClassNameA',
+        'GetCursorPos', 'GetForegroundWindow', 'GetMessageA', 'GetSystemMetrics', 'GetWindowLongA', 'GetWindowTextA',
+        'GetWindowThreadProcessId', 'IsWindowVisible', 'KillTimer', 'PeekMessageA', 'PostThreadMessageA',
+        'RegisterClassA', 'SetTimer', 'SetWindowsHookExA', 'SystemParametersInfoA', 'UnhookWindowsHookEx', 'WindowFromPoint', 'wsprintfA', 'wvsprintfA'},
     'advapi32.dll': {'RegCloseKey', 'RegEnumKeyExA', 'RegEnumValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
 }
 

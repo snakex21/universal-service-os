@@ -67,11 +67,53 @@ class Stage(unittest.TestCase):
         # Fresh root: a previous install is never a staging input.
         shutil.rmtree(self.target);self.target.mkdir()
         self.state(self.run_stage(),'card not listed in INF')
+    def driver4(self,id='PCI\\VEN_8086&DEV_1539'):
+        (self.lib/'network/usosnet95.inf').write_text('[Models]\n%Card%=Install,'+id+'\n')
+        (self.lib/'network/usosnet4.sys').write_bytes(b'own NDIS 4 test fixture, not a driver')
+    def fresh(self):
+        shutil.rmtree(self.target);self.target.mkdir()
     def test_95_nt4_never_receive_ndis5(self):
         self.card();self.driver()
         for os_id in ('95','NT4'):
-            self.config(os_id);self.state(self.run_stage(),'NDIS 4 build not available')
-            self.assertFalse(list(self.target.rglob('USOSNET.SYS')))
+            self.fresh();self.config(os_id);self.state(self.run_stage(),'brak w kompilacji')
+            self.assertFalse(list(self.target.rglob('USOSNET*.SYS')))
+            self.assertFalse(list(self.target.rglob('USOSNET.REG')))
+    def test_95_stages_ndis4_build_as_usosnet_sys(self):
+        self.card();self.driver();self.driver4();self.config('95')
+        self.state(self.run_stage(),'usosnet4.sys as USOSNET.SYS')
+        net=self.target/'USOS9X/NET'
+        self.assertEqual((net/'USOSNET.SYS').read_bytes(),(self.lib/'network/usosnet4.sys').read_bytes())
+        self.assertEqual((net/'USOSNET.INF').read_bytes(),(self.lib/'network/usosnet95.inf').read_bytes())
+        self.assertIn('driver=staged',(self.target/'USOS9X/NETCFG.INI').read_text())
+        self.fresh()
+        (self.lib/'network/usosnet95.inf').write_text('[Models]\n%Card%=Install,PCI\\VEN_8086&DEV_10C9\n')
+        self.state(self.run_stage(),'card not listed in INF')
+    def test_nt4_stages_ndis4_and_loopback_takeover_reg(self):
+        self.card();self.driver();self.driver4();self.config('NT4')
+        self.state(self.run_stage(),'USOSNET.REG staged')
+        self.assertEqual((self.target/'USOS/Drivers/USOSNET/USOSNET4.SYS').read_bytes(),(self.lib/'network/usosnet4.sys').read_bytes())
+        self.assertFalse((self.target/'USOS/Drivers/USOSNET/USOSNET.SYS').exists())
+        reg=(self.target/'USOS/NT4/USOSNET.REG').read_bytes()
+        self.assertTrue(reg.startswith(b'REGEDIT4\r\n'));self.assertNotIn(b'\n',reg.replace(b'\r\n',b''))
+        text=reg.decode('ascii')
+        for token in ('[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\NDISLoop]\r\n"ImagePath"="\\\\SystemRoot\\\\System32\\\\drivers\\\\usosnet4.sys"',
+                      'Services\\NDISLoop1\\Parameters]\r\n"BusType"=dword:00000005','"EnableDHCP"=dword:00000001',
+                      '"IPAddress"=hex(7):30,2e,30,2e,30,2e,30,00,00','"DefaultGateway"=hex(7):00,00','Services\\DHCP]\r\n"Start"=dword:00000002'):
+            self.assertIn(token,text)
+        self.assertIn('driver=staged',(self.target/'USOS/NT4/NETCFG.INI').read_text())
+        self.fresh();self.config('NT4',ip='192.168.1.20/26',gateway='192.168.1.1',dns='1.1.1.1,8.8.8.8')
+        r=self.run_stage();self.state(r,'static LAN IP in USOSNET.REG')
+        text=(self.target/'USOS/NT4/USOSNET.REG').read_text()
+        hx=lambda s:','.join('%02x'%c for c in s.encode())+',00,00'
+        for token in ('"EnableDHCP"=dword:00000000','"IPAddress"=hex(7):'+hx('192.168.1.20'),
+                      '"SubnetMask"=hex(7):'+hx('255.255.255.192'),'"DefaultGateway"=hex(7):'+hx('192.168.1.1'),
+                      '"NameServer"="1.1.1.1 8.8.8.8"'):
+            self.assertIn(token,text)
+        self.assertNotIn('Services\\DHCP]',text)
+    def test_nt4_without_card_keeps_loopback_only(self):
+        self.driver();self.driver4();self.config('NT4')
+        self.state(self.run_stage(),'no Ethernet card')
+        self.assertFalse((self.target/'USOS/NT4/USOSNET.REG').exists())
     def test_network_off_writes_nothing(self):
         self.config(network='off');self.card();self.driver();self.state(self.run_stage(),'original flow')
         self.assertEqual(list(self.target.iterdir()),[])
@@ -140,6 +182,33 @@ class Builds(unittest.TestCase):
         for file in stage_driver(ROOT,OUT/'driver'):
             sub='bin/i386' if file.suffix=='.sys' else 'inf'
             self.assertEqual(file.read_bytes(),(ROOT/'tools/nt/usosnet'/sub/file.name).read_bytes())
+
+class RunValueAndStartPage(unittest.TestCase):
+    """95 X470 2026-10-20: the 9x shell starts Run values inside its
+    RegEnumValue(index) loop, so USOSLan's immediate self-delete made the
+    shell skip USOSDisplay; IE 3 cannot open about:blank."""
+    def test_helpers_wait_before_deleting_their_run_value(self):
+        lan=(ROOT/'tools/windows_usos_lan.c').read_text()
+        body=lan[lan.index('static void unregister(void)'):]
+        body=body[:body.index('\n}')+2] if '\n}' in body[:400] else body[:400]
+        self.assertIn('#define USOS_RUN_DELETE_DELAY 15000',lan)
+        self.assertLess(body.index('Sleep(USOS_RUN_DELETE_DELAY);'),body.index('RegDeleteValueA'))
+        self.assertLess(body.index('#ifndef USOS_LAN_NT'),body.index('Sleep('))
+        res=(ROOT/'tools/windows_usos_res.c').read_text()
+        fin=res[res.index('static int finish(const char *reason)'):]
+        fin=fin[:fin.index('\n}\n')]
+        self.assertLess(fin.index('Sleep(15000);'),fin.index('RegDeleteValueA(key,"USOSDisplay")'))
+    def test_95_start_page_is_local_file(self):
+        lan=(ROOT/'tools/windows_usos_lan.c').read_text()
+        page=lan[lan.index('static const char *start_page(void)'):]
+        page=page[:page.index('return home;}')]
+        for part in ('eq(system_id,"95")','!lstrcmpA(home,"about:blank")','local(path,"START.HTM")',
+                     'GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES','lstrcpyA(page,"file://")'):
+            self.assertIn(part,page)
+        self.assertIn('set(root,main_key,"Start Page",REG_SZ,page,len(page)+1);',lan)
+        self.assertIn('set(root,main_key,"First Home Page",REG_SZ,page,len(page)+1);',lan)
+        self.assertIn('config_hash',lan)
+        self.assertNotIn('page',lan[lan.index('static unsigned long config_hash'):lan.index('static void initial_state')])
 
 class Render(unittest.TestCase):
     @classmethod

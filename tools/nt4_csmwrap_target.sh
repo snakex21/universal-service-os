@@ -995,6 +995,24 @@ if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAI
 if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
+if not exist C:\USOS\Drivers\USOSNET\USOSNET4.SYS goto nonet4
+if not exist C:\USOS\NT4\USOSNET.REG goto nonet4
+%SystemRoot%\regedit.exe /e C:\USOS\NT4\LOOPCHK.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1
+if not exist C:\USOS\NT4\LOOPCHK.REG goto noloop4
+copy C:\USOS\Drivers\USOSNET\USOSNET4.SYS %SystemRoot%\system32\drivers\usosnet4.sys >> C:\USOS\NT4\NETSETUP.TXT
+if not exist %SystemRoot%\system32\drivers\usosnet4.sys goto net4fail
+%SystemRoot%\regedit.exe /s C:\USOS\NT4\USOSNET.REG
+%SystemRoot%\regedit.exe /e C:\USOS\NT4\NET4CHK.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop
+findstr /i /c:"usosnet4.sys" C:\USOS\NT4\NET4CHK.REG > nul
+if errorlevel 1 goto net4fail
+echo usosnet4: NDISLoop service now loads usosnet4.sys, NDISLoop1 BusType 5 + TCP/IP from USOSNET.REG >> C:\USOS\NT4\NETSETUP.TXT
+goto nonet4
+:noloop4
+echo usosnet4: no NDISLoop1 adapter (loopback not installed by Setup); driver not registered >> C:\USOS\NT4\NETSETUP.TXT
+goto nonet4
+:net4fail
+echo usosnet4: copy or registry readback FAILED (NET4CHK.REG) >> C:\USOS\NT4\NETSETUP.TXT
+:nonet4
 if not exist C:\USOS\NT4\USOS-REG.TXT goto noregset
 C:\USOS\NT4\USOS-REG.EXE --log C:\USOS\NT4\USOS-REG.LOG C:\USOS\NT4\USOS-REG.TXT
 echo profile registry set applied %errorlevel% >> C:\USOS\NT4\POST.LOG

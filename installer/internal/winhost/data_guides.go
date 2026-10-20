@@ -36,15 +36,17 @@ var dataGuides = []dataGuide{
 		contents: []byte("Universal Service OS - Programs\\USOS\r\n\r\n" +
 			"[PL] Ten folder jest zarządzany przez USOS. Nie edytuj, nie przenoś i nie usuwaj jego zawartości.\r\n" +
 			"Instalator, aktualizacja i Naprawa USOS zapisują tu swoje pliki (USOS Installer.exe, szablony WIMBoot/VHDBoot).\r\n" +
-			"WinPE\\ (ukryty folder systemowy) zawiera obraz pomocniczy WinPE 10, którego potrzebują Windows Vista i Windows 7 w trybie UEFI.\r\n" +
-			"Jego sumę SHA-256 zapisuje EFI\\USOS\\winpe-donor.ini na partycji USOS_ESP; menu USOS sprawdza ją przed użyciem.\r\n" +
-			"Jeśli obraz zniknie albo zostanie zmieniony, menu zablokuje Vistę/Windows 7 z prośbą o uruchomienie Naprawy w instalatorze USOS.\r\n" +
+			"WinPE\\ (ukryty folder systemowy) zawiera obrazy pomocnicze WinPE 10: x64 (PE10_x64_*, potrzebny Windows Vista i Windows 7 w trybie UEFI)\r\n" +
+			"oraz x86 (PE10_x86_*, potrzebny 32-bitowym Windows 7, Vista i Server 2008 w trybie UEFI bez CSM). Jeden obraz na architekturę.\r\n" +
+			"Ich sumy SHA-256 zapisuje EFI\\USOS\\winpe-donor.ini na partycji USOS_ESP; menu USOS sprawdza je przed użyciem.\r\n" +
+			"Jeśli obraz zniknie albo zostanie zmieniony, menu zablokuje systemy, które go potrzebują, z prośbą o uruchomienie Naprawy w instalatorze USOS.\r\n" +
 			"Nic z tego folderu nie pojawia się w menu systemów.\r\n\r\n" +
 			"[EN] This folder is managed by USOS. Do not edit, move or delete its contents.\r\n" +
 			"The USOS installer, update and Repair keep their files here (USOS Installer.exe, WIMBoot/VHDBoot templates).\r\n" +
-			"WinPE\\ (a hidden system folder) holds the WinPE 10 helper image that Windows Vista and Windows 7 need in UEFI mode.\r\n" +
-			"Its SHA-256 is recorded in EFI\\USOS\\winpe-donor.ini on the USOS_ESP partition; the USOS menu checks it before use.\r\n" +
-			"If the image goes missing or is changed, the menu blocks Vista/Windows 7 and asks you to run Repair in the USOS installer.\r\n" +
+			"WinPE\\ (a hidden system folder) holds the WinPE 10 helper images: x64 (PE10_x64_*, needed by Windows Vista and Windows 7 in UEFI mode)\r\n" +
+			"and x86 (PE10_x86_*, needed by 32-bit Windows 7, Vista and Server 2008 in UEFI mode without CSM). One image per architecture.\r\n" +
+			"Their SHA-256 sums are recorded in EFI\\USOS\\winpe-donor.ini on the USOS_ESP partition; the USOS menu checks them before use.\r\n" +
+			"If an image goes missing or is changed, the menu blocks the systems that need it and asks you to run Repair in the USOS installer.\r\n" +
 			"Nothing in this folder appears in the systems menu.\r\n"),
 	},
 }

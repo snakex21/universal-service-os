@@ -37,8 +37,11 @@ def stage_driver(root: Path, out: Path) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     source = root / 'tools/nt/usosnet'
     result = []
-    for inf in ('usosnet9x.inf', 'usosnet.inf'):
-        sys = source / 'bin/i386/usosnet.sys'
+    # usosnet.sys (NDIS 5.0): 98 / 98 SE / Me, 2000; usosnet4.sys (NDIS 4.0):
+    # 95 OSR2 (usosnet95.inf), NT4 (registry staging, IDs from usosnet.inf).
+    for inf, driver in (('usosnet9x.inf', 'usosnet.sys'), ('usosnet.inf', 'usosnet.sys'),
+                        ('usosnet95.inf', 'usosnet4.sys'), ('usosnet.inf', 'usosnet4.sys')):
+        sys = source / 'bin/i386' / driver
         inf_path = source / 'inf' / inf
         if sys.is_file() and inf_path.is_file():
             for file in (sys, inf_path):

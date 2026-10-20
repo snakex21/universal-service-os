@@ -70,6 +70,11 @@
  * WM_NULL; Win32 windows keep the stock path. The decisions are in
  * usoskey_wheel.h; USOSWHEELLOG (by name, USOSDBG.EXE) gives the last
  * decisions with the real delta. SYSTEM.INI [usosmous] WheelScroll=0: off.
+ * Windows 95 (2026-10-20): no WM_MOUSEWHEEL in 95 USER, so every notch is
+ * translated (WM_VSCROLL to the WS_VSCROLL window under the pointer, Win32
+ * windows too) or, with no such window, posted as the registered
+ * MSWHEEL_ROLLMSG to the window under the pointer (usoskey_wheel.h
+ * wheel_decide95; [usosmous] MSWheel=0: no MSWHEEL_ROLLMSG).
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
@@ -294,6 +299,7 @@ typedef struct {
     WORD expired;                   /* translations dropped (window gone, task never ran) */
     DWORD lines;                    /* last SPI_GETWHEELSCROLLLINES value (3 if the call failed) */
     WHEELREC rec[WHEEL_RECS];
+    BYTE os95;                      /* after rec (readers of version 1 stop there): Windows 95 path */
 } WHEELLOG;
 
 static HHOOK msg_hook;
@@ -311,6 +317,8 @@ static char wcls[20];
 static BYTE wmdb[16];
 static DWORD wlines;
 static WORD wcode;
+static BYTE w95;                    /* Windows 95: USER has no wheel (INT 2Fh 160Ah) */
+static UINT rollmsg;                /* Windows 95: RegisterWindowMessage("MSWHEEL_ROLLMSG"), 0 = off */
 
 static HWND wheel_target(void)
 {
@@ -363,7 +371,8 @@ static void wheel_new(void)
         GetClassName(t, wcls, sizeof(wcls));
         kind = window_kind(t);
     }
-    action = wheel_decide(1, t != 0, kind, wcls);
+    action = w95 ? wheel_decide95(1, t != 0, rollmsg != 0) : wheel_decide(1, t != 0, kind, wcls);
+    if (action == WA_ROLLMSG) t = WindowFromPoint(wpt);    /* no WS_VSCROLL window: the one under the pointer */
     r = &wlog.rec[wlog.seq % WHEEL_RECS];
     r->seq = ++wlog.seq;
     r->tick = GetTickCount();
@@ -374,6 +383,13 @@ static void wheel_new(void)
     r->sent = 0;
     r->code = 0;
     for (i = 0; i < sizeof(r->cls); i++) r->cls[i] = wcls[i];
+    if (action == WA_ROLLMSG && t) {
+        /* MSWheel: wParam the delta (120 per notch, up positive), lParam
+         * the pointer position in screen coordinates. Posted, so the hook
+         * never waits for another task. */
+        PostMessage(t, rollmsg, (WPARAM)wheel_roll_delta(n), MAKELONG(wpt.x, wpt.y));
+        r->sent = 1;
+    }
     if (action != WA_TRANSLATE) { swallow_on = 0; return; }
     swallow_on = 1;
     translated_at = r->tick;
@@ -428,8 +444,25 @@ LRESULT FAR PASCAL __export __loadds getmsg_proc(int code, WPARAM wp, LPARAM lp)
     return CallNextHookEx(msg_hook, code, wp, lp);
 }
 
-/* DRV_ENABLE: 98 / 98 SE / Me with USOSMOUS.DRV v4 (USOSWHEELINFO v2), the
- * wheel not switched off (Wheel=0) and WheelScroll not 0. */
+/* Windows 95? INT 2Fh AX=160Ah (Windows version in BX). */
+static int windows_95(void)
+{
+    WORD ax_after = 0x160A, wver = 0;
+    _asm {
+        push bx
+        push cx
+        mov ax, 160Ah
+        int 2Fh
+        mov ax_after, ax
+        mov wver, bx
+        pop cx
+        pop bx
+    }
+    return wheel_is_95(ax_after, wver);
+}
+
+/* DRV_ENABLE: 95 / 98 / 98 SE / Me with USOSMOUS.DRV v4 (USOSWHEELINFO v2),
+ * the wheel not switched off (Wheel=0) and WheelScroll not 0. */
 static void wheel_start(void)
 {
     FARPROC info;
@@ -442,6 +475,11 @@ static void wheel_start(void)
     if (!w || w->version < 2 || w->pref == 1) return;
     mwi = w;
     notch_seen = w->notches;
+    w95 = (BYTE)windows_95();
+    rollmsg = 0;
+    if (w95 && GetPrivateProfileInt("usosmous", "MSWheel", 1, "SYSTEM.INI"))
+        rollmsg = RegisterWindowMessage("MSWHEEL_ROLLMSG");
+    wlog.os95 = w95;
     swallow_on = 0;
     pend_hwnd = 0;
     msg_hook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)getmsg_proc, GetModuleHandle("USOSKEY"), 0);

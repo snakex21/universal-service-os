@@ -193,6 +193,10 @@ IF NOT "%U9UDS%"=="1" GOTO UDSAUTO
 IF "%U9SYS%"=="ME" GOTO UDSAUTO
 ECHO @IF EXIST C:\USOS9X\USBREG.BAT CALL C:\USOS9X\USBREG.BAT>>C:\AUTOEXEC.BAT
 :UDSAUTO
+REM Windows 95: C:\USOS9X\REG95.BAT (tools/w9x_reg95.sh) imports the answer's
+REM [Install] AddReg values once (95 Setup ignores them): after VESA95.BAT,
+REM whose failure path restores its registry backup, before the first desktop.
+ECHO @IF EXIST C:\USOS9X\REG95.BAT CALL C:\USOS9X\REG95.BAT>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
@@ -322,6 +326,10 @@ IF "%U9SYS%"=="95" SET U9SW=/IS /IW
 REM Windows 95 NVMe opt-in: ignore the empty SeaBIOS PnP BIOS device list.
 REM /P I exists in 95 too (Microsoft KB152064); test PCI detection here.
 IF "%U9SYS%"=="95" IF "%U9NVME%"=="1" SET U9SW=/IS /IW /P I
+REM The same for usosnet on 95 (NET\USOSNET.SYS = the NDIS 4.0 usosnet4.sys,
+REM staged only for a matching PCI card): without the PCI bus node 95 never
+REM enumerates the card on the real PC, so USOSNET.INF would never be used.
+IF "%U9SYS%"=="95" IF EXIST C:\%U9SRC%\USOSNET.SYS SET U9SW=/IS /IW /P I
 REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
 REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
 IF "%U9SYS%"=="95" GOTO VMSWOK

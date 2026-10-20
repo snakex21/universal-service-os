@@ -157,7 +157,8 @@ The 1.0 release is a set of separate files:
 | File | What it is | Needed |
 |---|---|---|
 | `USOS-Installer-1.0.0.exe` | the installer (contains all of USOS) | always |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | helper WinPE 10 image ("PE10 donor") | for Vista and original Windows 7 ISOs in UEFI mode |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | helper WinPE 10 x64 image ("PE10 donor") | for Vista and original Windows 7 ISOs in UEFI mode |
+| `USOS-1.0.0-WinPE-PE10-x86-donor.zip` | helper WinPE 10 x86 image ("x86 PE10 donor") | for 32-bit Windows 7, Vista and Server 2008 in UEFI mode without CSM |
 | `USOS-1.0.0-XP-package-PL.zip` | Windows XP x86 SP3 UEFI package (Polish) | for XP in UEFI mode |
 | `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI package (English) | for XP in UEFI mode |
 | `USOS-1.0.0-sources.zip` | source code | for reference |
@@ -200,22 +201,34 @@ Get-Content .\SHA256SUMS | ForEach-Object {
 
 If any file shows `BAD`, download it again.
 
-### 3.2 The PE10 donor (Vista and original Windows 7 on UEFI)
+### 3.2 The PE10 donors (Vista and Windows 7 on UEFI)
 
-Windows Vista and original Windows 7 ISOs need a helper WinPE 10 image in
-UEFI mode. Without it the menu blocks these systems on UEFI.
+Two helper WinPE 10 images, one per architecture:
 
-1. Unpack `USOS-1.0.0-WinPE-PE10-donor.zip`. Inside is the folder
-   `Programs\USOS\WinPE\` with the file `PE10_x64_19041_USOS.iso`.
+- **x64** (`PE10_x64_19041_USOS.iso`, in `USOS-1.0.0-WinPE-PE10-donor.zip`):
+  Windows Vista and original Windows 7 ISOs need it in UEFI mode. Without it
+  the menu blocks these systems on UEFI.
+- **x86** (`PE10_x86_19041_USOS.iso`, in
+  `USOS-1.0.0-WinPE-PE10-x86-donor.zip`): 32-bit Windows 7, Vista and
+  Server 2008 need it in UEFI mode without CSM (section 5.1). Without it they
+  can still use your own Windows 10 x86 ISO in
+  `Systems\Windows\Windows 10\Images`.
+
+The full installer contains both and offers them in its **Components** step
+(the online installer downloads them). By hand:
+
+1. Unpack the zip. Inside is the folder `Programs\USOS\WinPE\` with the ISO
+   file.
 2. Copy the `Programs` folder to the **USOS_DATA** partition so that the
-   file ends up at `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`.
-   `Programs\USOS\WinPE\` may hold only one ISO file.
+   file ends up at `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`
+   (or `...\PE10_x86_19041_USOS.iso`). `Programs\USOS\WinPE\` holds one ISO
+   per architecture; a file name with `x86` in it counts as the x86 donor.
 3. Start the installer and run **Update USOS** (section 2.2). The installer
-   then records the image's SHA-256 in `EFI\USOS\winpe-donor.ini` on the ESP
-   and marks the folder hidden and system.
-4. Do not change, move or delete this file. The menu checks its checksum
-   before each use. If the file disappears or changes, the menu blocks Vista
-   and Windows 7 on UEFI and asks you to update again in the installer.
+   then records the SHA-256 of each image in `EFI\USOS\winpe-donor.ini` on
+   the ESP and marks the folder hidden and system.
+4. Do not change, move or delete these files. The menu checks the checksum
+   before each use. If a file disappears or changes, the menu blocks the
+   systems that need it and asks you to update again in the installer.
 
 This folder never shows up in the systems menu.
 
@@ -446,8 +459,13 @@ Notes on the table:
 - Windows 7 on UEFI with CSM skips UefiSeven. The X470 test was without CSM
   and used the "6in1" ISO (with a newer WinPE). The original SP1 ISO through
   the PE10 donor was not tested on hardware.
-- 32-bit (x86) Windows 10 and 11 are blocked on 64-bit UEFI. Start them in
-  BIOS mode (CSM).
+- 32-bit (x86) Windows 10 and 8.1, and 32-bit Windows 7, Vista and
+  Server 2008, install on 64-bit UEFI without CSM through CSMWrap: USOS
+  prepares an MBR disk and Setup runs in BIOS mode (section 5.1). On the X470
+  this passed for Windows 10, Windows 7, Vista and Web Server 2008 x86, with
+  the user's own Windows 10 x86 ISO as the donor; the shipped x86 PE10 donor
+  (section 3.2) has not been tested on hardware yet. Windows 11 has no 32-bit
+  edition.
 - Windows 2000 does not work on the X470: there is no AHCI driver for NT 5.0.
 - The menu shows a badge next to each system, e.g. "Requires Secure Boot
   off" or "Requires BIOS".
@@ -898,6 +916,7 @@ at all):
 | The installer says "The drive is in use" | Close Explorer windows showing the stick and click Retry. |
 | The stick does not start | Run **Repair -> Repair ESP**. |
 | Vista / Windows 7 are blocked on UEFI | PE10 donor missing or changed: section 3.2, then **Update USOS**. |
+| 32-bit Windows 7 / Vista / 2008 are blocked without CSM | x86 PE10 donor missing or changed (and no own Windows 10 x86 ISO): section 3.2, then **Update USOS**. |
 | "Verification failed" at start | The USOS key is missing: section 6. |
 | A system has the badge "Requires Secure Boot off" | Turn Secure Boot off in the BIOS. |
 | A system has the badge "Requires BIOS" | Start the stick in Legacy mode (turn CSM on). |

@@ -202,13 +202,17 @@ pub fn inspectX86Donor(allocator: std.mem.Allocator, iso: anytype) !wim.Setup {
     return setup;
 }
 
-/// The x86 PE10 donor: the first valid one (by name) in Programs/USOS/WinPE,
-/// else in Systems/Windows/Windows 10/Images (where a Windows 10 x86 ISO for
-/// its own install already lives). x64 donors and other ISOs are skipped.
+/// The x86 PE10 donor. In Programs/USOS/WinPE the donor the installer
+/// recorded (`preferred`: the x86_name of winpe-donor.ini, the shipped
+/// PE10_x86_19041_USOS.iso) wins, else the first valid one by name; only when
+/// that folder has no valid x86 donor, the first valid one in
+/// Systems/Windows/Windows 10/Images (the user's own Windows 10 x86 ISO, the
+/// fallback from before the donor was shipped). x64 donors and other ISOs
+/// are skipped, so the x64 and the x86 donor share the managed folder.
 /// `context.probeX86Donor(directory, name)` reads the ISO's metadata.
-pub fn resolveX86Donor(selected: Inspection, source: directory.Source, context: anytype) !Inspection {
-    var iso_count: usize = 0;
+pub fn resolveX86Donor(selected: Inspection, source: directory.Source, context: anytype, preferred: ?[]const u8) !Inspection {
     for (donor_directories) |folder| {
+        var first: ?Inspection = null;
         var entries: [8]directory.Entry = undefined;
         var skip: usize = 0;
         while (true) {
@@ -221,7 +225,9 @@ pub fn resolveX86Donor(selected: Inspection, source: directory.Source, context: 
             for (entries[0..page.count]) |entry| {
                 const name = entry.name.slice();
                 if (entry.directory or !std.ascii.endsWithIgnoreCase(name, ".iso")) continue;
-                iso_count += 1;
+                const is_preferred = if (preferred) |want| std.mem.eql(u8, folder, donor_directory) and std.ascii.eqlIgnoreCase(want, name) else false;
+                // Once a candidate is known, only the recorded donor can still change it.
+                if (first != null and !is_preferred) continue;
                 const setup = context.probeX86Donor(folder, name) catch |err| switch (err) {
                     error.OutOfMemory => return err,
                     else => continue,
@@ -232,18 +238,25 @@ pub fn resolveX86Donor(selected: Inspection, source: directory.Source, context: 
                 result.donor_name = entry.name;
                 result.donor_directory = folder;
                 result.boot_setup = setup;
-                return result;
+                if (is_preferred) return result;
+                first = result;
+                // Without a recorded name the first valid donor is final.
+                if (preferred == null or !std.mem.eql(u8, folder, donor_directory)) return result;
             }
             skip += page.count;
             if (!page.has_more) break;
         }
+        if (first) |result| return result;
     }
     return error.X86PeDonorMissing;
 }
 
 /// Written by the installer (install/update/repair) next to the other ESP
-/// state: the PE10 donor it placed in Programs\USOS\WinPE.
+/// state: the PE10 donors it placed in Programs\USOS\WinPE. The x64 donor
+/// uses `name=`, `size=`, `sha256=` (as before the x86 donor); the x86 donor
+/// `x86_name=`, `x86_size=`, `x86_sha256=`, which older readers ignore.
 pub const donor_record_path = "\\EFI\\USOS\\winpe-donor.ini";
+pub const DonorArch = enum { x64, x86 };
 pub const DonorRecord = struct {
     name: [128]u8 = undefined,
     name_len: usize = 0,
@@ -255,14 +268,23 @@ pub const DonorRecord = struct {
     }
 };
 
-/// Parses winpe-donor.ini (`name=`, `size=`, `sha256=`); null if incomplete.
+/// Parses the x64 entry of winpe-donor.ini (`name=`, `size=`, `sha256=`);
+/// null if incomplete.
 pub fn parseDonorRecord(text: []const u8) ?DonorRecord {
+    return parseDonorRecordFor(text, .x64);
+}
+
+/// The entry of one donor (x86: the `x86_` keys); null if incomplete.
+pub fn parseDonorRecordFor(text: []const u8, arch: DonorArch) ?DonorRecord {
+    const prefix: []const u8 = if (arch == .x86) "x86_" else "";
     var record = DonorRecord{};
     var have: u3 = 0;
     var lines = std.mem.tokenizeAny(u8, text, "\r\n");
     while (lines.next()) |line| {
         const eq = std.mem.indexOfScalar(u8, line, '=') orelse continue;
-        const key = std.mem.trim(u8, line[0..eq], " \t");
+        const full_key = std.mem.trim(u8, line[0..eq], " \t");
+        if (full_key.len < prefix.len or !std.ascii.eqlIgnoreCase(full_key[0..prefix.len], prefix)) continue;
+        const key = full_key[prefix.len..];
         const value = std.mem.trim(u8, line[eq + 1 ..], " \t");
         if (std.ascii.eqlIgnoreCase(key, "name")) {
             if (value.len == 0 or value.len > record.name.len) return null;
@@ -279,6 +301,22 @@ pub fn parseDonorRecord(text: []const u8) ?DonorRecord {
         }
     }
     return if (have == 7) record else null;
+}
+
+/// Whether the resolved x86 donor is the one the installer recorded (then it
+/// is checked against the record: size, and SHA-256 right before use). A
+/// donor from the Windows 10/Images fallback or an unrecorded one in the
+/// managed folder gets the structural checks only; a damaged recorded donor
+/// fails closed (Repair), it does not silently fall back to another ISO.
+pub fn x86DonorRecorded(record: ?DonorRecord, inspection: *const Inspection) bool {
+    const r = record orelse return false;
+    return std.mem.eql(u8, inspection.donor_directory, donor_directory) and std.ascii.eqlIgnoreCase(r.nameSlice(), inspection.donor_name.slice());
+}
+
+/// A recorded donor's size and SHA-256 against what was read.
+pub fn checkDonorDigest(record: *const DonorRecord, size: u64, digest: ?*const [32]u8) !void {
+    if (size != record.size) return error.Windows10PeDonorCorrupt;
+    if (digest) |d| if (!std.mem.eql(u8, d, &record.sha256)) return error.Windows10PeDonorCorrupt;
 }
 
 /// Folder name of a catalog Windows system ("\Systems\Windows\<folder>\Images").
@@ -299,7 +337,7 @@ pub fn errorDetail(err: anyerror) []const u8 {
         error.Windows10PeDonorScanLimit => "Donor scan exceeds 256 directory entries; reduce the donor folder contents.",
         error.UnsupportedWindows7InstallTarget => "Every install image must be Windows 7 (6.1) x64; mixed targets are rejected.",
         error.Windows7OriginalRequiresInstallWim => "Native-PE7 media requires sources/install.wim for external PE10 Setup.",
-        error.X86PeDonorMissing => "Add a Windows 10 x86 Setup ISO to Systems/Windows/Windows 10/Images (or Programs/USOS/WinPE) on DATA.",
+        error.X86PeDonorMissing => "Add the WinPE x86 helper (USOS installer, Components) or a Windows 10 x86 Setup ISO to Systems/Windows/Windows 10/Images on DATA.",
         error.UnsupportedNt6X86InstallTarget => "Every install image must be 32-bit Windows 7 (6.1) or Vista / Server 2008 (6.0).",
         else => "ISO validation failed; no PE7 fallback and no installer was launched.",
     };
@@ -314,7 +352,7 @@ const Fake = struct {
     /// Entries of the legacy Windows 10/Images folder (null: folder missing).
     legacy_entries: ?[]const TestDonor = null,
     probed_directory: []const u8 = "",
-    const TestDonor = struct { name: []const u8, setup: ?wim.Setup };
+    const TestDonor = struct { name: []const u8, setup: ?wim.Setup, x86: bool = false };
     fn source(self: *Fake) directory.Source {
         return .{ .context = self, .list_fn = list, .page_fn = page };
     }
@@ -337,17 +375,22 @@ const Fake = struct {
         }
         return .{ .count = count, .has_more = skip + count < list_entries.len };
     }
-    pub fn probeDonor(self: *Fake, folder: []const u8, name: []const u8) anyerror!wim.Setup {
+    // Like inspectDonor / inspectX86Donor: an ISO of the other architecture
+    // fails the probe (detectX64Setup / detectX86Setup).
+    fn probe(self: *Fake, folder: []const u8, name: []const u8, x86: bool) anyerror!wim.Setup {
         self.probes += 1;
         self.probed_directory = folder;
         const list_entries = if (std.mem.eql(u8, folder, donor_directory)) self.entries else self.legacy_entries orelse &.{};
         for (list_entries) |item| {
-            if (std.mem.eql(u8, item.name, name)) return item.setup orelse error.InvalidWindowsBootFile;
+            if (std.mem.eql(u8, item.name, name)) return if (item.x86 != x86) error.InvalidWimXml else item.setup orelse error.InvalidWindowsBootFile;
         }
         return error.FileNotFound;
     }
+    pub fn probeDonor(self: *Fake, folder: []const u8, name: []const u8) anyerror!wim.Setup {
+        return self.probe(folder, name, false);
+    }
     pub fn probeX86Donor(self: *Fake, folder: []const u8, name: []const u8) anyerror!wim.Setup {
-        return self.probeDonor(folder, name);
+        return self.probe(folder, name, true);
     }
 };
 const pe7 = wim.Setup{ .index = 2, .major = 6, .minor = 1, .build = 7601 };
@@ -437,12 +480,83 @@ test "donor record needs name, size and a 64-digit SHA-256" {
 
 test "x86 PE10 donor: first valid by name, managed folder first, then Windows 10/Images" {
     const pe10_x86 = wim.Setup{ .index = 1, .major = 10, .minor = 0, .build = 19041 };
-    var fake = Fake{ .missing = true, .legacy_entries = &.{ .{ .name = "a-bad.iso", .setup = null }, .{ .name = "w10x86.iso", .setup = pe10_x86 }, .{ .name = "z.iso", .setup = pe10_x86 } } };
-    const resolved = try resolveX86Donor(original, fake.source(), &fake);
+    var fake = Fake{ .missing = true, .legacy_entries = &.{ .{ .name = "a-bad.iso", .setup = null, .x86 = true }, .{ .name = "w10x86.iso", .setup = pe10_x86, .x86 = true }, .{ .name = "z.iso", .setup = pe10_x86, .x86 = true } } };
+    const resolved = try resolveX86Donor(original, fake.source(), &fake, null);
     try std.testing.expectEqualStrings("w10x86.iso", resolved.donor_name.slice());
     try std.testing.expectEqualStrings(legacy_donor_directory, resolved.donor_directory);
-    fake = .{ .entries = &.{.{ .name = "pe.iso", .setup = pe10_x86 }}, .legacy_entries = &.{.{ .name = "w10x86.iso", .setup = pe10_x86 }} };
-    try std.testing.expectEqualStrings(donor_directory, (try resolveX86Donor(original, fake.source(), &fake)).donor_directory);
-    fake = .{ .missing = true, .legacy_entries = &.{.{ .name = "pe7.iso", .setup = pe7 }} };
-    try std.testing.expectError(error.X86PeDonorMissing, resolveX86Donor(original, fake.source(), &fake));
+    fake = .{ .entries = &.{.{ .name = "pe.iso", .setup = pe10_x86, .x86 = true }}, .legacy_entries = &.{.{ .name = "w10x86.iso", .setup = pe10_x86, .x86 = true }} };
+    try std.testing.expectEqualStrings(donor_directory, (try resolveX86Donor(original, fake.source(), &fake, null)).donor_directory);
+    fake = .{ .missing = true, .legacy_entries = &.{.{ .name = "pe7.iso", .setup = pe7, .x86 = true }} };
+    try std.testing.expectError(error.X86PeDonorMissing, resolveX86Donor(original, fake.source(), &fake, null));
+}
+
+const x64_donor = "PE10_x64_19041_USOS.iso";
+const x86_donor = "PE10_x86_19041_USOS.iso";
+
+test "both donors in Programs/USOS/WinPE: each resolver takes its own architecture" {
+    var fake = Fake{ .entries = &.{ .{ .name = x64_donor, .setup = pe10 }, .{ .name = x86_donor, .setup = pe10, .x86 = true } }, .legacy_entries = &.{.{ .name = "Win10_x86.iso", .setup = pe10, .x86 = true }} };
+    // x64 (Vista / Windows 7): the x86 donor is no second x64 donor.
+    const x64 = try resolveDonor(original, fake.source(), &fake);
+    try std.testing.expectEqualStrings(x64_donor, x64.donor_name.slice());
+    // x86: the shipped donor, not the user's ISO in the legacy folder.
+    const x86 = try resolveX86Donor(original, fake.source(), &fake, x86_donor);
+    try std.testing.expectEqualStrings(x86_donor, x86.donor_name.slice());
+    try std.testing.expectEqualStrings(donor_directory, x86.donor_directory);
+    try std.testing.expectEqualStrings(x86_donor, (try resolveX86Donor(original, fake.source(), &fake, null)).donor_name.slice());
+}
+
+test "only one donor present: the other architecture is missing or falls back" {
+    // Only the x64 donor: the x86 path uses the user's Windows 10 x86 ISO...
+    var fake = Fake{ .entries = &.{.{ .name = x64_donor, .setup = pe10 }}, .legacy_entries = &.{.{ .name = "pl-pl_windows_10_x86.iso", .setup = pe10, .x86 = true }} };
+    const fallback = try resolveX86Donor(original, fake.source(), &fake, null);
+    try std.testing.expectEqualStrings("pl-pl_windows_10_x86.iso", fallback.donor_name.slice());
+    try std.testing.expectEqualStrings(legacy_donor_directory, fallback.donor_directory);
+    // ...and without one it is missing.
+    fake = .{ .entries = &.{.{ .name = x64_donor, .setup = pe10 }} };
+    try std.testing.expectError(error.X86PeDonorMissing, resolveX86Donor(original, fake.source(), &fake, null));
+    // Only the x86 donor: Vista / Windows 7 x64 have no donor (an ISO was seen, none valid).
+    fake = .{ .entries = &.{.{ .name = x86_donor, .setup = pe10, .x86 = true }} };
+    try std.testing.expectError(error.Windows10PeDonorInvalid, resolveDonor(original, fake.source(), &fake));
+    try std.testing.expectEqualStrings(x86_donor, (try resolveX86Donor(original, fake.source(), &fake, x86_donor)).donor_name.slice());
+}
+
+test "the recorded x86 donor wins over other x86 ISOs in the managed folder" {
+    const entries = [_]Fake.TestDonor{ .{ .name = "A_my_x86.iso", .setup = pe10, .x86 = true }, .{ .name = x86_donor, .setup = pe10, .x86 = true }, .{ .name = "Z_x86.iso", .setup = pe10, .x86 = true } };
+    var fake = Fake{ .entries = &entries };
+    try std.testing.expectEqualStrings(x86_donor, (try resolveX86Donor(original, fake.source(), &fake, x86_donor)).donor_name.slice());
+    // Without a record: the first valid one by name.
+    try std.testing.expectEqualStrings("A_my_x86.iso", (try resolveX86Donor(original, fake.source(), &fake, null)).donor_name.slice());
+    // A recorded donor that no longer probes valid: the next valid one in the folder.
+    const broken = [_]Fake.TestDonor{ .{ .name = "A_my_x86.iso", .setup = pe10, .x86 = true }, .{ .name = x86_donor, .setup = null, .x86 = true } };
+    fake = .{ .entries = &broken };
+    try std.testing.expectEqualStrings("A_my_x86.iso", (try resolveX86Donor(original, fake.source(), &fake, x86_donor)).donor_name.slice());
+}
+
+test "x86 donor record: own keys, applies only to the recorded managed donor, damaged hash fails closed" {
+    const text = "; USOS\r\nname=" ++ x64_donor ++ "\r\nsize=459735040\r\nsha256=" ++ "ab" ** 32 ++ "\r\nx86_name=" ++ x86_donor ++ "\r\nx86_size=475332608\r\nx86_sha256=" ++ "cd" ** 32 ++ "\r\n";
+    const x64 = parseDonorRecord(text).?;
+    try std.testing.expectEqualStrings(x64_donor, x64.nameSlice());
+    try std.testing.expectEqual(@as(u64, 459735040), x64.size);
+    const x86 = parseDonorRecordFor(text, .x86).?;
+    try std.testing.expectEqualStrings(x86_donor, x86.nameSlice());
+    try std.testing.expectEqual(@as(u64, 475332608), x86.size);
+    try std.testing.expectEqual(@as(u8, 0xcd), x86.sha256[0]);
+    // An x64-only record (older install) has no x86 entry, and the other way round.
+    try std.testing.expect(parseDonorRecordFor("name=a.iso\nsize=1\nsha256=" ++ "00" ** 32, .x86) == null);
+    try std.testing.expect(parseDonorRecord("x86_name=a.iso\nx86_size=1\nx86_sha256=" ++ "00" ** 32) == null);
+
+    var fake = Fake{ .entries = &.{.{ .name = x86_donor, .setup = pe10, .x86 = true }}, .legacy_entries = &.{.{ .name = "Win10_x86.iso", .setup = pe10, .x86 = true }} };
+    const shipped = try resolveX86Donor(original, fake.source(), &fake, x86.nameSlice());
+    try std.testing.expect(x86DonorRecorded(x86, &shipped));
+    try std.testing.expect(!x86DonorRecorded(null, &shipped));
+    fake = .{ .missing = true, .legacy_entries = &.{.{ .name = "Win10_x86.iso", .setup = pe10, .x86 = true }} };
+    const user = try resolveX86Donor(original, fake.source(), &fake, x86.nameSlice());
+    try std.testing.expect(!x86DonorRecorded(x86, &user));
+
+    var digest = x86.sha256;
+    try checkDonorDigest(&x86, 475332608, &digest);
+    try checkDonorDigest(&x86, 475332608, null);
+    try std.testing.expectError(error.Windows10PeDonorCorrupt, checkDonorDigest(&x86, 475332607, null));
+    digest[31] ^= 1;
+    try std.testing.expectError(error.Windows10PeDonorCorrupt, checkDonorDigest(&x86, 475332608, &digest));
 }

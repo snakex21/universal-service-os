@@ -104,7 +104,11 @@ class Sources(unittest.TestCase):
         self.assertIn('FlushFileBuffers(f)', log)
         self.assertIn('#define FALLBACK_IP "64.227.13.248"', log)
         self.assertIn('#define LOG_PORT    21843', log)
-        self.assertNotIn('CreateWindow', log)             # no window of its own
+        # No visible window: only the hidden session window (end of session).
+        self.assertEqual(log.count('CreateWindow'), 1)
+        self.assertIn('CreateWindowExA(0, "USOSLOGSession", "USOSLOG", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);', log)
+        self.assertNotIn('WS_VISIBLE', log)
+        self.assertNotIn('ShowWindow(', log)
         # Windows 95 .. Me and NT: Winsock, IPHLPAPI, Toolhelp32 at run time only
         self.assertNotIn('wsock32', lnk.lower())
         for dll in ('"WSOCK32.DLL"', '"IPHLPAPI.DLL"', '"CreateToolhelp32Snapshot"'):
@@ -326,7 +330,7 @@ class Watcher(unittest.TestCase):
         self.assertIn('#define WATCH_MS        250', log)
         self.assertIn('#define WATCH_EV_MAX    1000', log)
         self.assertIn('timer = SetTimer(0, 0, WATCH_MS, 0);', log)
-        self.assertIn('if (++ticks % (60000 / WATCH_MS) == 0) hook_install();', log)   # still once a minute
+        self.assertIn('if (++ticks % (60000 / WATCH_MS) == 0 && !g_ending) hook_install();', log)   # once a minute
         self.assertIn('"%02u:%02u:%02u.%03u t+%lu.%03lu "', log)                        # ms timestamps
         tick = grab(log, r'^static void watch_tick\(void\)\n\{.*?\n\}\n')
         self.assertIn('if (watch_procs(now)) watch_hot = WATCH_HOT;', tick)
@@ -520,6 +524,60 @@ class Binary(unittest.TestCase):
         self.assertRegex(text, ts + r'-window [0-9A-F]{8} class "ConsoleWindowClass" pid [0-9A-F]{8} \S+  shown \d+ ms'
                                r'  <- console / DOS box')
 
+
+    @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
+    def test_host_session_end(self):
+        """The hidden session window: WM_QUERYENDSESSION is answered TRUE and
+        writes the session end record at once (processes, watcher events);
+        WM_ENDSESSION FALSE keeps it running; WM_ENDSESSION TRUE writes one
+        line and the process exits by itself (Windows 95 X470 shutdown hang
+        with USOSLOG resident, 2026-10-20)."""
+        import ctypes
+        import time
+        from ctypes import wintypes as W
+        u = ctypes.WinDLL('user32', use_last_error=True)
+        u.FindWindowA.restype = W.HWND
+        u.FindWindowA.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+        u.GetWindowThreadProcessId.argtypes = [W.HWND, ctypes.POINTER(W.DWORD)]
+        u.SendMessageTimeoutA.restype = ctypes.c_ssize_t
+        u.SendMessageTimeoutA.argtypes = [W.HWND, W.UINT, W.WPARAM, W.LPARAM, W.UINT, W.UINT,
+                                          ctypes.POINTER(ctypes.c_size_t)]
+        out = self.tmp / 'end.txt'
+        log = subprocess.Popen([str(self.exe), '/first', '600', '/every', '600', '/nonet', '/nohook', '/nodbg',
+                                '/nodisk', '/out', str(out)])
+        try:
+            hwnd = None
+            t0 = time.time()
+            while time.time() - t0 < 30 and not hwnd:
+                h = u.FindWindowA(b'USOSLOGSession', None)
+                pid = W.DWORD()
+                if h:
+                    u.GetWindowThreadProcessId(h, ctypes.byref(pid))
+                    if pid.value == log.pid:
+                        hwnd = h
+                time.sleep(0.2)
+            self.assertTrue(hwnd, 'no USOSLOGSession window')
+            res = ctypes.c_size_t()
+
+            def send(msg, wp, lp=0):
+                ok = u.SendMessageTimeoutA(hwnd, msg, wp, lp, 2, 10000, ctypes.byref(res))
+                return ok, res.value
+            self.assertEqual(send(0x0011, 0, 0x80000000), (1, 1))         # WM_QUERYENDSESSION, ENDSESSION_LOGOFF
+            text = out.read_text(encoding='latin-1')
+            self.assertRegex(text, r'=== USOSLOG 1\.0 session end  \d{4}-\d\d-\d\d \d\d:\d\d:\d\d  tick \d+')
+            self.assertIn('[END] WM_QUERYENDSESSION lParam 80000000: journal hook removed', text)
+            self.assertRegex(text, r'\[END\] processes \(\d+\):')
+            self.assertIn('[END] watcher events since the last record:', text)
+            send(0x0016, 0)                                                # WM_ENDSESSION FALSE
+            self.assertIsNone(log.poll())
+            self.assertIn('WM_ENDSESSION FALSE: the session goes on', out.read_text(encoding='latin-1'))
+            send(0x0016, 1)                                                # WM_ENDSESSION TRUE
+            self.assertEqual(log.wait(timeout=10), 0)
+            self.assertIn('WM_ENDSESSION TRUE: USOSLOG exits now', out.read_text(encoding='latin-1'))
+        finally:
+            if log.poll() is None:
+                log.kill()
+                log.wait()
 
     @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
     def test_host_disk_watcher_sees_subst_letter(self):
