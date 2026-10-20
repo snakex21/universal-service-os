@@ -56,11 +56,11 @@ class Fallback(unittest.TestCase):
             self.assertEqual(0, result.returncode)
             self.assertIn('SELECTED=' + str(wanted), result.stdout)
 
-    def run_step(self, nt='6.1', build='7601', package=False, conflict=False, fail=''):
+    def run_step(self, nt='6.1', build='7601', package=False, conflict=False, fail='', notify=False):
         script = (ROOT / 'tools/windows_x86_csmwrap.cmd').read_text(encoding='utf-8')
         step = script.split('\n:nt60_usb\n', 1)[1].split('\n:nvme_pe_driver\n', 1)[0]
         step = re.sub(r'^"%~dp0usos-x86-csmwrap.exe" target .*$',
-                      lambda _: f'>"%TEMP%\\usos-target.txt" echo C: {nt} {build}', step, flags=re.M)
+                      lambda _: f'>"%TEMP%\\usos-target.txt" echo %USOS_TEST_TARGET% {nt} {build}', step, flags=re.M)
         step = re.sub(r'^for /f .*reg query .*Current.*$', 'set "USOS_CS=1"', step, flags=re.M)
         step = step.replace('copy /y ', 'call :copy_mock ')
         step = step.replace('"%~dp0usos-x86-csmwrap.exe" samefile ', 'call :samefile_mock ')
@@ -72,6 +72,8 @@ class Fallback(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=scratch) as temp:
             directory = Path(temp)
             (directory / 'usosusb-nt6.sys').write_bytes(b'inert-test-file')
+            if notify:
+                (directory / 'usos-drivenotify.exe').write_bytes(b'MZ-stand-in')
             harness = directory / 'step.cmd'
             mocks = r'''
 :copy_mock
@@ -85,13 +87,14 @@ exit /b 0
 echo REG %*>>"%TRACE%"
 if "%~1"=="load" if "%FAIL%"=="load" exit /b 1
 if "%~1"=="add" if "%FAIL%"=="add" exit /b 1
+if "%~1"=="add" if "%FAIL%"=="add_sw" echo %*| find "USOS_SW" >nul && exit /b 1
 if "%~1"=="query" if "%FAIL%"=="query" exit /b 1
 if "%~3"=="/s" exit /b %CONFLICT_RESULT%
 exit /b 0
 '''
             harness.write_text('@echo off\n' + step + '\n' + mocks)
             trace = directory / 'trace.txt'
-            env = dict(os.environ, TEMP=temp, TMP=temp, TRACE=str(trace), FAIL=fail,
+            env = dict(os.environ, TEMP=temp, TMP=temp, TRACE=str(trace), FAIL=fail, USOS_TEST_TARGET=temp if notify else 'C:',
                        USOS_USB3_INSTALLED='1' if package else '', CONFLICT_RESULT='0' if conflict else '1')
             result = subprocess.run(['cmd', '/d', '/c', str(harness)], env=env, capture_output=True, text=True)
             return result, trace.read_text() if trace.exists() else ''
@@ -102,6 +105,20 @@ exit /b 0
         self.assertIn('phase=nt61-usb', result.stdout)
         self.assertIn('Services\\usosusb" /v Start /t REG_DWORD /d 1', trace)
         self.assertIn('REG unload HKLM\\USOS_SYS', trace)
+
+    def test_drive_notifier_runs_at_logon(self):
+        result, trace = self.run_step(notify=True)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn('drive notifier at logon', result.stdout)
+        self.assertIn('REG load HKLM\\USOS_SW', trace)
+        self.assertIn('CurrentVersion\\Run" /v USOSDriveNotify /t REG_EXPAND_SZ', trace)
+        self.assertIn('REG unload HKLM\\USOS_SW', trace)
+        self.assertLess(trace.index('REG unload HKLM\\USOS_SYS'), trace.index('REG load HKLM\\USOS_SW'))
+
+    def test_drive_notifier_failure_is_not_fatal(self):
+        result, trace = self.run_step(notify=True, fail='add_sw')
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn('REG unload HKLM\\USOS_SW', trace)
 
     def test_successful_external_package_wins(self):
         result, trace = self.run_step(package=True)

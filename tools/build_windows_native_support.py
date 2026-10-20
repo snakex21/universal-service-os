@@ -133,6 +133,13 @@ def build_modern_support(root: Path, out: Path):
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_usb_reenum.c'),
                     '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lsetupapi', '-lcfgmgr32', '-o', str(helpers / 'usos-usbreenum.exe')], env=env, check=True)
+    # Vista / 7 x86 with the bundled usosusb: tells Explorer about the
+    # stick letters usosusb's legacy volumes get (no PnP broadcast) and logs
+    # them; installed by the usosusb step (:usb_drive_notify, HKLM Run).
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-Wno-missing-declarations', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_drive_notify.c'),
+                    '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-luser32', '-lshell32', '-ladvapi32',
+                    '-o', str(helpers / 'usos-drivenotify.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_nvme_modern.c'), '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lcrypt32', '-lshell32',
@@ -149,6 +156,7 @@ def build_modern_support(root: Path, out: Path):
         # offline by the nt60_usb step (Win7: only without another xHCI
         # driver). HID and bulk-only disks need no external DATA package.
         writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
+        writer.add_file('usos-drivenotify.exe', helpers / 'usos-drivenotify.exe')
         # Windows 7 / 8.x / 10 before 1703 x86: own USB multi-partition disk
         # filter (committed x86 build of tools/nt/usosmpart), registered
         # offline by the mpart step of usos-x86-csmwrap.cmd.
