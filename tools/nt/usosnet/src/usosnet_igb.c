@@ -310,13 +310,13 @@ static BOOLEAN InvmMac(PADAPTER A, UCHAR *Mac)
 static ULONG PmCsrOffset(PADAPTER A)
 {
     ULONG v = 0, p, n;
-    NdisReadPciSlotInformation(A->Handle, 0, 0x04, &v, 4);
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0x04, &v, 4);
     if (v & (1UL << 20)) {                   /* capability list present */
         v = 0;
-        NdisReadPciSlotInformation(A->Handle, 0, 0x34, &v, 1);
+        NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0x34, &v, 1);
         for (p = v & 0xFC, n = 0; p >= 0x40 && n < 48; n++) {
             v = 0;
-            NdisReadPciSlotInformation(A->Handle, 0, p, &v, 2);
+            NdisReadPciSlotInformation(A->Handle, A->PciSlot, p, &v, 2);
             if ((v & 0xFF) == 0x01) return p + 4;   /* power management: PMCSR */
             p = (v >> 8) & 0xFC;
         }
@@ -327,9 +327,9 @@ static ULONG PmCsrOffset(PADAPTER A)
 static void PciSetD(PADAPTER A, ULONG Pmcsr, ULONG State)
 {
     ULONG v = 0;
-    NdisReadPciSlotInformation(A->Handle, 0, Pmcsr, &v, 2);
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, Pmcsr, &v, 2);
     v = (v & ~3UL & ~0x8000UL) | State;      /* keep PME_Status untouched (RW1C) */
-    NdisWritePciSlotInformation(A->Handle, 0, Pmcsr, &v, 2);
+    NdisWritePciSlotInformation(A->Handle, A->PciSlot, Pmcsr, &v, 2);
 }
 
 static BOOLEAN PllConfigured(PADAPTER A)
@@ -370,17 +370,17 @@ static void IgbPllCheck(PADAPTER A)
         /* D3hot and back; command + BARs are saved in case D0 resets them */
         for (j = 0; j < 7; j++) {
             saved[j] = 0;
-            NdisReadPciSlotInformation(A->Handle, 0, j ? 0x0C + 4 * j : 0x04, &saved[j], 4);
+            NdisReadPciSlotInformation(A->Handle, A->PciSlot, j ? 0x0C + 4 * j : 0x04, &saved[j], 4);
         }
         PciSetD(A, pmcsr, 3);
         UsStall(1000);
         PciSetD(A, pmcsr, 0);
         UsStall(10000);                       /* PCI PM: D3hot -> D0 recovery time */
         bar0 = 0;
-        NdisReadPciSlotInformation(A->Handle, 0, 0x10, &bar0, 4);
+        NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0x10, &bar0, 4);
         if (bar0 != saved[1]) {
-            for (j = 1; j < 7; j++) NdisWritePciSlotInformation(A->Handle, 0, 0x0C + 4 * j, &saved[j], 4);
-            NdisWritePciSlotInformation(A->Handle, 0, 0x04, &saved[0], 2);
+            for (j = 1; j < 7; j++) NdisWritePciSlotInformation(A->Handle, A->PciSlot, 0x0C + 4 * j, &saved[j], 4);
+            NdisWritePciSlotInformation(A->Handle, A->PciSlot, 0x04, &saved[0], 2);
         }
         for (j = 0; j < 100 && !(RD32(A, EECD) & EECD_AUTO_RD); j++) UsStall(1000);
         WR32(A, CTRL, RD32(A, CTRL) & ~CTRL_PHY_RST);   /* if D0 kept CTRL: PHY out of reset */
@@ -568,7 +568,7 @@ static void IgbRxPoll(PADAPTER A)
         A->RxNext = (i + 1) % RX_COUNT;
     }
     if (last != 0xFFFFFFFF) {
-        NdisMEthIndicateReceiveComplete(A->Handle);
+        UsIndicateRxComplete(A);
         WR32(A, RDT0, last);
     }
 }

@@ -9,10 +9,10 @@ full Windows VM installation was performed for this change.
 
 | System | Setup requests | Own Ethernet package | First hardware desktop |
 |---|---|---|---|
-| 95 | VREDIR + MSTCP, DHCP by default | NDIS 4 pending; never receives NDIS 5 | IE LAN defaults and Favorite if IE exposes its Favorites folder |
+| 95 | VREDIR + MSTCP, DHCP by default | usosnet4.sys (NDIS 4.0, usosnet95.inf) for a matching card, Setup /P I; never receives NDIS 5 (docs/usosnet-ndis4-2026-10-20.md) | IE LAN defaults and Favorite if IE exposes its Favorites folder |
 | 98 / 98 SE | VREDIR + MSTCP, DHCP by default | Existing usosnet NDIS 5, only with matching Ethernet PCI ID and SYS/INF pair | EnableDNS, IE LAN defaults, Favorite, transport diagnostics |
 | Me | Same | Same | Additionally removes exactly the inbox `*PNP8387` Dial-Up Adapter through SetupAPI |
-| NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server and Browser services disabled | NDIS 4 pending; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
+| NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server and Browser services disabled | usosnet4.sys takes over the loopback adapter (USOSNET.REG, POST.CMD) for a matching card; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
 | 2000 | Microsoft client + TCP/IP; no MS_Server in NetServices | Existing usosnet, matching hardware only; OEM package and merged OemPnPDriversPath | IE settings and Favorites; existing `reg=` setup path seeds defaults too |
 
 NT4's loopback uses `192.0.2.1/24`, **not a usable LAN address or DHCP
@@ -111,7 +111,7 @@ The initramfs builder builds own `USOSLAN9X.EXE` and `USOSLANNT.EXE`, GUI
 PE 4.0, no CRT, static kernel32/advapi32 imports only. `stage_driver` copies
 an optional unchanged SYS/INF pair; `network_setup.sh` only stages it after
 matching actual PCI Ethernet hardware. States `missing`, `no_card`,
-`unsupported`, `ndis4_pending`, `staged` and readback failures are logged.
+`unsupported`, `staged` and readback failures are logged.
 Absence of an optional driver never prevents installation.
 
 9x: `C:\USOS9X\NETCFG.INI`, `USOSLAN.EXE`, optional `NET\USOSNET.*` and

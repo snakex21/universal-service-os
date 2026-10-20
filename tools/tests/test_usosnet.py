@@ -346,5 +346,155 @@ int main(void) {
             r = subprocess.run([str(exe)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)
 
+
+SYS4 = DRV / 'bin/i386/usosnet4.sys'
+
+
+def export_table(name):
+    """tools/tests/data/<name>: [module] sections of export names."""
+    table, cur = {}, None
+    for line in (ROOT / 'tools/tests/data' / name).read_text(encoding='ascii').splitlines():
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('['):
+            cur = table.setdefault(line[1:-1].lower(), set())
+        else:
+            cur.add(line.split(' -> ')[0])
+    return table
+
+
+def iat_va(path, wanted):
+    """Image VA of the IAT slot of one NDIS.SYS import (calls are FF 15 <VA>)."""
+    import struct
+    b = path.read_bytes()
+    u = lambda o: struct.unpack_from('<I', b, o)[0]
+    p = u(60); opt = p + 24; base = u(opt + 28); dd = opt + 96
+    secs = opt + struct.unpack_from('<H', b, p + 20)[0]
+    def off(v):
+        for i in range(struct.unpack_from('<H', b, p + 6)[0]):
+            vs, va, rs, raw = struct.unpack_from('<IIII', b, secs + i * 40 + 8)
+            if va <= v < va + max(vs, rs):
+                return raw + v - va
+        raise ValueError(v)
+    d = off(u(dd + 8))
+    while u(d + 12):
+        names, first = u(d), u(d + 16)
+        k = 0
+        while u(off(names or first) + 4 * k):
+            hint = u(off(names or first) + 4 * k)
+            if not hint & 0x80000000:
+                n = off(hint) + 2
+                if b[n:b.index(b'\0', n)].decode() == wanted:
+                    return base + first + 4 * k
+            k += 1
+        d += 20
+    raise KeyError(wanted)
+
+
+class Ndis4(unittest.TestCase):
+    """usosnet4.sys: the NDIS 4.0 build for Windows 95 OSR2 and NT 4.0 SP6a
+    (docs/usosnet-ndis4-2026-10-20.md). Export names: the user's 95 OSR2.1 PL
+    NDIS.VXD 4.0 tables and NT 4.0 SP6a PL NDIS.SYS 4.00 (names only)."""
+
+    def test_imports_resolve_on_95_osr2_and_nt4_sp6a(self):
+        imports = pe(SYS4)[1]
+        self.assertTrue(imports)
+        w95 = export_table('w95osr2_ndis_exports.txt')['ndis.sys']
+        nt4 = export_table('nt4sp6a_ndis_exports.txt')['ndis.sys']
+        for mod, name in imports:
+            self.assertEqual(mod, 'ndis.sys', name)          # no ntoskrnl / HAL import
+            self.assertIn(name, w95, '95 OSR2 NDIS.VXD: ' + name)
+            self.assertIn(name, nt4, 'NT4 SP6a NDIS.SYS: ' + name)
+        names = {n for _, n in imports}
+        self.assertTrue({'EthFilterDprIndicateReceive', 'EthFilterDprIndicateReceiveComplete',
+                         'NdisMPciAssignResources', 'NdisOverrideBusNumber'} <= names)
+
+    def test_pe_version_4(self):
+        b = SYS4.read_bytes()
+        off = int.from_bytes(b[0x3C:0x40], 'little') + 24
+        self.assertEqual((b[off + 48], b[off + 50]), (4, 0))   # subsystem 4.00
+        self.assertEqual(int.from_bytes(b[off + 68:off + 70], 'little'), 1)   # native
+
+    def test_registers_ndis_4_with_0x48_byte_characteristics(self):
+        b = SYS4.read_bytes()
+        call = b'\xFF\x15' + iat_va(SYS4, 'NdisMRegisterMiniport').to_bytes(4, 'little')
+        at = b.find(call)
+        self.assertGreater(at, 0)
+        self.assertEqual(b.count(call), 1)
+        before = b[at - 128:at]
+        self.assertIn(b'\x6A\x48', before)                  # push 48h: the size argument
+        self.assertRegex(before, rb'\xC6\x45[\x80-\xFF]\x04')   # mov byte [ebp-n], 4: MajorNdisVersion
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        self.assertIn('mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;', src)
+        self.assertIn('C_ASSERT(USOSNET_CHARS_SIZE == 0x48);', src)
+        self.assertIn('#define USOSNET_NDIS_MAJOR 4', (DRV / 'src/usosnet.h').read_text(encoding='latin-1'))
+        self.assertIn('-DUSOSNET_NDIS4=1', (DRV / 'src4/sources').read_text(encoding='latin-1'))
+
+    def test_receive_uses_the_ndis3_filter_not_ndis5_handlers(self):
+        """push dword [reg + 0D8h] (EthDB) before the exported filter calls;
+        no call [reg + 164h] / [reg + 170h] (NDIS 5 EthRxIndicate / Complete
+        handlers of the miniport block, absent from the 4.0 block)."""
+        b = SYS4.read_bytes()
+        pushes = sum(b.count(bytes([0xFF, 0xB0 + r, 0xD8, 0, 0, 0])) for r in range(8) if r != 4)
+        self.assertGreaterEqual(pushes, 2)
+        for disp in (0x164, 0x170):
+            for r in range(8):
+                if r != 4:
+                    self.assertNotIn(bytes([0xFF, 0x90 + r]) + disp.to_bytes(4, 'little'), b)
+        for name in ('EthFilterDprIndicateReceive', 'EthFilterDprIndicateReceiveComplete'):
+            self.assertIn(b'\xFF\x15' + iat_va(SYS4, name).to_bytes(4, 'little'), b)
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        self.assertIn('C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);', src)
+        self.assertIn('#define USOSNET_ETHDB_OFFSET 0xD8', src)
+
+    def test_ndis5_binary_keeps_its_contract(self):
+        imports = {n for _, n in pe(SYS)[1]}
+        self.assertNotIn('EthFilterDprIndicateReceive', imports)
+        self.assertNotIn('NdisOverrideBusNumber', imports)
+
+    def test_nt4_legacy_path(self):
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        init = re.search(r'static NDIS_STATUS MpInitialize\(.*?\nfail:', src, re.S).group(0)
+        nd4 = init.index('#if USOSNET_NDIS4')
+        # PnP resources first; NT4 (NOT_SUPPORTED): bus scan, then the HAL assignment
+        self.assertLess(nd4, init.index('LegacyFind(A, WrapperConfigurationContext)'))
+        self.assertLess(init.index('LegacyFind(A, WrapperConfigurationContext)'),
+                        init.index('NdisMPciAssignResources(MiniportAdapterHandle, A->PciSlot, &rl)'))
+        self.assertLess(init.index('NdisMPciAssignResources'), init.index('A->Chip = FindChip(cfg32)'))
+        find = re.search(r'static BOOLEAN LegacyFind\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('NdisOverrideBusNumber(Wcc, A->Handle, bus)', find)
+        self.assertIn('dev | (fn << 5)', find)                    # PCI_SLOT_NUMBER
+        self.assertIn('0x00800000UL', find)                       # multi-function header bit
+        # every PCI config access goes to the found slot (0 on PnP systems)
+        for f in ('usosnet.c', 'usosnet_igb.c'):
+            text = (DRV / 'src' / f).read_text(encoding='latin-1')
+            self.assertNotRegex(text, r'Ndis(Read|Write)PciSlotInformation\([^,]+, 0,', f)
+        # interrupt failure: polling on the NDIS 4 build, failure on NDIS 5
+        irq = init[init.index('NdisMRegisterInterrupt('):]
+        self.assertLess(irq.index('A->PollMode = 2;'), irq.index('#else'))
+
+    def test_95_inf(self):
+        text = (DRV / 'inf/usosnet95.inf').read_text(encoding='ascii')
+        ids = inf_ids('usosnet95.inf')
+        self.assertTrue({'1539', '10C9'} <= ids)
+        self.assertLessEqual(ids, chip_ids())
+        for line in ('HKR,,DevLoader,,*ndis', 'HKR,,DeviceVxDs,,usosnet.sys', 'HKR,NDIS,MajorNdisVersion,1,04',
+                     'Signature="$CHICAGO$"', 'Class=Net', 'usosnet.sys=1'):
+            self.assertIn(line, text)
+        self.assertNotIn('MajorNdisVersion,1,05', text)
+
+    def test_flow_wiring(self):
+        post = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='latin-1')
+        block = post[post.index('if not exist C:\\USOS\\Drivers\\USOSNET\\USOSNET4.SYS goto nonet4'):post.index(':nonet4')]
+        for token in ('regedit.exe /e C:\\USOS\\NT4\\LOOPCHK.REG', 'drivers\\usosnet4.sys',
+                      'regedit.exe /s C:\\USOS\\NT4\\USOSNET.REG', 'findstr /i /c:"usosnet4.sys"', 'NETSETUP.TXT'):
+            self.assertIn(token, block)
+        self.assertLess(post.index('echo drivers registered'), post.index(':nonet4'))
+        self.assertLess(post.index(':nonet4'), post.index('if not exist C:\\USOS\\NT4\\SP6I386.EXE goto nosp'))
+        dos = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
+        self.assertIn('IF "%U9SYS%"=="95" IF EXIST C:\\%U9SRC%\\USOSNET.SYS SET U9SW=/IS /IW /P I', dos)
+        self.assertLess(dos.index('COPY /Y %U9T%\\NET\\USOSNET.SYS C:\\%U9SRC%'),
+                        dos.index('IF EXIST C:\\%U9SRC%\\USOSNET.SYS SET U9SW='))
+
 if __name__ == '__main__':
     unittest.main()

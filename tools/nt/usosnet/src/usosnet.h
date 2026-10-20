@@ -28,6 +28,30 @@
 
 #define USOSNET_MAJOR 0
 #define USOSNET_MINOR 5
+
+/* USOSNET_NDIS4=1 (src4/sources): usosnet4.sys, registered as an NDIS 4.0
+ * miniport for Windows 95 OSR2 (NDIS.VXD 4.0) and Windows NT 4.0 (NDIS.SYS
+ * 4.0); both refuse MajorNdisVersion 5. Differences, all in usosnet.c
+ * (docs/usosnet-ndis4-2026-10-20.md):
+ *   - characteristics: the NDIS 3.0 part + the three 4.0 handlers (0x48);
+ *   - receive indication through the exported EthFilterDprIndicateReceive /
+ *     ...Complete with the filter at NDIS_MINIPORT_BLOCK + 0xD8 (the same
+ *     offset in WDK 7.1, the NT4 SP6a and the 95 OSR2 drivers) instead of
+ *     the NDIS 5 handler pointers of the miniport block;
+ *   - NT4 (no PnP: NdisMQueryAdapterResources answers NOT_SUPPORTED): the
+ *     driver finds the card on the PCI buses itself (NdisOverrideBusNumber +
+ *     NdisReadPciSlotInformation with a real slot number) and takes the
+ *     resources from NdisMPciAssignResources;
+ *   - a failed NdisMRegisterInterrupt switches to timer polling instead of
+ *     failing the start. */
+#ifndef USOSNET_NDIS4
+#define USOSNET_NDIS4 0
+#endif
+#if USOSNET_NDIS4
+#define USOSNET_NDIS_MAJOR 4
+#else
+#define USOSNET_NDIS_MAJOR 5
+#endif
 #define USOSNET_TAG 'NSOU'
 
 #define ETH_ALEN 6
@@ -194,6 +218,13 @@ typedef struct _ADAPTER {
     USNS_BLOCK *Stats;
     ULONG LogRequest;           /* TX saw the USOSLOG request broadcast */
     ULONG ForcedLogs;
+
+    /* PCI location: slot number for Ndis{Read,Write}PciSlotInformation (0 on
+     * PnP systems, which ignore it; NT4: device | function << 5 on PciBus) */
+    ULONG PciSlot, PciBus;
+    BOOLEAN Legacy;             /* NT4: found by the bus scan, no PnP resources */
+    ULONG AssignStatus;         /* NT4: NdisMPciAssignResources status */
+    ULONG IrqStatus;            /* NdisMRegisterInterrupt status (NDIS 4 build: failure -> polling) */
 } ADAPTER, *PADAPTER;
 
 /* register access (MMIO through volatile pointers, no HAL import) */
@@ -212,6 +243,7 @@ BOOLEAN UsEqual(const void *A, const void *B, ULONG N);
 void UsStall(ULONG Us);
 void UsLog(PADAPTER A, const char *Fmt, ULONG V1, ULONG V2);
 void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
+void UsIndicateRxComplete(PADAPTER A);
 void UsRxDropped(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
 
 extern const USOSNET_CHIP_OPS IgbOps;

@@ -326,6 +326,10 @@ IF "%U9SYS%"=="95" SET U9SW=/IS /IW
 REM Windows 95 NVMe opt-in: ignore the empty SeaBIOS PnP BIOS device list.
 REM /P I exists in 95 too (Microsoft KB152064); test PCI detection here.
 IF "%U9SYS%"=="95" IF "%U9NVME%"=="1" SET U9SW=/IS /IW /P I
+REM The same for usosnet on 95 (NET\USOSNET.SYS = the NDIS 4.0 usosnet4.sys,
+REM staged only for a matching PCI card): without the PCI bus node 95 never
+REM enumerates the card on the real PC, so USOSNET.INF would never be used.
+IF "%U9SYS%"=="95" IF EXIST C:\%U9SRC%\USOSNET.SYS SET U9SW=/IS /IW /P I
 REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
 REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
 IF "%U9SYS%"=="95" GOTO VMSWOK
