@@ -4,6 +4,7 @@ This does not promote import resolution, a boot menu or a preparation marker
 to desktop PASS. Hardware bindings must be reviewed against cited documents.
 """
 from pathlib import Path
+from datetime import date
 import argparse
 import json
 import re
@@ -21,10 +22,18 @@ def measured_result(sha256, results):
         if item.get('result') == 'PASS':
             if item.get('stage') == 'desktop' and item.get('screen') and item.get('evidence'):
                 return 'QEMU PASS', 'pulpit', item
-        elif item.get('result') in ('FAIL', 'NOT_RUN', 'RUNNER_ERROR'):
-            labels = {'FAIL':'QEMU FAIL', 'NOT_RUN':'nie uruchomiono', 'RUNNER_ERROR':'błąd adaptera testu'}
+        elif item.get('result') in ('FAIL', 'NOT_RUN', 'RUNNER_ERROR', 'INCOMPLETE'):
+            labels = {'FAIL':'QEMU FAIL', 'NOT_RUN':'nie uruchomiono', 'RUNNER_ERROR':'błąd adaptera testu', 'INCOMPLETE':'QEMU nieukończono'}
             return labels[item['result']], item.get('stage','—'), item
     return 'oczekuje', '—', {}
+
+
+def variant_notes(sha256, results):
+    """A successful AHCI retry must not hide the same source's NVMe failure."""
+    rows = [row for row in results if row.get('sha256') == sha256 and row.get('result') in ('PASS','FAIL','INCOMPLETE')]
+    if len(rows) < 2:return ''
+    notes = dict.fromkeys(row.get('target','wariant bez opisu dysku')+': '+row['result']+' ('+row.get('stage','—')+')' for row in rows)
+    return '; '.join(notes)
 
 
 def identity(facts):
@@ -79,7 +88,7 @@ def main(args):
             representatives.append('- '+cell(Path(result['path']).name)+': '+result.get('candidate_reason','')+
                 ' UEFI → CSMWrap; pusty dysk NVMe lub SATA; sprawdzić start, klawiaturę/mysz i ponowny start. SHA-256 `'+digest+'`.')
     lines = ['# Macierz Windows — checkpoint, testy instalacji nieukończone','',
-        'Data: 2026-10-20. Baza `97f40f018d1d811dab85c2c1e44f8b6404860189`, po rebase z `1197eb49`.','',
+        f'Data: {date.today().isoformat()}. Baza `97f40f018d1d811dab85c2c1e44f8b6404860189`, po rebase z `1197eb49`.','',
         f"Inwentaryzacja obejmuje {len(inventory['files'])} plików wejściowych. To także archiwa, dyskietki, nośniki aktualizacji i duplikaty — nie liczba unikatowych instalatorów.", '',
         '**Ten dokument nie spełnia jeszcze kryterium pełnych testów QEMU.** Wiersze „oczekuje” nie oznaczają ani PASS, ani wykrytego błędu Windows. Status X470 przypisano wyłącznie tam, gdzie dokumentacja wskazuje dokładne źródło.','',
         '„API” poniżej oznacza uruchomione biblioteczne parsery USOS. W szczególności `windows_legacy_media` nie jest w tej bazie wywoływany przez ekran UEFI; wpis katalogu i profil nie są automatycznym rozpoznaniem wersji/SP starszego ISO. Dla nowszych nośników odczytano także XML WIM.','',
@@ -105,6 +114,8 @@ def main(args):
         status, stage, result = measured_result(row['sha256'], results)
         if result:
             notes += '; '+result.get('reason',result.get('evidence',''))
+        variants = variant_notes(row['sha256'],results)
+        if variants:notes += '; warianty: '+variants
         hw = hardware.get(row['sha256'],{})
         hw_status = hw.get('status','nie przypisano potwierdzenia dla dokładnego obrazu')
         if hw.get('citations'):

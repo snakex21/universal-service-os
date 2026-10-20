@@ -29,6 +29,14 @@ class MeasuredResultTests(unittest.TestCase):
         self.assertEqual(matrix.measured_result('a',[dict(sha256='a', result='FAIL', stage='Setup')])[:2],
                          ('QEMU FAIL','Setup'))
 
+    def test_successful_retry_preserves_failed_storage_variant(self):
+        rows = [dict(sha256='a',result='FAIL',stage='disk selection',target='NVMe'),
+                dict(sha256='a',result='PASS',stage='desktop',target='AHCI',screen='s.png',evidence='result.json')]
+        self.assertEqual(matrix.measured_result('a',rows)[0],'QEMU PASS')
+        self.assertIn('NVMe: FAIL',matrix.variant_notes('a',rows))
+        self.assertIn('AHCI: PASS',matrix.variant_notes('a',rows))
+        self.assertNotIn('NVMe',matrix.variant_notes('b',rows))
+
 
 if __name__ == '__main__':
     unittest.main()
