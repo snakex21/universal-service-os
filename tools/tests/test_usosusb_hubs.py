@@ -73,7 +73,7 @@ class HubSource(unittest.TestCase):
         self.assertIn('static WCHAR g_diag[1024];', self.text)
 
     def test_binaries_carry_hub_build(self):
-        for rel, ver in (('bin/i386/usosusb.sys', 'usosusb 1.3-nt4'), ('bin/nt6/i386/usosusb.sys', 'usosusb 1.3-nt6'),
+        for rel, ver in (('bin/i386/usosusb.sys', 'usosusb 1.4-nt4'), ('bin/nt6/i386/usosusb.sys', 'usosusb 1.4-nt6'),
                          ('bin/nt31/i386/usosusb.sys', 'usosusb 1.2-nt31')):
             data = (ROOT / 'tools/nt4/usosusb' / rel).read_bytes()
             self.assertIn(ver.encode('utf-16-le'), data, rel)
@@ -91,6 +91,9 @@ class HubQemu(unittest.TestCase):
 
     def test_nt4(self):
         self.run_variant('nt4')
+
+    def test_nt31(self):
+        self.run_variant('nt31')
 
 
 if __name__ == '__main__':

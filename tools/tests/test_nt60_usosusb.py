@@ -46,7 +46,7 @@ class Binary(unittest.TestCase):
 
     def test_nt6_variant(self):
         data = SYS.read_bytes()
-        self.assertIn('usosusb 1.3-nt6'.encode('utf-16-le'), data)
+        self.assertIn('usosusb 1.4-nt6'.encode('utf-16-le'), data)
         self.assertIn(b'HalGetBusDataByOffset', data)      # PCI through the HAL lock
         for name in (b'_snwprintf', b'__security_check_cookie', b'IoRegisterPlugPlayNotification', b'usbd.sys'):
             self.assertNotIn(name, data)
@@ -80,9 +80,10 @@ class MassStorage(unittest.TestCase):
     def test_source_bot_and_scsi(self):
         text = SRC.read_text(encoding='utf-8')
         self.assertIn('#define USOSUSB_MSC 1', text)
-        # only the NT6 block defines it
+        # the NT6 block defines it (and the NT4 block since usosusb 1.1-nt4,
+        # tools/tests/test_nt4_usosusb_storage.py); NT 3.1 does not
         self.assertLess(text.index('defined(USOSUSB_NT6)'), text.index('#define USOSUSB_MSC 1'))
-        self.assertLess(text.index('#define USOSUSB_MSC 1'), text.index('#define USOSUSB_VERSION L"usosusb 1.3-nt4"'))
+        self.assertLess(text.index('#define USOSUSB_MSC 1'), text.index('#define USOSUSB_VERSION L"usosusb 1.4-nt4"'))
         for needle in ('0x43425355', '0x53425355',            # CBW / CSW signatures
                        'b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50',   # class 08/06/50
                        "cdb[0] = (UCHAR)(wr ? 0x2A : 0x28);",  # WRITE(10) / READ(10)
@@ -92,8 +93,9 @@ class MassStorage(unittest.TestCase):
             self.assertIn(needle, text)
 
     def test_nt4_builds_keep_the_old_path(self):
-        # the committed NT 4.0 / 3.1 binaries carry no storage code
-        for rel in ('bin/i386/usosusb.sys', 'bin/nt31/i386/usosusb.sys'):
+        # the committed NT 3.1 binary carries no storage code (NT 4.0 does
+        # since 1.1-nt4)
+        for rel in ('bin/nt31/i386/usosusb.sys',):
             data = (DRV / rel).read_bytes()
             self.assertNotIn('UsosUsbDisk'.encode('utf-16-le'), data)
 

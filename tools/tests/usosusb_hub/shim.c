@@ -147,6 +147,7 @@ void *__stdcall MmAllocateContiguousMemory(u32 n, u64 highest)
 
 u64 __stdcall MmGetPhysicalAddress(void *va) { return (u32)va; }
 void *__stdcall MmMapIoSpace(u64 pa, u32 n, int cache) { (void)n; (void)cache; return (void *)(u32)pa; }
+void *__stdcall MmMapLockedPages(void *mdl, char mode) { (void)mdl; (void)mode; return 0; }
 void *__stdcall MmMapLockedPagesSpecifyCache(void *mdl, int mode, int cache, void *base, u32 bug, int prio)
 {
     (void)mdl; (void)mode; (void)cache; (void)base; (void)bug; (void)prio;
@@ -189,9 +190,13 @@ i32 __stdcall KeSetEvent(void *e, i32 inc, u8 wait)
     return old;
 }
 
+void __stdcall harness_idle(void);
+
 i32 __stdcall KeWaitForSingleObject(void *o, int reason, char mode, u8 alertable, i64 *t)
 {
     (void)reason; (void)mode; (void)alertable;
+    if (t)
+        harness_idle();         /* the worker's idle wait: run the NT 4.0 mount queue */
     if (((i32 *)o)[1]) {
         if (((u8 *)o)[0] == 1)  /* SynchronizationEvent: auto reset */
             ((i32 *)o)[1] = 0;
@@ -350,6 +355,54 @@ i32 __stdcall ZwCreateFile(void **h, u32 a, void *oa, void *iosb, void *size, u3
 {
     (void)h; (void)a; (void)oa; (void)iosb; (void)size; (void)attr; (void)share; (void)disp; (void)opt; (void)ea; (void)eal;
     return (i32)0xC0000034;
+}
+
+/* NT 4.0 sticks build: drive letters are plain \DosDevices links */
+i32 __stdcall IoCreateSymbolicLink(US *link, US *target)
+{
+    harness_puts("LINK + ");
+    harness_putw(link->Buffer);
+    harness_puts(" -> ");
+    harness_putw(target->Buffer);
+    harness_puts("\n");
+    return 0;
+}
+
+i32 __stdcall IoDeleteSymbolicLink(US *link)
+{
+    harness_puts("LINK - ");
+    harness_putw(link->Buffer);
+    harness_puts("\n");
+    return 0;
+}
+
+/* Parameters\Storage / LogFile: not set (the defaults stay) */
+i32 __stdcall RtlQueryRegistryValues(u32 rel, const u16 *path, void *table, void *ctx, void *env)
+{
+    (void)rel; (void)path; (void)table; (void)ctx; (void)env;
+    return (i32)0xC0000034;
+}
+
+/* NT 4.0 log file: never opened (no LogFile value), never written */
+i32 __stdcall ZwWriteFile(void *h, void *ev, void *apc, void *ctx, void *iosb, void *buf, u32 len, i64 *off, u32 *key)
+{
+    (void)h; (void)ev; (void)apc; (void)ctx; (void)iosb; (void)buf; (void)len; (void)off; (void)key;
+    return (i32)0xC0000008;
+}
+
+i32 __stdcall ZwQueryInformationFile(void *h, void *iosb, void *info, u32 len, int cls)
+{
+    (void)h; (void)iosb; (void)info; (void)len; (void)cls;
+    return (i32)0xC0000008;
+}
+
+void __stdcall ExSystemTimeToLocalTime(i64 *sys, i64 *loc) { *loc = *sys; }
+void __stdcall RtlTimeToTimeFields(i64 *t, u16 *tf)
+{
+    int i;
+    (void)t;
+    for (i = 0; i < 8; i++)
+        tf[i] = 0;
 }
 
 i32 __stdcall ZwOpenKey(void **h, u32 a, void *oa) { (void)h; (void)a; (void)oa; return (i32)0xC0000034; }

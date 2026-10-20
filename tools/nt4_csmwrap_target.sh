@@ -48,6 +48,9 @@ SP_EXE=${NT4_SP_EXE:-}
 # tse: the menu entry is Windows NT 4.0 Terminal Server Edition (the CD must
 # be the TSE CD and the other entries must not take it).
 EDITION=${NT4_EDITION:-}
+# 1 (default): usosusb also drives USB sticks (NT 4.0 only; DATA
+# usb-storage-off.txt -> 0, read by w9x_csmwrap_prepare.sh).
+USB_STORAGE=${NT4_USB_STORAGE:-1}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 SYSLINUX_DIR=${NT4_SYSLINUX_DIR:-/usr/share/syslinux}
 PART_START=63
@@ -894,6 +897,25 @@ REGEDIT4
 
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Mouclass\Parameters]
 "ConnectMultiplePorts"=dword:00000001
+EOF
+# USB sticks (usosusb 1.1-nt4, tools/nt4/usosusb/README.md "USB mass storage
+# on NT 4.0"): the same driver and worker thread that own the xHCI for the
+# keyboard and mouse, so there is no second xHCI owner (SeaBIOS's USB disk
+# service, the 9x path, is not used: usosusb resets the controller).
+# Storage=0 (DATA usb-storage-off.txt) keeps keyboard and mouse only. The
+# log file gets one line per stick arrival / removal and the Diag changes.
+if [ "$USB_STORAGE" = 0 ]; then
+    usb_storage_dword=00000000
+    log 'USB sticks: off (usb-storage-off.txt); usosusb drives keyboard and mouse only'
+else
+    usb_storage_dword=00000001
+    log 'USB sticks: usosusb mass storage on (FAT12/FAT16/NTFS on MBR or superfloppy sticks; log C:\USOS\NT4\USOSUSB.LOG)'
+fi
+crlf >> "$usos/DRIVERS.REG" <<EOF
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosusb\Parameters]
+"Storage"=dword:$usb_storage_dword
+"LogFile"="\\\\DosDevices\\\\C:\\\\USOS\\\\NT4\\\\USOSUSB.LOG"
 EOF
 # NVMe target (docs/nvme-nt-2026-10-11.md): USOS's own usosnvme miniport
 # (tools/nt/usosnvme, NT4 build: non-PnP, scans PCI for class 01-08-02,

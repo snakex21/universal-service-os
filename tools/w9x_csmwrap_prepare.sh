@@ -560,6 +560,18 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log 'DISPLAY display-keep.txt: USOSRES off, the display keeps its own mode'
     fi
     export USOS_DISPLAY_KEEP
+    # Windows NT 4.0: USB sticks through usosusb (the keyboard / mouse driver
+    # that owns the xHCI), on by default; the same usb-storage-off.txt turns
+    # them off (tools/nt4/usosusb/README.md).
+    nt4usb=1
+    if [ -n "$nt4" ] && [ "$nt_major" = 4 ]; then
+        if [ -f "/mnt/data/Systems/$data_category/$folder/Unattended/usb-storage-off.txt" ]; then
+            nt4usb=0
+            w9x_csmwrap_log 'USB usosusb sticks off (usb-storage-off.txt)'
+        else
+            w9x_csmwrap_log 'USB usosusb sticks on (default, usb-storage-off.txt turns them off)'
+        fi
+    fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
         usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true
@@ -573,7 +585,7 @@ usos_w9x_csmwrap_prepare() {
             w9x_nt3_ui_locale "$answer_inf" "$ui_locale" "$ui_keyboard" || stop 'the locale could not be added to the answer'
             w9x_csmwrap_log "NT3 locale: $(grep -a '^;USOS-\(LOCALE\|KEYBOARD\)=' "$answer_inf" | tr -d '\r' | tr '\n' ' ')"
         fi
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT4_USB_STORAGE="$nt4usb" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
