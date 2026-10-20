@@ -78,8 +78,36 @@ class Reg95(unittest.TestCase):
         out.mkdir(exist_ok=True)
         quoted = ' '.join("'%s'" % a for a in extra)
         rc, so, err = sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" {quoted}', {})
-        files = {n: (out / n).read_bytes() for n in ('REG95.BAT', 'REG95.REG') if (out / n).exists()}
+        files = {n: (out / n).read_bytes() for n in ('REG95.BAT', 'REG95.REG', 'START.HTM') if (out / n).exists()}
+        for n in files:
+            (out / n).unlink()
         return rc, files, err
+
+    def test_run_values_persistent_first_lan_last(self):
+        # The 95 shell starts Run values inside its RegEnumValue(index) loop:
+        # a helper deleting its own value shifts the next one onto its index
+        # and the shell skips it (X470: USOSLan hid USOSDisplay).
+        _, files, _ = self.write(ANSWER_95, 'C:\\USOS9X\\USOSLOG.EXE')
+        reg = files['REG95.REG'].decode('ascii')
+        self.assertEqual(reg.count('[%s]' % RUN), 1)
+        run = reg[reg.index('[%s]\r\n' % RUN):].split('\r\n\r\n')[0]
+        self.assertEqual(re.findall(r'^"(\w+)"=', run, flags=re.M), ['USOSLog', 'USOSDisplay', 'USOSLan'])
+
+    def test_start_page_file(self):
+        _, files, _ = self.write(ANSWER_95)
+        page = files['START.HTM']
+        self.assertEqual(page.count(b'\n'), page.count(b'\r\n'))
+        text = page.decode('ascii')
+        self.assertIn('<A HREF="http://68k.news">', text)
+        self.assertNotIn('<SCRIPT', text.upper())
+        no_home = ANSWER_95.replace('"Start Page",,"about:blank"', '"Other",,"x"')
+        self.assertNotEqual(no_home, ANSWER_95)
+        _, files, _ = self.write(no_home)
+        self.assertNotIn('START.HTM', files)
+        self.assertNotIn(b'START.HTM', files['REG95.REG'])
+        _, files, _ = self.write(ANSWER_95.replace('"about:blank"', '"http://example.org/"'))
+        self.assertIn(b'"Start Page"="http://example.org/"', files['REG95.REG'])
+        self.assertNotIn('START.HTM', files)
 
     def test_install_values_become_regedit4(self):
         rc, files, err = self.write(ANSWER_95, 'C:\\USOS9X\\USOSLOG.EXE')
@@ -93,7 +121,9 @@ class Reg95(unittest.TestCase):
                       '"EnableAutodial"=hex:00,00,00,00\r\n"NoNetAutodial"=hex:01,00,00,00\r\n', reg)
         self.assertNotIn('dword:', reg)                                # 4 binary bytes (real-mode REGEDIT)
         self.assertIn('[HKEY_USERS\\.Default\\Software\\Microsoft\\Internet Connection Wizard]\r\n"Completed"=hex:01,00,00,00\r\n', reg)
-        self.assertIn('"Start Page"="about:blank"\r\n', reg)
+        # IE 3 cannot open about:blank: the local start page instead.
+        self.assertIn('"Start Page"="file://C:\\\\USOS9X\\\\START.HTM"\r\n', reg)
+        self.assertNotIn('about:blank', reg)
         self.assertIn('"DefaultPassword"=""\r\n', reg)
         # The three helpers 95 never started (unquoted subkey of USOS.Display too).
         run = reg[reg.index('[%s]\r\n' % RUN):]

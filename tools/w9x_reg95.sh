@@ -31,12 +31,24 @@
 #     (95 OSR2's {FBF23B42-...} Shell\Open\Command until the wizard ran;
 #     the wizard installs Dial-Up Networking and the Dial-Up Adapter).
 #   * NoWelcome's replacement: Explorer\Tips Show = 0 (no Welcome window).
+#   * IE start page: Internet Explorer 3 cannot open about:blank (X470,
+#     2026-10-20: "cannot find"), so an about:blank Start Page / First Home
+#     Page becomes the local C:\USOS9X\START.HTM (written here: USOS info and
+#     the 68k.news link), as file://C:\USOS9X\START.HTM, the form IE 3's
+#     SHDOCVW.DLL builds for local pages itself.
+#   * Run value order: USOSLog first, then the self-removing helpers, USOSLan
+#     last. The 95 shell starts each Run value inside its RegEnumValue(index)
+#     loop, so a helper that deletes its own value at once moves the next
+#     value onto its index and the shell skips that one (X470 2026-10-20:
+#     USOSLan hid USOSDisplay, USOSRES never ran). The helpers also wait 15 s
+#     before deleting (tools/windows_usos_lan.c, tools/windows_usos_res.c).
 
 W9X_REG95_INTERNET_CLSID='{FBF23B42-E3F0-101B-8488-00AA003E56F8}'
+W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -81,7 +93,21 @@ w9x_reg95_convert() {
         printf "%s=%s\r\n", (name == "" ? "@" : "\"" esc(name) "\""), data
     }
     function skip(line, why) { skipped[++nskip] = why ": " line }
-    BEGIN { usoslog = ENVIRON["W9X_REG95_LOG"]; clsid = ENVIRON["W9X_REG95_CLSID"] }
+    # HKLM Run values are held back and written in rank order at the end.
+    function rank(name) {
+        name = tolower(name)
+        return name == "usoslog" ? 0 : name == "usosdisplay" ? 2 : name == "usosaddons" ? 3 : name == "usoslan" ? 4 : 1
+    }
+    function value(key, name, data) {
+        if (tolower(key) == tolower(runkey)) { nrun++; runname[nrun] = name; rundata[nrun] = data; return }
+        if (tolower(key) ~ /\\internet explorer\\main$/ && tolower(name) ~ /^(start page|first home page)$/ && tolower(data) == "\"about:blank\"")
+            data = "\"" esc(home) "\""
+        emit(key, name, data)
+    }
+    BEGIN {
+        usoslog = ENVIRON["W9X_REG95_LOG"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
+        runkey = "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    }
     { sub(/\r$/, "") }
     /^[ \t]*\[/ {
         sec = tolower(trim($0)); gsub(/^\[|\]$/, "", sec); order[++nsec] = sec; next
@@ -121,14 +147,14 @@ w9x_reg95_convert() {
                 flag = (n >= 4 ? f[4] : "")
                 fv = (flag == "" ? 0 : hexval(flag))
                 if (n < 4 && f[3] == "") { if (!(key in made)) { made[key] = 1; if (key != last) { printf "\r\n[%s]\r\n", key; last = key } } continue }
-                if (fv == 0) emit(key, f[3], "\"" esc(n >= 5 ? f[5] : "") "\"")
+                if (fv == 0) value(key, f[3], "\"" esc(n >= 5 ? f[5] : "") "\"")
                 else if (fv == 65537) {
                     v = hexval(n >= 5 ? f[5] : "0")
                     if (v < 0) { skip(line, "dword"); continue }
                     # 4 binary bytes, as the 9x readers take a DWORD (and as 95 itself
                     # stores EnableAutodial); real-mode REGEDIT "hex:" is proven on the
                     # X470 (USOSUSB.REG), "dword:" there is not.
-                    emit(key, f[3], sprintf("hex:%02x,%02x,%02x,%02x", v % 256, int(v / 256) % 256, int(v / 65536) % 256, int(v / 16777216) % 256))
+                    value(key, f[3], sprintf("hex:%02x,%02x,%02x,%02x", v % 256, int(v / 256) % 256, int(v / 65536) % 256, int(v / 16777216) % 256))
                 } else if (fv == 1) {
                     data = ""
                     for (i = 5; i <= n; i++) {
@@ -137,17 +163,39 @@ w9x_reg95_convert() {
                         data = data (i > 5 ? "," : "") (length(b) == 1 ? "0" b : b)
                     }
                     if (data == "!") { skip(line, "binary"); continue }
-                    emit(key, f[3], "hex:" data)
+                    value(key, f[3], "hex:" data)
                 } else { skip(line, "flags " flag); continue }
                 if (tolower(f[2]) ~ /internet connection wizard$/ && tolower(f[3]) == "completed") icw = 1
             }
         }
-        if (usoslog != "") emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "USOSLog", "\"" esc(usoslog) "\"")
+        if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
+        for (r = 0; r <= 4; r++)
+            for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
         if (icw) emit("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command", "", "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\"")
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
         printf "\r\n"
         for (i = 1; i <= nskip; i++) printf "; USOS: not converted (%s)\r\n", skipped[i]
     }' "$1"
+}
+
+# The local IE 3 start page (HTML 3.2, ASCII, CRLF; no script, no images).
+w9x_reg95_start_page() {
+    sed 's/$/\r/' <<'EOF'
+<HTML>
+<HEAD><TITLE>USOS - Windows 95</TITLE></HEAD>
+<BODY>
+<H2>Windows 95, installed by USOS</H2>
+<P>Universal Service OS set up this computer. This page is a local file:
+C:\USOS9X\START.HTM. Change the start page in View, Options, Navigation.</P>
+<P>Without a Windows 95 driver for the network card the link below cannot
+open.</P>
+<UL>
+<LI><A HREF="http://68k.news">68k.news</A> - news for old browsers</LI>
+</UL>
+<P>USOS logs: C:\USOS9X\LOGS</P>
+</BODY>
+</HTML>
+EOF
 }
 
 w9x_reg95_write() {
@@ -156,6 +204,7 @@ w9x_reg95_write() {
     grep -qi '^\[install\]' "$inf" || return 1
     w9x_reg95_convert "$inf" "$usoslog" > "$dir/REG95.REG" || return 1
     grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
+    if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
     A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
     R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'

@@ -186,6 +186,12 @@ static int finish(const char *reason) {
         CloseHandle(f); DeleteFileA(path); say("DISPLAY marker write failed\r\n"); return 0;
     }
     CloseHandle(f);
+#ifdef USOSRES_9X
+    /* The 9x shell starts Run values inside its RegEnumValue(index) loop:
+       an early delete shifts the next value onto this index and the shell
+       skips it (95 X470 2026-10-20, USOSLan hid USOSDisplay). */
+    Sleep(15000);
+#endif
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
     }

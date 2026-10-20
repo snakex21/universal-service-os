@@ -274,10 +274,10 @@ USOSLOG_IMPORTS = {
         'IsBadReadPtr', 'LeaveCriticalSection', 'LoadLibraryA', 'MoveFileA', 'ReadFile', 'SetFilePointer', 'Sleep',
         'WaitForSingleObject', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA', 'lstrlenA'},
     'user32.dll': {
-        'CallNextHookEx', 'DispatchMessageA', 'EnumWindows', 'GetClassNameA', 'GetCursorPos', 'GetForegroundWindow',
-        'GetMessageA', 'GetSystemMetrics', 'GetWindowLongA', 'GetWindowTextA', 'GetWindowThreadProcessId',
-        'IsWindowVisible', 'KillTimer', 'PeekMessageA', 'PostThreadMessageA', 'SetTimer', 'SetWindowsHookExA',
-        'SystemParametersInfoA', 'UnhookWindowsHookEx', 'WindowFromPoint', 'wsprintfA', 'wvsprintfA'},
+        'CallNextHookEx', 'CreateWindowExA', 'DefWindowProcA', 'DispatchMessageA', 'EnumWindows', 'GetClassNameA',
+        'GetCursorPos', 'GetForegroundWindow', 'GetMessageA', 'GetSystemMetrics', 'GetWindowLongA', 'GetWindowTextA',
+        'GetWindowThreadProcessId', 'IsWindowVisible', 'KillTimer', 'PeekMessageA', 'PostThreadMessageA',
+        'RegisterClassA', 'SetTimer', 'SetWindowsHookExA', 'SystemParametersInfoA', 'UnhookWindowsHookEx', 'WindowFromPoint', 'wsprintfA', 'wvsprintfA'},
     'advapi32.dll': {'RegCloseKey', 'RegEnumKeyExA', 'RegEnumValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
 }
 
