@@ -13,6 +13,8 @@ class MeasuredResultTests(unittest.TestCase):
         facts = dict(usos=dict(legacy=dict(arch='unknown',locale=1033)),
                      binary_versions={'i386/ntoskrnl.ex_':dict(machine='0x14c',file_version=[3,51,1025,1])})
         self.assertEqual(matrix.identity(facts)[:3],('3.51.1025.1','en-US','x86'))
+        facts['binary_versions']['i386/ntoskrnl.ex_']['nt_build_number']=dict(build=1057)
+        self.assertEqual(matrix.identity(facts)[0],'3.51.1057 (NtBuildNumber; zasób 3.51.1025.1)')
 
     def test_same_hash_and_reviewed_desktop_required(self):
         row = dict(sha256='a', result='PASS', stage='desktop', screen='s.png', evidence='result.json')

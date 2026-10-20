@@ -13,6 +13,7 @@ import json
 import re
 import shutil
 import subprocess
+import struct
 import tempfile
 import xml.etree.ElementTree as ET
 
@@ -23,6 +24,47 @@ spec=importlib.util.spec_from_file_location('coverage_media_facts',ROOT/'tools/w
 facts=importlib.util.module_from_spec(spec);spec.loader.exec_module(facts)
 spec=importlib.util.spec_from_file_location('coverage_cab',Path(__file__).with_name('unpack_bytes.py'))
 cab=importlib.util.module_from_spec(spec);spec.loader.exec_module(cab)
+
+
+def nt_build_number(blob):
+    """Read the exported kernel data variable; resources can retain an old build.
+
+    NT 3.51's actual NtBuildNumber is 1057 while its version resource says
+    1025. This reads PE metadata/data only and never executes the input.
+    """
+    try:
+        if blob[:2] != b'MZ':return None
+        u=lambda n:struct.unpack_from('<I',blob,n)[0]
+        pe=u(0x3c)
+        if blob[pe:pe+4] != b'PE\0\0':return None
+        opt=pe+24;magic=struct.unpack_from('<H',blob,opt)[0]
+        if magic not in (0x10b,0x20b):return None
+        count=struct.unpack_from('<H',blob,pe+6)[0]
+        if not 0<count<=96:return None
+        sections=opt+struct.unpack_from('<H',blob,pe+20)[0]
+        def offset(rva):
+            for i in range(count):
+                vs,va,rs,raw=struct.unpack_from('<IIII',blob,sections+i*40+8)
+                if va<=rva<va+min(vs or rs,rs) and raw+rva-va<len(blob):return raw+rva-va
+            raise ValueError('RVA outside backed file bytes')
+        directory=opt+(112 if magic==0x20b else 96)
+        rva,size=u(directory),u(directory+4)
+        if not rva:return None
+        exp=offset(rva);names=offset(u(exp+32));ords=offset(u(exp+36));funcs=offset(u(exp+28))
+        name_count=u(exp+24)
+        if name_count>65536:return None
+        for i in range(name_count):
+            position=offset(u(names+4*i))
+            if blob[position:position+14] != b'NtBuildNumber\0':continue
+            ordinal=struct.unpack_from('<H',blob,ords+2*i)[0]
+            if ordinal>=u(exp+20):return None
+            value_rva=u(funcs+4*ordinal)
+            if rva<=value_rva<rva+size:return None  # Forwarder, not a DWORD.
+            value=u(offset(value_rva))
+            return dict(rva=value_rva,raw=value,build=value&0xffff)
+    except (ValueError,IndexError,struct.error):
+        return None
+    return None
 
 
 def inspect_iso(path,probe):
@@ -42,6 +84,9 @@ def inspect_iso(path,probe):
                 blob=volume.read(name)
                 if blob.startswith((b'MSCF',b'SZDD')):blob=cab.unpack(blob)
                 version=facts.pe_facts(blob)
+                if 'ntoskrnl' in name and version:
+                    number=nt_build_number(blob)
+                    if number:version['nt_build_number']=number
                 if version:binaries[name]=version
             result['binary_versions']=binaries
             for name in ('sources/install.wim','sources/install.esd','sources/install.swm'):

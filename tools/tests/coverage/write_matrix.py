@@ -38,6 +38,10 @@ def identity(facts):
     if install.get('known'):
         version = [install['major'],install['minor'],install['build']]
     version_text = '.'.join(str(n) for n in version) if version else 'nie odczytano wersji binarnej'
+    kernel_row = next((row for name,row in versions.items() if 'ntoskrnl' in name),{})
+    number = kernel_row.get('nt_build_number',{}).get('build')
+    if number and kernel and not install.get('known') and number != kernel[2]:
+        version_text = '.'.join(str(n) for n in [kernel[0],kernel[1],number])+' (NtBuildNumber; zasób '+'.'.join(str(n) for n in kernel)+')'
     markers = facts.get('cd_markers',[]) + facts.get('root_markers',[])
     sp = next((re.search(r'(?:\.sp|cdromsp)([0-9])',str(x),re.I).group(1)
                for x in markers if re.search(r'(?:\.sp|cdromsp)([0-9])',str(x),re.I)),None)
