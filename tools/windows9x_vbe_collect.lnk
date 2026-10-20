@@ -5,6 +5,8 @@ option start=__usos_start
 option nodefaultlibs
 option stack=8192
 option heapsize=1024
+# KERNEL InitTask writes the stack bounds into the first 16 bytes of DGROUP:
+# the reserved _NULL (class BEGDATA) area goes first.
 order clname CODE clname BEGDATA clname DATA clname BSS
 option quiet
 libpath '%WATCOM%/lib286/win'

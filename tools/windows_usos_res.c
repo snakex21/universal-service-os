@@ -75,29 +75,53 @@ static void request_log(const UsosDisplayRequest *request,unsigned count) {
 static UsosDisplayVbeList vbe;
 static char inf_text[32768];
 static DWORD vram_limit;
+static void say_number(const char *text,unsigned long n) { lstrcpyA(line,text); number(n); lstrcatA(line,"\r\n"); say(line); }
+/* The collector's own one-line VBE.LOG (stage and VBE facts) into USOSRES.LOG. */
+static void copy_vbi_log(void) {
+    HANDLE file; DWORD bytes=0; char text[260];
+    file_path("VBE.LOG");file=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(file==INVALID_HANDLE_VALUE) { say("DISPLAY VBE.LOG absent\r\n"); return; }
+    if(!ReadFile(file,text,sizeof(text)-1,&bytes,NULL))bytes=0;
+    CloseHandle(file);text[bytes]=0;
+    say("DISPLAY ");say(text);
+    if(!bytes || text[bytes-1]!='\n')say("\r\n");
+}
 static int prepare_vbe(void) {
     STARTUPINFOA startup; PROCESS_INFORMATION process; DWORD result,bytes,type;
     HANDLE file;
     file_path("VBE.DAT"); DeleteFileA(path); /* reject stale results after failure */
+    file_path("VBE.LOG"); DeleteFileA(path);
     file_path("USOSVBI.EXE"); zero(&startup,sizeof startup); zero(&process,sizeof process);
     startup.cb=sizeof startup; startup.dwFlags=STARTF_USESHOWWINDOW; startup.wShowWindow=SW_HIDE;
-    if(!CreateProcessA(path,NULL,NULL,NULL,FALSE,0,NULL,directory,&startup,&process)) return 0;
+    if(!CreateProcessA(path,NULL,NULL,NULL,FALSE,0,NULL,directory,&startup,&process)) {
+        say_number("DISPLAY VBI start failed error=",GetLastError()); return 0;
+    }
     result=WaitForSingleObject(process.hProcess,30000);
-    type=1; if(result==WAIT_OBJECT_0) GetExitCodeProcess(process.hProcess,&type);
+    type=1; if(result==WAIT_OBJECT_0 && !GetExitCodeProcess(process.hProcess,&type)) type=0xFFFFFFFFUL;
     CloseHandle(process.hThread); CloseHandle(process.hProcess);
-    if(result!=WAIT_OBJECT_0 || type!=0) return 0;
+    lstrcpyA(line,"DISPLAY VBI wait=");number(result);lstrcatA(line," exit=");number(type);lstrcatA(line,"\r\n");say(line);
+    copy_vbi_log();
+    /* A Win16 exit code may not reach GetExitCodeProcess: VBE.DAT's own
+       magic, count and exact length are the evidence that counts. */
+    if(result!=WAIT_OBJECT_0) return 0;
     file_path("VBE.DAT");file=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    if(file==INVALID_HANDLE_VALUE)return 0;
+    if(file==INVALID_HANDLE_VALUE) { say("DISPLAY VBE.DAT absent\r\n"); return 0; }
     type=GetFileSize(file,NULL);
     result=ReadFile(file,&vbe,sizeof vbe,&bytes,NULL);CloseHandle(file);
-    if(!result || type!=bytes || vbe.magic!=USOS_DISPLAY_VBE_MAGIC || !vbe.count || vbe.count>USOS_DISPLAY_VBE_COUNT || bytes!=8+vbe.count*sizeof(UsosDisplayVbeMode)) return 0;
+    if(!result || type!=bytes || vbe.magic!=USOS_DISPLAY_VBE_MAGIC || !vbe.count || vbe.count>USOS_DISPLAY_VBE_COUNT || bytes!=8+vbe.count*sizeof(UsosDisplayVbeMode)) {
+        say_number("DISPLAY VBE.DAT invalid bytes=",bytes); return 0;
+    }
     file_path("USOSVESA.INF");file=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    if(file==INVALID_HANDLE_VALUE)return 0;
+    if(file==INVALID_HANDLE_VALUE) { say("DISPLAY USOSVESA.INF absent\r\n"); return 0; }
     result=ReadFile(file,inf_text,sizeof(inf_text)-1,&bytes,NULL);CloseHandle(file);
-    if(!result || bytes>=sizeof(inf_text)-1)return 0;
+    if(!result || bytes>=sizeof(inf_text)-1) { say_number("DISPLAY USOSVESA.INF unreadable bytes=",bytes); return 0; }
     inf_text[bytes]=0;vram_limit=usos_display_inf_limit(inf_text);
     lstrcpyA(line,"DISPLAY VBE modes=");number(vbe.count);lstrcatA(line," memory=");
     number(vbe.modes[0].vram);lstrcatA(line," INF_limit=");number(vram_limit);lstrcatA(line," buffers=2\r\n");say(line);
+    for(type=0;type<vbe.count;type++) {
+        lstrcpyA(line,"DISPLAY VBE ");number(vbe.modes[type].width);lstrcatA(line,"x");number(vbe.modes[type].height);
+        lstrcatA(line,"x");number(vbe.modes[type].bpp);lstrcatA(line," pitch=");number(vbe.modes[type].pitch);lstrcatA(line,"\r\n");say(line);
+    }
     return vram_limit!=0;
 }
 static void validate_vbe(UsosDisplayMode *mode) {
@@ -290,6 +314,8 @@ static void run(void) {
             (settings[count].dmDisplayFrequency<=1 || settings[count].dmDisplayFrequency==60);
 #ifdef USOSRES_9X
         validate_vbe(&modes[count]);
+        lstrcpyA(line,"DISPLAY mode ");describe(&modes[count]);lstrcatA(line,modes[count].valid?" ok":" rejected");
+        lstrcatA(line," pitch=");number(modes[count].pitch);lstrcatA(line," memory=");number(modes[count].vram);lstrcatA(line,"\r\n");say(line);
 #endif
         count++;
     }

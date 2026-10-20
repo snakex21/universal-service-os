@@ -247,6 +247,24 @@ class TargetBuilds(unittest.TestCase):
         self.assertEqual(data[struct.unpack_from('<I', data, 0x3c)[0]:][:2], b'NE')
         self.assertNotIn('clib', (self.collector.parent/'usosvbi.map').read_text().lower())
 
+    def test_win16_instance_header_reserved(self):
+        # 98 SE X470 2026-10-20: InitTask/LocalInit wrote the first 16 bytes of
+        # DGROUP over "VBE.DAT"; no VBE.DAT, USOSRES "no fresh VBE/INF evidence".
+        data = self.collector.read_bytes()
+        ne = struct.unpack_from('<I', data, 0x3c)[0]
+        table = ne + struct.unpack_from('<H', data, ne+0x22)[0]
+        auto, align = struct.unpack_from('<H', data, ne+0x0e)[0], struct.unpack_from('<H', data, ne+0x32)[0]
+        offset = struct.unpack_from('<H', data, table+(auto-1)*8)[0] << align
+        self.assertEqual(data[offset:offset+16], bytes(16))
+        source = (ROOT/'tools/windows9x_vbe_collect.c').read_text()
+        self.assertIn('#pragma data_seg("_NULL", "BEGDATA")', source)
+        self.assertIn('write_log();', source)
+
+    def test_9x_helper_logs_collector_result(self):
+        source = (ROOT/'tools/windows_usos_res.c').read_text()
+        for text in ('DISPLAY VBI start failed error=', 'DISPLAY VBI wait=', 'copy_vbi_log();', 'DISPLAY VBE.DAT absent', '" rejected"'):
+            self.assertIn(text, source)
+
     def test_original_media_proves_nt35_fallback_is_required(self):
         for fixture, expected in [('nt35_display_exports.txt', False), ('nt351_display_exports.txt', True), ('nt4rtm_display_exports.txt', True)]:
             table = exports(fixture)['user32.dll']

@@ -27,7 +27,7 @@
 #include "usosnet_proto.h"
 
 #define USOSNET_MAJOR 0
-#define USOSNET_MINOR 4
+#define USOSNET_MINOR 5
 #define USOSNET_TAG 'NSOU'
 
 #define ETH_ALEN 6
@@ -47,6 +47,15 @@
 #define TICK_MS         20
 #define TICKS_PER_SEC   (1000 / TICK_MS)
 #define LOG_MAX         40      /* NdisWriteErrorLogEntry rounds per start */
+/* Windows 98 SE NDIS.VXD (also Me): before Init_Complete the 5th error log
+ * entry of one adapter within 30 s removes its devnode (CONFIGMG
+ * Call_At_Appy_Time -> Remove_SubTree) and the first one shows a "device
+ * not working properly" notice. So no entry in the first LOG_QUIET_SEC
+ * seconds and at most LOG_WINDOW_MAX entries per LOG_WINDOW_SEC window
+ * (docs/98se-fresh-install-2026-10-20.md). */
+#define LOG_QUIET_SEC   30
+#define LOG_WINDOW_SEC  31
+#define LOG_WINDOW_MAX  4
 
 /* Diagnostic stages (registry value UsosnetStage, last stage reached). */
 #define ST_ENTRY        1
@@ -173,6 +182,7 @@ typedef struct _ADAPTER {
     ULONG TxDone, TxFull, TxStalls, TxStallSec, TxLastClean;
     ULONG HwTpr, HwTpt, HwGprc, HwGptc, HwMpc, HwRnbc, HwCrc;   /* chip counters, summed */
     ULONG LogCount;
+    ULONG LogWindowStart, LogWindowUsed, LogSkipped; /* error log budget (ticks) */
 
     /* diagnostics written to the adapter's registry key at init */
     ULONG Stage, Error, StatusAtInit, CtrlAtInit, PhyBmsr, PhyId, Bar0High;

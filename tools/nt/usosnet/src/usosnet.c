@@ -342,6 +342,26 @@ static ULONG DiagFlags(PADAPTER A, ULONG Event)
            ((Event & 0xFF) << 8) | ((A->LinkMbps & 0xFFFF) << 16);
 }
 
+/* NdisWriteErrorLogEntry within the NDIS.VXD budget (LOG_* in usosnet.h):
+ * FALSE = entry skipped (counted in LogSkipped). */
+static BOOLEAN LogBudget(PADAPTER A)
+{
+    ULONG now = A->TimerCount;
+    if (now < LOG_QUIET_SEC * TICKS_PER_SEC) { A->LogSkipped++; return FALSE; }
+    if (!A->LogWindowUsed || now - A->LogWindowStart >= LOG_WINDOW_SEC * TICKS_PER_SEC) {
+        A->LogWindowStart = now;
+        A->LogWindowUsed = 0;
+    }
+    if (A->LogWindowUsed >= LOG_WINDOW_MAX) { A->LogSkipped++; return FALSE; }
+    A->LogWindowUsed++;
+    return TRUE;
+}
+
+#define LOG10(tag, a, b, c, d, e, f, g, h, i) \
+    do { if (LogBudget(A)) NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, \
+         (ULONG)(tag), (ULONG)(a), (ULONG)(b), (ULONG)(c), (ULONG)(d), (ULONG)(e), (ULONG)(f), \
+         (ULONG)(g), (ULONG)(h), (ULONG)(i)); } while (0)
+
 static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
 {
     ULONG r[DIAG_REGS], pci = 0;
@@ -354,27 +374,23 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
     A->LogCount++;
     A->Chip->Ops->Diag(A, r);
     NdisReadPciSlotInformation(A->Handle, 0, 4, &pci, 4);   /* bit 19 = PCI status INTx pending */
-    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E31UL, Sec,
-                           DiagFlags(A, Event), A->IsrCalls, A->IsrCount, A->DpcCount,
-                           A->RxOk, A->RxByTimer, A->TxOk, A->TxDone);
-    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E32UL, Sec,
-                           A->TxErr, A->TxFull, A->RxErr, A->HwTpr, A->HwGprc, A->HwGptc,
-                           A->HwMpc, A->HwRnbc);
-    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E33UL, Sec,
-                           r[DR_STATUS], r[DR_IMS], r[DR_RDH], r[DR_RDT], r[DR_TDH], r[DR_TDT],
-                           pci, r[DR_RCTL]);
+    LOG10(0x55534E31UL, Sec, DiagFlags(A, Event), A->IsrCalls, A->IsrCount, A->DpcCount,
+          A->RxOk, A->RxByTimer, A->TxOk, A->TxDone);
+    LOG10(0x55534E32UL, Sec, A->TxErr, A->TxFull, A->RxErr, A->HwTpr, A->HwGprc, A->HwGptc,
+          A->HwMpc, A->HwRnbc);
+    LOG10(0x55534E33UL, Sec, r[DR_STATUS], r[DR_IMS], r[DR_RDH], r[DR_RDT], r[DR_TDH], r[DR_TDT],
+          pci, r[DR_RCTL]);
     if (A->LogCount == 1)
-        NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E34UL,
-                               (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF), A->RxRing.Pa, A->TxRing.Pa,
-                               r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], A->HwCrc,
-                               (USOSNET_MAJOR << 16) | USOSNET_MINOR);
+        LOG10(0x55534E34UL, (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF), A->RxRing.Pa, A->TxRing.Pa,
+              r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], A->HwCrc,
+              (USOSNET_MAJOR << 16) | USOSNET_MINOR);
     if (A->Stats) {
         /* USN5: RX UDP, RX DNS, RX TCP, RX ICMP, TX UDP, TX DNS, UDP with L4E,
-         * TransferData without a frame being indicated */
+         * TransferData without a frame being indicated (the budget skips it
+         * in the first round, which also has USN4) */
         USNS_BLOCK *S = A->Stats;
-        NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E35UL, Sec,
-                               S->Rx[5], S->Rx[7], S->Rx[6], S->Rx[4], S->Tx[5], S->Tx[7],
-                               S->Drop[USNS_N_L4E_UDP], S->Td[USNS_T_NO_FRAME]);
+        LOG10(0x55534E35UL, Sec, S->Rx[5], S->Rx[7], S->Rx[6], S->Rx[4], S->Tx[5], S->Tx[7],
+              S->Drop[USNS_N_L4E_UDP], S->Td[USNS_T_NO_FRAME]);
     }
 }
 
@@ -441,7 +457,8 @@ static void TimerSecond(PADAPTER A)
     if (linkChanged && sec) DiagLog(A, EV_LINK, sec);
     if (A->LogRequest) { A->LogRequest = 0; DiagLog(A, EV_REQUEST, sec); }
     StatsSecond(A, sec);
-    if (sec == 3 || sec == 10 || sec == 30 || sec == 60 || (sec && sec % 300 == 0))
+    /* first round after the quiet time, then one per budget window */
+    if (sec == LOG_QUIET_SEC || sec == LOG_QUIET_SEC + LOG_WINDOW_SEC + 4 || (sec && sec % 300 == 0))
         DiagLog(A, EV_PERIODIC, sec);
 }
 
