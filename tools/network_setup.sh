@@ -66,13 +66,21 @@ usos_net_stage() {
         95|98|98SE|ME) _un_app=$_un_root/USOS9X; _un_log=$_un_app/LOGS/NETSETUP.TXT; _un_helper=USOSLAN9X.EXE; _un_inf=usosnet9x.inf; _un_driver=$_un_app/NET ;;
         NT4|W2K) _un_app=$_un_root/USOS/$_un_os; _un_log=$_un_app/NETSETUP.TXT; _un_helper=USOSLANNT.EXE; _un_inf=usosnet.inf; _un_driver=$_un_root/USOS/Drivers/USOSNET ;;
     esac
+    # 95 OSR2 / NT4 (NDIS 4.0) never get the NDIS 5.0 usosnet.sys: their
+    # driver is usosnet4.sys. 95 stages it as USOSNET.SYS beside its own INF
+    # (the 9x DOS flow copies NET\USOSNET.*); NT4 has no INF installer: the IDs
+    # come from usosnet.inf (same chip table) and USOSNET.REG takes over the
+    # inbox loopback adapter (usos_net_nt4_reg, POST.CMD).
+    _un_sys=usosnet.sys _un_dsys=USOSNET.SYS
+    case "$_un_os" in
+        95) _un_inf=usosnet95.inf; _un_sys=usosnet4.sys ;;
+        NT4) _un_sys=usosnet4.sys; _un_dsys=USOSNET4.SYS ;;
+    esac
     mkdir -p "$(dirname "$_un_log")" || return 1
     usos_net_log "system=$_un_os network=on ip=$(usos_net_value "$_un_cfg" ip) dns=$(usos_net_value "$_un_cfg" dns) home=$(usos_net_value "$_un_cfg" home_page)"
     _un_cards=$(usos_net_pci_cards "$_un_pci_root")
     usos_net_log "PCI=${_un_cards:-none}"
-    if [ "$_un_os" = 95 ] || [ "$_un_os" = NT4 ]; then
-        _un_state=ndis4_pending; usos_net_log 'usosnet: NDIS 4 build not available; NDIS 5 is not staged'
-    elif [ ! -f "$_un_lib/network/usosnet.sys" ] || [ ! -f "$_un_lib/network/$_un_inf" ]; then
+    if [ ! -f "$_un_lib/network/$_un_sys" ] || [ ! -f "$_un_lib/network/$_un_inf" ]; then
         _un_state=missing; usos_net_log 'usosnet: missing from build (brak w kompilacji)'
     elif [ -z "$_un_cards" ]; then _un_state=no_card; usos_net_log 'usosnet: no Ethernet card'
     else
@@ -83,11 +91,19 @@ usos_net_stage() {
         if [ "$_un_matches" = 0 ]; then _un_state=unsupported; usos_net_log 'usosnet: card not listed in INF'
         else
             mkdir -p "$_un_driver" || return 1
-            if cp "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cp "$_un_lib/network/usosnet.sys" "$_un_driver/USOSNET.SYS" &&
-               cmp -s "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cmp -s "$_un_lib/network/usosnet.sys" "$_un_driver/USOSNET.SYS"; then
-                _un_state=staged; _un_driver_path='USOS\Drivers\USOSNET'; usos_net_log "usosnet: staged $_un_hwid matches=$_un_matches; INF and PollMode unchanged"
+            if cp "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cp "$_un_lib/network/$_un_sys" "$_un_driver/$_un_dsys" &&
+               cmp -s "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cmp -s "$_un_lib/network/$_un_sys" "$_un_driver/$_un_dsys"; then
+                _un_state=staged; _un_driver_path='USOS\Drivers\USOSNET'; usos_net_log "usosnet: staged $_un_hwid matches=$_un_matches ($_un_sys as $_un_dsys); INF and PollMode unchanged"
+                if [ "$_un_os" = NT4 ]; then
+                    if usos_net_nt4_reg "$_un_cfg" > "$_un_app/USOSNET.REG"; then
+                        usos_net_log 'usosnet4: USOSNET.REG staged (POST.CMD: NDISLoop -> usosnet4.sys, NDISLoop1 TCP/IP)'
+                    else
+                        rm -f "$_un_app/USOSNET.REG" "$_un_driver/USOSNET.INF" "$_un_driver/$_un_dsys"
+                        _un_state=copy_error; usos_net_log 'usosnet4: USOSNET.REG not written; optional package skipped'
+                    fi
+                fi
             else
-                rm -f "$_un_driver/USOSNET.INF" "$_un_driver/USOSNET.SYS"
+                rm -f "$_un_driver/USOSNET.INF" "$_un_driver/$_un_dsys"
                 _un_state=copy_error; usos_net_log 'usosnet: copy/readback failed; optional package skipped'
             fi
         fi
@@ -95,7 +111,8 @@ usos_net_stage() {
     if [ "$(usos_net_value "$_un_cfg" ip)" != dhcp ]; then
         case "$_un_os" in
           W2K) [ "$_un_state" = staged ] && [ "$_un_matches" = 1 ] || usos_net_log 'static IP not applied: requires exactly one matched LAN adapter; DHCP remains available' ;;
-          NT4) usos_net_log 'static LAN IP deferred: NT4 loopback placeholder only; NDIS 4 pending' ;;
+          NT4) if [ "$_un_state" = staged ]; then usos_net_log 'static LAN IP in USOSNET.REG for the first card usosnet4 finds (NDISLoop1)'
+               else usos_net_log 'static LAN IP deferred: no usosnet4 adapter staged; loopback placeholder only'; fi ;;
         esac
     fi
     if [ "$_un_os" = W2K ] && [ "$_un_state" = staged ]; then
@@ -129,6 +146,53 @@ usos_net_run_reg() {
     case "$1" in NT4|W2K) ;; *) return 1 ;; esac
     printf '%s\r\n' 'REGEDIT4' '' '[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run]'
     printf '"USOSLan"="C:\\\\USOS\\\\%s\\\\USOSLAN.EXE"\r\n' "$1"
+}
+
+# REG_MULTI_SZ for NT 4.0 regedit (REGEDIT4: ANSI bytes, NT widens them):
+# each argument one string, an empty argument list = the empty list.
+usos_net_hex7() {
+    printf 'hex(7):'
+    { [ $# -gt 0 ] || printf '\000'; for _un_s in "$@"; do printf '%s\000' "$_un_s"; done; printf '\000'; } |
+        od -An -v -tx1 | tr -s ' \n' '  ' | sed 's/^ //; s/ $//; s/ /,/g'
+}
+
+# NT4: USOSNET.REG for POST.CMD (after usos_net_stage staged usosnet4.sys).
+# NT 4.0 has no INF installer for a PCI miniport; the unattended answer
+# installs the inbox MS Loopback Adapter (network_defaults.zig: LOOP + TCP/IP;
+# OEMNADLB.INF: driver service NDISLoop, adapter NDISLoop1) with every
+# binding (TCP/IP, NetBT, Workstation) computed by Setup. This takes that
+# adapter over: the NDISLoop service loads usosnet4.sys instead of loop.sys
+# (NDIS starts the miniport for NDISLoop's Linkage\Bind \Device\NDISLoop1
+# with NDISLoop1\Parameters), BusType 5 (PCI; the driver finds the bus and
+# slot itself) and the adapter's TCP/IP becomes DHCP or the profile's
+# static address. The Network applet still names the loopback adapter.
+usos_net_nt4_reg() {
+    _un_ip=$(usos_net_value "$1" ip); _un_gw=$(usos_net_value "$1" gateway); _un_dns=$(usos_net_value "$1" dns)
+    printf '%s\r\n' 'REGEDIT4' '' \
+        '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop]' \
+        '"ImagePath"="\\SystemRoot\\System32\\drivers\\usosnet4.sys"' \
+        '"Start"=dword:00000003' '' \
+        '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1\Parameters]' \
+        '"BusType"=dword:00000005' '"BusNumber"=dword:00000000' '"PollMode"=dword:00000000' '' \
+        '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1\Parameters\Tcpip]'
+    if [ "$_un_ip" = dhcp ]; then
+        printf '%s\r\n' '"EnableDHCP"=dword:00000001' \
+            "\"IPAddress\"=$(usos_net_hex7 0.0.0.0)" "\"SubnetMask\"=$(usos_net_hex7 0.0.0.0)" \
+            "\"DefaultGateway\"=$(usos_net_hex7)"
+    else
+        _un_mask=$(printf '%s\n' "${_un_ip#*/}" | awk '{b=$1;for(i=1;i<=4;i++){n=b>8?8:b;if(n<0)n=0;m=m (i==1?"":".") (256-2^(8-n))%256;b-=8}print m}')
+        printf '%s\r\n' '"EnableDHCP"=dword:00000000' \
+            "\"IPAddress\"=$(usos_net_hex7 "${_un_ip%/*}")" "\"SubnetMask\"=$(usos_net_hex7 "$_un_mask")"
+        if [ -n "$_un_gw" ]; then printf '"DefaultGateway"=%s\r\n' "$(usos_net_hex7 "$_un_gw")"
+        else printf '"DefaultGateway"=%s\r\n' "$(usos_net_hex7)"; fi
+    fi
+    if [ -n "$_un_dns" ]; then
+        printf '\r\n%s\r\n"NameServer"="%s"\r\n' '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters]' "$(printf '%s' "$_un_dns" | tr ',' ' ')"
+    fi
+    # The DHCP client: Setup may leave it on demand when every adapter was static.
+    if [ "$_un_ip" = dhcp ]; then
+        printf '\r\n%s\r\n%s\r\n' '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\DHCP]' '"Start"=dword:00000002'
+    fi
 }
 
 usos_net_w2k_sif() {
