@@ -52,8 +52,12 @@ def identity(facts):
     if number and kernel and not install.get('known') and number != kernel[2]:
         version_text = '.'.join(str(n) for n in [kernel[0],kernel[1],number])+' (NtBuildNumber; zasób '+'.'.join(str(n) for n in kernel)+')'
     markers = facts.get('cd_markers',[]) + facts.get('root_markers',[])
-    sp = next((re.search(r'(?:\.sp|cdromsp)([0-9])',str(x),re.I).group(1)
-               for x in markers if re.search(r'(?:\.sp|cdromsp)([0-9])',str(x),re.I)),None)
+    marker_sp = [int(m.group(1)) for x in markers if (m := re.search(r'(?:\.sp|cdromsp)([0-9])',str(x),re.I))]
+    sp = str(max(marker_sp)) if marker_sp else None
+    if sp is None and kernel and kernel[:3] == [5,0,2195]:
+        if 'cdrom_sp.tst' in (str(x).lower() for x in markers):sp = '1'
+        elif kernel[3:] == [1] and 'cdrom_ip.5' in markers:sp = '0'
+    if sp is None and kernel == [5,1,2600,0]:sp = '0'
     if not sp and install.get('known'):
         sp = {(6,0,6000):'0',(6,0,6001):'1',(6,0,6002):'2',(6,1,7600):'0',(6,1,7601):'1'}.get(tuple(version[:3]))
     if sp is not None: version_text += ' / SP'+sp

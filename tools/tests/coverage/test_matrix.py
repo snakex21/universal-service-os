@@ -9,6 +9,16 @@ spec.loader.exec_module(matrix)
 
 
 class MeasuredResultTests(unittest.TestCase):
+    def test_integrated_media_keeps_old_service_pack_markers(self):
+        cases=[(['cdromsp2.tst','cdromsp4.tst'],[5,0,2195,6717],'SP4'),
+               (['win51ip.sp2','win51ip.sp3'],[5,1,2600,5657],'SP3'),
+               (['cdrom_ip.5','cdrom_sp.tst'],[5,0,2195,1620],'SP1'),
+               (['cdrom_ip.5'],[5,0,2195,1],'SP0')]
+        for markers,kernel,expected in cases:
+            with self.subTest(expected=expected):
+                facts=dict(cd_markers=markers,binary_versions={'i386/ntoskrnl.ex_':dict(file_version=kernel)})
+                self.assertTrue(matrix.identity(facts)[0].endswith('/ '+expected))
+
     def test_original_pe_and_locale_fill_missing_optical_arch(self):
         facts = dict(usos=dict(legacy=dict(arch='unknown',locale=1033)),
                      binary_versions={'i386/ntoskrnl.ex_':dict(machine='0x14c',file_version=[3,51,1025,1])})
