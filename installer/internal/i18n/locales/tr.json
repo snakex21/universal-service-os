@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF kullanıldı, {2} atlandı",
   "boot.donor.missing": "WinPE yardımcı görüntüsü eksik (Vista/Windows 7 için gerekli). USOS yükleyicisinde Onar'ı çalıştırın.",
   "boot.donor.corrupt": "WinPE yardımcı görüntüsü bozuk (sağlama toplamı). USOS yükleyicisinde Onar'ı çalıştırın.",
+  "boot.donor.x86_missing": "WinPE x86 yardımcı görüntüsü eksik (32 bit Windows 7/Vista için gerekli). USOS yükleyicisinde (Bileşenler) ekleyin veya bir Windows 10 x86 ISO'su ekleyin.",
   "boot.help.win10_wimboot.line1": "Windows Kurulumunu doğrudan DATA'daki ISO'dan başlatır; WORK'e hiçbir şey kopyalanmaz.",
   "boot.help.win10_wimboot.line2": "Önyükleme dosyaları hedef diske gider; USOS belleğinin ESP'si denetlenir ve geri yüklenir.",
   "boot.error.firmware.title": "Ürün yazılımı uyuşmazlığı",

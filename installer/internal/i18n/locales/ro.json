@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF folosite, {2} omise",
   "boot.donor.missing": "Lipsește imaginea auxiliară WinPE (necesară pentru Vista/Windows 7). Rulați Reparare în instalatorul USOS.",
   "boot.donor.corrupt": "Imaginea auxiliară WinPE este deteriorată (sumă de control). Rulați Reparare în instalatorul USOS.",
+  "boot.donor.x86_missing": "Lipsește imaginea auxiliară WinPE x86 (necesară pentru Windows 7/Vista pe 32 de biți). Adăugați-o în instalatorul USOS (Componente) sau adăugați un ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Pornește instalarea Windows direct din ISO de pe DATA; nimic nu se copiază pe WORK.",
   "boot.help.win10_wimboot.line2": "Fișierele de pornire merg pe discul țintă; ESP-ul stickului USOS este verificat și restaurat.",
   "boot.error.firmware.title": "Nepotrivire de firmware",

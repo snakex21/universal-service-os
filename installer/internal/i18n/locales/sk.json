@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: použité INF {1}, preskočené {2}",
   "boot.donor.missing": "Chýba pomocný obraz WinPE (potrebný pre Vistu/Windows 7). Spustite Opravu v inštalátore USOS.",
   "boot.donor.corrupt": "Pomocný obraz WinPE je poškodený (kontrolný súčet). Spustite Opravu v inštalátore USOS.",
+  "boot.donor.x86_missing": "Chýba pomocný obraz WinPE x86 (potrebný pre 32-bitové Windows 7/Vistu). Pridajte ho v inštalátore USOS (Komponenty) alebo pridajte ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Spustí inštaláciu Windows priamo z ISO na DATA; na WORK sa nič nekopíruje.",
   "boot.help.win10_wimboot.line2": "Štartovacie súbory idú na cieľový disk; ESP kľúča USOS sa kontroluje a obnovuje.",
   "boot.error.firmware.title": "Nesúlad firmvéru",

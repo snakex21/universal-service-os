@@ -546,6 +546,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: uporabljenih INF {1}, preskočenih {2}",
   "boot.donor.missing": "Manjka pomožna slika WinPE (potrebna za Visto/Windows 7). V namestitvenem programu USOS zaženite Popravilo.",
   "boot.donor.corrupt": "Pomožna slika WinPE je poškodovana (kontrolna vsota). V namestitvenem programu USOS zaženite Popravilo.",
+  "boot.donor.x86_missing": "Manjka pomožna slika WinPE x86 (potrebna za 32-bitni Windows 7/Visto). Dodajte jo v namestitvenem programu USOS (Komponente) ali dodajte ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Zažene namestitev sistema Windows neposredno iz ISO na DATA; na WORK se nič ne kopira.",
   "boot.help.win10_wimboot.line2": "Zagonske datoteke gredo na ciljni disk; ESP ključka USOS se preveri in obnovi.",
   "boot.error.firmware.title": "Neujemanje vdelane programske opreme",

@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF kasutatud, {2} vahele jäetud",
   "boot.donor.missing": "WinPE abitõmmis puudub (vajalik Vista/Windows 7 jaoks). Käivitage USOS-i installeris Parandus.",
   "boot.donor.corrupt": "WinPE abitõmmis on rikutud (kontrollsumma). Käivitage USOS-i installeris Parandus.",
+  "boot.donor.x86_missing": "WinPE x86 abitõmmis puudub (vajalik 32-bitise Windows 7/Vista jaoks). Lisage see USOS-i installeris (Komponendid) või lisage Windows 10 x86 ISO.",
   "boot.help.win10_wimboot.line1": "Käivitab Windowsi installi otse DATA ISO-st; WORK-i ei kopeerita midagi.",
   "boot.help.win10_wimboot.line2": "Alglaadimisfailid lähevad sihtkettale; USOS-i pulga ESP kontrollitakse ja taastatakse.",
   "boot.error.firmware.title": "Püsivara ei sobi",

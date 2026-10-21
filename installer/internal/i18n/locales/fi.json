@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF käytössä, {2} ohitettu",
   "boot.donor.missing": "WinPE-apukuva puuttuu (tarvitaan Vistaan/Windows 7:ään). Suorita Korjaa USOS-asennusohjelmassa.",
   "boot.donor.corrupt": "WinPE-apukuva on vioittunut (tarkistussumma). Suorita Korjaa USOS-asennusohjelmassa.",
+  "boot.donor.x86_missing": "WinPE x86 -apukuva puuttuu (tarvitaan 32-bittiseen Windows 7:ään/Vistaan). Lisää se USOS-asennusohjelmassa (Komponentit) tai lisää Windows 10 x86 -ISO.",
   "boot.help.win10_wimboot.line1": "Käynnistää Windows-asennuksen suoraan DATAn ISOsta; mitään ei kopioida WORKiin.",
   "boot.help.win10_wimboot.line2": "Käynnistystiedostot menevät kohdelevylle; USOS-tikun ESP tarkistetaan ja palautetaan.",
   "boot.error.firmware.title": "Laiteohjelmisto ei sovi",

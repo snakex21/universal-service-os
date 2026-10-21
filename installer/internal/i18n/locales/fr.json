@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0} : {1} INF utilisés, {2} ignorés",
   "boot.donor.missing": "Image d'aide WinPE absente (nécessaire pour Vista/Windows 7). Lancez Réparer dans l'installateur USOS.",
   "boot.donor.corrupt": "Image d'aide WinPE endommagée (somme de contrôle). Lancez Réparer dans l'installateur USOS.",
+  "boot.donor.x86_missing": "Image d'aide WinPE x86 absente (nécessaire pour Windows 7/Vista 32 bits). Ajoutez-la dans l'installateur USOS (Composants) ou ajoutez une ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Lance l'installation de Windows directement depuis l'ISO sur DATA ; rien n'est copié sur WORK.",
   "boot.help.win10_wimboot.line2": "Les fichiers de démarrage vont sur le disque cible ; l'ESP de la clé USOS est vérifiée et restaurée.",
   "boot.error.firmware.title": "Firmware incompatible",

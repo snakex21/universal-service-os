@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: użyte INF: {1}, pominięte: {2}",
   "boot.donor.missing": "Brak obrazu pomocniczego WinPE (potrzebny dla Visty/Windows 7). Uruchom Naprawę w instalatorze USOS.",
   "boot.donor.corrupt": "Obraz pomocniczy WinPE jest uszkodzony (suma kontrolna). Uruchom Naprawę w instalatorze USOS.",
+  "boot.donor.x86_missing": "Brak obrazu pomocniczego WinPE x86 (potrzebny dla 32-bitowego Windows 7/Visty). Dodaj go w instalatorze USOS (Komponenty) albo dodaj ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Uruchamia instalator Windows prosto z ISO na DATA; nic nie jest kopiowane na WORK.",
   "boot.help.win10_wimboot.line2": "Pliki rozruchowe trafiają na dysk docelowy; ESP pendrive'a USOS jest sprawdzana i przywracana.",
   "boot.error.firmware.title": "Niezgodny tryb firmware",

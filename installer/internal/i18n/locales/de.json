@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF verwendet, {2} übersprungen",
   "boot.donor.missing": "WinPE-Hilfsabbild fehlt (für Vista/Windows 7 nötig). Führen Sie im USOS-Installer die Reparatur aus.",
   "boot.donor.corrupt": "WinPE-Hilfsabbild ist beschädigt (Prüfsumme). Führen Sie im USOS-Installer die Reparatur aus.",
+  "boot.donor.x86_missing": "WinPE-x86-Hilfsabbild fehlt (für 32-Bit-Windows 7/Vista nötig). Fügen Sie es im USOS-Installer (Komponenten) hinzu oder legen Sie eine Windows 10 x86-ISO ab.",
   "boot.help.win10_wimboot.line1": "Startet Windows-Setup direkt aus der ISO auf DATA; nichts wird auf WORK kopiert.",
   "boot.help.win10_wimboot.line2": "Startdateien kommen auf den Zieldatenträger; die ESP des USOS-Sticks wird geprüft und wiederhergestellt.",
   "boot.error.firmware.title": "Firmware passt nicht",

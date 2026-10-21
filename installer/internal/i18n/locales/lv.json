@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: izmantoti INF {1}, izlaisti {2}",
   "boot.donor.missing": "Trūkst WinPE palīgattēla (vajadzīgs Vista/Windows 7). USOS instalētājā palaidiet Labošanu.",
   "boot.donor.corrupt": "WinPE palīgattēls ir bojāts (kontrolsumma). USOS instalētājā palaidiet Labošanu.",
+  "boot.donor.x86_missing": "Trūkst WinPE x86 palīgattēla (vajadzīgs 32 bitu Windows 7/Vista). Pievienojiet to USOS instalētājā (Komponentes) vai pievienojiet Windows 10 x86 ISO.",
   "boot.help.win10_wimboot.line1": "Startē Windows instalēšanu tieši no ISO DATA sadaļā; uz WORK nekas netiek kopēts.",
   "boot.help.win10_wimboot.line2": "Sāknēšanas faili nonāk mērķa diskā; USOS zibatmiņas ESP tiek pārbaudīts un atjaunots.",
   "boot.error.firmware.title": "Aparātprogrammatūras neatbilstība",

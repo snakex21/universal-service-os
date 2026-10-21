@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF används, {2} hoppades över",
   "boot.donor.missing": "WinPE-hjälpavbild saknas (behövs för Vista/Windows 7). Kör Reparera i USOS-installationsprogrammet.",
   "boot.donor.corrupt": "WinPE-hjälpavbilden är skadad (kontrollsumma). Kör Reparera i USOS-installationsprogrammet.",
+  "boot.donor.x86_missing": "WinPE x86-hjälpavbild saknas (behövs för 32-bitars Windows 7/Vista). Lägg till den i USOS-installationsprogrammet (Komponenter) eller lägg till en Windows 10 x86-ISO.",
   "boot.help.win10_wimboot.line1": "Startar Windows-installationen direkt från ISO-filen på DATA; inget kopieras till WORK.",
   "boot.help.win10_wimboot.line2": "Startfilerna hamnar på måldisken; USOS-stickans ESP kontrolleras och återställs.",
   "boot.error.firmware.title": "Firmware passar inte",

@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: использовано INF {1}, пропущено {2}",
   "boot.donor.missing": "Нет вспомогательного образа WinPE (нужен для Vista/Windows 7). Запустите Восстановление в установщике USOS.",
   "boot.donor.corrupt": "Вспомогательный образ WinPE повреждён (контрольная сумма). Запустите Восстановление в установщике USOS.",
+  "boot.donor.x86_missing": "Нет вспомогательного образа WinPE x86 (нужен для 32-битных Windows 7/Vista). Добавьте его в установщике USOS (Компоненты) или добавьте ISO Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Запускает установку Windows прямо из ISO на DATA; на WORK ничего не копируется.",
   "boot.help.win10_wimboot.line2": "Загрузочные файлы идут на целевой диск; ESP флешки USOS проверяется и восстанавливается.",
   "boot.error.firmware.title": "Несовместимый режим прошивки",

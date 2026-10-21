@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF usados, {2} omitidos",
   "boot.donor.missing": "Falta la imagen auxiliar WinPE (necesaria para Vista/Windows 7). Ejecute Reparar en el instalador de USOS.",
   "boot.donor.corrupt": "La imagen auxiliar WinPE está dañada (suma de comprobación). Ejecute Reparar en el instalador de USOS.",
+  "boot.donor.x86_missing": "Falta la imagen auxiliar WinPE x86 (necesaria para Windows 7/Vista de 32 bits). Añádala en el instalador de USOS (Componentes) o añada una ISO de Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Inicia la instalación de Windows directamente desde la ISO en DATA; no se copia nada a WORK.",
   "boot.help.win10_wimboot.line2": "Los archivos de arranque van al disco de destino; la ESP de la memoria USOS se comprueba y se restaura.",
   "boot.error.firmware.title": "Firmware incompatible",

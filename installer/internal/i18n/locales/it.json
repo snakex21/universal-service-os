@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF usati, {2} saltati",
   "boot.donor.missing": "Manca l'immagine ausiliaria WinPE (necessaria per Vista/Windows 7). Esegui Ripara nel programma di installazione USOS.",
   "boot.donor.corrupt": "L'immagine ausiliaria WinPE è danneggiata (checksum). Esegui Ripara nel programma di installazione USOS.",
+  "boot.donor.x86_missing": "Manca l'immagine ausiliaria WinPE x86 (necessaria per Windows 7/Vista a 32 bit). Aggiungila nel programma di installazione USOS (Componenti) o aggiungi una ISO di Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Avvia l'installazione di Windows direttamente dalla ISO su DATA; nulla viene copiato su WORK.",
   "boot.help.win10_wimboot.line2": "I file di avvio vanno sul disco di destinazione; l'ESP della chiavetta USOS viene controllata e ripristinata.",
   "boot.error.firmware.title": "Firmware non compatibile",

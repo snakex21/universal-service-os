@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF used, {2} skipped",
   "boot.donor.missing": "WinPE helper image missing (needed for Vista/Windows 7). Run Repair in the USOS installer.",
   "boot.donor.corrupt": "WinPE helper image is damaged (checksum mismatch). Run Repair in the USOS installer.",
+  "boot.donor.x86_missing": "WinPE x86 helper image missing (needed for 32-bit Windows 7/Vista). Add it in the USOS installer (Components) or add a Windows 10 x86 ISO.",
   "boot.help.win10_wimboot.line1": "Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.",
   "boot.help.win10_wimboot.line2": "Boot files go to the target disk; the USOS stick's ESP is checked and restored.",
   "boot.error.firmware.title": "Firmware mismatch",

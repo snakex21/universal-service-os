@@ -543,6 +543,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: panaudota INF {1}, praleista {2}",
   "boot.donor.missing": "Trūksta WinPE pagalbinio atvaizdo (reikia Vista/Windows 7). USOS diegimo programoje paleiskite Taisymą.",
   "boot.donor.corrupt": "WinPE pagalbinis atvaizdas sugadintas (kontrolinė suma). USOS diegimo programoje paleiskite Taisymą.",
+  "boot.donor.x86_missing": "Trūksta WinPE x86 pagalbinio atvaizdo (reikia 32 bitų Windows 7/Vista). Pridėkite jį USOS diegimo programoje (Komponentai) arba pridėkite Windows 10 x86 ISO.",
   "boot.help.win10_wimboot.line1": "Paleidžia Windows diegimą tiesiai iš ISO, esančio DATA; į WORK nieko nekopijuojama.",
   "boot.help.win10_wimboot.line2": "Paleidimo failai patenka į tikslinį diską; USOS atmintinės ESP tikrinama ir atkuriama.",
   "boot.error.firmware.title": "Netinkamas BIOS/UEFI režimas",

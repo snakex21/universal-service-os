@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF gebruikt, {2} overgeslagen",
   "boot.donor.missing": "WinPE-hulpimage ontbreekt (nodig voor Vista/Windows 7). Voer Herstellen uit in het USOS-installatieprogramma.",
   "boot.donor.corrupt": "WinPE-hulpimage is beschadigd (controlesom). Voer Herstellen uit in het USOS-installatieprogramma.",
+  "boot.donor.x86_missing": "WinPE x86-hulpimage ontbreekt (nodig voor 32-bits Windows 7/Vista). Voeg het toe in het USOS-installatieprogramma (Onderdelen) of voeg een Windows 10 x86-ISO toe.",
   "boot.help.win10_wimboot.line1": "Start Windows-installatie direct vanaf de ISO op DATA; er wordt niets naar WORK gekopieerd.",
   "boot.help.win10_wimboot.line2": "Opstartbestanden gaan naar de doelschijf; de ESP van de USOS-stick wordt gecontroleerd en hersteld.",
   "boot.error.firmware.title": "Firmware komt niet overeen",

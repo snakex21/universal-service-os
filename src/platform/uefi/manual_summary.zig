@@ -260,8 +260,9 @@ pub fn show(
         } else |err| {
             can_start = false;
             fields.add(view.t(.summary_iso_inspection), @errorName(err));
-            // A damaged recorded x86 donor: "run Repair", as for the x64 one.
-            notes[note_count] = (if (err == error.Windows10PeDonorCorrupt) donorNote(err) else null) orelse view.tr(usos.windows7_iso.errorDetail(err));
+            // A damaged recorded x86 donor: "run Repair", as for the x64 one;
+            // no x86 donor at all: localized "add it in the installer".
+            notes[note_count] = (if (err == error.Windows10PeDonorCorrupt or err == error.X86PeDonorMissing) donorNote(err) else null) orelse view.tr(usos.windows7_iso.errorDetail(err));
             note_count += 1;
         }
     }
@@ -642,11 +643,13 @@ fn showMediaBlocked(name: []const u8, reason: usos.image_probe.windows_media.Blo
 }
 
 /// Missing or damaged PE10 donor (Programs/USOS/WinPE): a localized
-/// "run Repair in the USOS installer" message.
+/// "run Repair in the USOS installer" message; no x86 donor: a localized
+/// "add it in the installer (Components)" message.
 fn donorNote(err: anyerror) ?[]const u8 {
     return switch (err) {
         error.Windows10PeDonorMissing, error.Windows10PeDonorInvalid, error.Windows10PeDonorNotRecorded => view.t(.donor_missing),
         error.Windows10PeDonorCorrupt => view.t(.donor_corrupt),
+        error.X86PeDonorMissing => view.t(.donor_x86_missing),
         else => null,
     };
 }

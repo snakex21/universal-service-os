@@ -359,6 +359,7 @@ pub const Key = enum(u16) {
     chainload_line1,
     chainload_line2,
     chainload_title,
+    donor_x86_missing,
     efi_line1,
     efi_title,
     error_catalog_line1,
@@ -1173,6 +1174,7 @@ pub const hashes = [_]u32{
     0xfc4d4ef9, // chainload.line1
     0xf94d4a40, // chainload.line2
     0xb38e898e, // chainload.title
+    0xf1c6b01c, // donor.x86_missing
     0x23541dfa, // efi.line1
     0xf4cad9b1, // efi.title
     0x35820aab, // error.catalog.line1
@@ -2440,6 +2442,7 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2803,6 +2806,7 @@ pub const english = [_][]const u8{
     "Boot media preparation is complete.",
     "Starting EFI/BOOT from the prepared WORK partition...",
     "Starting chained bootloader",
+    "WinPE x86 helper image missing (needed for 32-bit Windows 7/Vista). Add it in the USOS installer (Components) or add a Windows 10 x86 ISO.",
     "Transferring control through UEFI LoadImage/StartImage...",
     "Starting EFI application",
     "USOS could not open the NTFS USOS_DATA volume.",

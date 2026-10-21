@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF használva, {2} kihagyva",
   "boot.donor.missing": "Hiányzik a WinPE segédkép (Vistához/Windows 7-hez kell). Futtassa a Javítást a USOS telepítőben.",
   "boot.donor.corrupt": "A WinPE segédkép sérült (ellenőrzőösszeg). Futtassa a Javítást a USOS telepítőben.",
+  "boot.donor.x86_missing": "Hiányzik a WinPE x86 segédkép (a 32 bites Windows 7-hez/Vistához kell). Adja hozzá a USOS telepítőben (Összetevők), vagy adjon hozzá egy Windows 10 x86 ISO-t.",
   "boot.help.win10_wimboot.line1": "A Windows telepítőt közvetlenül a DATA-n lévő ISO-ból indítja; semmi sem kerül a WORK-ra.",
   "boot.help.win10_wimboot.line2": "A rendszerindító fájlok a céllemezre kerülnek; a USOS pendrive ESP-jét ellenőrzi és visszaállítja.",
   "boot.error.firmware.title": "Firmware-eltérés",

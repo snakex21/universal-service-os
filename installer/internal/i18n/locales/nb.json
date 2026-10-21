@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: {1} INF brukt, {2} hoppet over",
   "boot.donor.missing": "WinPE-hjelpebilde mangler (trengs for Vista/Windows 7). Kjør Reparer i USOS-installasjonsprogrammet.",
   "boot.donor.corrupt": "WinPE-hjelpebildet er skadet (kontrollsum). Kjør Reparer i USOS-installasjonsprogrammet.",
+  "boot.donor.x86_missing": "WinPE x86-hjelpebilde mangler (trengs for 32-biters Windows 7/Vista). Legg det til i USOS-installasjonsprogrammet (Komponenter) eller legg til en Windows 10 x86-ISO.",
   "boot.help.win10_wimboot.line1": "Starter Windows-installasjon rett fra ISO-en på DATA; ingenting kopieres til WORK.",
   "boot.help.win10_wimboot.line2": "Oppstartsfiler går til måldisken; ESP på USOS-pinnen kontrolleres og gjenopprettes.",
   "boot.error.firmware.title": "Fastvaren passer ikke",

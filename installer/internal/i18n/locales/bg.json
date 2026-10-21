@@ -540,6 +540,7 @@
   "boot.summary.user_drivers_folder": "Drivers\\{0}: използвани INF {1}, пропуснати {2}",
   "boot.donor.missing": "Липсва помощният образ WinPE (нужен за Vista/Windows 7). Стартирайте Поправка в инсталатора на USOS.",
   "boot.donor.corrupt": "Помощният образ WinPE е повреден (контролна сума). Стартирайте Поправка в инсталатора на USOS.",
+  "boot.donor.x86_missing": "Липсва помощният образ WinPE x86 (нужен за 32-битови Windows 7/Vista). Добавете го в инсталатора на USOS (Компоненти) или добавете ISO на Windows 10 x86.",
   "boot.help.win10_wimboot.line1": "Стартира инсталирането на Windows направо от ISO на DATA; нищо не се копира на WORK.",
   "boot.help.win10_wimboot.line2": "Стартовите файлове отиват на целевия диск; ESP на флашката USOS се проверява и възстановява.",
   "boot.error.firmware.title": "Несъответствие на фърмуера",
