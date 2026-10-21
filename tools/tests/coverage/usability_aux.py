@@ -23,6 +23,11 @@ def manual_test_supported(private_profile,prepared_proof,token):
     return not private_profile or prepared_proof or valid_logon_token(token)
 
 
+def reject_unanswered_usos_form(line):
+    if line.strip().startswith('[UI_SCREEN] form '):
+        raise RuntimeError('Automatic fixture reached an unanswered USOS form; Windows has not started: '+line.strip())
+
+
 def require_operator_channel(enabled,stream=None):
     stream=sys.stdin if stream is None else stream
     if enabled and (stream.closed or not stream.isatty()):

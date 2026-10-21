@@ -213,6 +213,16 @@ Local defaults reference the development PC's assets and collection; pass
 explicit inputs. Keep product keys in the private test-key directory and do
 not place them in tool arguments, Git, logs or unknown-state screenshots.
 
+An unanswered USOS `form` now ends an automatic case immediately. In
+particular, a keyless NT4 case otherwise waits at the USOS key form, before
+any native installer starts. Do not mistake that timeout for an NT4 error.
+`collect_nt4_text` accepts a keyed NT4 failure/timeout but exports only four
+explicit native text logs from the stopped disposable FAT16 target. The
+guest strips non-ASCII bytes, key-shaped strings and numeric runs before
+transport; the host validates that rule again. No screens, answers or hives
+are exported. This deliberately loses numeric error codes and accented
+characters. Existing keyed screenshot restrictions are unchanged.
+
 Run the integrity regressions from the worktree:
 
 ```powershell

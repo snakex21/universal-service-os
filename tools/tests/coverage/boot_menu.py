@@ -329,6 +329,7 @@ async def main(args):
                         continue
                     last_screen = line.strip()
                     events.append(dict(seconds=round(time.monotonic()-start,2), text=line.strip()))
+                    aux.reject_unanswered_usos_form(line)
                     ui_count += 1
                     if ui_count > 20:
                         raise RuntimeError('Repeated menu transitions; refusing an input loop')
@@ -492,6 +493,16 @@ async def main(args):
             result['failure_evidence']='guest-evidence/collection.json'
         except Exception as error:
             result['failure_evidence_error']=type(error).__name__+': '+str(error)
+    if getattr(args,'collect_nt4_text',False) and not prepared.is_set() and not first_logon.is_set():
+        try:
+            spec=importlib.util.spec_from_file_location('nt4_native_text',Path(__file__).with_name('collect_nt4_text.py'))
+            collector=importlib.util.module_from_spec(spec);spec.loader.exec_module(collector)
+            from types import SimpleNamespace
+            await collector.main(SimpleNamespace(qemu=args.qemu,assets=args.evidence_assets,
+                fixture=work,out=args.out/'native-text-evidence'))
+            result['native_text_evidence']='native-text-evidence/collection.json'
+        except Exception as error:
+            result['native_text_evidence_error']=type(error).__name__+': '+str(error)
     (args.out/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     (args.out/'fixture.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     for path in all_disks:
@@ -518,6 +529,7 @@ if __name__ == '__main__':
     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
     parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; keyless NT4 diagnostic cases only')
+    parser.add_argument('--collect-nt4-text',action='store_true',help='Read-only sanitized NT4 Setup text logs; no native screenshots or answers')
     parser.add_argument('--evidence-assets',type=Path,help='Explicit frozen cache for the one post-failure collector')
     parser.add_argument('--usb-pointer',choices=('mouse','tablet'),default='tablet',help='Use mouse for the NT4 driver boot-HID path')
     parser.add_argument('--usability-usb',action='store_true',help='Own disposable FAT16 boot/hot-plug sticks; attach boot stick after disk preparation')
