@@ -1,9 +1,12 @@
 # NT 3.x, NT4 i macOS: zakres testów
 
-Prace rozdzielono na trzy osobne worktree: `fix/nt3-usb`, `fix/nt4-net`
-i `fix/macos-usb`. Koordynator zachowuje globalny limit trzech silników
-QEMU. Normalna instalacja NT w USOS zajmuje dwa z tych miejsc, ponieważ
-uruchamia również wewnętrzny QEMU. Test macOS zajmuje pozostałe miejsce.
+Aktualizacja22października: użytkownik zniósł sztywny limit trzech
+silników QEMU. Koordynator dobiera równoległość do dostępnych zasobów;
+przed uruchomieniem obowiązuje kontrola pamięci z rezerwą8GiB oraz
+wolnego miejsca. Normalna instalacja NT w USOS uruchamia także wewnętrzny
+QEMU, więc jej koszty trzeba uwzględnić obok zewnętrznej VM. Rozróżnienie
+jedno-/dwusilnikowej ścieżki w run_plan nie ustanawia globalnego limitu.
+Prace NT3, NT4 i macOS pozostają w oddzielnych worktree i gałęziach.
 Oczekiwanie na wynik jest pasywne, bez odczytywania postępu.
 
 Zakończone testy sterownika NT31 1.2 i NT4 1.3 w pomocniczym środowisku
@@ -18,8 +21,15 @@ Gałąź NT3 zawiera już izolację tej fazy do przyszłej powtórki.
 
 Normalne próby instalacji pozostawiają domyślne PS/2 w QEMU. Reakcja
 pulpitu na polecenie `sendkey` po ponownym podłączeniu urządzenia nie
-wystarczy zatem do oznaczenia USB PASS. Osobny zimny start z
-`q35,i8042=off` i dowód odbioru wejścia są nadal potrzebne.
+wystarczy zatem do oznaczenia USB PASS. Zakończone R19c NT31 i R18f
+NT351 izolują USB w osobnym zimnym starcie: sprzętowy i8042 pozostaje
+obecny dla NTDETECT, a systemowa usługa i8042prt ma Start4. Samo sprzętowe
+i8042=off zatrzymywało NT351 na NTDETECT. Odbiór klawiszy, ruchu i klików
+po replug oraz odpowiedź klawiatury przy nieobecnej myszy potwierdzono
+na rzeczywistych pulpitach i przez końcowy odczyt konfiguracji.
+Nie jest to jeszcze kwalifikacja świeżego instalatora z tą izolacją.
+Szczegóły: `docs/coverage-regf11-readback.md` oraz aktualny raport
+`C:\Users\ASRock\Documents\Codex\zadania\2026-10-22-nt3-nt4-macos-RAPORT.md`.
 
 Próba `r7-nt4-keyless-setup-diagnostic` nie uruchomiła instalatora NT4:
 czekała na klucz w formularzu USOS. Próba `r11-xp-sp3-en-usability`
