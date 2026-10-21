@@ -68,3 +68,48 @@ may be reusable only after those interfaces are established. No private
 NDIS handle fields, no renamed miniport imports and no no-op API stubs
 are proposed. A legacy NE2000 baseline, if later run, would qualify only
 that emulated NIC. Stock NT31 TCP/IP is static; DHCP is not applicable.
+
+## Additional lifecycle/resource measurement
+
+`audit_nt31_fullmac_lifecycle.py` produced `lifecycle-01.json` without a VM.
+NdisRegisterAdapter now has a complete875-instruction direct CFG, with
+truncated=false. MapIoSpace240, InitializeInterrupt253 and all measured
+binding/filter/NE2000 timer routines also completed. The875 instructions
+replace the earlier800-instruction truncation only for this newer measurement.
+
+Original default HAL SHA256:
+`301e7d13fb7c120657be7d911996aeefe2ec4e6b944fbc6db163ecffb12d872c`.
+HalGetBusData RVA57B0 branches only for BusDataType0 and1; the default returns
+zero, so the PCIConfiguration4 call is unsupported. HalGetInterruptVector
+3A40 accepts only InterfaceType1/2/3 and returns zero for PCIBus5. Memory
+translation2730 follows an identity mapping without that interface filter.
+These facts prevent treating the presence of HalGetBusData as PCI support
+or renaming the device to an ISA adapter. DMA master registration through
+HalGetAdapter3C60 still requires a separate dataflow assessment.
+
+NdisRegisterAdapter2780 consumes the sixth argument as adapter information.
+It reads type at information+0C, master at+4, physical-map count+10,
+maximum mapping+14, port count+18 and descriptors starting+1C. The original
+NE2000 helper940 zeros40bytes, sets type1/one port, then passes this record
+at9B7. Names for unproved fields are not inferred from a later header.
+The current [public ReactOS declaration](https://github.com/reactos/reactos/blob/master/sdk/include/ddk/ndis.h)
+confirms the56-byte MAC characteristics but does not declare the old
+RegisterAdapter/adapter-information interface. It cannot close this gap.
+
+Original NTOS SHA256:
+`7848c8e6dc7348ff1cb121b9f638fd9d0a5b5b0bc19c94ad618d9d6cd766dbaf`.
+KeCancelTimer, KeRemoveQueueDpc, event/wait and contiguous/MMIO primitives
+are present and have bounded complete CFGs. NdisCancelTimer is not a named
+NDIS export. NdisInitializeTimer1320 uses the kernel timer at offset0 and
+DPC at+28; NdisSetTimer1350 uses the same pair. NE2000 RemoveAdapter1B40
+sets stop byte+269, calls KeCancelTimer on+220 at1BA8 and, if not canceled,
+stalls500000us before freeing. That delay is not a general proof that a
+queued callback is drained and will not be copied into the new driver.
+
+A possible separate full-MAC design uses an owned system thread and a
+stop-event/20ms wait, then joins the actual thread object before freeing
+adapter data. It still needs verified Remove IRQL, thread-object APIs,
+filter/binding serialization and resource ownership before implementation.
+There is no Intel build or network runtime result from this audit.
+All four protected NT4/NDIS5/NT35/NT351 binaries stayed identical; the
+temporary ISO was removed and expanded Microsoft modules stayed in RAM.
