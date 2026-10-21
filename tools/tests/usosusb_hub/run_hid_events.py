@@ -121,6 +121,9 @@ async def trial(args):
         '-device','usb-mouse,bus=xhci.0,port=1.2,id=mhub']
     result=dict(variant=args.variant,scope='QEMU real driver with test kernel/class shims; no installed Windows',
         source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),cases=[],windows_installation_pass=False,
+        harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        input_isolation=dict(ps2_present=False,boot_root_or_hub_unspecified=True,
+                             root_replug=False,hub_replug=False),
         mass_storage_tested=False,network_tested=False,physical_writes=False)
     (work/'command.json').write_text(json.dumps(command,indent=2)+'\n',encoding='utf-8')
     async def check(label,action,pattern):
@@ -157,6 +160,7 @@ async def trial(args):
             # Remove the newer hub devices first, leaving only root inputs.
             await check('hub keyboard removed',lambda:qmp.delete('khub'),r'REG Diag=.* p5\.1-gone')
             await check('hub mouse removed',lambda:qmp.delete('mhub'),r'REG Diag=.* p5\.2-gone')
+            result['input_isolation']['root_replug']=True
             await keyboard('root keyboard remains usable');await mouse('root mouse remains usable')
             for attempt in (1,2):
                 old='kroot' if attempt==1 else 'kroot1'
@@ -169,6 +173,14 @@ async def trial(args):
                 await check(f'root mouse reattached {attempt}',lambda:qmp.command('device_add',
                     dict(driver='usb-mouse',id='mroot'+str(attempt),bus='xhci.0',port='3')),r'REG Diag=(?:.* p7-gone.* p7:s\d+-M){'+str(attempt)+'}')
                 await mouse(f'root mouse move/click after replug {attempt}')
+            # QMP sendkey/input-send-event select an admissible input handler,
+            # not a USB port. Leave one HID of each kind so class callbacks
+            # after the following replug can only come from the hub devices.
+            await check('root keyboard removed before hub-only input',lambda:qmp.delete('kroot2'),
+                r'REG Diag=(?:.* p6-gone){3}')
+            await check('root mouse removed before hub-only input',lambda:qmp.delete('mroot2'),
+                r'REG Diag=(?:.* p7-gone){3}')
+            result['input_isolation']['hub_replug']=True
             await check('hub keyboard reattached',lambda:qmp.command('device_add',
                 dict(driver='usb-kbd',id='khub2',bus='xhci.0',port='1.1')),r'REG Diag=.* p5\.1-gone.* p5\.1:s\d+K-')
             await keyboard('hub keyboard make/break after replug')
