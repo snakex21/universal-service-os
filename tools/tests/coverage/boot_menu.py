@@ -291,7 +291,7 @@ async def main(args):
         network_capture=capture_module.Capture(args.out/'network.pcap')
     usb_disks=aux.create_sticks(work,args.qemu) if usb_test else []
     for kind,path in zip(('boot','hot'),usb_disks):
-        command+=['-drive',f'if=none,id=usability{kind},format=qcow2,file={path.as_posix()}']
+        command+=aux.usb_block_arguments(kind,path)
     if not args.ps2_input:
         pointer=getattr(args,'usb_pointer','tablet')
         command += ['-device','usb-kbd,id=coveragekbd,bus=xhci.0',

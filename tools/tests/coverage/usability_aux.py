@@ -4,6 +4,7 @@ import struct
 import subprocess
 import sys
 import re
+import json
 
 VIRTUAL_BYTES=64*1024**2
 PARTITION_LBA=2048
@@ -62,6 +63,17 @@ def hid_descriptor(device,pointer):
     if device=='keyboard':return {'driver':'usb-kbd','id':'coveragekbd','bus':'xhci.0'}
     if device=='mouse':return {'driver':'usb-'+pointer,'id':'coveragepointer','bus':'xhci.0'}
     raise ValueError('Only the owned USB keyboard or pointer may be unplugged')
+
+
+def usb_block_arguments(kind,path):
+    """Named block nodes survive device_del; legacy -drive backends do not."""
+    if kind not in ('boot','hot'):raise ValueError('Unknown test stick')
+    path=Path(path)
+    if not path.is_absolute() or path.suffix.casefold()!='.qcow2':
+        raise ValueError('Expected an absolute owned qcow2 test image')
+    node={'driver':'qcow2','node-name':'usability'+kind,
+          'file':{'driver':'file','filename':str(path.resolve())}}
+    return ['-blockdev',json.dumps(node,separators=(',',':'),ensure_ascii=False)]
 
 
 def framebuffer_menu_keys(line):

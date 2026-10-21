@@ -230,5 +230,5 @@ if __name__=='__main__':
     dependency.add_argument('--after-file',type=Path,help='Wait for an owned terminal plan manifest before reserving this lane')
     parser.add_argument('--seven',type=Path,default=Path(r'C:\Program Files\7-Zip\7z.exe'))
     parser.add_argument('--accel',choices=('tcg','whpx'),default='tcg')
-    parser.add_argument('--nested',action='store_true',help='Explicitly reserve two engines for a serial 9x/NT3/NT4/POSReady lane; caller must enforce the global cap')
+    parser.add_argument('--nested',action='store_true',help='Account for two engines in a 9x/NT3/NT4/POSReady case; coordinate available RAM and other reserved work')
     run(parser.parse_args())
