@@ -99,7 +99,7 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None, nvme
     # Int10 dispatcher assets, shared with Windows 7 (docs/design/win7-vista-no-csm.md
     # section 7): used only when the plan adds usos-int10-dispatcher.flag. The
     # release UefiSeven binary (manifest-checked), never the source build.
-    wrapper=inputs/'zig-out/windows7-uefi/win7-wrapper.efi'
+    wrapper=root/'zig-out/windows7-uefi/win7-wrapper.efi'
     if not wrapper.is_file():
         subprocess.run([sys.executable,str(root/'tools/build_windows7_uefi.py')],check=True)
     uefiseven=root/'tools/vendor/uefiseven/1.30'
