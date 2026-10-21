@@ -305,10 +305,8 @@ async def main(args):
                 elif '[COVERAGE_MENU]' in line:
                     events.append(dict(seconds=round(time.monotonic()-start,2),text=line.strip()))
                     await asyncio.sleep(1)  # Give the just-opened input device its first frame.
-                    if '/run/xp-disk-menu.state' in line:
-                        await qmp.key('ret')
-                    elif '/run/xp-confirm-menu.state' in line:
-                        await qmp.key('up'); await qmp.key('ret')
+                    for key in aux.framebuffer_menu_keys(line):
+                        await qmp.key(key)
                 elif '[COVERAGE_NOTICE]' in line:
                     events.append(dict(seconds=round(time.monotonic()-start,2),text=line.strip()))
                     await asyncio.sleep(1)
@@ -355,7 +353,7 @@ async def main(args):
                 # verified preparation and offered its finished target boot.
                 if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await capture(qmp,args.out/'endpoint.png')
-                if args.interactive:
+                if args.interactive and not product_failure:
                     if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set()):
                         raise RuntimeError('Private Setup has not reached its verified post-key boundary; no manual capture')
                     await operator_steps(qmp,args.out,usb_test,not args.ps2_input,getattr(args,'usb_pointer','tablet'))

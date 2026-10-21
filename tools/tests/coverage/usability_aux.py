@@ -30,6 +30,21 @@ def hid_descriptor(device,pointer):
     raise ValueError('Only the owned USB keyboard or pointer may be unplugged')
 
 
+def framebuffer_menu_keys(line):
+    menus={
+        '/run/xp-disk-menu.state':('ret',),
+        # First row keeps existing partitions and uses unallocated space.
+        # The owned test target is initially blank; never choose erase here.
+        '/run/xp-disk-mode.txt':('ret',),
+        '/run/xp-confirm-menu.state':('up','ret'),
+    }
+    prefix='[COVERAGE_MENU] '
+    name=line.strip().removeprefix(prefix)
+    if not line.strip().startswith(prefix) or name not in menus:
+        raise ValueError('Unknown framebuffer menu; no input sent: '+name)
+    return menus[name]
+
+
 def fat16_prefix(kind):
     if kind not in ('boot','hot'):raise ValueError('Unknown test stick')
     start=PARTITION_LBA*512

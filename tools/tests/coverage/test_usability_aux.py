@@ -11,6 +11,13 @@ aux=importlib.util.module_from_spec(spec);spec.loader.exec_module(aux)
 
 
 class AuxiliaryTests(unittest.TestCase):
+    def test_disk_mode_uses_the_actual_non_erasing_first_row(self):
+        root=Path(__file__).resolve().parents[3]
+        source=(root/'tools/xp_disk_reset_ui.sh').read_text()
+        self.assertLess(source.index('item=Keep existing partitions'),source.index('item=Format entire disk'))
+        self.assertEqual(aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/xp-disk-mode.txt'),('ret',))
+        self.assertEqual(aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/xp-confirm-menu.state'),('up','ret'))
+        with self.assertRaises(ValueError):aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/new-menu.txt')
     def test_hid_requests_are_limited_to_owned_devices(self):
         self.assertEqual(aux.hid_descriptor('keyboard','mouse')['id'],'coveragekbd')
         self.assertEqual(aux.hid_descriptor('mouse','mouse')['driver'],'usb-mouse')

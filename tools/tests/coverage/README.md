@@ -152,6 +152,12 @@ still require their separate package. Frozen feature inputs must be named
 and hashed independently; a newer repository base does not make an older
 asset cache a newly built release.
 
+Framebuffer menus use an explicit allowlist. The disk-mode dialog chooses
+its first row (keep partitions / use unallocated space on the blank owned
+target). An unknown dialog stops the adapter instead of silently consuming
+the entire timeout. A product failure ends an interactive case without
+opening an unverified keyed Setup frame; that failure remains in metadata.
+
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB
 free and 8 GiB available host RAM, at most three VMs globally. VM disks are
