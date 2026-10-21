@@ -35,7 +35,28 @@ def digest(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
-def instructions(binary,export_functions=False,extra_rvas=()):
+def control_flow(md,pe,rva,limit=800):
+    """Follow direct branches of one routine; calls are recorded, not entered."""
+    base=pe.OPTIONAL_HEADER.ImageBase;mapped=pe.get_memory_mapped_image()
+    ranges=[(s.VirtualAddress,s.VirtualAddress+max(s.Misc_VirtualSize,s.SizeOfRawData))
+            for s in pe.sections if s.Characteristics&0x20000000]
+    todo=[base+rva];seen={};truncated=False
+    while todo:
+        address=todo.pop()
+        if not any(a<=address-base<b for a,b in ranges):continue
+        for i in md.disasm(mapped[address-base:],address):
+            if i.address in seen or not i.id:break
+            seen[i.address]={'rva':hex(i.address-base),'instruction':i.mnemonic+' '+i.op_str}
+            if len(seen)>=limit:truncated=True;todo.clear();break
+            if i.mnemonic.startswith('ret'):break
+            if i.mnemonic.startswith(('j','loop')):
+                if len(i.operands)==1 and i.operands[0].type==X86_OP_IMM:todo.append(i.operands[0].imm)
+                if i.mnemonic=='jmp':break
+    return {'entry_rva':hex(rva),'instructions':[seen[k] for k in sorted(seen)],
+            'truncated':truncated,'scope':'Direct-branch CFG only; indirect jumps and callees need separate proof'}
+
+
+def instructions(binary,export_functions=False,extra_rvas=(),call_offsets=(),windows=(),field_offsets=(),immediates=()):
     pe=pefile.PE(data=binary,fast_load=False)
     if pe.FILE_HEADER.Machine!=0x14c:raise ValueError('Expected original i386 PE')
     base=pe.OPTIONAL_HEADER.ImageBase
@@ -66,15 +87,43 @@ def instructions(binary,export_functions=False,extra_rvas=()):
             if memory.base==0 and memory.index==0:return iat.get(memory.disp)
     thunks={i.address:import_name(i) for i in decoded if i.mnemonic=='jmp' and import_name(i)}
     contexts=[]
+    indirect_fields=[]
+    field_references=[]
+    immediate_references=[]
     for n,i in enumerate(decoded):
+        if i.id and any(o.type==X86_OP_IMM and o.imm in immediates for o in i.operands):
+            immediate_references.append({'rva':hex(i.address-base),
+                'context':[record(item) for item in decoded[max(0,n-14):n+15]]})
+        if i.id and any(o.type==X86_OP_MEM and o.mem.disp in field_offsets and
+                        md.reg_name(o.mem.base) not in ('','esp','ebp') for o in i.operands):
+            field_references.append({'rva':hex(i.address-base),
+                'context':[record(item) for item in decoded[max(0,n-14):n+15]]})
         if i.mnemonic!='call':continue
+        if (len(i.operands)==1 and i.operands[0].type==X86_OP_MEM and
+            i.operands[0].mem.base and i.operands[0].mem.disp in call_offsets):
+            indirect_fields.append({'call_rva':hex(i.address-base),'field_offset':hex(i.operands[0].mem.disp),
+                'context':[record(item) for item in decoded[max(0,n-14):n+8]]})
         name=import_name(i)
         if len(i.operands)==1 and i.operands[0].type==X86_OP_IMM:name=thunks.get(i.operands[0].imm,name)
         if name in CALLS:
             contexts.append({'import':name,'call_rva':hex(i.address-base),
                              'context':[record(item) for item in decoded[max(0,n-20):n+4]]})
+    cfg_rvas=dict(selected) if export_functions or extra_rvas else {}
+    cfg={name:control_flow(md,pe,rva) for name,rva in cfg_rvas.items()
+         if name=='NdisMRegisterMiniport' or name.startswith('rva_')}
+    window_results=[]
+    for rva,before,after in windows:
+        index=next(n for n,i in enumerate(decoded) if i.address>=base+rva)
+        window_results.append({'target_rva':hex(rva),'instructions':[
+            record(i) for i in decoded[max(0,index-before):index+after+1]],
+            'scope':'Instruction window, not inferred function boundary'})
     return {'exports_rva':{n:hex(v) for n,v in sorted(exports.items())},
             'import_iat':{hex(address-base):name for address,name in sorted(iat.items())},
+            'control_flow':cfg,
+            'indirect_field_calls':indirect_fields,
+            'field_references':field_references,
+            'immediate_references':immediate_references,
+            'windows':window_results,
             'functions':functions,'import_call_contexts':contexts}
 
 
@@ -103,6 +152,13 @@ def main(args):
         module,rva=item.split(':',1)
         if module not in ('ndis.sys','ne2000.sys','elnk3.sys','dc21x4.sys','e100b.sys'):raise ValueError('Unexpected module for RVA')
         extra.setdefault(module,[]).append(int(rva,0))
+    windows={}
+    for item in args.window:
+        module,rva,before,after=item.split(':')
+        if module not in ('ndis.sys','dc21x4.sys'):raise ValueError('Unexpected window module')
+        before,after=int(before),int(after)
+        if not 0<=before<=160 or not 0<=after<=160:raise ValueError('Instruction window too large')
+        windows.setdefault(module,[]).append((int(rva,0),before,after))
     with tempfile.TemporaryDirectory(prefix='original-',dir=SCRATCH) as temporary:
         work=Path(temporary).resolve()
         if not work.is_relative_to(SCRATCH.resolve()):raise ValueError('Temporary path escaped owned audit')
@@ -120,7 +176,10 @@ def main(args):
                 exports,imports=audit.pe(audit.MemoryFile(binary,name))
                 report['modules'][name]={'member':member,'sha256':sha,'exports':sorted(exports),
                     'imports':imports,'selected_exports':{item:item in exports for item in SELECTED},
-                    'analysis':instructions(binary,name=='ndis.sys',extra.get(name,()))}
+                    'analysis':instructions(binary,name=='ndis.sys',extra.get(name,()),
+                        args.indirect_call_offset if name=='ndis.sys' else (),windows.get(name,()),
+                        args.field_offset if name=='ndis.sys' else (),
+                        args.immediate if name=='ndis.sys' else ())}
     report['temporary_iso_removed']=not work.exists()
     report['expanded_microsoft_binaries_persisted']=False
     out.parent.mkdir(parents=True,exist_ok=True)
@@ -134,4 +193,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('coverage-root','plan','out'):parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--rva',action='append',default=[],help='Bounded instruction proof, module:RVA; no raw bytes persisted')
+    parser.add_argument('--indirect-call-offset',action='append',default=[],type=lambda n:int(n,0),help='NDIS indirect call field to trace from registration dataflow')
+    parser.add_argument('--window',action='append',default=[],help='Bounded module:RVA:before:after instruction window')
+    parser.add_argument('--field-offset',action='append',default=[],type=lambda n:int(n,0),help='NDIS non-stack field access to follow from verified dataflow')
+    parser.add_argument('--immediate',action='append',default=[],type=lambda n:int(n,0),help='NDIS immediate address/value references for verified dataflow')
     main(parser.parse_args())
