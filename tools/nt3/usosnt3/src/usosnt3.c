@@ -976,7 +976,7 @@ static void nt351_network(void)
     DWORD version, type, size, medium, enabled;
     DWORD (WINAPI *get_version)(void);
     int ok = 0;
-    if (!read_text("NET351.ON", meta, sizeof meta)) return;
+    if (read_text("NET351.ON", meta, sizeof meta) <= 0) return;
     get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
     if (!get_version) return;
     version = get_version();
