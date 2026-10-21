@@ -5,6 +5,15 @@ usos_display_valid() {
 usos_display_from_answer() {
     awk '/^;USOS-DISPLAY=/ {sub(/^[^=]*=/, ""); sub(/\r$/, ""); value=$0; n++} END {if(n>1) exit 1; if(n) print value}' "$1"
 }
+# Vista / 7 autounattend.xml (autounattend.zig): <!-- USOS-DISPLAY=... -->.
+usos_display_from_xml() {
+    awk '{sub(/\r$/, "")} /^<!-- USOS-DISPLAY=[^ ]* -->$/ {sub(/^<!-- USOS-DISPLAY=/, ""); sub(/ -->$/, ""); value=$0; n++}
+        END {if(n>1) exit 1; if(n) print value}' "$1"
+}
+# The answer registers the NT6 helper (autounattend.zig display_helper).
+usos_display_nt6_answer() {
+    grep -qF '\USOS\NT6\USOSRES.EXE' "$1"
+}
 usos_display_from_nt5() {
     [ -n "${1:-}" ] && [ -f "$1" ] || return 0
     awk -F= '{sub(/\r$/, "")} $1=="family"{f=$2} $1=="display"{d=$2;n++} $1=="display_bpp"{b=$2;m++}

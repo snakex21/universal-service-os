@@ -35,6 +35,21 @@ static SERVICE_STATUS_HANDLE service_handle;
 static UsosDisplayModeList registry_modes;
 #endif
 static void run(void);
+#ifndef USOSRES_9X
+/* Vista / 7 (docs/nt6-display-2026-10-21.md): every new user gets a HKCU Run
+ * value from the Default hive. Display settings are per machine there, so
+ * the first hardware sign-in applies; each user's value is removed without
+ * elevation (UAC), also once DISPLAY.DONE exists. Never on older Windows. */
+static void forget_user_run(void) {
+    HKEY key;
+    if((GetVersion()&255)<6) return;
+    if(RegOpenKeyExA(HKEY_CURRENT_USER,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
+        RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
+    }
+}
+#else
+static void forget_user_run(void) {}
+#endif
 
 __attribute__((noreturn)) static void leave(DWORD code) {
 #ifndef USOSRES_9X
@@ -195,6 +210,7 @@ static int finish(const char *reason) {
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
     }
+    forget_user_run();
 #ifndef USOSRES_9X
     if(service_handle && RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\usosdisplay",0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         DWORD disabled=SERVICE_DISABLED;
@@ -279,7 +295,7 @@ static void run(void) {
     while(length && directory[length-1]!='\\') length--;
     if(!length) leave(1); directory[length]=0;
     if(length>MAX_PATH-32)leave(1);
-    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) leave(0);
+    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) { forget_user_run(); leave(0); }
     file_path("DISPLAY.TXT"); input=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
     if(input==INVALID_HANDLE_VALUE) leave(0); /* absent profile = unchanged */
     zero(text,sizeof text);
@@ -309,7 +325,9 @@ static void run(void) {
     if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
     display_flags=CDS_UPDATEREGISTRY;
 #ifndef USOSRES_9X
-    if((GetVersion()&255)>=5)display_flags|=CDS_GLOBAL;
+    /* NT5 only: on 6.x the settings are per machine already, and CDS_GLOBAL
+       needs an elevated token the first sign-in may lack (UAC). */
+    if((GetVersion()&255)==5)display_flags|=CDS_GLOBAL;
 #endif
     for(i=0;i<USOS_DISPLAY_MAX;i++) {
         if(!usos_display_enum(enumerate,GetVersion(),i,&settings[count])) break;

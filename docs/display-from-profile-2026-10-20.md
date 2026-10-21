@@ -194,3 +194,10 @@ CDS_TEST and rollback. A user's own answer file copied 1:1 gets no request;
 NT 3.x stays explicit (3.5 needs the miniport rebuild). The sections above
 that call auto an opt-in describe the earlier state. See
 docs/me-fresh-install-2026-10-20.md.
+
+# NT6 without CSM, 2026-10-21
+
+Vista / 7 / Server 2008 / 2008 R2 on the CSMWrap paths now stage USOSRES
+too (default auto, or the profile's value), and a fixed profile value is
+written as Shell-Setup Display for every 6.x+ version. See
+docs/nt6-display-2026-10-21.md.

@@ -1155,7 +1155,7 @@
   "boot.profile.value.theme_classic": "Klasyczny Windows",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Rozdzielczość ekranu",
-  "boot.profile.help.display": "XP i Server 2003: kolor 32-bitowy w tej rozdzielczości, jeśli sterownik karty ją oferuje. Automatycznie: bez zmian; bez sterownika karty (sterownik VGA, np. przez CSMWrap) Windows zostaje w trybie podstawowym.",
+  "boot.profile.help.display": "Vista, 7, Server 2008 i 2008 R2 bez CSM (CSMWrap): Automatycznie wybiera najlepszy tryb do 1920x1080 przy pierwszym logowaniu na prawdziwym sprzęcie. Stała wartość trafia też do Instalatora Windows (wszystkie wersje 6.x+; tryb nieobsługiwany przez sterownik jest pomijany). XP i Server 2003: kolor 32-bitowy w tej rozdzielczości, jeśli sterownik karty ją oferuje.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (tylko do odczytu); Importuj tworzy z niego profil USOS",
   "boot.profile.section.apps": "Aplikacje i skrypty",
   "boot.profile.field.shortcut_suffix_off": "Bez „Skrót” w nazwach skrótów",

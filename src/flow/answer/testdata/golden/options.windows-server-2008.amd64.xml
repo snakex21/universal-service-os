@@ -99,78 +99,86 @@
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>16</Order>
-          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; icacls.exe &quot;%SystemDrive%\USOS&quot; /reset /t /c /q</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>17</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>18</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>19</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>20</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer&quot; /v link /t REG_BINARY /d 00000000 /f</Path>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>21</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {20D04FE0-3AEA-1069-A2D8-08002B30309D} /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer&quot; /v link /t REG_BINARY /d 00000000 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>22</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {59031a47-3f72-44a7-89c5-5595fe6b30ee} /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {20D04FE0-3AEA-1069-A2D8-08002B30309D} /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>23</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {F02C1A0D-BE21-4350-88B0-7367FC96EF3C} /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {59031a47-3f72-44a7-89c5-5595fe6b30ee} /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>24</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0} /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {F02C1A0D-BE21-4350-88B0-7367FC96EF3C} /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>25</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarGlomming /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0} /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>26</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer&quot; /v EnableAutoTray /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop\WindowMetrics&quot; /v MinAnimate /t REG_SZ /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarGlomming /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>27</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v DragFullWindows /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f</Path>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer&quot; /v EnableAutoTray /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop\WindowMetrics&quot; /v MinAnimate /t REG_SZ /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>28</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects&quot; /v VisualFXSetting /t REG_DWORD /d 2 /f</Path>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v DragFullWindows /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>29</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAnimations /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects&quot; /v VisualFXSetting /t REG_DWORD /d 2 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>30</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewAlphaSelect /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAnimations /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>31</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewShadow /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\DWM&quot; /v EnableAeroPeek /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewAlphaSelect /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>32</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseSpeed /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold1 /t REG_SZ /d 0 /f</Path>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewShadow /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\DWM&quot; /v EnableAeroPeek /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>33</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold2 /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Accessibility\StickyKeys&quot; /v Flags /t REG_SZ /d 506 /f</Path>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseSpeed /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold1 /t REG_SZ /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>34</Order>
+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold2 /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Accessibility\StickyKeys&quot; /v Flags /t REG_SZ /d 506 /f</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>35</Order>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; /f</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>36</Order>
           <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
         </RunSynchronousCommand>
       </RunSynchronous>

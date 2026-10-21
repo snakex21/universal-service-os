@@ -246,6 +246,7 @@ def check_linux() -> None:
 # independent copy of src/flow/answer/schema.zig tweak_support). Every other
 # system must render byte for byte what it renders without the tweak.
 NT6_ALL = {s for s, _ in NT6}
+NT6_DISPLAY_HELPER = {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'}
 NT5_BASE = {system: base for system, base, _ in NT5}
 TWEAKS = {
     'skip_games=yes': {'windows-xp', 'windows-vista', 'windows-7'},
@@ -255,8 +256,10 @@ TWEAKS = {
     'theme=classic': {'windows-xp', 'windows-7'},
     'theme=basic': {'windows-7'},
     'no_balloon_tips=yes': {'windows-xp', 'windows-server-2003'},
-    'display=1280x1024': {'windows-xp', 'windows-server-2003', 'windows-2000'},
-    'display_bpp=16': {'windows-2000'},
+    # 6.x+ since 2026-10-21: Shell-Setup Display; Vista / 7 / 2008 / 2008 R2
+    # also the request comment for the CSMWrap USOSRES staging.
+    'display=1280x1024': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'display_bpp=16': {'windows-2000'} | NT6_DISPLAY_HELPER,
     'disable_uac=yes': {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'},
     'no_sidebar=yes': {'windows-vista', 'windows-7'},
     'no_welcome_center=yes': {'windows-vista'},
@@ -275,7 +278,7 @@ MARKERS = {
     'theme=classic': ('DefaultThemesOff=Yes', 'classic.theme'),
     'theme=basic': ('basic.theme',),
     'no_balloon_tips=yes': ('EnableBalloonTips',),
-    'display=1280x1024': ('Xresolution=1280', '1280x1024xauto'),
+    'display=1280x1024': ('Xresolution=1280', '1280x1024xauto', '<HorizontalResolution>1280</HorizontalResolution>'),
     'display_bpp=16': ('autox16',),
     'disable_uac=yes': ('<EnableLUA>false</EnableLUA>', '/v EnableLUA /t REG_DWORD /d 0'),
     'no_sidebar=yes': ('TurnOffSidebar',),

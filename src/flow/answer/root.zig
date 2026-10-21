@@ -127,11 +127,15 @@ test "display metadata reaches supported legacy targets only and preserves missi
         const chosen = (try render(&p, id, .x86, null, null, &buffer)).?;
         try std.testing.expect(std.mem.endsWith(u8, chosen.bytes, ";USOS-DISPLAY=autoxauto\r\n"));
     }
-    for ([_][]const u8{ "windows-xp", "windows-server-2003", "windows-nt-3-1", "windows-vista" }) |id| {
+    for ([_][]const u8{ "windows-xp", "windows-server-2003", "windows-nt-3-1", "windows-10" }) |id| {
         const out = (try render(&p, id, .x86, null, null, &buffer)).?;
         try std.testing.expect(std.mem.indexOf(u8, out.bytes, "USOS-DISPLAY=") == null);
         try std.testing.expect(std.mem.indexOf(u8, out.bytes, "display_bpp=") == null);
     }
+    // Vista / 7: an XML comment for the CSMWrap staging (autounattend.zig).
+    const vista = (try render(&p, "windows-vista", .x86, null, null, &buffer)).?;
+    try std.testing.expect(std.mem.indexOf(u8, vista.bytes, "<!-- USOS-DISPLAY=autoxauto -->\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, vista.bytes, ";USOS-DISPLAY=") == null);
 }
 
 test {

@@ -153,6 +153,54 @@ class DisplayTransport(unittest.TestCase):
         r=shell(pre+env+'usos='+quote(nt4)+" nt3='' nt31=''; "+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn(b'; preserved driver values\r\n',(nt4/'VESA.REG').read_bytes());self.assertIn(b'"USOSDisplay"=',(nt4/'VESA.REG').read_bytes())
 
+    def test_nt6_xml_request_and_registration_marker(self):
+        source = self.tmp/'autounattend.xml'
+        source.write_bytes(b'<?xml version="1.0"?>\n<!-- USOS-DISPLAY=1920x1080xauto -->\n<unattend/>\n')
+        self.assertEqual(shell(self.lib+'usos_display_from_xml '+quote(source)).stdout, b'1920x1080xauto\n')
+        source.write_bytes(b'<!-- USOS-DISPLAY=autox16 -->\r\n<!-- USOS-DISPLAY=autox16 -->\r\n')
+        self.assertNotEqual(shell(self.lib+'usos_display_from_xml '+quote(source)).returncode, 0)
+        source.write_bytes(b'<unattend><Path>x &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot;</Path></unattend>\n')
+        r = shell(self.lib+'usos_display_from_xml '+quote(source))
+        self.assertEqual((r.returncode, r.stdout), (0, b''))
+        self.assertEqual(shell(self.lib+'usos_display_nt6_answer '+quote(source)).returncode, 0)
+        source.write_bytes(b'<unattend/>\n')
+        self.assertNotEqual(shell(self.lib+'usos_display_nt6_answer '+quote(source)).returncode, 0)
+
+    def nt6_display_block(self, answer_bytes, helper=True):
+        lib = self.tmp/'lib-nt6'; lib.mkdir(exist_ok=True)
+        shutil.copy(ROOT/'tools/display_profile.sh', lib/'display_profile.sh')
+        if helper: (lib/'USOSRES.EXE').write_bytes(b'own helper fixture')
+        work = self.tmp/'work'; shutil.rmtree(work, ignore_errors=True); work.mkdir()
+        answer = ''
+        if answer_bytes is not None:
+            answer = str(work/'answer.xml'); Path(answer).write_bytes(answer_bytes)
+        text = (ROOT/'tools/vista_csmwrap_target.sh').read_text()
+        start = text.index('# 2b. Display'); end = text.index('# 3. The PE10 donor', start)
+        # The Windows partition is a host folder here: mount/umount do nothing.
+        pre = 'fail() { echo "$*" >&2; exit 1; }; log() { echo "LOG $*"; }; modprobe() { :; }; mount() { :; }; umount() { :; }; '
+        env = 'LIB='+quote(lib)+' work='+quote(work)+' ANSWER_XML='+quote(answer)+' windows_node=/dev/null; '
+        r = shell(pre+env+text[start:end])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return work/'windows/USOS/NT6', r.stdout
+
+    def test_nt6_csmwrap_stages_auto_or_request_only_for_usos_answers(self):
+        registered = b'<!-- USOS answer profile rendered for windows-vista (amd64) -->\n<unattend><Path>cmd.exe /c if exist &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; reg.exe add</Path></unattend>\n'
+        folder, out = self.nt6_display_block(registered)
+        self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
+        self.assertEqual((folder/'USOSRES.EXE').read_bytes(), b'own helper fixture')
+        self.assertIn(b'DISPLAY request=autoxauto', out)
+        folder, _ = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=1280x1024x32 -->\n<unattend>'))
+        self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'1280x1024x32\r\n')
+        # A user's own answer (no registration), no answer, or no helper: nothing.
+        for answer in (b'<unattend/>\n', None):
+            folder, _ = self.nt6_display_block(answer)
+            self.assertFalse(folder.exists())
+        folder, out = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=800x600xauto -->\n<unattend>'))
+        self.assertFalse(folder.exists()); self.assertIn(b'invalid request', out)
+        shutil.rmtree(self.tmp/'lib-nt6')
+        folder, out = self.nt6_display_block(registered, helper=False)
+        self.assertFalse(folder.exists()); self.assertIn(b'USOSRES.EXE missing', out)
+
     def test_display_section_stays_before_usos_csm(self):
         # INSTALL.BAT appends Me's usoskey.drv line to the last section, which
         # must stay [USOS.Csm] (else the Me USB keyboard driver is lost).
