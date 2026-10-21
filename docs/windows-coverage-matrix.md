@@ -1,6 +1,6 @@
 # Macierz Windows — checkpoint, testy instalacji nieukończone
 
-Data: 2026-10-21. Baza `6476cd9515813af4ef8f58657d398189181947d1`, po rebase z `1197eb49`.
+Data: 2026-10-21. Baza `f28a3fd8155b82dd1be22608f6ef17e82437ad1d`, po rebase z `1197eb49`.
 
 Inwentaryzacja obejmuje 102 plików wejściowych. To także archiwa, dyskietki, nośniki aktualizacji i duplikaty — nie liczba unikatowych instalatorów.
 
