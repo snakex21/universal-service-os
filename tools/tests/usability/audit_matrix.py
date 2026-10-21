@@ -22,7 +22,7 @@ def capability(row):
         return 'brak MSC w bazie; gotowa osobna feat/nt4-usb-sticks ed1e1459, start / hot-swap oczekują świeżego QEMU [S2]', 'brak pomiaru: usosnet4 NDIS 4, takeover NDISLoop1 + DHCP; świeży QEMU oczekuje'
     if 'windows-95' in r or 'windows 95' in p:
         if 'rtm' in p or 'osr1' in p:
-            return 'brak potwierdzenia; osobny wymóg FAT16 dla RTM/OSR1',pending
+            return 'brak runtime; fix/win95-usb 09c399d1 wybiera FAT16 dla RTM/OSR1; USB/NDIS nadal niepotwierdzone',pending
         if 'osr2.1 pl' not in p:
             return 'brak testu tego źródła; odniesienie OSR2 X470 PASS [U] nie jest PASS tego wydania',pending+'; odnieść do usosnet4 OSR2'
         return 'X470 PASS rodziny OSR2: USOSUSB.MPD + UDS, start / hot-swap [U]; nie przenosi PASS na inne wydania', 'X470 PASS rodziny OSR2: usosnet4 NDIS 4 [U]; DHCP/ping/DNS tego ISO wymagają osobnych logów'
@@ -36,7 +36,7 @@ def capability(row):
             net='brak potwierdzenia; usosnet SYS w bazie jest x86, nie nadaje się do x64; sprawdzić zgodny pakiet DATA/Drivers'
         elif 'windows-2000' in r:
             net='brak pomiaru; matching usosnet NDIS 5 + OEM LAN stage; DHCP z Setupu, ping/DNS oczekują'
-        else:net='brak pomiaru; audyt stagingu NIC/INF i DATA/Drivers wymagany; istniejący W2K stage nie potwierdza XP/2003'
+        else:net='brak pomiaru; XP/2003: InstallDefaultComponents=Yes, bez osobnego stagingu usosnet; wymagany zgodny pakiet NIC i jawna polityka client/TCP-IP bez sharing'
         return usb,net
     if any(s in r for s in ('windows-7','windows-vista','windows-server-2008','posready-7')):
         is_x86='x86' in arch.lower() and 'x64' not in arch.lower()
@@ -78,6 +78,7 @@ def main(args):
         'Każdy poniższy wiersz pochodzi z macierzy instalacji. PASS pulpitu nie jest PASS pendrive ani LAN. „Brak” obejmuje brak implementacji lub brak pomiaru — przyczyna jest wypisana jawnie.','',
         '[U] Stan rodzin przekazany przez użytkownika w zadaniu; nie certyfikacja wszystkich języków, SP i nośników. [S1] `tools/nt4/usosusb/README.md`, USB mass storage: Win7 SP1 x86, FAT32 i dwa hot-plugi; `aa868ba8` opisuje scalony test X470.','',
         '[S2] Niezmienione binaria `feat/nt4-usb-sticks` na `ed1e14598927516c70a778d1a7cabfab7428d539`, zamrożone wejście B261020-200536-968CCBE8. To osobny pakiet do testu, bez scalenia i bez użycia gałęzi hubów. Nie jest runtime PASS.','',
+        'Stan kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. NT4 zatrzymał się przed pulpitem; nie oznacza to awarii MSC. Próby NT5 na zbyt małym dysku VM nie są wynikami działania Windows.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
     for row in entries:
@@ -85,14 +86,14 @@ def main(args):
         tests='nie zlecać teraz: brak ścieżki / poza zakresem' if 'nie dotyczy' in usb or 'osobna ścieżka' in usb or 'NT3 po 1.0' in usb else 'T1 / T2 / T3 / T4 / T5 po gotowym QEMU i cichym loggerze'
         out.append('| '+' | '.join([*row[:4],usb,net,hid_test(usb),tests])+' |')
     out+=['','## Ograniczenia i kolejność','',
-        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9), własne pendrive FAT16. Test czeka na zwolnienie dwusilnikowej kolejki.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają.','- NT3.51: MSC po 1.0; możliwa osobna ścieżka NIC NDIS3, brak takiego dopasowania w obecnym usosnet.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`): błąd instalacji notyfikatora zatrzymuje restart; host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
+        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9), własne pendrive FAT16. R6 nie osiągnął pulpitu; R7 diagnozuje wewnętrzny Setup bez klucza.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: MSC po 1.0; możliwa osobna ścieżka NIC NDIS3, brak takiego dopasowania w obecnym usosnet.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
     out+=['## Pytania sprzętowe — odpowiedzi tylko tak/nie','',
         '- T1: Czy po uruchomieniu systemu widać pendrive i można otworzyć jego START.TXT bez propozycji formatowania?',
         '- T2: Czy po dopięciu drugiego pendrive na pulpicie widać go i można otworzyć HOTPLUG.TXT bez restartu, konsoli i AutoPlay?',
         '- T4: Czy po odpięciu i ponownym podłączeniu klawiatury można normalnie pisać, bez zablokowanego klawisza i restartu?',
         '- T5: Czy po odpięciu i ponownym podłączeniu myszy działają ruch oraz przyciski, bez restartu?',
         '- T3: Czy przeglądarka startuje bez modemu/ICW i otwiera 68k.news z ulubionych? W systemach bez IE użyć dostępnej przeglądarki; jeśli nie ma żadnej, HTTP pozostaje nieprzetestowane.','',
-        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Dla NT4 i pozostałych nowych ścieżek uzupełnienie loggera ping/DHCP i podłączenia go do instalacji wciąż jest wymagane; nie jest to gotowy pakiet do testu X470.','']
+        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Logger i podłączenie NT4 przygotowano na fix/nt4-net 9859f850, z testami hosta; runtime nadal oczekuje. Pozostałe nowe ścieżki wymagają własnego podłączenia. Nie jest to jeszcze gotowy pakiet do testu X470.','']
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text('\n'.join(out),encoding='utf-8',newline='\n')
     print('USB_LAN_MATRIX',len(entries),'coverage rows; no new runtime PASS inferred')
