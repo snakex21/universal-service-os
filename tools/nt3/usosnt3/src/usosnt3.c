@@ -1029,6 +1029,98 @@ done:
     write_file("NET351.STATUS",g_text);
 }
 
+/* NET35.ON is owned staging metadata, never a new arbitrary registry target.
+ * Decimal PCI bus/slot are unique and bounded before any service mutation. */
+static int net35_decimal(const char *text, const char *key, DWORD *out)
+{
+    const char *p=text;
+    DWORD value=0;
+    int found=0, k=len(key);
+    while (*p) {
+        int i=0, digits=0;
+        while (i<k && p[i] && (p[i]|32)==(key[i]|32)) i++;
+        if (i==k && p[k]=='=') {
+            if (found++) return 0;
+            p+=k+1;value=0;
+            while (*p>='0' && *p<='9') {
+                if (++digits>3) return 0;
+                value=value*10+(*p++-'0');
+            }
+            if (!digits || value>255 || (*p && *p!='\r' && *p!='\n')) return 0;
+        }
+        while (*p && *p!='\n') p++;
+        if (*p) p++;
+    }
+    if (found!=1) return 0;
+    *out=value;
+    return 1;
+}
+
+static void nt35_network(void)
+{
+    static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet35.sys";
+    HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
+    char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
+    DWORD version, type, size, medium, enabled, bus, slot;
+    DWORD (WINAPI *get_version)(void);
+    int ok = 0, meta_len;
+    meta_len=read_text("NET35.ON", meta, sizeof meta);
+    if (meta_len<=0 || meta_len>=sizeof meta-1 ||
+        !net35_decimal(meta,"bus",&bus) || !net35_decimal(meta,"slot",&slot)) return;
+    get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
+    if (!get_version) return;
+    version = get_version();
+    if ((version & 0xff) != 3 || ((version >> 8) & 0xff) != 50) {
+        say("NET35 refused: actual Windows version is not3.5\r\n"); return;
+    }
+    say("NET35: configuring existing original TCP/IP DHCP binding\r\n");
+    /* Only take over the exact original Ethernet LOOP binding. Missing or
+       unexpected system configuration is a failure, never a new fake card. */
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop",0,KEY_READ|KEY_WRITE,&svc) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters",0,KEY_READ|KEY_WRITE,&params) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters\\Tcpip",0,KEY_READ,&tcp) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Tcpip\\Linkage",0,KEY_READ,&linkage) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Dhcp",0,KEY_READ,&dhcp)) goto done;
+    size=sizeof medium;
+    if (RegQueryValueExA(params,"Medium",NULL,&type,(BYTE *)&medium,&size) || type!=REG_DWORD ||
+        size!=sizeof medium || medium!=0) goto done;
+    size=sizeof enabled;
+    if (RegQueryValueExA(tcp,"EnableDHCP",NULL,&type,(BYTE *)&enabled,&size) || type!=REG_DWORD ||
+        size!=sizeof enabled || enabled!=1 || !net351_has_binding(linkage)) goto done;
+    size=sizeof previous-1;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)previous,&size) ||
+        (type!=REG_SZ && type!=REG_EXPAND_SZ)) goto done;
+    previous[size]=0;
+    if (len(previous)<8 || (lstrcmpiA(previous+len(previous)-8,"loop.sys") && lstrcmpiA(previous,image))) goto done;
+    if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
+    lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet35.sys");
+    if (!CopyFileA(DIR "USOSNET35.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET35.SYS",dst)) goto done;
+    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"BusNumber",bus) ||
+        !net351_dword(params,"UsosPciSlot",slot) || !net351_dword(params,"PollMode",0) ||
+        !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
+        !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
+    /* Commit the new image only after byte-for-byte copy and configuration
+       readback. The existing NDISLoop1 TCP/IP/NetBT linkage stays intact. */
+    if (RegSetValueExA(svc,"ImagePath",0,REG_EXPAND_SZ,(const BYTE *)image,sizeof image)) goto done;
+    size=sizeof got;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)got,&size) ||
+        type!=REG_EXPAND_SZ || size!=sizeof image || lstrcmpiA(got,image)) goto done;
+    ok=1;
+done:
+    if (dhcp) RegCloseKey(dhcp);
+    if (linkage) RegCloseKey(linkage);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    say(ok ? "NET35: exact staged driver copy/configuration readback verified; next boot required\r\n" :
+        "NET35 FAILED: original binding or copy/configuration readback; network is unproven\r\n");
+    lstrcpyA(g_text,meta);
+    lstrcatA(g_text,ok ? "staged_copy_readback=match\r\nconfiguration_readback=match\r\ninstalled_runtime_pass=false\r\n" :
+        "staged_copy_readback=unconfirmed\r\nconfiguration_readback=failed\r\ninstalled_runtime_pass=false\r\n");
+    write_file("NET35.STATUS",g_text);
+}
+
+
 static void display_profile(void)
 {
     /* The install VM must not select its own VBE modes for the real board.
@@ -1139,6 +1231,7 @@ static void post(void)
     }
     write_file("DRIVERS.TXT", g_text);
     nt351_network();
+    nt35_network();
     vesa();
     display_profile();
 }

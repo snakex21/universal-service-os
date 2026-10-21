@@ -602,6 +602,7 @@ def main() -> int:
             ("tools/w9x_logon.sh", "usr/lib/usos/w9x_logon.sh"),
             ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/nt351_network_setup.sh", "usr/lib/usos/nt351_network_setup.sh"),
+            ("tools/nt35_network_setup.sh", "usr/lib/usos/nt35_network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -787,6 +788,14 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
         nt3_post = build_nt3(root)
         put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        net35 = (root / 'tools/nt/usosnet/bin/i386/usosnet35.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SYS', stat.S_IFREG | 0o644, net35))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net35).hexdigest()+'  USOSNET35.SYS\n').encode('ascii')))
+        logger35 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.EXE', stat.S_IFREG | 0o644, logger35))
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(logger35).hexdigest()+'  USOSLOG35.EXE\n').encode('ascii')))
         net351 = (root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,

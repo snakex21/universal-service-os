@@ -27,7 +27,8 @@ MAX_TRANSPORT=8*1024**2
 
 
 def validate(metadata,work,assets,output,collection,root,require_target=True):
-    if metadata.get('private_profile') is not False or metadata.get('folder') not in FOLDERS:
+    folder=metadata.get('folder')
+    if metadata.get('private_profile') is not False or not isinstance(folder,str) or folder not in FOLDERS:
         raise ValueError('Only explicitly keyless allowlisted NT35 fixtures may be collected')
     work=work.resolve();assets=assets.resolve();output=output.resolve()
     if not work.is_relative_to(collection.resolve()/'_vm') or work==collection.resolve()/'_vm':

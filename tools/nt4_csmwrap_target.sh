@@ -572,6 +572,14 @@ if [ -n "$nt3" ]; then
               mv "$work/WINNT.NET351" "$work/WINNT.SIF" || fail 'cannot render original NT351 LAN answer'
         fi
     fi
+    if [ "$major:$minor" = 3:50 ]; then
+        . "$LIB/nt35_network_setup.sh"
+        usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'NT35 LAN preflight failed (DHCP, exact PCI bus/slot and verified own driver required)'
+        if [ "$_u35_enabled" = on ]; then
+            usos_nt35_answer "$work/WINNT.SIF" > "$work/WINNT.NET35" &&
+              mv "$work/WINNT.NET35" "$work/WINNT.SIF" || fail 'cannot render original NT35 LAN answer'
+        fi
+    fi
 else
     nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
     if [ -n "$tse" ]; then
@@ -723,6 +731,7 @@ cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 nt3_nvme_stage
 nt3_stage_profile
 [ "$minor" != 51 ] || usos_nt351_stage "$work/c" || fail 'cannot stage verified NT351 LAN driver'
+[ "$minor" != 50 ] || usos_nt35_stage "$work/c" || fail 'cannot stage verified NT35 LAN driver'
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the
