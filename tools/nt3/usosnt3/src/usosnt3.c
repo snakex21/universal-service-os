@@ -924,6 +924,111 @@ static void polish(void)
 }
 
 static void vesa(void);
+static int net351_dword(HKEY h, const char *name, DWORD value)
+{
+    DWORD type, size = sizeof(DWORD), got = 0;
+    return RegSetValueExA(h, name, 0, REG_DWORD, (const BYTE *)&value, sizeof value) == ERROR_SUCCESS &&
+        RegQueryValueExA(h, name, NULL, &type, (BYTE *)&got, &size) == ERROR_SUCCESS &&
+        type == REG_DWORD && size == sizeof(DWORD) && got == value;
+}
+
+static int net351_has_binding(HKEY h)
+{
+    char data[1024];
+    DWORD type, size = sizeof data;
+    int i = 0;
+    if (RegQueryValueExA(h, "Bind", NULL, &type, (BYTE *)data, &size) != ERROR_SUCCESS ||
+        type != REG_MULTI_SZ || size < 2 || size > sizeof data || data[size-1] || data[size-2]) return 0;
+    while (i < (int)size-1 && data[i]) {
+        if (!lstrcmpiA(data+i, "\\Device\\NDISLoop1")) return 1;
+        i += len(data+i)+1;
+    }
+    return 0;
+}
+
+static int net351_equal_files(const char *source, const char *target)
+{
+    HANDLE a, b;
+    char x[1024], y[1024];
+    DWORD na, nb, i, total = 0;
+    int equal = 0;
+    a = CreateFileA(source, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    b = CreateFileA(target, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (a != INVALID_HANDLE_VALUE && b != INVALID_HANDLE_VALUE) {
+        for (;;) {
+            if (!ReadFile(a,x,sizeof x,&na,NULL) || !ReadFile(b,y,sizeof y,&nb,NULL) || na != nb) break;
+            if (!na) { equal = total != 0; break; }
+            for (i=0;i<na;i++) if (x[i] != y[i]) break;
+            if (i != na) break;
+            total += na;
+        }
+    }
+    if (a != INVALID_HANDLE_VALUE) CloseHandle(a);
+    if (b != INVALID_HANDLE_VALUE) CloseHandle(b);
+    return equal;
+}
+
+static void nt351_network(void)
+{
+    static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet351.sys";
+    HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
+    char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
+    DWORD version, type, size, medium, enabled;
+    DWORD (WINAPI *get_version)(void);
+    int ok = 0;
+    if (!read_text("NET351.ON", meta, sizeof meta)) return;
+    get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
+    if (!get_version) return;
+    version = get_version();
+    if ((version & 0xff) != 3 || ((version >> 8) & 0xff) != 51) {
+        say("NET351 refused: actual Windows version is not3.51\r\n"); return;
+    }
+    say("NET351: configuring existing original TCP/IP DHCP binding\r\n");
+    /* Only take over the exact original Ethernet LOOP binding. Missing or
+       unexpected system configuration is a failure, never a new fake card. */
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop",0,KEY_READ|KEY_WRITE,&svc) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters",0,KEY_READ|KEY_WRITE,&params) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters\\Tcpip",0,KEY_READ,&tcp) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Tcpip\\Linkage",0,KEY_READ,&linkage) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Dhcp",0,KEY_READ,&dhcp)) goto done;
+    size=sizeof medium;
+    if (RegQueryValueExA(params,"Medium",NULL,&type,(BYTE *)&medium,&size) || type!=REG_DWORD ||
+        size!=sizeof medium || medium!=0) goto done;
+    size=sizeof enabled;
+    if (RegQueryValueExA(tcp,"EnableDHCP",NULL,&type,(BYTE *)&enabled,&size) || type!=REG_DWORD ||
+        size!=sizeof enabled || enabled!=1 || !net351_has_binding(linkage)) goto done;
+    size=sizeof previous-1;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)previous,&size) ||
+        (type!=REG_SZ && type!=REG_EXPAND_SZ)) goto done;
+    previous[size]=0;
+    if (len(previous)<8 || (lstrcmpiA(previous+len(previous)-8,"loop.sys") && lstrcmpiA(previous,image))) goto done;
+    if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
+    lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet351.sys");
+    if (!CopyFileA(DIR "USOSNET351.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET351.SYS",dst)) goto done;
+    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"PollMode",0) ||
+        !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
+        !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
+    /* Commit the new image only after byte-for-byte copy and configuration
+       readback. The existing NDISLoop1 TCP/IP/NetBT linkage stays intact. */
+    if (RegSetValueExA(svc,"ImagePath",0,REG_EXPAND_SZ,(const BYTE *)image,sizeof image)) goto done;
+    size=sizeof got;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)got,&size) ||
+        type!=REG_EXPAND_SZ || size!=sizeof image || lstrcmpiA(got,image)) goto done;
+    ok=1;
+done:
+    if (dhcp) RegCloseKey(dhcp);
+    if (linkage) RegCloseKey(linkage);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    say(ok ? "NET351: exact staged driver copy/configuration readback verified; next boot required\r\n" :
+        "NET351 FAILED: original binding or copy/configuration readback; network is unproven\r\n");
+    lstrcpyA(g_text,meta);
+    lstrcatA(g_text,ok ? "staged_copy_readback=match\r\nconfiguration_readback=match\r\ninstalled_runtime_pass=false\r\n" :
+        "staged_copy_readback=unconfirmed\r\nconfiguration_readback=failed\r\ninstalled_runtime_pass=false\r\n");
+    write_file("NET351.STATUS",g_text);
+}
+
 static void display_profile(void)
 {
     /* The install VM must not select its own VBE modes for the real board.
@@ -1033,6 +1138,7 @@ static void post(void)
         dump_value(g_text, key, "Group");
     }
     write_file("DRIVERS.TXT", g_text);
+    nt351_network();
     vesa();
     display_profile();
 }

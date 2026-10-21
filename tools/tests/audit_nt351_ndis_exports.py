@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -132,8 +133,10 @@ def main(args):
     spec=importlib.util.spec_from_file_location('original_audit',helper)
     audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
     cases=json.loads(args.plan.read_text(encoding='utf-8'))
-    candidates=[c for c in cases if c['system']=='windows-nt-3-51' and c['folder']=='Windows NT 3.51']
-    if len(candidates)!=1:raise ValueError('Exactly one NT3.51 Workstation case required')
+    system,folder=(('windows-nt-3-51','Windows NT 3.51') if args.edition=='workstation' else
+        ('windows-nt-3-51-server','Windows NT 3.51 Server'))
+    candidates=[c for c in cases if c['system']==system and c['folder']==folder]
+    if len(candidates)!=1:raise ValueError('Exactly one selected original NT3.51 case required')
     case=candidates[0]
     out=args.out.resolve()
     if not out.is_relative_to(ROOT/'artifacts') or out.exists():raise ValueError('Use a new metadata artifact in this worktree')
@@ -146,7 +149,7 @@ def main(args):
     if not packed.is_relative_to(SCRATCH.resolve()):raise ValueError('Packed-input path escaped owned audit')
     audit.cab.unpack=lambda blob,member=None:original_unpack(blob,member,scratch=packed)
     report={'scope':'Static original NT3.51 metadata and bounded disassembly; no ABI/runtime PASS',
-            'source_sha256':case['source_sha256'],'member_sha256':case['member_sha256'],'modules':{}}
+            'edition':args.edition,'source_sha256':case['source_sha256'],'member_sha256':case['member_sha256'],'modules':{}}
     extra={}
     for item in args.rva:
         module,rva=item.split(':',1)
@@ -168,6 +171,36 @@ def main(args):
         if digest(iso)!=case['member_sha256']:raise ValueError('Original ISO hash mismatch')
         with iso.open('rb') as stream:
             volume=audit.media.ISO(stream)
+            report['network_inf_members']=[name for name in sorted(volume.entries)
+                if name.startswith('i386/') and any(Path(name).name.startswith(prefix)
+                    for prefix in ('oemnad','oemnsp','oemnxp','nettcp','ntlanman','unattend','initial'))]
+            if args.inf_contract:
+                report['inf_contract']={}
+                for name in args.inf_contract:
+                    if not name.startswith('i386/') or name not in volume.entries:
+                        raise ValueError('INF contract must name an exact original i386 member')
+                    blob=audit.binary(volume,name)
+                    text=blob.decode('cp1252')
+                    lines=text.splitlines()
+                    matches=[i for i,line in enumerate(lines) if any(re.search(pattern,line,re.I)
+                        for pattern in args.inf_pattern)]
+                    indices={i for n in matches for i in range(max(0,n-args.inf_context),min(len(lines),n+args.inf_context+1))}
+                    if len(indices)>800:raise ValueError('Narrow INF contract patterns: more than800 selected lines')
+                    report['inf_contract'][name]={'sha256':hashlib.sha256(blob).hexdigest(),
+                        'total_lines':len(lines),'lines':[{'line':i+1,'text':lines[i]} for i in sorted(indices)],
+                        'scope':'Bounded contract excerpts only; original expanded file stays in RAM'}
+                    if args.loop_patch and name=='i386/oemnadlb.in_':
+                        patch=args.loop_patch.resolve()
+                        if patch!=ROOT/'tools/nt351_network_setup.sh':raise ValueError('Expected owned NT351 patch function')
+                        shell=Path(r'C:\Program Files\Git\bin\sh.exe')
+                        changed=subprocess.run([str(shell),'-c',f'. "{patch.as_posix()}"; usos_nt351_loop_inf'],
+                            input=blob,capture_output=True,check=True)
+                        if changed.stdout.count(b';USOS-NT351-LOOP-AUTO')!=1:raise ValueError('Expected exactly one original INF patch')
+                        report['loop_patch_validation']={'source_sha256':hashlib.sha256(blob).hexdigest(),
+                            'patched_sha256':hashlib.sha256(changed.stdout).hexdigest(),
+                            'original_bytes':len(blob),'patched_bytes':len(changed.stdout),
+                            'patch_source_sha256':digest(patch),'process_exit':changed.returncode,
+                            'microsoft_bytes_persisted':False,'runtime_pass':False}
             for name in ('ndis.sys','ne2000.sys','elnk3.sys','dc21x4.sys','e100b.sys'):
                 binary,member=audit.module_from_iso(volume,name)
                 if binary is None:report['modules'][name]={'present':False};continue
@@ -192,9 +225,14 @@ def main(args):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('coverage-root','plan','out'):parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--edition',choices=('workstation','server'),default='workstation')
     parser.add_argument('--rva',action='append',default=[],help='Bounded instruction proof, module:RVA; no raw bytes persisted')
     parser.add_argument('--indirect-call-offset',action='append',default=[],type=lambda n:int(n,0),help='NDIS indirect call field to trace from registration dataflow')
     parser.add_argument('--window',action='append',default=[],help='Bounded module:RVA:before:after instruction window')
     parser.add_argument('--field-offset',action='append',default=[],type=lambda n:int(n,0),help='NDIS non-stack field access to follow from verified dataflow')
     parser.add_argument('--immediate',action='append',default=[],type=lambda n:int(n,0),help='NDIS immediate address/value references for verified dataflow')
+    parser.add_argument('--inf-contract',action='append',default=[],help='Exact original i386 INF member; bounded contract lines only')
+    parser.add_argument('--inf-pattern',action='append',default=[],help='Case-insensitive original INF contract regex')
+    parser.add_argument('--inf-context',type=int,choices=range(0,21),default=4)
+    parser.add_argument('--loop-patch',type=Path,help='Execute the owned patch against original OEMNADLB in RAM; persist only hashes')
     main(parser.parse_args())

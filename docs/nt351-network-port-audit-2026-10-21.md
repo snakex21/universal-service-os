@@ -73,3 +73,28 @@ Finalny build `artifacts/nt351-network/build-03/build.json`: **17024 B**, PE i38
 `tools/tests/test_usosnet351.py` oraz istniejący `test_usosnet.py`: **27/27 PASS, 0 skip**; wynik `artifacts/nt351-network/host-tests/result.json` wiąże testy z powyższym hashem. Nowe 7 testów sprawdza importy oryginalnego NDIS, PE, gotowe instrukcje rejestracji i callback prefix, 4 argumenty SetAttributes, oba wskazania EthDB+0xD8, hashe starych binarek oraz faktycznie skompilowany callback z mock chip operations (unstarted guard, IRQ/poll modes, kolejność RX/TX, nominalny czas, saturacja stall i cadence). Nie wykonuje NDIS ani fizycznego sprzętu na hoście.
 
 **Nie ma jeszcze installed-Windows PASS, DHCP/brama/DNS ani wyniku USB NT3.** R17 reprodukuje Setup z dotychczasowym cache; nie zawiera tej binarki. Następna próba sieci musi jawnie dostarczyć i sprawdzić hash powyższego `usosnet351.sys`, zainstalować TCP/IP, uzyskać DHCP, zapisać bramę i DNS, a potem wykonać rzeczywiste próby pakietowe. Nie rozszerza się wariantu na NT3.5/3.1: ich oryginalne eksporty wymagają dalszego portu.
+
+## Integracja do następnej świeżej instalacji
+
+Pomiary `artifacts/nt351-network/inf-answer-contract.json`, `inf-auto-card-path.json`, `original-inf-patch-final.json` i `server-inf-contract.json` dotyczą oryginalnych INF w RAM. WS ISO/hash jest podany wyżej; kontrola Server użyła archiwum `caa4aea1c97500aaee99dfda7ebb748562d8e612e2bb87ea9fe4879b9ad34f43` i ISO `bc9e2d532f3f13c062a412b196eed72118ebd15b09fda6ffbea148d828b044c7`. NDIS.SYS Server ma identyczny hash jak WS. Wszystkie tymczasowe ISO zostały usunięte.
+
+Oryginalny UNATTEND.TXT opisuje NetworkAdapterData/AutoNetOption=LOOP, AdapterParameters/Medium=0 dla802.3, TransportData/InstallTCPIP=1 i DomainData/AutoWorkGroup (klucze odpowiedzi z prefiksem!). INITIAL.INF czyta dokładnie !SetupNetWork (wielkie W) oraz te sekcje. NTLANMAN.INF przy niepustym AutoNetOption omija detekcję karty. OEMNXPTC.INF przy GUI_UNATTENDED ustawia EnableDHCPFlag=1, instaluje DHCP Client i mapy opcji3 (brama) i6 (DNS); adapter DHCP otrzymuje początkowe IP/mask0.0.0.0. To konfiguracja, nie dowód uzyskanego lease lub osiągalności.
+
+OEMNADLB.INF ustawia usługę NDISLoop z loop.sys i ma bezwarunkowy dialog medium. Własna funkcja dodaje tylko branch GUI_UNATTENDED -> skipoptions, zachowując domyślne medium802.3. Patch wykonuje się po zakończonym boocie text-mode, na rozwiniętym system32/OEMNADLB.INF. Twardo sprawdza wejście, wyjście i readback:
+
+| Edycja | Oryginalny OEMNADLB SHA256 | Po własnym patchu |
+|---|---|---|
+| WS | `5f64dac6ee633bf961b9d07e2907c63c962a8dc41186eb00a73836d4647bfa52` | `df77ec120ac57faa3bc5b8ba554d254a1c00be55bf56fdc930519c7b0aa16d33` |
+| Server | `bc73cc4ffc1677bda5cb536aca9d6dc584a7b2970eb93303e629710c91132946` | `22e9fe3e67d6f097044de0b52e7918aec9e1e5bc10e6f3997c05766727dca125` |
+
+Oba patche faktycznie wykonano na oryginalnym INF w RAM, zapisując tylko hashe/metadane. Nie dołączono plików Microsoft do repo.
+
+renderForSystem emituje marker LAN tylko dla NT351 WS/Server i respektuje network=off. nt351_network_setup.sh wymaga zgodnych hashy binarki/loggera i dokładnie jednej obsługiwanej karty. Pierwsza próba ma celowo DHCP i automatyczny DNS; statyczne żądanie jest odrzucane przed przygotowaniem dysku. Staging zapisuje własne pliki obok aplikacji w C:\USOS\NT3. Inne NT3 minory nie otrzymują tego wariantu.
+
+Po Setup własny USOSNT3 sprawdza rzeczywistą wersję3.51, istniejący Ethernet NDISLoop1, Medium0, EnableDHCP1 i TCP/IP Linkage zawierający adapter. Kopiuje usosnet351 do system32/drivers i porównuje pliki bajt po bajcie. Po readback konfiguracji ustawia ImagePath na nowy plik jako ostatni krok. Nie tworzy fałszywego adaptera przy brakującym stosie/powiązaniu. NET351.STATUS obok helpera wiąże wynik z manifestem źródła i nadal zapisuje installed_runtime_pass=false. Następny start ma dopiero załadować miniport. Standardowa rejestracja sterownika/protokołu jest konfiguracją instalowanego Windows; prywatne logi pozostają przy aplikacji.
+
+Logger NT3 jest odrębnym snapshotem własnego GPL kodu z7024a504 pod tools/nt3/usoslog. Starego źródła/payloadu loggera9x/NT4 nie zmieniono. Przenośny rebuild snapshotu dał identyczną binarkę: SHA256 `fcf99da83e40fbee37496f22ff0f0cfec3386b393db36c87e748ef87c845017e`, GUI PE3.10. TESTNET.CMD uruchamia się jawnie po pulpicie z /once /nohook /nodbg i wyjściem C:\USOS\NT3\USABILITY.TXT. Staging nie uruchamia testów sieci.
+
+Nowe testy rzeczywistego CLI renderera, DHCP answer, stagingu, odmowy złego SHA/dwóch kart/statycznego IP, markerów off/duplicate, patchowania i ochrony nowszych cache hunks:9 PASS. Z istniejącymi testami NT3/NT4 flow daje80/80 host PASS,0skip (host-tests/flow-result.json). Osobne27 testów binarki/core pozostaje ważne. USOSNT3 zbudowano i jego importy nadal przechodzą kontrolę NT3.1, mimo aktywacji nowej funkcji wyłącznie3.51. Nie jest to zainstalowany Windows ani DHCP PASS.
+
+tools/tests/build_nt351_fixture_cache.py tworzy nowy katalog pod G:\USOS-Kolekcja\_assets, zachowuje prefix bazowego initrd3cfcae...ecd5 bajt w bajt i dokłada własny CPIO override. Na rzeczywiste skrypty cache nakłada wyłącznie nowe hunks NT351 i kontroluje zachowanie NT4 Storage/LogFile. Dołącza spójny helper, miniport/hash, logger/hash, własny stage i nowy UEFI renderer. Manifest podaje każdy hash i niedostępność lokalnie źródłowego commitu starego EFI; nie deklaruje nowego pełnego release USOS. Aktywne R17/cache pozostają bez zmian. Następny krok należy do kolejki po diagnozie start2, z USB-only input i rzeczywistymi testami sieci.

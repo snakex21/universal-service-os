@@ -87,6 +87,9 @@ w9x_nt3_default_sif() {
     [ -z "${1:-}" ] || printf ';USOS-TZ=%s\r\n' "$1"
     printf '\r\n[UserData]\r\n!FullName = "USOS"\r\n!OrgName = "USOS"\r\n!ComputerName = USOS-NT351\r\n'
     printf '\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n'
+    case "${2:-}" in NT351|NT351S)
+        printf ';USOS-NT351-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
+    esac
 }
 
 # NT 3.x (English-only CDs; docs/nt3-polish-2026-10-14.md): the menu
@@ -310,7 +313,7 @@ usos_w9x_csmwrap_prepare() {
         3:none)
             # NT 3.51 needs no key: without a profile the default answer.
             time_zone=$(w9x_csmwrap_value timezone "$request") || time_zone=
-            w9x_nt3_default_sif "$time_zone" > "$answer_inf" || stop 'the default WINNT.SIF could not be written'
+            w9x_nt3_default_sif "$time_zone" "$tag" > "$answer_inf" || stop 'the default WINNT.SIF could not be written'
             w9x_csmwrap_log "NT3 default answer, timezone=${time_zone:-none}"
             answer=nt4 ;;
         [34]:profile)

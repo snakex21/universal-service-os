@@ -78,7 +78,7 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     // remains available through the existing answer-file path.
     if (std.mem.eql(u8, system_id, "windows-longhorn")) return null;
     if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try displayMetadata(p, system_id, try nt4.render(p, use_key, buffer), buffer), system_id, p.beta_clock.slice(), buffer) };
-    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try displayMetadata(p, system_id, try nt3.render(p, buffer), buffer), system_id, p.beta_clock.slice(), buffer) };
+    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try displayMetadata(p, system_id, try nt3.renderForSystem(p, system_id, buffer), buffer), system_id, p.beta_clock.slice(), buffer) };
     // POSReady 2009: POSR.SIF (staged like WINNT.SIF; posready.zig).
     if (posready.isPosReady(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try posready.render(p, use_key, buffer), system_id, p.beta_clock.slice(), buffer) };
     if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try clockMetadata(try displayMetadata(p, system_id, try msbatch.render(p, release, use_key, buffer), buffer), system_id, p.beta_clock.slice(), buffer) };

@@ -1,0 +1,14 @@
+{
+  "source_commit": "7024a504",
+  "source_directory": "src/platform/bios/win9x",
+  "scope": "Exact own GPL logger snapshot for isolated NT3 build; does not replace NT4/9x sources",
+  "files": {
+    "usoslog.c": "b3c024404abf89dbd14687563e26b5d0980497a2da1d65522a41c2e45eecd1f3",
+    "usoslog_compat.h": "3b9726c1caa62dd18aa0a4a9e15bc4d5ecb5411f38a42c7ced4872889e9b7995",
+    "usoslog_net.h": "48f277d801449c74ce0a5194698a4a7949ff8108485093a828cc93c722ac4883",
+    "usoslog_rawicmp.h": "235bf8e7a571b076ce732a14cf42a4701562b5447f5649523d7be5c2aeeada6b",
+    "usoslog_icmp_packet.h": "6cedb41886f7f250bb37d5ad5adb5840a0a35b91f92353b2896b6ba271404d56",
+    "usoslog.lnk": "54ed79da2163bbf23a8f5918a7ada4677162ae898c9de99c4ae0b5403c6a6280"
+  },
+  "binary_sha256": "fcf99da83e40fbee37496f22ff0f0cfec3386b393db36c87e748ef87c845017e"
+}
