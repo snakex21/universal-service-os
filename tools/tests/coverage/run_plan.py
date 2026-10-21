@@ -195,6 +195,8 @@ def run(args):
             if case.get('collect_nt4_text'):boot+=['--collect-nt4-text','--evidence-assets',str(args.assets)]
             if case.get('collect_nt4_success'):boot+=['--collect-nt4-success','--evidence-assets',str(args.assets)]
             if case.get('capture_nt4_network'):boot+=['--capture-nt4-network']
+            if case.get('collect_nt35_success'):boot+=['--collect-nt35-success','--evidence-assets',str(args.assets)]
+            if case.get('capture_nt35_network'):boot+=['--capture-nt35-network']
             if case.get('collect_nt351_success'):boot+=['--collect-nt351-success','--evidence-assets',str(args.assets)]
             if case.get('capture_nt351_network'):boot+=['--capture-nt351-network']
             with (logdir/(tag+'.log')).open('w',encoding='utf-8') as log:

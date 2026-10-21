@@ -25,6 +25,8 @@ aux = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(aux)
 spec = importlib.util.spec_from_file_location('nt351_own', Path(__file__).with_name('collect_nt351_success.py'))
 nt351_own = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_own)
+spec = importlib.util.spec_from_file_location('nt35_own', Path(__file__).with_name('collect_nt35_success.py'))
+nt35_own = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt35_own)
 spec = importlib.util.spec_from_file_location('nt351_capture', Path(__file__).with_name('nt351_capture.py'))
 nt351_capture = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_capture)
 spec = importlib.util.spec_from_file_location('nt4_own', Path(__file__).with_name('collect_nt4_success.py'))
@@ -225,9 +227,11 @@ async def main(args):
                                     getattr(args,'evidence_assets',None),fixture.COLLECTION)
     collect_nt351=getattr(args,'collect_nt351_success',False)
     capture_nt351=getattr(args,'capture_nt351_network',False)
+    collect_nt35=getattr(args,'collect_nt35_success',False)
+    capture_nt35=getattr(args,'capture_nt35_network',False)
     collect_nt4=getattr(args,'collect_nt4_success',False)
     capture_nt4=getattr(args,'capture_nt4_network',False)
-    if (collect_nt4 or capture_nt4) and (collect_nt351 or capture_nt351):
+    if sum(bool(v) for v in (collect_nt4 or capture_nt4, collect_nt351 or capture_nt351, collect_nt35 or capture_nt35)) > 1:
         raise ValueError('Choose one explicit OS evidence policy')
     if capture_nt4 and (not collect_nt4 or args.nic!='igb'):
         raise ValueError('NT4 DHCP capture needs NT4 own collector and sole pinned igb')
@@ -240,6 +244,12 @@ async def main(args):
     if collect_nt351:
         if args.evidence_assets is None:raise ValueError('NT351 collector needs explicit frozen assets')
         nt351_own.validate(metadata,work,args.evidence_assets,args.out/'nt351-own-evidence',
+            fixture.COLLECTION,Path(__file__).resolve().parents[3],require_target=False)
+    if capture_nt35 and (not collect_nt35 or args.nic!='igb'):
+        raise ValueError('NT35 capture requires its own collector and the sole pinned igb')
+    if collect_nt35:
+        if args.evidence_assets is None:raise ValueError('NT35 collector needs explicit frozen assets')
+        nt35_own.validate(metadata,work,args.evidence_assets,args.out/'nt35-own-evidence',
             fixture.COLLECTION,Path(__file__).resolve().parents[3],require_target=False)
     if metadata['result']['result'] != 'PASS':
         raise ValueError('Fixture preparation was not successful')
@@ -282,7 +292,7 @@ async def main(args):
     command += aux.network_arguments(getattr(args,'nic','none'))
     network_capture=None
     network_capture_result=None
-    if capture_nt351 or capture_nt4:
+    if capture_nt351 or capture_nt35 or capture_nt4:
         capture_module=nt4_capture if capture_nt4 else nt351_capture
         # The sole NIC and MAC are defined by network_arguments('igb').
         expected=['-netdev','user,id=usabilitynet,hostname=usos-test',
@@ -559,6 +569,15 @@ async def main(args):
             result['nt351_own_evidence']='nt351-own-evidence/collection.json'
         except Exception as error:
             result['nt351_own_evidence_error']=type(error).__name__+': '+str(error)
+    if collect_nt35:
+        # Target writer has ended; collect before this exact target is removed.
+        try:
+            from types import SimpleNamespace
+            await nt35_own.main(SimpleNamespace(qemu=args.qemu,assets=args.evidence_assets,
+                fixture=work,out=args.out/'nt35-own-evidence'))
+            result['nt35_own_evidence']='nt35-own-evidence/collection.json'
+        except Exception as error:
+            result['nt35_own_evidence_error']=type(error).__name__+': '+str(error)
     if product_failure and getattr(args,'collect_nt4_failure',False):
         # Outer QEMU and its nested installer have ended. One read-only
         # collector fits the already reserved nested lane; no extra live OS.
@@ -609,6 +628,8 @@ if __name__ == '__main__':
     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
     parser.add_argument('--collect-nt4-success',action='store_true',help='Private NT4 only: guest-filtered own NET excerpt and driver hash after actual first logon')
     parser.add_argument('--capture-nt4-network',action='store_true',help='DHCP-only mirror after actual NT4 first logon, 8 MiB capped, sole pinned igb')
+    parser.add_argument('--collect-nt35-success',action='store_true',help='Read-only five own NT35 files plus pinned installed-driver hash; never runtime PASS')
+    parser.add_argument('--capture-nt35-network',action='store_true',help='Passive 8MiB-capped sole igb mirror; needs explicit keyless NT35 collector')
     parser.add_argument('--collect-nt351-success',action='store_true',help='Read-only five own NT351 files plus installed own-driver hash before cleanup; never runtime PASS')
     parser.add_argument('--capture-nt351-network',action='store_true',help='Passive 8 MiB-capped localhost mirror of sole pinned igb; needs keyless NT351 collector')
     parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; exact allowlisted keyless NT3/NT4 cases only')
