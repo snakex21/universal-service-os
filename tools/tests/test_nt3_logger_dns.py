@@ -32,12 +32,14 @@ class DNSParser(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(dir=parent);cls.directory=Path(cls.temp.name)
         cls.addClassCleanup(cls.temp.cleanup)
         wrapper=cls.directory/'wrapper.c';dll=cls.directory/'dns.dll'
+        temporary=cls.directory/'tmp';temporary.mkdir()
         wrapper.write_text('#include "'+HEADER.as_posix()+'"\n'+
             '__declspec(dllexport) int match(const unsigned char *p,int n,unsigned id,const char *q,int peer,unsigned char *a) '+
             '{return usos_dns_a_reply(p,n,id,q,peer,a);}\n',encoding='utf-8')
         result=subprocess.run([str(ZIG),'cc','-shared','-O2','-Wall','-Wextra','-Werror',
             str(wrapper),'-o',str(dll)],capture_output=True,
-            env=dict(os.environ,ZIG_GLOBAL_CACHE_DIR=str(cls.directory/'cache-global'),ZIG_LOCAL_CACHE_DIR=str(cls.directory/'cache-local')))
+            env=dict(os.environ,TEMP=str(temporary),TMP=str(temporary),
+                ZIG_GLOBAL_CACHE_DIR=str(cls.directory/'cache-global'),ZIG_LOCAL_CACHE_DIR=str(cls.directory/'cache-local')))
         if result.returncode:raise RuntimeError(result.stderr.decode(errors='replace'))
         cls.library=ctypes.CDLL(str(dll));cls.function=cls.library.match
         cls.function.argtypes=[ctypes.POINTER(ctypes.c_ubyte),ctypes.c_int,ctypes.c_uint,ctypes.c_char_p,ctypes.c_int,ctypes.POINTER(ctypes.c_ubyte)]
