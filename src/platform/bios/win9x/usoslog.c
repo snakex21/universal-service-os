@@ -382,6 +382,8 @@ static void mcpy(void *d, const void *s, DWORD n)
     while (n--) *a++ = *b++;
 }
 
+#include "usoslog_compat.h"
+
 static char lower(char c)
 {
     return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
@@ -510,7 +512,7 @@ static void flush_out(void)
         if (size != 0xFFFFFFFFUL && size > ROTATE) {
             char old[MAX_PATH];
             int n;
-            lstrcpynA(old, out_path, MAX_PATH - 4);
+            compat_strcopy(old, out_path, MAX_PATH - 4);
             n = lstrlenA(old);
             if (n > 4 && old[n - 4] == '.') old[n - 4] = 0;
             lstrcatA(old, ".OLD");
@@ -586,7 +588,7 @@ static void reg_dump(HKEY root, const char *rootname, const char *path, DWORD ma
         if (!name[0]) lstrcpyA(name, "(default)");
         if (type == REG_SZ || type == REG_EXPAND_SZ) {
             char t[600];
-            lstrcpynA(t, (char *)rdata, sizeof(t));
+            compat_strcopy(t, (char *)rdata, sizeof(t));
             o("    %s = \"%s\"", (LPSTR)name, (LPSTR)t);
         } else if (type == REG_DWORD && dl == 4) {
             DWORD v = *(DWORD *)rdata;
@@ -821,7 +823,7 @@ static int proc_list(PROCREC *out, int max)
                 out[n].pid = pe.th32ProcessID;
                 out[n].ppid = pe.th32ParentProcessID;
                 out[n].born = 0;
-                lstrcpynA(out[n].exe, pe.szExeFile, sizeof(out[n].exe));
+                compat_strcopy(out[n].exe, pe.szExeFile, sizeof(out[n].exe));
                 n++;
             }
             pe.dwSize = sizeof(pe);
@@ -957,7 +959,7 @@ static void sec_sys(void)
     DWORD up = GetTickCount();
     mset(&v, 0, sizeof(v));
     v.dwOSVersionInfoSize = sizeof(v);
-    GetVersionExA(&v);
+    compat_os_version(&v);
     mset(&m, 0, sizeof(m));
     m.dwLength = sizeof(m);
     GlobalMemoryStatus(&m);
@@ -1260,6 +1262,9 @@ static void add_dns(DWORD a)
     if (ndns_cfg < 8) dns_cfg[ndns_cfg++] = a;
 }
 
+#ifdef USOS_NT3_RAW_ICMP
+static void raw_ping_gateway(void);
+#endif
 #include "usoslog_net.h"
 
 static void sec_iphlp_config(void)
@@ -1710,6 +1715,10 @@ static void sec_ndislog(void)
     if (n > 0) { otext("    | ", nb, (DWORD)n); ndis_off += (DWORD)n; }
 }
 
+#ifdef USOS_NT3_RAW_ICMP
+#include "usoslog_rawicmp.h"
+#endif
+
 static void sec_net_config(void)
 {
     HKEY k;
@@ -1937,7 +1946,7 @@ static void reg_value_text(HKEY k, const char *name, char *t, int cap)
     int m = 0;
     if (RegQueryValueExA(k, (LPSTR)name, 0, &type, rdata, &dl) != ERROR_SUCCESS) { lstrcpyA(t, "-"); return; }
     rdata[dl < sizeof(rdata) ? dl : sizeof(rdata) - 1] = 0;
-    if (type == REG_SZ || type == REG_EXPAND_SZ) { t[0] = '"'; lstrcpynA(t + 1, (char *)rdata, cap - 2); lstrcatA(t, "\""); return; }
+    if (type == REG_SZ || type == REG_EXPAND_SZ) { t[0] = '"'; compat_strcopy(t + 1, (char *)rdata, cap - 2); lstrcatA(t, "\""); return; }
     if (type == REG_DWORD && dl == 4) { wsprintfA(t, "dword:%08lX", *(DWORD *)rdata); return; }
     m = wsprintfA(t, "hex:");
     for (j = 0; j < dl && j < 16 && m < cap - 4; j++) m += wsprintfA(t + m, "%02X", (unsigned)rdata[j]);
@@ -2155,7 +2164,7 @@ static void list_dir(const char *label, const char *dir)
     char pat[MAX_PATH + 4];
     int n = 0;
     if (!dir[0]) { o("[START] %s: (no path)", (LPSTR)label); return; }
-    lstrcpynA(pat, dir, MAX_PATH);
+    compat_strcopy(pat, dir, MAX_PATH);
     lstrcatA(pat, "\\*.*");
     o("[START] %s: %s", (LPSTR)label, (LPSTR)dir);
     h = FindFirstFileA(pat, &fd);
@@ -2309,10 +2318,10 @@ static void parse_args(void)
         }
         arg[n] = 0;
         if (first) { first = 0; continue; }       /* program name */
-        if (want == 1) { lstrcpynA(out_path, arg, MAX_PATH); opt_custom_out = 1; want = 0; continue; }
+        if (want == 1) { compat_strcopy(out_path, arg, MAX_PATH); opt_custom_out = 1; want = 0; continue; }
         if (want == 2) { opt_first = decval(arg); want = 0; continue; }
         if (want == 3) { opt_every = decval(arg); if (opt_every < 10) opt_every = 10; want = 0; continue; }
-        if (want == 4) { lstrcpynA(opt_dbgfile, arg, MAX_PATH); want = 0; continue; }
+        if (want == 4) { compat_strcopy(opt_dbgfile, arg, MAX_PATH); want = 0; continue; }
         if (!lstrcmpiA(arg, "/once")) opt_once = 1;
         else if (!lstrcmpiA(arg, "/nonet")) opt_nonet = 1;
         else if (!lstrcmpiA(arg, "/nodbg")) opt_nodbg = 1;
@@ -2446,7 +2455,7 @@ void __cdecl usos_entry(void)
         OSVERSIONINFOA v;
         mset(&v, 0, sizeof(v));
         v.dwOSVersionInfoSize = sizeof(v);
-        if (GetVersionExA(&v)) is_nt = v.dwPlatformId == VER_PLATFORM_WIN32_NT;
+        if (compat_os_version(&v)) is_nt = v.dwPlatformId == VER_PLATFORM_WIN32_NT;
     }
     mutex = CreateMutexA(0, FALSE, "USOSLOG-instance");
     if (!opt_once && mutex && GetLastError() == ERROR_ALREADY_EXISTS) ExitProcess(0);
