@@ -55,7 +55,17 @@ def write_index(rows):
             f"  Download URL: {r['final_url']}",f"  Bytes: {r['bytes']}",f"  SHA-256: {r['sha256']}",
             f"  Published {r['hash_algorithm']}: {r['published_hash']} (MATCH)",
             f"  Identity (source claim; media inspection separate): {r['identity']}",f"  Downloaded: {r['date']}",'']
+    if (COLLECTION/'macOS/README.txt').exists():
+        lines += ['macOS/README.txt', '  Separate Apple installer/recovery index; outside the Windows coverage matrix.', '']
     (COLLECTION/'README.txt').write_text('\n'.join(lines),encoding='utf-8')
+
+
+def merge_manifest(previous,results):
+    merged={row['relative']:row for row in previous}
+    for row in results:
+        old=merged.get(row['relative'],{})
+        if row.get('sha256') or not old.get('sha256'):merged[row['relative']]=row
+    return sorted(merged.values(),key=lambda row:row['relative'])
 
 
 def main(a):
@@ -72,8 +82,11 @@ def main(a):
             print(json.dumps({'media':result['relative'],'status':result['status'],
                               'error':result.get('error')},ensure_ascii=False),flush=True)
     results.sort(key=lambda r:r['relative'])
-    (COLLECTION/'download-manifest.json').write_text(json.dumps(results,indent=2,ensure_ascii=False),encoding='utf-8')
-    write_index(results)
+    manifest=COLLECTION/'download-manifest.json'
+    previous=json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else []
+    combined=merge_manifest(previous,results)
+    manifest.write_text(json.dumps(combined,indent=2,ensure_ascii=False),encoding='utf-8')
+    write_index(combined)
     a.out.write_text(json.dumps({'free_before':before,'free_after':shutil.disk_usage(COLLECTION).free,
                                 'files':results},indent=2,ensure_ascii=False),encoding='utf-8')
 
