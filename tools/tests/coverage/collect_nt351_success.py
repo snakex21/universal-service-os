@@ -7,7 +7,6 @@ from pathlib import Path
 import argparse
 import asyncio
 import base64
-import gzip
 import importlib.util
 import io
 import json
@@ -16,6 +15,8 @@ import tarfile
 
 spec=importlib.util.spec_from_file_location('nt351_serial_shell',Path(__file__).with_name('serial_shell.py'))
 serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
+spec=importlib.util.spec_from_file_location('nt351_archive_policy',Path(__file__).with_name('evidence_archive.py'))
+archive_policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(archive_policy)
 
 FOLDERS=frozenset(('Windows NT 3.51','Windows NT 3.51 Server'))
 FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256')
@@ -95,9 +96,7 @@ def export_evidence(payload,output):
     # Validate the entire archive before writing anything. No extractall,
     # permissive basenames, traversal, duplicate members or binary logs.
     records={};total=0
-    with gzip.GzipFile(fileobj=io.BytesIO(payload)) as compressed:
-        plain=compressed.read(MAX_TOTAL+65536+1)
-    if len(plain)>MAX_TOTAL+65536:raise ValueError('Decompressed archive limit exceeded')
+    plain=archive_policy.single_gzip(payload,MAX_TOTAL+65536)
     with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
         for member in archive:
             if member.name in ('.','./') and member.isdir():continue
@@ -110,6 +109,7 @@ def export_evidence(payload,output):
             data=archive.extractfile(member).read(MAX_FILE+1)
             if len(data)!=member.size or b'\0' in data:raise ValueError('Invalid text evidence')
             records[name]=data.decode('utf-8',errors='strict')
+        archive_policy.tar_end(plain,archive.offset)
     digest=records.pop('DRIVER-READBACK.SHA256',None)
     if digest is not None:
         digest=digest.strip()

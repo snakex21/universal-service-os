@@ -11,7 +11,6 @@ import io
 import json
 import re
 import tarfile
-import zlib
 
 spec=importlib.util.spec_from_file_location('nt4_serial_shell',Path(__file__).with_name('serial_shell.py'))
 serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
@@ -57,6 +56,9 @@ KEY=re.compile(r'[A-Za-z0-9]{5}(?:-[A-Za-z0-9]{5}){4}|[0-9]{5}-OEM-[0-9]{7}-[0-9
 def module(name,file):
     spec=importlib.util.spec_from_file_location(name,Path(__file__).with_name(file))
     result=importlib.util.module_from_spec(spec);spec.loader.exec_module(result);return result
+
+
+archive_policy=module('nt4_network_archive','evidence_archive.py')
 
 
 def validate(metadata,work,assets,output,collection,root,first_logon=False,preflight=False):
@@ -169,10 +171,7 @@ poweroff -f
 
 
 def export_evidence(payload,output):
-    inflater=zlib.decompressobj(16+zlib.MAX_WBITS)
-    plain=inflater.decompress(payload,MAX_TOTAL+65537)
-    if len(plain)>MAX_TOTAL+65536 or not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
-        raise ValueError('Invalid or multiple bounded gzip streams')
+    plain=archive_policy.single_gzip(payload,MAX_TOTAL+65536)
     records={};total=0
     with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
         for member in archive:
@@ -186,7 +185,7 @@ def export_evidence(payload,output):
             text=data.decode('ascii')
             if re.search(r'[^\n\x20-\x7e]',text) or KEY.search(text):raise ValueError('Unfiltered private evidence rejected')
             records[name]=text
-        if len(plain)%512 or any(plain[archive.offset:]):raise ValueError('Trailing tar data rejected')
+        archive_policy.tar_end(plain,archive.offset)
     lines=records.get('collection-state.txt','').splitlines()
     if not lines or lines[0]!=HEADER:raise ValueError('Missing own NT4 status')
     states={}

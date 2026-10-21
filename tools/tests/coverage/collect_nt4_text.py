@@ -16,11 +16,13 @@ ROOT=Path(__file__).resolve().parents[3]
 def module(name,path):
     spec=importlib.util.spec_from_file_location(name,path)
     result=importlib.util.module_from_spec(spec);spec.loader.exec_module(result);return result
+archive_policy=module('native_text_archive',Path(__file__).with_name('evidence_archive.py'))
 fixture=module('native_text_fixture',Path(__file__).with_name('prepare_stick.py'))
 transport=module('native_text_transport',Path(__file__).with_name('collect_guest_logs.py'))
 LOGS=('setuplog.txt','setuperr.txt','setupact.txt','post.txt')
 NAMES=set(LOGS)|{'collection-state.txt'}
 STATUSES={'exported','empty','unavailable','too-large'}
+MAX_ARCHIVE_PLAIN=len(NAMES)*2*1024**2+65536
 STATE_HEADER='Sanitized Setup text; unavailable means read failed and source existence is unknown.'
 SANITIZER=r'''LC_ALL=C tr -cd '\11\12\15\40-\176' | sed -E 's/[[:alnum:]]{5}(-[[:alnum:]]{5}){4}/[key omitted]/g; s/[0-9]{3,}/[number omitted]/g' '''
 READLOG=r'''readlog() {
@@ -61,8 +63,11 @@ def log_status(text):
 
 
 def export_text(payload,directory):
+    # Canonical base64 still permits multiple gzip members inside one frame.
+    # Bound expansion and verify one member's EOF/CRC before parsing any tar.
+    plain=archive_policy.single_gzip(payload,MAX_ARCHIVE_PLAIN)
     entries={}
-    with tarfile.open(fileobj=io.BytesIO(payload),mode='r:gz') as archive:
+    with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
         for member in archive.getmembers():
             # BusyBox tar's single ./ prefix is allowed; all other path syntax
             # and collisions are rejected by the same exact basename allowlist.
@@ -74,6 +79,9 @@ def export_text(payload,directory):
             if re.search(r'[^\t\n\r\x20-\x7e]|[0-9]{3,}|[A-Za-z0-9]{5}(?:-[A-Za-z0-9]{5}){4}',text):
                 raise ValueError('Evidence guest did not sanitize text; no raw data saved')
             entries[name]=text
+        # BusyBox and Python tar both terminate with at least two zero blocks.
+        # A second tar or unvalidated nonzero trailer must not be ignored.
+        archive_policy.tar_end(plain,archive.offset)
     if 'collection-state.txt' not in entries:raise ValueError('Missing NT4 text evidence status')
     statuses=log_status(entries['collection-state.txt'])
     for name,status in statuses.items():

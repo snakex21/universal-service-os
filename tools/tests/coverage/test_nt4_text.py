@@ -1,6 +1,8 @@
 from pathlib import Path
 import importlib.util
 import io
+import base64
+import gzip
 import os
 import subprocess
 import tarfile
@@ -45,6 +47,37 @@ class NativeTextTests(unittest.TestCase):
         self.temporary=tempfile.TemporaryDirectory(dir=OUT)
         self.addCleanup(self.temporary.cleanup)
         self.directory=Path(self.temporary.name)
+
+    def test_canonical_transport_cannot_hide_a_second_gzip_archive(self):
+        payload=bundle()+archive('unexpected.txt',b'Own synthetic second archive')
+        encoded=base64.b64encode(payload).decode('ascii')
+        decoded=collector.transport.decode_transport('COVERAGE_EVIDENCE_BEGIN\n'+encoded+'\nCOVERAGE_EVIDENCE_END\n')
+        self.assertEqual(decoded,payload)  # Valid one-frame canonical base64.
+        with self.assertRaisesRegex(ValueError,'gzip'):
+            collector.export_text(decoded,self.directory)
+        self.assertEqual(list(self.directory.iterdir()),[])
+
+    def test_second_tar_and_nonzero_trailer_inside_one_gzip_are_rejected(self):
+        plain=gzip.decompress(bundle())
+        for trailer in (gzip.decompress(archive('unexpected.txt',b'Own synthetic second tar')),b'X'+bytes(511)):
+            with self.subTest(trailer_bytes=len(trailer)),self.assertRaisesRegex(ValueError,'tar'):
+                collector.export_text(gzip.compress(plain+trailer),self.directory)
+            self.assertEqual(list(self.directory.iterdir()),[])
+
+    def test_truncated_gzip_crc_failure_and_absent_tar_terminator_save_nothing(self):
+        payload=bundle();corrupt=bytearray(payload);corrupt[-8]^=1
+        # The first state-only member occupies one header and one data block.
+        unterminated=gzip.compress(gzip.decompress(payload)[:1024])
+        for bad in (payload[:-1],bytes(corrupt),unterminated):
+            with self.subTest(payload_bytes=len(bad)),self.assertRaises(ValueError):
+                collector.export_text(bad,self.directory)
+            self.assertEqual(list(self.directory.iterdir()),[])
+
+    def test_compressed_expansion_is_bounded_before_tar_or_output(self):
+        payload=gzip.compress(bytes(collector.MAX_ARCHIVE_PLAIN+1))
+        with self.assertRaisesRegex(ValueError,'bounded.*gzip'):
+            collector.export_text(payload,self.directory)
+        self.assertEqual(list(self.directory.iterdir()),[])
 
     def test_unanswered_product_key_form_stops_before_windows(self):
         with self.assertRaisesRegex(RuntimeError,'Windows has not started'):
