@@ -43,6 +43,8 @@ class Phase1Vm(unittest.TestCase):
         self.tmp = scratch('usos-w9x-vm-')
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         (self.tmp / 'share').mkdir()
+        (self.tmp / 'share/keymaps').mkdir()
+        (self.tmp / 'share/keymaps/en-us').write_bytes(b'# fake QEMU test input only\n')
         for name in ('bios-256k.bin', 'vgabios-stdvga.bin'):
             (self.tmp / 'share' / name).write_bytes(b'x')
         (self.tmp / 'flags').mkdir()
@@ -120,6 +122,13 @@ class Phase1Vm(unittest.TestCase):
         self.assertIn('rc=2', out, err)
         self.assertFalse((self.tmp / 'args.txt').exists())
         self.assertFalse((self.tmp / 'run/command.txt').exists())
+
+    def test_missing_95_keymap_stops_before_qemu_starts(self):
+        (self.tmp / 'share/keymaps/en-us').unlink()
+        rc,out,err=self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',W9X_VM_KEY='98765001234554321')
+        self.assertIn('rc=2',out,err)
+        self.assertFalse((self.tmp/'args.txt').exists())
+        self.assertIn('keymap missing',(self.tmp/'run/event-errors.log').read_text())
 
     def test_the_key_is_typed_once_idle_and_never_logged(self):
         if self.run_lib('command -v mkfifo')[0] != 0:

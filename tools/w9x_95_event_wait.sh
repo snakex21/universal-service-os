@@ -14,6 +14,10 @@ w9x_95_event_run() {
     command -v timeout >/dev/null 2>&1 || [ -x /bin/busybox ] || return 2
     rm -rf "$W9X_VM_RUN"
     mkdir -p "$W9X_VM_RUN"
+    if [ ! -r "$W9X_VM_DATADIR/keymaps/en-us" ]; then
+        printf 'Required QEMU VNC keymap missing: %s/keymaps/en-us\n' "$W9X_VM_DATADIR" > "$W9X_VM_RUN/event-errors.log"
+        return 2
+    fi
     sync
     blockdev --flushbufs "$target" 2>/dev/null || true
     mkfifo "$W9X_VM_RUN/mon.in" "$W9X_VM_RUN/mon.out" "$W9X_VM_RUN/key.in" "$W9X_VM_RUN/key.out" "$W9X_VM_RUN/events" || return 2

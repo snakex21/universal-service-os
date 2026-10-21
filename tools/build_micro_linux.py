@@ -343,9 +343,10 @@ def qemu9x_entries(
     binary = str(lock["binary"])
     if binary not in entries:
         raise RuntimeError(f"qemu9x: {binary} missing from the pinned packages")
-    for required in ("usr/share/qemu/bios-256k.bin", "usr/share/qemu/vgabios-stdvga.bin"):
+    for required in ("usr/share/qemu/bios-256k.bin", "usr/share/qemu/vgabios-stdvga.bin",
+                     "usr/share/qemu/keymaps/en-us"):
         if required not in entries:
-            raise RuntimeError(f"qemu9x: firmware missing: {required}")
+            raise RuntimeError(f"qemu9x: required runtime data missing: {required}")
 
     def resolve(soname: str) -> Entry | None:
         name = "usr/lib/" + soname

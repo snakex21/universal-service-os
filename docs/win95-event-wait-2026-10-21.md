@@ -18,8 +18,8 @@ Nine host RFB tests cover malformed/truncated input, wire bounds, resize,
 unsupported encodings, colour reconstruction, role-only output/private-field
 updates and absence of repeated requests while waiting. Ten
 FAT16 tests, eight page-input tests and the two affected fake-VM controller
-tests pass. A real QEMU-in-QEMU smoke test completed its RFB handshake and
-clean shutdown; this is **not** Windows installation evidence.
+tests pass. The earlier real-QEMU smoke result is withdrawn: its harness
+could mistake an echoed PASS command for success after a failure.
 
 The first fresh RTM fixture (768 MiB outer / 128 MiB inner) stopped before
 the nested installer because micro-Linux supplies BusyBox without a
@@ -32,6 +32,16 @@ The next test uses 2 GiB outer / 512 MiB inner RAM. The user explicitly
 reserved two QEMU engines and allowed a 6 GiB host RAM reserve for this
 session. The shared task file subsequently raised the physical machine's
 global allowance to five engines: two here and three in the other session.
+
+After fixing that harness on `fix/win95-fixture-serial`, RTM r14 passed the
+normal menu and target preparation but nested QEMU exited after one second:
+VNC required `keymaps/en-us`, absent from the minimal QEMU initrd. The
+builder now pins Alpine's matching `qemu-11.0.3-r0.apk` and includes only
+that map (SHA-256 `56c6e878253d8e84cf75d8642aeaa0ba156bea7504c4d4029acb17432cfa70ee`;
+no include directives). Missing runtime data rejects the package and the
+95 controller fails before starting QEMU. The NT controller remains
+unchanged. A replacement nested smoke uses a script in initrd and an exact
+completion line; verification is pending.
 
 Private inputs originate in the separately measured
 `B261020-200536-968CCBE8-win95-fat16` cache. Its 283 other files and 825
