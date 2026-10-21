@@ -17,5 +17,9 @@ output before USOS is a terminal runner error, rather than a long wait.
 
 The shared low-RAM worktree and production installer are unchanged. Seven
 host regression cases cover echoed success, panic, child failure, deadline,
-clean completion, historical metadata and firmware fallback. A fresh real
-fixture verification remains pending. No Windows runtime PASS is claimed.
+clean completion, historical metadata and firmware fallback. A fresh RTM
+fixture in QEMU completed all comparisons, sync and unmount in 47.034 s;
+`commands_sent=false`, clean child exit and the independent marker were
+verified. This checks the disposable installation media, not Windows.
+The subsequent normal menu/install test is pending. No Windows runtime
+PASS is claimed.
