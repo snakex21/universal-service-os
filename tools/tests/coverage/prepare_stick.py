@@ -209,10 +209,16 @@ async def main(args):
         destination.mkdir(parents=True,exist_ok=True)
         for item in native.iterdir():
             if item.is_file():shutil.copyfile(item,destination/item.name)
+    observed_initrds=[]
     if args.trace_menus:
-        with (share/'EFI/USOS/micro-linux/initramfs-usos').open('ab') as stream:
-            stream.write(b'\0'*(-stream.tell()%4))
-            stream.write(trace_overlay(observer_token if args.legacy_first_logon else None))
+        overlay=trace_overlay(observer_token if args.legacy_first_logon else None)
+        # NT5 boots the separate XP package; step 620 boots micro-linux.
+        # Both frozen bundles contain the verified same own UI script bases.
+        for relative in ('EFI/USOS/micro-linux/initramfs-usos','EFI/USOS-XP/initramfs-xp'):
+            with (share/relative).open('ab') as stream:
+                stream.write(b'\0'*(-stream.tell()%4))
+                stream.write(overlay)
+            observed_initrds.append(relative)
     if args.profile:
         profiles = share/'EFI/USOS/profiles'
         profiles.mkdir(parents=True,exist_ok=True)
@@ -276,6 +282,7 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
     metadata = dict(disk=str(disk), disk_guid=disk_guid, esp_guid=esp_guid,
         data_guid=data_guid, work_guid=work_guid, source=str(args.iso), folder=args.folder,
         resources=resources, result=result, menu_observation=args.trace_menus,
+        observed_initrds=observed_initrds,
         answer_profile=bool(args.profile),
         profile_sha256=hashlib.sha256(profile).hexdigest() if args.profile else None,
         private_profile=bool(args.private_key),
