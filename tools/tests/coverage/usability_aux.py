@@ -40,6 +40,16 @@ def require_operator_channel(enabled,stream=None):
         raise ValueError('Interactive test requires an open TTY; launch exec_command with tty=true')
 
 
+def input_machine(machine,ps2_input,usb_only):
+    if type(usb_only) is not bool or type(ps2_input) is not bool:
+        raise ValueError('Input scenario must use explicit boolean flags')
+    if usb_only:
+        if ps2_input or machine!='q35':
+            raise ValueError('USB-only input requires q35 and cannot enable PS/2 input')
+        return 'q35,i8042=off'
+    return machine
+
+
 def network_arguments(model):
     if model=='none':return ['-nic','none']
     if model!='igb':raise ValueError('Only the source-verified 82576 NIC is supported')

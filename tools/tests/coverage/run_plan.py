@@ -126,6 +126,9 @@ def run(args):
     if getattr(args,'after_file',None):after_file(args.after_file)
     for case in cases:
         validate_system(case['system'],args.nested)
+        ps2_input=case.get('ps2_input',not args.nested)
+        usb_only=case.get('usb_only_input',False)
+        aux.input_machine('q35',ps2_input,usb_only)
         tag=case['tag']
         if not re.fullmatch('[a-z0-9-]+',tag):raise ValueError('Invalid case tag')
         out=ROOT/'artifacts/coverage/vm'/tag
@@ -178,7 +181,8 @@ def run(args):
             boot=[sys.executable,'-I','-B',str(HERE/'boot_menu.py'),'--qemu',str(args.qemu),'--fixture',str(work),
                 '--out',str(out),'--seconds',str(case.get('seconds',3600)),'--target-gib',str(target_gib),
                 '--target-bus',case.get('target_bus','ahci'),'--accel',args.accel]
-            if case.get('ps2_input',not args.nested):boot+=['--ps2-input']
+            if ps2_input:boot+=['--ps2-input']
+            if usb_only:boot+=['--usb-only-input']
             if 'boot_seconds' in case:boot+=['--boot-seconds',str(case['boot_seconds'])]
             if case.get('auto_native'):boot+=['--auto-native']
             if case.get('interactive'):boot+=['--interactive']

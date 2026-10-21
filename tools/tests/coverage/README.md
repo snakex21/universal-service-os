@@ -225,6 +225,14 @@ transport; the host validates that rule again. No screens, answers or hives
 are exported. This deliberately loses numeric error codes and accented
 characters. Existing keyed screenshot restrictions are unchanged.
 
+An explicit plan `usb_only_input: true` with `ps2_input: false` adds
+`--usb-only-input`. This uses the verified q35 `i8042=off` property;
+contradictory flags fail before a fixture or disk is opened. Result metadata
+records `usb_only_input` and `ps2_controller_enabled`. Earlier/default runs
+keep their PS/2 controller and must not establish USB input solely through
+a successful `sendkey` or mouse action. Disabling PS/2 is only a fixture
+precondition, not proof of successful HID input or an automatic PASS.
+
 Run the integrity regressions from the worktree:
 
 ```powershell

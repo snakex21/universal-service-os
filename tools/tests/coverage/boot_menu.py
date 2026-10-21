@@ -207,6 +207,8 @@ async def operator_steps(qmp, output,usb_test=False,hid_test=False,pointer='tabl
 
 async def main(args):
     aux.require_operator_channel(args.interactive)
+    usb_only=getattr(args,'usb_only_input',False)
+    machine=aux.input_machine(args.machine,args.ps2_input,usb_only)
     work = args.fixture.resolve()
     if not work.is_relative_to(fixture.COLLECTION/'_vm'):
         raise ValueError('Only owned collection VM fixtures may be opened writable')
@@ -244,7 +246,7 @@ async def main(args):
     port = server.sockets[0].getsockname()[1]
     acceleration = ('whpx,kernel-irqchip=off' if args.accel == 'whpx' else 'tcg,thread=multi')
     cpu = ('qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt' if args.accel == 'whpx' else 'EPYC-Rome')
-    command = [str(args.qemu), '-machine',args.machine, '-accel',acceleration,
+    command = [str(args.qemu), '-machine',machine, '-accel',acceleration,
         '-cpu',cpu, '-smp','2', '-m',str(args.ram_mib), '-display','none',
         '-serial','stdio', '-monitor','none', '-qmp',f'tcp:127.0.0.1:{port},server=off',
         '-drive',f'if=pflash,format=raw,readonly=on,file={(args.qemu.parent/"share/edk2-x86_64-code.fd").as_posix()}',
@@ -469,6 +471,8 @@ async def main(args):
         disk_bytes=sizes, total_disk_bytes=sum(sizes.values()), menu_observation=metadata.get('menu_observation'))
     result['product_failure'] = product_failure
     result['input'] = 'PS/2' if args.ps2_input else 'USB xHCI'
+    result['ps2_controller_enabled']=not usb_only
+    result['usb_only_input']=usb_only
     result['accel'] = args.accel
     result['cpu'] = cpu
     result['shutdown_method'] = shutdown_method
@@ -526,9 +530,10 @@ if __name__ == '__main__':
     parser.add_argument('--accel',choices=('tcg','whpx'),default='tcg',help='Explicit host accelerator; record CPU differences, never silently fall back')
     parser.add_argument('--boot-seconds',type=int,help='One endpoint after the real prepared-disk notice and target boot')
     parser.add_argument('--ps2-input',action='store_true',help='Use default QEMU PS/2 keyboard/mouse; USB stick stays on xHCI')
+    parser.add_argument('--usb-only-input',action='store_true',help='Disable q35 i8042 so USB HID cannot be replaced by default PS/2 input')
     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
-    parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; keyless NT4 diagnostic cases only')
+    parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; exact allowlisted keyless NT3/NT4 cases only')
     parser.add_argument('--collect-nt4-text',action='store_true',help='Read-only sanitized NT4 Setup text logs; no native screenshots or answers')
     parser.add_argument('--evidence-assets',type=Path,help='Explicit frozen cache for the one post-failure collector')
     parser.add_argument('--usb-pointer',choices=('mouse','tablet'),default='tablet',help='Use mouse for the NT4 driver boot-HID path')
