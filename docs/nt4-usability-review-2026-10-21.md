@@ -585,3 +585,84 @@ wTTY15282 uruchomiła jeden zwykły guard i512MiB, nowy overlay bez
 naruszenia preserved02. Po pierwszym odczycie pozostanie kanał zamkniętych
 pytań o TEN SAM RAMframe. Żaden wynik OCR nie udziela automatycznie
 zezwolenia na screenshot. Nadal brak desktop/LAN/HID/MSC/hardware PASS.
+
+
+## Zakończona diagnoza 05 i przygotowanie wrappera 06
+
+Próba 05 zakończyła się kontrolowanym QMP quit/rc0 po 957.59 s, bez żadnej
+akcji UI. Powtórne zamknięte pytania używały tego samego obrazu w RAM.
+Rozszerzony bank 2409 publicznych wzorców i trzy warianty OCR nie dały
+żadnego dopasowanego oryginalnego message-ID. Sygnał „klucz” nie rozróżnia
+klucza produktu i rejestru, zatem nie wykonano Next/OK. Obraz i OCR zwolniono,
+a maszyna nie zajmuje już RAM. To nie jest rozpoznany błąd licencji.
+
+Na nowym własnym overlay przygotowano diagnostyczny NT4PAGE.EXE. Nie
+zastępuje setup.exe: zmienia wyłącznie System\Setup\CmdLine na swój wrapper,
+który uruchamia dokładne oryginalne `setup -newsetup`, czeka na zakończenie
+native child i przekazuje jego rzeczywisty kod wyjścia. Plik SYSTEM jest
+zmieniany w RAM; osobne hive ani zasoby Microsoftu nie są eksportowane.
+Tymczasowy własny pełny dysk RAW pod G:\USOS-Kolekcja został po weryfikacji
+usunięty. Readback potwierdził oczekiwany SYSTEM i własny EXE, niezmienione
+setup.exe, SOFTWARE i logger. Porównano każdy pozostały wirtualny bajt;
+qemu-img compare całego obrazu również PASS.
+
+Końcowy SHA256 wrappera to
+`7c198c04063adfc5a4de230735cda8877208f1e685de59885f267de18f14c4aa`
+(32768 B); niezależne build06/build07 są identyczne. Wszystkie 34 importy
+potwierdzono w oryginalnych NT4 PL i EN. Odczyt obejmuje wyłącznie tytuły,
+STATIC i BUTTON przez bounded WM_GETTEXT/SendMessageTimeoutW: EDIT jest
+wykluczony przed wysłaniem wiadomości. Limit wynosi 2 s na kontrolkę i 15 s
+łącznie na jeden capture. Porównania z oryginalnymi zasobami odbywają się
+w gościu; host dostaje wyłącznie zamknięte publiczne ID i booleany.
+
+19 host tests PASS: 5 semantycznych rzeczywistego kodu C, 4 z oddzielnym
+procesem Windows (w tym licznik 0 wiadomości WM_GETTEXT do EDIT i rzeczywisty
+hung-control), 6 ścisłego protokołu UART i 4 zamkniętej polityki operatora.
+To dowód narzędzia hostowego, nie poprawności Windows. Metadane i źródła:
+`artifacts/nt4-success-review/nt4page/host-validation.json` oraz
+`nativepage06-preparation.json`. Próba 06 jest diagnostic_only: zachowany
+Setup, PS/2, bez NIC i bez interfejsu obrazu ekranu. Nadal brak potwierdzenia
+pulpitu/LAN/HID/MSC na NT4 i brak wyników fizycznego sprzętu.
+
+
+## Wynik wrappera 06 i poprawka niezależna od COM
+
+Próba 06 zakończyła się OBSERVER_ENDPOINT_TIMEOUT po 480.15 s i kontrolowanym
+QMP quit/rc0. Nie odebrano publicznych stanów ani ramek, nie wykonano żadnej
+akcji. Przyczyna konkretnej strony pozostaje nieustalona. To błąd/ograniczenie
+instrumentacji, nie nowy Windows FAIL. Wersja 06 NIE blokowała native child
+przy błędzie COM: entry zawsze wywoływało CreateProcess, natomiast observe
+pomijało całą obserwację przy niedostępnym COM. Serial Start=2 jest faktem
+z zatrzymanej bazy; nie dowodzi samodzielnie przyczyny braku kanału.
+
+Readback po zakończeniu 06 potwierdził zachowany własny EXE oraz przywrócone
+CmdLine do dokładnego polecenia native. SYSTEM różni się od bazowego, Setup
+nadal ma InProgress=1/RestartSetup=1/SetupType=0, SETUPLOG jest pusty.
+Nie wyeksportowano hive ani wartości klucza. Tymczasowy własny dysk RAW
+usunięto. Te fakty nie zastępują dowodu uruchomienia wrappera lub strony.
+
+Nowy wrapper zapisuje wyłącznie publiczne identyfikatory i zamknięte stany do
+własnego C:\USOS\NT4\NT4PAGE.LOG (CREATE_NEW, WRITE_THROUGH), niezależnie
+od COM. Kanały mają jawne booleany, a reader nadaje osobny enum m.in.
+FILE_ONLY_COM_UNAVAILABLE. Plik czyta się dopiero po potwierdzonym quit,
+w RAM, z dokładnego allowlist path. Nie zapisuje się surowej kopii pliku.
+Host odrzuca obce ID, dane niezgodne z ASCII grammar, fragment ramki,
+niegotowy sink i dwuznaczny status native launch. Sam native-start bez
+pełnej ramki nie daje rozpoznania strony; transport nie klasyfikuje strony
+na podstawie samego ogólnego tytułu czy przycisku.
+
+Końcowy build08/build09 ma identyczny SHA256
+`9081b76eb870437a7f5ad0c9db2ead95ae19b65d85a1faf45f8f3a3219b7a22e`,
+32768 B i komplet 34 importów w oryginalnych PL/EN. 24 host tests PASS:
+6 actual-C semantics, 4 cross-process WM_GETTEXT, 6 protokołu, 4 operatora,
+4 czytnika pliku. Jawny COM-open-failure test potwierdza uruchomienie native
+child i dokładne exit codes 0/19/259/C0000005; drugi test potwierdza pełny
+file capture przy braku COM. Nie zmieniano hubów ani sterowników.
+
+Własny overlay nativepage07 jest przygotowany i jeszcze niebootowany;
+pełny readback i porównanie innych wirtualnych bajtów PASS. Plan diagnozy:
+obserwacja 60 s po native child, jeden endpoint po 150 s od startu, quit,
+następnie tylko odczyt własnego pliku. Źródło do review:
+`artifacts/nt4-success-review/nt4page/page.c`; metadane
+`host-validation-file.json` i `nativepage07-preparation.json`. Nie ma
+nowego desktop/LAN/HID/MSC ani hardware PASS.
