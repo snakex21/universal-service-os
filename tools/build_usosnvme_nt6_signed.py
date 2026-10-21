@@ -27,7 +27,12 @@ HwInterrupt, so ScsiPort connects no interrupt; the X470 Win10 x86 WinPE
 failed the 2KXP build's start with Problem 10 / 0xC000000D, 2026-10-14),
 usosnvme.cat, usosnvme.cer. arch='amd64': the NT6X64 build (WDK 7.1 fre x64
 WLH, same polled source) with NTamd64 models, for Vista / Server 2008 SP2 x64,
-which load it in test mode (docs/vista-x64-nvme-2026-10-21.md).
+which load it in test mode (docs/vista-x64-nvme-2026-10-21.md). The amd64
+package also carries usosmpart.sys (own USB multi-partition disk filter,
+tools/nt/usosmpart bin/NT6/amd64, WDK 7.1 fre x64 WLH), embedded-signed with
+the same per-build certificate in the same signing session (no catalog: it is
+registered as a boot-start service, not installed through PnP), for the
+Vista / 2008 x64 CSMWrap path (docs/vista-x64-usb-multipartition-2026-10-21.md).
 """
 from __future__ import annotations
 
@@ -48,6 +53,9 @@ INF_DATE_OUT = b'DriverVer=01/01/2001,1.0.0.0'
 # test-signed USB backport of the v11 payload. modern=True (8.1/10 exact-ID
 # package) stays x86-only.
 ARCHES = ('x86', 'amd64')
+# Vista / 2008 x64 USB multi-partition filter (WLH x64 build), signed with
+# the amd64 package's certificate.
+MPART_AMD64 = 'tools/nt/usosmpart/bin/NT6/amd64/usosmpart.sys'
 
 
 def nt6_inf(root: Path, modern: bool = False, arch: str = 'x86') -> bytes:
@@ -100,6 +108,7 @@ def find_tools() -> tuple[Path, Path]:
 PS_SIGN = r'''
 $ErrorActionPreference = 'Stop'
 $out = $env:USOS_SIGN_OUT; $signtool = $env:USOS_SIGNTOOL; $makecat = $env:USOS_MAKECAT
+$extras = @(); if ($env:USOS_SIGN_EXTRA) { $extras = @($env:USOS_SIGN_EXTRA -split ';' | Where-Object { $_ }) }
 $subject = 'CN=USOS usosnvme ' + $env:USOS_SIGN_BUILD + ' (per-build test signature, key destroyed after signing), O=Universal Service OS'
 $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject -CertStoreLocation 'Cert:\CurrentUser\My' `
     -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA1 -KeyExportPolicy NonExportable `
@@ -110,6 +119,10 @@ try {
     Export-Certificate -Cert $cert -FilePath (Join-Path $out 'usosnvme.cer') -Type CERT | Out-Null
     & $signtool sign /q /fd sha1 /s My /sha1 $thumb (Join-Path $out 'usosnvme.sys')
     if ($LASTEXITCODE -ne 0) { throw "signtool (sys) exit $LASTEXITCODE" }
+    foreach ($extra in $extras) {
+        & $signtool sign /q /fd sha1 /s My /sha1 $thumb (Join-Path $out $extra)
+        if ($LASTEXITCODE -ne 0) { throw "signtool ($extra) exit $LASTEXITCODE" }
+    }
     Push-Location $out
     try { & $makecat -v usosnvme.cdf | Out-Null; if ($LASTEXITCODE -ne 0) { throw "makecat exit $LASTEXITCODE" } } finally { Pop-Location }
     & $signtool sign /q /fd sha1 /s My /sha1 $thumb (Join-Path $out 'usosnvme.cat')
@@ -118,7 +131,7 @@ try {
     Remove-Item -LiteralPath ('Cert:\CurrentUser\My\' + $thumb) -DeleteKey -ErrorAction SilentlyContinue
 }
 if (Test-Path -LiteralPath ('Cert:\CurrentUser\My\' + $thumb)) { throw 'signing certificate still in CurrentUser\My' }
-foreach ($f in 'usosnvme.sys', 'usosnvme.cat') {
+foreach ($f in (@('usosnvme.sys', 'usosnvme.cat') + $extras)) {
     $s = Get-AuthenticodeSignature -LiteralPath (Join-Path $out $f)
     if (-not $s.SignerCertificate -or $s.SignerCertificate.Thumbprint -ne $thumb) { throw "$f is not signed by $thumb" }
 }
@@ -140,6 +153,11 @@ def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> 
     (out / 'usosnvme.inf').write_bytes(inf)
     shutil.copyfile(root / ('tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys' if arch == 'x86' else
                             'tools/nt/usosnvme/bin/NT6/amd64/usosnvme.sys'), out / 'usosnvme.sys')
+    extras = []
+    if arch == 'amd64':
+        # Same certificate, same session: the key is gone after this build.
+        shutil.copyfile(root / MPART_AMD64, out / 'usosmpart.sys')
+        extras.append('usosmpart.sys')
     (out / 'usosnvme.cdf').write_bytes(
         b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n' +
         (b'CATATTR1=0x10010001:OSAttr:2:6.3,2:10.0\r\n\r\n' if modern else
@@ -147,6 +165,7 @@ def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> 
         b'[CatalogFiles]\r\n<hash>usosnvme.inf=usosnvme.inf\r\n<hash>usosnvme.sys=usosnvme.sys\r\n')
     signtool, makecat = find_tools()
     env = dict(os.environ, USOS_SIGN_OUT=str(out), USOS_SIGNTOOL=str(signtool), USOS_MAKECAT=str(makecat),
+               USOS_SIGN_EXTRA=';'.join(extras),
                USOS_SIGN_BUILD=os.environ.get('USOS_BUILD_ID', 'DEV') + ('' if arch == 'x86' else ' amd64'))
     result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', PS_SIGN],
                             env=env, capture_output=True, text=True)
@@ -154,7 +173,7 @@ def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> 
         raise RuntimeError('usosnvme NT6 signing failed:\n' + result.stdout + result.stderr)
     thumb = result.stdout.strip().splitlines()[-1].strip()
     (out / 'usosnvme.cdf').unlink()
-    for name in ('usosnvme.inf', 'usosnvme.sys', 'usosnvme.cat', 'usosnvme.cer'):
+    for name in ('usosnvme.inf', 'usosnvme.sys', 'usosnvme.cat', 'usosnvme.cer', *extras):
         if not (out / name).is_file():
             raise FileNotFoundError(name)
     print('[PASS] usosnvme NT6 package signed, certificate', thumb, '(private key deleted)')

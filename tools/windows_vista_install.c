@@ -794,6 +794,7 @@ static void stage_testmode_desktop_root(const WCHAR *root){
 #endif
 }
 #include "windows_vista_nvme.h"
+#include "windows_vista_mpart.h"
 #include "windows_vista_nvme_setup.h"
 static BOOL prepare_servicing_answer(WCHAR *answer){
  static WCHAR xml[2048],cab[MAX_PATH],source[MAX_PATH];BYTE digest[32];
@@ -1027,6 +1028,8 @@ void entry(void){
  stage_testmode_desktop_root(target->root);
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
  if(!install_nvme64(target)){logcode("STOP: NVMe64 boot package not prepared=",GetLastError());ExitProcess(11);}
+ /* Not fatal: on failure the stick keeps one volume (as before). */
+ if(!install_mpart64(target))logcode("Mpart64: USB multi-partition filter not installed (not fatal)=",1);
  install_optional_dispatcher(target);
  /* PE10 runs from RAM: the staging partition is not needed any more unless
   * Setup made it the system partition. Not fatal. */
