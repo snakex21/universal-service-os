@@ -80,13 +80,16 @@ have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
 Hardware evidence (silent, no user action): after attaching, the launcher saves
-small 640x200 bottom-right crops of the primary monitor as
-`logs\corner-s<session>-p<pid>-{before,after,late20s,endsession}.bmp`
-(at most 16 files) and logs the attach time in ms since boot. `before` shows
-the native paint, `after` the synchronous repaint by our renderer. X470
-Vista x64 2026-10-21: hook attached and renderer active 10 s after logon with
-no refusal, yet the user still reported the text; these crops decide whether
-it was only the pre-Startup native paint or an uncovered paint path.
+24-bit BMPs of the whole virtual screen (all monitors) as
+`logs\screen-s<session>-p<pid>-{before,after,late20s,endsession}.bmp`
+(at most 8 files in total). At the same moments the session log records the
+virtual screen, every monitor's rect/work area/current mode, and each visible
+top-level window overlapping the top eighth of the screen (class, title, rect,
+style, PID, image path). `before` shows the native paint, `after` the
+synchronous repaint by our renderer. X470 Vista x64 2026-10-21: hook attached
+and renderer active 10 s after logon with no refusal, yet the user reported a
+"Test Mode" text at the TOP of the screen, where the NT 6.0 desktop painter
+does not place it; these records identify what draws there.
 
 ## Installation flow and opt-out
 
