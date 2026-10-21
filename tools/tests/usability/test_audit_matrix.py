@@ -66,5 +66,19 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('full-MAC',net)
         self.assertNotIn('PASS',usb+net)
 
+    def test_nt31_completed_hid_does_not_qualify_storage_or_intel(self):
+        exact=list(audit.NT31_R19C_ROW)
+        usb,net=audit.capability(exact)
+        self.assertNotIn('PASS',usb+net)
+        self.assertIn('QEMU PASS R19c',audit.hid_test(usb,exact))
+        self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
+
+    def test_nt31_result_does_not_spread_to_other_media_or_server(self):
+        for index,value in ((0,'Windows NT 3.1\\Other.iso'),(1,'3.10 SP3'),
+                            (2,'en-US / x86'),(3,'windows-nt-3-1-server / nt3-x86-qemu-csmwrap')):
+            changed=list(audit.NT31_R19C_ROW);changed[index]=value
+            usb,net=audit.capability(changed)
+            self.assertNotIn('QEMU PASS',usb+net+audit.hid_test(usb,changed))
+
 
 if __name__=='__main__':unittest.main()

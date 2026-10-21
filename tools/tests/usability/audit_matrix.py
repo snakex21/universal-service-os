@@ -11,6 +11,19 @@ NT351_R18F_ROW = (
     'windows-nt-3-51 / nt3-x86-qemu-csmwrap',
 )
 
+NT31_R19C_ROW = (
+    r'Windows NT 3.1\Windows NT 3.1 Workstation 3.10.511.1 EN (ISO).7z',
+    '3.10.5098.1',
+    'nie odczytano / x86',
+    'windows-nt-3-1 / nt3-x86-qemu-csmwrap',
+)
+
+
+def nt31_r19c(row):
+    """Bind USB HID only to the exact completed R19c inventory row [S5]."""
+    return len(row) >= 4 and tuple(value.casefold() for value in row[:4]) == tuple(
+        value.casefold() for value in NT31_R19C_ROW)
+
 
 def nt351_r18f(row):
     """Bind a completed diagnostic to its exact frozen inventory row [S4]."""
@@ -90,6 +103,8 @@ def rows(path):
 
 def hid_test(usb,row=None):
     if 'nie dotyczy' in usb:return 'nie dotyczy'
+    if row and nt31_r19c(row):
+        return 'QEMU PASS R19c: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje File; sprzęt i8042 obecny, i8042prt Start4 [S5]; osobny overlay po świeżym USOS, nie konfiguracja domyślna instalatora'
     if row and nt351_r18f(row):
         return 'QEMU PASS R18f: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run; sprzęt i8042 obecny, i8042prt Start4 [S4]; nie konfiguracja domyślna instalatora'
     if row and 'windows-7' in row[3] and '7601' in row[1] and 'pl-PL' in row[2] and 'x86' in row[2] and 'x64' not in row[2]:
@@ -107,13 +122,15 @@ def main(args):
         '[S2] Niezmienione binaria `feat/nt4-usb-sticks` na `ed1e14598927516c70a778d1a7cabfab7428d539`, zamrożone wejście B261020-200536-968CCBE8. To osobny pakiet do testu, bez scalenia i bez użycia gałęzi hubów. Nie jest runtime PASS.','',
         '[S3] `docs/usosusb-hubs-2026-10-21.md:180`: runda 2 X470, Win7 SP1 x86, root-port replug klawiatury i myszy PASS. `docs/release-notes-1.0.md:186` potwierdza świeżą instalację PL x86 z dołączonym donorem. Huby pozostają QEMU only. Dokumenty nie podają hasha ISO, więc wynik jest rodzinny.','',
         '[S4] `docs/nt351-r18f-usability-evidence.md`: zakończony rzeczywisty NT3.51 Workstation R18f, źródło i sterowniki przypięte hashami. Diagnostyczny overlay po normalnym USOS, jawne wyłączenie i8042prt; QEMU only, bez MSC i bez kwalifikacji całego przepływu instalatora.','',
-        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-21-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 ma osobną trwającą próbę; wcześniejsza awaria stagingu nie jest wynikiem Windows ani MSC.','',
+        '[S5] `docs/nt31-r19c-usb-evidence.md`: normalny USOS R19 doszedł do pulpitu NT3.1; osobny overlay R19c z wyłączeniem i8042prt przeszedł USB HID out/in. Sterownik przypięty hashem i odczytany po native Shutdown. Nie jest to MSC ani Intel LAN PASS.','',
+        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 nie doszedł do logowania; diagnoza działa na osobnych overlay. Wcześniejsza awaria stagingu nie jest wynikiem Windows ani MSC.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
     for row in entries:
         usb,net=capability(row)
         tests='nie zlecać teraz: brak ścieżki / poza zakresem' if 'nie dotyczy' in usb or 'osobna ścieżka' in usb or 'NT3 po 1.0' in usb else 'T1 / T2 / T3 / T4 / T5 po gotowym QEMU i cichym loggerze'
         if nt351_r18f(row):tests='T3 / T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0'
+        if nt31_r19c(row):tests='T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0, Intel LAN brak'
         out.append('| '+' | '.join([*row[:4],usb,net,hid_test(usb,row),tests])+' |')
     out+=['','## Ograniczenia i kolejność','',
         '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9). Candidate02 trwa; USB MSC i HID wymagają osobnych dowodów, bez przenoszenia wyników NT351.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: [S4] potwierdza zainstalowany Workstation i konkretny diagnostyczny overlay, bez MSC. Fallback sieci około2s pozostaje istotnym ograniczeniem. NT3.1/3.5/Server wymagają osobnych testów.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
