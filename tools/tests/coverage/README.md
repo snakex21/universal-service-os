@@ -193,6 +193,14 @@ into network PASS: inspect the completed log independently. This is fixture
 instrumentation through the existing user_script option, not installer
 staging or a release build. The normal installed LAN helper remains GUI-only.
 
+An optional `driver_zip` plus exact `driver_zip_sha256` supplies a private
+`Other/package/...` archive under collection `_assets`. The fixture validates
+paths, Windows aliases, links, collisions, bounds and SHA-256, copies the
+unchanged files to normal `DATA/Drivers/<system>` and reads them back.
+Production Setup chooses the matching INF; the adapter does not install a
+driver on the host. Inputs and licenses stay outside Git. This option does
+not imply vendor redistribution rights or runtime compatibility.
+
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB
 free and 8 GiB available host RAM, at most three VMs globally. VM disks are

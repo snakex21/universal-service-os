@@ -24,6 +24,8 @@ LOWRAM = Path(r'C:\Users\ASRock\usos-work\lowram-pomiar\tools\tests\lowram\boots
 PRIVATE_KEYS = Path(r'C:\Users\ASRock\AppData\Local\USOS\test-assets\private-keys').resolve()
 NT5_FOLDERS={'windows xp','windows xp x64','windows 2000','windows 2000 server',
     'windows server 2003','windows xp media center edition 2005','windows xp tablet pc edition 2005'}
+_driver_spec=importlib.util.spec_from_file_location('coverage_driver_inputs',Path(__file__).with_name('driver_inputs.py'))
+driver_inputs=importlib.util.module_from_spec(_driver_spec);_driver_spec.loader.exec_module(driver_inputs)
 LEGACY_OBSERVER_AWK = r'''
 {
     sub(/\r$/, "")
@@ -197,7 +199,12 @@ async def main(args):
         (service_pack,f'/mnt/data/Systems/Windows/{args.folder}/ServicePack/SP6I386.EXE'),
         (args.boot_floppy,f'/mnt/data/Systems/Windows/{args.folder}/Boot/BOOTDISK.IMG')) if path]
     # Fail on missing inputs before constructing a copied share with private data.
-    inputs = args.iso.stat().st_size + sum(path.stat().st_size for path,_ in extras)
+    driver_bundle=None
+    if getattr(args,'user_drivers_zip',None):
+        driver_bundle=driver_inputs.load(args.user_drivers_zip,getattr(args,'user_drivers_sha256',None))
+    elif getattr(args,'user_drivers_sha256',None):
+        raise ValueError('Driver ZIP required with its hash')
+    inputs = args.iso.stat().st_size + sum(path.stat().st_size for path,_ in extras)+(driver_bundle['bytes'] if driver_bundle else 0)
     profile = None
     if args.profile:
         profile = args.profile.read_bytes()
@@ -216,6 +223,7 @@ async def main(args):
         getattr(args,'usability_logger',None),getattr(args,'logger_sha256',None))
     share = work/'share'
     shutil.copytree(args.assets/'zig-out/usb', share)
+    if driver_bundle:driver_inputs.stage(driver_bundle,share/'coverage-user-drivers',work)
     shutil.copyfile(args.assets/'zig-out/bin/usos-x86_64.efi', share/'EFI/BOOT/BOOTX64.EFI')
     for source, destination in [('micro-linux','EFI/USOS/micro-linux'),
                                 ('dos-native','EFI/USOS/dos-native'),
@@ -292,6 +300,9 @@ mkdir -p '/mnt/data/Systems/Windows/{args.folder}/Images' /mnt/data/Programs /mn
 dd if=/dev/vdc of='/mnt/data/Systems/Windows/{args.folder}/Images/source.iso' bs=1M
 printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
 '''
+    if driver_bundle:
+        commands += f"mkdir -p '/mnt/data/Drivers/{args.folder}'\ncp -R /mnt/share/coverage-user-drivers/. '/mnt/data/Drivers/{args.folder}/'\n"
+        commands += "(cd /mnt/share/coverage-user-drivers && find . -type f | while IFS= read -r file; do cmp -s \"$file\" \"/mnt/data/Drivers/"+args.folder+"/$file\" || exit 1; done)\n"
     for index,(_,destination) in enumerate(extras,3):
         commands += f"mkdir -p '{destination.rsplit('/',1)[0]}'\n"
         commands += f"dd if=/dev/vd{chr(ord('a')+index)} of='{destination}' bs=1M\n"
@@ -319,11 +330,13 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
         observer_ide=args.observer_ide,
         observer_kind='9x-runonce' if args.legacy_first_logon else 'scripts-cd' if args.first_logon_observer else None,
         donor=str(args.donor) if args.donor else None,
+        user_drivers=driver_inputs.metadata(driver_bundle) if driver_bundle else None,
         legacy_service_pack=str(service_pack) if service_pack else None,
         boot_floppy=str(args.boot_floppy) if args.boot_floppy else None, nvme_9x=args.nvme_9x,
         virtual_bytes=virtual_gib*1024**3,
         current_bytes=disk.stat().st_size)
     (work/'fixture.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
+    if not share.resolve().is_relative_to(work):raise ValueError('Fixture share escaped the owned work directory')
     shutil.rmtree(share)  # Only the new per-test copied asset share.
     if result['result'] != 'PASS':
         raise SystemExit(1)
@@ -338,6 +351,8 @@ if __name__ == '__main__':
     parser.add_argument('--logger-sha256',help='Required exact hash of the own logger, never a Windows file')
     parser.add_argument('--dos', type=Path)
     parser.add_argument('--donor', type=Path, help='Unchanged read-only PE10 donor ISO')
+    parser.add_argument('--user-drivers-zip',type=Path,help='Private hashed Other/package ZIP staged through ordinary DATA/Drivers')
+    parser.add_argument('--user-drivers-sha256',help='Exact SHA-256 required for the private driver input')
     parser.add_argument('--legacy-service-pack',type=Path,help='Unchanged read-only NT4 SP6a/TSE SP6 prerequisite')
     parser.add_argument('--boot-floppy',type=Path,help='Read-only Windows 95 prerequisite boot disk')
     parser.add_argument('--nvme-9x',action='store_true',help='Use the product NVMe experimental opt-in file')

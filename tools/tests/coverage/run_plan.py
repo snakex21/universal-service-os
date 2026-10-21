@@ -162,6 +162,10 @@ def run(args):
             prepare=[sys.executable,'-I','-B',str(HERE/'prepare_stick.py'),'--assets',str(args.assets),'--qemu',str(args.qemu),
                 '--iso',str(source),'--folder',case['folder'],'--profile',str(case.get('profile',args.profile)),'--trace-menus','--out',str(work)]
             if case.get('donor'):prepare+=['--donor',case['donor']]
+            if case.get('driver_zip'):
+                digest=case.get('driver_zip_sha256')
+                if not isinstance(digest,str) or not re.fullmatch('[a-f0-9]{64}',digest):raise ValueError('Private driver input needs its exact SHA-256')
+                prepare+=['--user-drivers-zip',case['driver_zip'],'--user-drivers-sha256',digest]
             if service_pack:prepare+=['--legacy-service-pack',str(service_pack)]
             if case.get('boot_floppy'):prepare+=['--boot-floppy',case['boot_floppy']]
             if case.get('nvme_9x'):prepare+=['--nvme-9x']
