@@ -40,9 +40,11 @@ for this new NDIS3 candidate. There is no runtime PASS in this document.
 An additional original NT3.5 PCI audit found a possible starting point,
 not a drop-in replacement: `NdisPciAssignResources` exists at RVA `0xee64`
 in NDIS.SYS `fa392210418f6a5977ea8117d49b4d6a0b4cfc7d4fcc436fca2e3defdd6a5543`.
-The bounded decode shows five stack arguments (`ret 0x14`), accesses to
-the third handle at `+0x64` / `+0x6c`, and a call through the imported
-`HalAssignSlotResources`. This differs from the three-argument
+The initial bounded decode shows five stack arguments (`ret 0x14`) and
+a call through imported `HalAssignSlotResources`. The later complete
+dataflow audit identifies the write at `+0x6c` as belonging to the **first**
+handle, not the third; do not implement the earlier handle interpretation.
+This differs from the three-argument
 `NdisMPciAssignResources` used by our miniport. Aliasing the imports is
 therefore not a demonstrated adaptation.
 
