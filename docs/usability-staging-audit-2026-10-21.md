@@ -9,7 +9,7 @@ desktop PASS, source matches, static imports or QMP replies.
 | 95 OSR2 / 98 FE / 98 SE / Me | `network_defaults.zig`: MS Client (VREDIR), MSTCP, DHCP, no sharing service; Dial-Up off by default. `network_setup.sh` matches actual PCI IDs before staging usosnet4 for 95 or usosnet for 98/Me. | User reports family X470 PASS; each exact image/language still needs its own lease, gateway ICMP and DNS log. RTM/OSR1 are separate. |
 | NT4 | Setup installs LOOP + TCP/IP as a placeholder. `network_setup.sh` stages usosnet4 and switches NDISLoop/NDISLoop1 to the matched physical NIC. `POST.CMD` applies the binding. LAN helper disables Server/Browser services. | Loopback address is not LAN. R5/R6 stopped in internal Setup start 2; no MSC or NIC runtime result. Keyless R7 collects the actual question. |
 | Windows 2000 | `prepare_xp_ntfs_target.sh` calls the W2K network stage. An exactly matching usosnet package is copied into OEM source trees. `usos_net_w2k_sif` requests MS Client, TCP/IP and empty NetServices. | Verify the actual installed adapter/bindings and live lease. R8 stopped before writes because the fixture disk was too small; retry R11 uses 32 GiB. |
-| XP / 2003 x86 | Base answer has `InstallDefaultComponents=Yes`. The W2K-specific network stage does not run for XP/2003. | Separate unmerged fix/nt5-net d51b445a explicitly requests client/TCP-IP and empty NetServices. Driver staging/connectivity remain unproved. Prefer inbox or a verified redistributable vendor package; do not add a second own driver merely because the fixture lacks one. |
+| XP / 2003 x86 | Base answer has `InstallDefaultComponents=Yes`. The W2K-specific network stage does not run for XP/2003. | Separate unmerged fix/nt5-net d51b445a requests client/TCP-IP and empty NetServices; 513cda9a adds XP x86 user Class=Net package staging. Fresh execution/connectivity remain unproved. Prefer inbox or a verified redistributable vendor package. |
 | XP x64 | `nt5_user_drivers.sh` accepts architecture-matched DATA/Drivers packages. Existing usosnet SYS is x86. | Need a matching amd64 NIC package; the x86 SYS cannot serve this route. |
 | Server 2003 x86 | `nt5_user_drivers.sh` also stages x86 DATA/Drivers packages and reads every copied file back. | R5 correctly rejected a source-mismatched storage bundle. R12 uses a separately built, exact PL CD1 bundle without weakening source hashes. NIC readiness remains separate. |
 | Vista / Server 2008 SP2 x86 | Existing bundled NT6 usosusb and shared notifier path; x86 WinPE donor used only for Setup. | Fresh R13 verifies storage and HID, including reconnect. NIC inbox/vendor presence and LAN defaults still require measurement; PE10 USB/NIC availability does not prove installed-system support. |
@@ -44,6 +44,10 @@ Separate unmerged changes:
   for XP/2003 automatic answers. 3 new component tests, 79 settings checks
   and 9215 renderer checks PASS; fresh runtime pending. Existing custom SIF
   and W2K network-off decisions are preserved.
+  Follow-up `513cda9a` accepts user XP x86 network packages through the
+  existing NT5 PnP copy/readback path, filters non-Net/mixed and Storage/USB
+  packages, and preserves selected custom answers. Six staging tests PASS;
+  no vendor bytes bundled and no claim of fresh runtime readiness.
 
 Upstream now includes the hubs/root-port fix. The reported X470 round 2
 confirms keyboard and mouse reconnect on front/rear root ports in Win7 SP1

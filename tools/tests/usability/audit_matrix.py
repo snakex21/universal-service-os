@@ -36,7 +36,7 @@ def capability(row):
             net='brak potwierdzenia; usosnet SYS w bazie jest x86, nie nadaje się do x64; sprawdzić zgodny pakiet DATA/Drivers'
         elif 'windows-2000' in r:
             net='brak pomiaru; matching usosnet NDIS 5 + OEM LAN stage; DHCP z Setupu, ping/DNS oczekują'
-        else:net='brak pomiaru; baza XP/2003 ma InstallDefaultComponents=Yes, bez osobnego stagingu usosnet; fix/nt5-net d51b445a jawnie wybiera client/TCP-IP bez sharing, runtime oczekuje; wymagany zgodny NIC'
+        else:net='brak pomiaru; baza XP/2003 ma InstallDefaultComponents=Yes; fix/nt5-net d51b445a/513cda9a wybiera client/TCP-IP bez sharing i umożliwia XP pakiety Class=Net z DATA/Drivers; runtime i zgodny NIC oczekują'
         return usb,net
     if any(s in r for s in ('windows-7','windows-vista','windows-server-2008','posready-7')):
         is_x86='x86' in arch.lower() and 'x64' not in arch.lower()
