@@ -126,3 +126,27 @@ ograniczeniem, jeśli nadal ma domyślną ścieżkę PS/2.
 Nie stwierdzono obecnie uzasadnienia dla kolejnej zmiany kodu sterownika
 sieci lub USB. Najbliższy brakujący dowód dotyczy natywnego Setupu, a
 następnie testu HID bez alternatywnego kontrolera PS/2.
+
+## Uzupełnienie po przeglądzie kolektora
+
+W niezależnej kopii dwóch plików kolektora z `macierz-windows` przygotowano
+patch jawnych statusów czterech logów: `exported`, `empty`, `unavailable`,
+`too-large`. Nieudany mcopy nie jest dowodem nieistnienia pliku. Same
+statusy lub puste logi dają `no-native-text-exported`, a metadane wskazują
+rzeczywiste niepuste logi. Zachowano sanitizację w gościu przed transportem
+i dokładną allowlistę. Jeden prefiks tar `./` jest normalizowany w jednym
+miejscu; kolejne prefiksy, kolizje, linki i traversal są odrzucane.
+
+Autor wykonał 13 testów skupionych na kolektorze, wszystkie PASS, w tym
+rzeczywistą funkcję shell gościa ze sztucznymi odczytami. Właściciel głównego
+testera przejrzał i zintegrował patch jako `e0fac76d`, a następnie zgłosił
+72/72 PASS zestawu coverage. Te 72 testy są osobnym zestawem od 62 testów
+hostowych sieci opisanych wyżej. R16 załaduje kolektor po zakończeniu VM;
+aktywna maszyna nie została zmieniona. Poprzedni repack main już usuwał
+`./`, więc przegląd nie dowiódł istniejącej awarii prefiksu podczas pracy VM.
+
+Właściciel testera dodał też przyszły tryb `--usb-only-input`, commit
+`82e7eaf1`, z `q35,i8042=off`, sprawdzaniem konfliktu z PS/2 przed fixture
+i jawną metryką wyniku. Obecny R16 zachował dotychczasowy plan. Raport
+zadaniowy z pełną analizą ograniczeń sanitizera i proponowanego preflight
+klucza: `Documents/Codex/zadania/2026-10-21-nt4-usability-RAPORT.md`.
