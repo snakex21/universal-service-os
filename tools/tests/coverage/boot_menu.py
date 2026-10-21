@@ -150,11 +150,22 @@ async def start_nt5_target(qmp,usb_test):
 
 async def capture(qmp, path):
     from PIL import Image
+    pending = path.with_name(path.name + '.pending')
     ppm = path.with_suffix('.ppm')
-    await qmp.command('screendump', {'filename':str(ppm.resolve())})
-    with Image.open(ppm) as frame:
-        frame.save(path)
-    ppm.unlink()
+    if any(item.exists() for item in (path, pending, ppm)):
+        raise FileExistsError('Refusing to overwrite an existing evidence frame')
+    pending_created = False
+    try:
+        await qmp.command('screendump', {'filename':str(ppm.resolve())})
+        with Image.open(ppm) as frame, pending.open('xb') as output:
+            pending_created = True
+            frame.save(output, format='PNG')
+        # Publish only complete, closed PNG bytes. An existing destination
+        # fails atomically instead of silently replacing previous evidence.
+        os.link(pending, path)
+    finally:
+        if pending_created: pending.unlink(missing_ok=True)
+        ppm.unlink(missing_ok=True)
 
 
 async def operator_steps(qmp, output,usb_test=False,hid_test=False,pointer='tablet'):
@@ -482,7 +493,7 @@ async def main(args):
                     if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                         raise RuntimeError('Private Setup has not reached its verified post-key boundary; no manual capture')
                     await operator_steps(qmp,args.out,usb_test,not args.ps2_input,getattr(args,'usb_pointer','tablet'))
-                    await capture(qmp,args.out/'endpoint.png')
+                    await capture(qmp,args.out/'final.png')
                 if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await qmp.command('human-monitor-command',{'command-line':
                         f'pmemsave 0xb8000 4000 "{(args.out/"endpoint-vga.bin").resolve().as_posix()}"'})
@@ -520,11 +531,6 @@ async def main(args):
     sizes = {path.name:path.stat().st_size for path in all_disks}
     allocated = {path.name:fixture.allocated_bytes(path) for path in all_disks}
     variables.unlink(missing_ok=True)
-    from PIL import Image
-    if (args.out/'endpoint.ppm').exists():
-        with Image.open(args.out/'endpoint.ppm') as frame:
-            frame.save(args.out/'endpoint.png')
-        (args.out/'endpoint.ppm').unlink()
     result = dict(result='RUNNER_ERROR' if failure else 'ASSESS_ENDPOINT', error=failure,
         source=metadata['source'], folder=metadata['folder'],
         events=events, elapsed=round(time.monotonic()-start,2), resources=resources,
