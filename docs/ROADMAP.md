@@ -555,6 +555,26 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   test świeżej instalacji na SanDisku: [RELEASE-TEST-1.0.md](RELEASE-TEST-1.0.md).
   Tag `v1.0.0` dopiero po zaliczeniu tego testu.
 
+- **Rozdzielczość ekranu: otwarte punkty** (2026-10-21, zasady:
+  [display-policy.md](display-policy.md)):
+  - Vista x64 / 7 / 2008: automatyczna natywna rozdzielczość (USOSRES)
+    zaimplementowana; do potwierdzenia na X470 na świeżej instalacji
+    (Vista x64 ręcznie 1920x1080 OK 2026-10-21).
+  - Win7 x64 przez UefiSeven: dwa tryby VBE (1024x768 + natywny) i USOSRES
+    za flagą (gałąź `feat/w7x64-native-res`,
+    `w7x64-native-res-2026-10-21.md` na tej gałęzi); test X470 czeka.
+    Jeśli nie przejdzie, zostaje 1024x768.
+  - Vista x64, tekst trybu testowego: zakryty przez nadmalowanie usoswm
+    (X470 PASS 2026-10-21); próba usunięcia u źródła nieudana
+    ([vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md)).
+    Po 1.0: debugger jądra, ustalić, skąd win32k bierze ten napis.
+  - 9x: automatyczna rozdzielczość ograniczona do 1920x1080; zdjąć limit
+    po teście z monitorem 1440p/4K.
+  - Windows 3.x: wysoka rozdzielczość przez VBESVGA.DRV tylko z pliku
+    użytkownika (brak licencji); plan integracji w
+    [display-policy.md](display-policy.md).
+  - POSReady 2009: jeszcze bez automatycznej rozdzielczości.
+
 ## 3. Znane ograniczenia (zaakceptowane)
 
 - **AMI pokazuje każdą montowalną partycję** pendrive'a jako osobny
