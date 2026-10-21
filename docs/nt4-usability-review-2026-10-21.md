@@ -150,3 +150,93 @@ Właściciel testera dodał też przyszły tryb `--usb-only-input`, commit
 i jawną metryką wyniku. Obecny R16 zachował dotychczasowy plan. Raport
 zadaniowy z pełną analizą ograniczeń sanitizera i proponowanego preflight
 klucza: `Documents/Codex/zadania/2026-10-21-nt4-usability-RAPORT.md`.
+
+
+## Zakończony R16 i odzyskanie transportu
+
+Po pasywnym powiadomieniu `cleanup.json` odczytano zakończony wynik R16.
+Próba zgłosiła `Preparation stopped` po około 4057 s (całość 4060 s), bez
+potwierdzenia pierwszego logowania. QEMU zakończono przez QMP; obrazy testu
+usunięto. Nie przechwytywano ani nie otwierano niezweryfikowanego ekranu
+prywatnego Setupu. R16 nie obejmował nowego loggera 54282e85 i miał PS/2.
+
+Pierwotna kolekcja tekstowa zakończyła się błędem transportu `Excess data
+after padding`. Zachowany serial kolektora w G: zawierał jedną pełną ramkę
+oraz dokładnie dwa znane echa BusyBox ash: zapytanie kursora przy komendzie
+base64 i skrócony fragment `VERAGE_E` przed echem END. Oryginalny błąd
+odtworzono, a transport odzyskano bez trybu pobłażliwego base64 i bez
+obcinania na pierwszym padding. Nieznane linie, inne komendy, podwójne
+ramki i doklejone drugie archiwum są odrzucane. Oryginał pozostał niezmieniony.
+
+Po pełnej walidacji allowlist i sanitizacji host przyjął archiwum 238 B.
+SHA-256 serialu: `8b05063892e4ad5b5591b5a0da1ddd0d639e440ba75585a17221811a16913417`;
+archiwum: `fd5490dc185d03b14fdacdb78480ed4be72149277e1e8bc8f4325e76169c1119`.
+
+| Log | Status |
+| --- | --- |
+| SETUPLOG.TXT | empty |
+| SETUPERR.LOG | unavailable |
+| SETUPACT.LOG | unavailable |
+| POST.LOG | unavailable |
+
+`actual_native_logs=[]`, `native_logs_read=false`. Nie ma niepustego
+natywnego tekstu Setupu ani dowodu jego konkretnej przyczyny. `unavailable`
+oznacza nieudany odczyt, bez twierdzenia o istnieniu pliku. Potwierdzona
+statycznie luka UTC nie jest przez to potwierdzoną przyczyną zatrzymania R16.
+
+[Wynik odzyskania i zachowane źródło](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-transport-review/r16-recovered/collection.json>)
+wiąże wszystkie hashe. [Patch dekodera do przeglądu](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-transport-review/strict-transport-echo.patch>)
+ma 6 testów transportu PASS oraz 13 testów NT4 text PASS. Poprzedni patch
+statusów e0fac76d miał 13 focused PASS i pełne 72 testy roota PASS;
+nie przypisuje się tych 72 testów nowemu patchowi bez nowego wyniku roota.
+
+## Gotowy cache i wariant ze ścisłym DNS
+
+Na polecenie właściciela przygotowano nowy, oddzielny baseline
+`G:\USOS-Kolekcja\_assets\B261020-200536-968CCBE8-nt4-hid13-net542-utc`.
+Initrd SHA-256: `e71de996f25f3e25a65f97debb9caba82609eaa300250d27be6fbd1770edeff4`.
+Zmiany obejmują dokładnie cztery własne wpisy: osiem linii kopiowania i
+readback loggera w aktualnym skrypcie cache, dwie linie UTC PL/EN z e2a0d6a9,
+USOSLANNT.EXE oraz USOSLOG.EXE z 54282e85. Nie podmieniono całych skryptów
+starszą wersją. Wszystkie 824 inne wpisy mają identyczne bajty, tryby i
+symlinki, w tym własne HID 1.3, NDIS4, Storage i LogFile. Brak domieszki MSC.
+SP6a PL znajduje się wyłącznie w dozwolonym cache, z przypiętym hashem
+`a3306f0bc93d1d4709ab784ecd8aebd1a162c8249a219a9e078d1a4a91260542`.
+[Manifest, mapy CPIO i ścisłe hunki](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-coherent-cache-review/cache-manifest.json>)
+umożliwiają przegląd.
+
+Przegląd loggera 54282e85 wykazał, że samo `resolved` mogło pochodzić z
+niedopasowanej odpowiedzi DNS. Dlatego na polecenie roota utworzono drugi,
+mały overlay, bez zmian wspólnych źródeł loggera NT4/9x:
+`G:\USOS-Kolekcja\_assets\B261020-200536-968CCBE8-nt4-hid13-netdns-utc`.
+Initrd SHA-256: `932bb19a66a9b1807f2658e73d010aa74bbc8fe5521d2881e7cf654dd2efd8be`.
+Zastępuje wyłącznie jeden wpis USOSLOG.EXE samodzielnym, odtwarzalnym
+wariantem z ec8d61d1; pozostałe 827 wpisów zachowano bitowo wraz z trybami
+i dowiązaniami. Hash EXE:
+`ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7`.
+
+Wszystkie 7 hashów źródeł i zgodność z drugim przypiętym buildem są
+potwierdzone. PE 3.10 GUI ma 71 importów; wszystkie importy z łańcuchami
+forwarderów oraz 16 wymaganych dynamicznych API WSOCK32/ICMP.DLL znaleziono
+w oryginalnych NT4 PL i Enterprise EN CD. Oryginalne binaria były tylko w RAM.
+To dowód dostępności eksportów, nie runtime ani ABI PASS.
+[Audyt importów i źródeł](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-strict-logger-review/original-nt4-imports.json>)
+wiąże nośniki i hashe. Rzeczywisty parser C przeszedł 7 testów PASS,
+w tym 1500 deterministycznych mutacji. Dopasowuje peer/IP/port, ID,
+QR/opcode/rcode/TC, pytanie A/IN i łańcuch odpowiedzi; dopiero wtedy
+`DNS PASS dns_match=1` może być dowodem. Dodatkowo wykonano 6 kontroli
+składni skryptów i faktycznych wyników UTC/GMT PL/EN z finalnego cache.
+
+[Konkretny plan instalacji](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-coherent-cache-review/nt4-hid13-dns-utc-candidate01.json>)
+i [argv oraz kryteria odbioru](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-coherent-cache-review/launch-review.json>)
+są gotowe do przeglądu roota. Plan ma jawny first_logon, dokładny logger
+na własnym CD obserwatora, USB-only/i8042 off, igb, świeży cel i SP6a.
+Żadnej nowej VM nie uruchomiono. Root przydziela RAM i kolejność.
+
+Do ukończenia nadal wymagane są: rzeczywisty pulpit NT4, klawiatura i mysz
+przed i po reconnect, aktualna dzierżawa DHCP oraz zgodne z nią ICMP i DNS
+w tym samym gościu. Sam marker, rejestr DHCP, HTTP i start helpera nie są
+PASS. Należy zebrać własny USABILITY.TXT i natywne ipconfig /all przed
+usunięciem celu po sukcesie. Obecny kolektor awarii NT4 nie zbiera tych
+logów po sukcesie. Fizyczny X470/I211 pozostaje osobnym nieprzetestowanym
+zakresem; żaden z opisanych testów hostowych go nie zastępuje.
