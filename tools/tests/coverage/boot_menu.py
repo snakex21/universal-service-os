@@ -145,11 +145,17 @@ async def operator_steps(qmp, output,usb_test=False,hid_test=False,pointer='tabl
             move=action['pointer']
             if not hid_test or pointer!='mouse':raise ValueError('Relative test requires the owned boot-protocol USB mouse')
             dx,dy=move.get('dx',0),move.get('dy',0)
+            click=move.get('click')
             if type(dx)!=int or type(dy)!=int or not -2048<=dx<=2048 or not -2048<=dy<=2048:
                 raise ValueError('Invalid bounded relative mouse movement')
+            if click is not None and click not in ('left','right','middle'):raise ValueError('Unsupported mouse button')
             await qmp.command('input-send-event',{'events':[
                 {'type':'rel','data':{'axis':'x','value':dx}},
                 {'type':'rel','data':{'axis':'y','value':dy}}]})
+            if click:
+                await qmp.command('input-send-event',{'events':[{'type':'btn','data':{'down':True,'button':click}}]})
+                await asyncio.sleep(.1)
+                await qmp.command('input-send-event',{'events':[{'type':'btn','data':{'down':False,'button':click}}]})
         await asyncio.sleep(settle)
         count += 1
         destination = output/f'operator-{count:02}.png'
@@ -414,6 +420,7 @@ async def main(args):
     result['accel'] = args.accel
     result['cpu'] = cpu
     result['shutdown_method'] = shutdown_method
+    result['qemu_returncode'] = process.returncode
     result['first_logon_observed'] = first_logon.is_set()
     result['native_fixed_input_scenario'] = args.auto_native
     result['nic']=getattr(args,'nic','none')

@@ -34,6 +34,14 @@ def validate_system(system,nested):
         raise ValueError('System does not match the explicitly reserved one- or two-engine lane')
 
 
+def target_capacity(case):
+    capacity=case.get('target_gib',4 if case['system'] in NESTED_SYSTEMS else 32)
+    if type(capacity)!=int or not 1<=capacity<2048:raise ValueError('Invalid disposable target capacity')
+    if case['system'] in FLAT_SYSTEMS-{'windows-7'} and capacity<10:
+        raise ValueError('NT5 fixture needs at least 10 GiB total per the actual partition planner; default is 32 GiB thin qcow2')
+    return capacity
+
+
 def after_cleanup(directory):
     directory=directory.resolve()
     if not directory.is_relative_to(ROOT/'artifacts/coverage/vm'):
@@ -127,6 +135,7 @@ def run(args):
         outcome=dict(tag=tag,started=time.strftime('%Y-%m-%dT%H:%M:%S%z'),source=case['source'])
         logdir=ROOT/'artifacts/coverage/plan-logs';logdir.mkdir(parents=True,exist_ok=True)
         try:
+            target_gib=target_capacity(case)
             source=Path(case['source'])
             if source.drive.upper()=='G:' and not source.resolve().is_relative_to(COLLECTION):
                 raise ValueError('G: input outside the authorized collection')
@@ -162,7 +171,7 @@ def run(args):
             elif case.get('first_logon',not args.nested):prepare+=['--first-logon-observer','--observer-ide']
             if case.get('usability_logger'):prepare+=['--usability-logger',case['usability_logger'],'--logger-sha256',case['logger_sha256']]
             boot=[sys.executable,'-I','-B',str(HERE/'boot_menu.py'),'--qemu',str(args.qemu),'--fixture',str(work),
-                '--out',str(out),'--seconds',str(case.get('seconds',3600)),'--target-gib',str(case.get('target_gib',8)),
+                '--out',str(out),'--seconds',str(case.get('seconds',3600)),'--target-gib',str(target_gib),
                 '--target-bus',case.get('target_bus','ahci'),'--accel',args.accel]
             if case.get('ps2_input',not args.nested):boot+=['--ps2-input']
             if 'boot_seconds' in case:boot+=['--boot-seconds',str(case['boot_seconds'])]

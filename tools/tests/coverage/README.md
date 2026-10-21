@@ -115,7 +115,12 @@ read-only. It accepts generated log names and verified images, rejects
 invalid binary payloads, and records corrupt data as metadata instead of
 retaining it. Its direct Linux boot is evidence collection, not an OS test.
 
-`run_plan.py` executes an explicit case list one at a time. Its optional
+`run_plan.py` executes an explicit case list one at a time.
+NT5/Win7 targets default to **32 GiB virtual capacity**, still thin qcow2.
+The actual NT5 partition planner requires at least 10 GiB total and an
+8 GiB contiguous reservation. An 8 GiB whole disk is not a valid fixture;
+explicit undersized NT5 cases are rejected. Legacy nested cases keep 4 GiB.
+Its optional
 `--after` subscribes to the owned prior test's cleanup-file creation using
 Windows directory notifications, including a future case directory, not
 repeated status-file reads. Default lanes accept only flat NT5/Win7 flows.
@@ -143,7 +148,10 @@ At a verified desktop use `{"hid":{"device":"keyboard","state":"remove"},"settle
 and the corresponding `insert`; `device: "mouse"` does the same for the
 owned pointer. `{"pointer":{"dx":100,"dy":60},"settle":2}` sends relative
 movement with the mouse variant. Check actual key input and pointer motion
-after reconnection, and the guest driver log; QMP acknowledging an action
+and clicks after reconnecting. An optional `"click":"left"` (or right/middle)
+inside `pointer` sends a button-down/up pair through the same emulated mouse.
+The event schema follows the [QEMU QMP reference](https://www.qemu.org/docs/master/interop/qemu-qmp-ref.html#command-input-send-event).
+Review the guest driver log too; QMP acknowledging an action
 is not a functional PASS. PS/2 hardware remains available to NTDETECT, so
 typing while USB is absent does not prove USB routing. The action journal
 stores only key counts, never the text typed. These actions are test
