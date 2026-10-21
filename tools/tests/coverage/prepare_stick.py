@@ -56,17 +56,34 @@ def private_key(path, root=PRIVATE_KEYS, index=None):
     return values[0]
 
 
-def make_observer_iso(path,token):
+def make_observer_iso(path,token,logger=None,logger_sha256=None):
     """Own read-only scripts CD for the existing USOS user_script option."""
     import pycdlib
     if not re.fullmatch('USOS_COVERAGE_FIRST_LOGON_[a-f0-9]{32}',token):
         raise ValueError('Invalid observer token')
+    payload=None
+    if logger is not None:
+        payload=logger.read_bytes()
+        if not logger_sha256 or hashlib.sha256(payload).hexdigest()!=logger_sha256:
+            raise ValueError('Own usability logger hash mismatch')
+        if not payload.startswith(b'MZ') or b'USOSLOG' not in payload or len(payload)>4*1024**2:
+            raise ValueError('Unexpected own logger input')
     cd=pycdlib.PyCdlib()
     cd.new(interchange_level=3,joliet=3,vol_ident='USOS_EVIDENCE')
     try:
         cd.add_directory(iso_path='/SYSTEMS',joliet_path='/Systems')
         cd.add_directory(iso_path='/SCRIPTS',joliet_path='/Scripts')
-        script=('@echo off\r\nmode COM1: BAUD=115200 PARITY=N DATA=8 STOP=1 >nul 2>&1\r\necho '+token+'>COM1\r\n').encode('ascii')
+        script='@echo off\r\n'
+        if payload is not None:
+            cd.add_directory(iso_path='/TOOLS',joliet_path='/Tools')
+            cd.add_fp(io.BytesIO(payload),len(payload),iso_path='/TOOLS/USOSLOG.EXE;1',joliet_path='/Tools/USOSLOG.EXE')
+            script+=('if not exist "%SystemDrive%\\USOS\\Coverage" md "%SystemDrive%\\USOS\\Coverage"\r\n'
+                'copy /y "%~d0\\Tools\\USOSLOG.EXE" "%SystemDrive%\\USOS\\Coverage\\USOSLOG.EXE" >nul 2>&1\r\n'
+                'if errorlevel 1 goto observed\r\n'
+                'start "" /wait "%SystemDrive%\\USOS\\Coverage\\USOSLOG.EXE" /once /nodbg /nohook /out "%SystemDrive%\\USOS\\Coverage\\USABILITY.TXT"\r\n'
+                ':observed\r\n')
+        script+=('mode COM1: BAUD=115200 PARITY=N DATA=8 STOP=1 >nul 2>&1\r\necho '+token+'>COM1\r\n')
+        script=script.encode('ascii')
         cd.add_fp(io.BytesIO(script),len(script),iso_path='/SCRIPTS/FIRSTLO.CMD;1',joliet_path='/Scripts/first-logon.cmd')
         cd.write(str(path))
     finally:cd.close()
@@ -164,6 +181,8 @@ async def main(args):
         raise ValueError('First-logon observer needs an actual USOS profile')
     if args.legacy_first_logon and (not args.trace_menus or args.folder not in ('Windows 98','Windows 98 SE','Windows Me')):
         raise ValueError('Legacy observer is only for profile-based 98/98SE/Me with trace overlay')
+    if getattr(args,'usability_logger',None) and not args.first_logon_observer:
+        raise ValueError('Own logger requires the scripts-CD first-logon observer')
     required=['usb','dos-native/msdos/INSTALL.BAT','micro-linux','bin/usos-x86_64.efi']
     if args.folder.casefold() in NT5_FOLDERS:required.append('xp-uefi-csm/initramfs-xp')
     for name in required:
@@ -193,7 +212,8 @@ async def main(args):
         raise ValueError('Private key injection requires a USOS profile')
     work.mkdir(parents=True, exist_ok=False)
     observer_token='USOS_COVERAGE_FIRST_LOGON_'+uuid.uuid4().hex if (args.first_logon_observer or args.legacy_first_logon) else None
-    if args.first_logon_observer:make_observer_iso(work/'observer.iso',observer_token)
+    if args.first_logon_observer:make_observer_iso(work/'observer.iso',observer_token,
+        getattr(args,'usability_logger',None),getattr(args,'logger_sha256',None))
     share = work/'share'
     shutil.copytree(args.assets/'zig-out/usb', share)
     shutil.copyfile(args.assets/'zig-out/bin/usos-x86_64.efi', share/'EFI/BOOT/BOOTX64.EFI')
@@ -295,6 +315,7 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
         profile_sha256=hashlib.sha256(profile).hexdigest() if args.profile else None,
         private_profile=bool(args.private_key),
         observer_token=observer_token,
+        usability_logger_sha256=getattr(args,'logger_sha256',None),
         observer_ide=args.observer_ide,
         observer_kind='9x-runonce' if args.legacy_first_logon else 'scripts-cd' if args.first_logon_observer else None,
         donor=str(args.donor) if args.donor else None,
@@ -313,6 +334,8 @@ if __name__ == '__main__':
     for name in ('assets','qemu','iso','out'):
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--folder', required=True)
+    parser.add_argument('--usability-logger',type=Path,help='Own GUI diagnostic executable for the test-only first-logon CD')
+    parser.add_argument('--logger-sha256',help='Required exact hash of the own logger, never a Windows file')
     parser.add_argument('--dos', type=Path)
     parser.add_argument('--donor', type=Path, help='Unchanged read-only PE10 donor ISO')
     parser.add_argument('--legacy-service-pack',type=Path,help='Unchanged read-only NT4 SP6a/TSE SP6 prerequisite')

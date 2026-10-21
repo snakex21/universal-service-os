@@ -81,7 +81,9 @@ or VGA contents until a family-specific event proves the key page passed.
 For 95/NT3/NT4/POSReady this is the successful prepared-disk notice; for
 98/Me and other keyed systems it requires the first-logon notification.
 Manual operation of a keyed 95/NT3/NT4/POSReady case is allowed only after
-that verified prepared-disk boundary; keyed NT5/NT6 cases refuse it.
+that verified prepared-disk boundary. Keyed NT5/NT6 cases need the exact
+nonce line from the first-logon observer before any manual frame/input.
+Staging or a log merely containing that nonce does not satisfy the gate.
 Staging alone does not prove Setup accepted a key. Keep incomplete images private until
 cleanup; never attach or commit them.
 
@@ -165,6 +167,19 @@ after outer and nested QEMU have ended, within the reserved two-engine lane.
 It never runs on a keyed test. This diagnostic can reveal the Setup question;
 it is not a completed installation or USB test. Collection failure is saved
 separately and never prevents normal image cleanup.
+
+In an NT5/NT6 interactive usability case, the boot-test stick can first attach
+after verified first logon. That initial insertion is **not** USB-at-start
+PASS: explicitly reboot with it attached and review the file after boot.
+Its attachment event is recorded separately from the prepared-disk route.
+
+An optional `usability_logger` and required exact `logger_sha256` add the
+own GUI logger to the scripts CD. The test-only script copies it under
+`%SystemDrive%\USOS\Coverage`, runs one snapshot to USABILITY.TXT and then
+emits the first-logon nonce. Copy/diagnostic failure does not turn the nonce
+into network PASS: inspect the completed log independently. This is fixture
+instrumentation through the existing user_script option, not installer
+staging or a release build. The normal installed LAN helper remains GUI-only.
 
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB

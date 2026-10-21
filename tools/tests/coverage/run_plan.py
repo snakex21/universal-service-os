@@ -160,6 +160,7 @@ def run(args):
                 if 'key_index' in case:prepare+=['--key-index',str(case['key_index'])]
             if case.get('legacy_first_logon'):prepare+=['--legacy-first-logon']
             elif case.get('first_logon',not args.nested):prepare+=['--first-logon-observer','--observer-ide']
+            if case.get('usability_logger'):prepare+=['--usability-logger',case['usability_logger'],'--logger-sha256',case['logger_sha256']]
             boot=[sys.executable,'-I','-B',str(HERE/'boot_menu.py'),'--qemu',str(args.qemu),'--fixture',str(work),
                 '--out',str(out),'--seconds',str(case.get('seconds',3600)),'--target-gib',str(case.get('target_gib',8)),
                 '--target-bus',case.get('target_bus','ahci'),'--accel',args.accel]

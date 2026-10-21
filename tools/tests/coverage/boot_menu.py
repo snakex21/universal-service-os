@@ -181,11 +181,11 @@ async def main(args):
     system=catalog[desired_system]
     prepared_proves_key_passed=(system['id']=='windows-95' or
         system.get('uefi_profile','').startswith(('nt3-','nt4-','posready-')))
-    if args.interactive and metadata.get('private_profile') and not prepared_proves_key_passed:
-        raise ValueError('Manual keyed tests require a family with a verified post-key preparation boundary')
+    if args.interactive and not aux.manual_test_supported(metadata.get('private_profile'),prepared_proves_key_passed,metadata.get('observer_token')):
+        raise ValueError('Manual keyed tests need a post-key preparation boundary or an exact first-logon notification')
     usb_test=getattr(args,'usability_usb',False)
-    if usb_test and not prepared_proves_key_passed:
-        raise ValueError('USB-at-boot instrumentation needs the verified prepared-disk boundary')
+    if usb_test and not (prepared_proves_key_passed or aux.valid_logon_token(metadata.get('observer_token'))):
+        raise ValueError('USB instrumentation needs a prepared-disk boundary or verified first logon')
     resources = fixture.check_resources(work, args.ram_mib)
     args.out.mkdir(parents=True, exist_ok=False)
     target = work/'target.qcow2'
@@ -242,18 +242,24 @@ async def main(args):
     product_failure = None
     native_actions=[]
     native_started=False
+    boot_usb_attached=False
     env = dict(os.environ, TEMP=str(work), TMP=str(work), APPDATA=str(work), LOCALAPPDATA=str(work))
     with (args.out/'stderr.log').open('wb') as errors, (args.out/'serial.log').open('w',encoding='utf-8') as log:
         process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
         (args.out/'pid.txt').write_text(str(process.pid))
         async def consume():
-            nonlocal ui_count, last_screen, answer_row, product_failure, native_started
+            nonlocal ui_count, last_screen, answer_row, product_failure, native_started, boot_usb_attached
             while raw := await process.stdout.readline():
                 line = redact(raw.decode('utf-8',errors='replace'))
                 log.write(line); log.flush()
-                if metadata.get('observer_token') and metadata['observer_token'] in line:
+                if aux.logon_notification(metadata.get('observer_token'),line) and not first_logon.is_set():
                     events.append(dict(seconds=round(time.monotonic()-start,2),text='First-logon script COM1 marker received; desktop still needs visual review'))
+                    if usb_test and not boot_usb_attached:
+                        await qmp.command('device_add',{'driver':'usb-storage','id':'usability-boot',
+                            'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
+                        boot_usb_attached=True
+                        events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 stick attached after first logon; start test requires a subsequent explicit reboot'))
                     first_logon.set()
                 elif 'first frame presented' in line and ui_count == 0:
                     # The home view has no UI_SCREEN trace in this build.
@@ -312,10 +318,11 @@ async def main(args):
                 elif '[COVERAGE_NOTICE]' in line:
                     events.append(dict(seconds=round(time.monotonic()-start,2),text=line.strip()))
                     await asyncio.sleep(1)
-                    if 'start the prepared disk' in line and usb_test:
+                    if 'start the prepared disk' in line and usb_test and not boot_usb_attached:
                         await qmp.command('device_add',{'driver':'usb-storage','id':'usability-boot',
                             'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
                         events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 test stick attached before first prepared-target boot'))
+                        boot_usb_attached=True
                     await qmp.key('ret')
                     if 'start the prepared disk' in line:
                         prepared.set()
@@ -356,7 +363,7 @@ async def main(args):
                 if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await capture(qmp,args.out/'endpoint.png')
                 if args.interactive and not product_failure:
-                    if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set()):
+                    if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                         raise RuntimeError('Private Setup has not reached its verified post-key boundary; no manual capture')
                     await operator_steps(qmp,args.out,usb_test,not args.ps2_input,getattr(args,'usb_pointer','tablet'))
                     await capture(qmp,args.out/'endpoint.png')

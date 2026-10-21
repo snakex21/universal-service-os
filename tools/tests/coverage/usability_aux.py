@@ -3,11 +3,24 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import re
 
 VIRTUAL_BYTES=64*1024**2
 PARTITION_LBA=2048
 FAT_SECTORS=128
 ROOT_ENTRIES=512
+
+
+def valid_logon_token(token):
+    return isinstance(token,str) and re.fullmatch('USOS_COVERAGE_FIRST_LOGON_[a-f0-9]{32}',token) is not None
+
+
+def logon_notification(token,line):
+    return valid_logon_token(token) and line.strip()==token
+
+
+def manual_test_supported(private_profile,prepared_proof,token):
+    return not private_profile or prepared_proof or valid_logon_token(token)
 
 
 def require_operator_channel(enabled,stream=None):

@@ -11,6 +11,14 @@ aux=importlib.util.module_from_spec(spec);spec.loader.exec_module(aux)
 
 
 class AuxiliaryTests(unittest.TestCase):
+    def test_nt5_manual_actions_need_an_exact_post_logon_notification(self):
+        token='USOS_COVERAGE_FIRST_LOGON_'+'a'*32
+        self.assertTrue(aux.manual_test_supported(True,False,token))
+        self.assertFalse(aux.manual_test_supported(True,False,None))
+        self.assertFalse(aux.manual_test_supported(True,False,'unvalidated'))
+        self.assertTrue(aux.logon_notification(token,token+'\r\n'))
+        self.assertFalse(aux.logon_notification(token,'echo '+token+'>COM1'))
+        self.assertFalse(aux.logon_notification(token,'script contains '+token))
     def test_failure_collection_never_exports_keyed_setup(self):
         root=Path(__file__).resolve().parents[3]
         meta={'folder':'Windows NT 4.0','private_profile':False}
