@@ -32,6 +32,13 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(audit.hid_test('X470 PASS pendrive').startswith('brak pomiaru'))
         self.assertEqual(audit.hid_test('nie dotyczy: update'),'nie dotyczy')
 
+    def test_upstream_win7_hid_evidence_is_only_a_family_binding(self):
+        pl=row('Windows 7\\SP1 PL x86.iso','windows-7','pl-PL / x86');pl[1]='6.1.7601 / SP1'
+        self.assertIn('X470 PASS rodziny',audit.hid_test('USB',pl))
+        self.assertIn('brak powiązania z hashem',audit.hid_test('USB',pl))
+        en=list(pl);en[2]='en-US / x86'
+        self.assertTrue(audit.hid_test('USB',en).startswith('brak pomiaru'))
+
     def test_nt3_storage_remains_after_1_0(self):
         usb,net=audit.capability(row('Windows NT 3.51\\Workstation.iso','windows-nt-3-51'))
         self.assertIn('po 1.0',usb)
