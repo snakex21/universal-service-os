@@ -406,3 +406,40 @@ Aktualna ocena: hostowe polityki/importy/buildy opisane wyżej PASS;
 Windows desktop, DHCP, brama, DNS, USB/HID reconnect, MSC i fizyczny
 sprzęt nadal bez PASS. Candidate01 ma konkretny błąd fixture i zakończone
 wszystkie własne procesy. Kolejna VM wymaga odrębnego przydziału roota.
+
+
+## Candidate02: przydzielony start i niezależny audyt klas NT351
+
+Root zintegrował poprawkę rodzica CPIO oraz serial_shell.wrap dla czterech
+kolektorów jako 015ddddf; potwierdził 105 testów coverage PASS. Rzeczywisty
+syntetyczny Linux QEMU wykazał, że samo stty/PS1 nie wystarcza; finalny
+exec /bin/sh z quoted heredoc przeniósł dokładnie 24603 B. Zintegrowany
+wariant również przeszedł próbę (8.205 s). Decoder pozostał ścisły.
+
+Po wyraźnym przydziale uruchomiono candidate02 w TTY 85872. Plan zmienia
+wyłącznie tag względem01, zachowując cache/profile/SP6a/helper i PS/2.
+Nowe jednorazowe listenery retention76687 i endpoint/cleanup92035 uzbrojono
+przed startem; zwykły guard nie był obchodzony. Retention potwierdził
+utworzenie i tożsamość hardlinku bez odczytu zawartości aktywnego celu.
+Nie uruchamiano niedokończonego retained01. W chwili tej aktualizacji
+oczekuje się pasywnie na endpoint/cleanup; desktop/LAN nie dostały PASS.
+
+W tym czasie wykonano uzgodniony, niezależny read-only audyt oryginalnych
+kbdclass/mouclass NT351. Rozpakowane binaria pozostawały wyłącznie w RAM;
+oryginalne hashe zgadzają się z wcześniejszym audytem NT3. Własne źródła
+usosusb są identyczne z frozen f28a3fd8 i nie zostały zmienione.
+
+[Przegląd kontraktu klas](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/nt351-class-contract-review.json>)
+wykazuje DeviceMap query bez zależności od nazwy dostawcy i8042prt:
+callback liczy wartości, potem klasy otwierają kolejne KeyboardPortN lub
+PointerPortN. MaximumPortsServiced ma default1; pętla jest ograniczona
+przez min(parametr, liczba wartości mapy), od indeksu0. ConnectMultiplePorts
+sam nie zwiększa tego limitu. Rzeczywista wartość w badanej instalacji
+NT351 pozostaje do sprawdzenia przez prowadzącego tamten runtime.
+
+CONNECT używa Internal=1, METHOD_NEITHER, wejścia8B z dwoma wskaźnikami;
+kody B0203/F0203 oraz ENABLE/DISABLE B0803/B1003/F0803/F1003 zgadzają się
+z WDK i dispatch frozenUSB. Callback RVA70a obu klas ma cztery argumenty
+i RET10. Nie znaleziono statycznej niezgodności tego kontraktu; audyt nie
+potwierdza rzeczywistego CONNECT, ENABLE ani dostarczania zdarzeń HID.
+Wyniki z RVA i ograniczonymi instrukcjami przekazano rootowi i agentowi NT3.
