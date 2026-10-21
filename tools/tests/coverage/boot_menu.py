@@ -53,12 +53,14 @@ class Qmp:
         identifier = self.sequence
         future = asyncio.get_running_loop().create_future()
         self.pending[identifier] = future
-        self.writer.write((json.dumps(dict(execute=name, arguments=arguments or {}, id=identifier))+'\n').encode())
-        await self.writer.drain()
         try:
+            self.writer.write((json.dumps(dict(execute=name, arguments=arguments or {}, id=identifier))+'\n').encode())
+            await self.writer.drain()
             response = await asyncio.wait_for(future,10)
         finally:
             self.pending.pop(identifier,None)
+            if not future.done():future.cancel()
+            elif not future.cancelled():future.exception()
         if 'error' in response:
             raise RuntimeError(response['error'])
         return response.get('return')
