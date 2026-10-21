@@ -26,6 +26,27 @@ class AuxiliaryTests(unittest.TestCase):
         for changed in (dict(meta,private_profile=True),dict(meta,folder='Windows XP')):
             with self.assertRaises(ValueError):aux.validate_failure_collection(True,changed,root/'_assets',root)
         with self.assertRaises(ValueError):aux.validate_failure_collection(True,meta,root/'outside',root)
+    def test_failure_collection_accepts_exact_nt3_metadata_folders(self):
+        root=Path(__file__).resolve().parents[3]
+        for folder in ('Windows NT 3.1','Windows NT 3.1 Advanced Server',
+                       'Windows NT 3.5','Windows NT 3.5 Server',
+                       'Windows NT 3.51','Windows NT 3.51 Server'):
+            with self.subTest(folder=folder):
+                meta={'folder':folder,'private_profile':False}
+                aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+                with self.assertRaises(ValueError):
+                    aux.validate_failure_collection(True,dict(meta,private_profile=True),root/'_assets',root)
+    def test_failure_collection_requires_explicit_keyless_and_exact_allowlist(self):
+        root=Path(__file__).resolve().parents[3]
+        for meta in ({'folder':'Windows NT 3.51'},
+                     *({'folder':'Windows NT 3.51','private_profile':value} for value in (None,0,'false',True)),
+                     *({'folder':folder,'private_profile':False} for folder in
+                       ('Windows NT 3.51 Other','windows nt 3.51','Windows NT 3.1 Server','Windows XP',None,[]))):
+            with self.subTest(metadata=meta),self.assertRaises(ValueError):
+                aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+        for assets in (None,root/'outside'):
+            with self.subTest(assets=assets),self.assertRaises(ValueError):
+                aux.validate_failure_collection(True,{'folder':'Windows NT 3.51','private_profile':False},assets,root)
     def test_disk_mode_uses_the_actual_non_erasing_first_row(self):
         root=Path(__file__).resolve().parents[3]
         source=(root/'tools/xp_disk_reset_ui.sh').read_text()

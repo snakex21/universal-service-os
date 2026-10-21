@@ -9,6 +9,12 @@ VIRTUAL_BYTES=64*1024**2
 PARTITION_LBA=2048
 FAT_SECTORS=128
 ROOT_ENTRIES=512
+KEYLESS_FAILURE_FOLDERS=frozenset((
+    'Windows NT 4.0',
+    'Windows NT 3.1','Windows NT 3.1 Advanced Server',
+    'Windows NT 3.5','Windows NT 3.5 Server',
+    'Windows NT 3.51','Windows NT 3.51 Server',
+))
 
 
 def valid_logon_token(token):
@@ -65,8 +71,9 @@ def framebuffer_menu_keys(line):
 
 def validate_failure_collection(enabled,metadata,assets,collection):
     if not enabled:return
-    if metadata.get('private_profile') or metadata.get('folder')!='Windows NT 4.0':
-        raise ValueError('Failure collector accepts only a keyless NT4 diagnostic case')
+    folder=metadata.get('folder')
+    if metadata.get('private_profile') is not False or not isinstance(folder,str) or folder not in KEYLESS_FAILURE_FOLDERS:
+        raise ValueError('Failure collector accepts only an explicitly keyless allowlisted NT3/NT4 diagnostic case')
     if assets is None or not assets.resolve().is_relative_to(collection/'_assets'):
         raise ValueError('Failure collector needs explicit owned frozen assets')
 

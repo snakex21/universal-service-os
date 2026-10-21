@@ -173,10 +173,12 @@ the entire timeout. A product failure ends an interactive case without
 opening an unverified keyed Setup frame; that failure remains in metadata.
 
 `collect_nt4_failure: true` plus the explicit frozen `--evidence-assets`
-allows a **keyless NT4 diagnostic case only** to collect the inner Setup's
+allows an **explicitly keyless NT3/NT4 diagnostic case only** to collect the inner Setup's
 saved screen/logs before disk cleanup. It runs one read-only Linux collector
 after outer and nested QEMU have ended, within the reserved two-engine lane.
-It never runs on a keyed test. This diagnostic can reveal the Setup question;
+The folder must exactly match the allowlist in `usability_aux.py`, and
+`private_profile` must be the boolean `false`, never an absent or false-like
+value. It never runs on a keyed test. This diagnostic can reveal the Setup question;
 it is not a completed installation or USB test. Collection failure is saved
 separately and never prevents normal image cleanup.
 
