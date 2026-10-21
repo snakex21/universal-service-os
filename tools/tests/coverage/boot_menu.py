@@ -32,6 +32,7 @@ class Qmp:
         self.sequence = 0
         self.writer = None
         self.deleted = {}
+        self.events = {}
 
     async def accept(self, reader, writer):
         self.writer = writer
@@ -40,6 +41,8 @@ class Qmp:
         try:
             while line := await reader.readline():
                 response = json.loads(line)
+                event_waiter = self.events.get(response.get('event'))
+                if event_waiter and not event_waiter.done():event_waiter.set_result(response)
                 if response.get('event') == 'DEVICE_DELETED':
                     future=self.deleted.get(response.get('data',{}).get('device'))
                     if future and not future.done():future.set_result(response)
@@ -55,6 +58,19 @@ class Qmp:
                     future.set_exception(ConnectionError('QMP closed'))
             for future in self.deleted.values():
                 if not future.done():future.set_exception(ConnectionError('QMP closed'))
+            for future in self.events.values():
+                if not future.done():future.set_exception(ConnectionError('QMP closed'))
+
+    def expect_event(self,name):
+        if name in self.events:raise ValueError('Duplicate QMP event subscription')
+        future=asyncio.get_running_loop().create_future()
+        self.events[name]=future
+        return future
+
+    def forget_event(self,name,future):
+        if self.events.get(name) is future:self.events.pop(name)
+        if not future.done():future.cancel()
+        elif not future.cancelled():future.exception()
 
     async def command(self, name, arguments=None):
         await asyncio.wait_for(self.connected.wait(),10)
@@ -98,6 +114,28 @@ def redact(text):
 def capture_permitted(private_profile,prepared_proof,prepared,first_logon=False):
     """Staging a private answer is not evidence that Setup passed its key page."""
     return not private_profile or (prepared_proof and prepared) or first_logon
+
+
+async def start_nt5_target(qmp,usb_test):
+    """Answer the real remove-USB/power-off page, then power on the target.
+
+    QEMU stays allocated with -no-shutdown. Wait for the guest's actual
+    SHUTDOWN event before reset/cont; no timer or state polling substitutes
+    for completed unmount/power-off. This does not prove key acceptance.
+    """
+    await qmp.delete_device('coverage-install-stick')
+    if usb_test:
+        await qmp.command('device_add',{'driver':'usb-storage','id':'usability-boot',
+            'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
+    shutdown=qmp.expect_event('SHUTDOWN')
+    try:
+        await qmp.key('ret')
+        notification=await asyncio.wait_for(shutdown,90)
+        if notification.get('data',{}).get('guest') is not True:
+            raise RuntimeError('Expected guest power-off, not host-requested shutdown')
+        await qmp.command('system_reset')
+        await qmp.command('cont')
+    finally:qmp.forget_event('SHUTDOWN',shutdown)
 
 
 async def capture(qmp, path):
@@ -185,6 +223,7 @@ async def main(args):
         raise ValueError('Fixture folder must match one real catalogue entry')
     desired_system = matches[0]
     system=catalog[desired_system]
+    nt5_handoff=metadata['folder'].casefold() in fixture.NT5_FOLDERS
     prepared_proves_key_passed=(system['id']=='windows-95' or
         system.get('uefi_profile','').startswith(('nt3-','nt4-','posready-')))
     if args.interactive and not aux.manual_test_supported(metadata.get('private_profile'),prepared_proves_key_passed,metadata.get('observer_token')):
@@ -221,8 +260,9 @@ async def main(args):
         command += ['-device','usb-kbd,id=coveragekbd,bus=xhci.0',
                     '-device',f'usb-{pointer},id=coveragepointer,bus=xhci.0']
     command += [
-        '-device','usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOS-COVERAGE-STICK,bootindex=1',
+        '-device','usb-storage,id=coverage-install-stick,bus=xhci.0,drive=stick,removable=on,serial=USOS-COVERAGE-STICK,bootindex=1',
         '-drive',f'if=none,id=target,format=qcow2,file={target.as_posix()}']
+    if nt5_handoff:command+=['-no-shutdown']
     if args.target_bus == 'nvme':
         if args.machine != 'q35':raise ValueError('NVMe coverage requires q35')
         command += ['-device','pcie-root-port,id=nvmeroot,chassis=20,slot=20',
@@ -249,16 +289,27 @@ async def main(args):
     native_actions=[]
     native_started=False
     boot_usb_attached=False
+    nt5_synced=False
+    nt5_started=False
     env = dict(os.environ, TEMP=str(work), TMP=str(work), APPDATA=str(work), LOCALAPPDATA=str(work))
     with (args.out/'stderr.log').open('wb') as errors, (args.out/'serial.log').open('w',encoding='utf-8') as log:
         process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
         (args.out/'pid.txt').write_text(str(process.pid))
         async def consume():
-            nonlocal ui_count, last_screen, answer_row, product_failure, native_started, boot_usb_attached
+            nonlocal ui_count, last_screen, answer_row, product_failure, native_started, boot_usb_attached, nt5_synced, nt5_started
             while raw := await process.stdout.readline():
                 line = redact(raw.decode('utf-8',errors='replace'))
                 log.write(line); log.flush()
+                if line.strip()=='[LEGACY_XP] PREPARED SYNC PASS; USOS media may now be removed safely':
+                    nt5_synced=True
+                if line.strip()=='[LEGACY_XP] WAITING FOR USER: remove USOS USB, then press ENTER to power off; target will boot XPSETUP as BIOS 0x80 on next power-on':
+                    if not nt5_handoff or not nt5_synced or nt5_started:
+                        raise RuntimeError('Unexpected NT5 power-off handoff; no input sent')
+                    await start_nt5_target(qmp,usb_test)
+                    nt5_started=True
+                    boot_usb_attached=usb_test
+                    events.append(dict(seconds=round(time.monotonic()-start,2),text='Guest powered off after safe USB removal; reset/cont started the prepared NT5 target; key acceptance still unverified'))
                 if aux.logon_notification(metadata.get('observer_token'),line) and not first_logon.is_set():
                     events.append(dict(seconds=round(time.monotonic()-start,2),text='First-logon script COM1 marker received; desktop still needs visual review'))
                     if usb_test and not boot_usb_attached:
@@ -422,6 +473,7 @@ async def main(args):
     result['shutdown_method'] = shutdown_method
     result['qemu_returncode'] = process.returncode
     result['first_logon_observed'] = first_logon.is_set()
+    result['nt5_target_started'] = nt5_started
     result['native_fixed_input_scenario'] = args.auto_native
     result['nic']=getattr(args,'nic','none')
     result['usb_test_images']=usb_test

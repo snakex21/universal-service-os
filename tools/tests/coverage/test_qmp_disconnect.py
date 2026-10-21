@@ -14,6 +14,24 @@ class ClosedWriter:
 
 
 class DisconnectTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shutdown_event_can_precede_key_command_reply(self):
+        reader=asyncio.StreamReader();reader.feed_data(b'{"QMP":{}}\n')
+        class Writer:
+            def write(self,data):
+                request=json.loads(data)
+                reader.feed_data((json.dumps({'event':'SHUTDOWN','data':{'guest':True}})+'\n'+
+                    json.dumps({'return':{},'id':request['id']})+'\n').encode())
+            async def drain(self):pass
+        qmp=menu.Qmp();consumer=asyncio.create_task(qmp.accept(reader,Writer()))
+        event=qmp.expect_event('SHUTDOWN')
+        try:
+            await qmp.command('human-monitor-command',{'command-line':'sendkey ret'})
+            self.assertTrue((await event)['data']['guest'])
+        finally:
+            qmp.forget_event('SHUTDOWN',event)
+            reader.feed_eof();await consumer
+        self.assertEqual(qmp.events,{})
+
     async def test_device_deleted_event_can_precede_command_reply(self):
         reader=asyncio.StreamReader();reader.feed_data(b'{"QMP":{}}\n')
         class Writer:
