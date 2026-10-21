@@ -26,6 +26,30 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(collector.decode_transport(text),b'evidence')
         with self.assertRaises(ValueError):collector.decode_transport(text.replace(encoded,'!'+encoded))
 
+    def test_observed_r16_cursor_query_and_truncated_end_echo(self):
+        payload=archive('./collection-state.txt',b'Sanitized state only\n')
+        encoded=base64.b64encode(payload).decode()
+        text=('COVERAGE_EVIDENCE_BEGIN\n/tmp/export/nt4 # \x1b[6nbase64 /tmp/evidence.tgz\n'+
+              '\n'.join(encoded[i:i+76] for i in range(0,len(encoded),76))+
+              '\nVERAGE_E/tmp/export/nt4 # echo COVERAGE_EVIDENCE_END\nCOVERAGE_EVIDENCE_END\n')
+        self.assertEqual(collector.decode_transport(text),payload)
+
+    def test_second_encoded_archive_after_padding_is_rejected(self):
+        payload=archive('collection-state.txt',b'state\n')
+        while len(payload)%3==0:payload+=b'\0'
+        encoded=base64.b64encode(payload).decode()
+        second=base64.b64encode(archive('post.txt',b'other archive\n')).decode()
+        text='COVERAGE_EVIDENCE_BEGIN\n'+encoded+'\n'+second+'\nCOVERAGE_EVIDENCE_END\n'
+        with self.assertRaises(ValueError):collector.decode_transport(text)
+
+    def test_unknown_prompt_suffix_and_duplicate_frames_are_rejected(self):
+        encoded=base64.b64encode(b'evidence').decode()
+        frame='COVERAGE_EVIDENCE_BEGIN\n'+encoded+'\nCOVERAGE_EVIDENCE_END\n'
+        for text in (frame+frame,frame.replace(encoded,'/tmp/export/nt4 # unknown\n'+encoded),
+                     frame.replace(encoded,encoded+'\nMOTD unexpected'),
+                     frame.replace(encoded,'VERAGE_E/tmp/export/nt4 # echo COVERAGE_EVIDENCE_END\n'+encoded)):
+            with self.assertRaises(ValueError):collector.decode_transport(text)
+
     def test_only_valid_screen_is_persisted(self):
         scratch=Path(__file__).resolve().parents[3]/'artifacts/coverage/evidence-test'
         scratch.mkdir(parents=True,exist_ok=True)

@@ -10,6 +10,7 @@ import base64
 import importlib.util
 import io
 import json
+import re
 import tarfile
 
 ROOT=Path(__file__).resolve().parents[3]
@@ -20,13 +21,36 @@ fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 
 def decode_transport(text):
     lines=text.splitlines()
-    begin=next(i for i,line in enumerate(lines) if line.strip()=='COVERAGE_EVIDENCE_BEGIN')
-    end=next(i for i,line in enumerate(lines[begin+1:],begin+1) if line.strip()=='COVERAGE_EVIDENCE_END')
-    # The console echoes each command with its prompt. Preserve strict
-    # base64 validation after removing only that known prompt prefix.
-    encoded=''.join(line.strip() for line in lines[begin+1:end]
-                    if line.strip() and not line.startswith('/tmp/export/nt4 # '))
-    return base64.b64decode(encoded,validate=True)
+    begins=[i for i,line in enumerate(lines) if line.strip()=='COVERAGE_EVIDENCE_BEGIN']
+    ends=[i for i,line in enumerate(lines) if line.strip()=='COVERAGE_EVIDENCE_END']
+    if len(begins)!=1 or len(ends)!=1 or begins[0]>=ends[0]:
+        raise ValueError('Expected exactly one complete evidence transport frame')
+    # BusyBox ash can echo its cursor query and a truncated END marker before
+    # the next prompt. Recognize only these observed commands, never arbitrary
+    # prompt-prefixed text or non-base64 lines. Keep every payload byte through
+    # the END marker so padding cannot hide a second encoded archive.
+    base64_echo=re.compile(r'/tmp/export/nt4 # (?:\x1b\[6n)?base64 /tmp/evidence\.tgz')
+    end_echo=re.compile(r'(?:VERAGE_E)?/tmp/export/nt4 # (?:\x1b\[6n)?echo COVERAGE_EVIDENCE_END')
+    encoded=[]
+    echoed_base64=False; echoed_end=False
+    for line in lines[begins[0]+1:ends[0]]:
+        if not line.strip():continue
+        if base64_echo.fullmatch(line):
+            if encoded or echoed_base64 or echoed_end:raise ValueError('Unexpected evidence command echo order')
+            echoed_base64=True
+        elif end_echo.fullmatch(line):
+            if not encoded or echoed_end:raise ValueError('Unexpected evidence command echo order')
+            echoed_end=True
+        else:
+            if echoed_end or not re.fullmatch(r'[A-Za-z0-9+/=]+',line.strip()):
+                raise ValueError('Unexpected evidence transport line')
+            encoded.append(line.strip())
+    if not encoded:raise ValueError('Empty evidence transport')
+    value=''.join(encoded)
+    payload=base64.b64decode(value,validate=True)
+    if base64.b64encode(payload).decode('ascii')!=value:
+        raise ValueError('Noncanonical evidence base64')
+    return payload
 
 
 def export_evidence(payload,output):
