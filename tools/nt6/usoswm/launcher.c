@@ -67,7 +67,18 @@ static void log_screen(const char *stage){
  EnumWindows(log_window,(LPARAM)&band);
  if(band.count>40)wm_log(0,"  (window list truncated at 40)");
 }
+/* Off by default: normal installs write no BMPs and no screen/window records.
+ * A diagnostic run enables it with a file named capture.flag beside usoswm.exe. */
+static int capture_state=-1;
+static BOOL capture_enabled(void){
+ if(capture_state<0){
+  WCHAR flag[MAX_PATH];capture_state=0;
+  if(wm_directory(0,flag)){lstrcatW(flag,L"capture.flag");DWORD a=GetFileAttributesW(flag);capture_state=a!=INVALID_FILE_ATTRIBUTES&&!(a&FILE_ATTRIBUTE_DIRECTORY);}
+ }
+ return capture_state==1;
+}
 static void capture_screen(const WCHAR *stage,const char *label){
+ if(!capture_enabled())return;
  log_screen(label);
  WCHAR file[MAX_PATH],digits[12];if(!wm_directory(0,file))return;lstrcatW(file,L"logs\\");if(!capture_budget(file))return;
  DWORD session=0;ProcessIdToSessionId(GetCurrentProcessId(),&session);lstrcatW(file,L"screen-s");wm_number(digits,session);lstrcatW(file,digits);
@@ -146,7 +157,7 @@ static void attach_shell(void){
  /* UPDATENOW/ERASENOW: the shell thread repaints synchronously, so the next
   * crop shows our renderer's output rather than the earlier native paint. */
  RedrawWindow(shell,0,0,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW|RDW_ERASENOW);wm_log(0,"Hook registered for this session's explorer desktop thread");shell_window=shell;outline_drag();
- capture_screen(L"after","[after]");HANDLE late=CreateThread(0,0,late_capture,0,0,0);if(late)CloseHandle(late);
+ capture_screen(L"after","[after]");if(capture_enabled()){HANDLE late=CreateThread(0,0,late_capture,0,0,0);if(late)CloseHandle(late);}
 }
 static void CALLBACK shell_event(HWINEVENTHOOK hook,DWORD event,HWND window,LONG object,LONG child,DWORD thread,DWORD time){(void)hook;(void)event;(void)thread;(void)time;if(window&&object==OBJID_WINDOW&&child==CHILDID_SELF)PostMessageW(receiver,WM_APP,0,0);}
 static LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM w,LPARAM l){

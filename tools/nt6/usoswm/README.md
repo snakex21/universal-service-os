@@ -79,7 +79,11 @@ proof; that fixture is not a complete fresh-install acceptance. Classic-theme ch
 have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
-Hardware evidence (silent, no user action): after attaching, the launcher saves
+Diagnostic capture is OFF by default: normal installs write no BMPs and no
+screen/window records. It is enabled only by an explicit flag file
+`capture.flag` beside `usoswm.exe` (read once per launcher start).
+
+Hardware evidence (silent, no user action, flag present): after attaching, the launcher saves
 24-bit BMPs of the whole virtual screen (all monitors) as
 `logs\screen-s<session>-p<pid>-{before,after,late20s,endsession}.bmp`
 (at most 8 files in total). At the same moments the session log records the

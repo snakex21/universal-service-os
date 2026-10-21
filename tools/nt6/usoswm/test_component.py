@@ -47,6 +47,11 @@ class ComponentTest(unittest.TestCase):
         self.assertNotIn(b'SetTimer',functions)
         self.assertIn(b'SetProcessShutdownParameters',functions)
         self.assertIn(b'SystemParametersInfoW',functions)
+        self.assertIn(b'GetFileAttributesW',functions)
+        # Diagnostic screen capture only behind the explicit flag file.
+        self.assertIn('capture.flag'.encode('utf-16-le'),(OUT/'usoswm.exe').read_bytes())
+        source=(ROOT/'tools/nt6/usoswm/launcher.c').read_text(encoding='utf-8')
+        self.assertIn('if(!capture_enabled())return;',source)
         p=pefile.PE(str(OUT/'usoswm-desktop.dll'))
         self.assertIn(b'WmPaintCover',{s.name for s in p.DIRECTORY_ENTRY_EXPORT.symbols})
     def test_host_outside_vista_refuses_activation(self):
