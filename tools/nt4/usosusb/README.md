@@ -79,6 +79,9 @@ USB 3.2 chapter 10 (hub class) descriptions.
   qemu-xhci and two nested usb-hubs (keyboard, mouse, stick, hot plug).
   QEMU's usb-hub is a full-speed hub, so the TT fields and SuperSpeed hubs
   are not exercised there (docs/usosusb-hubs-2026-10-21.md).
+* Hardware: root ports X470 PASS 2026-10-21 (Windows 7 SP1 x86, 1.3-nt6:
+  front panel, stick hot-swap, keyboard / mouse replug); hubs not yet run on
+  a real hub (QEMU only).
 
 ## Installation (USOS NT4 flow)
 

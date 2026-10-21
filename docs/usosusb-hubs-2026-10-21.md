@@ -2,9 +2,19 @@
 
 Branch `feat/usosusb-hubs`. Own xHCI driver `tools/nt4/usosusb` (shared
 source of the NT 3.1, NT 4.0 and NT 6.0/6.1 x86 builds) now enumerates
-devices behind USB 2.0 and USB 3.x hubs. Status: **QEMU only**; nothing has
-run on the X470 yet. Design notes are in `tools/nt4/usosusb/README.md`
-("Hubs").
+devices behind USB 2.0 and USB 3.x hubs. Merged into `test/x470-98se-qemu`
+on 2026-10-21. Design notes are in `tools/nt4/usosusb/README.md` ("Hubs").
+
+Status (2026-10-21):
+
+* **X470 PASS** (Windows 7 SP1 x86, usosusb 1.3-nt6, root-port replug fix):
+  keyboard + mouse + stick on the front panel, stick at boot and hot-swap
+  between ports, keyboard **and** mouse unplug / replug on rear and front
+  ports.
+* **Hubs: QEMU only.** The X470 front panel ports are chipset root ports
+  and no real external hub was on hand, so the hub code (route string, TT,
+  hub class requests, hot plug behind a hub) has not run on hardware yet.
+* NT4 (1.3-nt4) and NT 3.1 (1.2-nt31) builds: QEMU only.
 
 Own code, written from the public xHCI 1.2 and USB 2.0 / USB 3.2 hub class
 descriptions; GPL-3.0-or-later like the rest of the driver.
@@ -166,3 +176,45 @@ QEMU only: harness has a mouse on root port 3 (`p7`) plus mouse out / in on
 p7 (twice) and on hub port 1.2, each followed by mouse_move / button
 records at the mouse class callback: nt6 25/25, nt4 22/22, nt31 22/22 PASS.
 QEMU devices are ready at once, so the hardware timing is not reproduced.
+
+## X470 round 2 (2026-10-21, Windows 7 SP1 x86, 1.3-nt6)
+
+PASS: front panel keyboard + mouse + stick, stick hot-swap, keyboard and
+mouse unplug / replug on rear and front ports (the round 1 mouse FAIL is
+fixed). No hub on hand: hubs remain QEMU only.
+
+## Rebasing `feat/nt4-usb-sticks` (note for Codex)
+
+`feat/nt4-usb-sticks` (usosusb 1.1-nt4 sticks) was **not** merged. A trial
+merge (`git merge-tree`) onto `test/x470-98se-qemu` after this merge gives:
+
+* `tools/nt4/usosusb/src/usosusb.c`: **one** textual conflict, the NT4
+  `#else` block with `USOSUSB_VERSION`. Keep the sticks comment and
+  `USOSUSB_MSC` / `USOSUSB_NT4MSC`, and take a version above both,
+  `usosusb 1.4-nt4`.
+* `tools/tests/test_nt60_usosusb.py`: the matching version string in the
+  NT4 assertion (use the new version).
+* `tools/nt4/usosusb/bin/i386/usosusb.sys` and
+  `installer/internal/payload/legacy_boot_generated.go`: generated; rebuild
+  the driver and run `build.bat` instead of resolving by hand.
+
+What changed under the sticks code (auto-merged, but check it):
+
+* `port_enum(hc, p)` is split: `port_enum(hc, p, csc)` is now only the root
+  port part (100 ms connect debounce, reset before every retry, 2 retries,
+  `hc->tried`), and descriptor / configuration work moved into the new
+  `dev_enum(hc, hub, p, speed)`, which root ports and hub ports both call.
+  The sticks branch's `g_storage &&` check on the mass storage interface
+  (class 08/06/50) lands inside `dev_enum()` — it did auto-merge there.
+* New hub functions: `queue_hub`, `hub_status`, `hub_clear`, `hub_child`,
+  `hub_start`, `hub_port`, `hub_changes`, `hub_poll_all`; `port_changes`,
+  `hc_poll`, `worker`, `dev_drop` and `port_present` were touched (a device
+  can now sit behind a hub: `DEV` has hub / route fields, `port_present()`
+  checks the root port (`d->rport`) plus `d->gone`, which the hub path sets). A stick on a hub reaches `msc_attach()` through
+  `dev_enum()`; on unplug behind a hub `dev_drop()` is called from the hub
+  path, so the volume removal (`mnt_remove` / `\DosDevices` links) must hang
+  off `dev_drop()`, not off the root port code.
+* `g_diag` grew to 1024 WCHARs; Diag gained `H` (hub) entries and `/r`
+  retry marks.
+* Run `tools/tests/test_nt60_usosusb.py`, `test_usosusb_hubs.py` and the
+  NT4 sticks tests after the rebase; `USOS_QEMU_HUB=1` runs the hub harness.
