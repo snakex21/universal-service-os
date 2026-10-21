@@ -26,6 +26,20 @@ usos_display_stage() {
     [ -f "$display_exe" ] && [ -d "$display_dir" ] || return 1
     cp "$display_exe" "$display_dir/USOSRES.EXE" || return 1
     printf '%s\r\n' "$display_request" > "$display_dir/DISPLAY.TXT" || return 1
+    # The monitor's native size (EDID preferred timing) read by the UEFI
+    # menu for this preparation (src/platform/uefi/display_native.zig);
+    # USOSRES's auto picks it first. Absent or malformed: highest mode.
+    display_native=$(usos_display_native) || display_native=
+    [ -z "$display_native" ] || printf 'native=%s\r\n' "$display_native" >> "$display_dir/DISPLAY.TXT" || return 1
+}
+# The UEFI menu's EDID record: one line WxH (docs/display-policy.md).
+usos_display_native() {
+    _dn_file=${USOS_DISPLAY_NATIVE_FILE:-/mnt/esp/EFI/USOS/display-native.txt}
+    [ -f "$_dn_file" ] || return 1
+    _dn=$(head -c 32 "$_dn_file" | tr -d '\r\n')
+    # The same bounds as usos_display_parse (tools/display_policy.h).
+    printf '%s\n' "$_dn" | LC_ALL=C awk -Fx 'NF==2 && $1~/^[1-9][0-9]*$/ && $2~/^[1-9][0-9]*$/ && $1>=320 && $2>=200 && $1<=8192 && $2<=8192 {ok=1} END {exit !ok}' || return 1
+    printf '%s\n' "$_dn"
 }
 usos_display_run_reg() {
     case "$1" in W2K|NT4|NT3) ;; *) return 1 ;; esac

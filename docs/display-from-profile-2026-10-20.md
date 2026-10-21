@@ -200,4 +200,4 @@ docs/me-fresh-install-2026-10-20.md.
 Vista / 7 / Server 2008 / 2008 R2 on the CSMWrap paths now stage USOSRES
 too (default auto, or the profile's value), and a fixed profile value is
 written as Shell-Setup Display for every 6.x+ version. See
-docs/nt6-display-2026-10-21.md.
+docs/display-policy.md (cross-family policy: native EDID mode, else highest).

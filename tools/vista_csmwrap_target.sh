@@ -151,11 +151,11 @@ dd if="$node" of="$work/boot.readback" bs=512 count=16 2>/dev/null
 cmp -s "$work/boot" "$work/boot.readback" || fail 'NT60 boot code readback mismatch'
 log 'NT60 NTFS boot code PASS'
 
-# 2b. Display (docs/nt6-display-2026-10-21.md): Vista / 7 / 2008 / 2008 R2
+# 2b. Display (docs/display-policy.md): Vista / 7 / 2008 / 2008 R2
 # install on the Standard VGA driver at 800x600. A USOS answer for them
 # registers \USOS\NT6\USOSRES.EXE (autounattend.zig display_helper); its
-# request is <!-- USOS-DISPLAY=... --> or, without one, auto (up to
-# 1920x1080, as 9x / NT4 / 2000). Staged into the new Windows partition now:
+# request is <!-- USOS-DISPLAY=... --> or, without one, auto (native EDID
+# mode, else the highest). Staged into the new Windows partition now:
 # Setup installs into it (InstallTo, no format) and leaves the folder. A
 # user's own answer file has no registration: nothing staged. Optional:
 # any failure keeps Windows' own mode and the preparation goes on.

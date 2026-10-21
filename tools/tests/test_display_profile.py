@@ -72,6 +72,20 @@ class DisplayTransport(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual((self.tmp/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
 
+    def test_stage_appends_prep_time_native_size(self):
+        exe = self.tmp/'fake.exe'; exe.write_bytes(b'own test placeholder')
+        record = self.tmp/'display-native.txt'
+        stage = 'USOS_DISPLAY_NATIVE_FILE='+quote(record)+' usos_display_stage '+quote(self.tmp)+' '+quote(exe)+' autoxauto'
+        for text, expected in ((b'2560x1440\r\n', b'autoxauto\r\nnative=2560x1440\r\n'),
+                               (b'3840x2160', b'autoxauto\r\nnative=3840x2160\r\n'),
+                               (b'100x100\r\n', b'autoxauto\r\n'), (b'2560x1440;x\r\n', b'autoxauto\r\n'),
+                               (b'99999x1440\r\n', b'autoxauto\r\n'), (None, b'autoxauto\r\n')):
+            if text is None: record.unlink()
+            else: record.write_bytes(text)
+            r = shell(self.lib+stage)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual((self.tmp/'DISPLAY.TXT').read_bytes(), expected, text)
+
     def test_nt5_scoping_and_depth_only_request(self):
         source = self.tmp/'settings.ini'
         for text, expected in [('family=xp\ndisplay=1920x1080\n', b''),

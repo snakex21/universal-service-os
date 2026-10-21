@@ -176,7 +176,7 @@ const explorer_advanced = "reg.exe add \"" ++ default_hive ++ "\\Software\\Micro
 /// (Default hive Run: it removes its own value, no elevation needed) only
 /// when the file is there. The other paths (UEFI with CSM, UefiSeven,
 /// native UEFI) never have the file, so the commands do nothing there.
-/// docs/nt6-display-2026-10-21.md.
+/// docs/display-policy.md.
 pub const display_helper = "%SystemDrive%\\USOS\\NT6\\USOSRES.EXE";
 const display_guard = "cmd.exe /c if exist \"" ++ display_helper ++ "\" ";
 

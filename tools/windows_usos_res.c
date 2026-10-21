@@ -6,7 +6,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cpuid.h>
+#ifdef USOSRES_9X
+#define USOS_DISPLAY_AUTO_MAX_W 1920
+#define USOS_DISPLAY_AUTO_MAX_H 1080
+#endif
 #include "display_policy.h"
+#include "display_edid.h"
 #include "display_apply.h"
 #include "display_modes.h"
 #ifdef USOSRES_9X
@@ -36,7 +41,7 @@ static UsosDisplayModeList registry_modes;
 #endif
 static void run(void);
 #ifndef USOSRES_9X
-/* Vista / 7 (docs/nt6-display-2026-10-21.md): every new user gets a HKCU Run
+/* Vista / 7 (docs/display-policy.md): every new user gets a HKCU Run
  * value from the Default hive. Display settings are per machine there, so
  * the first hardware sign-in applies; each user's value is removed without
  * elevation (UAC), also once DISPLAY.DONE exists. Never on older Windows. */
@@ -84,8 +89,48 @@ static void request_log(const UsosDisplayRequest *request,unsigned count) {
     if(request->width) {number(request->width);lstrcatA(line,"x");number(request->height);}
     else lstrcatA(line,"auto");
     lstrcatA(line,"x");if(request->bpp)number(request->bpp);else lstrcatA(line,"auto");
+    lstrcatA(line," native=");
+    if(request->native_width) {number(request->native_width);lstrcatA(line,"x");number(request->native_height);}
+    else lstrcatA(line,"unknown");
     lstrcatA(line," modes=");number(count);lstrcatA(line,"\r\n");say(line);
 }
+#ifndef USOSRES_9X
+/* No native size from the preparation (DISPLAY.TXT native=): NT5 / 6.x keep
+ * each monitor's EDID under Enum\DISPLAY\<id>\<instance>\Device Parameters.
+ * Used only when every EDID found names the same native size (a fresh
+ * install has just the connected monitor; several sizes: unknown). */
+static BYTE edid[256];
+static void registry_native(UsosDisplayRequest *request) {
+    HKEY root,id,instance; char name[128],sub[160]; DWORD i,j,size,type,found=0,conflict=0;
+    unsigned long w=0,h=0,nw,nh;
+    if((GetVersion()&255)<5 || request->native_width) return;
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Enum\\DISPLAY",0,KEY_READ,&root)!=ERROR_SUCCESS) return;
+    for(i=0;i<64;i++) {
+        size=sizeof name; if(RegEnumKeyExA(root,i,name,&size,NULL,NULL,NULL,NULL)!=ERROR_SUCCESS) break;
+        if(RegOpenKeyExA(root,name,0,KEY_READ,&id)!=ERROR_SUCCESS) continue;
+        for(j=0;j<16;j++) {
+            size=128; if(RegEnumKeyExA(id,j,sub,&size,NULL,NULL,NULL,NULL)!=ERROR_SUCCESS) break;
+            lstrcatA(sub,"\\Device Parameters");
+            if(RegOpenKeyExA(id,sub,0,KEY_QUERY_VALUE,&instance)!=ERROR_SUCCESS) continue;
+            size=sizeof edid;
+            if(RegQueryValueExA(instance,"EDID",NULL,&type,edid,&size)==ERROR_SUCCESS && type==REG_BINARY &&
+               usos_edid_native(edid,size,&nw,&nh)) {
+                if(found && (nw!=w || nh!=h)) conflict=1;
+                w=nw;h=nh;found++;
+            }
+            RegCloseKey(instance);
+        }
+        RegCloseKey(id);
+    }
+    RegCloseKey(root);
+    lstrcpyA(line,"DISPLAY registry EDID found=");number(found);
+    if(found && !conflict) {
+        request->native_width=w;request->native_height=h;
+        lstrcatA(line," native=");number(w);lstrcatA(line,"x");number(h);
+    } else if(conflict) lstrcatA(line," sizes differ; native unknown");
+    lstrcatA(line,"\r\n");say(line);
+}
+#endif
 #ifdef USOSRES_9X
 static UsosDisplayVbeList vbe;
 static char inf_text[32768];
@@ -306,6 +351,9 @@ static void run(void) {
     SetFilePointer(log_file,0,NULL,FILE_END);
     if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); CloseHandle(log_file); leave(1); }
     if(vm()) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
+#ifndef USOSRES_9X
+    if(!request.width) registry_native(&request);
+#endif
 #ifdef USOSRES_9X
     if(!prepare_vbe()) { say("DISPLAY no fresh VBE/INF memory evidence; unchanged\r\n"); CloseHandle(log_file); leave(1); }
 #endif
