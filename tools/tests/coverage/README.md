@@ -123,7 +123,11 @@ explicit undersized NT5 cases are rejected. Legacy nested cases keep 4 GiB.
 Its optional
 `--after` subscribes to the owned prior test's cleanup-file creation using
 Windows directory notifications, including a future case directory, not
-repeated status-file reads. Default lanes accept only flat NT5/Win7 flows.
+repeated status-file reads. Default lanes accept only flat NT5/NT6 flows.
+Vista / Server 2008 x86 use the reviewed `vista_csmwrap_prepare.sh` and
+`vista_csmwrap_target.sh` route: prepare the target's staging WinPE and boot
+it through CSMWrap in the same outer emulator. They do not start the nested
+9x/NT4 QEMU installer. The PE10 donor architecture must match x86.
 `--nested` explicitly reserves a two-engine lane for 9x/NT3/NT4/POSReady;
 the default lane rejects these products. One flat lane and one nested lane
 can stay at three engines. The caller must reserve those slots; this is

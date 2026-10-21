@@ -19,8 +19,9 @@ import importlib.util
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 COLLECTION=Path(r'G:\USOS-Kolekcja').resolve()
-FLAT_SYSTEMS={'windows-xp','windows-xp-mce','windows-xp-tablet','windows-2000',
-    'windows-2000-server','windows-server-2003','windows-xp-x64','windows-7'}
+NT5_SYSTEMS={'windows-xp','windows-xp-mce','windows-xp-tablet','windows-2000',
+    'windows-2000-server','windows-server-2003','windows-xp-x64'}
+FLAT_SYSTEMS=NT5_SYSTEMS|{'windows-7','windows-vista','windows-server-2008'}
 NESTED_SYSTEMS={'windows-95','windows-98','windows-98-se','windows-me',
     'windows-nt-3-1','windows-nt-3-1-server','windows-nt-3-5','windows-nt-3-5-server',
     'windows-nt-3-51','windows-nt-3-51-server','windows-nt-4','windows-nt-4-server',
@@ -37,7 +38,7 @@ def validate_system(system,nested):
 def target_capacity(case):
     capacity=case.get('target_gib',4 if case['system'] in NESTED_SYSTEMS else 32)
     if type(capacity)!=int or not 1<=capacity<2048:raise ValueError('Invalid disposable target capacity')
-    if case['system'] in FLAT_SYSTEMS-{'windows-7'} and capacity<10:
+    if case['system'] in NT5_SYSTEMS and capacity<10:
         raise ValueError('NT5 fixture needs at least 10 GiB total per the actual partition planner; default is 32 GiB thin qcow2')
     return capacity
 

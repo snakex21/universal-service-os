@@ -24,8 +24,9 @@ class LaneTests(unittest.TestCase):
         for system in ('windows-95','windows-nt-4','windows-embedded-posready-2009'):
             with self.assertRaises(ValueError):plan.validate_system(system,False)
             plan.validate_system(system,True)
-        plan.validate_system('windows-7',False)
-        with self.assertRaises(ValueError):plan.validate_system('windows-7',True)
+        for system in ('windows-7','windows-vista','windows-server-2008'):
+            plan.validate_system(system,False)
+            with self.assertRaises(ValueError):plan.validate_system(system,True)
         with self.assertRaises(ValueError):plan.validate_system('unrecognized',False)
 
 
