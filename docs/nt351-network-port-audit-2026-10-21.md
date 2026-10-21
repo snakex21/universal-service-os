@@ -1,6 +1,6 @@
 # NT 3.51: audyt oddzielnego wariantu usosnet
 
-2026-10-21. Nie uruchomiono QEMU ani sterownika pod Windows. Nie zmieniono wariantów NT4/95. Nie utworzono eksperymentalnej binarki: pozostał nierozstrzygnięty kontrakt zamykania timera, opisany poniżej.
+2026-10-21. Nie uruchomiono QEMU ani sterownika pod Windows. Pierwszy checkpoint zakończył się bez implementacji z powodu nierozstrzygniętego zamykania prywatnego timera. Późniejszy dowód z oryginalnego CheckForHang pozwolił zbudować osobny eksperymentalny `usosnet351.sys` bez tego timera; aktualny stan jest na końcu dokumentu. Warianty NT4/95 zachowują dotychczasowe działanie.
 
 ## Oryginalny nośnik i metoda
 
@@ -47,4 +47,29 @@ Przed budową wariantu potrzebny jest ten ostatni dowód albo inny kompletny mec
 
 Ostatnia kontrola: rejestracja DC21X4 w RVA `0x32a4` ustawia Halt na VA `0x11972` (RVA `0x1972`). Ta funkcja wywołuje `0xf7e` (zatrzymanie układu i `KeStallExecutionProcessor(2000)`), `0x3132` (zwalnianie buforów/DMA), następnie NdisMDeregisterInterrupt (`0x1987`), NdisMDeregisterIoPortRange (`0x19a1`), NdisMFreeMapRegisters (`0x19a9`) i NdisFreeMemory (`0x19b7`). W prześledzonych funkcjach nie ma anulowania timera ani oczekiwania na oddanie referencji. Osobny shutdown handler RVA `0x19c1`, zarejestrowany przez `0x4668`–`0x4671`, anuluje timer kontekst+0x58 w `0x19d2`. Timer callback RVA `0x1654` może ponownie uzbroić ten sam timer w `0x186f`–`0x1878` na 2000 ms. Nie wykazano, że shutdown handler zawsze poprzedza Halt, ani że NDIS sam opróżnia te DPC przed zwolnieniem kontekstu. Krótki stall sprzętowy nie jest dowodem takiej bariery. Nie skopiowano tego schematu do usosnet.
 
-Wniosek audytu: **receive i rejestracja mają teraz konkretny dowód NT351; bezpieczny teardown timera nadal nie ma pełnego dowodu.** Audyt kończy się bez implementacji i bez eksperymentalnego worktree/binary. Ustalenie brakującego kontraktu lub zaprojektowanie sprawdzonego mechanizmu z dostępnym oczekiwaniem pozostaje osobnym zadaniem, przed jakimkolwiek runtime.
+Wniosek pierwszego checkpointu: receive i rejestracja mają konkretny dowód NT351; teardown prywatnego timera nadal nie ma pełnego dowodu. Nie wdrożono wariantu one-shot rearm. Poniższy wariant usuwa potrzebę takiego timera.
+
+## Oryginalny checker, cykl i serializacja
+
+Nowe pomiary z tego samego hash-verified ISO: `nt3-usb-tests/artifacts/nt351-network-audit/register-cfg.json`, `halt-wrapper.json`, `checker-routine.json` oraz `checker-initialization.json`. Zapis `checker-cfg.json` z wejściem 0x980 był wyłącznie oknem poszukiwawczym i nie jest dowodem CFG: ten adres leży wewnątrz instrukcji. Prawidłowe wejście to 0x98E, a jego direct-branch CFG nie został ucięty.
+
+- `NdisMRegisterMiniport` RVA 0x179D sprawdza wersję 3.0 i minimum 0x3C B, następnie kopiuje dokładnie 0x3C B do driverblock+0x18 (0x180A–0x181A). CheckForHang z charakterystyk+8 trafia więc do driverblock+0x20, a Halt z +0x14 do driverblock+0x2C.
+- Inicjalizacja RVA 0x9CB4–0x9CC9 przekazuje miniport jako kontekst, callback VA 0x1098E (RVA 0x98E) i obiekt miniport+0x90 do oryginalnego eksportu `NdisInitializeTimer` (RVA 0x19EB).
+- Checker 0x98E bierze miniport lock+0x30 (0x9A1–0x9A6), sprawdza closing+0x4A3 i busy+0x2E. Ustawia busy=1 w 0x9C5, pobiera driverblock+0x20 i wywołuje callback z miniport context+0xC w 0x9D8–0x9DB. W tym miejscu lock pozostaje zajęty. Zwolnienie busy jest w 0xA26. Ścieżka końcowa przekazuje 2000 ms i miniport+0x90 do `NdisSetTimer` (0xA2A–0xA36), następnie oddaje lock w 0xA3D. Również busy-path pomija callback i przechodzi do ponownego uzbrojenia.
+- Oryginalny wrapper Halt 0x873C podnosi IRQL do 2, bierze ten sam lock+0x30 i czeka na busy=0 (0x8758–0x8794). Ustawia busy=1 w 0x879C przed oddaniem locka, anulowaniem wewnętrznego timera+0x90 (0x87B0–0x87B7) i wywołaniem Halt przez driverblock+0x2C (0x87D9). Callback miniportu nie może rozpocząć pracy równolegle z tym Halt. Prywatne timery miniportu nie są w tej ścieżce dowiedzioną listą opróżnianych DPC; nie dodano ich do wariantu.
+
+Ten pomiar dotyczy dokładnego NDIS.SYS o SHA-256 podanym wyżej. Późniejszy [opis Microsoft MiniportCheckForHang](https://learn.microsoft.com/en-us/previous-versions/windows/hardware/network/ff549367(v=vs.85)) jest kontrolą znaczenia callbacku; sam nie stanowi dowodu NT351. Nie wykorzystano Doors ani wycieków kodu.
+
+## Wariant eksperymentalny i wykonane testy hostowe
+
+Worktree `C:\Users\ASRock\usos-work\nt351-net`, gałąź `fix/nt351-net`. Wspólny core otrzymuje wyłącznie warunki `USOSNET_NT351`; osobne `src351/sources` i `build351.py` budują `usosnet351.sys`. NT4/95 i NDIS5 mają tę opcję wyłączoną. Stare pliki binarne zachowały hashe odpowiednio `4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d` i `8eac15b474b23fb4e7ac2c2431a4b17e6666cc2d03788b78ec2d8e19eeef89f9`.
+
+NT351 rejestruje 3.0/0x3C, importuje czteroargumentowe `NdisMSetAttributes(TRUE, Pci)` i korzysta ze sprawdzonego EthDB+0xD8. Normalne RX/TX obsługują istniejące ISR/HandleInterrupt. CheckForHang wykonuje ograniczone RX/TX housekeeping jako wolny fallback; **nie tworzy, nie uzbraja ani nie anuluje prywatnego timera**. Pozostaje obowiązek runtime sprawdzenia IRQ w zainstalowanym NT351. QEMU 82576 nie dowodzi I211/X470 ani osiągów fallbacku 20 ms.
+
+Diagnostyczne sekundy są nominalne: każde wywołanie checker dodaje 2 s, więc opóźnione/ominięte callbacki powodują dryf. Próg nominal3s TX stall jest wykrywany na następnym checkerze przy nominal4s, licznik saturuje i nie raportuje ponownie po przepełnieniu. Log cadence uwzględnia parzyste sekundy. Ten wariant nie zapisuje prywatnych danych przez `NdisWriteConfiguration` ani do systemowego event logu; opcjonalny serial i RAM zbiera host przy VM w jej katalogu artefaktów. Standardowa instalacja usługi/protokołu sieciowego Windows jest osobną konfiguracją systemu.
+
+Finalny build `artifacts/nt351-network/build-03/build.json`: **17024 B**, PE i386 native OS/subsystem **3.10**, SHA-256 `dc8827954e6fe75ee8264c7382e87899cc9761890998198c126c7ea8aa5c55b6`. Plik do dalszej próby: `tools/nt/usosnet/bin/i386/usosnet351.sys`. Wszystkie 30 importów pochodzą wyłącznie z NDIS.SYS i występują w oryginalnym NDIS351; nie ma importów z nazwą Timer ani Ex. Build wymaga istniejącego WDK7.1; świeży output i TEMP/TMP są pod artifacts tego worktree, bez usuwania katalogów lub zapisu do profilu.
+
+`tools/tests/test_usosnet351.py` oraz istniejący `test_usosnet.py`: **27/27 PASS, 0 skip**; wynik `artifacts/nt351-network/host-tests/result.json` wiąże testy z powyższym hashem. Nowe 7 testów sprawdza importy oryginalnego NDIS, PE, gotowe instrukcje rejestracji i callback prefix, 4 argumenty SetAttributes, oba wskazania EthDB+0xD8, hashe starych binarek oraz faktycznie skompilowany callback z mock chip operations (unstarted guard, IRQ/poll modes, kolejność RX/TX, nominalny czas, saturacja stall i cadence). Nie wykonuje NDIS ani fizycznego sprzętu na hoście.
+
+**Nie ma jeszcze installed-Windows PASS, DHCP/brama/DNS ani wyniku USB NT3.** R17 reprodukuje Setup z dotychczasowym cache; nie zawiera tej binarki. Następna próba sieci musi jawnie dostarczyć i sprawdzić hash powyższego `usosnet351.sys`, zainstalować TCP/IP, uzyskać DHCP, zapisać bramę i DNS, a potem wykonać rzeczywiste próby pakietowe. Nie rozszerza się wariantu na NT3.5/3.1: ich oryginalne eksporty wymagają dalszego portu.
