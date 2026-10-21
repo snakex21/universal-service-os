@@ -724,7 +724,17 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     /* 95 OSR2 (PnP): the devnode's resources, PCI slot numbers are ignored.
      * NT4: NDIS.SYS 4.0 answers NOT_SUPPORTED; find the card, then let the
      * HAL assign (claim) its resources for this slot. */
+#if USOSNET_NT351
+    /* Original NDIS351 SHA948d...ab1b, RVA3B26 only returns
+       STATUS_NOT_SUPPORTED in EAX (ret0x10); it never writes *Status.
+       Do not inherit SUCCESS from NdisOpenConfiguration or read the
+       uninitialized resource buffer as a PnP result. NT4/95 stay unchanged. */
+    st = NDIS_STATUS_NOT_SUPPORTED;
+#endif
     NdisMQueryAdapterResources(&st, WrapperConfigurationContext, res, &resLen);
+#if USOSNET_NT351
+    UsLog(A, "resources status %x bytes %x", st, resLen);
+#endif
     if (st == NDIS_STATUS_SUCCESS) {
         rl = res;
     } else {

@@ -128,6 +128,75 @@ class BuiltBinary(unittest.TestCase):
             self.assertEqual(hashlib.sha256((DRV / 'bin/i386' / name).read_bytes()).hexdigest(), expected)
 
 
+class ResourceQueryExecution(unittest.TestCase):
+    def test_real_pci_branch_with_original_nonwriting_stub_and_nt4_control(self):
+        cc=shutil.which('gcc') or 'C:/msys64/mingw64/bin/gcc.exe'
+        self.assertTrue(Path(cc).is_file())
+        source=(DRV/'src/usosnet.c').read_text()
+        start=source.index('#if USOSNET_NDIS4\n    /* 95 OSR2 (PnP)')
+        end=source.index('\n\n    /* PCI identity;',start)
+        branch=source[start:end]
+        harness=r"""
+#include <stdint.h>
+#include <stdio.h>
+#define USOSNET_NDIS4 1
+#define NDIS_STATUS_SUCCESS 0U
+#define NDIS_STATUS_NOT_SUPPORTED 0xC00000BBU
+#define NDIS_STATUS_ADAPTER_NOT_FOUND 0xC0010006U
+#define TRUE 1
+#define FALSE 0
+typedef uint32_t ULONG,NDIS_STATUS,UINT;
+typedef struct { ULONG Count; } NDIS_RESOURCE_LIST,*PNDIS_RESOURCE_LIST;
+typedef struct { void *Handle; ULONG PciSlot,AssignStatus,Legacy; } ADAPTER;
+static unsigned query_calls,find_calls,assign_calls,write_status,found;
+static NDIS_RESOURCE_LIST assigned={2};
+static void NdisMQueryAdapterResources(NDIS_STATUS *st,void *ctx,PNDIS_RESOURCE_LIST res,UINT *len) {
+ (void)ctx;(void)len;query_calls++;
+ /* Original351 stub returns EAX=C00000BB; caller's VOID prototype ignores it.
+    Precisely the important contract: neither *st nor *res is written. */
+ if(write_status){*st=0;res->Count=1;}
+}
+static int LegacyFind(ADAPTER *a,void *ctx){(void)ctx;find_calls++;a->PciSlot=3;return found;}
+static NDIS_STATUS NdisMPciAssignResources(void *h,ULONG slot,PNDIS_RESOURCE_LIST *r) {
+ (void)h;if(slot!=3)return 99;assign_calls++;*r=&assigned;return 0;
+}
+static void UsLog(ADAPTER *a,const char *s,ULONG v1,ULONG v2){(void)a;(void)s;(void)v1;(void)v2;}
+static NDIS_STATUS run(void) {
+ ADAPTER adapter={0},*A=&adapter;void *WrapperConfigurationContext=(void*)1;
+ void *MiniportAdapterHandle=(void*)2;
+ NDIS_RESOURCE_LIST buffer={0xDEADBEEFU},*res=&buffer,*rl=0;
+ UINT resLen=sizeof buffer;NDIS_STATUS st=NDIS_STATUS_SUCCESS;
+"""+branch+r"""
+ if(write_status)return (!rl||rl->Count!=1||find_calls||assign_calls)?10:0;
+ return (!A->Legacy||find_calls!=1||assign_calls!=1||rl!=&assigned)?11:0;
+fail:
+ return st;
+}
+int main(void) {
+ NDIS_STATUS st;
+ write_status=1;found=1;st=run();if(st||query_calls!=1)return 1;
+#if USOSNET_NT351
+ query_calls=find_calls=assign_calls=0;write_status=0;found=1;
+ st=run();if(st||query_calls!=1)return 2;
+ query_calls=find_calls=assign_calls=0;found=0;
+ st=run();if(st!=NDIS_STATUS_ADAPTER_NOT_FOUND||find_calls!=1||assign_calls)return 3;
+#endif
+ puts("resource branch PASS");return 0;
+}
+"""
+        owned=ROOT/'artifacts/nt351-network/host-tests';owned.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='resource-',dir=owned) as directory:
+            work=Path(directory);c=work/'resource.c';c.write_text(harness,encoding='utf-8')
+            env=dict(os.environ,TEMP=str(work),TMP=str(work))
+            for nt351 in (0,1):
+                exe=work/f'resource-{nt351}.exe'
+                built=subprocess.run([cc,'-std=c99','-Wall','-Werror','-Wno-unused-function',
+                    f'-DUSOSNET_NT351={nt351}',str(c),'-o',str(exe)],capture_output=True,text=True,env=env)
+                self.assertEqual(built.returncode,0,built.stdout+built.stderr)
+                result=subprocess.run([str(exe)],capture_output=True,text=True,env=env)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+
 class CallbackExecution(unittest.TestCase):
     def test_real_checker_with_mock_chip_ops_and_nominal_time_policy(self):
         cc = shutil.which('gcc') or ('C:/msys64/mingw64/bin/gcc.exe'
