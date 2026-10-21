@@ -996,8 +996,8 @@ static int hub_port(HC *hc, DEV *h, ULONG n)
         delay_ms(10);
         if (!hub_status(h, n, &st))
             return 0;
-        if (((st >> 16) & 0x10) || (!(st & 0x10) && (st & 2)))
-            break;              /* C_PORT_RESET, or reset over and enabled */
+        if (((st >> 16) & 0x10) || (i >= 4 && !(st & 0x10) && (st & 2)))
+            break;              /* C_PORT_RESET, or (after 50 ms) reset over and enabled */
     }
     if (st >> 16)
         hub_clear(h, n, st >> 16);
