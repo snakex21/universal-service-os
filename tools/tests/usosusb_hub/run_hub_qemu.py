@@ -13,10 +13,13 @@ Windows install, no disk image besides a 64 MiB scratch stick.
 Scenarios (one QEMU run, monitor commands in between):
   boot      hub on root port 1 with keyboard 1.1, mouse 1.2, stick 1.3, a
             second hub on 1.4 with a keyboard on 1.4.1 (depth 2); a keyboard
-            on root port 2 (root ports unchanged)
+            on root port 2 (root ports unchanged), a mouse on root port 3
   input     sendkey / mouse_move reach the class callbacks
   hotplug   keyboard 1.1 out, keyboard in on 1.4.2, stick 1.3 out and in,
             the depth-2 hub out (its keyboard goes with it)
+  mouse     mouse out / in on root port 3 and on hub port 1.2; mouse_move
+            and a button must reach the mouse class callback after each
+            reattach (X470 2026-10-21: mouse replug failed with -addr4)
 
 QEMU's usb-hub is a full-speed USB 1.1 hub: the transaction translator
 fields (TT hub slot / port) and SuperSpeed hubs (SET_HUB_DEPTH, the USB 3
@@ -167,6 +170,8 @@ class Vm:
                 '-kernel', str(kernel),
                 '-drive', f'if=none,id=stick,format=raw,file={stick.as_posix()}',
                 '-device', 'qemu-xhci,id=xhci',
+                # before the hub mouse: QEMU routes mouse_move to the newest mouse
+                '-device', 'usb-mouse,bus=xhci.0,port=3,id=m2',
                 '-device', 'usb-hub,bus=xhci.0,port=1,id=hub1',
                 '-device', 'usb-kbd,bus=xhci.0,port=1.1,id=k1',
                 '-device', 'usb-mouse,bus=xhci.0,port=1.2,id=m1',
@@ -248,7 +253,7 @@ def main() -> int:
     vm = Vm(kernel, stick, work)
     try:
         # boot: everything enumerated
-        want = [r' p5:s\d+H8fs', r' p5\.1:s\d+K-', r' p5\.2:s\d+-M', r' p5\.4:s\d+H8fs', r' p5\.4\.1:s\d+K-', r' p6:s\d+K-']
+        want = [r' p7:s\d+-M', r' p5:s\d+H8fs', r' p5\.1:s\d+K-', r' p5\.2:s\d+-M', r' p5\.4:s\d+H8fs', r' p5\.4\.1:s\d+K-', r' p6:s\d+K-']
         if msc:
             want.append(r' p5\.3:s\d+--S\(64M wp0 1v\)')
         ok = vm.wait(r' p5\.4\.1:s\d+K-', 240)
@@ -289,6 +294,32 @@ def main() -> int:
         check('hotplug hub 1.4 out with its keyboards', ok)
         vm.hmp('device_add usb-kbd,bus=xhci.0,port=1.1,id=k5')
         check('hotplug kbd back on 1.1', vm.wait(r'p5\.1-gone.* p5\.1:s\d+K-', 30))
+
+        # mouse unplug / replug, root port and hub port; the new mouse is
+        # QEMU's newest mouse, so mouse_move goes to it
+        def mouse_records(name: str) -> None:
+            m0 = vm.text().count('MOU ')
+            vm.hmp('mouse_move 7 -3')
+            vm.hmp('mouse_button 1')
+            vm.hmp('mouse_button 0')
+            time.sleep(3)
+            check(name, vm.text().count('MOU ') > m0, f'{vm.text().count("MOU ") - m0} new')
+
+        vm.hmp('device_del m2')
+        check('mouse root port 3 out', vm.wait(r' p7-gone', 30))
+        vm.hmp('device_add usb-mouse,bus=xhci.0,port=3,id=m3')
+        check('mouse root port 3 back in', vm.wait(r'p7-gone.* p7:s\d+-M', 30))
+        mouse_records('mouse records after root port replug')
+        vm.hmp('device_del m3')
+        check('mouse root port 3 out again', vm.wait(r'p7-gone.* p7:s\d+-M.* p7-gone', 30))
+        vm.hmp('device_add usb-mouse,bus=xhci.0,port=3,id=m5')
+        check('mouse root port 3 in again', vm.wait(r'p7-gone.* p7-gone.* p7:s\d+-M', 30))
+        mouse_records('mouse records after second root port replug')
+        vm.hmp('device_del m1')
+        check('mouse hub port 1.2 out', vm.wait(r' p5\.2-gone', 30))
+        vm.hmp('device_add usb-mouse,bus=xhci.0,port=1.2,id=m4')
+        check('mouse hub port 1.2 back in', vm.wait(r'p5\.2-gone.* p5\.2:s\d+-M', 30))
+        mouse_records('mouse records after hub port replug')
         print('DIAG', vm.diag(), flush=True)
     finally:
         vm.stop()

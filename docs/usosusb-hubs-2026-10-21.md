@@ -34,7 +34,8 @@ descriptions; GPL-3.0-or-later like the rest of the driver.
   `-hubd`, `-hubctx<cc>`, `-noen`, `-deep`, `-full`. Diag is 1024 characters
   now. Conn and Msc are unchanged.
 * Versions: `usosusb 1.2-nt6`, `usosusb 1.2-nt4`, `usosusb 1.1-nt31`
-  (1.1-nt4 is taken by `feat/nt4-usb-sticks`).
+  (1.1-nt4 is taken by `feat/nt4-usb-sticks`); 1.3-nt6 / 1.3-nt4 /
+  1.2-nt31 with the root port replug fix below.
 
 ## QEMU harness (QEMU only)
 
@@ -131,3 +132,37 @@ change). Nothing is deployed by this branch; the deploy is a separate step.
 
 Afterwards the Diag line answers the rest: hub speed (`hs` / `fs` / `ss`),
 whether the TT was used (`/tt`), and any error tag per port.
+
+## X470 round 1 (2026-10-21, Windows 7 SP1 x86, 1.2-nt6)
+
+PASS: keyboard + mouse + stick on the front panel (HAF XB EVO USB 3 ports),
+stick at boot, stick moved between ports, keyboard unplug / replug.
+Topology from Diag: the front panel ports are chipset root ports (hc0
+01:00.0, ports 13..16), no hub (no `H` entry); p17 is an onboard device
+without HID (`p17-nohid`, then `p17-addr4`).
+
+FAIL: USB mouse unplug / replug, every port. Diag of that session (stale
+cell in the SYSTEM hive): `p15:s1K- p16:s2-M ... p15-gone p16-gone p16:s5K-
+p16-gone p16-addr4 p16-addr4 p15-addr4`: the keyboard came back on p16, the
+mouse failed Address Device with completion code 4 (USB Transaction Error)
+on p16 and p15.
+
+Cause: root port hot plug reset the port at once on the connect change, with
+no connect debounce (USB 2.0 7.1.7.3: 100 ms before the reset; the hub path
+already waited). A device that is still powering up (here the mouse) misses
+that reset and never answers SET_ADDRESS. Later port events then went
+straight to Address Device on the already enabled port without a new reset,
+so it never recovered (same mechanism as `p17-addr4` after `p17-nohid`).
+Present in 1.1-nt6 too (root port code unchanged by the hub work).
+
+Fix (1.3-nt6 / 1.3-nt4 / 1.2-nt31): `port_enum(hc, p, csc)` waits 100 ms
+after a connect change, resets the port again whenever the device on it was
+already tried (`hc->tried`, cleared on disconnect), retries a failed
+address / descriptor / configure step twice (100, 200 ms, new reset each
+time; Diag `/r` after the failed entry), and ignores port events without a
+connect change on a port whose device was already tried (no reset loop).
+
+QEMU only: harness has a mouse on root port 3 (`p7`) plus mouse out / in on
+p7 (twice) and on hub port 1.2, each followed by mouse_move / button
+records at the mouse class callback: nt6 25/25, nt4 22/22, nt31 22/22 PASS.
+QEMU devices are ready at once, so the hardware timing is not reproduced.

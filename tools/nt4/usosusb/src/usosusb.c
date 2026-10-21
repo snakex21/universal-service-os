@@ -62,7 +62,7 @@
 __declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityBoost);
 __declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
 __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
-#define USOSUSB_VERSION L"usosusb 1.1-nt31"
+#define USOSUSB_VERSION L"usosusb 1.2-nt31"
 #elif defined(USOSUSB_NT6)
 /* Vista / Server 2008 SP2 x86 (build-nt6.cmd): same legacy port devices;
    kbdclass / mouclass connect them as legacy ports (\Device\KeyboardClassLegacyN,
@@ -71,13 +71,13 @@ __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
    driver connected even before its ENABLE, and a Conn value shows the
    connect / enable state. */
 #pragma warning(disable:4996)   /* HalGetBusDataByOffset is marked obsolete */
-#define USOSUSB_VERSION L"usosusb 1.2-nt6"
+#define USOSUSB_VERSION L"usosusb 1.3-nt6"
 /* USB mass storage (bulk-only transport, SCSI transparent command set):
    removable volumes for the file systems, drive letters via the mount
    manager. */
 #define USOSUSB_MSC 1
 #else
-#define USOSUSB_VERSION L"usosusb 1.2-nt4"
+#define USOSUSB_VERSION L"usosusb 1.3-nt4"
 #endif
 
 #define MAXHC 4
@@ -185,6 +185,7 @@ typedef struct _HC {
     volatile int cmd_done;
     ULONG cmd_cc, cmd_slot;
     ULONG portchg;              /* bit per port (1..31) to look at */
+    ULONG tried;                /* bit per root port: enumerated since the last connect (needs a new reset) */
     volatile int hubchg;        /* a hub reported a port change */
     DEV dev[MAXDEV];
     int ok;
@@ -1069,17 +1070,22 @@ static void hub_poll_all(HC *hc)
     }
 }
 
-static void port_enum(HC *hc, ULONG p)
+static int g_enum_soft;         /* dev_enum failed on the wire (address / descriptors): worth a retry */
+
+/* Root port p. csc: the port reported a connect change (a device was
+   plugged in or replaced), otherwise only reset / enable / link changes. */
+static void port_enum(HC *hc, ULONG p, int csc)
 {
     volatile ULONG *ps = hc->op + 0x100 + (p - 1) * 4;
     ULONG v = *ps;
-    int i;
+    int i, t;
     DEV *d = NULL;
 
     for (i = 0; i < MAXDEV; i++)
         if (hc->dev[i].used && !hc->dev[i].parent && hc->dev[i].port == p)
             d = &hc->dev[i];
     if (!(v & PS_CCS)) {
+        hc->tried &= ~(1u << p);
         if (d) {
             dev_drop(d);
             diag_add(L" p%u-gone", p, 0, 0, 0);
@@ -1089,19 +1095,44 @@ static void port_enum(HC *hc, ULONG p)
     }
     if (d)
         return;
-    if (!(v & PS_PED)) {
-        *ps = (v & PS_KEEP) | PS_PR;
-        for (i = 0; i < 50 && !(*ps & PS_PRC); i++)
-            delay_ms(5);
-        *ps = (*ps & PS_KEEP) | PS_PRC;
-        delay_ms(20);
-        v = *ps;
-        if (!(v & PS_PED)) {
-            diag_add(L" p%u-noen", p, 0, 0, 0);
-            return;
-        }
+    if (csc) {
+        /* hot plug: connect debounce (USB 2.0 7.1.7.3, 100 ms) before the
+           reset. A device still powering up misses an early reset and then
+           never answers SET_ADDRESS (X470: mouse replug -> p16-addr4). */
+        hc->tried &= ~(1u << p);
+        delay_ms(100);
+    } else if (hc->tried & (1u << p)) {
+        return;                 /* same device as before (refused or failed): the reset's own events end here */
     }
-    dev_enum(hc, NULL, p, (v >> 10) & 0xF);
+    for (t = 0; t < 3; t++) {
+        if (t) {
+            diag_add(L"/r", 0, 0, 0, 0);
+            delay_ms(100 * t);
+        }
+        v = *ps;
+        if (!(v & PS_CCS))
+            return;
+        /* reset unless a USB 3 port trained by itself and nothing has
+           talked to the device yet; a device left addressed by a failed or
+           dropped enumeration only answers again after a new reset */
+        if (!(v & PS_PED) || (hc->tried & (1u << p))) {
+            *ps = (v & PS_KEEP) | PS_PR;
+            for (i = 0; i < 50 && !(*ps & PS_PRC); i++)
+                delay_ms(5);
+            *ps = (*ps & PS_KEEP) | PS_PRC;
+            delay_ms(20);
+            v = *ps;
+            if (!(v & PS_PED)) {
+                diag_add(L" p%u-noen", p, 0, 0, 0);
+                hc->tried |= 1u << p;
+                continue;
+            }
+        }
+        hc->tried |= 1u << p;
+        g_enum_soft = 0;
+        if (dev_enum(hc, NULL, p, (v >> 10) & 0xF) || !g_enum_soft)
+            return;
+    }
 }
 
 /* Enumerate the device on root port p (hub == NULL) or on port p of hub.
@@ -1217,6 +1248,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
     cc = hc_cmd(hc, d->inpa, 0, (TRB_ADDRESS_DEVICE << 10) | (slot << 24));
     if (cc != CC_SUCCESS) {
         diag_add(L" %s-addr%d", (ULONG_PTR)path, (ULONG)cc, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
         return NULL;
     }
@@ -1224,6 +1256,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
     b = d->buf;
     if (control(d, 0x80, 6, 0x0100, 0, 8) < 0) {
         diag_add(L" %s-dd", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
         return NULL;
     }
@@ -1236,6 +1269,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
     }
     if (control(d, 0x80, 6, 0x0200, 0, 9) < 0) {
         diag_add(L" %s-cd", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
         return NULL;
     }
@@ -1244,6 +1278,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
         cfglen = 1000;
     if (cfglen < 9 || control(d, 0x80, 6, 0x0200, 0, (USHORT)cfglen) < 0) {
         diag_add(L" %s-cd2", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
         return NULL;
     }
@@ -1366,6 +1401,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
         cc = hc_cmd(hc, d->inpa, 0, (TRB_CONFIGURE_EP << 10) | (slot << 24));
         if (cc != CC_SUCCESS) {
             diag_add(L" %s-cfgep%d", (ULONG_PTR)path, (ULONG)cc, 0, 0);
+            g_enum_soft = 1;
             dev_drop(d);
             return NULL;
         }
@@ -2493,7 +2529,7 @@ static void port_changes(HC *hc)
                 }
         }
 #endif
-        port_enum(hc, p);
+        port_enum(hc, p, (v & 0x00020000) != 0);
     }
 }
 

@@ -54,7 +54,17 @@ class HubSource(unittest.TestCase):
         # root-port lookups only see devices without a parent hub
         self.assertIn('if (hc->dev[i].used && !hc->dev[i].parent && hc->dev[i].port == p)', self.text)
         self.assertIn('if (hc->dev[k].used && !hc->dev[k].parent && hc->dev[k].port == p) {', self.text)
-        self.assertIn('dev_enum(hc, NULL, p, (v >> 10) & 0xF);', self.text)
+        self.assertIn('dev_enum(hc, NULL, p, (v >> 10) & 0xF)', self.text)
+
+    def test_root_port_replug(self):
+        # X470 2026-10-21: mouse replug -> p16-addr4 (reset before the device
+        # was ready, retries on the enabled port without a reset)
+        self.assertIn('static void port_enum(HC *hc, ULONG p, int csc)', self.text)
+        self.assertIn('port_enum(hc, p, (v & 0x00020000) != 0);', self.text)
+        self.assertIn('delay_ms(100);\n    } else if (hc->tried & (1u << p)) {', self.text)
+        self.assertIn('if (!(v & PS_PED) || (hc->tried & (1u << p))) {', self.text)
+        self.assertIn('if (dev_enum(hc, NULL, p, (v >> 10) & 0xF) || !g_enum_soft)', self.text)
+        self.assertEqual(self.text.count('g_enum_soft = 1;'), 5)
 
     def test_diag_names(self):
         self.assertIn('wfmt(path, 24, hub ? L"%s.%u" : L"p%u", pa);', self.text)
@@ -63,8 +73,8 @@ class HubSource(unittest.TestCase):
         self.assertIn('static WCHAR g_diag[1024];', self.text)
 
     def test_binaries_carry_hub_build(self):
-        for rel, ver in (('bin/i386/usosusb.sys', 'usosusb 1.2-nt4'), ('bin/nt6/i386/usosusb.sys', 'usosusb 1.2-nt6'),
-                         ('bin/nt31/i386/usosusb.sys', 'usosusb 1.1-nt31')):
+        for rel, ver in (('bin/i386/usosusb.sys', 'usosusb 1.3-nt4'), ('bin/nt6/i386/usosusb.sys', 'usosusb 1.3-nt6'),
+                         ('bin/nt31/i386/usosusb.sys', 'usosusb 1.2-nt31')):
             data = (ROOT / 'tools/nt4/usosusb' / rel).read_bytes()
             self.assertIn(ver.encode('utf-16-le'), data, rel)
             self.assertIn('%s:s%uH%u%s'.encode('utf-16-le'), data, rel)

@@ -46,7 +46,7 @@ class Binary(unittest.TestCase):
 
     def test_nt6_variant(self):
         data = SYS.read_bytes()
-        self.assertIn('usosusb 1.2-nt6'.encode('utf-16-le'), data)
+        self.assertIn('usosusb 1.3-nt6'.encode('utf-16-le'), data)
         self.assertIn(b'HalGetBusDataByOffset', data)      # PCI through the HAL lock
         for name in (b'_snwprintf', b'__security_check_cookie', b'IoRegisterPlugPlayNotification', b'usbd.sys'):
             self.assertNotIn(name, data)
@@ -82,7 +82,7 @@ class MassStorage(unittest.TestCase):
         self.assertIn('#define USOSUSB_MSC 1', text)
         # only the NT6 block defines it
         self.assertLess(text.index('defined(USOSUSB_NT6)'), text.index('#define USOSUSB_MSC 1'))
-        self.assertLess(text.index('#define USOSUSB_MSC 1'), text.index('#define USOSUSB_VERSION L"usosusb 1.2-nt4"'))
+        self.assertLess(text.index('#define USOSUSB_MSC 1'), text.index('#define USOSUSB_VERSION L"usosusb 1.3-nt4"'))
         for needle in ('0x43425355', '0x53425355',            # CBW / CSW signatures
                        'b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50',   # class 08/06/50
                        "cdb[0] = (UCHAR)(wr ? 0x2A : 0x28);",  # WRITE(10) / READ(10)
