@@ -32,9 +32,13 @@ f39/17024B. To host preflight, nie wynik Windows.
 Plan `artifacts/coverage/nt351-fresh-network-plan-r21.json` ma jeden tag
 `r21-nt351-fresh-network-ps2`,4GiB target,ps2_input=true,usb_only_input=false,
 igb oraz ograniczony capture, success/failure collector i interaktywny endpoint.
-Plan SHA5cc8c614c9b1c1b8bb4122e18b784f014cd38e50611a999789888641814fde11.
+Plan SHA22b4c7f3aa672e85d34ddda0221cf2e1f7878d1e376f6739778cff9caef42704.
 Media archive24adda13744589cacebf6a75e21bf8999465b5637235ce55b0cf3a7578aa7975,
 ISO b9d0e8417c1f502d1de22c249401b593be2a7fe59524b27a624dfa8dedaa099c.
 Root przejmuje start po zwykłym RAM guardzie, retencję i pasywne endpointy;
 ten worktree nie uruchamia drugiej kopii. NT35/R20/R18f i ich binaria/wyniki
 pozostają bez zmian. Ulepszenia IRQ/timera są poza tą zamrożoną próbą.
+
+Przed spawnem root wykrył skopiowany stary expected_own_driver_sha256 w planie.
+Poprawiono wyłącznie to pole na f39 i plan_sha256 w manifeście; cache i binarka
+były prawidłowe. Wcześniejszy SHA planu 5cc8c614c9b1c1b8bb4122e18b784f014cd38e50611a999789888641814fde11 nie jest pinem uruchamianej próby.
