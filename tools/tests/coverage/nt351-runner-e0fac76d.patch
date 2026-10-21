@@ -26,7 +26,7 @@
      if metadata['result']['result'] != 'PASS':
          raise ValueError('Fixture preparation was not successful')
      if args.auto_native and args.interactive:
-@@ -254,6 +266,16 @@
+@@ -254,6 +266,14 @@
          '-drive',f'if=none,id=stick,format=qcow2,file={(work/"stick.qcow2").as_posix()}',
          '-device','qemu-xhci,id=xhci']
      command += aux.network_arguments(getattr(args,'nic','none'))
@@ -38,28 +38,38 @@
 +                  '-device','igb,netdev=usabilitynet,mac='+nt351_capture.MAC]
 +        if aux.network_arguments('igb')!=expected:raise ValueError('Pinned capture NIC changed')
 +        network_capture=nt351_capture.Capture(args.out/'network.pcap')
-+        capture_port=await network_capture.start()
-+        command+=nt351_capture.arguments(capture_port)
      usb_disks=aux.create_sticks(work,args.qemu) if usb_test else []
      for kind,path in zip(('boot','hot'),usb_disks):
          command+=['-drive',f'if=none,id=usability{kind},format=qcow2,file={path.as_posix()}']
-@@ -295,8 +317,13 @@
+@@ -276,7 +296,6 @@
+         command += ['-drive',f'if=none,id=evidencecd,format=raw,readonly=on,media=cdrom,file={(work/"observer.iso").as_posix()}']
+         controller='piix3-ide' if metadata.get('observer_ide') else 'ich9-ahci'
+         command += ['-device',controller+',id=evidencehba','-device','ide-cd,drive=evidencecd,bus=evidencehba.0']
+-    (args.out/'command.json').write_text(json.dumps(command,indent=2))
+     start = time.monotonic()
+     events = []
+     ui_count = 0
+@@ -295,8 +314,17 @@
      nt5_started=False
      env = dict(os.environ, TEMP=str(work), TMP=str(work), APPDATA=str(work), LOCALAPPDATA=str(work))
      with (args.out/'stderr.log').open('wb') as errors, (args.out/'serial.log').open('w',encoding='utf-8') as log:
 -        process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
 -            stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
 +        try:
++            if network_capture:
++                capture_port=await network_capture.start()
++                command+=nt351_capture.arguments(capture_port)
++            (args.out/'command.json').write_text(json.dumps(command,indent=2))
 +            process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
 +                stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
 +        except BaseException:
-+            if network_capture:await network_capture.finish()
++            if network_capture and network_capture.server:await network_capture.finish()
 +            server.close();await server.wait_closed()
 +            raise
          (args.out/'pid.txt').write_text(str(process.pid))
          async def consume():
              nonlocal ui_count, last_screen, answer_row, product_failure, native_started, boot_usb_attached, nt5_synced, nt5_started
-@@ -383,6 +410,8 @@
+@@ -383,6 +411,8 @@
                              'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
                          events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 test stick attached before first prepared-target boot'))
                          boot_usb_attached=True
@@ -68,7 +78,7 @@
                      await qmp.key('ret')
                      if 'start the prepared disk' in line:
                          prepared.set()
-@@ -456,6 +485,9 @@
+@@ -456,6 +486,9 @@
                  qmp.writer.close()
                  try: await qmp.writer.wait_closed()
                  except (ConnectionResetError, OSError): pass
@@ -78,7 +88,7 @@
      all_disks=[work/'stick.qcow2',target,*usb_disks]
      sizes = {path.name:path.stat().st_size for path in all_disks}
      allocated = {path.name:fixture.allocated_bytes(path) for path in all_disks}
-@@ -485,6 +517,17 @@
+@@ -485,6 +518,17 @@
      result['usb_pointer']=None if args.ps2_input else getattr(args,'usb_pointer','tablet')
      result['allocated_disk_bytes'] = allocated
      result['total_allocated_disk_bytes'] = sum(allocated.values())
@@ -96,7 +106,7 @@
      if product_failure and getattr(args,'collect_nt4_failure',False):
          # Outer QEMU and its nested installer have ended. One read-only
          # collector fits the already reserved nested lane; no extra live OS.
-@@ -533,6 +576,8 @@
+@@ -533,6 +577,8 @@
      parser.add_argument('--usb-only-input',action='store_true',help='Disable q35 i8042 so USB HID cannot be replaced by default PS/2 input')
      parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
      parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')

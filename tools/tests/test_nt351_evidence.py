@@ -177,6 +177,13 @@ class PassiveReceiver(unittest.IsolatedAsyncioTestCase):
     async def test_no_connection_is_not_proof(self):
         receiver=cap.Capture(self.path);await receiver.start();result=await receiver.finish()
         self.assertFalse(result['connected']);self.assertFalse(result['analysis']['dora_observed'])
+    async def test_open_localhost_client_cannot_block_finish_indefinitely(self):
+        receiver=cap.Capture(self.path);writer=await self.connect(receiver)
+        # Deliberately retain the connection: Python3.13 server.wait_closed
+        # would otherwise wait forever before reaching the client timeout.
+        result=await asyncio.wait_for(receiver.finish(),8)
+        self.assertIn('did not close',result['error']);self.assertFalse(result['analysis']['dora_observed'])
+        writer.close();await writer.wait_closed()
 
 
 class IntegrationPatch(unittest.TestCase):
@@ -197,6 +204,8 @@ class IntegrationPatch(unittest.TestCase):
             self.assertLess(boot.index('await network_capture.finish()\n        except Exception'),boot.index('await nt351_own.main('))
             self.assertIn('require_target=False',boot);self.assertIn("'--collect-nt351-success'",plan)
             self.assertIn("'--capture-nt351-network'",plan)
+            self.assertGreater(boot.index('await network_capture.start()'),boot.index('usb_disks=aux.create_sticks'))
+            self.assertLess(boot.index('await network_capture.start()'),boot.index('process = await asyncio.create_subprocess_exec'))
 
 
 if __name__=='__main__':unittest.main()

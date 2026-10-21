@@ -115,4 +115,6 @@ Analiza wymaga kolejnych Discover/Offer/Request/ACK dla tego samego xid/chaddr i
 
 14 testów hostowych sprawdza politykę/archiwum/transport, rzeczywiste tar/base64 i hash własnej binarki z mock mtools, fragmentowany socket, pełny limit ze100 odebranymi ramkami, błędne długości/EOF, korelację DHCP i odmowy oraz git apply do e0fac76d i kolejność collect przed cleanup. To nie jest wykonanie collectora ani sieci w VM.
 
+Review poprawił kolejność zamykania dla Python3.13: najpierw close listener, ograniczone oczekiwanie klienta i close/cancel, dopiero bounded server.wait_closed. Realny localhost client pozostawiony otwarty potwierdził zakończenie finish po5s, zamiast wcześniejszego nieosiągalnego timeoutu. Start capture przeniesiono bezpośrednio do osłoniętej fazy spawn po całym preflight. Po tej poprawce zestaw ma15/15 host PASS.
+
 Nie uruchomiono przygotowanego planu artifacts/nt351-network/nt351-network-hid-plan-next.json. Używa USB-only input, jednego igb i klawiatury/myszy USB. next-run-requirements.json wymaga najpierw rozstrzygnięcia R17/start2 oraz kolektora sukcesu przed usunięciem targetu: własny NET351.STATUS/USABILITY.TXT i hash system32/drivers/usosnet351.sys. DHCP musi mieć dowód wymiany pakietów, a brama i DNS rzeczywiste próby; sam wpis lease/konfiguracji w rejestrze nie wystarcza. Logger uruchamia się jawnie dopiero po pulpicie.

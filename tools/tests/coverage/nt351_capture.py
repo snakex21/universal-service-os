@@ -160,14 +160,18 @@ class Capture:
         """Called only after QEMU termination, never to observe VM progress."""
         if self.finished:raise ValueError('Capture already finished')
         self.finished=True
-        self.server.close();await self.server.wait_closed()
+        self.server.close()
         if self.task:
             try:await asyncio.wait_for(asyncio.shield(self.task),5)
             except asyncio.TimeoutError:
                 self.error='Mirror did not close after QEMU exit'
                 self.writer.close();self.task.cancel()
                 await asyncio.gather(self.task,return_exceptions=True)
-        self.file.close()
+        # Python3.13 wait_closed also waits for active client transports.
+        # Reach the bounded client shutdown above before waiting for this.
+        try:await asyncio.wait_for(self.server.wait_closed(),5)
+        except asyncio.TimeoutError:self.error='Mirror listener did not close after client shutdown'
+        finally:self.file.close()
         data=self.path.read_bytes()
         result=dict(path=self.path.name,mac=MAC,netdev=NETDEV,hard_byte_cap=self.limit,
             stored_bytes=len(data),stored_frames=self.stored,received_frames=self.received,
