@@ -153,6 +153,8 @@ pub fn wimbootPlan(options: WimbootOptions) WimbootPlan {
             if (vista and options.int10_dispatcher) plan.add(.{ .flag = "usos-int10-dispatcher.flag" });
             if (!vista) plan.add(.{ .bundled_drivers = folder });
             if (vista) plan.add(.{ .unattended_flag = .{ .folder = folder, .source = "testmode-watermark-on.txt", .target = "usos-testmode-watermark-on.flag" } });
+            // Win7 x64 UefiSeven native-resolution experiment (default off).
+            if (!vista) plan.add(.{ .unattended_flag = .{ .folder = folder, .source = "native-res-on.txt", .target = "usos-native-res.flag" } });
             plan.add(.boot_files);
             plan.add(.{ .source_ini = folder });
             // The Vista answer folder is "Windows 7" (Vista refuses one first).
@@ -207,8 +209,10 @@ test "Windows Server 2008 R2 / 2008 plans use their own DATA folder" {
     const r2 = wimbootPlan(.{ .kind = .win7, .folder = "Windows Server 2008 R2", .answer = true });
     const items = r2.slice();
     try std.testing.expectEqualStrings("Windows Server 2008 R2", items[3].bundled_drivers);
-    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[5].source_ini);
-    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[6].answer);
+    try std.testing.expectEqualStrings("native-res-on.txt", items[4].unattended_flag.source);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[4].unattended_flag.folder);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[6].source_ini);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[7].answer);
     var buffer: [160]u8 = undefined;
     try std.testing.expectEqualStrings("drivers usos-drivers.bin bundled+user Drivers\\Windows Server 2008 R2", try describe(items[3], &buffer));
     const vista = wimbootPlan(.{ .kind = .vista, .folder = "Windows Server 2008", .external_pe10 = true });
@@ -240,9 +244,19 @@ test "Vista gets the Int10 dispatcher flag only when asked; Windows 7 never need
 }
 
 test "watermark opt-out is injected only by the Vista x64 plan" {
-    for ([_]WimbootKind{ .modern_setup, .winpe, .win7 }) |kind| {
+    for ([_]WimbootKind{ .modern_setup, .winpe }) |kind| {
         for (wimbootPlan(.{ .kind = kind }).slice()) |item| try std.testing.expect(item != .unattended_flag);
     }
+    // Windows 7 has exactly one optional flag: the native-resolution experiment.
+    var win7_flags: usize = 0;
+    for (wimbootPlan(.{ .kind = .win7 }).slice()) |item| switch (item) {
+        .unattended_flag => |flag| {
+            win7_flags += 1;
+            try std.testing.expectEqualStrings("usos-native-res.flag", flag.target);
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), win7_flags);
     const plan = wimbootPlan(.{ .kind = .vista, .folder = "Windows Server 2008" });
     var count: usize = 0;
     for (plan.slice()) |item| switch (item) {

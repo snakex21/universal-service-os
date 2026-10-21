@@ -150,7 +150,6 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         "tools/windows7_vga_routing.zig",
         "tools/windows7_gop_retry.zig",
         "tools/windows7_vbe_table.zig",
-        "src/platform/uefi/edid_mode.zig",
     };
     for (uefi_test_files) |file| {
         const module = b.createModule(.{ .root_source_file = b.path(file), .target = target, .optimize = optimize });

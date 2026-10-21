@@ -33,6 +33,55 @@ pub fn record(size: Size, buffer: []u8) ![]const u8 {
 
 pub const record_path = "\\EFI\\USOS\\display-native.txt";
 
+
+// GOP mode choice for UEFI paths that must set one mode for an OS without
+// its own GPU driver (Win7 x64 UefiSeven: tools/windows7_native_mode.zig).
+// Same policy as USOSRES: the EDID native size, else the largest usable mode.
+
+/// One GOP mode as the caller saw it through QueryMode.
+pub const Candidate = struct {
+    width: u32,
+    height: u32,
+    /// 32 bpp RGB/BGR (PixelRedGreenBlueReserved8BitPerColor or
+    /// PixelBlueGreenRedReserved8BitPerColor) and any caller-specific limit.
+    usable: bool,
+};
+
+pub const Reason = enum {
+    /// The GOP mode with the EDID preferred timing's size.
+    edid_native,
+    /// No EDID (or an invalid one): the largest usable mode.
+    largest_no_edid,
+    /// EDID present, but no usable mode with its size: the largest usable mode.
+    largest_no_match,
+};
+
+pub const Pick = struct {
+    index: usize,
+    reason: Reason,
+};
+
+/// Index of the mode to use, or null when no candidate is usable.
+pub fn pickMode(candidates: []const Candidate, preferred: ?Size) ?Pick {
+    if (preferred) |want| {
+        for (candidates, 0..) |c, i| {
+            if (c.usable and c.width == @as(u32, want.width) and c.height == @as(u32, want.height)) return .{ .index = i, .reason = .edid_native };
+        }
+    }
+    var best: ?usize = null;
+    for (candidates, 0..) |c, i| {
+        if (!c.usable) continue;
+        if (best) |b| {
+            const cur = candidates[b];
+            const area = @as(u64, c.width) * c.height;
+            const cur_area = @as(u64, cur.width) * cur.height;
+            if (area > cur_area or (area == cur_area and c.width > cur.width)) best = i;
+        } else best = i;
+    }
+    const index = best orelse return null;
+    return .{ .index = index, .reason = if (preferred == null) .largest_no_edid else .largest_no_match };
+}
+
 fn sample(w: u16, h: u16) [128]u8 {
     var e: [128]u8 = @splat(0);
     @memcpy(e[0..8], &header);
@@ -72,4 +121,24 @@ test "edid: invalid blocks give no native size" {
     e[55] = 0;
     e[127] +%= 0x56 +% 0x5E;
     try std.testing.expect(native(&e) == null);
+}
+
+test "pick: EDID native, then largest" {
+    const modes = [_]Candidate{
+        .{ .width = 640, .height = 480, .usable = true },
+        .{ .width = 1024, .height = 768, .usable = true },
+        .{ .width = 1920, .height = 1080, .usable = true },
+        .{ .width = 2560, .height = 1600, .usable = true },
+        .{ .width = 3840, .height = 2160, .usable = false },
+    };
+    try std.testing.expectEqual(Pick{ .index = 2, .reason = .edid_native }, pickMode(&modes, Size{ .width = 1920, .height = 1080 }).?);
+    // No cap: a 2560x1600 monitor gets 2560x1600.
+    try std.testing.expectEqual(Pick{ .index = 3, .reason = .edid_native }, pickMode(&modes, Size{ .width = 2560, .height = 1600 }).?);
+    try std.testing.expectEqual(Pick{ .index = 3, .reason = .largest_no_edid }, pickMode(&modes, null).?);
+    // The 4K mode exists but is not usable (e.g. not 32 bpp): largest usable.
+    try std.testing.expectEqual(Pick{ .index = 3, .reason = .largest_no_match }, pickMode(&modes, Size{ .width = 3840, .height = 2160 }).?);
+    try std.testing.expect(pickMode(&[_]Candidate{.{ .width = 800, .height = 600, .usable = false }}, null) == null);
+    // Same area: the wider mode wins.
+    const tie = [_]Candidate{ .{ .width = 1200, .height = 1600, .usable = true }, .{ .width = 1600, .height = 1200, .usable = true } };
+    try std.testing.expectEqual(@as(usize, 1), pickMode(&tie, null).?.index);
 }

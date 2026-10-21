@@ -16,9 +16,9 @@ static int publish_loaders(void){
   * install on a reused ESP (X470 2026-09-27: Windows 7's win7.original.efi
   * made the Vista publication fail). Remove only these known USOS files. */
  {
-  static const WCHAR *stale[]={L"win7.original.efi",L"win7.efi",L"UefiSeven.ini",L"uefiseven-LICENSE.txt",L"usos-win7-new.efi"};
+  static const WCHAR *stale[]={L"win7.original.efi",L"win7.efi",L"UefiSeven.ini",L"uefiseven-LICENSE.txt",L"usos-win7-new.efi",L"usos-native-res.flag"};
   /* Only in a folder whose own loader exists and was confirmed above. */
-  for(unsigned i=0;i<2;i++)for(unsigned j=0;exists[i]&&j<5;j++){
+  for(unsigned i=0;i<2;i++)for(unsigned j=0;exists[i]&&j<6;j++){
    path(b,chosen,dirs[i]);copy(b+len(b),stale[j]);
    if(GetFileAttributesW(b)==INVALID_FILE_ATTRIBUTES)continue;
    SetFileAttributesW(b,FILE_ATTRIBUTE_NORMAL);
@@ -33,6 +33,13 @@ static int publish_loaders(void){
    path(a,base,assets[j]);path(b,chosen,dirs[i]);copy(b+len(b),assets[j]);
    if(GetFileAttributesW(b)==INVALID_FILE_ATTRIBUTES&&!CopyFileW(a,b,TRUE))return 1;
    if(!same_file(a,b))return say("UEFI: compatibility asset verification failed; original loaders retained.\r\n");
+  }
+  /* Native-resolution experiment (docs/w7x64-native-res-2026-10-21.md): the
+   * flag beside the PE helpers goes beside the dispatcher. Optional. */
+  path(a,base,L"usos-native-res.flag");
+  if(GetFileAttributesW(a)!=INVALID_FILE_ATTRIBUTES){
+   path(b,chosen,dirs[i]);copy(b+len(b),L"usos-native-res.flag");
+   if(CopyFileW(a,b,FALSE))say("UEFI: native-resolution flag copied beside the dispatcher.\r\n");
   }
   path(pending[i],chosen,dirs[i]);copy(pending[i]+len(pending[i]),L"usos-win7-new.efi");
   path(a,base,L"win7-wrapper.efi");

@@ -6,7 +6,7 @@
 //
 //  1. StartImage: the first image UefiSeven starts (the Windows boot manager).
 //     Before it runs, USOS picks the monitor-native GOP mode (EDID preferred
-//     timing, else the largest 32 bpp mode; src/platform/uefi/edid_mode.zig),
+//     timing, else the largest 32 bpp mode; src/flow/display_edid.zig),
 //     switches GOP to it and replaces UefiSeven's one-mode table and handler
 //     at C0000 with the USOS multi-mode layout (tools/windows7_vbe_table.zig,
 //     tools/windows7_vbe_handler.S): 0x00F1 = 1024x768 as a centred window
@@ -25,7 +25,7 @@
 // and calls ExitBootServices once more.
 const std = @import("std");
 const uefi = std.os.uefi;
-const edid_mode = @import("edid_mode");
+const edid_mode = @import("display_edid");
 const table = @import("windows7_vbe_table.zig");
 const trace = @import("windows7_uefi_trace.zig");
 const handler = @import("windows7_vbe_handler");
@@ -204,7 +204,7 @@ fn applyNative() void {
     }
     say("flag: max {d}x{d}, {s}", .{ config.max_width, config.max_height, if (config.single) "native mode only" else "1024x768 window + native" });
     const edid = readEdid(bs, gopHandle(bs, gop));
-    const preferred = if (edid) |e| edid_mode.preferredResolution(e) else null;
+    const preferred = if (edid) |e| edid_mode.native(e) else null;
     if (preferred) |p| say("EDID preferred timing {d}x{d}", .{ p.width, p.height }) else say("no usable EDID ({s})", .{if (edid == null) "no EDID protocol" else "invalid block"});
     const pick = edid_mode.pickMode(candidates[0..count], preferred) orelse {
         say("no 32 bpp GOP mode; table stays {d}x{d}", .{ cur.width, cur.height });

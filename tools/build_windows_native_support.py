@@ -94,6 +94,13 @@ def build_stock_support(root: Path, out: Path):
         # WIMBoot treats .efi files as boot applications rather than injected
         # WinPE files. Transport target-only EFI assets under neutral names.
         writer.add_file('usos-win7-wrapper.bin', helpers / 'win7-wrapper.efi')
+        # USOSRES for the native-resolution experiment (staged only with
+        # usos-native-res.flag; built by the micro-Linux step).
+        usos_res = root / 'zig-out/windows-usos-res/USOSRES.EXE'
+        if not usos_res.is_file():
+            from build_windows_usos_res import build as build_usos_res
+            usos_res = build_usos_res(root, root / 'zig-out/windows-usos-res')
+        writer.add_file('usos-res.exe', usos_res)
         writer.add_file('usos-win7-video.bin', vendor / 'UefiSeven.efi')
         writer.add_file('uefiseven-LICENSE.txt', vendor / 'LICENSE.txt')
         writer.add_bytes('UefiSeven.ini', b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=0\r\nforce_fakevesa=0\r\n')

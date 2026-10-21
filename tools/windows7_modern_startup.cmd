@@ -61,6 +61,9 @@ copy /y "%~dp0usos-win7-video.bin" "%~dp0win7.efi" >nul
 if errorlevel 1 exit /b 1
 "%~dp0usos-win7-finalize.exe" before
 if errorlevel 1 exit /b 1
+rem Windows installations present before Setup (native-resolution staging only).
+if exist "%~dp0usos-old-windows.txt" del "%~dp0usos-old-windows.txt"
+if exist "%~dp0usos-native-res.flag" for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z) do if exist "%%D:\Windows\System32\config\SOFTWARE" echo %%D>>"%~dp0usos-old-windows.txt"
 echo [USOS] phase=launch-setup generated-answer=%USOS_NEED_UNATTEND%
 "%~dp0usos-log-x86_64.exe"
 if "%USOS_NEED_UNATTEND%"=="1" (
@@ -80,10 +83,43 @@ if defined USOS_HIDDEN (
     )
     echo [USOS] Answer command runner copied to the installed Windows.
 )
+if exist "%~dp0usos-native-res.flag" call :native_res_display
 echo [USOS] phase=finalize-target-efi
 "%~dp0usos-win7-finalize.exe" after-modern
 if errorlevel 1 exit /b 1
 echo [USOS] phase=reboot-after-success
 "%~dp0usos-log-x86_64.exe"
 wpeutil reboot
+exit /b 0
+
+rem Native-resolution experiment (usos-native-res.flag from DATA
+rem Systems\Windows\Windows 7\Unattended\native-res-on.txt;
+rem docs/w7x64-native-res-2026-10-21.md): the dispatcher then offers the
+rem monitor's native VBE mode besides 1024x768, and USOSRES (registered by
+rem the USOS answer's guarded specialize command) selects it at the first
+rem sign-in. Stage <target>\USOS\NT6\USOSRES.EXE + DISPLAY.TXT (auto).
+rem Never fatal.
+:native_res_display
+if not exist "%~dp0usos-res.exe" exit /b 0
+set "USOS_TARGET="
+set "USOS_TARGET_COUNT=0"
+for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z) do if exist "%%D:\Windows\Panther\setupact.log" if exist "%%D:\Windows\System32\config\SOFTWARE" call :native_res_candidate %%D
+if not "%USOS_TARGET_COUNT%"=="1" (
+    echo USOS WARNING: %USOS_TARGET_COUNT% new Windows installations found; USOSRES not staged.
+    exit /b 0
+)
+if not exist "%USOS_TARGET%:\USOS\NT6\" md "%USOS_TARGET%:\USOS\NT6"
+copy /y "%~dp0usos-res.exe" "%USOS_TARGET%:\USOS\NT6\USOSRES.EXE" >nul
+if errorlevel 1 (
+    echo USOS WARNING: cannot copy USOSRES to %USOS_TARGET%:\USOS\NT6.
+    exit /b 0
+)
+> "%USOS_TARGET%:\USOS\NT6\DISPLAY.TXT" echo autoxauto
+echo USOS: native-resolution experiment: USOSRES staged in %USOS_TARGET%:\USOS\NT6 (auto: EDID native, else highest).
+exit /b 0
+
+:native_res_candidate
+if exist "%~dp0usos-old-windows.txt" find /i "%~1" "%~dp0usos-old-windows.txt" >nul 2>&1 && exit /b 0
+set "USOS_TARGET=%~1"
+set /a USOS_TARGET_COUNT+=1
 exit /b 0
