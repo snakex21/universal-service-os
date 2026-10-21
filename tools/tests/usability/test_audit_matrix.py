@@ -44,5 +44,27 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('po 1.0',usb)
         self.assertIn('NDIS 3',net)
 
+    def test_completed_nt351_diagnostic_does_not_qualify_storage_or_installer(self):
+        exact=[*audit.NT351_R18F_ROW,'unused','unused','unused','unused']
+        usb,net=audit.capability(exact)
+        self.assertNotIn('PASS',usb)
+        self.assertIn('QEMU PASS R18f',net)
+        self.assertIn('bez kwalifikacji świeżego instalatora',net)
+        self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
+
+    def test_nt351_result_does_not_spread_to_other_media_editions_or_architecture(self):
+        for index,value in ((0,'Windows NT 3.51\\Other.iso'),(1,'3.51 SP5'),
+                            (2,'en-US / x64'),(3,'windows-nt-3-51-server / nt3-x86-qemu-csmwrap')):
+            changed=list(audit.NT351_R18F_ROW)
+            changed[index]=value
+            usb,net=audit.capability(changed)
+            self.assertNotIn('QEMU PASS',usb+net+audit.hid_test(usb,changed))
+
+    def test_nt31_static_tcpip_capability_is_not_an_intel_network_pass(self):
+        usb,net=audit.capability(row('Windows NT 3.1\\WKS.iso','windows-nt-3-1'))
+        self.assertIn('DHCP nie dotyczy',net)
+        self.assertIn('full-MAC',net)
+        self.assertNotIn('PASS',usb+net)
+
 
 if __name__=='__main__':unittest.main()
