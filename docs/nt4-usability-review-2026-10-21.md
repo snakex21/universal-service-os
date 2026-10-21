@@ -443,3 +443,11 @@ z WDK i dispatch frozenUSB. Callback RVA70a obu klas ma cztery argumenty
 i RET10. Nie znaleziono statycznej niezgodności tego kontraktu; audyt nie
 potwierdza rzeczywistego CONNECT, ENABLE ani dostarczania zdarzeń HID.
 Wyniki z RVA i ograniczonymi instrukcjami przekazano rootowi i agentowi NT3.
+
+
+Korekta na podstawie rzeczywistego readback przekazanego przez roota:
+Readback R18e ma MaximumPortsServiced=3 dla obu klas i ConnectMultiplePorts=1/1; R18f dziedziczy te wartości bez zmian.
+Domyślny limit1 jest faktem oryginalnych binariów, lecz nie wyjaśnia tego
+konkretnego gościa. Nie przygotowano ani nie wprowadzono poprawki limitu.
+Oddzielna próba NT3 zmienia tylko i8042prt Start1 na4; jej wynik jest
+prowadzony przez roota/NT3 i nie jest przypisywany do trwającego NT4.
