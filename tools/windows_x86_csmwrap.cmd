@@ -323,6 +323,7 @@ if errorlevel 1 goto usb_port_failed
 echo [USOS] usosusb: registered in ControlSet00%USOS_CS% exit=%errorlevel%
 reg unload HKLM\USOS_SYS >nul
 if errorlevel 1 exit /b 1
+call :usb_drive_notify
 "%~dp0usos-log-x86.exe"
 exit /b 0
 
@@ -330,6 +331,26 @@ exit /b 0
 echo [USOS] usosusb: offline registration failed; installation stopped before reboot.
 reg unload HKLM\USOS_SYS >nul
 exit /b 1
+
+rem usosusb sticks are legacy (non-PnP) volumes: the mount manager gives the
+rem letter, but nothing broadcasts DBT_DEVICEARRIVAL, so Explorer never shows
+rem a stick plugged in on the desktop (X470 Win7 SP1 x86 2026-10-21: Msc
+rem "UsosUsbDisk0:0=D", no drive in Explorer). usos-drivenotify.exe (own,
+rem tools/windows_drive_notify.c) runs at every logon (HKLM Run), announces
+rem new / removed letters to the shell and logs them with usosusb's Diag /
+rem Conn / Msc to C:\USOS\Logs\usos-drivenotify.log. Not fatal: keyboard and
+rem mouse do not depend on it.
+:usb_drive_notify
+if not exist "%~dp0usos-drivenotify.exe" (echo [USOS] usosusb: usos-drivenotify.exe missing; sticks need a new Explorer window. & exit /b 0)
+if not exist "%USOS_T%\USOS" mkdir "%USOS_T%\USOS"
+copy /y "%~dp0usos-drivenotify.exe" "%USOS_T%\USOS\usos-drivenotify.exe" >nul
+if errorlevel 1 (echo [USOS] usosusb: usos-drivenotify copy failed. & exit /b 0)
+reg load HKLM\USOS_SW "%USOS_T%\Windows\System32\config\SOFTWARE" >nul
+if errorlevel 1 (echo [USOS] usosusb: SOFTWARE hive not loaded; no drive notifier. & exit /b 0)
+reg add "HKLM\USOS_SW\Microsoft\Windows\CurrentVersion\Run" /v USOSDriveNotify /t REG_EXPAND_SZ /d "%%SystemDrive%%\USOS\usos-drivenotify.exe" /f >nul
+if errorlevel 1 (echo [USOS] usosusb: drive notifier Run entry failed.) else (echo [USOS] usosusb: drive notifier at logon.)
+reg unload HKLM\USOS_SW >nul
+exit /b 0
 
 rem ---- NVMe target: which driver runs the controller in this WinPE ---------
 rem micro-Linux (vista_csmwrap_target.sh, NVMe target, NT6 x86 donor) put

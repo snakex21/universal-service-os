@@ -150,6 +150,17 @@ descriptions.
   `p3:s1--S(512M wp0 1v)`; `Parameters\Msc` the mount manager results, e.g.
   `UsosUsbDisk0:0=E` (`=` letter from the mount manager, `+` set by usosusb,
   `UsosUsbDisk0:gone0` after removal).
+* Explorer: the volumes are not PnP, so nothing broadcasts
+  `DBT_DEVICEARRIVAL` and an open shell does not add the letter. X470
+  2026-10-21 (Windows 7 SP1 x86): two hot plugs got `UsosUsbDisk0:0=D` /
+  `UsosUsbDisk1:0=D` from the mount manager, but no drive showed in
+  Explorer. The usosusb step therefore also installs `usos-drivenotify.exe`
+  (`tools/windows_drive_notify.c`, HKLM Run at every logon): it polls the
+  drive letters once a second, sends `DBT_DEVICEARRIVAL` /
+  `DBT_DEVICEREMOVECOMPLETE` and `SHCNE_DRIVEADD` / `SHCNE_DRIVEREMOVED`, and
+  logs each removable letter (file system, label, size or the open error)
+  plus `Diag` / `Conn` / `Msc` to `C:\USOS\Logs\usos-drivenotify.log`
+  (history across boots; `Diag` itself is rewritten at each boot).
 * Limits: root ports only (no hubs, as for HID), polling (no interrupts; about
   40 MB/s read under QEMU TCG), no safe-removal UI (unplug after the copy has
   finished), Explorer may need F5 / reopening after a hot plug (a kernel
