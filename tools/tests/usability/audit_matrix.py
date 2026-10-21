@@ -92,7 +92,7 @@ def main(args):
         '- T4: Czy po odpięciu i ponownym podłączeniu klawiatury można normalnie pisać, bez zablokowanego klawisza i restartu?',
         '- T5: Czy po odpięciu i ponownym podłączeniu myszy działają ruch oraz przyciski, bez restartu?',
         '- T3: Czy przeglądarka startuje bez modemu/ICW i otwiera 68k.news z ulubionych? W systemach bez IE użyć dostępnej przeglądarki; jeśli nie ma żadnej, HTTP pozostaje nieprzetestowane.','',
-        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Dla NT4 i pozostałych nowych ścieżek uzupełnienie loggera ping/DHCP i podłączenia go do instalacji wciąż jest wymagane; nie jest to gotowy pakiet do testu X470.','']
+        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Logger i podłączenie NT4 przygotowano na fix/nt4-net, z testami hosta; runtime nadal oczekuje. Pozostałe nowe ścieżki wymagają własnego podłączenia. Nie jest to jeszcze gotowy pakiet do testu X470.','']
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text('\n'.join(out),encoding='utf-8',newline='\n')
     print('USB_LAN_MATRIX',len(entries),'coverage rows; no new runtime PASS inferred')

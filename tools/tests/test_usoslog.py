@@ -97,7 +97,9 @@ class Sources(unittest.TestCase):
         self.assertIn('runtime windows=4.0', lnk)         # GUI subsystem: no console window
         self.assertIn('option norelocs', lnk)
         self.assertIn('#define ROTATE      (256UL * 1024)', log)
-        self.assertIn('LOGDIR      "C:\\\\USOS9X\\\\LOGS"', log)
+        self.assertIn('GetModuleFileNameA(0, app, sizeof(app))', log)
+        self.assertIn('if (!opt_custom_out) CreateDirectoryA(LOGDIR, 0);', log)
+        self.assertNotIn('CreateDirectoryA("C:\\\\USOS9X"', log)
         self.assertIn('opt_first = 180, opt_every = 300', log)
         self.assertIn('CreateMutexA(0, FALSE, "USOSLOG-instance")', log)
         self.assertIn('si.wShowWindow = SW_HIDE', log)

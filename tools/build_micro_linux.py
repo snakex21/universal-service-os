@@ -794,6 +794,12 @@ def main() -> int:
         from build_windows_usos_lan import build as build_lan, stage_driver as stage_lan_driver
         lan_out = root / "zig-out/windows-usos-lan"
         lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
+        # Same own GUI/no-CRT logger as 9x, staged for the NT4 first-desktop
+        # evidence step. Build just this program, not another complete kit.
+        from build_win9x_support import build_usoslog
+        logger_work = lan_out / "logger-work"
+        logger_work.mkdir(parents=True, exist_ok=True)
+        lan_files.append(build_usoslog(lan_out, logger_work))
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
         from build_usosadd import build as build_addons_runner

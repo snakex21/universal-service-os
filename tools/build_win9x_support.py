@@ -269,7 +269,7 @@ USOSLOG_IMPORTS = {
         'CloseHandle', 'CreateDirectoryA', 'CreateFileA', 'CreateMutexA', 'CreateProcessA', 'CreateThread',
         'DeleteFileA', 'EnterCriticalSection', 'ExitProcess', 'FindClose', 'FindFirstFileA', 'FindNextFileA',
         'FlushFileBuffers', 'GetCommandLineA', 'GetComputerNameA', 'GetCurrentThreadId', 'GetFileSize',
-        'GetLastError', 'GetLocalTime', 'GetModuleHandleA', 'GetPrivateProfileStringA', 'GetProcAddress',
+        'GetLastError', 'GetLocalTime', 'GetModuleFileNameA', 'GetModuleHandleA', 'GetPrivateProfileStringA', 'GetProcAddress',
         'GetProfileStringA', 'GetTickCount', 'GetVersionExA', 'GlobalMemoryStatus', 'InitializeCriticalSection',
         'IsBadReadPtr', 'LeaveCriticalSection', 'LoadLibraryA', 'MoveFileA', 'ReadFile', 'SetFilePointer', 'Sleep',
         'WaitForSingleObject', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA', 'lstrlenA'},

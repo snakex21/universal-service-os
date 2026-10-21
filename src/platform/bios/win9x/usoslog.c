@@ -6,7 +6,7 @@
  *
  * Started from the Startup folder (one instance: a named mutex). It writes
  * a short start record at once, a full snapshot about 3 minutes after the
- * start and then every 5 minutes, appended to C:\USOS9X\LOGS\USOSLOG.TXT
+ * start and then every 5 minutes, appended to LOGS\USOSLOG.TXT beside EXE
  * (over 256 KiB: renamed to USOSLOG.OLD, one generation kept). Each write
  * is flushed and the file closed, so a normal shutdown loses nothing.
  *
@@ -64,8 +64,9 @@
  * part, USOSDBG and the WM_MOUSEWHEEL lines, so a wheel test is in the
  * log even when Windows is shut down before the next snapshot.
  *
- * Nothing is written anywhere but C:\USOS9X\LOGS; the only packets sent are
- * the test queries above and the one broadcast.
+ * Own files stay in the application directory (normally C:\USOS9X) or the
+ * explicitly selected /out file. No profile-directory fallback. Network
+ * tests include one bounded ICMP echo to the configured gateway.
  *
  * Options (testing): /once (one full snapshot, then exit), /out <file>,
  * /first <s>, /every <s>, /nonet (no active network tests), /nodbg (no
@@ -153,10 +154,11 @@ static PFN_SETSOCKOPT ws_setsockopt;
 #endif
 
 #define VERSION     "1.0"
-#define LOGDIR      "C:\\USOS9X\\LOGS"
-#define LOGFILE     LOGDIR "\\USOSLOG.TXT"
-#define DBGEXE      "C:\\USOS9X\\USOSDBG.EXE"
-#define DBGTMP      LOGDIR "\\USOSDBG.TMP"
+static char app_dir[MAX_PATH], log_dir[MAX_PATH], log_file[MAX_PATH], dbg_exe[MAX_PATH],
+            dbg_tmp[MAX_PATH], dbg_tmp_disk[MAX_PATH];
+#define LOGDIR      log_dir
+#define DBGEXE      dbg_exe
+#define DBGTMP      dbg_tmp
 #define ROTATE      (256UL * 1024)
 /* frogfind.com A record, resolved 2026-10-18 through 1.1.1.1 and 8.8.8.8 */
 #define FALLBACK_IP "64.227.13.248"
@@ -256,10 +258,10 @@ typedef BOOL (WINAPI *PFN_PROC)(HANDLE, PROCENTRY *);
 /* ------------------------------------------------------------------ */
 /* options and state                                                   */
 static DWORD opt_first = 180, opt_every = 300;
-static int opt_once, opt_nonet, opt_nodbg, opt_nohook;
+static int opt_once, opt_nonet, opt_nodbg, opt_nohook, opt_custom_out;
 static volatile LONG g_ending;         /* WM_QUERYENDSESSION seen: no new USOSDBG / disk polls */
 static char opt_dbgfile[MAX_PATH];
-static char out_path[MAX_PATH] = LOGFILE;
+static char out_path[MAX_PATH];
 static DWORD main_tid;
 static DWORD t_start;
 static int snap_no;
@@ -348,6 +350,24 @@ static int winsock_load(void)
 }
 
 static int is_nt;                   /* VER_PLATFORM_WIN32_NT: no Win16 DPMI tools */
+
+static int logger_paths(void)
+{
+    char app[MAX_PATH];
+    DWORD length = GetModuleFileNameA(0, app, sizeof(app)), i;
+    if (!length || length >= sizeof(app)) return 0;
+    for (i = length; i && app[i - 1] != '\\' && app[i - 1] != '/'; i--) ;
+    if (!i || i > MAX_PATH - 32) return 0;
+    app[i] = 0;
+    lstrcpyA(app_dir, app);
+    lstrcpyA(log_dir, app); lstrcatA(log_dir, "LOGS");
+    lstrcpyA(log_file, log_dir); lstrcatA(log_file, "\\USOSLOG.TXT");
+    lstrcpyA(dbg_exe, app); lstrcatA(dbg_exe, "USOSDBG.EXE");
+    lstrcpyA(dbg_tmp, log_dir); lstrcatA(dbg_tmp, "\\USOSDBG.TMP");
+    lstrcpyA(dbg_tmp_disk, log_dir); lstrcatA(dbg_tmp_disk, "\\USOSDBGD.TMP");
+    lstrcpyA(out_path, log_file);
+    return 1;
+}
 
 static void mset(void *d, int c, DWORD n)
 {
@@ -482,8 +502,7 @@ static void flush_out(void)
     DWORD *len = disk ? &dlen : &olen, *lost = disk ? &dlost : &olost;
     if (*lost) o("(output truncated: %lu bytes lost)", *lost);
     EnterCriticalSection(&file_cs);
-    CreateDirectoryA("C:\\USOS9X", 0);
-    CreateDirectoryA(LOGDIR, 0);
+    if (!opt_custom_out) CreateDirectoryA(LOGDIR, 0);
     f = CreateFileA(out_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
     if (f != INVALID_HANDLE_VALUE) {
         size = GetFileSize(f, 0);
@@ -965,7 +984,7 @@ static void run_usosdbg(DWORD stats_pa)
 {
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    char cmd[300];
+    char cmd[MAX_PATH * 2 + 64];
     DWORD t0, w;
     int n, i, ended;
     usns_raw_len = 0;
@@ -989,7 +1008,7 @@ static void run_usosdbg(DWORD stats_pa)
         dbg_proc = 0;
     }
     DeleteFileA(DBGTMP);
-    n = wsprintfA(cmd, "%s /L %s", (LPSTR)DBGEXE, (LPSTR)DBGTMP);
+    n = wsprintfA(cmd, "\"%s\" /L \"%s\"", (LPSTR)DBGEXE, (LPSTR)DBGTMP);
     if (!dbg_pci_done) n += wsprintfA(cmd + n, " /F");
     if (stats_pa) n += wsprintfA(cmd + n, " /N %08lX", stats_pa);
     mset(&si, 0, sizeof(si));
@@ -997,7 +1016,7 @@ static void run_usosdbg(DWORD stats_pa)
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     t0 = GetTickCount();
-    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, "C:\\USOS9X", &si, &pi)) {
+    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, app_dir, &si, &pi)) {
         o("[MOUSE] %s: CreateProcess failed, error %lu", (LPSTR)cmd, GetLastError());
         return;
     }
@@ -1241,12 +1260,20 @@ static void add_dns(DWORD a)
     if (ndns_cfg < 8) dns_cfg[ndns_cfg++] = a;
 }
 
+#include "usoslog_net.h"
+
 static void sec_iphlp_config(void)
 {
     ULONG len;
     DWORD r;
+    gateway = 0;
+    ndns_cfg = 0;
     iphlp_load();
-    if (!iphlp) { o("[NET] IPHLPAPI.DLL: not loadable (error %lu)", GetLastError()); return; }
+    if (!iphlp) {
+        o("[NET] IPHLPAPI.DLL: not loadable (error %lu)", GetLastError());
+        if (is_nt) nt_tcpip_config();
+        return;
+    }
     if (p_gnp) {
         len = sizeof(ipbuf);
         r = p_gnp(ipbuf, &len);
@@ -1296,6 +1323,7 @@ static void sec_iphlp_config(void)
             o("[NET] GetAdaptersInfo: error %lu", r);
         }
     }
+    if (is_nt) nt_tcpip_config();
 }
 
 static DWORD st_ip[23], st_udp[5], st_tcp[15], st_icmp[26];
@@ -1610,6 +1638,7 @@ static void sec_tests(void)
         ws_ok = 1;
         o("[NET] Winsock \"%s\" version %04X", (LPSTR)wd.szDescription, (unsigned)wd.wVersion);
     }
+    ping_gateway();
     t0 = GetTickCount();
     h = gethostbyname(TEST_HOST);
     if (h && h->h_addr_list && h->h_addr_list[0]) {
@@ -1733,7 +1762,7 @@ static PFN_VOLINFO p_volinfo;
 static PFN_FREE p_free;
 static PFN_ERRMODE p_errmode;
 
-#define DBGTMPD     LOGDIR "\\USOSDBGD.TMP"
+#define DBGTMPD     dbg_tmp_disk
 #define DISK_SNAP_MS 2000               /* at most one USOSDBG DISK snapshot per 2 s */
 #define DISK_VOL_EVERY 8                /* removable volume serials every 8 ticks (2 s) */
 
@@ -1883,7 +1912,9 @@ static void sec_ios(void)
         n = read_file("C:\\WINDOWS\\IOS.LOG", disk_fb, sizeof(disk_fb), 0);
         o("[DISK] C:\\WINDOWS\\IOS.LOG: %lu bytes%s", size, (LPSTR)(size >= sizeof(disk_fb) ? " (first 64 KiB read)" : ""));
         if (n > 0) {
-            copy_file(LOGDIR "\\IOS.LOG", disk_fb, n);
+            char ios_copy[MAX_PATH];
+            lstrcpyA(ios_copy, LOGDIR); lstrcatA(ios_copy, "\\IOS.LOG");
+            copy_file(ios_copy, disk_fb, n);
             o("[DISK] IOS.LOG real mode / MS-DOS compatibility lines:");
             grep_lines("[DISK] IOS.LOG", disk_fb, n, ios_keys, 40);
         }
@@ -1968,7 +1999,7 @@ static void run_usosdbg_disk(const char *why)
 {
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    char cmd[300];
+    char cmd[MAX_PATH * 2 + 64];
     DWORD t0, w;
     int n, ended;
     if (opt_nodbg || opt_dbgfile[0]) { o("[DISK] USOSDBG DISK snapshot skipped (%s)", (LPSTR)(opt_nodbg ? "/nodbg" : "/dbgfile")); return; }
@@ -1977,13 +2008,13 @@ static void run_usosdbg_disk(const char *why)
     if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[DISK] %s missing", (LPSTR)DBGEXE); return; }
     EnterCriticalSection(&dbg_cs);
     DeleteFileA(DBGTMPD);
-    wsprintfA(cmd, "%s /L %s /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);
+    wsprintfA(cmd, "\"%s\" /L \"%s\" /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);
     mset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     t0 = GetTickCount();
-    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, "C:\\USOS9X", &si, &pi)) {
+    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, app_dir, &si, &pi)) {
         LeaveCriticalSection(&dbg_cs);
         o("[DISK] %s: CreateProcess failed, error %lu", (LPSTR)cmd, GetLastError());
         return;
@@ -2278,7 +2309,7 @@ static void parse_args(void)
         }
         arg[n] = 0;
         if (first) { first = 0; continue; }       /* program name */
-        if (want == 1) { lstrcpynA(out_path, arg, MAX_PATH); want = 0; continue; }
+        if (want == 1) { lstrcpynA(out_path, arg, MAX_PATH); opt_custom_out = 1; want = 0; continue; }
         if (want == 2) { opt_first = decval(arg); want = 0; continue; }
         if (want == 3) { opt_every = decval(arg); if (opt_every < 10) opt_every = 10; want = 0; continue; }
         if (want == 4) { lstrcpynA(opt_dbgfile, arg, MAX_PATH); want = 0; continue; }
@@ -2409,6 +2440,7 @@ void __cdecl usos_entry(void)
     DWORD tid, ticks = 0;
     UINT timer;
     t_start = GetTickCount();
+    if (!logger_paths()) ExitProcess(2); /* no fallback outside the application */
     parse_args();
     {
         OSVERSIONINFOA v;

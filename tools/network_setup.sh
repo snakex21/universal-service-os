@@ -78,6 +78,14 @@ usos_net_stage() {
     esac
     mkdir -p "$(dirname "$_un_log")" || return 1
     usos_net_log "system=$_un_os network=on ip=$(usos_net_value "$_un_cfg" ip) dns=$(usos_net_value "$_un_cfg" dns) home=$(usos_net_value "$_un_cfg" home_page)"
+    if [ "$_un_os" = NT4 ]; then
+        if ! cp "$_un_lib/network/USOSLOG.EXE" "$_un_app/USOSLOG.EXE" ||
+           ! cmp -s "$_un_lib/network/USOSLOG.EXE" "$_un_app/USOSLOG.EXE"; then
+            usos_net_log 'NT4 silent network evidence helper missing or copy/readback failed'
+            return 1
+        fi
+        usos_net_log 'NT4 silent evidence helper copied and read back; first hardware desktop, no console'
+    fi
     _un_cards=$(usos_net_pci_cards "$_un_pci_root")
     usos_net_log "PCI=${_un_cards:-none}"
     if [ ! -f "$_un_lib/network/$_un_sys" ] || [ ! -f "$_un_lib/network/$_un_inf" ]; then

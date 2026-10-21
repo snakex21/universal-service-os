@@ -124,4 +124,4 @@ Każdy poniższy wiersz pochodzi z macierzy instalacji. PASS pulpitu nie jest PA
 - T5: Czy po odpięciu i ponownym podłączeniu myszy działają ruch oraz przyciski, bez restartu?
 - T3: Czy przeglądarka startuje bez modemu/ICW i otwiera 68k.news z ulubionych? W systemach bez IE użyć dostępnej przeglądarki; jeśli nie ma żadnej, HTTP pozostaje nieprzetestowane.
 
-T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Dla NT4 i pozostałych nowych ścieżek uzupełnienie loggera ping/DHCP i podłączenia go do instalacji wciąż jest wymagane; nie jest to gotowy pakiet do testu X470.
+T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Logger i podłączenie NT4 przygotowano na fix/nt4-net, z testami hosta; runtime nadal oczekuje. Pozostałe nowe ścieżki wymagają własnego podłączenia. Nie jest to jeszcze gotowy pakiet do testu X470.
