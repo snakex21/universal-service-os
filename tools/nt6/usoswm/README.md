@@ -79,6 +79,15 @@ proof; that fixture is not a complete fresh-install acceptance. Classic-theme ch
 have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
+Hardware evidence (silent, no user action): after attaching, the launcher saves
+small 640x200 bottom-right crops of the primary monitor as
+`logs\corner-s<session>-p<pid>-{before,after,late20s,endsession}.bmp`
+(at most 16 files) and logs the attach time in ms since boot. `before` shows
+the native paint, `after` the synchronous repaint by our renderer. X470
+Vista x64 2026-10-21: hook attached and renderer active 10 s after logon with
+no refusal, yet the user still reported the text; these crops decide whether
+it was only the pre-Startup native paint or an uncovered paint path.
+
 ## Installation flow and opt-out
 
 The x64 Vista support builder adds this separate package alongside the unchanged
