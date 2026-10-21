@@ -63,19 +63,22 @@ def scoped_services(values,number):
             result[service]['parameters']={n:struct.unpack('<I',params[n][1])[0] for n in ('connectmultipleports','maximumportsserviced') if n in params and params[n][0]==4 and len(params[n][1])==4}
     return result
 
-def main(prepare=False):
-    previous=MATRIX/'artifacts/coverage/vm/r20-nt35-network-hid'
-    record_path=OUT/('r20b-usb-isolation-preparation.json' if prepare else 'r20-stopped-input-readback.json')
+def main(prepare=False,stopped_r20b=False):
+    if prepare and stopped_r20b:raise ValueError('Readback and preparation are separate operations')
+    base=WORK/'target.qcow2' if stopped_r20b else BASE
+    previous=ROOT/'artifacts/coverage/vm/r20b-nt35-usb-isolation' if stopped_r20b else MATRIX/'artifacts/coverage/vm/r20-nt35-network-hid'
+    record_path=OUT/('r20b-stopped-input-readback.json' if stopped_r20b else 'r20b-usb-isolation-preparation.json' if prepare else 'r20-stopped-input-readback.json')
     if record_path.exists() or prepare and WORK.exists():raise FileExistsError('Fresh owned evidence required')
     prior=json.loads((previous/'result.json').read_text(encoding='utf-8'))
-    meta=json.loads((previous/'fixture.json').read_text(encoding='utf-8'))
-    if prior.get('qemu_returncode')!=0 or not (previous/'cleanup.json').is_file():raise ValueError('Baseline writer completion absent')
+    meta=json.loads(((WORK if stopped_r20b else previous)/'fixture.json').read_text(encoding='utf-8'))
+    if prior.get('qemu_returncode')!=0 or not (previous/('completed.json' if stopped_r20b else 'cleanup.json')).is_file():raise ValueError('Baseline writer completion absent')
     if meta.get('private_profile') is not False or meta.get('folder')!='Windows NT 3.5':raise ValueError('Explicit keyless NT35 required')
-    if BASE.resolve().parent!=COLLECTION/'_vm/r20-nt35-preserved':raise ValueError('Unexpected stopped base')
+    wanted=WORK if stopped_r20b else COLLECTION/'_vm/r20-nt35-preserved'
+    if base.resolve().parent!=wanted:raise ValueError('Unexpected stopped base')
     if shutil.disk_usage(COLLECTION).free<100*1024**3:raise ValueError('Less than100GiB disk free')
     def digest(path):
         with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
-    base_hash=digest(BASE)
+    base_hash=digest(base)
     if prepare:
         measured=json.loads((OUT/'r20-stopped-input-readback.json').read_text(encoding='utf-8'))
         if measured.get('base_sha256')!=base_hash or measured.get('base_unchanged') is not True:
@@ -83,7 +86,7 @@ def main(prepare=False):
     scratch_parent=COLLECTION/'_vm/r20-stopped-analysis';scratch_parent.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='fat-',dir=scratch_parent) as tmp:
         raw=Path(tmp)/'stopped.raw'
-        subprocess.run([str(h.QIMG),'convert','-f','qcow2','-O','raw',str(BASE),str(raw)],check=True)
+        subprocess.run([str(h.QIMG),'convert','-f','qcow2','-O','raw',str(base),str(raw)],check=True)
         fs=h.BoundedFat(raw)
         try:
             if fs.fat32 or fs.base!=32256 or fs.bps!=512:raise ValueError('Unexpected NT35 FAT16 layout')
@@ -100,7 +103,9 @@ def main(prepare=False):
         number=struct.unpack('<I',current[1])[0]
         if not 1<=number<=999:raise ValueError('Invalid controlset number')
         services=scoped_services(values,number)
-        record=dict(base=str(BASE),base_sha256=base_hash,hive_version=version,current=number,default=number,
+        if stopped_r20b and values[f'controlset{number:03d}\\services\\i8042prt'].get('start')!=(4,struct.pack('<I',4)):
+            raise ValueError('Stopped USB-isolation service is not Start4')
+        record=dict(base=str(base),base_sha256=base_hash,hive_version=version,current=number,default=number,
             services=services,driver_sha256=DRIVER,usb_sha256=USB,stopped=True,ms_hive_or_driver_exported=False)
         if prepare:
             key=f'controlset{number:03d}\\services\\i8042prt'
@@ -129,11 +134,15 @@ def main(prepare=False):
             record.update(overlay=str(WORK/'target.qcow2'),key=key,before=1,after=4,hive_value_offset=at,
                 hive_only_one_dword_changed=True,own_sys_unchanged=True,raw_overlay_qemu_compare_pass=True,
                 system_before_sha256=hashlib.sha256(system).hexdigest(),system_after_sha256=hashlib.sha256(changed).hexdigest())
-    if digest(BASE)!=base_hash:raise ValueError('Stopped base changed')
+    if digest(base)!=base_hash:raise ValueError('Stopped base changed')
+    if stopped_r20b:
+        proof=json.loads((OUT/'r20b-usb-isolation-preparation.json').read_text(encoding='utf-8'))
+        if digest(BASE)!=proof['base_sha256']:raise ValueError('Original R20 backing changed')
+        record['original_backing_unchanged']=True
     record.update(base_unchanged=True,scratch_raw_removed=True)
     record_path.write_bytes((json.dumps(record,indent=2)+'\n').encode('utf-8'))
     print(json.dumps(record,indent=2),flush=True)
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--prepare',action='store_true')
-    main(parser.parse_args().prepare)
+    parser=argparse.ArgumentParser();parser.add_argument('--prepare',action='store_true');parser.add_argument('--stopped-r20b',action='store_true')
+    args=parser.parse_args();main(args.prepare,args.stopped_r20b)

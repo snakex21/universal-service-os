@@ -1,4 +1,14 @@
-# Eksperymentalny LAN NT3.5 — stan przed runtime
+# Eksperymentalny LAN NT3.5 — dowody i historia portu
+
+Aktualny wynik R20: świeży normalny USOS osiągnął Program Manager Version3.5,
+DHCP, dopasowany ICMP oraz UDP/TCP DNS. `r20-guest-evaluation.json` wiąże wynik
+z faktycznym installed SYS e1aa...21c5, gościem i zakończonym capture. Stock ping
+5s dał najpierw2/3, oddzielny warm3/3; opóźnienia około2s pozostają usterką
+używalności. StrictDORA=false zachowano, osobne dopasowane pary i guest lease
+potwierdzają przydział. Native safe shutdown/QMPquit/rc0 i ścisły odzysk5plików
+zakończone. R20b osobno sprawdza USB przy i8042prtStart4. Poniższe sekcje są
+historią pomiarów, a ich wcześniejsze oczekiwanie na runtime nie jest nowym
+ograniczeniem aktualnego wyniku. Szczegóły w nt35-r20b-usb-isolation.md.
 
 Fix/nt35-net pochodzi z NT351b762b240. Build i host testy nie są wynikiem Windows; nie wykonano jeszcze nowej instalacjiNT35. ISO SHA256109d2c28e3d774e01987434b11c622fbf336e01f28eec2eafe40544f166852d1 i NDISfa392210418f6a5977ea8117d49b4d6a0b4cfc7d4fcc436fca2e3defdd6a5543 są związane z oryginalnym nośnikiem. Expanded MS pliki pozostawały wRAM, tymczasowyISO pod własnymG/_audit usunięto. Metadane są w artifacts/nt35-network/original-{bus,setup}-contract-04/05.json.
 

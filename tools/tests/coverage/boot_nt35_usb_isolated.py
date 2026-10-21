@@ -93,7 +93,9 @@ async def main():
     if process and process.returncode==0:
         import argparse
         try:
-            collection=await boot.nt35_own.main(argparse.Namespace(qemu=QEMU,assets=ASSETS,fixture=WORK,out=OUT/'nt35-own-evidence'))
+            # The imported collector deliberately owns only matrix artifacts.
+            collection=await boot.nt35_own.main(argparse.Namespace(qemu=QEMU,assets=ASSETS,fixture=WORK,
+                out=MATRIX/'artifacts/coverage/nt35-stopped-r20b/own-evidence'))
         except Exception as error:collection_error=type(error).__name__+': '+str(error)
     result=dict(result='ASSESS_ENDPOINT' if failure is None else 'RUNNER_ERROR',error=failure,
         elapsed=round(time.monotonic()-started,2),resources=resources,qemu_returncode=process.returncode if process else None,
