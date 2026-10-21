@@ -20,7 +20,7 @@ COLLECTION=Path(r'G:\USOS-Kolekcja').resolve()
 BASE_INITRD='3cfcaee979bd6ab9ba59447b912b1ed8fbcea1b5aac75df7531eb8bd4f3fecd5'
 BASE_COMMIT='b6411a14'
 DRIVER_SHA='dc8827954e6fe75ee8264c7382e87899cc9761890998198c126c7ea8aa5c55b6'
-LOGGER_SHA='fcf99da83e40fbee37496f22ff0f0cfec3386b393db36c87e748ef87c845017e'
+LOGGER_SHA='ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7'
 
 
 def sha(data):return hashlib.sha256(data).hexdigest()

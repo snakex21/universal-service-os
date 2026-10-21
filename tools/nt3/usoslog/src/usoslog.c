@@ -1420,45 +1420,22 @@ static int dns_query(BYTE *q, WORD id, const char *name)
     return n;
 }
 
-static int dns_skip_name(const BYTE *r, int n, int p)
-{
-    while (p < n) {
-        if (r[p] == 0) return p + 1;
-        if ((r[p] & 0xC0) == 0xC0) return p + 2;
-        p += r[p] + 1;
-    }
-    return n;
-}
+#include "usoslog_dns_packet.h"
 
-/* summary of a DNS reply; *First = first A record (network order) */
-static void dns_answer(char *t, const BYTE *r, int n, WORD id, DWORD *first)
+/* An unrelated or malformed answer can never seed the later HTTP address. */
+static int dns_answer(char *t, const BYTE *r, int n, WORD id, int peer_matches, DWORD *first)
 {
-    int p, an, i, m;
+    unsigned char address[4];
+    char ip[20];
     *first = 0;
-    if (n < 12) { wsprintfA(t, "short reply (%d bytes)", n); return; }
-    an = (r[6] << 8) | r[7];
-    m = wsprintfA(t, "%d bytes id %s rcode %u an %d ns %d ar %d tc %u:", n,
-                  (LPSTR)(((r[0] << 8) | r[1]) == id ? "ok" : "MISMATCH"), (unsigned)(r[3] & 15), an,
-                  (r[8] << 8) | r[9], (r[10] << 8) | r[11], (unsigned)((r[2] >> 1) & 1));
-    p = dns_skip_name(r, n, 12) + 4;
-    for (i = 0; i < an && p + 10 <= n && m < 400; i++) {
-        int type, len;
-        p = dns_skip_name(r, n, p);
-        if (p + 10 > n) break;
-        type = (r[p] << 8) | r[p + 1];
-        len = (r[p + 8] << 8) | r[p + 9];
-        p += 10;
-        if (type == 1 && len == 4 && p + 4 <= n) {
-            char a[20];
-            DWORD v = *(const DWORD *)(r + p);
-            ipstr(a, v);
-            m += wsprintfA(t + m, " A %s", (LPSTR)a);
-            if (!*first) *first = v;
-        } else {
-            m += wsprintfA(t + m, " type %d (%d bytes)", type, len);
-        }
-        p += len;
+    if (!usos_dns_a_reply(r,n,id,TEST_HOST,peer_matches,address)) {
+        wsprintfA(t,"%d bytes DNS FAIL dns_match=0 (peer/ID/question/flags/records)",n);
+        return 0;
     }
+    mcpy(first,address,4);ipstr(ip,*first);
+    wsprintfA(t,"%d bytes DNS PASS dns_match=1 id=%04X question=%s A=%s",n,
+        (unsigned)id,(LPSTR)TEST_HOST,(LPSTR)ip);
+    return 1;
 }
 
 static DWORD resolved;      /* frogfind.com from any test, network order */
@@ -1490,13 +1467,15 @@ static void udp_dns(DWORD server, const char *why)
         closesocket(s);
         return;
     }
+    mset(&from,0,sizeof(from));
     n = recvfrom(s, (char *)pkt, sizeof(pkt), 0, (struct sockaddr *)&from, &fl);
     if (n <= 0) {
         o("[NET] UDP DNS %s (%s): recvfrom error %d after %lu ms", (LPSTR)srv, (LPSTR)why, WSAGetLastError(),
           GetTickCount() - t0);
     } else {
         char f[20];
-        dns_answer(t, pkt, n, id, &first);
+        dns_answer(t, pkt, n, id, fl==sizeof(from) && from.sin_family==AF_INET &&
+            from.sin_addr.s_addr==server && from.sin_port==htons(53), &first);
         ipstr(f, from.sin_addr.s_addr);
         o("[NET] UDP DNS %s (%s): reply after %lu ms from %s:%u: %s", (LPSTR)srv, (LPSTR)why, GetTickCount() - t0,
           (LPSTR)f, (unsigned)ntohs(from.sin_port), (LPSTR)t);
@@ -1573,7 +1552,7 @@ static void tcp_dns(DWORD server)
     send(s, (char *)pkt, q + 2, 0);
     n = recv_wait(s, pkt, sizeof(pkt), 4000);
     if (n > 2) {
-        dns_answer(t, pkt + 2, n - 2, id, &first);
+        dns_answer(t, pkt + 2, n - 2, id, ((pkt[0]<<8)|pkt[1])==n-2, &first);
         o("[NET] TCP DNS %s:53: connected in %lu ms, reply: %s", (LPSTR)srv, ms, (LPSTR)t);
         if (first && !resolved) resolved = first;
     } else {

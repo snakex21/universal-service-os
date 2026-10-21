@@ -141,6 +141,19 @@ class Nt351Network(unittest.TestCase):
         with self.assertRaises(ValueError):owned_hunks(b'different\n',b'original\n',b'new\n')
         with self.assertRaises(ValueError):owned_hunks(b'original\noriginal\n',b'original\n',b'new\n')
 
+    def test_actual_nt351_utc_alias_and_nt4_mapping_preserved(self):
+        from test_nt4_flow import function_text
+        function=function_text(ROOT/'tools/nt4_csmwrap_target.sh','nt4_resolve_time_zone')
+        script=self.tmp/'timezone.sh'
+        script.write_text(function+'\nnt4_resolve_time_zone 0409 yes\n',encoding='utf-8',newline='\n')
+        result=subprocess.run([shell(),str(script)],input=b';USOS-TZ=Greenwich\r\n',capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr.decode())
+        self.assertEqual(result.stdout,b'!TimeZone = "(GMT) Monrovia, Casablanca"\r\n')
+        script.write_text(function+'\nnt4_resolve_time_zone 0409\n',encoding='utf-8',newline='\n')
+        result=subprocess.run([shell(),str(script)],input=b';USOS-TZ=Greenwich\r\n',capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr.decode())
+        self.assertNotIn(b'Monrovia',result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

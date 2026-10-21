@@ -15,6 +15,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--watcom',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--measure',action='store_true',help='Measure a deliberately updated own source before pinning its reproducible hash')
     args=parser.parse_args()
     out=args.out.resolve();ow=args.watcom.resolve()
     if not out.is_relative_to(ROOT/'artifacts') or out.exists():raise ValueError('Use fresh owned artifacts output')
@@ -36,9 +37,11 @@ def main():
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     raw=bytearray(exe.read_bytes());pe=int.from_bytes(raw[0x3c:0x40],'little');raw[pe+8:pe+12]=b'\0'*4
     exe.write_bytes(module.set_nt4(bytes(raw),3,10))
-    if hashlib.sha256(exe.read_bytes()).hexdigest()!=metadata['binary_sha256']:
+    digest=hashlib.sha256(exe.read_bytes()).hexdigest()
+    if not args.measure and digest!=metadata['binary_sha256']:
         raise ValueError('Rebuilt logger differs from the approved exact source/binary pair')
-    (out/'build.json').write_text(json.dumps({'sha256':metadata['binary_sha256'],'source_commit':metadata['source_commit'],
+    (out/'build.json').write_text(json.dumps({'sha256':digest,'source_commit':metadata['source_commit'],
+        'reproducible_pin_verified':not args.measure,
         'scope':'Reproducible isolated host build; no NT3 runtime PASS'},indent=2)+'\n',encoding='utf-8')
     print(str(exe))
 

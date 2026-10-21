@@ -88,6 +88,7 @@ nt4_resolve_time_zone() {
             if (k == "W. Europe") return "(GMT+01:00) Berlin, Stockholm, Rome, Bern, Brussels, Vienna"
             if (k == "Romance") return "(GMT+01:00) Paris, Madrid"
             if (k == "GMT") return "(GMT) Greenwich Mean Time; Dublin, Edinburgh, London"
+            if (k == "Greenwich") return "(GMT) Monrovia, Casablanca"
             if (k == "E. Europe") return "(GMT+02:00) Eastern Europe"
             if (k == "GTB" || k == "FLE") return "(GMT+02:00) Athens, Helsinki, Istanbul"
             if (k == "Russian") return "(GMT+03:00) Moscow, St. Petersburg"
