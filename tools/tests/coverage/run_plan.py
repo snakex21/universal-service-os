@@ -191,6 +191,8 @@ def run(args):
             if case.get('usability_usb'):boot+=['--usability-usb']
             if case.get('collect_nt4_failure'):boot+=['--collect-nt4-failure','--evidence-assets',str(args.assets)]
             if case.get('collect_nt4_text'):boot+=['--collect-nt4-text','--evidence-assets',str(args.assets)]
+            if case.get('collect_nt351_success'):boot+=['--collect-nt351-success','--evidence-assets',str(args.assets)]
+            if case.get('capture_nt351_network'):boot+=['--capture-nt351-network']
             with (logdir/(tag+'.log')).open('w',encoding='utf-8') as log:
                 subprocess.run(prepare,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
                 subprocess.run(boot,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
