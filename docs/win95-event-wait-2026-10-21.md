@@ -30,7 +30,8 @@ target independently proves actual FAT16 formatting: active type 06,
 
 The next test uses 2 GiB outer / 512 MiB inner RAM. The user explicitly
 reserved two QEMU engines and allowed a 6 GiB host RAM reserve for this
-session. The physical machine's global limit remains three engines.
+session. The shared task file subsequently raised the physical machine's
+global allowance to five engines: two here and three in the other session.
 
 Private inputs originate in the separately measured
 `B261020-200536-968CCBE8-win95-fat16` cache. Its 283 other files and 825
