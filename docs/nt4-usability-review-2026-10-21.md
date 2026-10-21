@@ -347,3 +347,62 @@ Późniejszy test HID użyje osobnego startu zachowanego celu z dowodem
 wyeliminowania PS/2 w gościu albo hardware OFF. MSC pozostaje odrębną,
 zamrożoną próbą. Autor nadal nie uruchomił nowej VM ani nie zmienił
 sterowników/hubów; żadnego runtime PASS nie przypisano hostowym testom.
+
+
+## Candidate01 wykonany: błąd fixture przed startem Windows
+
+Root zintegrował końcową politykę jako 450b8bd7 i potwierdził 102 testy
+coverage PASS (28.719 s). Zgodnie z przydziałem uruchomiono dokładny
+launch-review argv z TTY 33469 i zwykłym guardem, bez obchodzenia go lub
+ponawiania odczytu RAM. Próba miała PS/2 i i8042 ON; zakres desktop+LAN.
+
+Przed startem uzbrojono dwa oddzielne, jednorazowe ReadDirectoryChangesW.
+Listener retention (72256) zareagował na utworzenie dokładnego target.qcow2,
+utworzył target-retained.qcow2 przez CreateHardLinkW i porównał tożsamość
+metadanych, bez otwarcia/odczytu zawartości aktywnego obrazu. Listener
+endpoint/cleanup (87408) zakończył się dopiero po cleanup.json. Cleanup
+usunął pierwotny target; zachowany link ma 334954496 B i jeden link po
+usunięciu oryginalnej nazwy. To niedokończony staging, nie zainstalowany NT4.
+
+[Końcowy wynik](<C:/Users/ASRock/usos-work/macierz-windows/artifacts/coverage/vm/nt4-sp6a-desktop-net-ps2-candidate01/result.json>)
+wykazuje Preparation stopped po 214.75 s, cały boot 217.94 s,
+first_logon_observed=false i zero ramek sieciowych. Zwykły QMP quit/rc0
+zakończył VM; znany boundary WinError64 został poprawnie sklasyfikowany
+jako kontrolowane zamknięcie, bez błędu capture. ASSESS_ENDPOINT/rc0 jest
+wynikiem harnessu, nie oceną Windows. Nie powstał endpoint.png; ochrony
+prywatnego Setupu nie osłabiono ani nie otwarto nieznanego ekranu.
+
+Końcowy serial USOS jednoznacznie wskazał wcześniejszy błąd fixture:
+cp nie znalazł /usr/lib/usos/coverage-nt4/FIRSTLO.CMD, potem zatrzymano
+coverage script readback. CPIO zawierało pliki nowego katalogu, lecz nie
+jego rekord. Kernel initramfs nie tworzy automatycznie brakujących
+katalogów nadrzędnych. Nie wystartował wewnętrzny Windows, więc ten wynik
+nie diagnozuje NT4 Setup, HID, LAN ani sterownika.
+
+[Wąski patch](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/candidate01-cpio-parent.patch>)
+dodaje rekord katalogu 040755 przed czterema plikami, bez zmian cache,
+helpera, driverów czy hubów. 11 focused observer tests PASS (27.943 s).
+Nowy test czyta rzeczywiście serializowany newc, wymaga rodzica przed
+każdym plikiem i rozpoznaje poprawny typ katalogu. Kontrfaktycznie usunięty
+rekord odtwarza dokładnie brak rodzica przed FIRSTLO.CMD.
+
+Kolektor native-text zakończył swój readonly run, lecz interaktywny ash
+wstawił fragment własnego echo VERAGE_E po pierwszych 76 znakach base64.
+Surowego serialu nie zmieniono. Jednorazowe odzyskanie przypięto do jego
+SHA256 e5ae14042b6b370b257bc69aa7f43afda14a7909f96277d80b9acb2c4c01c6a6,
+wymagało jedynej pełnej ramki i usunęło tylko ten dokładny znany fragment.
+Zachowano canonical base64, CRC i EOF pojedynczego gzip, pojedynczy tar
+bez końcowych danych oraz pierwotny allowlist/status validator hosta.
+Test negatywny odrzucił doklejone drugie archiwum; automatycznego decoder
+nie rozszerzono. Root bada osobno wyłączenie echo/promptów przed transportem.
+
+[Odzyskany wynik kolektora](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/candidate01-recovered-native-text/collection.json>)
+ma tylko collection-state.txt: wszystkie cztery logi unavailable,
+actual_native_logs=[], native_logs_read=false. Nie dowodzi to nieistnienia
+plików; nic z natywnych logów nie odczytano. Archiwum ma 206 B i SHA256
+eff7442fd558c71ca260704efa957a833f2b6540092e63b2c8c7cd13ddbd47f0.
+
+Aktualna ocena: hostowe polityki/importy/buildy opisane wyżej PASS;
+Windows desktop, DHCP, brama, DNS, USB/HID reconnect, MSC i fizyczny
+sprzęt nadal bez PASS. Candidate01 ma konkretny błąd fixture i zakończone
+wszystkie własne procesy. Kolejna VM wymaga odrębnego przydziału roota.
