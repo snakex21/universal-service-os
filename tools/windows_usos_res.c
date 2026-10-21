@@ -393,6 +393,16 @@ static void run(void) {
     }
     request_log(&request,count);
     change_mode=change;
+    {   /* The driver already runs the mode the policy picks (e.g. an XP
+           driver at the monitor's native mode): nothing to change. */
+        UsosDisplayChoice chosen=usos_display_choose(modes,count,&request,DISPLAY_BUFFERS);
+        if(chosen.index>=0 && modes[chosen.index].width==current.dmPelsWidth &&
+           modes[chosen.index].height==current.dmPelsHeight && modes[chosen.index].bpp==current.dmBitsPerPel) {
+            lstrcpyA(line,"DISPLAY current=");describe(&modes[chosen.index]);lstrcatA(line," reason=");
+            lstrcatA(line,chosen.reason);lstrcatA(line,"\r\n");say(line);
+            finish("DISPLAY already at the selected mode; unchanged");CloseHandle(log_file);leave(0);
+        }
+    }
     transaction=usos_display_execute(modes,count,&request,DISPLAY_BUFFERS,&actions);
     if(usos_display_retry(current.dmBitsPerPel,transaction.state,transaction.apply_result,permission_failure)) {
         say("DISPLAY permissions prevent saving; request retained\r\n");CloseHandle(log_file);leave(1);

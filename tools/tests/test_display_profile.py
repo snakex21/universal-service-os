@@ -86,6 +86,37 @@ class DisplayTransport(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual((self.tmp/'DISPLAY.TXT').read_bytes(), expected, text)
 
+    def test_xp_2003_stage_helper_and_register_before_exit(self):
+        from test_nt4_flow import function_text
+        lib = self.tmp/'lib'; lib.mkdir()
+        shutil.copy(ROOT/'tools/display_profile.sh', lib/'display_profile.sh')
+        (lib/'USOSRES.EXE').write_bytes(b'own helper fixture')
+        settings = self.tmp/'usos-xp.ini'
+        setup = self.tmp/'vol/USOS/XP'; setup.mkdir(parents=True)
+        cmd = self.tmp/'accounts.cmd'
+        script = ROOT/'tools/prepare_xp_ntfs_target.sh'
+        funcs = function_text(script, 'usos_nt52_display_stage')+'; '+function_text(script, 'usos_nt52_insert_before_exit')+'; '
+        pre = 'fail() { echo "$*" >&2; exit 1; }; SCRIPT_DIR='+quote(lib)+' USOS_DISPLAY_NATIVE_FILE='+quote(self.tmp/'none')+'; '
+        run = 'line=$(usos_nt52_display_stage '+quote(setup)+') && [ -n "$line" ] && usos_nt52_insert_before_exit '+quote(cmd)+' "$line"'
+        for system, text, request in (('windows-xp', 'user=Bob\nfamily=xp\n', b'autoxauto\r\n'),
+                                      ('windows-server-2003', 'user=Bob\nfamily=2003\ndisplay=1280x1024\n', b'1280x1024xauto\r\n')):
+            settings.write_text(text)
+            cmd.write_bytes(b'@echo off\r\nnet user Bob /add\r\nexit /b 0\r\n')
+            env = 'NT5_SYSTEM='+system+' XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=; '
+            r = shell(pre+env+funcs+run)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual((setup/'DISPLAY.TXT').read_bytes(), request)
+            self.assertEqual((setup/'USOSRES.EXE').read_bytes(), b'own helper fixture')
+            self.assertEqual(cmd.read_bytes(), b'@echo off\r\nnet user Bob /add\r\n'
+                b'if exist "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" /v USOSDisplay /t REG_SZ /d "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" /f >> "%USOS_LOG%" 2>&1\r\nexit /b 0\r\n')
+            (setup/'DISPLAY.TXT').unlink()
+        # A user's own WINNT.SIF or Windows 2000 (vesa.cmd path): nothing here.
+        for env in ('NT5_SYSTEM=windows-xp XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=/x.sif; ',
+                    'NT5_SYSTEM=windows-2000 XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=; '):
+            r = shell(pre+env+funcs+'line=$(usos_nt52_display_stage '+quote(setup)+'); [ -z "$line" ]')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse((setup/'DISPLAY.TXT').exists())
+
     def test_nt5_scoping_and_depth_only_request(self):
         source = self.tmp/'settings.ini'
         for text, expected in [('family=xp\ndisplay=1920x1080\n', b''),

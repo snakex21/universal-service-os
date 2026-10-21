@@ -70,27 +70,31 @@ reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 | NT 3.51 | usosvbe + framebuf, USOSRES service | 1024x768x16; display only on request | request auto = native/highest; still explicit only (3.x hardware regression risk: STOP C0000143 without a valid mode) | yes |
 | NT 4.0 WS/Server/EE/TSE | usosvbe + framebuf, USOSRES at first logon | default auto = highest up to 1920x1080 | default auto = **native (prep EDID) / highest** | yes |
 | Windows 2000 Pro/Server | usosvbe + framebuf (vesa.cmd), USOSRES | default auto = highest up to 1920x1080 | default auto = **native (prep EDID, else registry EDID) / highest** | yes |
-| XP x86 / XP x64 / 2003 | no USOS display driver; Windows' or the driver bundle's driver | Full HD on X470 (user, 2026-10-17); profile value -> WINNT.SIF [Display] | **unchanged** (see below) | decide first |
+| XP x86 (incl. CSMWrap/PAE, MCE, Tablet) / XP x64 / 2003 x86+x64 | no USOS display driver; Windows' or the driver bundle's driver | Full HD on X470 (user, 2026-10-17); profile value -> WINNT.SIF [Display] | **USOSRES at the first logon** (user decision 2026-10-21): native (prep EDID, else registry EDID) / highest; **nothing when the driver already runs that mode** | yes |
 | 95 / 98 / 98 SE / Me | vmdisp9x VESA (USOSVESA.INF) + USOSRES 9x | default auto = highest up to 1920x1080 | default auto = **native up to 1920x1080**, else highest up to 1920x1080 | yes |
 | Vista / 7 / 2008 / 2008 R2 CSMWrap | Standard VGA (vgapnp, XDDM) on the CSMWrap VBE | 800x600 | default auto = **native (prep EDID, else registry EDID) / highest**; USOSRES at the first sign-in (below) | yes |
 | 8.1 / 10 x86 CSMWrap | Microsoft Basic Display | Windows' choice | unchanged (open) | no |
 | Win7 x64 UefiSeven | UefiSeven VBE shim | 1024x768 | not here: feat/w7x64-native-res | other branch |
 | Native UEFI Win8+ | GOP / WDDM | Windows' choice | unchanged; a fixed profile value -> `<Display>` | no |
 
-### XP / Server 2003
+### XP / Server 2003 (user decision 2026-10-21)
 
-USOS sets no XP mode for `auto`: the repo stages no XP display driver
-(no usosvbe, no vbemp) and writes `[Display]` only for a fixed value. The
-Full HD the user saw on the X470 comes from the display driver XP itself
-or the integrated driver bundle installs; that driver normally starts at
-the EDID mode, so a 1440p / 4K monitor would get native **only if that
-driver offers and picks it** (not verifiable from the repo). Per the
-project note "verify before fixing display on XP", USOSRES was **not**
-added to XP/2003. If wanted, it is a small step: stage USOSRES.EXE +
-DISPLAY.TXT into `USOS\<setup dir>` and import the Run value from
-usos-setup.cmd as Windows 2000 does (prepare_xp_ntfs_target.sh; the XP x86
-branch needs the same in its own staging). Decision + one X470 run with a
-1440p monitor first.
+`prepare_xp_ntfs_target.sh` (`usos_nt52_display_stage`): with a USOS
+settings file (profile or usos-xp.ini; not with the user's own WINNT.SIF)
+it stages `USOSRES.EXE` + `DISPLAY.TXT` into the setup folder
+(`USOS\XP` on the XP x86 path incl. CSMWrap/PAE, MCE and Tablet, which
+route as XP; `USOS\<setup dir>` for Server 2003 and XP x64) and adds
+`reg add HKLM\...\Run /v USOSDisplay` to usos-users.cmd before its
+`exit /b 0` (run at setup end: by pae.exe on XP x86, by usos-setup.cmd on
+the others). Request: a fixed profile `display=WxH` (WINNT.SIF [Display]
+still sets it too) as `WxHxauto`, else `autoxauto`, plus `native=` from
+the prep EDID. USOSRES on NT5 uses CDS_GLOBAL (the setup-end user is an
+administrator) and, before any test/apply, **exits with
+`DISPLAY already at the selected mode; unchanged`** when the driver
+already runs the chosen mode (the X470 Full HD case with a 1080p
+monitor). On the VGA driver (4 bpp) the request stays registered until a
+real driver is there. POSReady 2009 (its own VM-install flow,
+`\USOS\POSR`) is **not** covered yet.
 
 ## Vista / 7 / 2008 CSMWrap chain (commit 1b6fea70)
 
