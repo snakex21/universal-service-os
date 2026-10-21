@@ -50,7 +50,12 @@ static BOOL only_test_mode(void){
  if(FAILED(status))return refuse(8,"Native: licensing query unknown",(DWORD)status);
  if(!genuine)return refuse(9,"Native: licensing value is zero",genuine);return TRUE;
 }
-static void reset_background(void){if(wallpaper)DeleteObject(wallpaper);wallpaper=0;background_ready=FALSE;background_version++;}
+/* Stretched wallpaper scaled once per monitor size. HALFTONE StretchBlt of a
+ * full-size JPEG on every paint took ~0.5 s on X470 XDDM/VGA, which kept the
+ * kernel's native desktop paint (with the test-mode text) visible. */
+static HBITMAP scaled;
+static int scaled_width,scaled_height;
+static void reset_background(void){if(wallpaper)DeleteObject(wallpaper);wallpaper=0;if(scaled)DeleteObject(scaled);scaled=0;background_ready=FALSE;background_version++;}
 static BOOL load_wic_bitmap(const WCHAR *file){
  IWICImagingFactory *factory=0;IWICBitmapDecoder *decoder=0;IWICBitmapFrameDecode *frame=0;IWICFormatConverter *converter=0;
  HBITMAP candidate=0;DWORD *pixels=0;UINT width=0,height=0,count=0;
@@ -123,7 +128,19 @@ static BOOL paint_background(HMONITOR monitor,HDC dc,const RECT *update){
   HDC source=CreateCompatibleDC(dc);if(!source){RestoreDC(dc,saved);return FALSE;}
   HGDIOBJ old=SelectObject(source,wallpaper);RECT r=info.rcMonitor;
   int width=r.right-r.left,height=r.bottom-r.top,bw=wallpaper_info.bmWidth,bh=wallpaper_info.bmHeight;
-  if(wallpaper_style==WPSTYLE_STRETCH){SetStretchBltMode(dc,HALFTONE);SetBrushOrgEx(dc,0,0,0);ok=StretchBlt(dc,r.left,r.top,width,height,source,0,0,bw,bh,SRCCOPY);}
+  if(wallpaper_style==WPSTYLE_STRETCH){
+   if(!scaled||scaled_width!=width||scaled_height!=height){
+    if(scaled)DeleteObject(scaled);scaled=CreateCompatibleBitmap(dc,width,height);scaled_width=width;scaled_height=height;
+    HDC target=scaled?CreateCompatibleDC(dc):0;
+    if(target){HGDIOBJ previous=SelectObject(target,scaled);SetStretchBltMode(target,HALFTONE);SetBrushOrgEx(target,0,0,0);
+     if(!StretchBlt(target,0,0,width,height,source,0,0,bw,bh,SRCCOPY)){SelectObject(target,previous);DeleteDC(target);DeleteObject(scaled);scaled=0;}
+     else{SelectObject(target,previous);DeleteDC(target);}}
+    else if(scaled){DeleteObject(scaled);scaled=0;}
+   }
+   HDC cached=scaled?CreateCompatibleDC(dc):0;
+   if(cached){HGDIOBJ previous=SelectObject(cached,scaled);ok=BitBlt(dc,r.left,r.top,width,height,cached,0,0,SRCCOPY);SelectObject(cached,previous);DeleteDC(cached);}
+   else{SetStretchBltMode(dc,HALFTONE);SetBrushOrgEx(dc,0,0,0);ok=StretchBlt(dc,r.left,r.top,width,height,source,0,0,bw,bh,SRCCOPY);}
+  }
   else if(wallpaper_style==WPSTYLE_TILE){
    HBRUSH tile=CreatePatternBrush(wallpaper);ok=tile!=0;
    /* Shell32 can change the DC's window origin before painting. Brush
@@ -185,6 +202,14 @@ static BOOL attach_imports(void){
  if(!exchange_import(&changes[0],FALSE))return FALSE;
  if(!exchange_import(&changes[1],FALSE)){exchange_import(&changes[0],TRUE);return FALSE;}
  return TRUE;
+}
+/* Paints the reconstructed background for the launcher's shutdown cover
+ * window (another process). Same guards as the shell renderer, except the
+ * Explorer desktop-thread check, which does not apply outside Explorer. */
+__declspec(dllexport) BOOL WINAPI WmPaintCover(HDC dc){
+ if(!wm_supported()||GetSystemMetrics(SM_CLEANBOOT)||wm_visible(self))return FALSE;
+ DWORD thread=desktop_thread;desktop_thread=GetCurrentThreadId();BOOL allowed=only_test_mode();desktop_thread=thread;
+ return allowed&&load_background()&&EnumDisplayMonitors(dc,0,paint_one,0);
 }
 __declspec(dllexport) LRESULT CALLBACK WmHook(int code,WPARAM w,LPARAM l){
  if(code>=0){

@@ -2,6 +2,7 @@
  * Per-session launcher. Shell notifications replace process polling.
  */
 #include "common.h"
+#include <objbase.h>
 #include "setup_background.h"
 static HWND receiver;
 static HHOOK thread_hook;
@@ -90,6 +91,48 @@ static void capture_screen(const WCHAR *stage,const char *label){
  if(memory)DeleteDC(memory);ReleaseDC(0,screen);
 }
 static DWORD WINAPI late_capture(void *unused){(void)unused;Sleep(20000);capture_screen(L"late20s","[late20s]");return 0;}
+/* Shutdown cover. When Explorer exits, win32k repaints the uncovered desktop
+ * itself (desktop window erase), including the native test-mode text. This
+ * own window sits directly above the shell window from the query phase on,
+ * below every application window (their save dialogs stay visible), and is
+ * painted with the same reconstructed background. The process asks to be
+ * ended after Explorer (level 1, below Explorer's 2, as Task Manager does). */
+static HWND cover,shell_window;
+typedef BOOL (WINAPI *PaintCoverFn)(HDC);
+static LRESULT CALLBACK cover_proc(HWND window,UINT message,WPARAM w,LPARAM l){
+ if(message==WM_MOUSEACTIVATE)return MA_NOACTIVATE;
+ if(message==WM_ERASEBKGND)return 1;
+ if(message==WM_PAINT){
+  PAINTSTRUCT paint;HDC dc=BeginPaint(window,&paint);
+  int left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);SetWindowOrgEx(dc,left,top,0);
+  PaintCoverFn draw=component?(PaintCoverFn)GetProcAddress(component,"WmPaintCover"):0;
+  if(!draw||!draw(dc)){RECT all={left,top,left+GetSystemMetrics(SM_CXVIRTUALSCREEN),top+GetSystemMetrics(SM_CYVIRTUALSCREEN)};FillRect(dc,&all,GetSysColorBrush(COLOR_DESKTOP));}
+  EndPaint(window,&paint);return 0;
+ }
+ return DefWindowProcW(window,message,w,l);
+}
+static void show_cover(void){
+ if(cover||!shell_window||!IsWindow(shell_window))return;
+ cover=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE,L"USOSWM.Cover",L"",WS_POPUP,0,0,0,0,0,0,GetModuleHandleW(0),0);if(!cover)return;
+ HWND above=GetWindow(shell_window,GW_HWNDPREV);
+ SetWindowPos(cover,above?above:HWND_TOP,GetSystemMetrics(SM_XVIRTUALSCREEN),GetSystemMetrics(SM_YVIRTUALSCREEN),GetSystemMetrics(SM_CXVIRTUALSCREEN),GetSystemMetrics(SM_CYVIRTUALSCREEN),SWP_NOACTIVATE|SWP_SHOWWINDOW);
+ UpdateWindow(cover);wm_log(0,"Shutdown cover shown above the shell window");
+}
+static void hide_cover(void){if(cover){DestroyWindow(cover);cover=0;wm_log(0,"Shutdown cancelled; cover removed");}}
+/* Full-window drag: for windows of other threads, win32k repaints the
+ * uncovered desktop listview (the shell background window) in the kernel
+ * (redraw of "hung" windows during full drag), with the native test-mode
+ * text, before Explorer's own paint arrives. That path never calls USER32
+ * PaintDesktop, so no shell32 import can reach it. Outline drag avoids it.
+ * Session only: no SPIF_UPDATEINIFILE, the user's stored setting is kept. */
+static BOOL drag_checked;
+static void outline_drag(void){
+ if(drag_checked)return;drag_checked=TRUE;BOOL full=FALSE;
+ if(!SystemParametersInfoW(SPI_GETDRAGFULLWINDOWS,0,&full,0)){wm_log_code(0,"Drag setting unknown=",GetLastError());return;}
+ if(!full){wm_log(0,"Outline drag already active");return;}
+ if(SystemParametersInfoW(SPI_SETDRAGFULLWINDOWS,FALSE,0,0))wm_log(0,"Full-window drag off for this session (kernel desktop repaint path)");
+ else wm_log_code(0,"Cannot switch to outline drag=",GetLastError());
+}
 static void attach_shell(void){
  HWND shell=GetShellWindow();if(!shell)return;DWORD pid=0,thread=GetWindowThreadProcessId(shell,&pid);if(!thread||!pid||pid==shell_pid)return;
  HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid);if(!process)return;
@@ -102,13 +145,14 @@ static void attach_shell(void){
  DWORD_PTR result=0;SendMessageTimeoutW(shell,WM_NULL,0,0,SMTO_ABORTIFHUNG,5000,&result);
  /* UPDATENOW/ERASENOW: the shell thread repaints synchronously, so the next
   * crop shows our renderer's output rather than the earlier native paint. */
- RedrawWindow(shell,0,0,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW|RDW_ERASENOW);wm_log(0,"Hook registered for this session's explorer desktop thread");
+ RedrawWindow(shell,0,0,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW|RDW_ERASENOW);wm_log(0,"Hook registered for this session's explorer desktop thread");shell_window=shell;outline_drag();
  capture_screen(L"after","[after]");HANDLE late=CreateThread(0,0,late_capture,0,0,0);if(late)CloseHandle(late);
 }
 static void CALLBACK shell_event(HWINEVENTHOOK hook,DWORD event,HWND window,LONG object,LONG child,DWORD thread,DWORD time){(void)hook;(void)event;(void)thread;(void)time;if(window&&object==OBJID_WINDOW&&child==CHILDID_SELF)PostMessageW(receiver,WM_APP,0,0);}
 static LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM w,LPARAM l){
- if(message==WM_QUERYENDSESSION){if(shell_pid)capture_screen(L"endsession","[endsession]");return TRUE;}
- if(message==WM_ENDSESSION){if(w)PostQuitMessage(0);return 0;}
+ if(message==WM_QUERYENDSESSION){if(shell_pid){capture_screen(L"endsession","[endsession]");show_cover();}return TRUE;}
+ /* Ending: keep the cover until the system ends this process after Explorer. */
+ if(message==WM_ENDSESSION){if(!w)hide_cover();return 0;}
  if(message==WM_APP||message==taskbar_created){attach_shell();return 0;}
  if(message==WM_DESTROY){PostQuitMessage(0);return 0;}
  return DefWindowProcW(window,message,w,l);
@@ -119,6 +163,8 @@ void entry(void){
  HANDLE mutex=CreateMutexW(0,TRUE,L"Local\\USOSWM.Desktop.Launcher");if(!mutex||GetLastError()==ERROR_ALREADY_EXISTS)ExitProcess(0);
  WCHAR path[MAX_PATH];if(!wm_directory(0,path))ExitProcess(2);lstrcatW(path,L"usoswm-desktop.dll");component=LoadLibraryW(path);if(!component)ExitProcess(3);
  taskbar_created=RegisterWindowMessageW(L"TaskbarCreated");WNDCLASSW type={0};type.lpfnWndProc=window_proc;type.hInstance=GetModuleHandleW(0);type.lpszClassName=L"USOSWM.Session";
+ SetProcessShutdownParameters(1,SHUTDOWN_NORETRY);CoInitializeEx(0,COINIT_APARTMENTTHREADED);
+ WNDCLASSW cover_type={0};cover_type.lpfnWndProc=cover_proc;cover_type.hInstance=type.hInstance;cover_type.lpszClassName=L"USOSWM.Cover";cover_type.hCursor=LoadCursorW(0,(LPCWSTR)IDC_ARROW);RegisterClassW(&cover_type);
  if(!RegisterClassW(&type))ExitProcess(4);receiver=CreateWindowExW(WS_EX_TOOLWINDOW,type.lpszClassName,L"",0,0,0,0,0,0,0,type.hInstance,0);if(!receiver)ExitProcess(5);
  HWINEVENTHOOK events=SetWinEventHook(EVENT_OBJECT_CREATE,EVENT_OBJECT_SHOW,0,shell_event,0,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);if(!events)ExitProcess(6);
  attach_shell();MSG message;while(GetMessageW(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageW(&message);}
