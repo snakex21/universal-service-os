@@ -61,3 +61,33 @@ The NT3.5 ISO and compressed scratch files were removed after the audit;
 expanded NDIS/HAL bytes were held only in memory. `dc21x4.sys` was absent
 from this exact original medium, so it supplied no original-driver ABI
 reference in this audit.
+
+## NT3.1: distinguish the missing Intel port from stock TCP/IP capabilities
+
+A separate hash-bound original NT3.1 Workstation media audit used ISO
+`ee2a27153c0942b6b82f9b15145f3b7eaa34b331add1d077cc6f8d69b9223c0b`.
+It found original `ndis.sys`, `tcpip.sys` and `ne2000.sys`, but no
+DHCP-named media members, `dhcp.exe` or `dhcpcsvc.dll`. Bounded excerpts
+of original `OEMNXPTC.INF` describe static IP address, subnet mask and
+gateway configuration; there is no DHCP/EnableDHCP hit in that audit.
+Microsoft's [DHCP client overview](https://learn.microsoft.com/en-us/windows-server/troubleshoot/dynamic-host-configuration-protocol-basics)
+lists NT Workstation/Server 3.5, 3.51 and 4.0, rather than NT3.1.
+Together these support recording stock NT3.1 DHCP as not applicable,
+instead of reporting a missing DHCP lease as an Intel-driver failure.
+
+Original NE2000.SYS SHA256
+`c5fbffbf5d8de7b35f6812f46c176490c568853f2ea564bc363f5c826e17d7cb`
+uses the full-MAC `NdisRegisterMac`/`NdisRegisterAdapter` and Ethernet
+filter contracts. Its presence permits a separate legacy-NIC baseline
+experiment with static IP. It supplies neither an Intel I211/82576 port
+nor an installed-Windows network PASS. No such baseline was run by this
+media audit.
+
+Completed metadata and repeatable script are
+`artifacts/nt35-pci-audit/nt31-network-media.json` and
+`audit-nt31-network-media.py`. ISO/compressed scratch was removed;
+expanded binaries stayed in RAM. The NT3.5 branch-complete follow-up is
+`result-v2.json` / `audit-v2.py`; direct branches are followed, indirect
+calls and jumps still require separate contract proof. It confirms the
+full-MAC resource result is written through the first handle at `+0x6c`,
+which must not be guessed to be the miniport handle.
