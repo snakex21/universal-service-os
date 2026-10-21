@@ -2,7 +2,9 @@
 
 Branch `feat/vista-x64-mpart` (base `feat/vista-x64-nvme` `01389f83`).
 Status: **host tests PASS, full build PASS (B261021-163547-BFA844D5
-); not run in QEMU; X470 not tested.**
+); not run in QEMU.** **X470 PASS 2026-10-21** (Vista SP2 PL x64,
+CSMWrap, test mode): the multi-partition stick shows all partitions; plain
+sticks and the mouse unaffected. Merged into `test/x470-98se-qemu`.
 
 ## 1. Problem
 

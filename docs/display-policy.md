@@ -2,8 +2,10 @@
 
 Branch `feat/nt6-display` (base `test/x470-98se-qemu` f28a3fd8). Status:
 host-tested (Zig unit tests, answer goldens, compiled selector test, shell
-tests, full build). **Nothing here has run on the X470 yet**; no Windows
-install was run. Earlier details: docs/display-from-profile-2026-10-20.md
+tests, full build). X470 2026-10-21: Vista SP2 PL x64 (CSMWrap) runs 1920x1080
+when set manually; the **automatic** choice via USOSRES is **not yet tested on
+hardware**; nothing else here has run on the X470. Merged into
+`test/x470-98se-qemu`. Earlier details: docs/display-from-profile-2026-10-20.md
 (USOSRES, the 9x/NT4/NT3/2000 transport).
 
 ## Policy
