@@ -2,6 +2,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "../display_policy.h"
+#include "../display_edid.h"
 #include "../display_apply.h"
 #include "../display_inf.h"
 #include "../display_vbe.h"
@@ -50,6 +51,31 @@ void entry(void) {
     m[3].valid=0; CHECK(usos_display_choose(m,5,&r,0).index==2); m[3].valid=1;
     CHECK(usos_display_parse("1600x1050x32",&r)); CHECK(usos_display_choose(m,5,&r,0).index==4);
     CHECK(usos_display_parse("autoxauto",&r)); CHECK(usos_display_choose(m,5,&r,0).index==3);
+    {   /* Native (EDID) first, else the highest mode: no 1920x1080 cap. */
+        static UsosDisplayMode big[] = {
+            {1920,1080,32,7680,64UL*1024*1024,1}, {2560,1440,32,10240,64UL*1024*1024,1},
+            {3840,2160,32,15360,64UL*1024*1024,1}, {2560,1440,16,5120,64UL*1024*1024,1}};
+        static const unsigned char edid_1440[128] = {0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0,
+            [54]=0x56,[55]=0x5E,[56]=0x00,[57]=0xA0,[58]=0xA0,[59]=0xA0,[60]=0x29,[61]=0x50};
+        unsigned char e[128]; unsigned long w=0,h=0,sum=0; int i;
+        CHECK(usos_display_parse("autoxauto\r\n",&r) && !r.native_width);
+        c=usos_display_choose(big,4,&r,0); CHECK(c.index==2 && c.reason[0]=='h');
+        CHECK(usos_display_parse("autoxauto\r\nnative=2560x1440\r\n",&r) && r.native_width==2560 && r.native_height==1440);
+        c=usos_display_choose(big,4,&r,0); CHECK(c.index==1 && c.reason[0]=='n');
+        big[1].valid=0; c=usos_display_choose(big,4,&r,0); CHECK(c.index==3); big[1].valid=1;
+        big[1].valid=0; big[3].valid=0; c=usos_display_choose(big,4,&r,0); CHECK(c.index==0 && c.reason[0]=='b'); big[1].valid=1; big[3].valid=1;
+        /* A fixed request ignores native. */
+        CHECK(usos_display_parse("1920x1080x32\r\nnative=2560x1440\r\n",&r)); CHECK(usos_display_choose(big,4,&r,0).index==0);
+        CHECK(!usos_display_parse("autoxauto\r\nnative=2560\r\n",&r));
+        CHECK(!usos_display_parse("autoxauto\r\nnative=100x100\r\n",&r));
+        CHECK(!usos_display_parse("autoxauto\r\nnative=2560x1440;x\r\n",&r));
+        for(i=0;i<128;i++)e[i]=edid_1440[i];
+        for(i=0;i<127;i++)sum+=e[i]; e[127]=(unsigned char)(256-(sum&255));
+        CHECK(usos_edid_native(e,128,&w,&h) && w==2560 && h==1440);
+        e[127]^=1; CHECK(!usos_edid_native(e,128,&w,&h)); e[127]^=1;
+        CHECK(!usos_edid_native(e,127,&w,&h));
+        e[0]=1; CHECK(!usos_edid_native(e,128,&w,&h));
+    }
     CHECK(usos_display_parse("1920x1080xauto",&r));
     /* double buffering rejects 15.82 MiB for an 8 MiB adapter */
     CHECK(usos_display_choose(m,5,&r,1).index==2);

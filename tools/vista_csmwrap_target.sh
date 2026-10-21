@@ -74,12 +74,12 @@ cleanup() {
     umount "$work/donor" 2>/dev/null || true
     [ -z "${loop:-}" ] || losetup -d "$loop" 2>/dev/null || true
     umount "$work/staging" 2>/dev/null || true
+    umount "$work/windows" 2>/dev/null || true
 }
 trap cleanup EXIT HUP INT TERM
 
-# Pre-write NVMe package checks. x64 hook: codex/nvme-vista-x64 adds its
-# amd64 package check (X86_SELF != 1, USOS_PE_NVME=usosnvme) here as a
-# separate branch; this one only handles USOS_PE_NVME=usosnvme-modern.
+# Pre-write NVMe package checks: USOS_PE_NVME=usosnvme-modern (8.1 / 10 x86)
+# here, the Vista / 2008 x64 amd64 package below.
 modern_nvme=0
 if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
     [ "$X86_SELF" = 1 ] || fail 'modern NVMe requires the x86 self-boot profile'
@@ -95,6 +95,25 @@ if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
     modern_nvme=1
     USOS_PE_NVME=usosnvme
     log "modern NVMe preflight PASS id=$modern_id"
+fi
+
+# NVMe target, Vista / Server 2008 SP2 x64 (USOS_PE_NVME=usosnvme with
+# X86_SELF=0, docs/vista-x64-nvme-2026-10-21.md): the test-signed amd64
+# usosnvme package must be in vista-support.cpio, and usos-fb-ui must be able
+# to switch testsigning on in the staging BCD (the x64 WinPE 10 refuses a
+# test-signed boot driver otherwise). Checked before the first write.
+nvme64=0
+if [ "$X86_SELF" != 1 ] && [ "${USOS_PE_NVME:-}" = usosnvme ]; then
+    case "$TARGET_DEVICE" in /dev/nvme*) ;; *) fail 'the amd64 NVMe package requires an NVMe target' ;; esac
+    command -v usos-fb-ui >/dev/null 2>&1 || fail 'usos-fb-ui is missing (staging BCD testsigning); no disk was changed'
+    mkdir -p "$work/preflight"
+    ( cd "$work/preflight" && cpio -idm < "$helpers_cpio" 2>/dev/null ) || fail 'cannot inspect the amd64 NVMe helper package'
+    for f in usosnvme-amd64.ready usosnvme-nt6.sys usosnvme.inf usosnvme.cat usosnvme.cer; do
+        [ -s "$work/preflight/$f" ] || fail "signed amd64 NVMe package missing: $f; no disk was changed"
+    done
+    rm -rf "$work/preflight"
+    nvme64=1
+    log 'amd64 NVMe preflight PASS (test-signed usosnvme, testsigning in the staging BCD)'
 fi
 
 # 1. Partition table: erase the old one (both GPT copies), then a new MBR.
@@ -150,6 +169,43 @@ dd if="$node" of="$work/boot.readback" bs=512 count=16 2>/dev/null
 cmp -s "$work/boot" "$work/boot.readback" || fail 'NT60 boot code readback mismatch'
 log 'NT60 NTFS boot code PASS'
 
+# 2b. Display (docs/display-policy.md): Vista / 7 / 2008 / 2008 R2
+# install on the Standard VGA driver at 800x600. A USOS answer for them
+# registers \USOS\NT6\USOSRES.EXE (autounattend.zig display_helper); its
+# request is <!-- USOS-DISPLAY=... --> or, without one, auto (native EDID
+# mode, else the highest). Staged into the new Windows partition now:
+# Setup installs into it (InstallTo, no format) and leaves the folder. A
+# user's own answer file has no registration: nothing staged. Optional:
+# any failure keeps Windows' own mode and the preparation goes on.
+modprobe ntfs3 2>/dev/null || true
+display_request=
+if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && [ -r "$LIB/display_profile.sh" ]; then
+    . "$LIB/display_profile.sh"
+    if usos_display_nt6_answer "$ANSWER_XML"; then
+        display_request=$(usos_display_from_xml "$ANSWER_XML") || { display_request=; log 'DISPLAY duplicate request in the answer; display unchanged'; }
+        [ -n "$display_request" ] || display_request=autoxauto
+        usos_display_valid "$display_request" || { log "DISPLAY invalid request $display_request; display unchanged"; display_request=; }
+    fi
+fi
+if [ -n "$display_request" ]; then
+    mkdir -p "$work/windows"
+    if [ ! -f "$LIB/USOSRES.EXE" ]; then
+        log 'DISPLAY USOSRES.EXE missing in this build; display unchanged'
+    elif ! mount -t ntfs3 "$windows_node" "$work/windows"; then
+        log 'DISPLAY cannot mount the Windows partition; display unchanged'
+    else
+        if mkdir -p "$work/windows/USOS/NT6" && usos_display_stage "$work/windows/USOS/NT6" "$LIB/USOSRES.EXE" "$display_request" &&
+            cmp -s "$LIB/USOSRES.EXE" "$work/windows/USOS/NT6/USOSRES.EXE"; then
+            log "DISPLAY request=$display_request apply=first-sign-in vm=deferred"
+        else
+            rm -rf "$work/windows/USOS/NT6"
+            log 'DISPLAY staging failed; display unchanged'
+        fi
+        sync
+        umount "$work/windows" || fail 'cannot unmount the Windows partition'
+    fi
+fi
+
 # 3. The PE10 donor's boot files.
 modprobe ntfs3 2>/dev/null || true
 modprobe udf 2>/dev/null || true
@@ -189,6 +245,15 @@ case "$TARGET_DEVICE" in /dev/nvme*)
         fi
     fi ;;
 esac
+# Vista / 2008 x64 on NVMe: the x64 WinPE 10 boots with testsigning on (the
+# installed Vista gets it from usos-vista-install.exe, as for the v11 USB
+# backport), so its stornvme service can run the test-signed usosnvme.
+if [ "$nvme64" = 1 ]; then
+    rc=0
+    usos-fb-ui --bcd-testsigning "$work/bcd" > "$work/bcd-testsign.log" || rc=$?
+    while IFS= read -r line; do log "$line"; done < "$work/bcd-testsign.log"
+    case "$rc" in 0|10) ;; *) fail "staging BCD: testsigning not set (usos-fb-ui exit $rc)" ;; esac
+fi
 cp "$work/bcd" "$work/staging/boot/bcd" && cmp -s "$work/bcd" "$work/staging/boot/bcd" || fail 'BCD copy failed'
 cp "$sdi" "$work/staging/boot/boot.sdi" && cmp -s "$sdi" "$work/staging/boot/boot.sdi" || fail 'boot.sdi copy failed'
 log "PE10 boot files PASS boot_index=$boot_index"

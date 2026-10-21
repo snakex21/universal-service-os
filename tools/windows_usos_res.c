@@ -6,7 +6,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cpuid.h>
+#ifdef USOSRES_9X
+#define USOS_DISPLAY_AUTO_MAX_W 1920
+#define USOS_DISPLAY_AUTO_MAX_H 1080
+#endif
 #include "display_policy.h"
+#include "display_edid.h"
 #include "display_apply.h"
 #include "display_modes.h"
 #ifdef USOSRES_9X
@@ -35,6 +40,21 @@ static SERVICE_STATUS_HANDLE service_handle;
 static UsosDisplayModeList registry_modes;
 #endif
 static void run(void);
+#ifndef USOSRES_9X
+/* Vista / 7 (docs/display-policy.md): every new user gets a HKCU Run
+ * value from the Default hive. Display settings are per machine there, so
+ * the first hardware sign-in applies; each user's value is removed without
+ * elevation (UAC), also once DISPLAY.DONE exists. Never on older Windows. */
+static void forget_user_run(void) {
+    HKEY key;
+    if((GetVersion()&255)<6) return;
+    if(RegOpenKeyExA(HKEY_CURRENT_USER,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
+        RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
+    }
+}
+#else
+static void forget_user_run(void) {}
+#endif
 
 __attribute__((noreturn)) static void leave(DWORD code) {
 #ifndef USOSRES_9X
@@ -69,8 +89,48 @@ static void request_log(const UsosDisplayRequest *request,unsigned count) {
     if(request->width) {number(request->width);lstrcatA(line,"x");number(request->height);}
     else lstrcatA(line,"auto");
     lstrcatA(line,"x");if(request->bpp)number(request->bpp);else lstrcatA(line,"auto");
+    lstrcatA(line," native=");
+    if(request->native_width) {number(request->native_width);lstrcatA(line,"x");number(request->native_height);}
+    else lstrcatA(line,"unknown");
     lstrcatA(line," modes=");number(count);lstrcatA(line,"\r\n");say(line);
 }
+#ifndef USOSRES_9X
+/* No native size from the preparation (DISPLAY.TXT native=): NT5 / 6.x keep
+ * each monitor's EDID under Enum\DISPLAY\<id>\<instance>\Device Parameters.
+ * Used only when every EDID found names the same native size (a fresh
+ * install has just the connected monitor; several sizes: unknown). */
+static BYTE edid[256];
+static void registry_native(UsosDisplayRequest *request) {
+    HKEY root,id,instance; char name[128],sub[160]; DWORD i,j,size,type,found=0,conflict=0;
+    unsigned long w=0,h=0,nw,nh;
+    if((GetVersion()&255)<5 || request->native_width) return;
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Enum\\DISPLAY",0,KEY_READ,&root)!=ERROR_SUCCESS) return;
+    for(i=0;i<64;i++) {
+        size=sizeof name; if(RegEnumKeyExA(root,i,name,&size,NULL,NULL,NULL,NULL)!=ERROR_SUCCESS) break;
+        if(RegOpenKeyExA(root,name,0,KEY_READ,&id)!=ERROR_SUCCESS) continue;
+        for(j=0;j<16;j++) {
+            size=128; if(RegEnumKeyExA(id,j,sub,&size,NULL,NULL,NULL,NULL)!=ERROR_SUCCESS) break;
+            lstrcatA(sub,"\\Device Parameters");
+            if(RegOpenKeyExA(id,sub,0,KEY_QUERY_VALUE,&instance)!=ERROR_SUCCESS) continue;
+            size=sizeof edid;
+            if(RegQueryValueExA(instance,"EDID",NULL,&type,edid,&size)==ERROR_SUCCESS && type==REG_BINARY &&
+               usos_edid_native(edid,size,&nw,&nh)) {
+                if(found && (nw!=w || nh!=h)) conflict=1;
+                w=nw;h=nh;found++;
+            }
+            RegCloseKey(instance);
+        }
+        RegCloseKey(id);
+    }
+    RegCloseKey(root);
+    lstrcpyA(line,"DISPLAY registry EDID found=");number(found);
+    if(found && !conflict) {
+        request->native_width=w;request->native_height=h;
+        lstrcatA(line," native=");number(w);lstrcatA(line,"x");number(h);
+    } else if(conflict) lstrcatA(line," sizes differ; native unknown");
+    lstrcatA(line,"\r\n");say(line);
+}
+#endif
 #ifdef USOSRES_9X
 static UsosDisplayVbeList vbe;
 static char inf_text[32768];
@@ -195,6 +255,7 @@ static int finish(const char *reason) {
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
     }
+    forget_user_run();
 #ifndef USOSRES_9X
     if(service_handle && RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\usosdisplay",0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         DWORD disabled=SERVICE_DISABLED;
@@ -279,7 +340,7 @@ static void run(void) {
     while(length && directory[length-1]!='\\') length--;
     if(!length) leave(1); directory[length]=0;
     if(length>MAX_PATH-32)leave(1);
-    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) leave(0);
+    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) { forget_user_run(); leave(0); }
     file_path("DISPLAY.TXT"); input=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
     if(input==INVALID_HANDLE_VALUE) leave(0); /* absent profile = unchanged */
     zero(text,sizeof text);
@@ -290,6 +351,9 @@ static void run(void) {
     SetFilePointer(log_file,0,NULL,FILE_END);
     if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); CloseHandle(log_file); leave(1); }
     if(vm()) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
+#ifndef USOSRES_9X
+    if(!request.width) registry_native(&request);
+#endif
 #ifdef USOSRES_9X
     if(!prepare_vbe()) { say("DISPLAY no fresh VBE/INF memory evidence; unchanged\r\n"); CloseHandle(log_file); leave(1); }
 #endif
@@ -309,7 +373,9 @@ static void run(void) {
     if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
     display_flags=CDS_UPDATEREGISTRY;
 #ifndef USOSRES_9X
-    if((GetVersion()&255)>=5)display_flags|=CDS_GLOBAL;
+    /* NT5 only: on 6.x the settings are per machine already, and CDS_GLOBAL
+       needs an elevated token the first sign-in may lack (UAC). */
+    if((GetVersion()&255)==5)display_flags|=CDS_GLOBAL;
 #endif
     for(i=0;i<USOS_DISPLAY_MAX;i++) {
         if(!usos_display_enum(enumerate,GetVersion(),i,&settings[count])) break;
@@ -327,6 +393,16 @@ static void run(void) {
     }
     request_log(&request,count);
     change_mode=change;
+    {   /* The driver already runs the mode the policy picks (e.g. an XP
+           driver at the monitor's native mode): nothing to change. */
+        UsosDisplayChoice chosen=usos_display_choose(modes,count,&request,DISPLAY_BUFFERS);
+        if(chosen.index>=0 && modes[chosen.index].width==current.dmPelsWidth &&
+           modes[chosen.index].height==current.dmPelsHeight && modes[chosen.index].bpp==current.dmBitsPerPel) {
+            lstrcpyA(line,"DISPLAY current=");describe(&modes[chosen.index]);lstrcatA(line," reason=");
+            lstrcatA(line,chosen.reason);lstrcatA(line,"\r\n");say(line);
+            finish("DISPLAY already at the selected mode; unchanged");CloseHandle(log_file);leave(0);
+        }
+    }
     transaction=usos_display_execute(modes,count,&request,DISPLAY_BUFFERS,&actions);
     if(usos_display_retry(current.dmBitsPerPel,transaction.state,transaction.apply_result,permission_failure)) {
         say("DISPLAY permissions prevent saving; request retained\r\n");CloseHandle(log_file);leave(1);

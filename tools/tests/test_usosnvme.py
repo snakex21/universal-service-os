@@ -172,7 +172,7 @@ class Nt6Flow(unittest.TestCase):
         gate = prep[prep.index('usos_xp_choose_disk\n'):]
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
-        self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
+        self.assertIn('vista_nvme64_enabled "$profile" /mnt/esp/EFI/USOS/windows-native/vista-support.cpio ||', gate)
         # X470 2026-10-13: Microsoft's stornvme under CSMWrap failed every
         # size / layout IOCTL (433) on the Micron, so 8.1 / 10 x86 (stornvme
         # in Setup itself) stop on NVMe (docs/nvme-nt6-2026-10-12.md
@@ -188,6 +188,7 @@ class Nt6Flow(unittest.TestCase):
         self.assertNotIn('stop', nt6)
         self.assertNotIn('nvme-experimental.txt', nt6)
         self.assertIn('Unattended/nvme-experimental.txt', prep)
+        self.assertNotIn('Unattended/nvme-experimental.txt', nt6)
         self.assertNotIn('32-bit Windows 7/Vista/2008', prep)
         self.assertLess(prep.index("pe_nvme=''"), prep.index('        usos_xp_choose_disk\n'))
         self.assertIn('X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme', prep)
@@ -332,7 +333,8 @@ class Nt6Flow(unittest.TestCase):
         self.assertIn('if [ "$X86_SELF" = 1 ]; then', block)
         main = (ROOT / 'src/platform/linux/fb_ui_main.zig').read_text(encoding='utf-8')
         self.assertIn('"--bcd-truncatememory"', main)
-        self.assertIn('@import("bcd_lowmem.zig").run(', main)
+        self.assertIn('bcd.run(args.next() orelse return 2, bcd.truncatememory);', main)
+        self.assertIn('bcd.run(args.next() orelse return 2, bcd.testsigning);', main)
         zig = (ROOT / 'src/platform/linux/bcd_lowmem.zig').read_text(encoding='utf-8')
         for want in ('pub const limit: u64 = 0x100000000;', 'element_name = "15000007"', 'return error.Dirty;',
                      '"{9dea862c-5cdd-4e70-acc1-f32b344d4795}"', 'default_element = "23000003"'):
@@ -386,7 +388,7 @@ class Nt6Flow(unittest.TestCase):
         self.assertIn('for %%F in (usosnvme.inf usosnvme.cat usosnvme.cer) do if exist "%~dp0%%F" '
                       'copy /y "%~dp0%%F" "%USOS_T%\\USOS\\nvme\\%%F"', s)
         gate = (ROOT / 'tools/windows_vista_oobe_gate.c').read_text(encoding='utf-8')
-        body = gate[gate.index('static void nvme_stage(void)'):]
+        body = gate[gate.index('static BOOL nvme_stage(void)'):]
         for want in ('CERT_SYSTEM_STORE_LOCAL_MACHINE', 'L"Root",L"TrustedPublisher"', 'CertAddEncodedCertificateToStore',
                      'pnputil.exe', '-a \\"', 'CREATE_NO_WINDOW'):
             self.assertIn(want, body)

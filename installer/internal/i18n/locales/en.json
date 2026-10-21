@@ -1152,7 +1152,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Screen resolution",
-  "boot.profile.help.display": "XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Automatic: unchanged; without a display driver (the VGA driver, e.g. through CSMWrap) Windows keeps its basic mode.",
+  "boot.profile.help.display": "Vista, 7, Server 2008 and 2008 R2 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it.",
   "boot.profile.xp_ini.detail": "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
   "boot.profile.section.apps": "Apps and scripts",
   "boot.profile.field.shortcut_suffix_off": "No \"Shortcut\" in shortcut names",
@@ -1362,5 +1362,5 @@
   "boot.lx.logon_setup_asks": "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
   "boot.lx.logon_answer_file": "After the installation log on with the account from your answer file {0}.",
   "boot.profile.field.display_bpp": "Color depth",
-  "boot.profile.help.display_legacy": "Applied after installation on the real hardware. Automatic chooses up to 1920x1080; unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit."
+  "boot.profile.help.display_legacy": "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit."
 }

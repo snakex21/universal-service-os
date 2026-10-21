@@ -23,7 +23,7 @@ installs, and so does any multi-partition pendrive.
 | Vista / Server 2008 SP2 x86 | own usosusb 1.1-nt6 (xHCI, own mass storage) | **already every partition** (one volume device per MBR primary / GPT entry, max 4, ESP/MSR skipped) | unchanged |
 | Windows 7 / 8.x / 10 < 1703 x86 (CSMWrap x86) | Microsoft usbxhci (7: user's backport) + usbstor | first partition only | usosmpart (x86, `:mpart` WinPE step) |
 | Windows 10 1703+ / 11 | Microsoft | every partition | unchanged (step skips build >= 15063) |
-| Vista / 2008 x64 (test mode) | community USB3 backport + usbstor | first partition only | **open**: amd64 build exists; the Vista x64 path is the frozen hardware-success pipeline, not touched |
+| Vista / 2008 x64 (test mode) | community USB3 backport + usbstor | first partition only | usosmpart `nt6x64` build, test-signed per build, CSMWrap path only (`docs/vista-x64-usb-multipartition-2026-10-21.md`) - host-tested, not run in QEMU / on the X470 |
 | Windows 7 / 2008 R2 / 8.x x64 (native UEFI / UefiSeven) | Microsoft | first partition only | **blocked**: x64 kernel-mode code signing; a boot-start filter signed by a USOS per-build certificate loads only with test signing on, which these flows do not use |
 | 95 / 98 / ME | SeaBIOS BIOS disk (stick plugged before power-on); 98 SE opt-in xhci98 + NUSB (user files) | DOS/9x drive letters per BIOS disk partition (MBR only; GPT sticks not readable) | unchanged |
 | NT 3.x / NT 4.0 | no USB mass storage (usosusb HID only) | - | unchanged |

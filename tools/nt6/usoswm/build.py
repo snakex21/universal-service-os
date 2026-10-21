@@ -17,7 +17,7 @@ def build(tool_root:Path,out:Path):
     runtime=str(source/'runtime.c')
     dll=out/'usoswm-desktop.dll';exe=out/'usoswm.exe';register=out/'usoswm-register.exe'
     commands=[common+['-shared',str(source/'desktop.c'),runtime,'-Wl,--entry,DllMain','-lkernel32','-luser32','-lgdi32','-ladvapi32','-lole32','-o',str(dll)],
-              common+[str(source/'launcher.c'),runtime,'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-ladvapi32','-o',str(exe)],
+              common+[str(source/'launcher.c'),runtime,'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-lgdi32','-ladvapi32','-lole32','-o',str(exe)],
               common+[str(source/'register.c'),runtime,'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-ladvapi32','-lshell32','-lole32','-o',str(register)]]
     with (out/'build.log').open('w',encoding='utf-8') as log:
         for command in commands:subprocess.run(command,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)

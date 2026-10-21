@@ -953,7 +953,7 @@ usos_w2k_vesa_stage() {
     esac
     usos_w2k_vesa_reg > "$1/VESA.REG" && usos_w2k_vesa_cmd > "$1/vesa.cmd" || { echo '[W2K_STAGE] STOP: cannot write VESA.REG / vesa.cmd'; return 1; }
     # The profile's request, else (user decision 2026-10-20) auto: the
-    # highest tested mode up to 1920x1080 at the first hardware logon; the
+    # native (EDID) or else highest tested mode (docs/display-policy.md) at the first hardware logon; the
     # first start keeps 1024x768x16 (VESA.REG), USOSRES tests and rolls back.
     w2k_display_request=
     if [ -f "${USOS_LIB_DIR:-/usr/lib/usos}/display_profile.sh" ] && [ -f "${USOS_LIB_DIR:-/usr/lib/usos}/USOSRES.EXE" ]; then

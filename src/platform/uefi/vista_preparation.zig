@@ -171,6 +171,8 @@ fn startMode(root: *uefi.protocol.File, mode: Mode, heading: []const u8) !void {
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     try bs.setWatchdogTimer(0, 0, null);
+    // The monitor's native size for USOSRES (docs/display-policy.md).
+    @import("display_native.zig").record(root);
     const image = try esp_image.load(root, "\\EFI\\USOS\\micro-linux\\vmlinuz-virt");
     defer _ = bs.unloadImage(image) catch .load_error;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;

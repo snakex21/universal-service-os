@@ -68,6 +68,30 @@ usos_nt5_stage_regset() {
     printf '[NT5] registry set staged: %s entries for usos-reg.exe\n' "$(grep -vc '^;' "$work/usos-reg.txt")"
     rm -f "$work/usos-reg.txt"
 }
+# Display (docs/display-policy.md, user decision 2026-10-21): XP and Server
+# 2003, x86 and x64, from a USOS settings file get USOSRES at the first
+# logon: the monitor's native mode (prep-time EDID, else the registry EDID),
+# else the highest; nothing when the driver already runs it. DIR = the
+# setup folder; DIR's line for the setup-end script goes to stdout. A
+# user's own WINNT.SIF (XP_CUSTOM_SIF) gets nothing.
+usos_nt52_display_stage() {
+    [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ] || return 0
+    case "$NT5_SYSTEM" in windows-2000) return 0 ;; esac
+    if [ ! -f "$SCRIPT_DIR/USOSRES.EXE" ] || [ ! -f "$SCRIPT_DIR/display_profile.sh" ]; then
+        printf '[NT5] DISPLAY USOSRES.EXE missing in this build; display unchanged\n' >&2; return 0
+    fi
+    . "$SCRIPT_DIR/display_profile.sh"
+    _nd_request=$(usos_display_request_nt52 "$XP_USER_SETTINGS") || fail 'duplicate display request'
+    usos_display_stage "$1" "$SCRIPT_DIR/USOSRES.EXE" "$_nd_request" || fail 'cannot stage the display helper'
+    cmp -s "$SCRIPT_DIR/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
+    printf '[NT5] DISPLAY request=%s native=%s apply=first-logon\n' "$_nd_request" "$(usos_display_native || echo unknown)" >&2
+    usos_display_nt52_run_line "${1##*/USOS/}"
+}
+# CMD (setup-end script, ends with exit /b 0) with LINE before its last line.
+usos_nt52_insert_before_exit() {
+    # ENVIRON, not -v: awk -v would eat the backslashes of the path.
+    USOS_ADD_LINE=$2 awk '{sub(/\r$/, ""); l[NR]=$0} END {a=ENVIRON["USOS_ADD_LINE"]; sub(/\r$/, "", a); for(i=1;i<=NR;i++){if(i==NR) printf "%s\r\n", a; printf "%s\r\n", l[i]}}' "$1" > "$1.new" && mv "$1.new" "$1"
+}
 export XP_TARGET_ROOT="$work/volume" MTOOLS_IMAGE="$node"
 sh "$SCRIPT_DIR/prepare_xp_local_source.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k3-x86-sp2-uefi-csm ]; then
@@ -114,6 +138,8 @@ cmp -s "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe" || fail 'PAE help
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
 . "$SCRIPT_DIR/xp_user_settings.sh"
 usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
+display_line=$(usos_nt52_display_stage "$work/volume/USOS/XP")
+[ -z "$display_line" ] || usos_nt52_insert_before_exit "$work/accounts.cmd" "$display_line" || fail 'cannot register the display helper'
 cp "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"
@@ -180,6 +206,8 @@ fi
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
 . "$SCRIPT_DIR/xp_user_settings.sh"
 usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
+display_line=$(usos_nt52_display_stage "$setup_dir")
+[ -z "$display_line" ] || usos_nt52_insert_before_exit "$work/accounts.cmd" "$display_line" || fail 'cannot register the display helper'
 cp "$work/accounts.cmd" "$setup_dir/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$setup_dir/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"

@@ -70,7 +70,8 @@ mass-storage port driver:
 | Build | Folder | Target | For |
 |---|---|---|---|
 | `x86`   | `bin/i386`  | WDK 7.1 "x86 WXP" | Windows 2000 / XP / Server 2003 / 7 / 8.x / 10 (before 1703) x86 |
-| `amd64` | `bin/amd64` | WDK 7.1 "x64 WNET" | XP x64 / Server 2003 x64; Vista / 7 x64 only in test mode |
+| `amd64` | `bin/amd64` | WDK 7.1 "x64 WNET" | XP x64 / Server 2003 x64 |
+| `nt6x64` | `bin/NT6/amd64` | WDK 7.1 "x64 WLH" | Vista / Server 2008 SP2 x64 in test mode (signed per build, see below) |
 
 Build: `tools\nt\usosmpart\build.cmd all` (`WDKROOT` if `tools\WinDDK71` is
 elsewhere). The x86 imports resolve on the Windows 2000 SP4 kernel (checked
@@ -85,6 +86,11 @@ against the 2000 SP4 `ntoskrnl.exe`).
 - Windows 7 / 8.x / 10 before 1703 x86 (CSMWrap x86 path):
   `tools/windows_x86_csmwrap.cmd` step `:mpart` (offline registry from WinPE,
   appended to the existing disk class `LowerFilters`).
+- Vista / Server 2008 SP2 x64 (CSMWrap path, test mode): the `nt6x64` build,
+  embedded-signed with the per-build usosnvme amd64 certificate
+  (`tools/build_usosnvme_nt6_signed.py`), registered offline by
+  `usos-vista-install.exe` after the target BCD got testsigning
+  (`tools/windows_vista_mpart.h`, docs/vista-x64-usb-multipartition-2026-10-21.md).
 - Vista / Server 2008 x86 do not need it: their USB stack is USOS's own
   `usosusb` (one volume device per partition).
 

@@ -1,0 +1,15 @@
+# Vista / Server 2008 x64: polled miniport, no HwInterrupt or MSI/MSI-X.
+TARGETNAME=usosnvme
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+INCLUDES=..
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib \
+           $(DDK_LIB_PATH)\ntoskrnl.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_VISTA)
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+C_DEFINES=$(C_DEFINES) -DUSOSNVME_NT6
+SOURCES=..\usosnvme.c \
+        ..\usosnvme.rc
