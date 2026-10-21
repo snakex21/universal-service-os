@@ -475,7 +475,7 @@ native_cpio	win7-support.cpio	usos-kmdf-required.flag	3	f1b2f662800122bed0ff2556
 native_cpio	win7-support.cpio	Windows6.1-KB2990941-v3-x64.cab	6062245	3ecc3fe4e588cc308690093fa65e91b87161e806c2b784c093f6e67a5f3828aa
 native_cpio	win7-support.cpio	Windows6.1-KB3087873-v2-x64.cab	539077	3589d4f6fa3f024b7f9aa764f0f10d9fb4735f0c6a90cd11c52d4e5fc230ee22
 native_cpio	win7-support.cpio	usos-win7-start.cmd	10350	608a06dbb1a03e3a016e5d1fb679efc91128271429b6c207645fd20c553e18f3
-native_cpio	win7-support.cpio	usos-modern-win7.cmd	6584	3e00e31d33fe161bc55685bd42413c560fca42028d53aa1cb39534bed3bc9f9a
+native_cpio	win7-support.cpio	usos-modern-win7.cmd	12800	cdd72e0471b39c549821a2171edc8abb3e5b4ce6d4cbdcfa93bfdf4c80b978ea
 native_cpio	win7-support.cpio	usos-win7-setupcomplete.cmd	939	e54545df7edb6f3817a107696d2452ddfeb0d7aecea2695b94c20bc46c415a97
 native_cpio	win7-support.cpio	usos-win7-finalize.exe	15360	78be2bd2707d67cf02b4bfc04fb7c16f46dca0a2ee7be07399ac3773f58142df
 native_cpio	win7-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
