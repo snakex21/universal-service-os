@@ -58,9 +58,14 @@ pub const flag_name = "usos-native-res.flag";
 
 /// The experiment runs only with usos-native-res.flag beside the dispatcher.
 pub fn enabled(device: uefi.Handle, dir: []const u16) bool {
-    var buffer: [16]u8 = undefined;
-    return trace.readSmall(device, dir, std.unicode.utf8ToUtf16LeStringLiteral(flag_name), &buffer).len != 0;
+    var buffer: [128]u8 = undefined;
+    const text = trace.readSmall(device, dir, std.unicode.utf8ToUtf16LeStringLiteral(flag_name), &buffer);
+    if (std.mem.trim(u8, text, " \t\r\n").len == 0) return false;
+    config = table.parseFlag(text);
+    return true;
 }
+
+var config: table.FlagConfig = .{};
 
 /// Arm the StartImage hook. `uefiseven` is the image the dispatcher itself
 /// starts next; calls for it pass through.
@@ -97,8 +102,22 @@ fn say(comptime fmt: []const u8, args: anytype) void {
 }
 
 /// The GOP instance UefiSeven described (ConOut handle first, then any).
+/// The physical GOP (a GOP handle with a device path that is not the ConOut
+/// handle). The ConOut GOP is often the console splitter's virtual one: QEMU
+/// run 2026-10-21 showed the boot manager's text console switching the
+/// physical GOP to 1024x768 while the splitter's Mode still said 1920x1080,
+/// so mode checks must read the physical GOP. Falls back to the ConOut GOP.
 fn findGop(bs: *uefi.tables.BootServices) ?*Gop {
-    if (uefi.system_table.console_out_handle) |h| {
+    const conout = uefi.system_table.console_out_handle;
+    if (bs.locateHandleBuffer(.{ .by_protocol = &Gop.guid }) catch null) |handles| {
+        defer bs.freePool(@ptrCast(handles.ptr)) catch {};
+        for (handles) |h| {
+            if (conout != null and h == conout.?) continue;
+            if ((bs.handleProtocol(uefi.protocol.DevicePath, h) catch null) == null) continue;
+            if (bs.handleProtocol(Gop, h) catch null) |g| return g;
+        }
+    }
+    if (conout) |h| {
         if (bs.handleProtocol(Gop, h) catch null) |g| return g;
     }
     return bs.locateProtocol(Gop, null) catch null;
@@ -180,9 +199,10 @@ fn applyNative() void {
         candidates[i] = if (gop.queryMode(@intCast(i))) |info| .{
             .width = info.horizontal_resolution,
             .height = info.vertical_resolution,
-            .usable = usable(info),
+            .usable = usable(info) and info.horizontal_resolution <= config.max_width and info.vertical_resolution <= config.max_height,
         } else |_| .{ .width = 0, .height = 0, .usable = false };
     }
+    say("flag: max {d}x{d}, {s}", .{ config.max_width, config.max_height, if (config.single) "native mode only" else "1024x768 window + native" });
     const edid = readEdid(bs, gopHandle(bs, gop));
     const preferred = if (edid) |e| edid_mode.preferredResolution(e) else null;
     if (preferred) |p| say("EDID preferred timing {d}x{d}", .{ p.width, p.height }) else say("no usable EDID ({s})", .{if (edid == null) "no EDID protocol" else "invalid block"});
@@ -205,12 +225,13 @@ fn applyNative() void {
     // mode 0x00F1 (a centred window) and the native mode is 0x00F2.
     var sizes_buf: [2][2]u32 = undefined;
     var n: usize = 0;
-    if (!(fb.width == 1024 and fb.height == 768) and table.windowFits(fb, 1024, 768)) {
+    if (!config.single and !(fb.width == 1024 and fb.height == 768) and table.windowFits(fb, 1024, 768)) {
         sizes_buf[n] = .{ 1024, 768 };
         n += 1;
     }
     sizes_buf[n] = .{ fb.width, fb.height };
     n += 1;
+    if (config.native_first and n == 2) std.mem.swap([2]u32, &sizes_buf[0], &sizes_buf[1]);
     table.buildMulti(window(), fb, sizes_buf[0..n], handler.code) catch |err| {
         say("multi-mode table not built ({s}); GOP back to mode {d}, UefiSeven table kept", .{ @errorName(err), before });
         gop.setMode(before) catch {};

@@ -112,8 +112,9 @@ fn run() !uefi.Status {
     // UefiSeven path: native resolution instead of its fixed 1024x768
     // (windows7_native_mode.zig; hooks the boot manager start and winload's
     // ExitBootServices, removed again if UefiSeven returns). EXPERIMENTAL and
-    // off unless usos-native-res.flag sits beside the dispatcher: in QEMU the
-    // Setup PE stopped at "Starting Windows" with it (docs/w7x64-native-res-2026-10-21.md).
+    // off unless a non-empty usos-native-res.flag sits beside the dispatcher:
+    // QEMU reaches Setup with it, but Setup still picks the 1024x768 window
+    // (docs/w7x64-native-res-2026-10-21.md).
     if (!valid and native_mode.enabled(device, dir)) native_mode.arm(image, log);
     const result = bs.startImage(image) catch |err| {
         native_mode.disarm();

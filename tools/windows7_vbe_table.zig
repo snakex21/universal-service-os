@@ -231,6 +231,47 @@ test "multi-mode table: 1024x768 window plus native" {
     try std.testing.expectError(error.NotUefiSeven, buildMulti(&w, fb, &.{.{ 1920, 1080 }}, &code));
 }
 
+/// Contents of usos-native-res.flag (whitespace-separated words; an empty
+/// file means off): `max=WxH` caps the GOP pick, `single` offers only the
+/// native mode (no 1024x768 window), `nativefirst` swaps the two mode
+/// numbers. Anything else, e.g. `on`, is ignored.
+pub const FlagConfig = struct {
+    max_width: u32 = 0xffff_ffff,
+    max_height: u32 = 0xffff_ffff,
+    single: bool = false,
+    /// `nativefirst`: native = 0x00F1, the 1024x768 window = 0x00F2.
+    native_first: bool = false,
+};
+
+pub fn parseFlag(text: []const u8) FlagConfig {
+    var cfg = FlagConfig{};
+    var words = std.mem.tokenizeAny(u8, text, " \t\r\n,;");
+    while (words.next()) |word| {
+        if (std.ascii.eqlIgnoreCase(word, "single")) {
+            cfg.single = true;
+        } else if (std.ascii.eqlIgnoreCase(word, "nativefirst")) {
+            cfg.native_first = true;
+        } else if (word.len > 4 and std.ascii.eqlIgnoreCase(word[0..4], "max=")) {
+            const x = std.mem.indexOfAny(u8, word[4..], "xX") orelse continue;
+            const w = std.fmt.parseInt(u32, word[4..][0..x], 10) catch continue;
+            const h = std.fmt.parseInt(u32, word[4 + x + 1 ..], 10) catch continue;
+            cfg.max_width = w;
+            cfg.max_height = h;
+        }
+    }
+    return cfg;
+}
+
+test "flag file words" {
+    const d = parseFlag("on\r\n");
+    try std.testing.expect(!d.single and d.max_width == 0xffff_ffff);
+    const c = parseFlag("max=1920x1080 single\r\n");
+    try std.testing.expect(c.single);
+    try std.testing.expectEqual(@as(u32, 1920), c.max_width);
+    try std.testing.expectEqual(@as(u32, 1080), c.max_height);
+    try std.testing.expectEqual(@as(u32, 0xffff_ffff), parseFlag("max=abc").max_width);
+}
+
 /// Test helper and documentation of the layout UefiSeven 1.30 writes
 /// (ShimVesaInformation in UefiSeven.c) for a 1024x768 GOP mode.
 pub fn fillLikeUefiSeven(w: []u8, fb: Framebuffer) void {
