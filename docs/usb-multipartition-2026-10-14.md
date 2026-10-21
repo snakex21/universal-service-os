@@ -24,7 +24,7 @@ installs, and so does any multi-partition pendrive.
 | Windows 7 / 8.x / 10 < 1703 x86 (CSMWrap x86) | Microsoft usbxhci (7: user's backport) + usbstor | first partition only | usosmpart (x86, `:mpart` WinPE step) |
 | Windows 10 1703+ / 11 | Microsoft | every partition | unchanged (step skips build >= 15063) |
 | Vista / 2008 x64 (test mode) | community USB3 backport + usbstor | first partition only | usosmpart `nt6x64` build, test-signed per build, CSMWrap path only (`docs/vista-x64-usb-multipartition-2026-10-21.md`) - host-tested, not run in QEMU / on the X470 |
-| Windows 7 / 2008 R2 / 8.x x64 (native UEFI / UefiSeven) | Microsoft | first partition only | **blocked**: x64 kernel-mode code signing; a boot-start filter signed by a USOS per-build certificate loads only with test signing on, which these flows do not use |
+| Windows 7 / 2008 R2 / 8.x x64 (native UEFI / UefiSeven) | Microsoft | first partition only | **blocked**: x64 kernel-mode code signing; a boot-start filter signed by a USOS per-build certificate loads only with test signing on, which these flows do not use. **Win7 x64: not supported, decided to leave** (user decision 2026-10-22); workaround: a fixed-disk enclosure / SSD shows every partition |
 | 95 / 98 / ME | SeaBIOS BIOS disk (stick plugged before power-on); 98 SE opt-in xhci98 + NUSB (user files) | DOS/9x drive letters per BIOS disk partition (MBR only; GPT sticks not readable) | unchanged |
 | NT 3.x / NT 4.0 | no USB mass storage (usosusb HID only) | - | unchanged |
 

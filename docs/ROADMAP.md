@@ -560,10 +560,14 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   - Vista x64 / 7 / 2008: automatyczna natywna rozdzielczość (USOSRES)
     zaimplementowana; do potwierdzenia na X470 na świeżej instalacji
     (Vista x64 ręcznie 1920x1080 OK 2026-10-21).
-  - Win7 x64 przez UefiSeven: dwa tryby VBE (1024x768 + natywny) i USOSRES
-    za flagą (gałąź `feat/w7x64-native-res`,
-    `w7x64-native-res-2026-10-21.md` na tej gałęzi); test X470 czeka.
-    Jeśli nie przejdzie, zostaje 1024x768.
+  - ~~Win7 x64 przez UefiSeven~~ **ROZSTRZYGNIĘTE (decyzja użytkownika
+    2026-10-22):** domyślnie jeden tryb UefiSeven 1024x768 na cały ekran.
+    Dwa tryby VBE + USOSRES za flagą `Systems\Windows\Windows 7\Unattended\native-res-on.txt`
+    zostają opcjonalne, domyślnie wyłączone (X470 PASS 2026-10-21, ale
+    wyśrodkowane okno 1024x768 odrzucone). CSMWrap odrzucony (zabiera
+    1 procesor logiczny). Pełna rozdzielczość: sterownik GPU użytkownika
+    (AMD/NVIDIA) w `DATA\Drivers`
+    ([w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md)).
   - Vista x64, tekst trybu testowego: zakryty przez nadmalowanie usoswm
     (X470 PASS 2026-10-21); próba usunięcia u źródła nieudana
     ([vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md)).
@@ -589,6 +593,11 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   nie jest planowana. Ryzyka: AOAC, przyszły konflikt ze sterownikiem
   firmware, polling zamiast GPIO.
 - Windows XP, Vista i 7 wymagają wyłączonego Secure Boot.
+- **Win7 x64 (natywny UEFI): pendrive pokazuje tylko pierwszą partycję**
+  (decyzja użytkownika 2026-10-22, zostawiamy): usosmpart wymagałby trybu
+  testowego (podpisywanie sterowników jądra x64). Obejście: obudowa/dysk
+  SSD zgłaszany jako dysk stały pokazuje wszystkie partycje
+  ([usb-multipartition-2026-10-14.md](usb-multipartition-2026-10-14.md)).
 - **Vista x64 na X470 działa w trybie testowym** (backport USB 3 podpisany
   testowo). Nie ma legalnie podpisanego sterownika xHCI dla X470 pod Vistę
   x64 (katalog AMD dla Win7 ma tylko OSAttr 6.1 i łańcuch SHA-256). Jedyna

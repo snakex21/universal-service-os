@@ -76,7 +76,7 @@ reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 | 95 / 98 / 98 SE / Me | vmdisp9x VESA (USOSVESA.INF) + USOSRES 9x | default auto = highest up to 1920x1080 | default auto = **native up to 1920x1080**, else highest up to 1920x1080 | yes |
 | Vista / 7 / 2008 / 2008 R2 CSMWrap | Standard VGA (vgapnp, XDDM) on the CSMWrap VBE | 800x600 | default auto = **native (prep EDID, else registry EDID) / highest**; USOSRES at the first sign-in (below) | yes |
 | 8.1 / 10 x86 CSMWrap | Microsoft Basic Display | Windows' choice | unchanged (open) | no |
-| Win7 x64 UefiSeven | UefiSeven VBE shim | 1024x768 | not here: feat/w7x64-native-res | other branch |
+| Win7 x64 UefiSeven | UefiSeven VBE shim | 1024x768 fullscreen | **stays 1024x768** (user decision 2026-10-22); opt-in two-mode + USOSRES with `Systems\Windows\Windows 7\Unattended\native-res-on.txt` (X470 PASS 2026-10-21, centred-window cosmetics rejected, off by default); no CSMWrap route (reserves 1 logical CPU); full resolution = user's AMD/NVIDIA driver in `DATA\Drivers` (`docs/w7x64-native-res-2026-10-21.md`) | opt-in only |
 | Native UEFI Win8+ | GOP / WDDM | Windows' choice | unchanged; a fixed profile value -> `<Display>` | no |
 
 ### XP / Server 2003 (user decision 2026-10-21)
