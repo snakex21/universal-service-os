@@ -41,7 +41,9 @@ that map (SHA-256 `56c6e878253d8e84cf75d8642aeaa0ba156bea7504c4d4029acb17432cfa7
 no include directives). Missing runtime data rejects the package and the
 95 controller fails before starting QEMU. The NT controller remains
 unchanged. A replacement nested smoke uses a script in initrd and an exact
-completion line; verification is pending.
+completion line. It passed with both real engines in 10.303 s, no UART
+command upload, clean exit and the exact marker after the receiver's
+successful termination. This is RFB infrastructure evidence only.
 
 Private inputs originate in the separately measured
 `B261020-200536-968CCBE8-win95-fat16` cache. Its 283 other files and 825
