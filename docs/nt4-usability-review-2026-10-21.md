@@ -451,3 +451,137 @@ Domyślny limit1 jest faktem oryginalnych binariów, lecz nie wyjaśnia tego
 konkretnego gościa. Nie przygotowano ani nie wprowadzono poprawki limitu.
 Oddzielna próba NT3 zmienia tylko i8042prt Start1 na4; jej wynik jest
 prowadzony przez roota/NT3 i nie jest przypisywany do trwającego NT4.
+
+
+## Candidate02: zakończony stall GUI Setup, zachowany cel do diagnozy
+
+Oczekiwanie zakończyło powiadomienie cleanup; TTY85872 oraz oba jednorazowe
+listenery76687/92035 zakończyły się. Runner startował z015ddddf. Harness
+rc0/ASSESS_ENDPOINT nie oznacza sukcesu Windows. Preparation stopped po
+4407.25s, całość4409.87s. Wewnętrzny instalator zakończył się rc3 po4204s:
+brak zapisu903s na drugim starcie. Konkretna strona pozostaje nieznana.
+
+Nie zaobserwowano pierwszego logowania ani pulpitu; nie zapisano endpointu
+i nie otwarto nieznanego ekranu prywatnego Setupu. Przed logowaniem
+odrzucono11ramek, capture zachował0; pcap zawiera sam nagłówek24B. Nie
+wykonano operatora /testnet, więc DHCP/brama/DNS nie mają PASS. Zakres
+PS/2 nie obejmuje HID/reconnect/MSC; fizyczny sprzęt nadal bez oceny.
+
+Retencja utworzyła hardlink na zdarzeniu utworzenia dokładnego targetu,
+bez odczytu aktywnego obrazu. Po cleanup zachowany target-retained.qcow2
+ma430571520B. Jest to niedokończony Setup, nie gotowy pulpit. Oryginalnej
+nazwy target.qcow2 już nie ma; nie wystartowano retained01 ani nowej próby.
+
+Kolektor tekstu tym razem zakończył automatyczny transport po naprawie
+quoted-heredoc: SETUPLOG empty, SETUPERR/SETUPACT/POST unavailable,
+actual_native_logs=[], native_logs_read=false. Unavailable oznacza
+nieudany odczyt, nie dowód braku pliku. Zakończony redacted transport
+ponownie przeszedł aktualny ścisły validator: canonical base64, pojedynczy
+gzip zCRC/EOF, pojedynczy tar z wyłącznie zerami po terminatorze, allowlist
+i statusy. Nie tworzono nowej VM ani nie zmieniono surowego evidence.
+
+Startowy015ddddf oraz późniejszą weryfikację rozdzielono w metadanych.
+Nie przechwycono wersji modułu przy jego oryginalnym załadowaniu, więc
+nie przypisuje się historycznemu runtime aktualnego verifiera. Wąski
+patch integralności d422dc5d...83be6f root zastosował po review; mój
+izolowany focused run:45PASS/1skip (opcjonalny pin NT35),46testówłącznie.
+Obejmuje realne negatywne przypadki drugiego gzip/tar, CRC, obcięcia i
+bomby ekspansji w czterech kolektorach. Oceny historyczne bez zmian.
+
+Priorytet po fail02: readonly odczyt zachowanego qcow2 i wybranych hive
+wyłącznie wRAM, bez raw-convert/mount/exportu plików Microsoftu. Obie
+hive mają poprawny checksum i równe sequence. SYSTEM nadal oznacza
+Setup jako aktywny (SystemSetupInProgress1/RestartSetup1); CmdLine jest
+klasyfikowane wyłącznie jako GUI_SETUP_NEWSETUP. ProductId/owner/org
+są niepuste i inne od oryginalnego SOFTWARE template; oryginał nie ma
+ProductId. Żadnej wartości, długości ani hasha tych danych nie zapisano.
+Sama obecność nie jest jeszcze dowodem przejścia prywatnej strony: trwa
+audyt oryginalnego write-site/porządku GUI i warunku restartu. Bez tego
+nie dopuszcza się zrzutu ekranu. Kolejna czynność będzie krótką diagnozą
+zachowanego celu albo klasyfikatorem zwracającym tylko enum, bez kolejnej
+ślepej pełnej instalacji.
+
+
+## Doprecyzowanie diagnozy zachowanego Setup02 i integralności
+
+Root zintegrował wspólną kontrolę gzip/tar jako16970e7c. Pełne122testy
+coverage PASS (31.656s), z rzeczywistym pinem NT35 i zero skip. Ukończony
+BusyBox transport NT351 R18f przeszedł dodatkowy metadata-only replay;
+nie zmieniono historycznych ocen ani hash guardów.
+
+Oryginalny SYSSETUP PL bfd24b69...759e9 ma PSP40B wRVA29bf8:
+template102 (instalacja sieci), callback1d114. Przy WM_NOTIFY oraz
+PSN_WIZNEXT(-207) wywołuje18730→14a58→14422→RegSetValueExW(ProductId).
+Pozwala to powiązać dane zapisane w zakończonym target02 z natywnym
+postępem GUI. Nie dowodzi widocznej strony po osobnym wznowieniu; metadane
+product-write-order jawnie nie zezwalają na screenshot na tej podstawie.
+
+Przygotowany obserwator używa lokalnego VNC do jednego framebuffer
+transaction wRAM po300s. Bitmapa i tekst WinRT OCR pozostają wyłącznie
+wRAM/anonimowym stdin pipe; wynik to zamknięty enum, bez wartości/hashy
+danych produktu i bez framefile. OCR nie daje automatycznego zezwolenia
+na zapis ekranu. Nie podaje klucza ani żadnych klawiszy. Każdy diagnostic
+boot korzysta z nowego overlay, bazowy preserved02 jest backing read-only.
+
+Diag01 zakończyła się CLASSIFIER_ERROR/ValueError i nie ustaliła strony.
+Mój adapter nie negocjował QMP capabilities, więc quit zakończył fallback
+terminate/rc1; poprawiono to przed kolejnym startem. Paused/noOS32MiB
+fixture potwierdził RFB3.8,640×480 wyłącznieRAM i QMPquit/rc0.
+Diag02 również nie ustaliła strony: RFB_NO_COMPLETE_FRAME,300.49s,
+QMPquit/rc0. Nie ujawniono żadnego obrazu ani tekstu. To ograniczenia
+obserwatora, nie nowe Windows/USB/LAN FAIL.
+
+NoOS BIOS fixture po cont rzeczywiście odtworzył resize→raw720×400 i
+QMPquit/rc0. Nowy localhost test pięciu queued DesktopResize wykazał,
+że limit4 odpowiedzi odcina poprawną transakcję; bounded16 przechodzi.
+Nie przypisuje się tego z pewnością do historycznej diag02, która nie
+zachowała response enum. Host5/5 testów klasyfikatora syntetycznego oraz
+5/5 testów rzeczywistego localhost RFB PASS. Wariant03 dodaje wyłącznie
+closed failure/response enums i jeden odczyt końcowy. To kolejna krótka
+diagnoza zachowanego obrazu, nie nowa pełna instalacja.
+
+
+## Ukończone RAM diagnozy03/04 i kanał interaktywny05
+
+Diag03 rzeczywiście uzyskała640×480 i zakończyła kontrolowanym QMPquit
+rc0 po303.49s. Szeroki enum PRIVATE_PRODUCT_PAGE zachował ochronę, lecz
+nie dowodzi licencji: pasował również do polskiego słowa klucz. Bitmapa
+i OCR nie zostały zapisane ani pokazane. Diag04 zwróciła dokładniejsze
+PRODUCT_ENTRY_UNSPECIFIED, title WINDOWS_NT_SETUP i tylko sygnały
+KEY_LABEL/NETWORK_LABEL/ERROR_WORD. Nie wykryła ID/OEM/rejestracji/formatu
+klucza ani Dalej. Nie wysłano Alt+D: taki wynik nie spełnia predykatu Next.
+To może być klucz rejestru sieci; nadal nie przypisuje się konkretnego
+komunikatu bez dopasowania oryginalnego resource/message-ID.
+
+Osobny preflight porównał wartości tylko wRAM przez zatwierdzony adapter
+prywatnego assetu index0. WINNT.SIF,~BT/WINNT.SIF oraz rzeczywisty
+WINNT\SYSTEM32\$WINNT$.INF mają pojedynczy UserData/ProductId,
+poprawny znany kształt OEM i dokładnie odpowiadają zatwierdzonemu assetowi.
+Wszystkie3kopie są zgodne. RegisteredOwner/Organization w SOFTWARE
+pasują do odpowiedzi. Nie zapisano wartości, fragmentu, długości ani
+hasha klucza; żaden answer/hive nie został wyeksportowany. To wyklucza
+błąd keyless znany zR7 oraz zgubienie danych w tym render/copy. SIF sam
+nie jest dowodem przejścia natywnej strony.
+
+Oryginalny COMCTL32 PL8a7ad6ca...70c5b ma wdialogu1020 przyciski
+'< &Wstecz' i '&Dalej >'. Produkt używa default alt-n. Jest to rzeczywista
+różnica mnemonika locale, jednak nie wdrożono poprawki wciemno. Root
+upoważnił pojedyncze Alt+D na nowym overlay dopiero po potwierdzeniu
+strony Next i zgodności3SIF.
+
+V2 klasyfikatora ma7/7 actual WinRT OCR host PASS, wtym mały640×480tekst
+i kontrprzykład Network+OEM. V3 porównuje wyłącznie publiczne oryginalne
+resource/message patterns (1183 z7modułów, tekst tylkoRAM) i eksportuje
+allowlistedID z zamkniętym rodzajem dopasowania. Test4/4 PASS obejmuje
+oryginalny NETCFG5193, rozdzielenie registry error od OEMform, brak
+transkryptu przy nieznanym tekście i odrzucanie dowolnych danych hostowo.
+Kanał operatora ma3/3 semantic tests PASS: Next wymaga Dalej/brakbłędu/
+zgodnych odpowiedzi, ACK wymaga dopasowanego oryginalnegoID, brak
+ogólnego wprowadzania klawiszy lub dowolnych zapytań regex.
+
+Root zlecił utrzymanie kolejnego obrazu wyłącznie wRAM oraz kanału
+interaktywnego, aby nie bootować ponownie dla każdego pytania. Próba05
+wTTY15282 uruchomiła jeden zwykły guard i512MiB, nowy overlay bez
+naruszenia preserved02. Po pierwszym odczycie pozostanie kanał zamkniętych
+pytań o TEN SAM RAMframe. Żaden wynik OCR nie udziela automatycznie
+zezwolenia na screenshot. Nadal brak desktop/LAN/HID/MSC/hardware PASS.
