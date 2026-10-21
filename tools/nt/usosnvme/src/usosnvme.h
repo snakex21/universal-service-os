@@ -124,6 +124,8 @@
 #define NVME_LOG_NO_NS       0x4E560006UL  /* no active namespace */
 #define NVME_LOG_PAGE_SIZE   0x4E560007UL  /* controller cannot do 4 KiB pages */
 #define NVME_LOG_BAR_HIGH    0x4E560008UL  /* 9x: BAR above 4 GiB, not mapped */
+#define NVME_LOG_DMA_HIGH    0x4E560009UL  /* amd64: first data PRP above 4 GiB (once per boot; informational) */
+#define NVME_LOG_BAD_PA      0x4E56000AUL  /* amd64: unusable data address from ScsiPort, command not sent */
 
 #pragma pack(push, 1)
 typedef struct _NVME_SQE {
@@ -203,6 +205,10 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG IoQid;                 /* NVME_IO_QID, or 1 if fewer queues */
     ULONG Srbs;                  /* 9x debug: completed SRBs */
     ULONG DbgNonRw;              /* 9x debug: non read/write SRBs shown */
+#ifdef _WIN64
+    BOOLEAN DmaHighLogged;       /* NVME_LOG_DMA_HIGH written for this start */
+    ULONG BadPa;                 /* data addresses refused (NvmeBuildPrps) */
+#endif
 #ifdef USOSNVME_W9X
     SCSI_PHYSICAL_ADDRESS Prp9x[NVME_PRP9X_MAX];  /* NvmeRwPrps9x */
     ULONG Prp9xCount;

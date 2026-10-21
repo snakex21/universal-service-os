@@ -1265,14 +1265,94 @@ static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUC
 }
 #endif
 
+/* NvmeRw status for a request whose data address ScsiPort could not give
+   in a form the PRPs can carry: nothing was sent to the controller. */
+#define NVME_BADPA_STATUS 0xFFFFFFFEUL
+
+#if defined(_WIN64) && !defined(USOSNVME_W9X)
+/* amd64 (Vista / Server 2008 x64, RAM above 4 GiB). The miniport declares
+   Dma64BitAddresses, so ScsiPort hands out full 64-bit data addresses; they
+   go into the PRPs unmodified (both dwords). Before anything reaches the
+   controller every entry is checked, so a value the PRP model cannot carry
+   fails the request (event log NVME_LOG_BAD_PA) instead of becoming a DMA
+   to a wrong address:
+     - ScsiPort's "no address" value (SP_UNINITIALIZED_VALUE, all ones) or a
+       zero length (the address lies outside the request's S/G list);
+     - an address beyond 2^52 (no x64 RAM there);
+     - PRP1 not dword aligned, any later entry not page aligned;
+     - a contiguous run that ends inside a page while data continues there
+       (the PRP model cannot express a break inside a page);
+     - more entries than one PRP list page holds.
+   The x86 builds keep their unchanged, hardware-tested inline code below.
+   Returns 0, else the 1-based number of the refused entry. *Above4G is set
+   when any entry lies above 4 GiB. */
+static BOOLEAN NvmePaUsable(SCSI_PHYSICAL_ADDRESS Pa, ULONG Len, ULONG Need, ULONG AlignMask)
+{
+    if (Len == 0 || Len < Need) return FALSE;
+    if (Pa.LowPart == 0xFFFFFFFFUL && Pa.HighPart == -1) return FALSE;
+    if (((ULONG)Pa.HighPart & 0xFFF00000UL) != 0) return FALSE;
+    if ((Pa.LowPart & AlignMask) != 0) return FALSE;
+    return TRUE;
+}
+
+static ULONG NvmeBuildPrps(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUCHAR Va, ULONG Bytes,
+                           PNVME_SQE C, PBOOLEAN Above4G)
+{
+    SCSI_PHYSICAL_ADDRESS pa, list[2 * (NVME_MAX_TRANSFER / NVME_PAGE) + 2];
+    ULONG len = 0, first, rest, n = 0, i;
+    PUCHAR next;
+
+    *Above4G = FALSE;
+    if (Bytes == 0) return 1;
+    pa = ScsiPortGetPhysicalAddress(Ext, Srb, Va, &len);
+    first = NVME_PAGE - (pa.LowPart & (NVME_PAGE - 1));
+    if (!NvmePaUsable(pa, len, first < Bytes ? first : Bytes, 3)) return 1;
+    if (pa.HighPart != 0) *Above4G = TRUE;
+    C->Prp1Lo = pa.LowPart;
+    C->Prp1Hi = (ULONG)pa.HighPart;
+    C->Prp2Lo = 0;
+    C->Prp2Hi = 0;
+    if (Bytes <= first) return 0;
+    rest = Bytes - first;
+    next = Va + first;
+    while (rest) {
+        if (n >= sizeof(list) / sizeof(list[0]) || n >= NVME_PAGE / 8) return n + 2;
+        len = 0;
+        pa = ScsiPortGetPhysicalAddress(Ext, Srb, next, &len);
+        if (!NvmePaUsable(pa, len, rest < NVME_PAGE ? rest : NVME_PAGE, NVME_PAGE - 1)) return n + 2;
+        if (pa.HighPart != 0) *Above4G = TRUE;
+        list[n++] = pa;
+        next += NVME_PAGE;
+        rest = rest > NVME_PAGE ? rest - NVME_PAGE : 0;
+    }
+    if (n == 1) {
+        C->Prp2Lo = list[0].LowPart;
+        C->Prp2Hi = (ULONG)list[0].HighPart;
+        return 0;
+    }
+    for (i = 0; i < n; i++) {
+        Ext->PrpList[2 * i] = list[i].LowPart;
+        Ext->PrpList[2 * i + 1] = (ULONG)list[i].HighPart;
+    }
+    C->Prp2Lo = Ext->PrpListPhys.LowPart;
+    C->Prp2Hi = (ULONG)Ext->PrpListPhys.HighPart;
+    return 0;
+}
+#endif
+
 /* One READ / WRITE command for Blocks blocks at Va (dword aligned). */
 static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Write, PUCHAR Va,
                     ULONG LbaLo, ULONG LbaHi, ULONG Blocks, BOOLEAN Fua)
 {
     NVME_SQE c;
+#if defined(_WIN64) && !defined(USOSNVME_W9X)
+    ULONG bytes = Blocks << 9, refused;
+    BOOLEAN above4g = FALSE;
+#else
     SCSI_PHYSICAL_ADDRESS pa;
     ULONG len, bytes = Blocks << 9, first, rest, n;
     PUCHAR next;
+#endif
 
     NvmeZero(&c, sizeof(c));
     c.Cdw0 = Write ? NVME_NVM_WRITE : NVME_NVM_READ;
@@ -1291,6 +1371,18 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
         }
         c.Prp2Lo = Ext->PrpListPhys.LowPart;
         c.Prp2Hi = Ext->PrpListPhys.HighPart;
+    }
+#elif defined(_WIN64)
+    refused = NvmeBuildPrps(Ext, Srb, Va, bytes, &c, &above4g);
+    if (refused != 0) {
+        Ext->LastStatus = refused;
+        return NVME_BADPA_STATUS;
+    }
+    if (above4g && !Ext->DmaHighLogged) {
+        /* once per boot: proof in the System log that data DMA
+           above 4 GiB was used (the run continues normally) */
+        Ext->DmaHighLogged = TRUE;
+        NvmeLog(Ext, NVME_LOG_DMA_HIGH);
     }
 #else
     pa = ScsiPortGetPhysicalAddress(Ext, Srb, Va, &len);
@@ -1338,6 +1430,16 @@ static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext)
 static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULONG Status, BOOLEAN Write)
 {
     Ext->Errors++;
+#if defined(_WIN64) && !defined(USOSNVME_W9X)
+    if (Status == NVME_BADPA_STATUS) {
+        /* nothing reached the controller; LastStatus = refused PRP entry */
+        Ext->BadPa++;
+        NvmeLog(Ext, NVME_LOG_BAD_PA);
+        NvmeReport(Ext, "unusable data address from ScsiPort, request failed; PRP entry", Ext->LastStatus, TRUE);
+        NvmeSetSense(Ext, Srb, SCSI_SENSE_HARDWARE_ERROR, 0x44, 0);
+        return;
+    }
+#endif
     Ext->LastStatus = Status;
     if (Status == NVME_TIMEOUT_STATUS) {
         Ext->Timeouts++;
