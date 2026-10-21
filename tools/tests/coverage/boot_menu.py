@@ -75,6 +75,11 @@ def redact(text):
                   '[product key omitted]', text, flags=re.I)
 
 
+def capture_permitted(private_profile,prepared_proof,prepared,first_logon=False):
+    """Staging a private answer is not evidence that Setup passed its key page."""
+    return not private_profile or (prepared_proof and prepared) or first_logon
+
+
 async def capture(qmp, path):
     from PIL import Image
     ppm = path.with_suffix('.ppm')
@@ -117,8 +122,6 @@ async def main(args):
     metadata = json.loads((work/'fixture.json').read_text(encoding='utf-8'))
     if metadata['result']['result'] != 'PASS':
         raise ValueError('Fixture preparation was not successful')
-    if args.interactive and metadata.get('private_profile'):
-        raise ValueError('Manual screenshots are restricted to keyless tests')
     if args.auto_native and args.interactive:
         raise ValueError('Choose either the fixed native input scenario or manual interaction')
     catalog = [json.loads(line) for line in args.catalog.read_text(encoding='utf-8-sig').splitlines() if line.strip()]
@@ -129,6 +132,8 @@ async def main(args):
     system=catalog[desired_system]
     prepared_proves_key_passed=(system['id']=='windows-95' or
         system.get('uefi_profile','').startswith(('nt3-','nt4-','posready-')))
+    if args.interactive and metadata.get('private_profile') and not prepared_proves_key_passed:
+        raise ValueError('Manual keyed tests require a family with a verified post-key preparation boundary')
     resources = fixture.check_resources(work, args.ram_mib)
     args.out.mkdir(parents=True, exist_ok=False)
     target = work/'target.qcow2'
@@ -289,12 +294,14 @@ async def main(args):
                 # A keyed nested Setup may still be displaying the supplied
                 # value on failure. Only capture after the product itself
                 # verified preparation and offered its finished target boot.
-                if not metadata.get('private_profile') or (prepared.is_set() and prepared_proves_key_passed) or first_logon.is_set():
+                if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await capture(qmp,args.out/'endpoint.png')
                 if args.interactive:
+                    if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set()):
+                        raise RuntimeError('Private Setup has not reached its verified post-key boundary; no manual capture')
                     await operator_steps(qmp,args.out)
                     await capture(qmp,args.out/'endpoint.png')
-                if not metadata.get('private_profile') or (prepared.is_set() and prepared_proves_key_passed) or first_logon.is_set():
+                if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await qmp.command('human-monitor-command',{'command-line':
                         f'pmemsave 0xb8000 4000 "{(args.out/"endpoint-vga.bin").resolve().as_posix()}"'})
         except Exception as error:
