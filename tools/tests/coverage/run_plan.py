@@ -177,6 +177,8 @@ def run(args):
                 if 'key_index' in case:prepare+=['--key-index',str(case['key_index'])]
             if case.get('legacy_first_logon'):prepare+=['--legacy-first-logon']
             elif case.get('first_logon',not args.nested):prepare+=['--first-logon-observer','--observer-ide']
+            if case.get('nt4_network_evidence'):prepare+=['--nt4-network-evidence']
+            if case.get('nt4_observer_helper'):prepare+=['--nt4-observer-helper',case['nt4_observer_helper'],'--nt4-observer-helper-sha256',case['nt4_observer_helper_sha256']]
             if case.get('usability_logger'):prepare+=['--usability-logger',case['usability_logger'],'--logger-sha256',case['logger_sha256']]
             boot=[sys.executable,'-I','-B',str(HERE/'boot_menu.py'),'--qemu',str(args.qemu),'--fixture',str(work),
                 '--out',str(out),'--seconds',str(case.get('seconds',3600)),'--target-gib',str(target_gib),
@@ -191,6 +193,8 @@ def run(args):
             if case.get('usability_usb'):boot+=['--usability-usb']
             if case.get('collect_nt4_failure'):boot+=['--collect-nt4-failure','--evidence-assets',str(args.assets)]
             if case.get('collect_nt4_text'):boot+=['--collect-nt4-text','--evidence-assets',str(args.assets)]
+            if case.get('collect_nt4_success'):boot+=['--collect-nt4-success','--evidence-assets',str(args.assets)]
+            if case.get('capture_nt4_network'):boot+=['--capture-nt4-network']
             if case.get('collect_nt351_success'):boot+=['--collect-nt351-success','--evidence-assets',str(args.assets)]
             if case.get('capture_nt351_network'):boot+=['--capture-nt351-network']
             with (logdir/(tag+'.log')).open('w',encoding='utf-8') as log:

@@ -18,6 +18,15 @@ MAX_METADATA=64*1024
 PCAP_HEADER=struct.pack('<IHHIIII',0xa1b2c3d4,2,4,0,0,MAX_FRAME,1)
 
 
+def boundary_reset(error,reader):
+    # readexactly(4) does not consume partial header bytes before it raises.
+    # Python's concrete StreamReader buffer must be present and empty; unknown
+    # reader implementations fail closed. Payload errors never call this.
+    pending=getattr(reader,'_buffer',None)
+    code=getattr(error,'winerror',None) or getattr(error,'errno',None)
+    return code in (64,54,104,10054) and isinstance(pending,(bytes,bytearray)) and not pending
+
+
 def arguments(port):
     if type(port)!=int or not 1<=port<=65535:raise ValueError('Invalid local capture port')
     return ['-chardev',f'socket,id=nt351mirror,host=127.0.0.1,port={port},server=off',
@@ -118,6 +127,7 @@ class Capture:
         self.received=0;self.stored=0;self.bytes=24;self.discarded=0
         self.start_record=None;self.capped=False;self.error=None;self.finished=False
         self.connected=asyncio.Event()
+        self.boundary_disconnect=None;self.shutdown_requested=False
 
     async def start(self):
         self.file=self.path.open('xb');self.file.write(PCAP_HEADER)
@@ -129,6 +139,10 @@ class Capture:
         if self.start_record is not None:raise ValueError('Duplicate prepared-target boundary')
         self.start_record=self.stored+1
 
+    def begin_controlled_shutdown(self):
+        # Called immediately before QMP quit, never retroactively at finish.
+        self.shutdown_requested=True
+
     async def accept(self,reader,writer):
         if self.accepted:
             writer.close();await writer.wait_closed();return
@@ -138,6 +152,11 @@ class Capture:
         try:
             while True:
                 try:header=await reader.readexactly(4)
+                except OSError as error:
+                    if not boundary_reset(error,reader):raise
+                    self.boundary_disconnect=dict(type=type(error).__name__,errno=error.errno,
+                        winerror=getattr(error,'winerror',None),during_controlled_shutdown=self.shutdown_requested)
+                    break
                 except asyncio.IncompleteReadError as error:
                     if error.partial:raise ValueError('Truncated mirror length')
                     break
@@ -156,7 +175,7 @@ class Capture:
             try:await writer.wait_closed()
             except OSError:pass
 
-    async def finish(self):
+    async def finish(self,controlled_shutdown=False):
         """Called only after QEMU termination, never to observe VM progress."""
         if self.finished:raise ValueError('Capture already finished')
         self.finished=True
@@ -172,8 +191,13 @@ class Capture:
         try:await asyncio.wait_for(self.server.wait_closed(),5)
         except asyncio.TimeoutError:self.error='Mirror listener did not close after client shutdown'
         finally:self.file.close()
+        closure_accepted=bool(self.boundary_disconnect and controlled_shutdown is True and
+                              self.boundary_disconnect['during_controlled_shutdown'])
+        if self.boundary_disconnect and not closure_accepted:
+            self.error='Unexpected reset between mirror frames'
         data=self.path.read_bytes()
         result=dict(path=self.path.name,mac=MAC,netdev=NETDEV,hard_byte_cap=self.limit,
+            boundary_disconnect=self.boundary_disconnect,controlled_boundary_reset_accepted=closure_accepted,
             stored_bytes=len(data),stored_frames=self.stored,received_frames=self.received,
             discarded_frames=self.discarded,capped=self.capped,connected=self.accepted,error=self.error,
             sha256=hashlib.sha256(data).hexdigest(),analysis=analyze_pcap(data,self.start_record))

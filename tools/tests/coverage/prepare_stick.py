@@ -22,6 +22,8 @@ import uuid
 COLLECTION = Path(r'G:\USOS-Kolekcja').resolve()
 LOWRAM = Path(r'C:\Users\ASRock\usos-work\lowram-pomiar\tools\tests\lowram\bootstrap_probe.py')
 PRIVATE_KEYS = Path(r'C:\Users\ASRock\AppData\Local\USOS\test-assets\private-keys').resolve()
+NT4_OBSERVER_HELPER_SHA256='37e7a0f69846d9bab18a718f7d66c3fd937f0f35913d2b0eb22f2d7ce4eae0e9'
+NT4_NETWORK_LOGGER_SHA256='ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7'
 NT5_FOLDERS={'windows xp','windows xp x64','windows 2000','windows 2000 server',
     'windows server 2003','windows xp media center edition 2005','windows xp tablet pc edition 2005'}
 _driver_spec=importlib.util.spec_from_file_location('coverage_driver_inputs',Path(__file__).with_name('driver_inputs.py'))
@@ -89,6 +91,75 @@ def make_observer_iso(path,token,logger=None,logger_sha256=None):
         cd.add_fp(io.BytesIO(script),len(script),iso_path='/SCRIPTS/FIRSTLO.CMD;1',joliet_path='/Scripts/first-logon.cmd')
         cd.write(str(path))
     finally:cd.close()
+NT4_OBSERVER_STAGE=r'''
+# Test-only target-local notification; no unsupported NT4 user_script/CD hook.
+coverage="$work/c/USOS/Coverage"
+mkdir -p "$coverage" || fail 'coverage directory'
+for coverage_file in FIRSTLO.CMD TESTNET.CMD OBS.REG NT4OBS.EXE; do
+ cp "$LIB/coverage-nt4/$coverage_file" "$coverage/$coverage_file" &&
+ cmp -s "$LIB/coverage-nt4/$coverage_file" "$coverage/$coverage_file" || fail 'coverage script readback'
+done
+coverage_digest=$(sha256sum "$LIB/network/USOSLOG.EXE"); coverage_digest=${coverage_digest%% *}
+[ "$coverage_digest" = LOGGER_SHA ] || fail 'coverage logger pin'
+cp "$LIB/network/USOSLOG.EXE" "$coverage/USOSLOG.EXE" &&
+cmp -s "$LIB/network/USOSLOG.EXE" "$coverage/USOSLOG.EXE" || fail 'coverage logger readback'
+'''
+NT4_OBSERVER_ARM=r'''    # Test-only: inner QEMU returned and SP6a/target checks passed. No arming in POST.
+    if [ "$status" = 0 ] && [ "$sub" = NT4 ] && coverage_first=$(nt4_ci_path "$c" USOS/Coverage/FIRSTLO.CMD); then
+        coverage_dir=${coverage_first%/*}
+        printf 'NT4_PREPARED_FIRST_LOGON_READY\r\n' > "$coverage_dir/ARMED.TXT" || status=1
+    fi
+'''
+
+
+def nt4_observer_entries(script,finish,token,helper,target_mode=0o100755,finish_mode=0o100755):
+    if not re.fullmatch('USOS_COVERAGE_FIRST_LOGON_[a-f0-9]{32}',token):raise ValueError('Invalid NT4 observer token')
+    import_anchor=br'%SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG'+b'\n'
+    stage_anchor=br'''printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${tse:+tse}" > "$usos/SOURCE.TXT"'''+b'\n'
+    arm_anchor=b'    sync\n    umount "$c" || status=1\n'
+    if script.count(import_anchor)!=1 or script.count(stage_anchor)!=1 or finish.count(arm_anchor)!=1:
+        raise ValueError('Frozen NT4 observer insertion point changed')
+    if b'coverage-nt4/' in script or b'NT4_PREPARED_FIRST_LOGON_READY' in finish:raise ValueError('NT4 observer already installed')
+    staged=script.replace(import_anchor,import_anchor+br'%SystemRoot%\regedit.exe /s C:\USOS\Coverage\OBS.REG'+b'\n')
+    staged=staged.replace(stage_anchor,stage_anchor+NT4_OBSERVER_STAGE.replace('LOGGER_SHA',NT4_NETWORK_LOGGER_SHA256).encode('ascii'))
+    finished=finish.replace(arm_anchor,NT4_OBSERVER_ARM.encode('ascii')+arm_anchor)
+    # RunOnce is installed only at POST's end. The Run fallback is idempotent:
+    # if NT4 enumerates the new RunOnce in the inner logon, no ARM exists and
+    # no token is emitted. The fallback survives to the native target logon.
+    # ARM is created only after inner QEMU has returned, and removed on use.
+    firstlo=('@echo off\n'
+        'mode COM1: BAUD=115200 PARITY=N DATA=8 STOP=1 >nul 2>&1\n'
+        'if errorlevel 1 exit 1\n'
+        'echo '+token+'>COM1\nif errorlevel 1 exit 1\nexit 0\n')
+    testnet=('@echo off\n'
+        '"%SystemRoot%\\system32\\ipconfig.exe" /release >nul 2>&1\n'
+        'if errorlevel 1 exit 31\n'
+        '"%SystemRoot%\\system32\\ipconfig.exe" /renew >nul 2>&1\n'
+        'if errorlevel 1 exit 32\n'
+        'start "" /wait "C:\\USOS\\Coverage\\USOSLOG.EXE" /once /nodbg /nohook /nodisk /out "C:\\USOS\\Coverage\\USABILITY.TXT"\n'
+        'if errorlevel 1 exit 33\nexit 0\n')
+    obs='REGEDIT4\n\n'
+    for key in ('RunOnce','Run'):
+        section='[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\'+key+']\n'
+        obs+=section+'"USOSCoverage"="C:\\\\USOS\\\\Coverage\\\\NT4OBS.EXE /firstlogon"\n\n'
+    entries=[('usr/lib/usos/nt4_csmwrap_target.sh',target_mode,staged),('usr/lib/usos/nt4_qemu_install.sh',finish_mode,finished)]
+    for name,text in (('FIRSTLO.CMD',firstlo),('TESTNET.CMD',testnet),('OBS.REG',obs)):
+        entries.append(('usr/lib/usos/coverage-nt4/'+name,0o100644,text.replace('\n','\r\n').encode('ascii')))
+    entries.append(('usr/lib/usos/coverage-nt4/NT4OBS.EXE',0o100755,helper))
+    return entries
+
+
+def nt4_observer_assets(assets,token,helper):
+    import gzip
+    spec=importlib.util.spec_from_file_location('nt4_observer_cpio',Path(__file__).resolve().parents[2]/'build_micro_linux.py')
+    cpio=importlib.util.module_from_spec(spec);spec.loader.exec_module(cpio)
+    entries=cpio.parse_newc(gzip.decompress((assets/'zig-out/micro-linux/initramfs-usos').read_bytes()))
+    target=entries['usr/lib/usos/nt4_csmwrap_target.sh'];finish=entries['usr/lib/usos/nt4_qemu_install.sh']
+    logger=entries['usr/lib/usos/network/USOSLOG.EXE'].data
+    if hashlib.sha256(logger).hexdigest()!=NT4_NETWORK_LOGGER_SHA256:raise ValueError('Frozen NT4 observer logger differs')
+    return nt4_observer_entries(target.data,finish.data,token,helper,target.mode,finish.mode)
+
+
 def load_bootstrap():
     spec = importlib.util.spec_from_file_location('coverage_fixture_bootstrap', LOWRAM)
     bootstrap = importlib.util.module_from_spec(spec)
@@ -96,7 +167,7 @@ def load_bootstrap():
     return bootstrap
 
 
-def trace_overlay(legacy_token=None):
+def trace_overlay(legacy_token=None,nt4_entries=None):
     """Guest-only observation: announce each framebuffer menu before input.
 
     The product still opens and handles every menu normally. This avoids
@@ -134,6 +205,7 @@ cp "$work/coverage-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'coverage ob
 printf '@echo off\r\nmode COM1:9600,n,8,1 >nul\r\necho '''+legacy_token+r'''>COM1\r\n' > "$work/c/USOS9X/COVOBS.BAT"
 ''').encode('ascii')
         entries.append(('usr/lib/usos/w9x_csmwrap_target.sh',0o100755,script.replace(needle,needle+hook)))
+    if nt4_entries:entries.extend(nt4_entries)
     entries.append(('TRAILER!!!',0,b''))
     result = bytearray()
     for index, (name, mode, data) in enumerate(entries, 1):
@@ -185,6 +257,20 @@ async def main(args):
         raise ValueError('Legacy observer is only for profile-based 98/98SE/Me with trace overlay')
     if getattr(args,'usability_logger',None) and not args.first_logon_observer:
         raise ValueError('Own logger requires the scripts-CD first-logon observer')
+    nt4_network=getattr(args,'nt4_network_evidence',False)
+    if nt4_network and (args.folder!='Windows NT 4.0' or not args.private_key or not args.first_logon_observer or not args.trace_menus or
+                        not getattr(args,'usability_logger',None) or getattr(args,'logger_sha256',None)!=NT4_NETWORK_LOGGER_SHA256):
+        raise ValueError('Explicit private NT4 first-logon network policy requires exact strict logger')
+    nt4_helper=None
+    if nt4_network:
+        if hashlib.sha256(args.usability_logger.read_bytes()).hexdigest()!=NT4_NETWORK_LOGGER_SHA256:
+            raise ValueError('NT4 strict logger input differs')
+        helper_path=getattr(args,'nt4_observer_helper',None)
+        if not helper_path:raise ValueError('Explicit NT4 GUI observer helper required')
+        nt4_helper=helper_path.read_bytes()
+        helper_sha=getattr(args,'nt4_observer_helper_sha256',None)
+        if helper_sha!=NT4_OBSERVER_HELPER_SHA256 or hashlib.sha256(nt4_helper).hexdigest()!=helper_sha or len(nt4_helper)>131072 or not nt4_helper.startswith(b'MZ'):
+            raise ValueError('NT4 GUI observer helper pin differs')
     required=['usb','dos-native/msdos/INSTALL.BAT','micro-linux','bin/usos-x86_64.efi']
     if args.folder.casefold() in NT5_FOLDERS:required.append('xp-uefi-csm/initramfs-xp')
     for name in required:
@@ -214,12 +300,12 @@ async def main(args):
             if not args.key_for or not re.fullmatch('[a-z0-9-]+',args.key_for):
                 raise ValueError('Private key needs its exact catalogue system ID')
             profile += ('\nremember_key=yes\nkey.'+args.key_for+'='+private_key(args.private_key,index=args.key_index)+'\n').encode('ascii')
-        if args.first_logon_observer:profile += b'\nuser_script=yes\n'
+        if args.first_logon_observer and not nt4_network:profile += b'\nuser_script=yes\n'
     elif args.private_key:
         raise ValueError('Private key injection requires a USOS profile')
     work.mkdir(parents=True, exist_ok=False)
     observer_token='USOS_COVERAGE_FIRST_LOGON_'+uuid.uuid4().hex if (args.first_logon_observer or args.legacy_first_logon) else None
-    if args.first_logon_observer:make_observer_iso(work/'observer.iso',observer_token,
+    if args.first_logon_observer and not nt4_network:make_observer_iso(work/'observer.iso',observer_token,
         getattr(args,'usability_logger',None),getattr(args,'logger_sha256',None))
     share = work/'share'
     shutil.copytree(args.assets/'zig-out/usb', share)
@@ -246,7 +332,8 @@ async def main(args):
             if item.is_file():shutil.copyfile(item,destination/item.name)
     observed_initrds=[]
     if args.trace_menus:
-        overlay=trace_overlay(observer_token if args.legacy_first_logon else None)
+        nt4_entries=nt4_observer_assets(args.assets,observer_token,nt4_helper) if nt4_network else None
+        overlay=trace_overlay(observer_token if args.legacy_first_logon else None,nt4_entries)
         # NT5 boots the separate XP package; step 620 boots micro-linux.
         # Both frozen bundles contain the verified same own UI script bases.
         for relative in ('EFI/USOS/micro-linux/initramfs-usos','EFI/USOS-XP/initramfs-xp'):
@@ -326,9 +413,12 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
         profile_sha256=hashlib.sha256(profile).hexdigest() if args.profile else None,
         private_profile=bool(args.private_key),
         observer_token=observer_token,
+        nt4_network_evidence=nt4_network,
+        nt4_observer_helper_sha256=getattr(args,'nt4_observer_helper_sha256',None),
+        nt4_observer_overlay={name:hashlib.sha256(data).hexdigest() for name,mode,data in (nt4_entries or [])} if nt4_network else None,
         usability_logger_sha256=getattr(args,'logger_sha256',None),
         observer_ide=args.observer_ide,
-        observer_kind='9x-runonce' if args.legacy_first_logon else 'scripts-cd' if args.first_logon_observer else None,
+        observer_kind='nt4-test-run' if nt4_network else '9x-runonce' if args.legacy_first_logon else 'scripts-cd' if args.first_logon_observer else None,
         donor=str(args.donor) if args.donor else None,
         user_drivers=driver_inputs.metadata(driver_bundle) if driver_bundle else None,
         legacy_service_pack=str(service_pack) if service_pack else None,
@@ -347,6 +437,9 @@ if __name__ == '__main__':
     for name in ('assets','qemu','iso','out'):
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--folder', required=True)
+    parser.add_argument('--nt4-observer-helper',type=Path,help='Own exact GUI helper for target-local NT4 observer')
+    parser.add_argument('--nt4-observer-helper-sha256',help='Exact own GUI observer binary hash')
+    parser.add_argument('--nt4-network-evidence',action='store_true',help='Explicit private NT4 policy: stage target-local test Run notification and manual TESTNET after actual logon')
     parser.add_argument('--usability-logger',type=Path,help='Own GUI diagnostic executable for the test-only first-logon CD')
     parser.add_argument('--logger-sha256',help='Required exact hash of the own logger, never a Windows file')
     parser.add_argument('--dos', type=Path)

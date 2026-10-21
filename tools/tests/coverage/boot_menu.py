@@ -27,6 +27,10 @@ spec = importlib.util.spec_from_file_location('nt351_own', Path(__file__).with_n
 nt351_own = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_own)
 spec = importlib.util.spec_from_file_location('nt351_capture', Path(__file__).with_name('nt351_capture.py'))
 nt351_capture = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_capture)
+spec = importlib.util.spec_from_file_location('nt4_own', Path(__file__).with_name('collect_nt4_success.py'))
+nt4_own = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt4_own)
+spec = importlib.util.spec_from_file_location('nt4_capture', Path(__file__).with_name('nt4_capture.py'))
+nt4_capture = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt4_capture)
 
 
 class Qmp:
@@ -221,6 +225,16 @@ async def main(args):
                                     getattr(args,'evidence_assets',None),fixture.COLLECTION)
     collect_nt351=getattr(args,'collect_nt351_success',False)
     capture_nt351=getattr(args,'capture_nt351_network',False)
+    collect_nt4=getattr(args,'collect_nt4_success',False)
+    capture_nt4=getattr(args,'capture_nt4_network',False)
+    if (collect_nt4 or capture_nt4) and (collect_nt351 or capture_nt351):
+        raise ValueError('Choose one explicit OS evidence policy')
+    if capture_nt4 and (not collect_nt4 or args.nic!='igb'):
+        raise ValueError('NT4 DHCP capture needs NT4 own collector and sole pinned igb')
+    if collect_nt4:
+        if args.evidence_assets is None:raise ValueError('NT4 collector needs explicit frozen cache')
+        nt4_own.validate(metadata,work,args.evidence_assets,args.out/'nt4-network-evidence',
+            fixture.COLLECTION,Path(__file__).resolve().parents[3],preflight=True)
     if capture_nt351 and (not collect_nt351 or args.nic!='igb'):
         raise ValueError('NT351 capture requires its own collector and the sole pinned igb')
     if collect_nt351:
@@ -268,12 +282,13 @@ async def main(args):
     command += aux.network_arguments(getattr(args,'nic','none'))
     network_capture=None
     network_capture_result=None
-    if capture_nt351:
+    if capture_nt351 or capture_nt4:
+        capture_module=nt4_capture if capture_nt4 else nt351_capture
         # The sole NIC and MAC are defined by network_arguments('igb').
         expected=['-netdev','user,id=usabilitynet,hostname=usos-test',
                   '-device','igb,netdev=usabilitynet,mac='+nt351_capture.MAC]
         if aux.network_arguments('igb')!=expected:raise ValueError('Pinned capture NIC changed')
-        network_capture=nt351_capture.Capture(args.out/'network.pcap')
+        network_capture=capture_module.Capture(args.out/'network.pcap')
     usb_disks=aux.create_sticks(work,args.qemu) if usb_test else []
     for kind,path in zip(('boot','hot'),usb_disks):
         command+=['-drive',f'if=none,id=usability{kind},format=qcow2,file={path.as_posix()}']
@@ -292,7 +307,7 @@ async def main(args):
     else:
         command += ['-device','ich9-ahci,id=coverageahci',
                     '-device','ide-hd,drive=target,bus=coverageahci.0,serial=USOS-COVERAGE-TARGET,bootindex=0']
-    if metadata.get('observer_token') and metadata.get('observer_kind')!='9x-runonce':
+    if metadata.get('observer_token') and metadata.get('observer_kind') not in ('9x-runonce','nt4-test-run'):
         command += ['-drive',f'if=none,id=evidencecd,format=raw,readonly=on,media=cdrom,file={(work/"observer.iso").as_posix()}']
         controller='piix3-ide' if metadata.get('observer_ide') else 'ich9-ahci'
         command += ['-device',controller+',id=evidencehba','-device','ide-cd,drive=evidencecd,bus=evidencehba.0']
@@ -317,7 +332,7 @@ async def main(args):
         try:
             if network_capture:
                 capture_port=await network_capture.start()
-                command+=nt351_capture.arguments(capture_port)
+                command+=capture_module.arguments(capture_port)
             (args.out/'command.json').write_text(json.dumps(command,indent=2))
             process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
@@ -347,6 +362,7 @@ async def main(args):
                             'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
                         boot_usb_attached=True
                         events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 stick attached after first logon; start test requires a subsequent explicit reboot'))
+                    if capture_nt4:network_capture.mark_first_logon()
                     first_logon.set()
                 elif 'first frame presented' in line and ui_count == 0:
                     # The home view has no UI_SCREEN trace in this build.
@@ -411,7 +427,7 @@ async def main(args):
                             'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
                         events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 test stick attached before first prepared-target boot'))
                         boot_usb_attached=True
-                    if 'start the prepared disk' in line and network_capture:
+                    if 'start the prepared disk' in line and network_capture and not capture_nt4:
                         network_capture.mark_prepared_target()
                     await qmp.key('ret')
                     if 'start the prepared disk' in line:
@@ -465,6 +481,7 @@ async def main(args):
         finally:
             if process.returncode is None:
                 try:
+                    if network_capture:network_capture.begin_controlled_shutdown()
                     await asyncio.wait_for(qmp.command('quit'),3)
                 except Exception:
                     pass  # QEMU may close QMP before its quit reply arrives.
@@ -487,7 +504,7 @@ async def main(args):
                 try: await qmp.writer.wait_closed()
                 except (ConnectionResetError, OSError): pass
     if network_capture:
-        try:network_capture_result=await network_capture.finish()
+        try:network_capture_result=await network_capture.finish(controlled_shutdown=shutdown_method=='QMP quit' and process.returncode==0)
         except Exception as error:network_capture_result={'error':type(error).__name__+': '+str(error),'installed_runtime_pass':False}
     all_disks=[work/'stick.qcow2',target,*usb_disks]
     sizes = {path.name:path.stat().st_size for path in all_disks}
@@ -519,6 +536,19 @@ async def main(args):
     result['allocated_disk_bytes'] = allocated
     result['total_allocated_disk_bytes'] = sum(allocated.values())
     result['network_capture']=network_capture_result
+    if collect_nt4:
+        # Target is stopped; actual first logon is checked again before any read.
+        if not first_logon.is_set():
+            result['nt4_network_evidence_skipped']='actual first logon not observed'
+        else:
+            try:
+                from types import SimpleNamespace
+                await nt4_own.main(SimpleNamespace(qemu=args.qemu,assets=args.evidence_assets,
+                    fixture=work,out=args.out/'nt4-network-evidence',
+                    first_logon_observed=True,network_capture=network_capture_result))
+                result['nt4_network_evidence']='nt4-network-evidence/collection.json'
+            except Exception as error:
+                result['nt4_network_evidence_error']=type(error).__name__+': '+str(error)
     if collect_nt351:
         # Only after outer QEMU ended, before this exact target is deleted.
         # Fits the existing nested reservation; does not run alongside it.
@@ -577,6 +607,8 @@ if __name__ == '__main__':
     parser.add_argument('--usb-only-input',action='store_true',help='Disable q35 i8042 so USB HID cannot be replaced by default PS/2 input')
     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
+    parser.add_argument('--collect-nt4-success',action='store_true',help='Private NT4 only: guest-filtered own NET excerpt and driver hash after actual first logon')
+    parser.add_argument('--capture-nt4-network',action='store_true',help='DHCP-only mirror after actual NT4 first logon, 8 MiB capped, sole pinned igb')
     parser.add_argument('--collect-nt351-success',action='store_true',help='Read-only five own NT351 files plus installed own-driver hash before cleanup; never runtime PASS')
     parser.add_argument('--capture-nt351-network',action='store_true',help='Passive 8 MiB-capped localhost mirror of sole pinned igb; needs keyless NT351 collector')
     parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; exact allowlisted keyless NT3/NT4 cases only')
