@@ -13,6 +13,9 @@ import re
 import tarfile
 import zlib
 
+spec=importlib.util.spec_from_file_location('nt4_serial_shell',Path(__file__).with_name('serial_shell.py'))
+serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
+
 DRIVER_SHA256='4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d'
 DRIVER_BYTES=21376
 LOGGER_SHA256='ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7'
@@ -246,7 +249,7 @@ async def main(args):
     fixture.check_resources(work,1024)
     result=await fixture.load_bootstrap().run_case(args.qemu,args.assets/'zig-out/micro-linux/vmlinuz-virt',
         args.assets/'zig-out/micro-linux/initramfs-usos',work/'read-nt4-network',1024,'qemu64',180,
-        ['-drive',f'file={(work/"target.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],commands=commands(),suffix='-nt4-network')
+        ['-drive',f'file={(work/"target.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],commands=serial_shell.wrap(commands()),suffix='-nt4-network')
     if result['result']!='PASS':raise RuntimeError('Read-only own network collector failed')
     serial=Path(result['directory'])/'serial.log'
     if serial.stat().st_size>MAX_TRANSPORT:raise ValueError('Own evidence transport limit')

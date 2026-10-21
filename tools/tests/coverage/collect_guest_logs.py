@@ -14,6 +14,8 @@ import re
 import tarfile
 
 ROOT=Path(__file__).resolve().parents[3]
+spec=importlib.util.spec_from_file_location('coverage_serial_shell',Path(__file__).with_name('serial_shell.py'))
+serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
 ALLOWED_NAMES={'screen.ppm','command.txt','qemu.log','serial.log','seabios.log','monitor.log','runs.txt','POST.LOG'}
 spec=importlib.util.spec_from_file_location('fixture',Path(__file__).with_name('prepare_stick.py'))
 fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
@@ -120,7 +122,7 @@ poweroff -f
     result=await fixture.load_bootstrap().run_case(args.qemu,args.assets/'zig-out/micro-linux/vmlinuz-virt',
         args.assets/'zig-out/micro-linux/initramfs-usos',work/'read-logs-mtools',1024,'qemu64',180,
         ['-drive',f'file={(work/"stick.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],
-        commands=commands,suffix='-evidence')
+        commands=serial_shell.wrap(commands),suffix='-evidence')
     if result['result']!='PASS':raise RuntimeError('Read-only evidence VM failed; inspect its local serial log')
     payload=decode_transport((Path(result['directory'])/'serial.log').read_text(encoding='utf-8',errors='replace'))
     saved=export_evidence(payload,args.out)

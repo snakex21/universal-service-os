@@ -4,6 +4,7 @@ import ctypes
 import importlib.util
 import os
 import subprocess
+import stat
 import tempfile
 import unittest
 
@@ -85,6 +86,31 @@ class CStateMachine(unittest.TestCase):
 
 
 class FixtureOrdering(unittest.TestCase):
+    def test_real_newc_overlay_creates_new_directory_before_its_files(self):
+        entries=fixture.nt4_observer_entries(SCRIPT,FINISH,TOKEN,b'MZ own synthetic NT4OBS')
+        archive=fixture.trace_overlay(nt4_entries=entries)
+        # Model the kernel's parent requirement from the serialized newc,
+        # rather than auto-creating parents as an extracting test helper may.
+        directories={'usr','usr/lib','usr/lib/usos'}
+        observer_files=[];offset=0
+        while offset<len(archive):
+            header=archive[offset:offset+110];self.assertEqual(header[:6],b'070701')
+            fields=[int(header[6+i*8:14+i*8],16) for i in range(13)]
+            mode,size,namesize=fields[1],fields[6],fields[11]
+            offset+=110;name=archive[offset:offset+namesize-1].decode('ascii')
+            offset=(offset+namesize+3)&~3
+            data=archive[offset:offset+size];offset=(offset+size+3)&~3
+            if name=='TRAILER!!!':break
+            self.assertIn(name.rpartition('/')[0],directories,'newc parent missing before '+name)
+            if stat.S_ISDIR(mode):
+                self.assertEqual(data,b'');self.assertEqual(mode&0o777,0o755);directories.add(name)
+            else:
+                self.assertTrue(stat.S_ISREG(mode),name)
+                if name.startswith('usr/lib/usos/coverage-nt4/'):
+                    observer_files.append(name.rpartition('/')[2]);self.assertTrue(data)
+        self.assertIn('usr/lib/usos/coverage-nt4',directories)
+        self.assertEqual(observer_files,['FIRSTLO.CMD','TESTNET.CMD','OBS.REG','NT4OBS.EXE'])
+
     def test_only_cached_own_scripts_are_modified_and_arm_is_not_in_post(self):
         entries=fixture.nt4_observer_entries(SCRIPT,FINISH,TOKEN,b'MZ own synthetic NT4OBS')
         result={name:data for name,mode,data in entries};target=result['usr/lib/usos/nt4_csmwrap_target.sh'];finish=result['usr/lib/usos/nt4_qemu_install.sh']

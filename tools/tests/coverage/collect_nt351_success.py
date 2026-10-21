@@ -14,6 +14,9 @@ import json
 import re
 import tarfile
 
+spec=importlib.util.spec_from_file_location('nt351_serial_shell',Path(__file__).with_name('serial_shell.py'))
+serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
+
 FOLDERS=frozenset(('Windows NT 3.51','Windows NT 3.51 Server'))
 FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256')
 DRIVER_SHA256='dc8827954e6fe75ee8264c7382e87899cc9761890998198c126c7ea8aa5c55b6'
@@ -131,7 +134,7 @@ async def main(args):
     result=await fixture.load_bootstrap().run_case(args.qemu,args.assets/'zig-out/micro-linux/vmlinuz-virt',
         args.assets/'zig-out/micro-linux/initramfs-usos',work/'read-nt351-own',1024,'qemu64',180,
         ['-drive',f'file={(work/"target.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],
-        commands=commands(),suffix='-nt351-own')
+        commands=serial_shell.wrap(commands()),suffix='-nt351-own')
     if result['result']!='PASS':raise RuntimeError('Read-only collector failed; no runtime assessment')
     serial=Path(result['directory'])/'serial.log'
     if serial.stat().st_size>MAX_TRANSPORT:raise ValueError('Transport byte limit exceeded')

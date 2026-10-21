@@ -142,7 +142,10 @@ def nt4_observer_entries(script,finish,token,helper,target_mode=0o100755,finish_
     for key in ('RunOnce','Run'):
         section='[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\'+key+']\n'
         obs+=section+'"USOSCoverage"="C:\\\\USOS\\\\Coverage\\\\NT4OBS.EXE /firstlogon"\n\n'
-    entries=[('usr/lib/usos/nt4_csmwrap_target.sh',target_mode,staged),('usr/lib/usos/nt4_qemu_install.sh',finish_mode,finished)]
+    entries=[('usr/lib/usos/nt4_csmwrap_target.sh',target_mode,staged),('usr/lib/usos/nt4_qemu_install.sh',finish_mode,finished),
+             # The kernel's initramfs unpacker does not create missing parents
+             # for regular-file entries. This directory is new to the cache.
+             ('usr/lib/usos/coverage-nt4',0o040755,b'')]
     for name,text in (('FIRSTLO.CMD',firstlo),('TESTNET.CMD',testnet),('OBS.REG',obs)):
         entries.append(('usr/lib/usos/coverage-nt4/'+name,0o100644,text.replace('\n','\r\n').encode('ascii')))
     entries.append(('usr/lib/usos/coverage-nt4/NT4OBS.EXE',0o100755,helper))

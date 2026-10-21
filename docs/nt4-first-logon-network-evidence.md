@@ -51,3 +51,23 @@ HID routing. The stopped target must be retained before cleanup for a
 separate test that excludes functioning PS/2 input. Frozen MSC testing is
 also separate; HID and MSC results from different payloads cannot be
 combined. All resulting runtime claims remain QEMU only, not X470 PASS.
+
+The first candidate stopped during Linux staging, before Windows started:
+the new coverage-nt4 directory was missing its own CPIO directory record.
+The overlay now places a directory entry before its four files. The newc
+regression checks the actual serialized parent-before-child order.
+
+Serial collectors also now send the whole script as a quoted here-document
+to an exec'd noninteractive shell. Previously the paced interactive input
+could echo later commands into base64 while the archive was being printed.
+Disabling terminal echo alone failed a real Linux-only control test; the
+noninteractive wrapper recovered all 24,603 synthetic bytes with the strict
+decoder, gzip and exact content comparison. All four collectors use it;
+decoder grammar was not loosened. The integrated helper passed that QEMU
+test (exit 0, 8.205 s) and the full 105-test host suite passed. The test used
+no Windows image, key or physical device.
+
+Completed synthetic transport evidence is under
+`artifacts/coverage/transport-fixture/integrated/review.json`; the negative
+echo-only control is retained beside it. This is transport evidence only,
+not NT4 installation or connectivity PASS.

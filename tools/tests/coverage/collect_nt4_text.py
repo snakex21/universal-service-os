@@ -131,7 +131,7 @@ poweroff -f
     result=await fixture.load_bootstrap().run_case(args.qemu,args.assets/'zig-out/micro-linux/vmlinuz-virt',
         args.assets/'zig-out/micro-linux/initramfs-usos',work/'read-native-text',1024,'qemu64',180,
         ['-drive',f'file={(work/"target.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],
-        commands=commands,suffix='-nt4-text')
+        commands=transport.serial_shell.wrap(commands),suffix='-nt4-text')
     if result['result']!='PASS':raise RuntimeError('Read-only text evidence VM failed')
     payload=transport.decode_transport((Path(result['directory'])/'serial.log').read_text(encoding='utf-8',errors='replace'))
     evidence=export_text(payload,args.out)
