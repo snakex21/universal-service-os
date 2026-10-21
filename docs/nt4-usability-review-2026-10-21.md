@@ -240,3 +240,50 @@ PASS. Należy zebrać własny USABILITY.TXT i natywne ipconfig /all przed
 usunięciem celu po sukcesie. Obecny kolektor awarii NT4 nie zbiera tych
 logów po sukcesie. Fizyczny X470/I211 pozostaje osobnym nieprzetestowanym
 zakresem; żaden z opisanych testów hostowych go nie zastępuje.
+
+
+## Prywatna polityka sukcesowej kolekcji NT4 — gotowa do przeglądu
+
+Root zintegrował poprawkę ścisłego transportu w 41078de2; pełna suite
+coverage ma 75 testów PASS. Następnie przygotowano w odrębnej kopii
+[patch prywatnej polityki NT4](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/nt4-private-success-policy.patch>)
+bez edycji aktywnego kodu. Patch ma sześć plików i aplikuje się na
+41078de2; rezultat próbnego zastosowania jest identyczny z kopią roboczą.
+11 testów nowej polityki i 17 regresji PASS obejmują faktyczną ścieżkę
+shell filtr → tar → base64 → ścisły walidator, syntetyczne klucze,
+niepoprawne archiwa, bramę first-logon i korelację DHCP. Jest to wynik hosta.
+
+- Zakończony cel jest otwierany tylko do odczytu, po faktycznym znaczniku
+  logowania prywatnego NT4 z dokładnie przypiętym loggerem. Sama granica
+  przygotowanego dysku nie zezwala na sukcesową kolekcję.
+- Gość czyta wyłącznie `C:\USOS\Coverage\USABILITY.TXT`,
+  `C:\USOS\NT4\USABILITY.TXT` i własny `usosnet4.sys` do weryfikacji
+  dokładnego hasha. Każdy odczyt logu jest ograniczony do 1 MiB, eksport
+  do 64 KiB i 128 linii. Statusy odczytów są jawne.
+- Przed transportem gość redaguje kompletne formaty kluczy i przyjmuje
+  wyłącznie zamkniętą gramatykę ASCII linii ICMP, DNS oraz resolvera.
+  Nie eksportuje sekcji rejestru/procesów, HTTP, hexdumpów, pełnych logów,
+  odpowiedzi, hive ani obrazów ekranu. Adresy IP pozostają użyteczne.
+  Host ponawia walidację i odrzuca całe archiwum przed zapisem w razie
+  rozbieżności, także drugi strumień gzip/tar.
+- Osobna polityka NT4 mirror przyjmuje tylko ramki DHCP pinowanej,
+  wirtualnej karty igb po rzeczywistym first-logon. Wszystkie ramki
+  wcześniejsze oraz inne protokoły są odrzucane bez przechowywania.
+  Odbiornik zachowuje limit 8 MiB i opróżnia kanał po jego osiągnięciu.
+- Własny observer jedynie kopiuje `TESTNET.CMD`. Operator uruchamia go
+  jawnie po ocenie pulpitu/HID: native `ipconfig /release`, `/renew`,
+  następnie dokładny logger. Domyślne zachowanie observera innych testów
+  zachowano. Test odnowienia i log powstają po bramie logowania.
+- DHCP wymaga pełnego DORA z tym samym XID, serwerem i adresem dzierżawy.
+  Z tym dowodem muszą zgadzać się router/DNS rzeczywistego loggera, jego
+  `echo_match=1`, `dns_match=1` i hash sterownika. Sam rejestr DHCP ani
+  resolver/HTTP nie wystarczą. Pole `installed_runtime_pass` pozostaje
+  fałszywe: pulpit i HID wymagają oddzielnej oceny.
+
+[Metadane polityki i testów](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/review-result.json>)
+wiążą dokładny zakres. Plan candidate01 zawiera wymagane trzy jawne flagi;
+nie uruchomiono VM. Root przydzieli RAM i kolejność po przeglądzie.
+
+Końcowy cache HID 1.3 nie zawiera MSC. Po pulpicie, HID i LAN potrzebny
+będzie odrębny test zamrożonego, niezmienionego MSC z feat/nt4-usb-sticks.
+Nie łączy się go ze źródłami hubów i nie przypisuje wspólnego PASS.
