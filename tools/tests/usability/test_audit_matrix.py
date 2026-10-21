@@ -80,5 +80,21 @@ class EvidenceTests(unittest.TestCase):
             usb,net=audit.capability(changed)
             self.assertNotIn('QEMU PASS',usb+net+audit.hid_test(usb,changed))
 
+    def test_nt35_fresh_lan_and_overlay_hid_keep_storage_and_latency_limits(self):
+        exact=list(audit.NT35_R20_ROW)
+        usb,net=audit.capability(exact)
+        self.assertNotIn('PASS',usb)
+        self.assertIn('QEMU PASS R20',net)
+        self.assertIn('pierwszy ping2/3',net)
+        self.assertIn('około2s',net)
+        self.assertIn('QEMU PASS R20b',audit.hid_test(usb,exact))
+
+    def test_nt35_pass_never_spreads_to_server_or_nt351(self):
+        for index,value in ((0,'Windows NT 3.5\\Server.iso'),(1,'3.50.807 SP3'),(2,'pl-PL / x86'),
+                            (3,'windows-nt-3-5-server / nt3-x86-qemu-csmwrap'),(3,'windows-nt-3-51 / nt3-x86-qemu-csmwrap')):
+            changed=list(audit.NT35_R20_ROW);changed[index]=value
+            usb,net=audit.capability(changed)
+            self.assertNotIn('QEMU PASS',usb+net+audit.hid_test(usb,changed))
+
 
 if __name__=='__main__':unittest.main()
