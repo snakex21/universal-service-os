@@ -18,11 +18,11 @@ polls xHCI from INT 08h. NT never calls that code.
   (USBLEGSUP, forced if the firmware does not answer within 1 s), resets the
   controller and runs it without interrupts. It uses one command ring and one
   event ring and polls them every 8 to 10 ms.
-* Devices on root ports are enumerated: enable slot, address device, read the
-  device and configuration descriptors, then take the first HID boot keyboard and
-  the first boot mouse interface. For each it configures the interrupt IN
-  endpoint and sends SET_CONFIGURATION, SET_PROTOCOL(boot) and SET_IDLE(0).
-  Port status events handle plugging and unplugging.
+* Devices on root ports and behind hubs are enumerated: enable slot, address
+  device, read the device and configuration descriptors, then take the first HID
+  boot keyboard and the first boot mouse interface. For each it configures the
+  interrupt IN endpoint and sends SET_CONFIGURATION, SET_PROTOCOL(boot) and
+  SET_IDLE(0). Port status events handle plugging and unplugging (see "Hubs").
 * Keyboard boot reports become scan code set 1 make/break codes. Pause sends
   E1 1D 45, and AltGr sends E0 38. Typematic repeat is done in the driver
   (`IOCTL_KEYBOARD_SET_TYPEMATIC`). The Caps, Num and Scroll Lock LEDs follow
@@ -32,11 +32,53 @@ polls xHCI from INT 08h. NT never calls that code.
 * `HKLM\SYSTEM\CurrentControlSet\Services\usosusb\Parameters\Diag` (REG_SZ)
   holds one status line: the controllers found (bus:device.function, port count),
   then one entry per port, such as `p5:s1K-` for slot 1 with a keyboard on
-  port 5, or an error tag like `p3-addr4` or `p2-nohid`.
+  port 5, or an error tag like `p3-addr4` or `p2-nohid`. Devices behind hubs
+  are named by their path, e.g. `p5.2:s3K-` (port 2 of the hub on root port 5).
 
-Not supported: devices behind a USB hub (this includes keyboards with a
-built-in hub), non-boot HID devices, xHCI registers above 4 GiB, and more than 4
-controllers or 16 devices per controller.
+Not supported: non-boot HID devices, xHCI registers above 4 GiB, and more than 4
+controllers or 16 devices (hubs included) per controller.
+
+## Hubs (all builds, 2026-10-21)
+
+USB 2.0 and USB 3.x hubs on root ports and behind other hubs (hubs at tiers
+0..3, so devices up to 4 hubs deep): front-panel ports wired through a board
+hub, keyboards with a built-in hub, monitor hubs. Written from the public
+xHCI 1.2 (Route String, Slot Context hub / TT fields) and USB 2.0 chapter 11 /
+USB 3.2 chapter 10 (hub class) descriptions.
+
+* A device with class 09h and a hub interface (alternate setting 0, so a
+  multi-TT hub runs single-TT) gets its status change endpoint configured,
+  SET_CONFIGURATION, GET_HUB_DESCRIPTOR (29h, or 2Ah for SuperSpeed), then a
+  slot-only Configure Endpoint with Hub = 1, Number of Ports and TT Think Time,
+  SET_HUB_DEPTH (SuperSpeed hubs), SET_PORT_FEATURE(PORT_POWER) on every port
+  and the bPwrOn2PwrGood wait.
+* Children get the Route String (4 bits per tier), the root hub port of the
+  chain, and for low / full-speed devices on a high-speed hub the TT Hub Slot
+  ID / TT Port Number (inherited behind a full-speed hub). Speed from
+  wPortStatus (low / full / high; SuperSpeed on a SuperSpeed hub).
+* Port changes: the hub's status change endpoint is kept queued (bitmap,
+  handled in the worker loop, never inside the event poll), and every hub
+  port is read again with GET_PORT_STATUS every 2 s (a hub whose endpoint
+  stopped is re-armed). Change bits are cleared with CLEAR_PORT_FEATURE(C_*);
+  connect: 100 ms debounce, PORT_RESET, wait for C_PORT_RESET, enumerate.
+  Disconnect (or a connect change) drops the device; dropping a hub drops
+  everything behind it. A port whose device could not be used is retried only
+  after its next connect change (no repeated Diag entries).
+* A USB 3 hub is two hubs to xHCI: its SuperSpeed half on a USB 3 root port
+  and its USB 2 half on the paired USB 2 root port. Each shows up on its own,
+  e.g. `p1:s1H4ss p9:s2H4hs`, and devices appear on the half that matches
+  their speed.
+* Diag: `p5:s1H4hs` (hub, slot 1, 4 ports, high speed; `fs` / `ss`),
+  `p5.2:s3K-/tt1.2` (keyboard behind it through the TT of slot 1 port 2),
+  `p5.2-gone`, `p5.3-noen` (port did not enable after reset), `p5-hubd`
+  (no hub descriptor), `p5-hubctx<cc>` (hub slot fields refused),
+  `p5.1.1.1.1-deep` (a fifth hub tier), `p5.4-full` (no free device entry).
+  The Diag value holds up to 1024 characters.
+* QEMU harness: `tools/tests/usosusb_hub/run_hub_qemu.py` boots the real
+  driver source on QEMU (multiboot, kernel routines from a test shim) with
+  qemu-xhci and two nested usb-hubs (keyboard, mouse, stick, hot plug).
+  QEMU's usb-hub is a full-speed hub, so the TT fields and SuperSpeed hubs
+  are not exercised there (docs/usosusb-hubs-2026-10-21.md).
 
 ## Installation (USOS NT4 flow)
 
@@ -106,7 +148,7 @@ USB support does not migrate to the installed OS. This path needs neither
 KMDF nor a user driver package. Its 42 imports resolve against both Win7
 SP1 x86 kernels and all three HAL variants in the export-name fixture
 `tools/tests/data/nt61sp1_x86_exports.txt` (checked by
-`tools/tests/test_nt60_usosusb.py`). The root-port HID/BOT limits below
+`tools/tests/test_nt60_usosusb.py`). The HID/BOT limits below
 also apply to Windows 7. To install another xHCI stack later, disable the
 legacy `usosusb` service first: two drivers must not own the controller.
 
@@ -161,7 +203,7 @@ descriptions.
   logs each removable letter (file system, label, size or the open error)
   plus `Diag` / `Conn` / `Msc` to `C:\USOS\Logs\usos-drivenotify.log`
   (history across boots; `Diag` itself is rewritten at each boot).
-* Limits: root ports only (no hubs, as for HID), polling (no interrupts; about
+* Limits: sticks behind full-speed hubs run at full speed; polling (no interrupts; about
   40 MB/s read under QEMU TCG), no safe-removal UI (unplug after the copy has
   finished), Explorer may need F5 / reopening after a hot plug (a kernel
   driver cannot broadcast WM_DEVICECHANGE), no media change polling for card
