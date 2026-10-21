@@ -49,7 +49,7 @@ w9x_vm_type_owner_text() {
 w9x_vm_95_page_ready() {
     [ "$W9X_VM_PAGE" != "$w95_last_page" ] || return 1
     case "$W9X_VM_PAGE" in
-        coa) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
+        coa|coa-single) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
         owner) w9x_vm_owner_valid ;;
         recovery|welcome|directory|setup-type|hardware-list|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm) return 0 ;;
         *) return 1 ;;
@@ -58,6 +58,31 @@ w9x_vm_95_page_ready() {
 
 w9x_vm_95_input() {
     case "$W9X_VM_PAGE" in
+        coa-single)
+            key_on_screen=1
+            w9x_vm_clear_edit || return 1
+            w95_remaining=$key
+            w95_group=0
+            for w95_length in 5 7 5; do
+                case "$w95_group" in
+                    1) for w95_scan in minus shift-o shift-e shift-m minus; do
+                           w9x_vm_private_key "$w95_scan" || return 1
+                       done ;;
+                    2) w9x_vm_private_key minus || return 1 ;;
+                esac
+                w95_count=0
+                while [ "$w95_count" -lt "$w95_length" ]; do
+                    w95_digit=${w95_remaining%"${w95_remaining#?}"}
+                    w95_remaining=${w95_remaining#?}
+                    w9x_vm_private_key "$w95_digit" || return 1
+                    w95_count=$((w95_count + 1))
+                done
+                w95_group=$((w95_group + 1))
+            done
+            w95_remaining=''; w95_digit=''
+            key_tries=$((key_tries + 1))
+            w9x_vm_private_key ret || return 1
+            ;;
         coa)
             key_on_screen=1
             w95_remaining=$key

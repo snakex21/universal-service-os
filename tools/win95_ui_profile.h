@@ -1,4 +1,6 @@
 static const Page pages[] = {
+    /* RTM PL OEM: single Product ID edit; labels only, edit at y=235 excluded. */
+    {"coa-single", UINT64_C(0xa31becc465840cd2), UINT64_C(0x2983c7270b2212f1), 214, 212, 260, 16},
     {"recovery", UINT64_C(0x5f7deb30089843a5), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"welcome", UINT64_C(0x876af5e9289567a9), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"busy", UINT64_C(0x1f36e2daa8666765), UINT64_C(0x0000000000000000), 0, 0, 0, 0},

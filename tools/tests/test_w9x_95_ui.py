@@ -53,6 +53,28 @@ class Win95Input(unittest.TestCase):
         self.assertIn('coa=1', r.stdout)
         self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').strip(), 'ret')
 
+    def test_single_edit_uses_complete_oem_form_without_tabs(self):
+        r=self.run_policy('W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready && w9x_vm_95_input; echo "$key_tries $key_on_screen"')
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('1 1',r.stdout)
+        inputs=(self.temp/'input').read_text().splitlines()
+        self.assertEqual(inputs[:3],['home','shift-end','backspace'])
+        self.assertNotIn('tab',inputs)
+        text=''.join({'minus':'-','shift-o':'O','shift-e':'E','shift-m':'M'}.get(x,x) for x in inputs[3:-1])
+        self.assertEqual(text,'98765-OEM-0012345-54321')
+        self.assertEqual(inputs[-1],'ret')
+        self.assertNotIn('98765',(self.temp/'command.txt').read_text())
+
+    def test_single_edit_shares_one_attempt_with_three_field_form(self):
+        r=self.run_policy('W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready && w9x_vm_95_input; w95_last_page=; W9X_VM_PAGE=coa; w9x_vm_95_page_ready; echo again=$?')
+        self.assertIn('again=1',r.stdout)
+
+    def test_single_edit_requires_oem_shape_and_copy_guard(self):
+        for change in ('written=64','key=1234567890'):
+            r=self.run_policy(change+'; W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready; echo ready=$?')
+            self.assertIn('ready=1',r.stdout)
+            self.assertFalse((self.temp/'input').exists())
+
     def test_owner_uses_separate_fields_and_never_the_key(self):
         r = self.run_policy('W9X_VM_OWNER=Retro; W9X_VM_ORG=USOS; W9X_VM_PAGE=owner; w9x_vm_95_page_ready && w9x_vm_95_input; echo "$key_tries $key_on_screen"')
         self.assertEqual(r.returncode, 0, r.stderr)
