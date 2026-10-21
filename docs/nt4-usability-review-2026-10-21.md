@@ -287,3 +287,63 @@ nie uruchomiono VM. Root przydzieli RAM i kolejność po przeglądzie.
 Końcowy cache HID 1.3 nie zawiera MSC. Po pulpicie, HID i LAN potrzebny
 będzie odrębny test zamrożonego, niezmienionego MSC z feat/nt4-usb-sticks.
 Nie łączy się go ze źródłami hubów i nie przypisuje wspólnego PASS.
+
+
+## Aktualna wersja hooka, transportu i planu pierwszej instalacji
+
+Przegląd ujawnił ograniczenia starego planu: produkcyjny `user_script` nie
+obsługuje NT4, DONE.REG wyłącza ATAPI, a NT4 CMD nie obsługuje COPY /Y.
+Dlatego sam observer CD nie dawał poprawnego testu logowania. Ostateczna
+propozycja ma własny, testowy hook z plikami na celu; domyślna ścieżka CD
+innych systemów pozostała niezmieniona.
+
+[Finalny patch na 41078de2](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/nt4-private-success-final.patch>)
+składa się z czterech oddzielnie przeglądalnych poprawek wymienionych w
+[manifestcie przeglądu](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-success-review/final-review-result.json>).
+Wersje apply-check i byte-match są poprawne. Ostateczny helper GUI ma SHA
+`37e7a0f69846d9bab18a718f7d66c3fd937f0f35913d2b0eb22f2d7ce4eae0e9`;
+dwa świeże buildy 04/05 są identyczne. PE 4.00 GUI ma 23 importy, zgodne
+z eksportami i forwarderami oryginalnych NT4 PL/EN. Wcześniejszy pin 5fb8
+jest zastąpiony.
+
+Hook powstaje wyłącznie w prywatnym fixture na podstawie aktualnych
+skryptów finalnego cache. POST po SP6a/DONE.REG rejestruje testowe RunOnce
+oraz idempotentny Run. Dopiero po powrocie wewnętrznego QEMU i udanych
+kontrolach SP6a/status=0 w nt4_vm_finish powstaje ARMED.TXT, przed sync i
+unmount. GUI helper przy natywnym logowaniu sprawdza ARM i staging, usuwa
+oba własne hooki i ARM, uruchamia FIRSTLO ukrycie przez DETACHED_PROCESS i
+SW_HIDE oraz blokująco czeka na kod zakończenia. Błędy mają stały status;
+przed ARM ani przy błędzie przygotowania nie powstaje token. Duplikat
+uruchomienia bez ARM zachowuje READY, TESTNET_DONE i wcześniejsze błędy.
+
+Operator po ocenie pulpitu uruchamia `C:\USOS\Coverage\NT4OBS.EXE /testnet`.
+Helper dopiero po READY ukrycie wykonuje TESTNET (native release/renew i
+logger), czeka na zakończenie i zapisuje TESTNET_DONE albo błąd. Token nadal
+oznacza logowanie, nie LAN PASS. Kolektor dopuszcza dodatkowo wyłącznie
+zamknięty enum z własnego OBSERVER.STATUS; nie eksportuje żadnej innej
+zawartości tego pliku. Do korelacji sieci wymaga TESTNET_DONE.
+
+Testy końcowe hosta: 11 polityki kolektora PASS, 10 obserwatora PASS i
+6 FIN/RST PASS. Test obserwatora wykonuje rzeczywisty kod C dwa razy na
+tym samym kontekście: oba hooki i ARM są usunięte raz, token pojawia się
+raz, READY/DONE oraz błąd pozostają zachowane. Testy transportu używają
+rzeczywistych połączeń localhost. Znany reset/WinError64 jest akceptowany
+wyłącznie między ramkami, gdy bufor nagłówka jest pusty, shutdown został
+oznaczony przed QMP quit, a końcowy wynik to QMP quit/rc0. Częściowy
+nagłówek lub payload oraz wcześniejszy reset pozostają błędami. Nie nadaje
+się historycznemu R18b PASS wstecz bez dowodu pozycji jego błędu.
+
+Root przekazał potwierdzony wynik pary NT351: i8042 OFF zatrzymuje system
+na NTDETECT, ON pozwala dojść do pulpitu. Nie przenosi się tego jako
+przyczyny R16. Zgodnie z decyzją roota pierwszy nowy NT4 ma jawnie
+`usb_only_input:false`, `ps2_input:true`, i8042 ON. Tag planu to
+`nt4-sp6a-desktop-net-ps2-candidate01`. Zakres tej próby to rzeczywisty
+pulpit i LAN; samo umieszczenie HID 1.3 w cache nie otrzymuje HID PASS.
+
+[Plan i zapis zakresu](<C:/Users/ASRock/usos-work/nt4-net/artifacts/nt4-coherent-cache-review/launch-review.json>)
+wymagają od roota zachowania targetu przez dokładny hardlink w tym samym
+G:\USOS-Kolekcja\_vm przed finish/cleanup, z użyciem powiadomienia o pliku.
+Późniejszy test HID użyje osobnego startu zachowanego celu z dowodem
+wyeliminowania PS/2 w gościu albo hardware OFF. MSC pozostaje odrębną,
+zamrożoną próbą. Autor nadal nie uruchomił nowej VM ani nie zmienił
+sterowników/hubów; żadnego runtime PASS nie przypisano hostowym testom.
