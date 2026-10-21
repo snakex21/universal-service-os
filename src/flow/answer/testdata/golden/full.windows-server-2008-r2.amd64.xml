@@ -39,6 +39,26 @@
     <component name="Microsoft-Windows-ServerManager-SvrMgrNc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>
     </component>
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; icacls.exe &quot;%SystemDrive%\USOS&quot; /reset /t /c /q</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; /f</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
   </settings>
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">

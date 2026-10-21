@@ -72,6 +72,51 @@ class DisplayTransport(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual((self.tmp/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
 
+    def test_stage_appends_prep_time_native_size(self):
+        exe = self.tmp/'fake.exe'; exe.write_bytes(b'own test placeholder')
+        record = self.tmp/'display-native.txt'
+        stage = 'USOS_DISPLAY_NATIVE_FILE='+quote(record)+' usos_display_stage '+quote(self.tmp)+' '+quote(exe)+' autoxauto'
+        for text, expected in ((b'2560x1440\r\n', b'autoxauto\r\nnative=2560x1440\r\n'),
+                               (b'3840x2160', b'autoxauto\r\nnative=3840x2160\r\n'),
+                               (b'100x100\r\n', b'autoxauto\r\n'), (b'2560x1440;x\r\n', b'autoxauto\r\n'),
+                               (b'99999x1440\r\n', b'autoxauto\r\n'), (None, b'autoxauto\r\n')):
+            if text is None: record.unlink()
+            else: record.write_bytes(text)
+            r = shell(self.lib+stage)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual((self.tmp/'DISPLAY.TXT').read_bytes(), expected, text)
+
+    def test_xp_2003_stage_helper_and_register_before_exit(self):
+        from test_nt4_flow import function_text
+        lib = self.tmp/'lib'; lib.mkdir()
+        shutil.copy(ROOT/'tools/display_profile.sh', lib/'display_profile.sh')
+        (lib/'USOSRES.EXE').write_bytes(b'own helper fixture')
+        settings = self.tmp/'usos-xp.ini'
+        setup = self.tmp/'vol/USOS/XP'; setup.mkdir(parents=True)
+        cmd = self.tmp/'accounts.cmd'
+        script = ROOT/'tools/prepare_xp_ntfs_target.sh'
+        funcs = function_text(script, 'usos_nt52_display_stage')+'; '+function_text(script, 'usos_nt52_insert_before_exit')+'; '
+        pre = 'fail() { echo "$*" >&2; exit 1; }; SCRIPT_DIR='+quote(lib)+' USOS_DISPLAY_NATIVE_FILE='+quote(self.tmp/'none')+'; '
+        run = 'line=$(usos_nt52_display_stage '+quote(setup)+') && [ -n "$line" ] && usos_nt52_insert_before_exit '+quote(cmd)+' "$line"'
+        for system, text, request in (('windows-xp', 'user=Bob\nfamily=xp\n', b'autoxauto\r\n'),
+                                      ('windows-server-2003', 'user=Bob\nfamily=2003\ndisplay=1280x1024\n', b'1280x1024xauto\r\n')):
+            settings.write_text(text)
+            cmd.write_bytes(b'@echo off\r\nnet user Bob /add\r\nexit /b 0\r\n')
+            env = 'NT5_SYSTEM='+system+' XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=; '
+            r = shell(pre+env+funcs+run)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual((setup/'DISPLAY.TXT').read_bytes(), request)
+            self.assertEqual((setup/'USOSRES.EXE').read_bytes(), b'own helper fixture')
+            self.assertEqual(cmd.read_bytes(), b'@echo off\r\nnet user Bob /add\r\n'
+                b'if exist "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" /v USOSDisplay /t REG_SZ /d "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" /f >> "%USOS_LOG%" 2>&1\r\nexit /b 0\r\n')
+            (setup/'DISPLAY.TXT').unlink()
+        # A user's own WINNT.SIF or Windows 2000 (vesa.cmd path): nothing here.
+        for env in ('NT5_SYSTEM=windows-xp XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=/x.sif; ',
+                    'NT5_SYSTEM=windows-2000 XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=; '):
+            r = shell(pre+env+funcs+'line=$(usos_nt52_display_stage '+quote(setup)+'); [ -z "$line" ]')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse((setup/'DISPLAY.TXT').exists())
+
     def test_nt5_scoping_and_depth_only_request(self):
         source = self.tmp/'settings.ini'
         for text, expected in [('family=xp\ndisplay=1920x1080\n', b''),
@@ -152,6 +197,54 @@ class DisplayTransport(unittest.TestCase):
         text=(ROOT/'tools/nt4_csmwrap_target.sh').read_text();start=text.index('nt4_display_request=\nif [ -z "$nt3" ] && [ -z "$nt31" ] && grep');end=text.index('\nfor file in "$SYSLINUX_DIR',start)
         r=shell(pre+env+'usos='+quote(nt4)+" nt3='' nt31=''; "+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn(b'; preserved driver values\r\n',(nt4/'VESA.REG').read_bytes());self.assertIn(b'"USOSDisplay"=',(nt4/'VESA.REG').read_bytes())
+
+    def test_nt6_xml_request_and_registration_marker(self):
+        source = self.tmp/'autounattend.xml'
+        source.write_bytes(b'<?xml version="1.0"?>\n<!-- USOS-DISPLAY=1920x1080xauto -->\n<unattend/>\n')
+        self.assertEqual(shell(self.lib+'usos_display_from_xml '+quote(source)).stdout, b'1920x1080xauto\n')
+        source.write_bytes(b'<!-- USOS-DISPLAY=autox16 -->\r\n<!-- USOS-DISPLAY=autox16 -->\r\n')
+        self.assertNotEqual(shell(self.lib+'usos_display_from_xml '+quote(source)).returncode, 0)
+        source.write_bytes(b'<unattend><Path>x &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot;</Path></unattend>\n')
+        r = shell(self.lib+'usos_display_from_xml '+quote(source))
+        self.assertEqual((r.returncode, r.stdout), (0, b''))
+        self.assertEqual(shell(self.lib+'usos_display_nt6_answer '+quote(source)).returncode, 0)
+        source.write_bytes(b'<unattend/>\n')
+        self.assertNotEqual(shell(self.lib+'usos_display_nt6_answer '+quote(source)).returncode, 0)
+
+    def nt6_display_block(self, answer_bytes, helper=True):
+        lib = self.tmp/'lib-nt6'; lib.mkdir(exist_ok=True)
+        shutil.copy(ROOT/'tools/display_profile.sh', lib/'display_profile.sh')
+        if helper: (lib/'USOSRES.EXE').write_bytes(b'own helper fixture')
+        work = self.tmp/'work'; shutil.rmtree(work, ignore_errors=True); work.mkdir()
+        answer = ''
+        if answer_bytes is not None:
+            answer = str(work/'answer.xml'); Path(answer).write_bytes(answer_bytes)
+        text = (ROOT/'tools/vista_csmwrap_target.sh').read_text()
+        start = text.index('# 2b. Display'); end = text.index('# 3. The PE10 donor', start)
+        # The Windows partition is a host folder here: mount/umount do nothing.
+        pre = 'fail() { echo "$*" >&2; exit 1; }; log() { echo "LOG $*"; }; modprobe() { :; }; mount() { :; }; umount() { :; }; '
+        env = 'LIB='+quote(lib)+' work='+quote(work)+' ANSWER_XML='+quote(answer)+' windows_node=/dev/null; '
+        r = shell(pre+env+text[start:end])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return work/'windows/USOS/NT6', r.stdout
+
+    def test_nt6_csmwrap_stages_auto_or_request_only_for_usos_answers(self):
+        registered = b'<!-- USOS answer profile rendered for windows-vista (amd64) -->\n<unattend><Path>cmd.exe /c if exist &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; reg.exe add</Path></unattend>\n'
+        folder, out = self.nt6_display_block(registered)
+        self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
+        self.assertEqual((folder/'USOSRES.EXE').read_bytes(), b'own helper fixture')
+        self.assertIn(b'DISPLAY request=autoxauto', out)
+        folder, _ = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=1280x1024x32 -->\n<unattend>'))
+        self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'1280x1024x32\r\n')
+        # A user's own answer (no registration), no answer, or no helper: nothing.
+        for answer in (b'<unattend/>\n', None):
+            folder, _ = self.nt6_display_block(answer)
+            self.assertFalse(folder.exists())
+        folder, out = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=800x600xauto -->\n<unattend>'))
+        self.assertFalse(folder.exists()); self.assertIn(b'invalid request', out)
+        shutil.rmtree(self.tmp/'lib-nt6')
+        folder, out = self.nt6_display_block(registered, helper=False)
+        self.assertFalse(folder.exists()); self.assertIn(b'USOSRES.EXE missing', out)
 
     def test_display_section_stays_before_usos_csm(self):
         # INSTALL.BAT appends Me's usoskey.drv line to the last section, which

@@ -91,6 +91,7 @@ pub const flow = struct {
     pub const inf_package = @import("flow/inf_package.zig");
     pub const acpi_dump = @import("flow/acpi_dump.zig");
     pub const acpi_raw = @import("flow/acpi_raw.zig");
+    pub const display_edid = @import("flow/display_edid.zig");
     pub const linux_iso = @import("flow/linux_iso/root.zig");
 };
 pub const selftest = struct {
@@ -221,6 +222,7 @@ test {
     _ = flow.inf_package;
     _ = flow.acpi_dump;
     _ = flow.acpi_raw;
+    _ = flow.display_edid;
     _ = selftest.Case;
     _ = selftest.Report;
     _ = @import("selftest/runner.zig");

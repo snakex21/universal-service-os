@@ -84,6 +84,11 @@ pub const settings = [_]Setting{
     .{ .pass = .specialize, .component = shell, .path = "RegisteredOwner" },
     .{ .pass = .specialize, .component = shell, .path = "RegisteredOrganization" },
     .{ .pass = .specialize, .component = shell, .path = "TimeZone" },
+    // Tweak display (explicit resolution): Windows keeps its own mode when
+    // the adapter lacks the requested one.
+    .{ .pass = .specialize, .component = shell, .path = "Display/ColorDepth" },
+    .{ .pass = .specialize, .component = shell, .path = "Display/HorizontalResolution" },
+    .{ .pass = .specialize, .component = shell, .path = "Display/VerticalResolution" },
     .{ .pass = .specialize, .component = shell, .path = "ShowWindowsLive", .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Order" },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Path" },
@@ -177,7 +182,9 @@ pub const tweak_support = [_]TweakSupport{
     .{ .tweak = .theme_classic, .nt5 = &.{.windows_xp}, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .theme_basic, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .no_balloon_tips, .nt5 = xp_2003 },
-    .{ .tweak = .display, .nt5 = &.{ .windows_2000, .windows_xp, .windows_2003 } },
+    // 6.x+: an explicit resolution as Shell-Setup Display (specialize);
+    // Vista/7 also stage USOSRES on the CSMWrap paths (autounattend.zig).
+    .{ .tweak = .display, .nt5 = &.{ .windows_2000, .windows_xp, .windows_2003 }, .since = .vista },
     .{ .tweak = .display_bpp, .nt5 = &.{.windows_2000} },
     .{ .tweak = .disable_uac, .since = .vista, .until = .windows_7 },
     .{ .tweak = .no_sidebar, .since = .vista, .until = .windows_7, .client_only = true },

@@ -1090,7 +1090,7 @@ fi
 # Preserve the installation VM's basic mode. The persistent hardware helper
 # defers in QEMU and removes its Run value only after hardware processing.
 # No request in a USOS-made answer (user decision 2026-10-20): auto, the
-# highest tested mode up to 1920x1080, only with the VESA miniport. The first
+# native (EDID) or else highest tested mode (docs/display-policy.md), only with the VESA miniport. The first
 # start keeps VESA.REG's 1024x768x16; USOSRES applies at the first hardware
 # logon (CDS_TEST, rollback). A user's own answer file gets no request.
 nt4_display_request=
@@ -1101,7 +1101,7 @@ if [ -z "$nt3" ] && [ -z "$nt31" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; t
 elif [ -z "$nt3" ] && [ -z "$nt31" ] && [ "$ANSWER_KIND" != USER ] && [ -f "$usos/VESA.REG" ] && [ -f "$LIB/USOSRES.EXE" ]; then
     . "$LIB/display_profile.sh"
     nt4_display_request=autoxauto
-    log 'DISPLAY no request in the answer, default auto (up to 1920x1080)'
+    log 'DISPLAY no request in the answer, default auto (native EDID mode, else highest)'
 fi
 if [ -n "$nt4_display_request" ]; then
     usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt4_display_request" || fail 'cannot stage hardware display request'

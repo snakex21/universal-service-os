@@ -268,7 +268,7 @@ done
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
-# 2026-10-20) auto = the highest validated mode up to 1920x1080 for every
+# 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
 # Setup and the first start keep the INF's safe mode; USOSRES applies the
 # mode at the first hardware sign-in (CDS_TEST, rollback; defers in the VM).
@@ -279,7 +279,7 @@ if grep -q '^;USOS-DISPLAY=' "$ANSWER_INF"; then
 elif [ "$ANSWER_KIND" != USER ] && [ -f "$LIB/w9x-display/USOSRES.EXE" ] && [ -f "$LIB/w9x-display/USOSVBI.EXE" ]; then
     . "$LIB/display_profile.sh"
     display_request=autoxauto
-    log 'display: no request in the answer, default auto (up to 1920x1080)'
+    log 'display: no request in the answer, default auto (native EDID mode up to 1920x1080)'
 fi
 if [ -n "$display_request" ]; then
     usos_display_stage "$work/c/USOS9X" "$LIB/w9x-display/USOSRES.EXE" "$display_request" || fail 'cannot stage 9x display request'

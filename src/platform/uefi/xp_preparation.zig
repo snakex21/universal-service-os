@@ -184,6 +184,8 @@ pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8,
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     try bs.setWatchdogTimer(0, 0, null);
     progress(.loading);
+    // The monitor's native size for USOSRES (docs/display-policy.md).
+    @import("display_native.zig").record(root);
     const image = try esp_image.load(root, "\\EFI\\USOS-XP\\vmlinuz.efi");
     defer _ = bs.unloadImage(image) catch .load_error;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;

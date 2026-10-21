@@ -74,6 +74,7 @@ cleanup() {
     umount "$work/donor" 2>/dev/null || true
     [ -z "${loop:-}" ] || losetup -d "$loop" 2>/dev/null || true
     umount "$work/staging" 2>/dev/null || true
+    umount "$work/windows" 2>/dev/null || true
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -167,6 +168,43 @@ sync
 dd if="$node" of="$work/boot.readback" bs=512 count=16 2>/dev/null
 cmp -s "$work/boot" "$work/boot.readback" || fail 'NT60 boot code readback mismatch'
 log 'NT60 NTFS boot code PASS'
+
+# 2b. Display (docs/display-policy.md): Vista / 7 / 2008 / 2008 R2
+# install on the Standard VGA driver at 800x600. A USOS answer for them
+# registers \USOS\NT6\USOSRES.EXE (autounattend.zig display_helper); its
+# request is <!-- USOS-DISPLAY=... --> or, without one, auto (native EDID
+# mode, else the highest). Staged into the new Windows partition now:
+# Setup installs into it (InstallTo, no format) and leaves the folder. A
+# user's own answer file has no registration: nothing staged. Optional:
+# any failure keeps Windows' own mode and the preparation goes on.
+modprobe ntfs3 2>/dev/null || true
+display_request=
+if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && [ -r "$LIB/display_profile.sh" ]; then
+    . "$LIB/display_profile.sh"
+    if usos_display_nt6_answer "$ANSWER_XML"; then
+        display_request=$(usos_display_from_xml "$ANSWER_XML") || { display_request=; log 'DISPLAY duplicate request in the answer; display unchanged'; }
+        [ -n "$display_request" ] || display_request=autoxauto
+        usos_display_valid "$display_request" || { log "DISPLAY invalid request $display_request; display unchanged"; display_request=; }
+    fi
+fi
+if [ -n "$display_request" ]; then
+    mkdir -p "$work/windows"
+    if [ ! -f "$LIB/USOSRES.EXE" ]; then
+        log 'DISPLAY USOSRES.EXE missing in this build; display unchanged'
+    elif ! mount -t ntfs3 "$windows_node" "$work/windows"; then
+        log 'DISPLAY cannot mount the Windows partition; display unchanged'
+    else
+        if mkdir -p "$work/windows/USOS/NT6" && usos_display_stage "$work/windows/USOS/NT6" "$LIB/USOSRES.EXE" "$display_request" &&
+            cmp -s "$LIB/USOSRES.EXE" "$work/windows/USOS/NT6/USOSRES.EXE"; then
+            log "DISPLAY request=$display_request apply=first-sign-in vm=deferred"
+        else
+            rm -rf "$work/windows/USOS/NT6"
+            log 'DISPLAY staging failed; display unchanged'
+        fi
+        sync
+        umount "$work/windows" || fail 'cannot unmount the Windows partition'
+    fi
+fi
 
 # 3. The PE10 donor's boot files.
 modprobe ntfs3 2>/dev/null || true
