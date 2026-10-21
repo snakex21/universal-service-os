@@ -158,6 +158,14 @@ target). An unknown dialog stops the adapter instead of silently consuming
 the entire timeout. A product failure ends an interactive case without
 opening an unverified keyed Setup frame; that failure remains in metadata.
 
+`collect_nt4_failure: true` plus the explicit frozen `--evidence-assets`
+allows a **keyless NT4 diagnostic case only** to collect the inner Setup's
+saved screen/logs before disk cleanup. It runs one read-only Linux collector
+after outer and nested QEMU have ended, within the reserved two-engine lane.
+It never runs on a keyed test. This diagnostic can reveal the Setup question;
+it is not a completed installation or USB test. Collection failure is saved
+separately and never prevents normal image cleanup.
+
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB
 free and 8 GiB available host RAM, at most three VMs globally. VM disks are

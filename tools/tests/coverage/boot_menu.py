@@ -167,6 +167,8 @@ async def main(args):
     if not work.is_relative_to(fixture.COLLECTION/'_vm'):
         raise ValueError('Only owned collection VM fixtures may be opened writable')
     metadata = json.loads((work/'fixture.json').read_text(encoding='utf-8'))
+    aux.validate_failure_collection(getattr(args,'collect_nt4_failure',False),metadata,
+                                    getattr(args,'evidence_assets',None),fixture.COLLECTION)
     if metadata['result']['result'] != 'PASS':
         raise ValueError('Fixture preparation was not successful')
     if args.auto_native and args.interactive:
@@ -412,6 +414,18 @@ async def main(args):
     result['usb_pointer']=None if args.ps2_input else getattr(args,'usb_pointer','tablet')
     result['allocated_disk_bytes'] = allocated
     result['total_allocated_disk_bytes'] = sum(allocated.values())
+    if product_failure and getattr(args,'collect_nt4_failure',False):
+        # Outer QEMU and its nested installer have ended. One read-only
+        # collector fits the already reserved nested lane; no extra live OS.
+        try:
+            spec = importlib.util.spec_from_file_location('coverage_failure_collector',Path(__file__).with_name('collect_guest_logs.py'))
+            collector = importlib.util.module_from_spec(spec);spec.loader.exec_module(collector)
+            from types import SimpleNamespace
+            await collector.main(SimpleNamespace(qemu=args.qemu,assets=args.evidence_assets,
+                fixture=work,out=args.out/'guest-evidence'))
+            result['failure_evidence']='guest-evidence/collection.json'
+        except Exception as error:
+            result['failure_evidence_error']=type(error).__name__+': '+str(error)
     (args.out/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     (args.out/'fixture.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     for path in all_disks:
@@ -437,6 +451,8 @@ if __name__ == '__main__':
     parser.add_argument('--ps2-input',action='store_true',help='Use default QEMU PS/2 keyboard/mouse; USB stick stays on xHCI')
     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
+    parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; keyless NT4 diagnostic cases only')
+    parser.add_argument('--evidence-assets',type=Path,help='Explicit frozen cache for the one post-failure collector')
     parser.add_argument('--usb-pointer',choices=('mouse','tablet'),default='tablet',help='Use mouse for the NT4 driver boot-HID path')
     parser.add_argument('--usability-usb',action='store_true',help='Own disposable FAT16 boot/hot-plug sticks; attach boot stick after disk preparation')
     asyncio.run(main(parser.parse_args()))

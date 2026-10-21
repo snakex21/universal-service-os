@@ -45,6 +45,14 @@ def framebuffer_menu_keys(line):
     return menus[name]
 
 
+def validate_failure_collection(enabled,metadata,assets,collection):
+    if not enabled:return
+    if metadata.get('private_profile') or metadata.get('folder')!='Windows NT 4.0':
+        raise ValueError('Failure collector accepts only a keyless NT4 diagnostic case')
+    if assets is None or not assets.resolve().is_relative_to(collection/'_assets'):
+        raise ValueError('Failure collector needs explicit owned frozen assets')
+
+
 def fat16_prefix(kind):
     if kind not in ('boot','hot'):raise ValueError('Unknown test stick')
     start=PARTITION_LBA*512

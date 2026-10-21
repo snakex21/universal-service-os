@@ -11,6 +11,13 @@ aux=importlib.util.module_from_spec(spec);spec.loader.exec_module(aux)
 
 
 class AuxiliaryTests(unittest.TestCase):
+    def test_failure_collection_never_exports_keyed_setup(self):
+        root=Path(__file__).resolve().parents[3]
+        meta={'folder':'Windows NT 4.0','private_profile':False}
+        aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+        for changed in (dict(meta,private_profile=True),dict(meta,folder='Windows XP')):
+            with self.assertRaises(ValueError):aux.validate_failure_collection(True,changed,root/'_assets',root)
+        with self.assertRaises(ValueError):aux.validate_failure_collection(True,meta,root/'outside',root)
     def test_disk_mode_uses_the_actual_non_erasing_first_row(self):
         root=Path(__file__).resolve().parents[3]
         source=(root/'tools/xp_disk_reset_ui.sh').read_text()
