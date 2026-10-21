@@ -213,6 +213,7 @@ async def main(args):
     if not work.is_relative_to(fixture.COLLECTION/'_vm'):
         raise ValueError('Only owned collection VM fixtures may be opened writable')
     metadata = json.loads((work/'fixture.json').read_text(encoding='utf-8'))
+    fixture.fixture_init.require_verified(metadata)
     aux.validate_failure_collection(getattr(args,'collect_nt4_failure',False),metadata,
                                     getattr(args,'evidence_assets',None),fixture.COLLECTION)
     if metadata['result']['result'] != 'PASS':
@@ -303,6 +304,8 @@ async def main(args):
             while raw := await process.stdout.readline():
                 line = redact(raw.decode('utf-8',errors='replace'))
                 log.write(line); log.flush()
+                if ui_count==0 and not prepared.is_set():
+                    fixture.fixture_init.reject_firmware_shell(line)
                 if line.strip()=='[LEGACY_XP] PREPARED SYNC PASS; USOS media may now be removed safely':
                     nt5_synced=True
                 if line.strip()=='[LEGACY_XP] WAITING FOR USER: remove USOS USB, then press ENTER to power off; target will boot XPSETUP as BIOS 0x80 on next power-on':
