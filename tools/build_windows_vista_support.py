@@ -12,17 +12,25 @@ from nt6.usoswm.build import build as build_watermark
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def signed_amd64_image(raw):
+    """PE32+ AMD64 image with an embedded (Authenticode) security directory."""
+    if len(raw) < 64 or raw[:2] != b'MZ':
+        return False
+    nt = int.from_bytes(raw[60:64], 'little')
+    return (raw[nt:nt+4] == b'PE\0\0' and
+            int.from_bytes(raw[nt+4:nt+6], 'little') == 0x8664 and
+            int.from_bytes(raw[nt+24:nt+26], 'little') == 0x20b and
+            bool(int.from_bytes(raw[nt+24+112+4*8+4:nt+24+112+4*8+8], 'little')))
+
+
 def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None, nvme_package=None):
     tool_root = Path(tool_root) if tool_root is not None else root / 'tools'
     nvme_files = []
+    mpart_file = None
     if nvme_package is not None:
         package = Path(nvme_package)
         raw = (package / 'usosnvme.sys').read_bytes()
-        nt = int.from_bytes(raw[60:64], 'little')
-        if (raw[:2] != b'MZ' or raw[nt:nt+4] != b'PE\0\0' or
-                int.from_bytes(raw[nt+4:nt+6], 'little') != 0x8664 or
-                int.from_bytes(raw[nt+24:nt+26], 'little') != 0x20b or
-                not int.from_bytes(raw[nt+24+112+4*8+4:nt+24+112+4*8+8], 'little')):
+        if not signed_amd64_image(raw):
             raise ValueError('explicit NVMe package needs an embedded-signed amd64 NT6 image')
         if b'[Nvme_Models.NTamd64]' not in (package / 'usosnvme.inf').read_bytes():
             raise ValueError('NVMe package has no NTamd64 models')
@@ -31,6 +39,14 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None, nvme
             if not file.is_file() or not file.stat().st_size:
                 raise ValueError('explicit NVMe package is incomplete')
             nvme_files.append((file, 'usosnvme-nt6.sys' if name.endswith('.sys') else name))
+        # usosmpart (USB multi-partition disk filter), signed with the same
+        # per-build certificate; usos-vista-install.exe registers it on the
+        # CSMWrap path once testsigning is set in the target BCD
+        # (docs/vista-x64-usb-multipartition-2026-10-21.md).
+        mpart = package / 'usosmpart.sys'
+        if not mpart.is_file() or not signed_amd64_image(mpart.read_bytes()):
+            raise ValueError('explicit NVMe package needs the embedded-signed amd64 usosmpart.sys')
+        mpart_file = mpart
     # Keep the physically successful binaries: changing the installer must not
     # silently rebuild or alter firstboot, certificates or the driver package.
     frozen = Path(frozen_root) if frozen_root is not None else root / 'artifacts/vista/hardware-success-v11-20260920-235629'
@@ -114,6 +130,8 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None, nvme
             writer.add_bytes('usosnvme-amd64.ready', b'1\r\n')
             for file, name in nvme_files:
                 writer.add_file(name, file)
+        if mpart_file is not None:
+            writer.add_file('usosmpart-amd64.sys', mpart_file)
         writer.add_bytes('usos-modern-vista.cmd',(root/'tools/windows_vista_modern_startup.cmd').read_bytes().replace(b'\r\n',b'\n').replace(b'\n',b'\r\n'))
         for index,(path,_,_) in enumerate(files):
             writer.add_file('vista-payload-%02d.bin'%index,path)
