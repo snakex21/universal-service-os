@@ -101,6 +101,27 @@ class EvidencePolicy(unittest.TestCase):
             with self.assertRaises((ValueError,base64.binascii.Error)):own.decode_transport(bad)
         self.assertIn('readonly=on',(HERE/'collect_nt351_success.py').read_text())
         self.assertNotIn('SYSTEM32/CONFIG',own.commands())
+    def test_real_busybox_interleaved_end_prefix_and_strict_rejections(self):
+        # Same framing as R18c completed serial: a queued END prefix interrupts
+        # one76-character base64 line; the full echoed command follows payload.
+        payload=archive([('POST.LOG',bytes(range(1,128))*5,tarfile.REGTYPE)])
+        value=base64.b64encode(payload).decode();chunks=[value[i:i+76] for i in range(0,len(value),76)]
+        self.assertGreater(len(chunks),2)
+        chunks[1]+='NT351_OW'
+        text='NT351_OWN_EVIDENCE_BEGIN\n/tmp/export # base64 /tmp/evidence.tgz\n'+\
+            '\n\n'.join(chunks)+'\n/tmp/export # echo NT351_OWN_EVIDENCE_END\nNT351_OWN_EVIDENCE_END\n'
+        self.assertEqual(own.decode_transport(text),payload)
+        mutations=(text.replace('NT351_OW\n','NT351_OX\n'),
+            text.replace('/tmp/export # echo NT351_OWN_EVIDENCE_END\n',''),
+            text.replace('/tmp/export # base64 /tmp/evidence.tgz','/tmp/export # rm /tmp/evidence.tgz'),
+            text.replace('NT351_OW\n','NT351_OWNT351_OW\n'),
+            text.replace('NT351_OWN_EVIDENCE_END\n','AAAA\nNT351_OWN_EVIDENCE_END\n',1))
+        for bad in mutations:
+            with self.subTest(bad=bad[-120:]),self.assertRaises((ValueError,base64.binascii.Error)):
+                own.decode_transport(bad)
+        simple='NT351_OWN_EVIDENCE_BEGIN\n'+value+'AAAA\nNT351_OWN_EVIDENCE_END\n'
+        with self.assertRaises((ValueError,base64.binascii.Error)):own.decode_transport(simple)
+
     def test_actual_shell_tar_base64_and_driver_hash_transport(self):
         source=self.root/'source';source.mkdir()
         for name in own.FILES:(source/name).write_text(name+' own text\n',encoding='utf-8')

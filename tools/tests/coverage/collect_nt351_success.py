@@ -65,6 +65,8 @@ if MTOOLS_SKIP_CHECK=1 mdir -i "$disk" ::/WINNT/SYSTEM32/DRIVERS/usosnet351.sys 
  rm /tmp/own-driver
 fi
 cd /tmp/export
+# Disable terminal input echo before the bounded transport; shell mock has no tty.
+stty -echo 2>/dev/null || :
 tar -czf /tmp/evidence.tgz .
 echo NT351_OWN_EVIDENCE_BEGIN
 base64 /tmp/evidence.tgz
@@ -81,9 +83,35 @@ def decode_transport(text):
     begin=[i for i,v in enumerate(lines) if v.strip()=='NT351_OWN_EVIDENCE_BEGIN']
     end=[i for i,v in enumerate(lines) if v.strip()=='NT351_OWN_EVIDENCE_END']
     if len(begin)!=1 or len(end)!=1 or end[0]<=begin[0]:raise ValueError('Missing or ambiguous transport boundary')
-    encoded=''.join(v.strip() for v in lines[begin[0]+1:end[0]]
-                    if v.strip() and not v.startswith('/tmp/export # '))
-    payload=base64.b64decode(encoded,validate=True)
+    # Exact observed BusyBox command echoes, not arbitrary prompt lines.
+    base64_echo=re.compile(r'/tmp/export # (?:\x1b\[6n)?base64 /tmp/evidence\.tgz')
+    end_echo=re.compile(r'/tmp/export # (?:\x1b\[6n)?echo NT351_OWN_EVIDENCE_END')
+    # R18c's completed serial (SHA a788da3d...f3c7e) contains exactly this
+    # eight-character prefix of the queued END command after one full76B line.
+    # Preserve all76 payload characters; require the full matching echo below.
+    interrupted=re.compile(r'([A-Za-z0-9+/]{76})NT351_OW')
+    encoded=[];seen_base64=False;seen_end=False;seen_fragment=False
+    for line in lines[begin[0]+1:end[0]]:
+        if not line.strip():continue
+        if base64_echo.fullmatch(line):
+            if encoded or seen_base64 or seen_end:raise ValueError('Unexpected evidence command echo order')
+            seen_base64=True
+        elif end_echo.fullmatch(line):
+            if not encoded or seen_end:raise ValueError('Unexpected evidence command echo order')
+            seen_end=True
+        else:
+            if seen_end:raise ValueError('Payload after evidence end echo')
+            fragment=interrupted.fullmatch(line)
+            if fragment:
+                if not seen_base64 or seen_fragment:raise ValueError('Unexpected evidence echo fragment')
+                seen_fragment=True;line=fragment[1]
+            elif not re.fullmatch(r'[A-Za-z0-9+/=]+',line.strip()):
+                raise ValueError('Unexpected evidence transport line')
+            encoded.append(line.strip())
+    if not encoded or (seen_fragment and not seen_end):raise ValueError('Incomplete evidence transport')
+    value=''.join(encoded)
+    payload=base64.b64decode(value,validate=True)
+    if base64.b64encode(payload).decode('ascii')!=value:raise ValueError('Noncanonical evidence base64')
     if len(payload)>MAX_TOTAL+65536:raise ValueError('Archive limit exceeded')
     return payload
 
