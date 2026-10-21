@@ -36,3 +36,28 @@ Metadata and source/member hashes:
 `C:\Users\ASRock\usos-work\macierz-windows\artifacts\coverage\nt3-ndis3-candidate-original-exports.json`.
 The old NDIS4 driver's larger missing-import counts are superseded only
 for this new NDIS3 candidate. There is no runtime PASS in this document.
+
+An additional original NT3.5 PCI audit found a possible starting point,
+not a drop-in replacement: `NdisPciAssignResources` exists at RVA `0xee64`
+in NDIS.SYS `fa392210418f6a5977ea8117d49b4d6a0b4cfc7d4fcc436fca2e3defdd6a5543`.
+The bounded decode shows five stack arguments (`ret 0x14`), accesses to
+the third handle at `+0x64` / `+0x6c`, and a call through the imported
+`HalAssignSlotResources`. This differs from the three-argument
+`NdisMPciAssignResources` used by our miniport. Aliasing the imports is
+therefore not a demonstrated adaptation.
+
+`NdisReadPciSlotInformation` RVA `0x4bfc` branches on the type of handle;
+the first decoded path reads a bus field at handle `+0x104` before calling
+`HalGetBusDataByOffset`. The other branch, wrapper bus initialization,
+resource ownership and the matching miniport receive contract still need
+proof before an NT3.5 variant can be built. The original HAL exports
+`HalAssignSlotResources`, `HalGetBusDataByOffset` and `HalSetBusDataByOffset`.
+This is a concrete audit target, not permission to write guessed private
+handle fields. No new driver or Windows network PASS resulted.
+
+The completed bounded decode and its repeatable input script are in
+`artifacts/nt35-pci-audit/result.json` and `audit.py` in this worktree.
+The NT3.5 ISO and compressed scratch files were removed after the audit;
+expanded NDIS/HAL bytes were held only in memory. `dc21x4.sys` was absent
+from this exact original medium, so it supplied no original-driver ABI
+reference in this audit.
