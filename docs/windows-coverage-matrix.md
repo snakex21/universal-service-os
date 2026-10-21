@@ -1,8 +1,8 @@
 # Macierz Windows — checkpoint, testy instalacji nieukończone
 
-Data: 2026-10-20. Baza `97f40f018d1d811dab85c2c1e44f8b6404860189`, po rebase z `1197eb49`.
+Data: 2026-10-21. Baza `97f40f018d1d811dab85c2c1e44f8b6404860189`, po rebase z `1197eb49`.
 
-Inwentaryzacja obejmuje 91 plików wejściowych. To także archiwa, dyskietki, nośniki aktualizacji i duplikaty — nie liczba unikatowych instalatorów.
+Inwentaryzacja obejmuje 102 plików wejściowych. To także archiwa, dyskietki, nośniki aktualizacji i duplikaty — nie liczba unikatowych instalatorów.
 
 **Ten dokument nie spełnia jeszcze kryterium pełnych testów QEMU.** Wiersze „oczekuje” nie oznaczają ani PASS, ani wykrytego błędu Windows. Status X470 przypisano wyłącznie tam, gdzie dokumentacja wskazuje dokładne źródło.
 
@@ -12,53 +12,53 @@ Inwentaryzacja obejmuje 91 plików wejściowych. To także archiwa, dyskietki, n
 |---|---|---|---|---|---|---|---|
 | Bety: 7 plików | poza zakresem | — | — | poza zakresem | — | bez testów instalacji i sondowania wersji | nie oceniano |
 | Citrix WinFrame\Citrix WinFrame 1.8 (ISO + Tools ISO + boot disks).7z | 3.51.1057.6 | en-US / x86 | wymaga przypisania folderu katalogu | nie uruchomiono | brak backendu | brak identyfikacji przez sam parser optyczny; 5 obrazów wewnątrz archiwum; Katalog USOS jawnie blokuje WinFrame: potrzebny osobny Setup i integracja licencji Citrix. Narzędziowy Tools ISO i boot disks nie są osobnymi instalatorami. Źródło: catalog.ndjson, preparation_block. | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 1.01\Windows 1.01 EN (5.25 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-01 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 5 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 1.01\Windows 1.01 EN (5.25 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-01 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 5 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 1.01\Windows 1.01 EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-01 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-101-menu-5\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 1.04\Windows 1.04 EN (5.25 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-04 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 1.04\Windows 1.04 EN (5.25 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-04 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 1.04\Windows 1.04 EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-1-04 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-104\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 10\Windows 10 22H2 19045.6396 PL x86.iso | 10.0.19045 | pl-PL / x86 | windows-10 / win10-11-uefi-native | oczekuje | — | Windows 10 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 11\Windows 11 25H2 PL x64.iso | 10.0.26200 | pl-PL / x64 | windows-11 / win10-11-uefi-native | oczekuje | — | Windows 11 | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 2.03\Windows 2.03 EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-03 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 5 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 2.03\Windows 2.03 EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-03 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 5 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 2.03\Windows 2.03 EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-03 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-203\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 2.11 (286)\Windows 2.11 286 EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-286 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 2.11 (286)\Windows 2.11 286 EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-286 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 2.11 (286)\Windows 2.11 286 EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-286 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-211-286\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 2.11 (386)\Windows 2.11 386 EN (3.5 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-386 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 2.11 (386)\Windows 2.11 386 EN (3.5 floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-386 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 2.11 (386)\Windows 2.11 386 EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-2-11-386 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-211-386\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 2000 Server\Windows 2000 Server PL.iso | 5.0.2195.1 | pl-PL / x86 | windows-2000-server / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000-server | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 2000 Server\Windows 2000 Server PL.iso | 5.0.2195.1 | pl-PL / x86 | windows-2000-server / w2k-x86-sp4-uefi-csm | błąd adaptera testu | niespójny zestaw wejść NT5 | windows-2000-server; Starszy xp_user_settings.sh w dołączonym initramfs-xp odrzucił pięć pól generowanych przez nowsze menu. Audyt nt5-settings-bundle-audit.json. Wymagana powtórka na zsynchronizowanej kopii testowej, bez zmiany bajtów sterowników. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 2000 Server\Windows 2000 Server SP4 PL.iso | 5.0.2195.6717 / SP4 | pl-PL / x86 | windows-2000-server / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000-server | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 2000\W2KPLCMA4.811.iso | 5.0.2195.6717 / SP2 | pl-PL / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000 | X470 PASS: `docs/windows-2000-uefi-2026-09-27.md:106`, `docs/windows-2000-modern-2026-09-30.md:181`, `docs/windows-2000-modern-2026-09-30.md:712`; Historyczny test SP4 MPS; nie dowodzi ACPI ani innych SP/ISO |
-| Windows 2000\W2KPLCMA6.7.15.iso | 5.0.2195.6717 / SP2 | pl-PL / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000 | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 3.0\Windows 3.0a EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-3-0 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 2000\W2KPLCMA4.811.iso | 5.0.2195.6717 / SP4 | pl-PL / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000 | X470 PASS: `docs/windows-2000-uefi-2026-09-27.md:106`, `docs/windows-2000-modern-2026-09-30.md:181`, `docs/windows-2000-modern-2026-09-30.md:712`; Historyczny test SP4 MPS; nie dowodzi ACPI ani innych SP/ISO |
+| Windows 2000\W2KPLCMA6.7.15.iso | 5.0.2195.6717 / SP4 | pl-PL / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000 | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 3.0\Windows 3.0a EN (720K floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-3-0 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 7 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 3.0\Windows 3.0a EN.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-3-0 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; File Manager desktop after one manual Enter on the visible CONFIG.SYS/AUTOEXEC.BAT Setup question; operator-01.png | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 3.11\Windows 3.11 OEM EN (1.44M floppies).zip | nie odczytano wersji binarnej | nie odczytano / unknown | windows-3-11 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 12 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 3.11\Windows 3.11 OEM EN (1.44M floppies).zip | nie odczytano wersji binarnej | nie odczytano / unknown | windows-3-11 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 12 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 3.11\Windows 3.11 OEM EN.iso | 3.11.0.2 | nie odczytano / unknown | windows-3-11 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-311-oem\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 3.1\Windows 3.1 PL.iso | 3.10.0.103 | nie odczytano / unknown | windows-3-1 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; Polish Program Manager desktop with Main group, accessories, games and Startup; endpoint.png at 600s | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 7\Windows 7 Professional SP1 PL x64.iso | 6.1.7601 / SP1 | pl-PL / x64 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 7\Windows 7 SP1 6in1 PL x64 (2019-07).iso | 6.1.7601 / SP1 | pl-PL / x64 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | X470 PASS: `docs/windows7-bios-2026-09-10.md:23`, `docs/windows7-bios-2026-09-10.md:24`, `docs/design/win7-vista-no-csm.md:561`, `docs/design/win7-vista-no-csm.md:565`; 6in1 PL July 2019, UEFI bez CSM; wynik nie obejmuje oryginalnych SP1 ISO |
 | Windows 7\Windows 7 Ultimate SP1 PL x64.iso | 6.1.7601 / SP1 | pl-PL / x64 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 7\Windows 7 Ultimate SP1 PL x86.iso | 6.1.7601 / SP1 | pl-PL / x86 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 95\Windows 95 OSR2 Boot Disk.img | nie odczytano wersji binarnej | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows 95\Windows 95 OSR2.1 PL.iso | 4.0.0.1111 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 95\Windows 95 OSR2 Boot Disk.img | nie odczytano wersji binarnej | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | nie uruchomiono | wejście pomocnicze | brak identyfikacji przez sam parser optyczny; dyskietki/archiwum: parser optyczny nie ma zastosowania; Pomocnicza dyskietka DOS używana w teście ISO Windows 95; sama nie zawiera kompletnej instalacji Windows. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows 95\Windows 95 OSR2.1 PL.iso | 4.0.0.1111 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | QEMU nieukończono | prepared installation | brak identyfikacji przez sam parser optyczny; User requested stop for the night before completion; no desktop was observed. VM stopped and its disks removed.; warianty: NVMe 4 GiB / TCG, próba z pauzą: INCOMPLETE (nested Setup); NVMe 4 GiB / WHPX: INCOMPLETE (restart firmware po przygotowaniu); QEMU TCG NVMe, stopped for the night: INCOMPLETE (prepared installation) | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 98 SE\Windows 98 SE PL OEM.iso | 4.10.0.2222 | nie odczytano / unknown | windows-98-se / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows 98\Windows 98 PL.iso | 4.10.0.1998 | nie odczytano / unknown | windows-98 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Embedded 8.1 Industry\Windows Embedded 8.1 Industry Pro (9600.16384) PL x64.iso | 6.3.9600 | pl-PL / x64 | windows-embedded-8-1-industry / win10-11-uefi-native | oczekuje | — | Windows Embedded 8.1 Industry | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Embedded 8.1 Industry\Windows Embedded 8.1 Industry Pro (9600.16384) PL x86.iso | 6.3.9600 | pl-PL / x86 | windows-embedded-8-1-industry / win10-11-uefi-native | oczekuje | — | Windows Embedded 8.1 Industry | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Embedded POSReady 2009\Windows Embedded POSReady 2009 (XP SP3) EN.iso | nie odczytano wersji binarnej / SP3 | en-US / x86 | windows-embedded-posready-2009 / posready-x86-qemu-csmwrap | oczekuje | — | windows-embedded-posready-2009 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Embedded POSReady 7\Windows Embedded POSReady 7 EVAL EN x64.iso | 6.1.7601 / SP1 | en-US / x64 | windows-embedded-posready-7 / win7-uefi-native | oczekuje | — | Windows Embedded Standard 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows Embedded Standard 7\Windows Embedded Standard 7 SP1 IBW EN x86.iso | 6.1.7601 / SP1 | nie odczytano / x86 | windows-embedded-standard-7 / win7-uefi-native | oczekuje | — | Windows Embedded Standard 7; backend wyłączony: WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported. | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows Embedded Standard 7\Windows Embedded Standard 7 SP1 Runtime EN x64.iso | 6.1.7601 / SP1 | nie odczytano / x64 | windows-embedded-standard-7 / win7-uefi-native | oczekuje | — | Windows Embedded Standard 7; backend wyłączony: WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported. | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows Fundamentals for Legacy PCs\Windows Fundamentals for Legacy PCs EN.iso | nie odczytano wersji binarnej / SP1 | en-US / x86 | windows-flp / posready-x86-qemu-csmwrap | oczekuje | — | windows-flp; backend wyłączony: FLP needs its own WinPE and WinFLP.wim installer integration. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows Embedded Standard 7\Windows Embedded Standard 7 SP1 IBW EN x86.iso | 6.1.7601 / SP1 | nie odczytano / x86 | windows-embedded-standard-7 / win7-uefi-native | nie uruchomiono | brak backendu | Windows Embedded Standard 7; backend wyłączony: WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported.; WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported. Produkcyjny katalog blokuje pełny przepływ; do pulpitu potrzebny osobny backend, poza małymi poprawkami tej macierzy. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows Embedded Standard 7\Windows Embedded Standard 7 SP1 Runtime EN x64.iso | 6.1.7601 / SP1 | nie odczytano / x64 | windows-embedded-standard-7 / win7-uefi-native | nie uruchomiono | brak backendu | Windows Embedded Standard 7; backend wyłączony: WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported.; WES7 requires Image Builder Wizard (IBW) and DS/Packages; installing only Embedded Core is not supported. Produkcyjny katalog blokuje pełny przepływ; do pulpitu potrzebny osobny backend, poza małymi poprawkami tej macierzy. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows Fundamentals for Legacy PCs\Windows Fundamentals for Legacy PCs EN.iso | nie odczytano wersji binarnej / SP1 | en-US / x86 | windows-flp / posready-x86-qemu-csmwrap | nie uruchomiono | brak backendu | windows-flp; backend wyłączony: FLP needs its own WinPE and WinFLP.wim installer integration.; FLP needs its own WinPE and WinFLP.wim installer integration. Produkcyjny katalog blokuje pełny przepływ; do pulpitu potrzebny osobny backend, poza małymi poprawkami tej macierzy. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Home Server 2011\Windows Home Server 2011 (7601.17514) EN x64.iso | 6.1.7601 / SP1 | en-US / x64 | windows-home-server-2011 / win7-uefi-native | oczekuje | — | Windows Home Server 2011 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows ME\Windows ME PL OEM.iso | 4.90.0.3000 | nie odczytano / unknown | windows-me / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 3.1 Advanced Server\Windows NT 3.1 Advanced Server 3.10.511.1 EN (ISO + boot disks).7z | 3.10.5098.1 | nie odczytano / x86 | windows-nt-3-1-server / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 3 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 3.1\Windows NT 3.1 Workstation 3.10.511.1 EN (ISO).7z | 3.10.5098.1 | nie odczytano / x86 | windows-nt-3-1 / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows NT 3.51 Server\Windows NT 3.51 Server 3.51.1057.1 EN (ISO + boot disks).7z | 3.51.1025.1 | en-US / x86 | windows-nt-3-51-server / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 4 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows NT 3.51 Server\Windows NT 3.51 Server 3.51.1057.1 EN (ISO + boot disks).7z | 3.51.1057 (NtBuildNumber; zasób 3.51.1025.1) | en-US / x86 | windows-nt-3-51-server / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 4 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 3.51\Windows NT 3.51 SP5 EN.7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-nt-3-51 / nt3-x86-qemu-csmwrap | nie uruchomiono | archiwum aktualizacji | brak identyfikacji przez sam parser optyczny; 0 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum dodatku/aktualizacji; listing nie zawiera obrazu instalacyjnego. Nie jest samodzielnym systemem do pierwszego pulpitu. | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows NT 3.51\Windows NT 3.51 Workstation 3.51.1057.1 EN.7z | 3.51.1025.1 | en-US / x86 | windows-nt-3-51 / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 4 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows NT 3.51\Windows NT 3.51 Workstation 3.51.1057.1 EN.7z | 3.51.1057 (NtBuildNumber; zasób 3.51.1025.1) | en-US / x86 | windows-nt-3-51 / nt3-x86-qemu-csmwrap | QEMU FAIL | Setup w VM USOS, start 2 | brak identyfikacji przez sam parser optyczny; 4 obrazów wewnątrz archiwum; Przestój 902 s bez zapisu (2320 s łącznie), rc=3. Dokładna strona Setupu nieustalona; niespójny FAT na zatrzymanym ESP i niepoprawne dane logów/ekranu nie pozwalają rozpoznać dialogu. Badano główny ISO z archiwum, nie dyskietki. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 3.5\Windows NT 3.5 Workstation 3.50.807 EN (ISO + boot disks).7z | 3.50.800.1 | en-US / x86 | windows-nt-3-5 / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 4 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0 Server\Windows NT 4.0 Enterprise Server EN (CD1).iso | 4.0.1381.1 | en-US / x86 | windows-nt-4-server / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0 Server\Windows NT 4.0 Enterprise Server EN (CD1+CD2).7z | 4.0.1381.1 | en-US / x86 | windows-nt-4-server / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 2 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows NT 4.0 Server\Windows NT 4.0 Service Pack 6a.7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-nt-4-server / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 0 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows NT 4.0 Server\Windows NT 4.0 Service Pack 6a.7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-nt-4-server / nt4-x86-qemu-csmwrap | nie uruchomiono | wejście aktualizacji | brak identyfikacji przez sam parser optyczny; 0 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum Service Pack, bez ISO i bez kompletnej instalacji systemu; uzupełnienie z przeglądu listingu 7z. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0 Server\Windows NT 4.0 USB Support Patch.7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-nt-4-server / nt4-x86-qemu-csmwrap | nie uruchomiono | archiwum aktualizacji | brak identyfikacji przez sam parser optyczny; 0 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum dodatku/aktualizacji; listing nie zawiera obrazu instalacyjnego. Nie jest samodzielnym systemem do pierwszego pulpitu. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0 Terminal Server\Windows NT 4.0 Terminal Server Edition EN.7z | 4.0.1381.32772 | en-US / x86 | windows-nt-4-tse / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0 Terminal Server\Windows NT 4.0 Terminal Server Edition EN.iso | 4.0.1381.32772 | en-US / x86 | windows-nt-4-tse / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
@@ -67,7 +67,7 @@ Inwentaryzacja obejmuje 91 plików wejściowych. To także archiwa, dyskietki, n
 | Windows NT 4.0\ServicePacks\Windows NT 4.0 SP6a PL.iso | 4.0.1381.335 | nie odczytano / x86 | wymaga przypisania folderu katalogu | nie uruchomiono | nośnik aktualizacji | brak identyfikacji przez sam parser optyczny; Service-pack CD, nie instalator Windows. Sprawdzono pełny listing 7-Zip: spcdrom.40 i SPSETUP.BAT/SP6I386.EXE; wymaga uprzednio zainstalowanego NT4. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows NT 4.0\Windows NT 4.0 Workstation PL.iso | 4.0.1381.1 | pl-PL / x86 | windows-nt-4 / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Server 2003\Windows Server 2003 R2 Enterprise SP2 PL VL (CD1).iso | 5.2.3790.3959 / SP2 | pl-PL / x86 | windows-server-2003 / w2k3-x86-sp2-uefi-csm | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows Server 2003\Windows Server 2003 R2 Enterprise SP2 PL VL (CD2).iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-server-2003 / w2k3-x86-sp2-uefi-csm | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows Server 2003\Windows Server 2003 R2 Enterprise SP2 PL VL (CD2).iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-server-2003 / w2k3-x86-sp2-uefi-csm | nie uruchomiono | wejście dodatkowych składników R2 | brak identyfikacji przez sam parser optyczny; CD2 zawiera R2AUTO.EXE, CMPNENTS i WIN52IA.R2; brak TXTSETUP.SIF i install.wim. To dodatek R2 do już zainstalowanego Servera 2003 z CD1, nie samodzielny instalator do pulpitu. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Server 2008 R2\Windows Server 2008 R2 SP1 VL (Standard-Enterprise-Datacenter-Web) PL x64.iso | 6.1.7601 / SP1 | pl-PL / x64 | windows-server-2008-r2 / win7-uefi-native | oczekuje | — | Windows Server 2008 R2 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Server 2008\Windows Web Server 2008 SP2 (6002.18005) PL x64.iso | 6.0.6002 / SP2 | pl-PL / x64 | windows-server-2008 / vista-uefi-pe10 | oczekuje | — | Windows Server 2008 | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Server 2008\Windows Web Server 2008 SP2 (6002.18005) PL x86.iso | 6.0.6002 / SP2 | pl-PL / x86 | windows-server-2008 / vista-uefi-pe10 | oczekuje | — | Windows Server 2008 | nie przypisano potwierdzenia dla dokładnego obrazu |
@@ -75,26 +75,37 @@ Inwentaryzacja obejmuje 91 plików wejściowych. To także archiwa, dyskietki, n
 | Windows Vista\Windows Vista SP2 PL x64.iso | 6.0.6002 / SP2 | pl-PL / x64 | windows-vista / vista-uefi-pe10 | oczekuje | — | Windows Vista | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows Vista\Windows Vista SP2 PL x86.iso | 6.0.6002 / SP2 | pl-PL / x86 | windows-vista / vista-uefi-pe10 | oczekuje | — | Windows Vista | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows XP Media Center\Windows XP Media Center Edition 2005 SP3.iso | 5.1.2600.5512 / SP3 | en-US / x86 | wymaga przypisania folderu katalogu | oczekuje | — | windows-xp-mce | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows XP Tablet PC\Windows XP Tablet PC Edition 2005 SP3 EN (updated).7z | 5.1.2600.5657 / SP2 | en-US / x86 | wymaga przypisania folderu katalogu | oczekuje | — | windows-xp; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows XP Tablet PC\Windows XP Tablet PC Edition 2005 SP3 EN (updated).iso | 5.1.2600.5657 / SP2 | en-US / x86 | wymaga przypisania folderu katalogu | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows XP Tablet PC\Windows XP Tablet PC Edition 2005 SP3 EN (updated).7z | 5.1.2600.5657 / SP3 | en-US / x86 | wymaga przypisania folderu katalogu | oczekuje | — | windows-xp; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows XP Tablet PC\Windows XP Tablet PC Edition 2005 SP3 EN (updated).iso | 5.1.2600.5657 / SP3 | en-US / x86 | wymaga przypisania folderu katalogu | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows XP x64\Windows XP Professional x64 SP2 EN VL.iso | 5.2.3790.3959 / SP2 | en-US / x64 | windows-xp-x64 / xp-x64-sp2-uefi-csm | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows XP\Windows XP Professional SP2 PL.iso | 5.1.2600.2180 / SP2 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows XP\Windows XP Professional SP2 PL.iso | 5.1.2600.2180 / SP2 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | QEMU FAIL | przygotowanie: walidacja pakietu | windows-xp; USOS: this driver set requires XP Professional SP3. Odrzucono oryginalny starszy nośnik przed zapisem targetu. To ograniczenie pakietu USOS, nie wynik startu kernela Windows. | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows XP\Windows XP Professional SP3 EN.iso | 5.1.2600.5512 / SP3 | en-US / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows XP\Windows XP Professional SP3 PL OEM (NiKKA 2014-04).iso | 5.1.2600.6419 / SP3 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows XP\Windows XP Professional SP3 PL.iso | 5.1.2600.5512 / SP3 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | X470 PASS: `docs/research/xp-package-language-2026-09-25.md:6`, `docs/research/xp-package-language-2026-09-25.md:15`, `docs/research/xp-first-boot-2026-09-25.md:3`; XP Professional SP3 PL, dokĹ‚adny hash z tabeli ĹşrĂłdeĹ‚ |
-| Windows for Workgroups 3.11\Windows for Workgroups 3.11 PL (1.44M floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-wfw-3-11 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 10 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows for Workgroups 3.11\Windows for Workgroups 3.11 PL.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-wfw-3-11 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows 2000\Windows 2000 Professional SP0 EN x86.7z | 5.0.2195.1 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows 2000\Windows 2000 Professional SP1 EN x86.7z | 5.0.2195.1620 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows 2000\Windows 2000 Professional SP2 EN x86.7z | 5.0.2195.2951 / SP2 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows 2000\Windows 2000 Professional SP3 EN x86.7z | 5.0.2195.5438 / SP3 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | oczekuje | — | windows-2000; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows 7\Windows 7 Home Premium RTM PL x64.iso | 6.1.7600 / SP0 | pl-PL / x64 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows XP\Windows XP Professional SP3 PL.iso | 5.1.2600.5512 / SP3 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | X470 PASS: `docs/research/xp-package-language-2026-09-25.md:6`, `docs/research/xp-package-language-2026-09-25.md:15`, `docs/research/xp-first-boot-2026-09-25.md:3`; XP Professional SP3 PL, dokładny hash z tabeli źródeł |
+| Windows for Workgroups 3.11\Windows for Workgroups 3.11 PL (1.44M floppies).7z | nie odczytano wersji binarnej | nie odczytano / unknown | windows-wfw-3-11 / w9x-uefi-csmwrap | nie uruchomiono | brak przepływu zestawu dyskietek | brak identyfikacji przez sam parser optyczny; 10 obrazów wewnątrz archiwum; dyskietki/archiwum: parser optyczny nie ma zastosowania; Archiwum zawiera zestaw IMG, bez ISO. Obecny backend DOS/Win16 wymaga ISO9660 i SETUP.EXE w katalogu głównym. Brakuje przepływu podmiany/scalania dyskietek; wynik pokrewnego ISO nie jest przenoszony. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows for Workgroups 3.11\Windows for Workgroups 3.11 PL.iso | nie odczytano wersji binarnej | nie odczytano / unknown | windows-wfw-3-11 / w9x-uefi-csmwrap | QEMU PASS | pulpit | brak identyfikacji przez sam parser optyczny; artifacts\coverage\vm\windows-wfw311-extended\result.json | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 2000\Windows 2000 Professional SP0 EN x86.7z | 5.0.2195.1 / SP0 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | QEMU FAIL | przygotowanie: walidacja nośnika | windows-2000; 1 obrazów wewnątrz archiwum; NT5_SOURCE: Windows 2000 SP4 source is required. SP0–SP3 odrzucone przed zapisem targetu; nie jest to błąd uruchomienia Windows. Braki importów opisane osobno w driver-audit.json. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 2000\Windows 2000 Professional SP1 EN x86.7z | 5.0.2195.1620 / SP1 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | QEMU FAIL | przygotowanie: walidacja nośnika | windows-2000; 1 obrazów wewnątrz archiwum; NT5_SOURCE: Windows 2000 SP4 source is required. SP0–SP3 odrzucone przed zapisem targetu; nie jest to błąd uruchomienia Windows. Braki importów opisane osobno w driver-audit.json. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 2000\Windows 2000 Professional SP2 EN x86.7z | 5.0.2195.2951 / SP2 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | QEMU FAIL | przygotowanie: walidacja nośnika | windows-2000; 1 obrazów wewnątrz archiwum; NT5_SOURCE: Windows 2000 SP4 source is required. SP0–SP3 odrzucone przed zapisem targetu; nie jest to błąd uruchomienia Windows. Braki importów opisane osobno w driver-audit.json. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 2000\Windows 2000 Professional SP3 EN x86.7z | 5.0.2195.5438 / SP3 | en-US / x86 | windows-2000 / w2k-x86-sp4-uefi-csm | QEMU FAIL | przygotowanie: walidacja nośnika | windows-2000; 1 obrazów wewnątrz archiwum; NT5_SOURCE: Windows 2000 SP4 source is required. SP0–SP3 odrzucone przed zapisem targetu; nie jest to błąd uruchomienia Windows. Braki importów opisane osobno w driver-audit.json. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 7\Windows 7 Home Premium RTM PL x64.iso | 6.1.7600 / SP0 | pl-PL / x64 | windows-7 / win7-uefi-native | QEMU nieukończono | próba przerwana po wykryciu problemu emulatora | Windows 7; WHPX nie przeszedł osobnej próby resetu OVMF. Zatrzymano wyłącznie własny zweryfikowany PID; wrapper usunął obrazy. Bez zrzutu z niepotwierdzonego etapu prywatnego Setupu. Powtórzenie w TCG.; warianty: NVMe 25 GiB thin qcow2: FAIL (wybór dysku Setup); AHCI 25 GiB / PS/2 / TCG: INCOMPLETE (graficzny Setup); AHCI 25 GiB / PS/2 / WHPX: INCOMPLETE (próba przerwana po wykryciu problemu emulatora) | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows\Windows 7\Windows 7 Home Premium RTM PL x86.iso | 6.1.7600 / SP0 | pl-PL / x86 | windows-7 / win7-uefi-native | oczekuje | — | Windows 7 | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 95\Windows 95 OSR1 EN OEM x86.7z | 4.0.0.950 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 95\Windows 95 OSR2 EN OEM x86.7z | 4.0.0.1068 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 95\Windows 95 OSR2.5 EN OEM x86.7z | 4.0.0.1068 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 95\Windows 95 RTM PL OEM x86.7z | 4.0.0.950 | nie odczytano / unknown | windows-95 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 98 SE\Windows 98 FE to SE Update EN x86.7z | 4.10.0.2222 | nie odczytano / unknown | windows-98-se / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 98 SE\Windows 98 SE EN OEM Full x86.7z | 4.10.0.2222 | nie odczytano / unknown | windows-98-se / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 98 SE\Windows 98 SE EN Retail Upgrade x86.7z | 4.10.0.2222 | nie odczytano / unknown | windows-98-se / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows 98\Windows 98 FE EN OEM Full x86.7z | 4.10.0.1998 | nie odczytano / unknown | windows-98 / w9x-uefi-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows NT 3.5 Server\Windows NT 3.5 Server EN x86.7z | 3.50.800.1 | en-US / x86 | windows-nt-3-5-server / nt3-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows NT 4.0 Embedded\Windows NT 4.0 Embedded EN x86.7z | nie odczytano wersji binarnej | nie odczytano / unknown | wymaga przypisania folderu katalogu | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows NT 4.0 Server\Windows NT 4.0 Server EN x86.7z | 4.0.1381.1 | en-US / x86 | windows-nt-4-server / nt4-x86-qemu-csmwrap | oczekuje | — | brak identyfikacji przez sam parser optyczny; 1 obrazów wewnątrz archiwum | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows\Windows Vista\Windows Vista Business SP1 EN x86.iso | 6.0.6001 / SP1 | en-US / x86 | windows-vista / vista-uefi-pe10 | oczekuje | — | Windows Vista | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows\Windows Vista\Windows Vista RTM EN x64.iso | 6.0.6000 / SP0 | en-US / x64 | windows-vista / vista-uefi-pe10 | oczekuje | — | Windows Vista | nie przypisano potwierdzenia dla dokładnego obrazu |
 | Windows\Windows Vista\Windows Vista RTM EN x86.iso | 6.0.6000 / SP0 | en-US / x86 | windows-vista / vista-uefi-pe10 | oczekuje | — | Windows Vista | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows XP\Windows XP Home RTM PL x86.iso | 5.1.2600.0 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
-| Windows\Windows XP\Windows XP Professional SP1 EN x86.iso | 5.1.2600.1106 / SP1 | en-US / x86 | windows-xp / xp-x86-sp3-uefi-csm | oczekuje | — | windows-xp | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows XP\Windows XP Home RTM PL x86.iso | 5.1.2600.0 / SP0 | pl-PL / x86 | windows-xp / xp-x86-sp3-uefi-csm | QEMU FAIL | przygotowanie: walidacja pakietu | windows-xp; USOS: this driver set requires XP Professional SP3. Odrzucono oryginalny starszy nośnik przed zapisem targetu. To ograniczenie pakietu USOS, nie wynik startu kernela Windows. | nie przypisano potwierdzenia dla dokładnego obrazu |
+| Windows\Windows XP\Windows XP Professional SP1 EN x86.iso | 5.1.2600.1106 / SP1 | en-US / x86 | windows-xp / xp-x86-sp3-uefi-csm | QEMU FAIL | przygotowanie: walidacja pakietu | windows-xp; USOS: this driver set requires XP Professional SP3. Odrzucono oryginalny starszy nośnik przed zapisem targetu. To ograniczenie pakietu USOS, nie wynik startu kernela Windows. | nie przypisano potwierdzenia dla dokładnego obrazu |
 
 ## Etapy i zakres dowodu
 
@@ -102,7 +113,7 @@ Etapy: wykrywanie → menu → przygotowanie → micro-Linux → kopiowanie → 
 
 Wykonano audyt oryginalnych modułów dla 13 źródeł NT5: XP RTM/SP1 mają brakujące eksporty; badany XP SP2 oraz kontrolne SP3 nie mają braków symboli w badanym zestawie, ale nadal obowiązuje kontrakt pakietu przygotowanego pod SP3. Windows 2000 SP0–SP3 nie mają wymaganych dwóch eksportów USBPORT dla xhci98; kontrolne SP4 mają komplet. Dokładne symbole i opcje napraw znajdą się w raporcie końcowym.
 
-Pełne dane wejść i wyników: `artifacts/coverage/inventory-second.json`, `media-second.json`, `driver-audit.json`. Surowe bajty Microsoftu nie są elementem tej dokumentacji ani zmian Git.
+Pełne dane wejść i wyników: `artifacts/coverage/inventory-fourth.json`, `artifacts/coverage/media-fourth.json`, `driver-audit.json`. Surowe bajty Microsoftu nie są elementem tej dokumentacji ani zmian Git.
 
 ## Reprezentanci do X470
 
@@ -696,6 +707,94 @@ Magazyn: `G:\USOS-Kolekcja`; 3124578304 B; SHA-256 `1471fb683a445d932deb46d1fb3f
 Magazyn: `G:\USOS-Kolekcja`; 2395904000 B; SHA-256 `8a52d0559b578c16f510444840f789b1bfcdf469341a208ea03b1d0207c9cecd`.
 
 Źródła metadanych: `setup.exe`, `sources/boot.wim`, `sources/idwbinfo.txt`, `sources/install.wim`, `sources/lang.ini`, `sources/setup.exe`.
+
+### `Windows\Windows 95\Windows 95 OSR1 EN OEM x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 329814993 B; SHA-256 `b39518b1e698555a94060898b41ab8fe6e80749baebe500c4d11cc5e5131ab32`.
+
+Źródła metadanych: `setup.exe`.
+
+- `win95_a_oem.iso`: 605220864 B; SHA-256 `5a2eb601d689f08ecbd733aa6b52ee93ec8f5aa9a145332577a8ba37c9dc89f2`.
+
+### `Windows\Windows 95\Windows 95 OSR2 EN OEM x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 400669836 B; SHA-256 `d02167793b1e66077c19e9342a249cc85421c204be6f960b95f2a9886505680f`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Microsoft Windows 95B (4.00.1111) (OSR2) [English] (CD)\windows95b.iso`: 626272256 B; SHA-256 `b4f39760e99b1f53d8de40bc1485463b91684a17265d89366fc5227cc1d99900`.
+
+### `Windows\Windows 95\Windows 95 OSR2.5 EN OEM x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 384205502 B; SHA-256 `4e01a546f1d96f24467ef1135ef6339238f834de29c406206e18b77056859333`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Microsoft Windows 95C (4.03.1216) (OSR2.5) (1997-11-26) [English]\Win95_OSR25.iso`: 618229760 B; SHA-256 `493212b2a3cd391269e55a8fde5ee0a35e29ddece4b5910ec49df69ab62f5e26`.
+
+### `Windows\Windows 95\Windows 95 RTM PL OEM x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 206006444 B; SHA-256 `bb154a3ba0cf0c5051813875bdd94fc172e1bae83d97aa8c35d88f221f58017c`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Microsoft Windows 95 [Polish] (OEM) (ISO)\disk01.iso`: 260286464 B; SHA-256 `6cb14073c3090c5168c17cf28e845fac4f5c017699edb59a185b8f340454d313`.
+
+### `Windows\Windows 98 SE\Windows 98 FE to SE Update EN x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 542369302 B; SHA-256 `84e40109321c8c57bc1b5f345f7e744d854c015c00a519f6dc6643fc24964e81`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Microsoft Windows 98 Update (FE to SE)\Windows 98 Update (FE to SE).iso`: 652218368 B; SHA-256 `53c18a410b22d903ff5666fd06728dc62414a39ba0eb5bf6fe3c6ab5ee83937e`.
+
+### `Windows\Windows 98 SE\Windows 98 SE EN OEM Full x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 544438892 B; SHA-256 `e79dd47c37ae8bd3488ebe7a2be179c5fd12169f75f053f3b13a024d0ce1600f`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Microsoft Windows 98 Second Edition\Windows 98 Second Edition.iso`: 655591424 B; SHA-256 `2adfb46df8a9c7bbd2f67bff07461cc2f9d9ec8e01f0e112cb044c9e3e62f607`.
+
+### `Windows\Windows 98 SE\Windows 98 SE EN Retail Upgrade x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 545828415 B; SHA-256 `efc76dd2332a0aa67fd9d7c0c17903a4c8fb22cee28ceab2a52ebd357db119fd`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Windows 98 SE (102 - Retail Upgrade).iso`: 652603392 B; SHA-256 `c1e54c013e4b946830ad4e5536936d64dc4c0d099bb3ae1adb6fa07fe47329f4`.
+
+### `Windows\Windows 98\Windows 98 FE EN OEM Full x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 520031423 B; SHA-256 `3eca97f2f5ad03e73a6590b5eea651bc0297f4ea5b35ce3c5423a75d91ff2515`.
+
+Źródła metadanych: `setup.exe`.
+
+- `Windows 98 First Edition.iso`: 654219264 B; SHA-256 `108a40512f0c897697e31b4127dc1335b32a3d86cf637162552ae5e1556868fa`.
+
+### `Windows\Windows NT 3.5 Server\Windows NT 3.5 Server EN x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 148115829 B; SHA-256 `682ee2983d4850766b22e5a0e5c616b2b61adc5bfca9cf598972af29d4491204`.
+
+Źródła metadanych: `i386/txtsetup.sif`.
+
+- `Microsoft Windows NT 3.5 Server (3.50.800.1)\en_winnt_3.5.srv.iso`: 369180672 B; SHA-256 `b414ba25351ee58b78a57f8c093f9b82a5e03ad8485c83e056e7777cfae6f732`.
+
+### `Windows\Windows NT 4.0 Embedded\Windows NT 4.0 Embedded EN x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 236795062 B; SHA-256 `c9f12f95a312a6ecec622e5d97a31016d3d88cfcdb850da55ab2f10f7cfec487`.
+
+Źródła metadanych: brak standardowych małych plików metadanych.
+
+- `winnt40.1381.embedded.x86.iso`: 428709888 B; SHA-256 `96554d400d241db3bb04a74a7b527623afeb88e73aad8e4beb05de8d263c1b11`.
+
+### `Windows\Windows NT 4.0 Server\Windows NT 4.0 Server EN x86.7z`
+
+Magazyn: `G:\USOS-Kolekcja`; 421982892 B; SHA-256 `30500481e316daac4770f3d6d862055a7346022c811ee836b18afd0bb4ff3bc3`.
+
+Źródła metadanych: `i386/prodspec.ini`, `i386/setupp.ini`, `i386/txtsetup.sif`.
+
+- `Microsoft Windows NT 4.0 Server (4.00.1381.1)\en_winnt_4.0_svr.iso`: 640942080 B; SHA-256 `97596eece4d87e02b6775cf8c6a99e1ff518e0d23eb79b2eae8726d2a2c480bb`.
 
 ### `Windows\Windows Vista\Windows Vista Business SP1 EN x86.iso`
 
