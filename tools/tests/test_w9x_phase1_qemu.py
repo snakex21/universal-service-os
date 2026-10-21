@@ -54,6 +54,9 @@ class Phase1Vm(unittest.TestCase):
         self.page_helper = self.tmp / 'page-helper'
         self.page_helper.write_text('#!/bin/sh\necho unknown\n', newline='\n')
         self.page_helper.chmod(0o755)
+        self.event_helper = self.tmp / 'event-helper'
+        self.event_helper.write_text('#!/bin/sh\necho ready\nif [ "${W9X_FAKE_PAGE:-}" = coa ]; then echo "page coa"; fi\nsleep 60\n', newline='\n')
+        self.event_helper.chmod(0o755)
 
     def env(self, **extra):
         env = {
@@ -63,6 +66,8 @@ class Phase1Vm(unittest.TestCase):
             'W9X_FAKE_ARGS': (self.tmp / 'args.txt').as_posix(),
             'W9X_VM_95_LIB': (ROOT / 'tools/w9x_95_ui.sh').as_posix(),
             'W9X_VM_95_HELPER': self.page_helper.as_posix(),
+            'W9X_VM_95_EVENT_LIB': (ROOT / 'tools/w9x_95_event_wait.sh').as_posix(),
+            'W9X_VM_95_EVENTS': self.event_helper.as_posix(),
         }
         env.update(extra)
         return env
@@ -111,19 +116,20 @@ class Phase1Vm(unittest.TestCase):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')
         rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
-            W9X_VM_KEY='98765001234554321', W9X_VM_95_HELPER=(self.tmp / 'absent').as_posix())
+            W9X_VM_KEY='98765001234554321', W9X_VM_95_EVENTS=(self.tmp / 'absent').as_posix())
         self.assertIn('rc=2', out, err)
         self.assertFalse((self.tmp / 'args.txt').exists())
-        self.assertNotIn('98765', (self.tmp / 'run/command.txt').read_text())
+        self.assertFalse((self.tmp / 'run/command.txt').exists())
 
     def test_the_key_is_typed_once_idle_and_never_logged(self):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')
         # No /sys/block here: the written counter stays 0, i.e. a waiting page;
         # the fake QEMU draws nothing, so the screen test is replaced.
-        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { W9X_VM_PAGE=coa; return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
-                                    W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1', W9X_VM_KEY_TRIES='1')
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { echo forbidden-screen-query >&2; return 2; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
+                                    W9X_VM_KEY='98765001234554321', W9X_FAKE_PAGE='coa')
         self.assertIn('rc=0', out, err)
+        self.assertNotIn('forbidden-screen-query', err)
         command = (self.tmp / 'run/command.txt').read_text()
         self.assertEqual(command.count('95 input: coa'), 1)
         for name in ('command.txt', 'monitor.log', 'qemu.log'):
