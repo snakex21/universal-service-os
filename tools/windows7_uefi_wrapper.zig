@@ -9,6 +9,7 @@ const memory_probe = @import("windows7_uefi_memory_probe.zig");
 const amd_shadow = @import("windows7_amd_shadow.zig");
 const vga_routing = @import("windows7_vga_routing.zig");
 const gop_retry = @import("windows7_gop_retry.zig");
+const native_mode = @import("windows7_native_mode.zig");
 
 const counter_name = std.unicode.utf8ToUtf16LeStringLiteral(gop_retry.counter_name);
 
@@ -108,7 +109,17 @@ fn run() !uefi.Status {
     const start = if (valid) "USOS: starting original Windows 7 boot manager; firmware Int10 retained" else if (graphics_result == .connected) "USOS: GOP recovered by ConnectController; starting UefiSeven; details in UefiSeven.log" else if (graphics_result == .uga_present) "USOS: UGA present; starting UefiSeven; details in UefiSeven.log" else "USOS: GOP already present; starting UefiSeven; details in UefiSeven.log";
     trace.record(device, storage[0 .. slash + 1], start);
     log.line(start);
-    const result = try bs.startImage(image);
+    // UefiSeven path: native resolution instead of its fixed 1024x768
+    // (windows7_native_mode.zig; hooks the boot manager start and winload's
+    // ExitBootServices, removed again if UefiSeven returns). EXPERIMENTAL and
+    // off unless usos-native-res.flag sits beside the dispatcher: in QEMU the
+    // Setup PE stopped at "Starting Windows" with it (docs/w7x64-native-res-2026-10-21.md).
+    if (!valid and native_mode.enabled(device, dir)) native_mode.arm(image, log);
+    const result = bs.startImage(image) catch |err| {
+        native_mode.disarm();
+        return err;
+    };
+    native_mode.disarm();
     log.print("USOS: started image returned {s}", .{vga_routing.statusName(result.code)});
     return result.code;
 }

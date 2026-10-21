@@ -90,7 +90,7 @@ fn qemuTcg() bool {
     );
     return b == 0x54474354 and c == 0x43544743 and d == 0x47435447;
 }
-fn debugcon(bytes: []const u8) void {
+pub fn debugcon(bytes: []const u8) void {
     for (bytes) |byte| asm volatile ("outb %[v], %[p]"
         :
         : [v] "{al}" (byte),
