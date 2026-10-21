@@ -21,10 +21,14 @@
  *  - A system thread finds every xHCI controller (PCI class 0C0330), takes
  *    it from the firmware (USBLEGSUP), resets it and runs it without
  *    interrupts: one command ring, one event ring, polled every 10 ms.
- *  - Devices on root ports only (no hubs): enable slot, address, read the
- *    device and configuration descriptors, pick the first HID boot keyboard
- *    and boot mouse interface, configure their interrupt IN endpoint,
- *    SET_PROTOCOL(boot), SET_IDLE(0). Hot plug through port status events.
+ *  - Devices on root ports and behind USB 2.0 / 3.x hubs (up to 4 hub
+ *    tiers): enable slot, address, read the device and configuration
+ *    descriptors, pick the first HID boot keyboard and boot mouse interface,
+ *    configure their interrupt IN endpoint, SET_PROTOCOL(boot), SET_IDLE(0).
+ *    Hot plug through port status events (root ports) and the hub status
+ *    change endpoint plus a slow GET_PORT_STATUS poll (hub ports). Hubs get
+ *    the Route String, Hub / Number of Ports / TT fields in the Slot Context
+ *    (USB 2.0 hub class requests, SET_HUB_DEPTH for SuperSpeed hubs).
  *  - Keyboard boot reports become scan code set 1 make/break codes
  *    (KEYBOARD_INPUT_DATA) with software typematic repeat; Caps/Num/Scroll
  *    lock LEDs follow IOCTL_KEYBOARD_SET_INDICATORS (SET_REPORT). Mouse boot
@@ -58,7 +62,7 @@
 __declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityBoost);
 __declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
 __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
-#define USOSUSB_VERSION L"usosusb 1.0-nt31"
+#define USOSUSB_VERSION L"usosusb 1.2-nt31"
 #elif defined(USOSUSB_NT6)
 /* Vista / Server 2008 SP2 x86 (build-nt6.cmd): same legacy port devices;
    kbdclass / mouclass connect them as legacy ports (\Device\KeyboardClassLegacyN,
@@ -67,17 +71,18 @@ __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
    driver connected even before its ENABLE, and a Conn value shows the
    connect / enable state. */
 #pragma warning(disable:4996)   /* HalGetBusDataByOffset is marked obsolete */
-#define USOSUSB_VERSION L"usosusb 1.1-nt6"
+#define USOSUSB_VERSION L"usosusb 1.3-nt6"
 /* USB mass storage (bulk-only transport, SCSI transparent command set):
    removable volumes for the file systems, drive letters via the mount
    manager. */
 #define USOSUSB_MSC 1
 #else
-#define USOSUSB_VERSION L"usosusb 1.0-nt4"
+#define USOSUSB_VERSION L"usosusb 1.3-nt4"
 #endif
 
 #define MAXHC 4
 #define MAXDEV 16
+#define MAXTIER 4               /* hubs at tiers 0..3: devices up to 4 hubs deep */
 #define RING_TRBS 256           /* one 4 KiB page per ring */
 
 /* TRB types */
@@ -123,6 +128,21 @@ struct _HC;
 typedef struct _DEV {
     struct _HC *hc;
     UCHAR used, slot, port, speed;
+    /* topology: port = port on the parent (root port when parent == 0),
+       parent = index + 1 of the hub in hc->dev, rport = root hub port,
+       tier = hubs between the root port and this device, route = xHCI
+       Route String, tthub / ttport = the high-speed hub whose transaction
+       translator serves this LS / FS device (0 = none) */
+    UCHAR parent, rport, tier, gone;
+    UCHAR tthub, ttport;
+    ULONG route;
+    UCHAR dclass;               /* bDeviceClass */
+    WCHAR path[24];             /* Diag name, e.g. p5 or p5.2.1 */
+    /* hub: ports, status change endpoint (uses kring and buf + 1024) */
+    UCHAR ishub, nports, hdci, hmps, hival, httt, hss, hpwr;
+    volatile ULONG hchg;        /* bit per hub port (1..15) to look at */
+    ULONG hfail;                /* ports whose device failed; retried after a connect change */
+    ULONG hlive;                /* status change endpoint queued and working */
     UCHAR *out, *in, *buf;      /* output context, input context, data page */
     ULONG outpa, inpa, bufpa;
     RING ep0;
@@ -165,6 +185,8 @@ typedef struct _HC {
     volatile int cmd_done;
     ULONG cmd_cc, cmd_slot;
     ULONG portchg;              /* bit per port (1..31) to look at */
+    ULONG tried;                /* bit per root port: enumerated since the last connect (needs a new reset) */
+    volatile int hubchg;        /* a hub reported a port change */
     DEV dev[MAXDEV];
     int ok;
 } HC;
@@ -184,7 +206,7 @@ static int g_nhc;
 static PDEVICE_OBJECT g_kbd, g_mou;
 static UNICODE_STRING g_regpath;
 static WCHAR g_regbuf[256];
-static WCHAR g_diag[512];
+static WCHAR g_diag[1024];
 static volatile LONG g_ledseq;
 #ifdef USOSUSB_NT6
 static volatile LONG g_connseq;  /* bumped on connect / enable / disable */
@@ -656,6 +678,17 @@ static void queue_intr(DEV *d, int kbd)
     doorbell(hc, d->slot, kbd ? d->kdci : d->mdci);
 }
 
+/* hub status change endpoint: one TD for the port bitmap */
+static void queue_hub(DEV *d)
+{
+    ULONG len = d->hmps;
+    if (len > 8 || !len)
+        len = len ? 8 : 1;
+    ring_push(&d->kring, d->bufpa + 1024, 0, len, (TRB_NORMAL << 10) | (1 << 5) /* IOC */ | (1 << 2) /* ISP */);
+    doorbell(d->hc, d->slot, d->hdci);
+    d->hlive = 1;
+}
+
 static void hc_poll(HC *hc)
 {
     int n = 0;
@@ -682,6 +715,19 @@ static void hc_poll(HC *hc)
                 if (ep == 1) {
                     d->ctl_cc = cc;
                     d->ctl_done = 1;
+                } else if (d->ishub && ep == d->hdci) {
+                    /* bit 0 = hub, bit n = port n; handled in the worker loop */
+                    if (cc == CC_SUCCESS || cc == CC_SHORT) {
+                        ULONG asked = d->hmps > 8 ? 8 : (d->hmps ? d->hmps : 1);
+                        ULONG resid = d2 & 0xFFFFFF, got = resid <= asked ? asked - resid : 0, k, bits = 0;
+                        for (k = 0; k < got && k < 4; k++)
+                            bits |= (ULONG)d->buf[1024 + k] << (8 * k);
+                        d->hchg |= bits;
+                        hc->hubchg = 1;
+                        queue_hub(d);
+                    } else {
+                        d->hlive = 0;   /* hub gone or endpoint halted: the slow poll takes over */
+                    }
                 } else if (ep == d->kdci || ep == d->mdci) {
                     int kbd = ep == d->kdci;
                     ULONG asked = kbd ? d->kmps : d->mmps;
@@ -797,8 +843,18 @@ static UCHAR xhci_interval(UCHAR speed, UCHAR ival)
 static void dev_drop(DEV *d)
 {
     HC *hc = d->hc;
+    int i;
     if (!d->used)
         return;
+    d->gone = 1;
+    /* a hub takes everything behind it along (children first) */
+    for (i = 0; d->ishub && i < MAXDEV; i++) {
+        DEV *c = &hc->dev[i];
+        if (c->used && c->parent == (UCHAR)(d - hc->dev) + 1) {
+            dev_drop(c);
+            diag_add(L" %s-gone", (ULONG_PTR)c->path, 0, 0, 0);
+        }
+    }
     if (g_rep_usage && d->kdci)
         g_rep_usage = 0;
 #ifdef USOSUSB_MSC
@@ -810,23 +866,226 @@ static void dev_drop(DEV *d)
     }
     d->used = 0;
     d->slot = 0;
+    d->ishub = 0;
+    d->hchg = 0;
+    d->hlive = 0;
 }
 
-static void port_enum(HC *hc, ULONG p)
+/* ------------------------------------------------------------------ */
+/* hubs (USB 2.0 chapter 11, USB 3.x chapter 10 hub class)            */
+
+#define HUB_PORT_RESET 4
+#define HUB_PORT_POWER 8
+
+static ULONG hub_le32(const UCHAR *p)
+{
+    return p[0] | ((ULONG)p[1] << 8) | ((ULONG)p[2] << 16) | ((ULONG)p[3] << 24);
+}
+
+/* GET_PORT_STATUS: wPortStatus in 15:0, wPortChange in 31:16 */
+static int hub_status(DEV *h, ULONG n, ULONG *st)
+{
+    if (control(h, 0xA3, 0 /* GET_STATUS */, 0, (USHORT)n, 4) < 0)
+        return 0;
+    *st = hub_le32(h->buf);
+    return 1;
+}
+
+/* CLEAR_PORT_FEATURE for every change bit that is set */
+static void hub_clear(DEV *h, ULONG n, ULONG chg)
+{
+    /* USB 2.0: C_PORT_CONNECTION, C_PORT_ENABLE, C_PORT_SUSPEND,
+       C_PORT_OVER_CURRENT, C_PORT_RESET; USB 3.x: C_PORT_CONNECTION, -, -,
+       C_PORT_OVER_CURRENT, C_PORT_RESET, C_BH_PORT_RESET,
+       C_PORT_LINK_STATE, C_PORT_CONFIG_ERROR */
+    static const UCHAR f2[8] = { 16, 17, 18, 19, 20, 0, 0, 0 };
+    static const UCHAR f3[8] = { 16, 0, 0, 19, 20, 29, 25, 26 };
+    ULONG i;
+    for (i = 0; i < 8; i++)
+        if (chg & (1u << i)) {
+            UCHAR f = h->hss ? f3[i] : f2[i];
+            if (f)
+                control(h, 0x23, 1 /* CLEAR_FEATURE */, f, (USHORT)n, 0);
+        }
+}
+
+static DEV *hub_child(DEV *h, ULONG n)
+{
+    HC *hc = h->hc;
+    int i;
+    UCHAR me = (UCHAR)(h - hc->dev) + 1;
+    for (i = 0; i < MAXDEV; i++)
+        if (hc->dev[i].used && hc->dev[i].parent == me && hc->dev[i].port == n)
+            return &hc->dev[i];
+    return NULL;
+}
+
+/* After SET_CONFIGURATION: hub descriptor, Slot Context hub fields,
+   SET_HUB_DEPTH, port power, first scan of every port. */
+static int hub_start(DEV *d)
+{
+    HC *hc = d->hc;
+    UCHAR *b = d->buf;
+    ULONG n, wait, chr;
+    int cc;
+    d->hss = (UCHAR)(d->speed >= 4);
+    if (control(d, 0xA0, 6 /* GET_DESCRIPTOR */, d->hss ? 0x2A00 : 0x2900, 0, d->hss ? 12 : 9) < 0 || b[0] < 7 || b[2] == 0) {
+        diag_add(L" %s-hubd", (ULONG_PTR)d->path, 0, 0, 0);
+        return 0;
+    }
+    d->nports = b[2] > 15 ? 15 : b[2];
+    chr = b[3] | ((ULONG)b[4] << 8);
+    d->httt = (UCHAR)(d->speed == 3 ? (chr >> 5) & 3 : 0);
+    d->hpwr = b[5];
+    /* Slot Context: Hub = 1, Number of Ports, TT Think Time (MTT stays 0:
+       alternate setting 0 is the single-TT interface) */
+    RtlZeroMemory(d->in, PAGE_SIZE);
+    RtlCopyMemory(ictx(d, 1), octx(d, 0), hc->ctxsz);
+    ictx(d, 1)[0] = (ictx(d, 1)[0] & ~(1u << 25)) | (1u << 26);
+    ictx(d, 1)[1] = (ictx(d, 1)[1] & 0x00FFFFFF) | ((ULONG)d->nports << 24);
+    ictx(d, 1)[2] = (ictx(d, 1)[2] & ~0x00030000u) | ((ULONG)d->httt << 16);
+    ictx(d, 1)[3] = 0;
+    ictx(d, 0)[1] = 1;                                          /* slot only */
+    cc = hc_cmd(hc, d->inpa, 0, (TRB_CONFIGURE_EP << 10) | ((ULONG)d->slot << 24));
+    if (cc != CC_SUCCESS) {
+        diag_add(L" %s-hubctx%d", (ULONG_PTR)d->path, (ULONG)cc, 0, 0);
+        return 0;
+    }
+    if (d->hss)
+        control(d, 0x20, 12 /* SET_HUB_DEPTH */, d->tier, 0, 0);
+    for (n = 1; n <= d->nports; n++)
+        control(d, 0x23, 3 /* SET_FEATURE */, HUB_PORT_POWER, (USHORT)n, 0);
+    wait = (ULONG)d->hpwr * 2;
+    delay_ms(wait < 100 ? 100 : wait);
+    d->ishub = 1;
+    d->hfail = 0;
+    d->hchg = ((1u << (d->nports + 1)) - 1) & ~1u;              /* look at every port */
+    hc->hubchg = 1;
+    queue_hub(d);
+    return 1;
+}
+
+static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed);
+
+/* worker: one hub port with a change (or the slow poll). Returns 0 when
+   the hub did not answer (the rest of its ports wait for the next pass,
+   so a dead hub costs one control timeout, not one per port). */
+static int hub_port(HC *hc, DEV *h, ULONG n)
+{
+    ULONG st, ps, pc, i, bit = 1u << n;
+    DEV *c = hub_child(h, n);
+    if (!hub_status(h, n, &st))
+        return 0;               /* hub gone: its own port event drops it */
+    ps = st & 0xFFFF;
+    pc = st >> 16;
+    if (pc)
+        hub_clear(h, n, pc);
+    if ((pc & 1) || !(ps & 1)) {
+        if (c) {
+            dev_drop(c);
+            diag_add(L" %s-gone", (ULONG_PTR)c->path, 0, 0, 0);
+            c = NULL;
+        }
+        if (pc & 1)
+            h->hfail &= ~bit;
+    }
+    if (!(ps & 1) || c || (h->hfail & bit))
+        return 1;
+    delay_ms(100);              /* connect debounce */
+    control(h, 0x23, 3 /* SET_FEATURE */, HUB_PORT_RESET, (USHORT)n, 0);
+    for (i = 0; i < 50; i++) {
+        delay_ms(10);
+        if (!hub_status(h, n, &st))
+            return 0;
+        if (((st >> 16) & 0x10) || (i >= 4 && !(st & 0x10) && (st & 2)))
+            break;              /* C_PORT_RESET, or (after 50 ms) reset over and enabled */
+    }
+    if (st >> 16)
+        hub_clear(h, n, st >> 16);
+    ps = st & 0xFFFF;
+    if (!(ps & 1))
+        return 1;
+    if (!(ps & 2)) {
+        diag_add(L" %s.%u-noen", (ULONG_PTR)h->path, n, 0, 0);
+        h->hfail |= bit;
+        return 1;
+    }
+    /* xHCI speed ID: 1 full, 2 low, 3 high, 4 super */
+    if (h->hss)
+        i = 4;
+    else
+        i = (ps & 0x200) ? 2 : (ps & 0x400) ? 3 : 1;
+    delay_ms(10);               /* reset recovery */
+    if (!dev_enum(hc, h, n, i))
+        h->hfail |= bit;
+    return 1;
+}
+
+/* worker: hubs whose status change endpoint (or the slow poll) flagged
+   ports. Returns 1 when the Diag line changed. */
+static int hub_changes(HC *hc)
+{
+    int i;
+    size_t n0 = wcslen(g_diag);
+    hc->hubchg = 0;
+    for (i = 0; i < MAXDEV; i++) {
+        DEV *h = &hc->dev[i];
+        ULONG m, n;
+        if (!h->used || !h->ishub || !h->hchg)
+            continue;
+        m = h->hchg;
+        h->hchg = 0;
+        if (m & 1) {            /* hub status: clear C_HUB_LOCAL_POWER / C_HUB_OVER_CURRENT */
+            if (control(h, 0xA0, 0, 0, 0, 4) >= 0) {
+                ULONG chg = h->buf[2] | ((ULONG)h->buf[3] << 8);
+                if (chg & 1)
+                    control(h, 0x20, 1, 0, 0, 0);
+                if (chg & 2)
+                    control(h, 0x20, 1, 1, 0, 0);
+            }
+        }
+        for (n = 1; n <= h->nports && h->used; n++)
+            if ((m & (1u << n)) && !hub_port(hc, h, n))
+                break;
+    }
+    return wcslen(g_diag) != n0;
+}
+
+/* worker, about every 2 s: every hub port is read again (covers a hub
+   whose status change endpoint stopped), a hub endpoint that stopped is
+   queued again */
+static void hub_poll_all(HC *hc)
+{
+    int i;
+    for (i = 0; i < MAXDEV; i++) {
+        DEV *h = &hc->dev[i];
+        if (!h->used || !h->ishub)
+            continue;
+        h->hchg |= ((1u << (h->nports + 1)) - 1) & ~1u;
+        hc->hubchg = 1;
+        if (!h->hlive) {
+            ep_recover(h, h->hdci, &h->kring);
+            queue_hub(h);
+        }
+    }
+}
+
+static int g_enum_soft;         /* dev_enum failed on the wire (address / descriptors): worth a retry */
+
+/* Root port p. csc: the port reported a connect change (a device was
+   plugged in or replaced), otherwise only reset / enable / link changes. */
+static void port_enum(HC *hc, ULONG p, int csc)
 {
     volatile ULONG *ps = hc->op + 0x100 + (p - 1) * 4;
-    ULONG v = *ps, mps0, slot, cfglen, off, cfgval;
-    int i, cc, kind = 0, idx = -1;
+    ULONG v = *ps;
+    int i, t;
     DEV *d = NULL;
-    UCHAR *b;
-#ifdef USOSUSB_MSC
-    int last = 0;               /* 1 = bulk IN, 2 = bulk OUT just parsed (SS companion) */
-#endif
 
     for (i = 0; i < MAXDEV; i++)
-        if (hc->dev[i].used && hc->dev[i].port == p)
+        if (hc->dev[i].used && !hc->dev[i].parent && hc->dev[i].port == p)
             d = &hc->dev[i];
     if (!(v & PS_CCS)) {
+        hc->tried &= ~(1u << p);
         if (d) {
             dev_drop(d);
             diag_add(L" p%u-gone", p, 0, 0, 0);
@@ -836,25 +1095,72 @@ static void port_enum(HC *hc, ULONG p)
     }
     if (d)
         return;
-    if (!(v & PS_PED)) {
-        *ps = (v & PS_KEEP) | PS_PR;
-        for (i = 0; i < 50 && !(*ps & PS_PRC); i++)
-            delay_ms(5);
-        *ps = (*ps & PS_KEEP) | PS_PRC;
-        delay_ms(20);
-        v = *ps;
-        if (!(v & PS_PED)) {
-            diag_add(L" p%u-noen", p, 0, 0, 0);
-            return;
-        }
+    if (csc) {
+        /* hot plug: connect debounce (USB 2.0 7.1.7.3, 100 ms) before the
+           reset. A device still powering up misses an early reset and then
+           never answers SET_ADDRESS (X470: mouse replug -> p16-addr4). */
+        hc->tried &= ~(1u << p);
+        delay_ms(100);
+    } else if (hc->tried & (1u << p)) {
+        return;                 /* same device as before (refused or failed): the reset's own events end here */
     }
+    for (t = 0; t < 3; t++) {
+        if (t) {
+            diag_add(L"/r", 0, 0, 0, 0);
+            delay_ms(100 * t);
+        }
+        v = *ps;
+        if (!(v & PS_CCS))
+            return;
+        /* reset unless a USB 3 port trained by itself and nothing has
+           talked to the device yet; a device left addressed by a failed or
+           dropped enumeration only answers again after a new reset */
+        if (!(v & PS_PED) || (hc->tried & (1u << p))) {
+            *ps = (v & PS_KEEP) | PS_PR;
+            for (i = 0; i < 50 && !(*ps & PS_PRC); i++)
+                delay_ms(5);
+            *ps = (*ps & PS_KEEP) | PS_PRC;
+            delay_ms(20);
+            v = *ps;
+            if (!(v & PS_PED)) {
+                diag_add(L" p%u-noen", p, 0, 0, 0);
+                hc->tried |= 1u << p;
+                continue;
+            }
+        }
+        hc->tried |= 1u << p;
+        g_enum_soft = 0;
+        if (dev_enum(hc, NULL, p, (v >> 10) & 0xF) || !g_enum_soft)
+            return;
+    }
+}
+
+/* Enumerate the device on root port p (hub == NULL) or on port p of hub.
+   Returns the device, or NULL when nothing usable is there. */
+static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
+{
+    ULONG mps0, slot, cfglen, off, cfgval;
+    int i, cc, kind = 0, idx = -1;
+    DEV *d = NULL;
+    UCHAR *b;
+    WCHAR path[24];
+    ULONG_PTR pa[2];
+#ifdef USOSUSB_MSC
+    int last = 0;               /* 1 = bulk IN, 2 = bulk OUT just parsed (SS companion) */
+#endif
+
+    pa[0] = hub ? (ULONG_PTR)hub->path : p;
+    pa[1] = p;
+    wfmt(path, 24, hub ? L"%s.%u" : L"p%u", pa);
     for (i = 0; i < MAXDEV; i++)
         if (!hc->dev[i].used) {
             idx = i;
             break;
         }
-    if (idx < 0)
-        return;
+    if (idx < 0) {
+        diag_add(L" %s-full", (ULONG_PTR)path, 0, 0, 0);
+        return NULL;
+    }
     d = &hc->dev[idx];
     if (!d->out) {
         d->out = (UCHAR *)alloc_page(&d->outpa);
@@ -862,12 +1168,12 @@ static void port_enum(HC *hc, ULONG p)
         d->buf = (UCHAR *)alloc_page(&d->bufpa);
         if (!d->out || !d->in || !d->buf || !ring_init(&d->ep0) || !ring_init(&d->kring) || !ring_init(&d->mring)) {
             d->out = NULL;
-            return;
+            return NULL;
         }
 #ifdef USOSUSB_MSC
         if (!ring_init(&d->sring) || !ring_init(&d->oring)) {
             d->out = NULL;
-            return;
+            return NULL;
         }
 #endif
     }
@@ -879,8 +1185,32 @@ static void port_enum(HC *hc, ULONG p)
     d->ep0.cycle = d->kring.cycle = d->mring.cycle = 1;
     d->hc = hc;
     d->port = (UCHAR)p;
-    d->speed = (UCHAR)((v >> 10) & 0xF);
+    d->speed = (UCHAR)speed;
     d->kdci = d->mdci = 0;
+    RtlCopyMemory(d->path, path, sizeof(path));
+    /* topology: Route String, root port, transaction translator */
+    d->gone = 0;
+    d->ishub = d->nports = d->hdci = d->hmps = d->hival = d->httt = d->hss = 0;
+    d->hchg = d->hfail = d->hlive = 0;
+    d->tthub = d->ttport = 0;
+    if (hub) {
+        d->parent = (UCHAR)(hub - hc->dev) + 1;
+        d->rport = hub->rport;
+        d->tier = (UCHAR)(hub->tier + 1);
+        d->route = hub->route | ((p > 15 ? 15u : p) << (4 * hub->tier));
+        if (hub->speed == 3 && speed < 3) {
+            d->tthub = hub->slot;               /* LS / FS device on a high-speed hub */
+            d->ttport = (UCHAR)p;
+        } else if (hub->speed < 3) {
+            d->tthub = hub->tthub;              /* behind a LS / FS hub: its TT */
+            d->ttport = hub->ttport;
+        }
+    } else {
+        d->parent = 0;
+        d->rport = (UCHAR)p;
+        d->tier = 0;
+        d->route = 0;
+    }
 #ifdef USOSUSB_MSC
     RtlZeroMemory((void *)d->sring.v, PAGE_SIZE);
     RtlZeroMemory((void *)d->oring.v, PAGE_SIZE);
@@ -897,8 +1227,8 @@ static void port_enum(HC *hc, ULONG p)
     cc = hc_cmd(hc, 0, 0, TRB_ENABLE_SLOT << 10);
     slot = hc->cmd_slot;
     if (cc != CC_SUCCESS || !slot || slot > hc->maxslots) {
-        diag_add(L" p%u-slot%d", p, (ULONG)cc, 0, 0);
-        return;
+        diag_add(L" %s-slot%d", (ULONG_PTR)path, (ULONG)cc, 0, 0);
+        return NULL;
     }
     d->slot = (UCHAR)slot;
     d->used = 1;
@@ -908,25 +1238,29 @@ static void port_enum(HC *hc, ULONG p)
     mps0 = d->speed == 4 ? 512 : d->speed == 3 ? 64 : 8;
     RtlZeroMemory(d->in, PAGE_SIZE);
     ictx(d, 0)[1] = 3;                                      /* add slot + EP0 */
-    ictx(d, 1)[0] = ((ULONG)d->speed << 20) | (1u << 27);   /* speed, 1 context entry */
-    ictx(d, 1)[1] = p << 16;                                /* root hub port */
+    ictx(d, 1)[0] = d->route | ((ULONG)d->speed << 20) | (1u << 27);   /* route, speed, 1 context entry */
+    ictx(d, 1)[1] = (ULONG)d->rport << 16;                  /* root hub port */
+    ictx(d, 1)[2] = d->tthub | ((ULONG)d->ttport << 8);     /* TT hub slot / port (LS / FS behind a HS hub) */
     ictx(d, 2)[1] = (3 << 1) | (4 << 3) | (mps0 << 16);     /* CErr 3, control, max packet */
     ictx(d, 2)[2] = d->ep0.pa | 1;
     ictx(d, 2)[3] = 0;
     ictx(d, 2)[4] = 8;
     cc = hc_cmd(hc, d->inpa, 0, (TRB_ADDRESS_DEVICE << 10) | (slot << 24));
     if (cc != CC_SUCCESS) {
-        diag_add(L" p%u-addr%d", p, (ULONG)cc, 0, 0);
+        diag_add(L" %s-addr%d", (ULONG_PTR)path, (ULONG)cc, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
-        return;
+        return NULL;
     }
     delay_ms(10);
     b = d->buf;
     if (control(d, 0x80, 6, 0x0100, 0, 8) < 0) {
-        diag_add(L" p%u-dd", p, 0, 0, 0);
+        diag_add(L" %s-dd", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
-        return;
+        return NULL;
     }
+    d->dclass = b[4];
     if (d->speed < 3 && b[7] && b[7] != mps0) {
         RtlZeroMemory(d->in, PAGE_SIZE);
         ictx(d, 0)[1] = 2;
@@ -934,17 +1268,19 @@ static void port_enum(HC *hc, ULONG p)
         hc_cmd(hc, d->inpa, 0, (TRB_EVALUATE_CTX << 10) | (slot << 24));
     }
     if (control(d, 0x80, 6, 0x0200, 0, 9) < 0) {
-        diag_add(L" p%u-cd", p, 0, 0, 0);
+        diag_add(L" %s-cd", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
-        return;
+        return NULL;
     }
     cfglen = b[2] | (b[3] << 8);
     if (cfglen > 1000)
         cfglen = 1000;
     if (cfglen < 9 || control(d, 0x80, 6, 0x0200, 0, (USHORT)cfglen) < 0) {
-        diag_add(L" p%u-cd2", p, 0, 0, 0);
+        diag_add(L" %s-cd2", (ULONG_PTR)path, 0, 0, 0);
+        g_enum_soft = 1;
         dev_drop(d);
-        return;
+        return NULL;
     }
     cfgval = b[5];
     for (off = 0; off + 2 <= cfglen;) {
@@ -957,6 +1293,9 @@ static void port_enum(HC *hc, ULONG p)
             if (kind == 2 && d->mdci) kind = 0;
             if (kind == 1) d->kintf = b[off + 2];
             if (kind == 2) d->mintf = b[off + 2];
+            /* hub, alternate setting 0 (single TT), status change endpoint */
+            if (!kind && b[off + 5] == 9 && b[off + 3] == 0 && !d->hdci)
+                kind = 4;
 #ifdef USOSUSB_MSC
             /* mass storage, SCSI transparent, bulk-only, alternate setting 0 */
             if (!kind && b[off + 3] == 0 && b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50 && !d->sidci && !d->sodci) {
@@ -987,22 +1326,30 @@ static void port_enum(HC *hc, ULONG p)
                 UCHAR dci = (UCHAR)((addr & 0xF) * 2 + 1);
                 if (mps > 255) mps = 255;
                 if (kind == 1) { d->kdci = dci; d->kmps = (UCHAR)mps; d->kival = b[off + 6]; }
-                else { d->mdci = dci; d->mmps = (UCHAR)mps; d->mival = b[off + 6]; }
+                else if (kind == 2) { d->mdci = dci; d->mmps = (UCHAR)mps; d->mival = b[off + 6]; }
+                else if (kind == 4) { d->hdci = dci; d->hmps = (UCHAR)mps; d->hival = b[off + 6]; }
                 kind = 0;
             }
         }
         off += L;
     }
+    if (d->hdci && (d->dclass != 9 || d->tier >= MAXTIER)) {
+        if (d->dclass == 9)
+            diag_add(L" %s-deep", (ULONG_PTR)path, 0, 0, 0);
+        d->hdci = 0;
+    }
+    if (d->hdci)
+        d->kdci = d->mdci = 0;  /* a hub is only a hub */
 #ifdef USOSUSB_MSC
-    if (!d->sidci || !d->sodci)
+    if (d->hdci || !d->sidci || !d->sodci)
         d->sidci = d->sodci = 0;
-    if (!d->kdci && !d->mdci && !d->sidci) {
+    if (!d->kdci && !d->mdci && !d->sidci && !d->hdci) {
 #else
-    if (!d->kdci && !d->mdci) {
+    if (!d->kdci && !d->mdci && !d->hdci) {
 #endif
-        diag_add(L" p%u-nohid", p, 0, 0, 0);
+        diag_add(L" %s-nohid", (ULONG_PTR)path, 0, 0, 0);
         dev_drop(d);
-        return;
+        return NULL;
     }
     {
         ULONG maxdci = d->kdci > d->mdci ? d->kdci : d->mdci;
@@ -1013,6 +1360,10 @@ static void port_enum(HC *hc, ULONG p)
         dcis[0] = d->kdci; rings[0] = &d->kring; mpss[0] = d->kmps; ivs[0] = d->kival;
         dcis[1] = d->mdci; rings[1] = &d->mring; mpss[1] = d->mmps; ivs[1] = d->mival;
         dcis[2] = dcis[3] = 0;
+        if (d->hdci) {                          /* hub status change endpoint on kring */
+            dcis[0] = d->hdci; mpss[0] = d->hmps; ivs[0] = d->hival;
+            maxdci = d->hdci;
+        }
 #ifdef USOSUSB_MSC
         dcis[2] = d->sidci; rings[2] = &d->sring;
         dcis[3] = d->sodci; rings[3] = &d->oring;
@@ -1049,12 +1400,21 @@ static void port_enum(HC *hc, ULONG p)
         }
         cc = hc_cmd(hc, d->inpa, 0, (TRB_CONFIGURE_EP << 10) | (slot << 24));
         if (cc != CC_SUCCESS) {
-            diag_add(L" p%u-cfgep%d", p, (ULONG)cc, 0, 0);
+            diag_add(L" %s-cfgep%d", (ULONG_PTR)path, (ULONG)cc, 0, 0);
+            g_enum_soft = 1;
             dev_drop(d);
-            return;
+            return NULL;
         }
     }
     control(d, 0x00, 9, (USHORT)cfgval, 0, 0);                 /* SET_CONFIGURATION */
+    if (d->hdci) {
+        if (!hub_start(d)) {
+            dev_drop(d);
+            return NULL;
+        }
+        diag_add(L" %s:s%uH%u%s", (ULONG_PTR)path, slot, d->nports, (ULONG_PTR)(d->hss ? L"ss" : d->speed == 3 ? L"hs" : L"fs"));
+        return d;
+    }
     if (d->kdci) {
         control(d, 0x21, 0x0B, 0, d->kintf, 0);                  /* SET_PROTOCOL boot */
         control(d, 0x21, 0x0A, 0, d->kintf, 0);                  /* SET_IDLE 0 */
@@ -1065,7 +1425,9 @@ static void port_enum(HC *hc, ULONG p)
         control(d, 0x21, 0x0A, 0, d->mintf, 0);
         queue_intr(d, 0);
     }
-    diag_add(L" p%u:s%u%c%c", p, slot, d->kdci ? L'K' : L'-', d->mdci ? L'M' : L'-');
+    diag_add(L" %s:s%u%c%c", (ULONG_PTR)path, slot, d->kdci ? L'K' : L'-', d->mdci ? L'M' : L'-');
+    if (d->tthub)
+        diag_add(L"/tt%u.%u", d->tthub, d->ttport, 0, 0);
 #ifdef USOSUSB_MSC
     if (d->sidci) {
         diag_add(L"S", 0, 0, 0, 0);
@@ -1073,6 +1435,7 @@ static void port_enum(HC *hc, ULONG p)
         msc_attach(d);
     }
 #endif
+    return d;
 }
 
 static void kbd_leds(DEV *d)
@@ -1158,7 +1521,9 @@ static int bounce_init(void)
 
 static int port_present(DEV *d)
 {
-    return d->used && (d->hc->op[0x100 + (d->port - 1) * 4] & PS_CCS) != 0;
+    /* behind a hub: the root port still connected and the hub has not
+       reported the device gone (hub ports are read in the worker loop) */
+    return d->used && !d->gone && (d->hc->op[0x100 + (d->rport - 1) * 4] & PS_CCS) != 0;
 }
 
 /* One bulk TD (a single TRB; the buffer never crosses 64 KiB). Returns the
@@ -2158,13 +2523,13 @@ static void port_changes(HC *hc)
         if (v & 0x00020000) {   /* CSC: a device that was here is gone, even if another one is plugged in already */
             int k;
             for (k = 0; k < MAXDEV; k++)
-                if (hc->dev[k].used && hc->dev[k].port == p) {
+                if (hc->dev[k].used && !hc->dev[k].parent && hc->dev[k].port == p) {
                     dev_drop(&hc->dev[k]);
                     diag_add(L" p%u-gone", p, 0, 0, 0);
                 }
         }
 #endif
-        port_enum(hc, p);
+        port_enum(hc, p, (v & 0x00020000) != 0);
     }
 }
 
@@ -2172,6 +2537,7 @@ static VOID worker(PVOID ctx)
 {
     ULONG bus, dv, fn, i;
     LONG seq = 0;
+    LONGLONG hub_next = 0;
 #ifdef USOSUSB_NT6
     ULONG tick = 0, conn_last = 0xFFFFFFFFu;
 #endif
@@ -2225,6 +2591,13 @@ static VOID worker(PVOID ctx)
                 port_changes(hc);
                 changed = 1;
             }
+            if (hc->hubchg && hub_changes(hc))
+                changed = 1;
+        }
+        if (now_ms() >= hub_next) {
+            hub_next = now_ms() + 2000;
+            for (i = 0; i < (ULONG)g_nhc; i++)
+                hub_poll_all(&g_hc[i]);
         }
         if (changed)
             diag_write();
