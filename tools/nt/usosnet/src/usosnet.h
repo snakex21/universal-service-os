@@ -50,10 +50,17 @@
 #ifndef USOSNET_NT351
 #define USOSNET_NT351 0
 #endif
-#if USOSNET_NT351 && !USOSNET_NDIS4
+#ifndef USOSNET_NT35
+#define USOSNET_NT35 0
+#endif
+#define USOSNET_NDIS3 (USOSNET_NT351 || USOSNET_NT35)
+#if USOSNET_NT351 && USOSNET_NT35
+#error Select one NT3 target
+#endif
+#if USOSNET_NDIS3 && !USOSNET_NDIS4
 #error NT351 uses the legacy receive and PCI paths
 #endif
-#if USOSNET_NT351
+#if USOSNET_NDIS3
 #define USOSNET_NDIS_MAJOR 3
 #elif USOSNET_NDIS4
 #define USOSNET_NDIS_MAJOR 4
