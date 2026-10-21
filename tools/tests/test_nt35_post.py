@@ -4,7 +4,7 @@ import os,re,subprocess,tempfile,unittest
 ROOT=Path(__file__).resolve().parents[2]
 class Metadata(unittest.TestCase):
  def test_compiled_parser_real_body(self):
-  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text();body=re.search(r'static int net35_decimal\(.*?\n\}',source,re.S).group()
+  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8');body=re.search(r'static int net35_decimal\(.*?\n\}',source,re.S).group()
   prefix='#include <stdint.h>\n#include <string.h>\ntypedef uint32_t DWORD;\nstatic int len(const char *s){return (int)strlen(s);}\n'
   main=r'''
 int main(void){
@@ -21,11 +21,11 @@ int main(void){
 '''
   parent=ROOT/'artifacts/nt35-network/post-tests';parent.mkdir(parents=True,exist_ok=True)
   with tempfile.TemporaryDirectory(dir=parent) as temp:
-   d=Path(temp);c=d/'parser.c';c.write_text(prefix+body+main);exe=d/'parser.exe';env=dict(os.environ,TEMP=str(d),TMP=str(d))
+   d=Path(temp);c=d/'parser.c';c.write_text(prefix+body+main,encoding='utf-8');exe=d/'parser.exe';env=dict(os.environ,TEMP=str(d),TMP=str(d))
    r=subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-std=c99','-Wall','-Werror',str(c),'-o',str(exe)],capture_output=True,text=True,env=env);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
    r=subprocess.run([str(exe)],capture_output=True,text=True,env=env);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
  def test_only_nt35_commits_driver_after_verified_binding_and_bus(self):
-  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text();body=source[source.index('static void nt35_network(void)'):source.index('static void display_profile(void)')]
+  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8');body=source[source.index('static void nt35_network(void)'):source.index('static void display_profile(void)')]
   self.assertIn('meta_len<=0 || meta_len>=sizeof meta-1',body);self.assertIn('((version >> 8) & 0xff) != 50)',body)
   self.assertLess(body.index('!net351_has_binding(linkage)'),body.index('CopyFileA('))
   for key in ('BusNumber','UsosPciSlot'):

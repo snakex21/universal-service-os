@@ -13,7 +13,7 @@ def main():
  OWN.mkdir(parents=True,exist_ok=True)
  if shutil.disk_usage(OWN).free<100*1024**3:raise ValueError('100GiB reserve')
  h=load('timezone_original_media',MATRIX/'tools/tests/coverage/driver_audit.py');modern=load('timezone_regf12',ROOT/'tools/xp_hive.py');unpack=h.cab.unpack;h.cab.unpack=lambda b,member=None:unpack(b,member,scratch=OWN/'packed')
- case=next(x for x in json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text()) if x['tag']=='r15-nt35-wks-hid')
+ case=next(x for x in json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text(encoding='utf-8')) if x['tag']=='r15-nt35-wks-hid')
  if digest(Path(case['source']))!=case['source_sha256']:raise ValueError('Original archive hash differs')
  report={'source_sha256':case['source_sha256'],'iso_sha256':case['member_sha256'],'script_sha256':digest(Path(__file__)),'scope':'Original timezone source data, not unattended/runtime PASS'}
  with tempfile.TemporaryDirectory(prefix='original-',dir=OWN) as temporary:

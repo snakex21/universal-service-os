@@ -20,7 +20,7 @@ class NT35Evidence(unittest.TestCase):
    rel='tools/tests/coverage/'+name;dst=directory/rel;dst.parent.mkdir(parents=True,exist_ok=True)
    dst.write_bytes(subprocess.check_output(['git','show','015ddddfe328b44066768d12fb2840171689e33c:'+rel],cwd=ROOT))
   subprocess.run(['git','apply',str(ROOT/'tools/tests/coverage/nt35-runner-015ddddf.patch')],cwd=directory,check=True,capture_output=True)
-  cls.review=(directory/'tools/tests/coverage/boot_menu.py').read_text()
+  cls.review=(directory/'tools/tests/coverage/boot_menu.py').read_text(encoding='utf-8')
  @classmethod
  def tearDownClass(cls):cls.review_tmp.cleanup()
  def setUp(self):
@@ -72,5 +72,5 @@ class NT35Evidence(unittest.TestCase):
   source=self.review
   self.assertIn('if capture_nt351 or capture_nt35 or capture_nt4:',source)
   self.assertLess(source.index('await nt35_own.main'),source.rindex('.unlink('))
-  self.assertIn('readonly=on',(ROOT/'tools/tests/coverage/collect_nt35_success.py').read_text())
+  self.assertIn('readonly=on',(ROOT/'tools/tests/coverage/collect_nt35_success.py').read_text(encoding='utf-8'))
 if __name__=='__main__':unittest.main()

@@ -29,11 +29,11 @@ class Nt35Network(unittest.TestCase):
 
     def render(self, system='windows-nt-3-5', off=False):
         if off:
-            self.profile.write_text(self.profile.read_text()+'network=off\n', encoding='utf-8')
+            self.profile.write_text(self.profile.read_text(encoding='utf-8')+'network=off\n', encoding='utf-8')
         tool = ROOT / 'zig-out/bin/usos-answer.exe'
         result = subprocess.run([str(tool),'render',str(self.profile),system,'x86',str(self.answer),'-'], capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
-        return self.answer.read_text()
+        return self.answer.read_text(encoding='utf-8')
 
     def sh(self, code, input=None):
         script=self.tmp/'run.sh'
@@ -79,9 +79,9 @@ class Nt35Network(unittest.TestCase):
         staged=target/'USOS/NT3/USOSNET35.SYS'
         self.assertEqual(staged.read_bytes(),BIN.read_bytes())
         self.assertFalse((target/'USOS/NT3/USOSNET4.SYS').exists())
-        self.assertIn('adapter=NDISLoop1',(target/'USOS/NT3/NET35.ON').read_text())
-        self.assertIn('bus=2',(target/'USOS/NT3/NET35.ON').read_text())
-        self.assertIn('slot=35',(target/'USOS/NT3/NET35.ON').read_text())
+        self.assertIn('adapter=NDISLoop1',(target/'USOS/NT3/NET35.ON').read_text(encoding='utf-8'))
+        self.assertIn('bus=2',(target/'USOS/NT3/NET35.ON').read_text(encoding='utf-8'))
+        self.assertIn('slot=35',(target/'USOS/NT3/NET35.ON').read_text(encoding='utf-8'))
         self.assertIn('[NetCardParameterList]',text.decode())
 
     def test_wrong_driver_hash_refused_before_target_created(self):
@@ -98,7 +98,7 @@ class Nt35Network(unittest.TestCase):
         result=self.sh(f'usos_nt35_preflight "{self.answer.as_posix()}" "{lib.as_posix()}" "{pci.as_posix()}"')
         self.assertNotEqual(result.returncode,0)
         shutil.rmtree(pci/'card4')
-        self.answer.write_text(self.answer.read_text().replace(';USOS-IP=dhcp',';USOS-IP=192.0.2.2/24'),encoding='utf-8')
+        self.answer.write_text(self.answer.read_text(encoding='utf-8').replace(';USOS-IP=dhcp',';USOS-IP=192.0.2.2/24'),encoding='utf-8')
         result=self.sh(f'usos_nt35_preflight "{self.answer.as_posix()}" "{lib.as_posix()}" "{pci.as_posix()}"')
         self.assertNotEqual(result.returncode,0)
 
@@ -106,7 +106,7 @@ class Nt35Network(unittest.TestCase):
         self.render(off=True)
         result=self.sh(f'usos_nt35_preflight "{self.answer.as_posix()}" /missing /missing')
         self.assertEqual(result.returncode,0)
-        self.answer.write_text(self.answer.read_text()+';USOS-NT35-NETWORK=on\n',encoding='utf-8')
+        self.answer.write_text(self.answer.read_text(encoding='utf-8')+';USOS-NT35-NETWORK=on\n',encoding='utf-8')
         result=self.sh(f'usos_nt35_requested "{self.answer.as_posix()}"')
         self.assertNotEqual(result.returncode,0)
 
@@ -127,18 +127,18 @@ class Nt35Network(unittest.TestCase):
             self.assertNotEqual(self.sh('usos_nt35_pci_address '+bdf).returncode,0)
 
     def test_wiring_keeps_nt4_95_and_other_nt3_minors_out(self):
-        target=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        target=(ROOT/'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('if [ "$major:$minor" = 3:50 ]; then',target)
         self.assertIn('[ "$minor" != 50 ] || usos_nt35_stage',target)
         self.assertIn('yes:51|yes:50|yes:10',target)
-        self.assertIn(r'^version=3\.50[[:space:]]*$',LIB.read_text())
-        self.assertNotIn(r'^version=3\.5[[:space:]]*$',LIB.read_text())
-        helper=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text()
+        self.assertIn(r'^version=3\.50[[:space:]]*$',LIB.read_text(encoding='utf-8'))
+        self.assertNotIn(r'^version=3\.5[[:space:]]*$',LIB.read_text(encoding='utf-8'))
+        helper=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
         self.assertIn('((version >> 8) & 0xff) != 50)',helper)
         self.assertIn('!net351_equal_files(DIR "USOSNET35.SYS",dst)',helper)
         self.assertIn('!net351_has_binding(linkage)',helper)
         self.assertIn('installed_runtime_pass=false',helper)
-        build=(ROOT/'tools/build_micro_linux.py').read_text()
+        build=(ROOT/'tools/build_micro_linux.py').read_text(encoding='utf-8')
         self.assertIn("'usr/lib/usos/nt3/USOSNET35.SYS'",build)
         self.assertIn("'usr/lib/usos/nt3/USOSNET35.SHA256'",build)
 

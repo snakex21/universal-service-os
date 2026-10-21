@@ -36,7 +36,7 @@ def recover(raw):
 def main():
  out=ROOT/'artifacts/coverage/r17-historical-recovery'
  if out.exists():raise FileExistsError('Fresh owned recovery output required')
- completed=json.loads((MATRIX/'artifacts/coverage/vm/r17-nt351-wks-diag/cleanup.json').read_text());assert completed.get('removed')
+ completed=json.loads((MATRIX/'artifacts/coverage/vm/r17-nt351-wks-diag/cleanup.json').read_text(encoding='utf-8'));assert completed.get('removed')
  payload=recover(SERIAL.read_bytes());policy_path=MATRIX/'tools/tests/coverage/evidence_archive.py';spec=importlib.util.spec_from_file_location('r17_archive_policy',policy_path);policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(policy);plain=policy.single_gzip(payload,32*1024**2);records={}
  with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
   for member in archive:

@@ -15,7 +15,7 @@ def main():
  OWN.mkdir(parents=True,exist_ok=True)
  if shutil.disk_usage(OWN).free<100*1024**3:raise ValueError('100GiB reserve')
  h=load('original_media',MATRIX/'tools/tests/coverage/driver_audit.py');unpack=h.cab.unpack;h.cab.unpack=lambda blob,member=None:unpack(blob,member,scratch=OWN/'packed')
- cases=json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text());case,=[c for c in cases if c['system']=='windows-nt-3-5' and c['folder']=='Windows NT 3.5']
+ cases=json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text(encoding='utf-8'));case,=[c for c in cases if c['system']=='windows-nt-3-5' and c['folder']=='Windows NT 3.5']
  if digest(Path(case['source']))!=case['source_sha256']:raise ValueError('Original archive hash differs')
  helper=args.post_helper.resolve();logger=ROOT/'tools/nt3/usoslog/bin/i386/usoslog.exe'
  if not helper.is_relative_to(ROOT) or not helper.is_file():raise ValueError('Owned posthelper required')

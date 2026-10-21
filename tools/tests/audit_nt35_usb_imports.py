@@ -15,7 +15,7 @@ def main():
  OWN.mkdir(parents=True,exist_ok=True)
  if shutil.disk_usage(OWN).free<100*1024**3:raise ValueError('100GiB reserve')
  h=load('original_media',MATRIX/'tools/tests/coverage/driver_audit.py');unpack=h.cab.unpack;h.cab.unpack=lambda blob,member=None:unpack(blob,member,scratch=OWN/'packed')
- rows=json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text());case=next(c for c in rows if c['tag']=='r15-nt35-wks-hid')
+ rows=json.loads((MATRIX/'artifacts/coverage/nt3-hid-runtime-plan-r15.json').read_text(encoding='utf-8'));case=next(c for c in rows if c['tag']=='r15-nt35-wks-hid')
  if digest(Path(case['source']))!=case['source_sha256']:raise ValueError('Archive hash differs')
  cache=load('own_layers',ROOT/'tools/tests/build_nt35_fixture_cache.py');entries,_=cache.effective_newc(gzip.decompress(Path(r'G:\USOS-Kolekcja\_assets\B261020-200536-968CCBE8-nt35-net1\zig-out\micro-linux\initramfs-usos').read_bytes()))
  own=entries['usr/lib/usos/nt3/USOSUSB.SYS'].data
