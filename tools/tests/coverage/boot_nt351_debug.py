@@ -16,16 +16,20 @@ async def main(case):
  global WORK,PARENT,OUT
  if case=='r18e':
   WORK=COLLECTION/'_vm/r18e-nt351-stubfix-e9';PARENT=COLLECTION/'_vm/r18d-nt351-debug-e9';OUT=ROOT/'artifacts/coverage/vm/r18e-nt351-stubfix-e9'
+ if case=='r18f':
+  WORK=COLLECTION/'_vm/r18f-nt351-usb-port-isolation';PARENT=COLLECTION/'_vm/r18e-nt351-stubfix-e9';OUT=ROOT/'artifacts/coverage/vm/r18f-nt351-usb-port-isolation'
  tag=WORK.name
  boot=load('owned_matrix_boot',MATRIX/'tools/tests/coverage/boot_menu.py')
  proof_path=ROOT/('artifacts/nt351-network/r18e-stubfix-preparation.json' if case=='r18e' else 'artifacts/nt351-network/r18d-debug-preparation.json')
+ if case=='r18f':proof_path=ROOT/'artifacts/nt351-network/r18f-usb-isolation-preparation.json'
  proof=json.loads(proof_path.read_text(encoding='utf-8'))
- if case=='r18e':boot.aux.require_operator_channel(True)
+ if case in ('r18e','r18f'):boot.aux.require_operator_channel(True)
  meta=json.loads((WORK/'fixture.json').read_text(encoding='utf-8'))
  if meta.get('private_profile') is not False or meta.get('folder')!='Windows NT 3.51' or meta.get('debug_port')!=233:raise ValueError('Explicit keyless prepared diagnostic required')
  if proof.get('raw_overlay_qemu_compare_pass') is not True:raise ValueError('No verified stopped overlay')
  if case=='r18d' and proof.get('hive_only_one_dword_changed') is not True:raise ValueError('No verified single-DWORD preparation')
  if case=='r18e' and (proof.get('system_hive_unchanged') is not True or proof.get('only_own_sys_replaced') is not True):raise ValueError('Only own SYS replacement allowed')
+ if case=='r18f' and (proof.get('hive_only_one_dword_changed') is not True or proof.get('before')!=1 or proof.get('after')!=4 or proof.get('own_sys_unchanged') is not True):raise ValueError('Only verified i8042prt Start1 to4 allowed')
  if OUT.exists() or (WORK/'vars.fd').exists() or (WORK/'stick.qcow2').exists():raise FileExistsError('Fresh run required')
  resources=boot.fixture.check_resources(WORK,2048)
  OUT.mkdir(parents=True);shutil.copyfile(PARENT/'vars.fd',WORK/'vars.fd')
@@ -52,8 +56,9 @@ async def main(case):
   try:
    port=await cap.start();cap.mark_prepared_target()
    prior_tag='r18d-nt351-debug-e9' if case=='r18e' else 'r18c-nt351-cold-i8042-on'
+   if case=='r18f':prior_tag='r18e-nt351-stubfix-e9'
    cmd=json.loads((ROOT/'artifacts/coverage/vm'/prior_tag/'command.json').read_text(encoding='utf-8'))
-   if case=='r18e':
+   if case in ('r18e','r18f'):
     pairs=list(zip(cmd[1::2],cmd[2::2]))
     pairs=[(opt,val) for opt,val in pairs if not (opt=='-chardev' and val.startswith('socket,id=nt351debug,')) and not (opt=='-device' and val.startswith('isa-debugcon,id=nt351debugcon,'))]
     cmd=[cmd[0],*(part for pair in pairs for part in pair)]
@@ -81,7 +86,7 @@ async def main(case):
    await asyncio.gather(*waiters,return_exceptions=True)
    if process.returncode is None:
     await boot.capture(qmp,OUT/'endpoint.png')
-    if case=='r18e' and any(line.startswith('USOSNET started stage ') for line in debug_lines):
+    if case in ('r18e','r18f') and any(line.startswith('USOSNET started stage ') for line in debug_lines):
      print('ENDPOINT_COMPLETE '+tag,flush=True)
      await boot.operator_steps(qmp,OUT,False,True,'mouse')
   except Exception as error:failure=type(error).__name__+': '+str(error)
@@ -112,5 +117,5 @@ async def main(case):
  print('CASE_COMPLETE '+tag,flush=True)
  return 0 if failure is None else 1
 if __name__=='__main__':
- parser=argparse.ArgumentParser();parser.add_argument('--case',choices=('r18d','r18e'),required=True)
+ parser=argparse.ArgumentParser();parser.add_argument('--case',choices=('r18d','r18e','r18f'),required=True)
  raise SystemExit(asyncio.run(main(parser.parse_args().case)))
