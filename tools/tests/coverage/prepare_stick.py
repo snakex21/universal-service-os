@@ -167,9 +167,11 @@ async def main(args):
             raise FileNotFoundError('Missing fixture asset: '+name)
     if any(ch in args.folder for ch in "'\r\n"):
         raise ValueError('Unexpected catalogue folder')
+    service_pack=getattr(args,'legacy_service_pack',None)
     extras = [(path,destination) for path,destination in (
         (args.dos,'/mnt/data/Systems/DOS/MS-DOS/Images/MS-DOS 6.22.iso'),
         (args.donor,'/mnt/data/Programs/USOS/WinPE/PE10-donor.iso'),
+        (service_pack,f'/mnt/data/Systems/Windows/{args.folder}/ServicePack/SP6I386.EXE'),
         (args.boot_floppy,f'/mnt/data/Systems/Windows/{args.folder}/Boot/BOOTDISK.IMG')) if path]
     # Fail on missing inputs before constructing a copied share with private data.
     inputs = args.iso.stat().st_size + sum(path.stat().st_size for path,_ in extras)
@@ -290,6 +292,7 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
         observer_ide=args.observer_ide,
         observer_kind='9x-runonce' if args.legacy_first_logon else 'scripts-cd' if args.first_logon_observer else None,
         donor=str(args.donor) if args.donor else None,
+        legacy_service_pack=str(service_pack) if service_pack else None,
         boot_floppy=str(args.boot_floppy) if args.boot_floppy else None, nvme_9x=args.nvme_9x,
         virtual_bytes=virtual_gib*1024**3,
         current_bytes=disk.stat().st_size)
@@ -306,6 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--folder', required=True)
     parser.add_argument('--dos', type=Path)
     parser.add_argument('--donor', type=Path, help='Unchanged read-only PE10 donor ISO')
+    parser.add_argument('--legacy-service-pack',type=Path,help='Unchanged read-only NT4 SP6a/TSE SP6 prerequisite')
     parser.add_argument('--boot-floppy',type=Path,help='Read-only Windows 95 prerequisite boot disk')
     parser.add_argument('--nvme-9x',action='store_true',help='Use the product NVMe experimental opt-in file')
     parser.add_argument('--first-logon-observer',action='store_true',help='Use user_script with an own scripts CD; marker is not desktop PASS')

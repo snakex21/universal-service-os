@@ -92,7 +92,7 @@ def main(args):
             representatives.append('- '+cell(Path(result['path']).name)+': '+result.get('candidate_reason','')+
                 ' UEFI → CSMWrap; pusty dysk NVMe lub SATA; sprawdzić start, klawiaturę/mysz i ponowny start. SHA-256 `'+digest+'`.')
     lines = ['# Macierz Windows — checkpoint, testy instalacji nieukończone','',
-        f'Data: {date.today().isoformat()}. Baza `97f40f018d1d811dab85c2c1e44f8b6404860189`, po rebase z `1197eb49`.','',
+        f'Data: {date.today().isoformat()}. Baza `{args.base}`, po rebase z `1197eb49`.','',
         f"Inwentaryzacja obejmuje {len(inventory['files'])} plików wejściowych. To także archiwa, dyskietki, nośniki aktualizacji i duplikaty — nie liczba unikatowych instalatorów.", '',
         '**Ten dokument nie spełnia jeszcze kryterium pełnych testów QEMU.** Wiersze „oczekuje” nie oznaczają ani PASS, ani wykrytego błędu Windows. Status X470 przypisano wyłącznie tam, gdzie dokumentacja wskazuje dokładne źródło.','',
         '„API” poniżej oznacza uruchomione biblioteczne parsery USOS. W szczególności `windows_legacy_media` nie jest w tej bazie wywoływany przez ekran UEFI; wpis katalogu i profil nie są automatycznym rozpoznaniem wersji/SP starszego ISO. Dla nowszych nośników odczytano także XML WIM.','',
@@ -136,7 +136,7 @@ def main(args):
     lines += ['', '## Etapy i zakres dowodu','',
         'Etapy: wykrywanie → menu → przygotowanie → micro-Linux → kopiowanie → tekstowy Setup → graficzny Setup → pierwszy start → pulpit. PASS jest zarezerwowany dla pierwszego pulpitu. Zgodność eksportów nie dowodzi ABI ani działania sterownika. QEMU nie zastępuje testu X470.','',
         'Wykonano audyt oryginalnych modułów dla 13 źródeł NT5: XP RTM/SP1 mają brakujące eksporty; badany XP SP2 oraz kontrolne SP3 nie mają braków symboli w badanym zestawie, ale nadal obowiązuje kontrakt pakietu przygotowanego pod SP3. Windows 2000 SP0–SP3 nie mają wymaganych dwóch eksportów USBPORT dla xhci98; kontrolne SP4 mają komplet. Dokładne symbole i opcje napraw znajdą się w raporcie końcowym.','',
-        'Pełne dane wejść i wyników: `artifacts/coverage/inventory-second.json`, `media-second.json`, `driver-audit.json`. Surowe bajty Microsoftu nie są elementem tej dokumentacji ani zmian Git.','',
+        f'Pełne dane wejść i wyników: `{args.inventory.as_posix()}`, `{args.facts.as_posix()}`, `driver-audit.json`. Surowe bajty Microsoftu nie są elementem tej dokumentacji ani zmian Git.','',
         '## Reprezentanci do X470','',
         'Lista jest uzupełniana po przeglądzie końcowego pulpitu. Pokrewne wersje tej samej rodziny nie uzyskują PASS automatycznie.','',
         *representatives[:8], '',
@@ -154,4 +154,5 @@ if __name__ == '__main__':
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--results',type=Path)
     parser.add_argument('--hardware',type=Path)
+    parser.add_argument('--base',default='97f40f018d1d811dab85c2c1e44f8b6404860189')
     main(parser.parse_args())

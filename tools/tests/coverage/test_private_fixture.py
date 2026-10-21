@@ -26,9 +26,13 @@ class PrivateInputTests(unittest.TestCase):
             args=argparse.Namespace(out=out,assets=assets,iso=source,folder='Windows 7',dos=None,
                 donor=root/'missing.iso',boot_floppy=None,first_logon_observer=False,
                 legacy_first_logon=False,trace_menus=False)
-            with patch.object(fixture,'COLLECTION',root),patch.object(fixture,'check_resources',return_value={}):
-                with self.assertRaises(FileNotFoundError):asyncio.run(fixture.main(args))
-            self.assertFalse(out.exists())
+            for field in ('donor','legacy_service_pack'):
+                args.donor=None
+                args.legacy_service_pack=None
+                setattr(args,field,root/'missing-input')
+                with self.subTest(field=field),patch.object(fixture,'COLLECTION',root),patch.object(fixture,'check_resources',return_value={}):
+                    with self.assertRaises(FileNotFoundError):asyncio.run(fixture.main(args))
+                self.assertFalse(out.exists())
 
     def test_boundary_and_ambiguity(self):
         scratch=Path(__file__).resolve().parents[3]/'artifacts/coverage/private-input-test'
