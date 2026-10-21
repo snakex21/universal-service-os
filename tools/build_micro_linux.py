@@ -628,6 +628,7 @@ def main() -> int:
             ("tools/xp_detect_system.sh", "usr/lib/usos/xp_detect_system.sh"),
             ("tools/xp_disk_overview.sh", "usr/lib/usos/xp_disk_overview.sh"),
             ("tools/prepare_xp_windows_partition.sh", "usr/lib/usos/prepare_xp_windows_partition.sh"),
+            ("tools/w9x_filesystem.sh", "usr/lib/usos/w9x_filesystem.sh"),
             ("tools/prepare_wimboot.sh", "usr/lib/usos/prepare_wimboot.sh"),
             ("tools/prepare_vhdboot.sh", "usr/lib/usos/prepare_vhdboot.sh"),
             ("tools/work_boot_relocate.sh", "usr/lib/usos/work_boot_relocate.sh"),
