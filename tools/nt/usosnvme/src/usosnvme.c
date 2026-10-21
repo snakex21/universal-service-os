@@ -39,8 +39,13 @@
 #include "usosnvme.h"
 
 #ifndef USOSNVME_W9X
+#ifdef _WIN64
+__declspec(dllimport) PVOID MmMapIoSpace(IN PHYSICAL_ADDRESS PhysicalAddress,
+                                      IN SIZE_T NumberOfBytes, IN ULONG CacheType);
+#else
 __declspec(dllimport) PVOID __stdcall MmMapIoSpace(IN PHYSICAL_ADDRESS PhysicalAddress,
                                                    IN ULONG NumberOfBytes, IN ULONG CacheType);
+#endif
 #else
 static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN BOOLEAN SaveState);
 static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext);
@@ -73,6 +78,16 @@ static VOID NvmeCopy(PVOID Dest, const VOID *Src, ULONG Length)
     volatile UCHAR *d = (volatile UCHAR *)Dest;
     const UCHAR *s = (const UCHAR *)Src;
     while (Length--) *d++ = *s++;
+}
+
+/* Physical byte offset, including carry across a 4 GiB boundary. Keep the
+   split arithmetic so NT 3.x builds still need no 64-bit CRT helper. */
+static SCSI_PHYSICAL_ADDRESS NvmePhysAdd(SCSI_PHYSICAL_ADDRESS Pa, ULONG Bytes)
+{
+    ULONG low = Pa.LowPart + Bytes;
+    if (low < Pa.LowPart) Pa.HighPart++;
+    Pa.LowPart = low;
+    return Pa;
 }
 
 /* ------------------------------------------------------------------ */
@@ -514,10 +529,8 @@ static VOID NvmeQueueInit(PHW_DEVICE_EXTENSION Ext, PNVME_QUEUE Q, ULONG Qid, UL
 {
     Q->Sq = (PNVME_SQE)(Ext->Uncached + SqPage * NVME_PAGE);
     Q->Cq = (PNVME_CQE)(Ext->Uncached + CqPage * NVME_PAGE);
-    Q->SqPhys = Ext->UncachedPhys;
-    Q->SqPhys.LowPart += SqPage * NVME_PAGE;
-    Q->CqPhys = Ext->UncachedPhys;
-    Q->CqPhys.LowPart += CqPage * NVME_PAGE;
+    Q->SqPhys = NvmePhysAdd(Ext->UncachedPhys, SqPage * NVME_PAGE);
+    Q->CqPhys = NvmePhysAdd(Ext->UncachedPhys, CqPage * NVME_PAGE);
     Q->Depth = Depth;
     Q->SqTail = 0;
     Q->CqHead = 0;
@@ -986,14 +999,11 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     pa = ScsiPortGetPhysicalAddress(ext, NULL, va, &len);
     i = (NVME_PAGE - (pa.LowPart & (NVME_PAGE - 1))) & (NVME_PAGE - 1);
     ext->Uncached = va + i;
-    ext->UncachedPhys = pa;
-    ext->UncachedPhys.LowPart += i;
+    ext->UncachedPhys = NvmePhysAdd(pa, i);
     ext->Ident = ext->Uncached + NVME_PG_IDENT * NVME_PAGE;
-    ext->IdentPhys = ext->UncachedPhys;
-    ext->IdentPhys.LowPart += NVME_PG_IDENT * NVME_PAGE;
+    ext->IdentPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_IDENT * NVME_PAGE);
     ext->PrpList = (PULONG)(ext->Uncached + NVME_PG_PRPLIST * NVME_PAGE);
-    ext->PrpListPhys = ext->UncachedPhys;
-    ext->PrpListPhys.LowPart += NVME_PG_PRPLIST * NVME_PAGE;
+    ext->PrpListPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_PRPLIST * NVME_PAGE);
 #ifdef USOSNVME_W9X
     /* the queues need physically contiguous pages */
     for (i = 1; i < NVME_PAGES; i++) {

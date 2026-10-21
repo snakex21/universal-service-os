@@ -41,6 +41,7 @@ static BOOL have_selected_esp;
  * Vista Setup installs a legacy MBR system. The target disk is the one with
  * the MBR signature of usos-vista-target.ini. */
 static BOOL csmwrap;
+static BOOL csm_target_nvme;
 static DWORD csm_signature,csm_disk=0xffffffff;
 static ULONGLONG csm_staging_start,csm_staging_sectors,csm_windows_start,csm_windows_sectors;
 /* The prepared Windows partition (slot 1, NTFS, before the staging partition)
@@ -269,6 +270,7 @@ static BOOL load_csmwrap_target(void){
  const char *sig=ini_value(text,"disk_signature"),*start=ini_value(text,"staging_start"),*count=ini_value(text,"staging_sectors"),
   *wstart=ini_value(text,"windows_start"),*wcount=ini_value(text,"windows_sectors");
  if(!sig||!start||!count||!wstart||!wcount)return FALSE;
+ const char *bus=ini_value(text,"target_bus");csm_target_nvme=bus&&lstrlenA(bus)>=4&&same(bus,"nvme",4)&&(bus[4]=='\r'||bus[4]=='\n'||!bus[4]);
  DWORD v=0;for(int i=0;i<8;i++){char c=sig[i];if(c>='0'&&c<='9')v=v*16+(DWORD)(c-'0');else if((c|32)>='a'&&(c|32)<='f')v=v*16+(DWORD)((c|32)-'a'+10);else return FALSE;}
  csm_signature=v;csm_staging_start=parse_decimal(start);csm_staging_sectors=parse_decimal(count);
  csm_windows_start=parse_decimal(wstart);csm_windows_sectors=parse_decimal(wcount);
@@ -791,6 +793,8 @@ static void stage_testmode_desktop_root(const WCHAR *root){
  (void)root;
 #endif
 }
+#include "windows_vista_nvme.h"
+#include "windows_vista_nvme_setup.h"
 static BOOL prepare_servicing_answer(WCHAR *answer){
  static WCHAR xml[2048],cab[MAX_PATH],source[MAX_PATH];BYTE digest[32];
  unsigned i;for(i=0;i<sizeof(vista_files)/sizeof(vista_files[0]);i++)
@@ -992,6 +996,7 @@ void entry(void){
  if(!hide_answer_commands()){logcode("Setup not started: the answer commands could not be prepared=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(csmwrap&&!csmwrap_install_to(servicing_answer)){logcode("Setup not started: the target disk could not be written into the answer (InstallTo)=",ERROR_INVALID_DATA);staging_entry(STAGING_ACTIVE_IF_ALONE);ExitProcess(11);}
+ if(!prepare_nvme64_setup(source,setup_path)){logcode("Setup not started: NVMe64 compatibility preparation failed=",GetLastError());ExitProcess(11);}
  if(csmwrap&&!staging_entry(STAGING_INACTIVE)){logcode("Setup not started: the staging partition could not be marked inactive=",ERROR_WRITE_FAULT);ExitProcess(12);}
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");
@@ -1021,6 +1026,7 @@ void entry(void){
  if(csmwrap?!configure_boot_bios(target,&system_is_staging):!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
  stage_testmode_desktop_root(target->root);
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
+ if(!install_nvme64(target)){logcode("STOP: NVMe64 boot package not prepared=",GetLastError());ExitProcess(11);}
  install_optional_dispatcher(target);
  /* PE10 runs from RAM: the staging partition is not needed any more unless
   * Setup made it the system partition. Not fatal. */

@@ -88,7 +88,8 @@ class Source(unittest.TestCase):
                      'NvmeE9 = (v == 0xE9) ? 1 : 0;', 'c.Cdw11 = ((NVME_IO_QID - 1UL) << 16) | (NVME_IO_QID - 1UL);'):
             self.assertIn(want, src)
         # the NT builds keep queue 1 and MmMapIoSpace
-        self.assertIn('#ifndef USOSNVME_W9X\n__declspec(dllimport) PVOID __stdcall MmMapIoSpace', src)
+        self.assertIn('#ifndef USOSNVME_W9X\n#ifdef _WIN64\n__declspec(dllimport) PVOID MmMapIoSpace', src)
+        self.assertIn('#else\n__declspec(dllimport) PVOID __stdcall MmMapIoSpace', src)
 
     def test_build_target(self):
         cmd = (DRV / 'build.cmd').read_text(encoding='latin-1')

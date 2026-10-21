@@ -53,7 +53,12 @@ def build(root: Path):
     shutil.copyfile(wimboot, out / 'wimboot')
     build_stock_support(root, out)
     build_modern_support(root, out)
-    build_vista_support(root)
+    # Vista / Server 2008 SP2 x64 on NVMe (docs/vista-x64-nvme-2026-10-21.md):
+    # the amd64 usosnvme, test-signed per build like the x86 NT6 package
+    # (private key deleted after signing); the x64 profile runs in test mode.
+    nvme64 = root / 'zig-out/windows-source-mount/usosnvme-nt6-amd64'
+    build_usosnvme_nt6_signed(root, nvme64, arch='amd64')
+    build_vista_support(root, nvme_package=nvme64)
     print('[PASS] Native Windows support:', (out / 'support.cpio').stat().st_size, 'bytes')
 
 

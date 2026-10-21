@@ -15,6 +15,13 @@
 //! count + 1). The base block gets the new hbins size and checksum. Written
 //! from the public regf format description (no Microsoft code).
 //!
+//! `usos-fb-ui --bcd-testsigning <bcd>` (same script, Vista / Server 2008
+//! x64 on an NVMe target, docs/vista-x64-nvme-2026-10-21.md): the same edit
+//! for element 16000049 (testsigning, BcdLibraryBoolean_AllowPrereleaseSignatures)
+//! = 1, so the x64 WinPE 10 loads the test-signed usosnvme that replaces its
+//! stornvme image. A boolean is one byte, stored inline in the value cell
+//! (data length 0x80000001), as bcdedit writes it.
+//!
 //! Exit codes: 0 added or updated, 10 already set, 3 not changed (the
 //! reason on stdout), 2 bad arguments.
 const std = @import("std");
@@ -22,7 +29,17 @@ const linux = std.os.linux;
 
 pub const limit: u64 = 0x100000000;
 pub const element_name = "15000007";
-const element_name_bytes: u32 = 2 * element_name.len;
+
+/// One loader element of the default entry: its key name and REG_BINARY data.
+pub const Spec = struct {
+    name: *const [8]u8,
+    data: []const u8,
+    tag: []const u8,
+    what: []const u8,
+};
+pub const truncatememory = Spec{ .name = element_name, .data = &.{ 0, 0, 0, 0, 1, 0, 0, 0 }, .tag = "BCD_LOWMEM", .what = "truncatememory 0x100000000" };
+pub const testsigning = Spec{ .name = "16000049", .data = &.{1}, .tag = "BCD_TESTSIGN", .what = "testsigning on" };
+const element_name_bytes: u32 = 2 * 8;
 const bootmgr_guid = "{9dea862c-5cdd-4e70-acc1-f32b344d4795}";
 const default_element = "23000003";
 const bin_base: usize = 0x1000;
@@ -223,14 +240,15 @@ fn defaultElements(b: []const u8) Error!u32 {
     return (try path(b, root, &.{ "Objects", &guid, "Elements" })) orelse error.NoDefault;
 }
 
-/// State of the limit without changing anything.
-pub fn check(b: []const u8) Error!?u64 {
+/// State of the element without changing anything: null absent, false
+/// present with other data, true set to spec.data.
+pub fn check(b: []const u8, spec: Spec) Error!?bool {
     try checkHeader(b);
     const elements = try defaultElements(b);
-    const key = (try findSubkey(b, elements, element_name)) orelse return null;
+    const key = (try findSubkey(b, elements, spec.name)) orelse return null;
     const v = (try element(b, key)) orelse return null;
-    if (v.len != 8) return 0;
-    return std.mem.readInt(u64, b[v.data..][0..8], .little);
+    if (v.len != spec.data.len) return false;
+    return std.mem.eql(u8, b[v.data..][0..v.len], spec.data);
 }
 
 fn checksum(b: []u8) void {
@@ -243,15 +261,17 @@ fn checksum(b: []u8) void {
 }
 
 /// Edits buf[0..len.*] in place; buf must have room for one more hbin.
-pub fn apply(buf: []u8, len: *usize) Error!Outcome {
+pub fn apply(buf: []u8, len: *usize, spec: Spec) Error!Outcome {
     const b = buf[0..len.*];
     try checkHeader(b);
+    if (spec.data.len == 0 or spec.data.len > 12) return error.Unsupported;
     const elements = try defaultElements(b);
-    if (try findSubkey(b, elements, element_name)) |key| {
+    const small = spec.data.len <= 4; // inline in the vk cell, as Windows does
+    if (try findSubkey(b, elements, spec.name)) |key| {
         const v = (try element(b, key)) orelse return error.Unsupported;
-        if (v.len != 8 or v.inline_data) return error.Unsupported;
-        if (std.mem.readInt(u64, b[v.data..][0..8], .little) == limit) return .already;
-        std.mem.writeInt(u64, buf[v.data..][0..8], limit, .little);
+        if (v.len != spec.data.len or v.inline_data != small) return error.Unsupported;
+        if (std.mem.eql(u8, b[v.data..][0..v.len], spec.data)) return .already;
+        @memcpy(buf[v.data..][0..v.len], spec.data);
         checksum(buf);
         return .updated;
     }
@@ -268,7 +288,7 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
     const nk_size = 88;
     const vl_size = 8;
     const vk_size = 32;
-    const data_size = 16;
+    const data_size: usize = if (small) 0 else 16;
     const lh_size = std.mem.alignForward(usize, 8 + 8 * (list.n + 1), 8);
     const used = nk_size + vl_size + vk_size + data_size + lh_size;
     if (0x20 + used + 8 > bin_size) return error.Unsupported;
@@ -277,7 +297,7 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
     var at: usize = list.n;
     for (list.offs[0..list.n], 0..) |off, i| {
         const n = try keyName(b, try cellData(b, off, "nk"));
-        if (order(element_name, n.slice()) == .lt) {
+        if (order(spec.name, n.slice()) == .lt) {
             at = i;
             break;
         }
@@ -293,11 +313,11 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
     const vl_off = nk_off + nk_size;
     const vk_off = vl_off + vl_size;
     const data_off = vk_off + vk_size;
-    const lh_off = data_off + data_size;
+    const lh_off = data_off + @as(u32, @intCast(data_size));
     const free_off = lh_off + @as(u32, @intCast(lh_size));
 
     var p: usize = 0x20;
-    // nk "15000007"
+    // nk (the element name)
     wr32(out, p, @bitCast(-@as(i32, nk_size)));
     const nk = p + 4;
     @memcpy(out[nk..][0..2], "nk");
@@ -312,28 +332,35 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
     wr32(out, nk + 48, 0xFFFFFFFF);
     wr32(out, nk + 60, 2 * 7);
     wr32(out, nk + 64, 8);
-    wr16(out, nk + 72, element_name.len);
-    @memcpy(out[nk + 76 ..][0..element_name.len], element_name);
+    wr16(out, nk + 72, spec.name.len);
+    @memcpy(out[nk + 76 ..][0..spec.name.len], spec.name);
     p += nk_size;
     // value list
     wr32(out, p, @bitCast(-@as(i32, vl_size)));
     wr32(out, p + 4, vk_off);
     p += vl_size;
-    // vk "Element" REG_BINARY 8 bytes
+    // vk "Element" REG_BINARY
     wr32(out, p, @bitCast(-@as(i32, vk_size)));
     const vk = p + 4;
     @memcpy(out[vk..][0..2], "vk");
     wr16(out, vk + 2, 7);
-    wr32(out, vk + 4, 8);
-    wr32(out, vk + 8, data_off);
+    if (small) {
+        wr32(out, vk + 4, 0x80000000 | @as(u32, @intCast(spec.data.len)));
+        @memcpy(out[vk + 8 ..][0..spec.data.len], spec.data);
+    } else {
+        wr32(out, vk + 4, @intCast(spec.data.len));
+        wr32(out, vk + 8, data_off);
+    }
     wr32(out, vk + 12, 3);
     wr16(out, vk + 16, 1);
     @memcpy(out[vk + 20 ..][0..7], "Element");
     p += vk_size;
-    // data
-    wr32(out, p, @bitCast(-@as(i32, data_size)));
-    std.mem.writeInt(u64, out[p + 4 ..][0..8], limit, .little);
-    p += data_size;
+    // data (only when not inline)
+    if (!small) {
+        wr32(out, p, @bitCast(-@as(i32, @intCast(data_size))));
+        @memcpy(out[p + 4 ..][0..spec.data.len], spec.data);
+        p += data_size;
+    }
     // lh list of Elements
     wr32(out, p, @bitCast(-@as(i32, @as(i32, @intCast(lh_size)))));
     @memcpy(out[p + 4 ..][0..2], "lh");
@@ -344,8 +371,8 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
         const off = if (i == at) nk_off else list.offs[if (i < at) i else i - 1];
         const n = if (i == at) blk: {
             var nn = Name{};
-            @memcpy(nn.buf[0..element_name.len], element_name);
-            nn.len = element_name.len;
+            @memcpy(nn.buf[0..spec.name.len], spec.name);
+            nn.len = spec.name.len;
             break :blk nn;
         } else try keyName(b, try cellData(b, off, "nk"));
         wr32(out, e, off);
@@ -381,9 +408,11 @@ pub fn apply(buf: []u8, len: *usize) Error!Outcome {
 
 var hive_buffer: [max_hive + bin_size]u8 = undefined;
 
+var say_tag: []const u8 = "BCD_LOWMEM";
+
 fn say(comptime fmt: []const u8, args: anytype) void {
     var line: [512]u8 = undefined;
-    const text = std.fmt.bufPrint(&line, "[BCD_LOWMEM] " ++ fmt ++ "\n", args) catch return;
+    const text = std.fmt.bufPrint(&line, "[{s}] " ++ fmt ++ "\n", .{say_tag} ++ args) catch return;
     _ = linux.write(1, text.ptr, text.len);
 }
 
@@ -391,7 +420,8 @@ fn ok(rc: usize) bool {
     return @as(isize, @bitCast(rc)) >= 0;
 }
 
-pub fn run(file: []const u8) u8 {
+pub fn run(file: []const u8, spec: Spec) u8 {
+    say_tag = spec.tag;
     var path_buffer: [1024]u8 = undefined;
     if (file.len >= path_buffer.len) return 2;
     @memcpy(path_buffer[0..file.len], file);
@@ -421,21 +451,21 @@ pub fn run(file: []const u8) u8 {
             return 3;
         }
     }
-    const outcome = apply(&hive_buffer, &len) catch |err| {
+    const outcome = apply(&hive_buffer, &len, spec) catch |err| {
         say("not changed: {s}", .{@errorName(err)});
         return 3;
     };
     if (outcome == .already) {
-        say("truncatememory 0x100000000 already set", .{});
+        say("{s} already set", .{spec.what});
         return 10;
     }
     // read back from the edited image before writing it
-    const now = check(hive_buffer[0..len]) catch |err| {
+    const now = check(hive_buffer[0..len], spec) catch |err| {
         say("self-check failed: {s}; not written", .{@errorName(err)});
         return 3;
     };
-    if (now == null or now.? != limit) {
-        say("self-check failed: limit not found; not written", .{});
+    if (now != true) {
+        say("self-check failed: element not found; not written", .{});
         return 3;
     }
     const wfd = linux.open(zpath, .{ .ACCMODE = .WRONLY, .TRUNC = true }, 0);
@@ -455,7 +485,7 @@ pub fn run(file: []const u8) u8 {
         done += put;
     }
     _ = linux.fsync(fd);
-    say("truncatememory 0x100000000 {s} ({d} bytes)", .{ @tagName(outcome), len });
+    say("{s} {s} ({d} bytes)", .{ spec.what, @tagName(outcome), len });
     return 0;
 }
 
@@ -573,11 +603,12 @@ const TestHive = struct {
 test "bcd truncatememory: added once, then already set" {
     var h = TestHive{};
     var len = h.build();
-    try std.testing.expectEqual(@as(?u64, null), try check(h.buf[0..len]));
-    try std.testing.expectEqual(Outcome.added, try apply(&h.buf, &len));
+    try std.testing.expectEqual(@as(?bool, null), try check(h.buf[0..len], truncatememory));
+    try std.testing.expectEqual(Outcome.added, try apply(&h.buf, &len, truncatememory));
     try std.testing.expectEqual(@as(usize, bin_base + 2 * bin_size), len);
-    try std.testing.expectEqual(@as(?u64, limit), try check(h.buf[0..len]));
-    try std.testing.expectEqual(Outcome.already, try apply(&h.buf, &len));
+    try std.testing.expectEqual(@as(?bool, true), try check(h.buf[0..len], truncatememory));
+    try std.testing.expectEqual(@as(u64, limit), std.mem.readInt(u64, truncatememory.data[0..8], .little));
+    try std.testing.expectEqual(Outcome.already, try apply(&h.buf, &len, truncatememory));
     // the loader's Elements: 12000002, 15000007, 26000010 in this order
     const root = try rd32(&h.buf, 0x24);
     const le = (try path(h.buf[0..len], root, &.{ "Objects", "{7619dcc9-fafe-11d9-b411-000476eba25f}", "Elements" })).?;
@@ -603,17 +634,53 @@ test "bcd truncatememory: added once, then already set" {
 test "bcd truncatememory: other value updated, dirty store refused" {
     var h = TestHive{};
     var len = h.build();
-    _ = try apply(&h.buf, &len);
+    _ = try apply(&h.buf, &len, truncatememory);
     const v = blk: {
         const elements = try defaultElements(h.buf[0..len]);
         const key = (try findSubkey(h.buf[0..len], elements, element_name)).?;
         break :blk (try element(h.buf[0..len], key)).?;
     };
     std.mem.writeInt(u64, h.buf[v.data..][0..8], 0x80000000, .little);
-    try std.testing.expectEqual(Outcome.updated, try apply(&h.buf, &len));
-    try std.testing.expectEqual(@as(?u64, limit), try check(h.buf[0..len]));
+    try std.testing.expectEqual(@as(?bool, false), try check(h.buf[0..len], truncatememory));
+    try std.testing.expectEqual(Outcome.updated, try apply(&h.buf, &len, truncatememory));
+    try std.testing.expectEqual(@as(?bool, true), try check(h.buf[0..len], truncatememory));
     wr32(&h.buf, 8, 9);
-    try std.testing.expectError(error.Dirty, apply(&h.buf, &len));
+    try std.testing.expectError(error.Dirty, apply(&h.buf, &len, truncatememory));
     @memcpy(h.buf[0..4], "xxxx");
-    try std.testing.expectError(error.NotHive, apply(&h.buf, &len));
+    try std.testing.expectError(error.NotHive, apply(&h.buf, &len, truncatememory));
+}
+
+test "bcd testsigning: inline boolean added next to truncatememory, then updated" {
+    var h = TestHive{};
+    var len = h.build();
+    try std.testing.expectEqual(Outcome.added, try apply(&h.buf, &len, testsigning));
+    try std.testing.expectEqual(@as(?bool, true), try check(h.buf[0..len], testsigning));
+    try std.testing.expectEqual(@as(?bool, null), try check(h.buf[0..len], truncatememory));
+    // both elements coexist (a second appended hbin)
+    try std.testing.expectEqual(Outcome.added, try apply(&h.buf, &len, truncatememory));
+    try std.testing.expectEqual(@as(usize, bin_base + 3 * bin_size), len);
+    try std.testing.expectEqual(@as(?bool, true), try check(h.buf[0..len], testsigning));
+    try std.testing.expectEqual(Outcome.already, try apply(&h.buf, &len, testsigning));
+    const elements = try defaultElements(h.buf[0..len]);
+    // sorted: 12000002, 15000007, 16000049, 26000010
+    var list: Subkeys = undefined;
+    try subkeys(h.buf[0..len], elements, &list);
+    try std.testing.expectEqual(@as(usize, 4), list.n);
+    const want = [_][]const u8{ "12000002", "15000007", "16000049", "26000010" };
+    for (want, list.offs[0..4]) |w, o| {
+        const n = try keyName(&h.buf, try cellData(&h.buf, o, "nk"));
+        try std.testing.expectEqualStrings(w, n.slice());
+    }
+    // the boolean is inline: data length 0x80000001, the byte in the offset field
+    const key = (try findSubkey(h.buf[0..len], elements, testsigning.name)).?;
+    const v = (try element(h.buf[0..len], key)).?;
+    try std.testing.expect(v.inline_data);
+    try std.testing.expectEqual(@as(u32, 0x80000001), try rd32(&h.buf, v.vk + 4));
+    try std.testing.expectEqual(@as(u8, 1), h.buf[v.vk + 8]);
+    // a donor store with testsigning off (0) is switched on in place
+    h.buf[v.vk + 8] = 0;
+    checksum(&h.buf);
+    try std.testing.expectEqual(@as(?bool, false), try check(h.buf[0..len], testsigning));
+    try std.testing.expectEqual(Outcome.updated, try apply(&h.buf, &len, testsigning));
+    try std.testing.expectEqual(@as(?bool, true), try check(h.buf[0..len], testsigning));
 }

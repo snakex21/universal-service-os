@@ -18,6 +18,17 @@
 # design doc section 11): no donor (donor= is the Windows ISO itself), the
 # target script runs with X86_SELF=1 and prepares the Windows partition too.
 
+# Vista / Server 2008 SP2 x64 on NVMe (docs/vista-x64-nvme-2026-10-21.md):
+# only the x64 CSMWrap profile, and only when the support archive carries the
+# test-signed amd64 usosnvme package (tools/build_windows_vista_support.py
+# adds usosnvme-amd64.ready next to it). No DATA flag: this profile runs in
+# test mode anyway (the v11 USB backport is test-signed as well).
+vista_nvme64_enabled() {
+    [ "$1" = vista-x64-sp2-uefi-csmwrap ] || return 1
+    [ -r "$2" ] || return 1
+    cpio -it < "$2" 2>/dev/null | grep -qx 'usosnvme-amd64.ready'
+}
+
 vista_csmwrap_log() {
     printf '[VISTA_CSMWRAP] %s\n' "$*"
     printf '%s\n' "$*" >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true
@@ -42,9 +53,8 @@ vista_request_directory() {
 }
 
 # First 8.1/10 trial only: scoped DATA opt-in. Older x86 paths are unchanged.
-# x64 hook: codex/nvme-vista-x64 adds vista_nvme64_enabled (profile
-# vista-x64-sp2-uefi-csmwrap, same flag file) next to this; keep both scoped
-# by profile so one flag never opens the other architecture.
+# Scoped by profile: this flag never opens the x64 profile (vista_nvme64_enabled
+# above needs no flag).
 vista_modern_nvme_enabled() {
     [ "$1" = win-x86-uefi-csmwrap ] || return 1
     case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
@@ -192,12 +202,19 @@ usos_vista_csmwrap_prepare() {
         # nvme-experimental.txt is needed any more. 8.1 / 10 x86 run
         # Microsoft's stornvme in Setup itself, which failed on the X470
         # under CSMWrap (2026-10-13, section 12), so they still stop here.
-        # 64-bit Vista / 2008 would need a signed x64 driver. The 512-byte
-        # LBA check applies.
+        # 64-bit Vista / 2008 (vista-x64-sp2-uefi-csmwrap): the test-signed
+        # amd64 usosnvme in the PE10 x64 donor (testsigning in the staging
+        # BCD) and the installed system (docs/vista-x64-nvme-2026-10-21.md);
+        # QEMU only so far. The 512-byte LBA check applies.
         case "$TARGET_DEVICE" in /dev/nvme*)
             nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
             vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile folder=$folder"
-            [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed."
+            if [ "$x86_self" != 1 ]; then
+                vista_nvme64_enabled "$profile" /mnt/esp/EFI/USOS/windows-native/vista-support.cpio ||
+                    stop "No NVMe driver for 64-bit $NT5_NAME in this USOS build. Pick a SATA disk. No disk was changed."
+                pe_nvme=usosnvme
+                vista_csmwrap_log "NVME $folder amd64: test-signed usosnvme in the WinPE (testsigning) and the installed system"
+            fi
             case "$profile" in
                 win-nt6-x86-uefi-csmwrap)
                     vista_csmwrap_log "NVME $folder x86: usosnvme in the WinPE and the installed system, WinPE lowmem"
