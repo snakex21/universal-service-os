@@ -61,7 +61,10 @@ error. Native support files and an optional read-only PE10 donor may be
 included for the modern Windows paths. Record which donor was actually used.
 
 `boot_menu.py --interactive` stops at a completed endpoint and blocks on
-operator input. Send one JSON action, e.g. `{"keys":["ret"],"settle":20}`,
+operator input. Launch the runner with an open TTY (`exec_command tty:true`);
+redirecting its output to a log does not replace that input channel. The
+runner rejects a missing TTY before allocating a VM, and EOF before an
+explicit finish is an adapter error. Send one JSON action, e.g. `{"keys":["ret"],"settle":20}`,
 then inspect the announced `STEP_COMPLETE` frame. Finish with
 `{"finish":true}` to save the final evidence and remove the disks. This is
 for answering a visible Setup question after the capture boundary; do not use empty actions as
@@ -123,6 +126,31 @@ hash checked and removed after the case. Results still require assessment.
 also covers an older runner rejecting a fixture before QEMU starts.
 An optional `service_pack` input supplies the unchanged, hash-checked
 prerequisite under the filename expected by the NT4 preparation flow.
+
+For USB/LAN tests a case can set `nic: "igb"` (82576 / 8086:10C9, present in
+the actual usosnet source and INF), `usability_usb: true`, and
+`usb_pointer: "mouse"`. The default pointer remains a tablet for other
+cases; NT4 boot-protocol HID tests require the relative USB mouse. Two
+owned thin FAT16 sticks contain START.TXT / HOTPLUG.TXT. The first attaches
+only after USOS prepared the selected target; the second attaches with
+`{"usb":"insert","settle":5}` and detaches with `{"usb":"remove","settle":5}`.
+Device removal awaits DEVICE_DELETED, including an event preceding the
+command reply. No host USB device is forwarded.
+
+At a verified desktop use `{"hid":{"device":"keyboard","state":"remove"},"settle":2}`
+and the corresponding `insert`; `device: "mouse"` does the same for the
+owned pointer. `{"pointer":{"dx":100,"dy":60},"settle":2}` sends relative
+movement with the mouse variant. Check actual key input and pointer motion
+after reconnection, and the guest driver log; QMP acknowledging an action
+is not a functional PASS. PS/2 hardware remains available to NTDETECT, so
+typing while USB is absent does not prove USB routing. The action journal
+stores only key counts, never the text typed. These actions are test
+operations, not periodic progress sampling.
+
+NT4 and native fixtures do not require an unrelated XP initrd. NT5 fixtures
+still require their separate package. Frozen feature inputs must be named
+and hashed independently; a newer repository base does not make an older
+asset cache a newly built release.
 
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB

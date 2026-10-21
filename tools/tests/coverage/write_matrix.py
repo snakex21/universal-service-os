@@ -154,5 +154,5 @@ if __name__ == '__main__':
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--results',type=Path)
     parser.add_argument('--hardware',type=Path)
-    parser.add_argument('--base',default='97f40f018d1d811dab85c2c1e44f8b6404860189')
+    parser.add_argument('--base',required=True,help='Exact repository base; never infer it from a stale default')
     main(parser.parse_args())

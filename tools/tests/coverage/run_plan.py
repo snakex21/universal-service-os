@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import time
+import importlib.util
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -24,6 +25,8 @@ NESTED_SYSTEMS={'windows-95','windows-98','windows-98-se','windows-me',
     'windows-nt-3-1','windows-nt-3-1-server','windows-nt-3-5','windows-nt-3-5-server',
     'windows-nt-3-51','windows-nt-3-51-server','windows-nt-4','windows-nt-4-server',
     'windows-nt-4-tse','windows-embedded-posready-2009'}
+_spec=importlib.util.spec_from_file_location('usability_aux',HERE/'usability_aux.py')
+aux=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(aux)
 
 
 def validate_system(system,nested):
@@ -109,6 +112,7 @@ def after_file(path,alternatives=()):
 
 def run(args):
     cases=json.loads(args.plan.read_text(encoding='utf-8'))
+    aux.require_operator_channel(any(case.get('interactive') for case in cases))
     if args.after:after_cleanup(args.after)
     if getattr(args,'after_file',None):after_file(args.after_file)
     for case in cases:
@@ -162,6 +166,10 @@ def run(args):
             if case.get('ps2_input',not args.nested):boot+=['--ps2-input']
             if 'boot_seconds' in case:boot+=['--boot-seconds',str(case['boot_seconds'])]
             if case.get('auto_native'):boot+=['--auto-native']
+            if case.get('interactive'):boot+=['--interactive']
+            if case.get('nic'):boot+=['--nic',case['nic']]
+            if case.get('usb_pointer'):boot+=['--usb-pointer',case['usb_pointer']]
+            if case.get('usability_usb'):boot+=['--usability-usb']
             with (logdir/(tag+'.log')).open('w',encoding='utf-8') as log:
                 subprocess.run(prepare,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
                 subprocess.run(boot,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
@@ -172,7 +180,7 @@ def run(args):
             # Each child has returned; these exact, newly created inputs only.
             if inputs.exists() and inputs.resolve().is_relative_to(COLLECTION/'_inputs'):shutil.rmtree(inputs)
             removed=[]
-            for name in ('stick.qcow2','target.qcow2','vars.fd','observer.iso'):
+            for name in ('stick.qcow2','target.qcow2','usb-test-boot.qcow2','usb-test-hot.qcow2','vars.fd','observer.iso'):
                 path=work/name
                 if path.exists():path.unlink();removed.append(name)
             outcome['leftover_images_removed']=removed

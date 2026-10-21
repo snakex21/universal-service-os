@@ -20,6 +20,9 @@ import time
 spec = importlib.util.spec_from_file_location('coverage_fixture', Path(__file__).with_name('prepare_stick.py'))
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
+spec = importlib.util.spec_from_file_location('usability_aux', Path(__file__).with_name('usability_aux.py'))
+aux = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(aux)
 
 
 class Qmp:
@@ -28,6 +31,7 @@ class Qmp:
         self.pending = {}
         self.sequence = 0
         self.writer = None
+        self.deleted = {}
 
     async def accept(self, reader, writer):
         self.writer = writer
@@ -36,6 +40,9 @@ class Qmp:
         try:
             while line := await reader.readline():
                 response = json.loads(line)
+                if response.get('event') == 'DEVICE_DELETED':
+                    future=self.deleted.get(response.get('data',{}).get('device'))
+                    if future and not future.done():future.set_result(response)
                 identifier = response.get('id')
                 if identifier in self.pending:
                     future = self.pending.pop(identifier)
@@ -46,6 +53,8 @@ class Qmp:
             for future in self.pending.values():
                 if not future.done():
                     future.set_exception(ConnectionError('QMP closed'))
+            for future in self.deleted.values():
+                if not future.done():future.set_exception(ConnectionError('QMP closed'))
 
     async def command(self, name, arguments=None):
         await asyncio.wait_for(self.connected.wait(),10)
@@ -69,6 +78,17 @@ class Qmp:
         await self.command('human-monitor-command', {'command-line':'sendkey '+key})
         await asyncio.sleep(.35)  # Pace input release; this does not inspect progress.
 
+    async def delete_device(self,device):
+        future=asyncio.get_running_loop().create_future()
+        self.deleted[device]=future
+        try:
+            await self.command('device_del',{'id':device})
+            await asyncio.wait_for(future,10)
+        finally:
+            self.deleted.pop(device,None)
+            if not future.done():future.cancel()
+            elif not future.cancelled():future.exception()
+
 
 def redact(text):
     return re.sub(r'\b[A-Z0-9]{5}(?:-[A-Z0-9]{5}){4}\b|\b\d{5}-OEM-\d{7}-\d{5}\b|\b\d{3}-\d{7}\b',
@@ -89,7 +109,7 @@ async def capture(qmp, path):
     ppm.unlink()
 
 
-async def operator_steps(qmp, output):
+async def operator_steps(qmp, output,usb_test=False,hid_test=False,pointer='tablet'):
     """Block for an explicit operator action, then emit its completed frame.
 
     This is manual UI interaction, not a recurring progress observer. The
@@ -101,21 +121,48 @@ async def operator_steps(qmp, output):
     while line := await asyncio.to_thread(sys.stdin.readline):
         action = json.loads(line)
         if action.get('finish'):
-            break
+            return
+        if action.get('hid'):
+            if not hid_test:raise ValueError('USB input devices were not reserved by this test')
+            hid=action['hid'];descriptor=aux.hid_descriptor(hid['device'],pointer)
+            if hid['state']=='insert':await qmp.command('device_add',descriptor)
+            elif hid['state']=='remove':await qmp.delete_device(descriptor['id'])
+            else:raise ValueError('HID action must be insert or remove')
+        if action.get('usb'):
+            if not usb_test:raise ValueError('No disposable USB test images reserved')
+            if action['usb']=='insert':
+                await qmp.command('device_add',{'driver':'usb-storage','id':'usability-hot',
+                    'bus':'xhci.0','drive':'usabilityhot','removable':True,'serial':'USOS-USB-HOT-TEST'})
+            elif action['usb']=='remove':await qmp.delete_device('usability-hot')
+            else:raise ValueError('Only insert/remove of the owned hot-plug test stick is allowed')
         keys = action.get('keys',[])
         settle = float(action.get('settle',2))
         if len(keys)>64 or not 0<=settle<=3600 or any(not re.fullmatch('[a-z0-9_-]+',key) for key in keys):
             raise ValueError('Invalid operator input')
         for key in keys:
             await qmp.key(key)
+        if action.get('pointer'):
+            move=action['pointer']
+            if not hid_test or pointer!='mouse':raise ValueError('Relative test requires the owned boot-protocol USB mouse')
+            dx,dy=move.get('dx',0),move.get('dy',0)
+            if type(dx)!=int or type(dy)!=int or not -2048<=dx<=2048 or not -2048<=dy<=2048:
+                raise ValueError('Invalid bounded relative mouse movement')
+            await qmp.command('input-send-event',{'events':[
+                {'type':'rel','data':{'axis':'x','value':dx}},
+                {'type':'rel','data':{'axis':'y','value':dy}}]})
         await asyncio.sleep(settle)
         count += 1
         destination = output/f'operator-{count:02}.png'
         await capture(qmp,destination)
+        with (output/'operator-actions.jsonl').open('a',encoding='utf-8') as log:
+            log.write(json.dumps({'image':destination.name,'usb':action.get('usb'),
+                'hid':action.get('hid'),'pointer':action.get('pointer'),'keys_count':len(keys)})+'\n')
         print('STEP_COMPLETE: '+destination.name,flush=True)
+    raise EOFError('Operator channel closed before an explicit finish; test is incomplete')
 
 
 async def main(args):
+    aux.require_operator_channel(args.interactive)
     work = args.fixture.resolve()
     if not work.is_relative_to(fixture.COLLECTION/'_vm'):
         raise ValueError('Only owned collection VM fixtures may be opened writable')
@@ -134,6 +181,9 @@ async def main(args):
         system.get('uefi_profile','').startswith(('nt3-','nt4-','posready-')))
     if args.interactive and metadata.get('private_profile') and not prepared_proves_key_passed:
         raise ValueError('Manual keyed tests require a family with a verified post-key preparation boundary')
+    usb_test=getattr(args,'usability_usb',False)
+    if usb_test and not prepared_proves_key_passed:
+        raise ValueError('USB-at-boot instrumentation needs the verified prepared-disk boundary')
     resources = fixture.check_resources(work, args.ram_mib)
     args.out.mkdir(parents=True, exist_ok=False)
     target = work/'target.qcow2'
@@ -148,15 +198,20 @@ async def main(args):
     acceleration = ('whpx,kernel-irqchip=off' if args.accel == 'whpx' else 'tcg,thread=multi')
     cpu = ('qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt' if args.accel == 'whpx' else 'EPYC-Rome')
     command = [str(args.qemu), '-machine',args.machine, '-accel',acceleration,
-        '-cpu',cpu, '-smp','2', '-m',str(args.ram_mib), '-display','none', '-nic','none',
+        '-cpu',cpu, '-smp','2', '-m',str(args.ram_mib), '-display','none',
         '-serial','stdio', '-monitor','none', '-qmp',f'tcp:127.0.0.1:{port},server=off',
         '-drive',f'if=pflash,format=raw,readonly=on,file={(args.qemu.parent/"share/edk2-x86_64-code.fd").as_posix()}',
         '-drive',f'if=pflash,format=raw,file={variables.as_posix()}',
         '-drive',f'if=none,id=stick,format=qcow2,file={(work/"stick.qcow2").as_posix()}',
         '-device','qemu-xhci,id=xhci']
+    command += aux.network_arguments(getattr(args,'nic','none'))
+    usb_disks=aux.create_sticks(work,args.qemu) if usb_test else []
+    for kind,path in zip(('boot','hot'),usb_disks):
+        command+=['-drive',f'if=none,id=usability{kind},format=qcow2,file={path.as_posix()}']
     if not args.ps2_input:
+        pointer=getattr(args,'usb_pointer','tablet')
         command += ['-device','usb-kbd,id=coveragekbd,bus=xhci.0',
-                    '-device','usb-tablet,id=coveragepointer,bus=xhci.0']
+                    '-device',f'usb-{pointer},id=coveragepointer,bus=xhci.0']
     command += [
         '-device','usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOS-COVERAGE-STICK,bootindex=1',
         '-drive',f'if=none,id=target,format=qcow2,file={target.as_posix()}']
@@ -257,6 +312,10 @@ async def main(args):
                 elif '[COVERAGE_NOTICE]' in line:
                     events.append(dict(seconds=round(time.monotonic()-start,2),text=line.strip()))
                     await asyncio.sleep(1)
+                    if 'start the prepared disk' in line and usb_test:
+                        await qmp.command('device_add',{'driver':'usb-storage','id':'usability-boot',
+                            'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
+                        events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 test stick attached before first prepared-target boot'))
                     await qmp.key('ret')
                     if 'start the prepared disk' in line:
                         prepared.set()
@@ -299,7 +358,7 @@ async def main(args):
                 if args.interactive:
                     if not capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set()):
                         raise RuntimeError('Private Setup has not reached its verified post-key boundary; no manual capture')
-                    await operator_steps(qmp,args.out)
+                    await operator_steps(qmp,args.out,usb_test,not args.ps2_input,getattr(args,'usb_pointer','tablet'))
                     await capture(qmp,args.out/'endpoint.png')
                 if capture_permitted(metadata.get('private_profile'),prepared_proves_key_passed,prepared.is_set(),first_logon.is_set()):
                     await qmp.command('human-monitor-command',{'command-line':
@@ -330,8 +389,9 @@ async def main(args):
                 qmp.writer.close()
                 try: await qmp.writer.wait_closed()
                 except (ConnectionResetError, OSError): pass
-    sizes = {path.name:path.stat().st_size for path in (work/'stick.qcow2',target)}
-    allocated = {path.name:fixture.allocated_bytes(path) for path in (work/'stick.qcow2',target)}
+    all_disks=[work/'stick.qcow2',target,*usb_disks]
+    sizes = {path.name:path.stat().st_size for path in all_disks}
+    allocated = {path.name:fixture.allocated_bytes(path) for path in all_disks}
     variables.unlink(missing_ok=True)
     from PIL import Image
     if (args.out/'endpoint.ppm').exists():
@@ -349,14 +409,17 @@ async def main(args):
     result['shutdown_method'] = shutdown_method
     result['first_logon_observed'] = first_logon.is_set()
     result['native_fixed_input_scenario'] = args.auto_native
+    result['nic']=getattr(args,'nic','none')
+    result['usb_test_images']=usb_test
+    result['usb_pointer']=None if args.ps2_input else getattr(args,'usb_pointer','tablet')
     result['allocated_disk_bytes'] = allocated
     result['total_allocated_disk_bytes'] = sum(allocated.values())
     (args.out/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     (args.out/'fixture.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
-    for path in (work/'stick.qcow2',target):
+    for path in all_disks:
         path.unlink()  # These exact per-test files only; result is already saved.
     (work/'observer.iso').unlink(missing_ok=True)
-    (args.out/'cleanup.json').write_text(json.dumps({'removed':['stick.qcow2','target.qcow2','vars.fd','observer.iso (if present)']}),encoding='utf-8')
+    (args.out/'cleanup.json').write_text(json.dumps({'removed':[*sizes,'vars.fd','observer.iso (if present)']}),encoding='utf-8')
     print(json.dumps(dict(result=result['result'],events=len(events),seconds=result['elapsed'])),flush=True)
 
 
@@ -375,4 +438,7 @@ if __name__ == '__main__':
     parser.add_argument('--boot-seconds',type=int,help='One endpoint after the real prepared-disk notice and target boot')
     parser.add_argument('--ps2-input',action='store_true',help='Use default QEMU PS/2 keyboard/mouse; USB stick stays on xHCI')
     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
+    parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
+    parser.add_argument('--usb-pointer',choices=('mouse','tablet'),default='tablet',help='Use mouse for the NT4 driver boot-HID path')
+    parser.add_argument('--usability-usb',action='store_true',help='Own disposable FAT16 boot/hot-plug sticks; attach boot stick after disk preparation')
     asyncio.run(main(parser.parse_args()))

@@ -18,7 +18,7 @@ class PrivateInputTests(unittest.TestCase):
         scratch.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=scratch) as directory:
             root=Path(directory);assets=root/'assets'
-            for name in ('usb','micro-linux','xp-uefi-csm'):(assets/'zig-out'/name).mkdir(parents=True)
+            for name in ('usb','micro-linux'):(assets/'zig-out'/name).mkdir(parents=True)
             for name in ('dos-native/msdos/INSTALL.BAT','bin/usos-x86_64.efi'):
                 p=assets/'zig-out'/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'')
             source=root/'source.iso';source.write_bytes(b'')
@@ -26,13 +26,19 @@ class PrivateInputTests(unittest.TestCase):
             args=argparse.Namespace(out=out,assets=assets,iso=source,folder='Windows 7',dos=None,
                 donor=root/'missing.iso',boot_floppy=None,first_logon_observer=False,
                 legacy_first_logon=False,trace_menus=False)
-            for field in ('donor','legacy_service_pack'):
-                args.donor=None
-                args.legacy_service_pack=None
-                setattr(args,field,root/'missing-input')
-                with self.subTest(field=field),patch.object(fixture,'COLLECTION',root),patch.object(fixture,'check_resources',return_value={}):
-                    with self.assertRaises(FileNotFoundError):asyncio.run(fixture.main(args))
-                self.assertFalse(out.exists())
+            for folder in ('Windows 7','Windows NT 4.0'):
+                args.folder=folder
+                for field in ('donor','legacy_service_pack'):
+                    args.donor=None
+                    args.legacy_service_pack=None
+                    setattr(args,field,root/'missing-input')
+                    with self.subTest(folder=folder,field=field),patch.object(fixture,'COLLECTION',root),patch.object(fixture,'check_resources',return_value={}):
+                        with self.assertRaises(FileNotFoundError) as raised:asyncio.run(fixture.main(args))
+                    self.assertEqual(Path(raised.exception.filename),root/'missing-input', 'An unrelated missing XP package must not block NT4/native fixtures')
+                    self.assertFalse(out.exists())
+            args.folder='Windows XP'
+            with patch.object(fixture,'COLLECTION',root),patch.object(fixture,'check_resources',return_value={}):
+                with self.assertRaisesRegex(FileNotFoundError,'xp-uefi-csm/initramfs-xp'):asyncio.run(fixture.main(args))
 
     def test_boundary_and_ambiguity(self):
         scratch=Path(__file__).resolve().parents[3]/'artifacts/coverage/private-input-test'

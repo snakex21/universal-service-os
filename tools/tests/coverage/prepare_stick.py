@@ -22,6 +22,8 @@ import uuid
 COLLECTION = Path(r'G:\USOS-Kolekcja').resolve()
 LOWRAM = Path(r'C:\Users\ASRock\usos-work\lowram-pomiar\tools\tests\lowram\bootstrap_probe.py')
 PRIVATE_KEYS = Path(r'C:\Users\ASRock\AppData\Local\USOS\test-assets\private-keys').resolve()
+NT5_FOLDERS={'windows xp','windows xp x64','windows 2000','windows 2000 server',
+    'windows server 2003','windows xp media center edition 2005','windows xp tablet pc edition 2005'}
 LEGACY_OBSERVER_AWK = r'''
 {
     sub(/\r$/, "")
@@ -162,7 +164,9 @@ async def main(args):
         raise ValueError('First-logon observer needs an actual USOS profile')
     if args.legacy_first_logon and (not args.trace_menus or args.folder not in ('Windows 98','Windows 98 SE','Windows Me')):
         raise ValueError('Legacy observer is only for profile-based 98/98SE/Me with trace overlay')
-    for name in ('usb','dos-native/msdos/INSTALL.BAT','micro-linux','bin/usos-x86_64.efi','xp-uefi-csm'):
+    required=['usb','dos-native/msdos/INSTALL.BAT','micro-linux','bin/usos-x86_64.efi']
+    if args.folder.casefold() in NT5_FOLDERS:required.append('xp-uefi-csm/initramfs-xp')
+    for name in required:
         if not (args.assets/'zig-out'/name).exists():
             raise FileNotFoundError('Missing fixture asset: '+name)
     if any(ch in args.folder for ch in "'\r\n"):
@@ -197,6 +201,7 @@ async def main(args):
                                 ('dos-native','EFI/USOS/dos-native'),
                                 ('xp-uefi-csm','EFI/USOS-XP')]:
         source = args.assets/'zig-out'/source
+        if source.name=='xp-uefi-csm' and not source.exists():continue
         target = share/destination
         target.mkdir(parents=True, exist_ok=True)
         if source.name == 'dos-native':
@@ -217,6 +222,7 @@ async def main(args):
         # NT5 boots the separate XP package; step 620 boots micro-linux.
         # Both frozen bundles contain the verified same own UI script bases.
         for relative in ('EFI/USOS/micro-linux/initramfs-usos','EFI/USOS-XP/initramfs-xp'):
+            if not (share/relative).exists():continue
             with (share/relative).open('ab') as stream:
                 stream.write(b'\0'*(-stream.tell()%4))
                 stream.write(overlay)
