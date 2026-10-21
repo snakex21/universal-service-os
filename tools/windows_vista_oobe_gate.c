@@ -175,7 +175,7 @@ static void limit_autochk(void){
  report("Autochk: AutoChkTimeout = 3 s=",e);
  RegCloseKey(key);
 }
-#ifdef USOS_GATE_NATIVE_DEPLOY
+#if defined(USOS_GATE_NATIVE_DEPLOY) || defined(USOS_GATE_NVME_X64)
 /* NVMe target (usos-x86-csmwrap.cmd :nvme put the signed usosnvme package in
  * C:\USOS\nvme): before specialize, trust the package's per-build
  * certificate (its private key was deleted at build time, so nothing else can
@@ -183,22 +183,24 @@ static void limit_autochk(void){
  * stage the package into the driver store. Specialize then installs usosnvme
  * on the controller silently; without it NT 6.0 installed the NULL driver
  * and every later start was STOP 0x7B (docs/nvme-nt6-2026-10-12.md 8-9).
- * Never fatal. */
-static void nvme_stage(void){
+ * The amd64 NVMe experiment requires success before specialize. */
+static BOOL nvme_stage(void){
  static WCHAR dir[MAX_PATH],path[MAX_PATH],cmd[3*MAX_PATH];static BYTE cert[8192];
  lstrcpyW(dir,L"C:\\USOS\\nvme\\");dir[0]=windows[0];
  lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.inf");
- if(GetFileAttributesW(path)==INVALID_FILE_ATTRIBUTES)return;
+ if(GetFileAttributesW(path)==INVALID_FILE_ATTRIBUTES)return TRUE;
  lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.cer");
  DWORD n=0;HANDLE f=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
- if(f==INVALID_HANDLE_VALUE){report("NVMe: usosnvme.cer not opened=",GetLastError());return;}
+ if(f==INVALID_HANDLE_VALUE){report("NVMe: usosnvme.cer not opened=",GetLastError());return FALSE;}
  BOOL read=ReadFile(f,cert,sizeof(cert),&n,0);CloseHandle(f);
- if(!read||!n||n==sizeof(cert)){report("NVMe: usosnvme.cer not read=",read?ERROR_INVALID_DATA:GetLastError());return;}
+ if(!read||!n||n==sizeof(cert)){report("NVMe: usosnvme.cer not read=",read?ERROR_INVALID_DATA:GetLastError());return FALSE;}
+ BOOL trusted=TRUE;
  static const WCHAR *const stores[]={L"Root",L"TrustedPublisher"};
  for(unsigned i=0;i<2;i++){
   HCERTSTORE store=CertOpenStore(CERT_STORE_PROV_SYSTEM_W,0,0,CERT_SYSTEM_STORE_LOCAL_MACHINE,stores[i]);
   DWORD e=0;if(!store)e=GetLastError();
   else{if(!CertAddEncodedCertificateToStore(store,X509_ASN_ENCODING,cert,n,CERT_STORE_ADD_REPLACE_EXISTING,0))e=GetLastError();CertCloseStore(store,0);}
+  if(e)trusted=FALSE;
   report(i?"NVMe: certificate -> LocalMachine TrustedPublisher=":"NVMe: certificate -> LocalMachine Root=",e);
  }
  STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
@@ -207,6 +209,7 @@ static void nvme_stage(void){
  if(!CreateProcessW(path,cmd,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi))result=GetLastError();
  else{CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,120000)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);else{TerminateProcess(pi.hProcess,WAIT_TIMEOUT);result=WAIT_TIMEOUT;}CloseHandle(pi.hProcess);}
  report("NVMe: pnputil -a usosnvme.inf (driver store) exit=",result);
+ return trusted&&result==0;
 }
 #endif
 void entry(void){
@@ -260,6 +263,9 @@ void entry(void){
    * straight to native windeploy, as on the recovery branch above. */
   lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
 #else
+#ifdef USOS_GATE_NVME_X64
+  if(!nvme_stage()){report("NVMe64: package staging failed; specialize refused=",ERROR_DRIVER_BLOCKED);ExitProcess(ERROR_DRIVER_BLOCKED);}
+#endif
   lstrcpyW(file,L"C:\\USOS\\usb.exe");file[0]=windows[0];
   quiet_console=TRUE;
 #endif

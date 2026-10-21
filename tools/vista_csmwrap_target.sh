@@ -77,9 +77,8 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-# Pre-write NVMe package checks. x64 hook: codex/nvme-vista-x64 adds its
-# amd64 package check (X86_SELF != 1, USOS_PE_NVME=usosnvme) here as a
-# separate branch; this one only handles USOS_PE_NVME=usosnvme-modern.
+# Pre-write NVMe package checks: USOS_PE_NVME=usosnvme-modern (8.1 / 10 x86)
+# here, the Vista / 2008 x64 amd64 package below.
 modern_nvme=0
 if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
     [ "$X86_SELF" = 1 ] || fail 'modern NVMe requires the x86 self-boot profile'
@@ -95,6 +94,25 @@ if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
     modern_nvme=1
     USOS_PE_NVME=usosnvme
     log "modern NVMe preflight PASS id=$modern_id"
+fi
+
+# NVMe target, Vista / Server 2008 SP2 x64 (USOS_PE_NVME=usosnvme with
+# X86_SELF=0, docs/vista-x64-nvme-2026-10-21.md): the test-signed amd64
+# usosnvme package must be in vista-support.cpio, and usos-fb-ui must be able
+# to switch testsigning on in the staging BCD (the x64 WinPE 10 refuses a
+# test-signed boot driver otherwise). Checked before the first write.
+nvme64=0
+if [ "$X86_SELF" != 1 ] && [ "${USOS_PE_NVME:-}" = usosnvme ]; then
+    case "$TARGET_DEVICE" in /dev/nvme*) ;; *) fail 'the amd64 NVMe package requires an NVMe target' ;; esac
+    command -v usos-fb-ui >/dev/null 2>&1 || fail 'usos-fb-ui is missing (staging BCD testsigning); no disk was changed'
+    mkdir -p "$work/preflight"
+    ( cd "$work/preflight" && cpio -idm < "$helpers_cpio" 2>/dev/null ) || fail 'cannot inspect the amd64 NVMe helper package'
+    for f in usosnvme-amd64.ready usosnvme-nt6.sys usosnvme.inf usosnvme.cat usosnvme.cer; do
+        [ -s "$work/preflight/$f" ] || fail "signed amd64 NVMe package missing: $f; no disk was changed"
+    done
+    rm -rf "$work/preflight"
+    nvme64=1
+    log 'amd64 NVMe preflight PASS (test-signed usosnvme, testsigning in the staging BCD)'
 fi
 
 # 1. Partition table: erase the old one (both GPT copies), then a new MBR.
@@ -189,6 +207,15 @@ case "$TARGET_DEVICE" in /dev/nvme*)
         fi
     fi ;;
 esac
+# Vista / 2008 x64 on NVMe: the x64 WinPE 10 boots with testsigning on (the
+# installed Vista gets it from usos-vista-install.exe, as for the v11 USB
+# backport), so its stornvme service can run the test-signed usosnvme.
+if [ "$nvme64" = 1 ]; then
+    rc=0
+    usos-fb-ui --bcd-testsigning "$work/bcd" > "$work/bcd-testsign.log" || rc=$?
+    while IFS= read -r line; do log "$line"; done < "$work/bcd-testsign.log"
+    case "$rc" in 0|10) ;; *) fail "staging BCD: testsigning not set (usos-fb-ui exit $rc)" ;; esac
+fi
 cp "$work/bcd" "$work/staging/boot/bcd" && cmp -s "$work/bcd" "$work/staging/boot/bcd" || fail 'BCD copy failed'
 cp "$sdi" "$work/staging/boot/boot.sdi" && cmp -s "$sdi" "$work/staging/boot/boot.sdi" || fail 'boot.sdi copy failed'
 log "PE10 boot files PASS boot_index=$boot_index"

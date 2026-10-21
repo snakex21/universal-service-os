@@ -26,6 +26,8 @@ static DWORD scene(DWORD style,int left,int top){
  POINT origin={left-2,top-4};SetWindowOrgEx(dc,origin.x,origin.y,0);
  RECT update={left+2,top+2,left+8,top+6};
  if(!paint_background((HMONITOR)1,dc,&update))return 3;
+ /* Stretch: the second paint must come from the cached scaled bitmap. */
+ if(style==WPSTYLE_STRETCH&&(!scaled||scaled_width!=10||scaled_height!=8||!paint_background((HMONITOR)1,dc,&update)))return 7;
  GdiFlush();POINT after={0};GetWindowOrgEx(dc,&after);if(after.x!=origin.x||after.y!=origin.y)return 4;
  RECT clipping;GetClipBox(dc,&clipping);if(clipping.left!=origin.x||clipping.top!=origin.y||clipping.right!=origin.x+32||clipping.bottom!=origin.y+32)return 5;
  for(int y=0;y<32;y++)for(int x=0;x<32;x++){

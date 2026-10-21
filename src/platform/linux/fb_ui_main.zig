@@ -25,7 +25,13 @@ pub fn main(init: std.process.Init) !u8 {
         }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
-            return @import("bcd_lowmem.zig").run(args.next() orelse return 2);
+            const bcd = @import("bcd_lowmem.zig");
+            return bcd.run(args.next() orelse return 2, bcd.truncatememory);
+        }
+        // tools/vista_csmwrap_target.sh: testsigning in the x64 staging BCD.
+        if (std.mem.eql(u8, arg, "--bcd-testsigning")) {
+            const bcd = @import("bcd_lowmem.zig");
+            return bcd.run(args.next() orelse return 2, bcd.testsigning);
         }
     }
 

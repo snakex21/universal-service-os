@@ -25,8 +25,9 @@ Output folder: usosnvme.inf (NT6 copy with CatalogFile), usosnvme.sys
 (signed copy of the committed NT6 build: src\2KXP with -DUSOSNVME_NT6, no
 HwInterrupt, so ScsiPort connects no interrupt; the X470 Win10 x86 WinPE
 failed the 2KXP build's start with Problem 10 / 0xC000000D, 2026-10-14),
-usosnvme.cat, usosnvme.cer. The amd64 build does not exist yet (build.cmd
-is x86 only).
+usosnvme.cat, usosnvme.cer. arch='amd64': the NT6X64 build (WDK 7.1 fre x64
+WLH, same polled source) with NTamd64 models, for Vista / Server 2008 SP2 x64,
+which load it in test mode (docs/vista-x64-nvme-2026-10-21.md).
 """
 from __future__ import annotations
 
@@ -41,21 +42,32 @@ INF_DATE_IN = b'DriverVer=10/11/2026,1.0.0.0'
 INF_DATE_OUT = b'DriverVer=01/01/2001,1.0.0.0'
 
 
-# Joint-merge hook for codex/nvme-vista-x64 (pending the test-mode decision):
-# that series adds arch='amd64' (NTamd64 models, NT6/amd64 binary, explicit
-# allow_test_signature). Only x86 is accepted until it is merged; modern=True
-# (8.1/10 exact-ID package) stays x86-only.
-ARCHES = ('x86',)
+# arch='amd64' (Vista / Server 2008 SP2 x64, docs/vista-x64-nvme-2026-10-21.md):
+# NTamd64 models and the NT6/amd64 binary. The Vista x64 path runs with
+# testsigning on (PE10 staging BCD and the installed system), like the
+# test-signed USB backport of the v11 payload. modern=True (8.1/10 exact-ID
+# package) stays x86-only.
+ARCHES = ('x86', 'amd64')
 
 
 def nt6_inf(root: Path, modern: bool = False, arch: str = 'x86') -> bytes:
     if arch not in ARCHES:
         raise ValueError('unsupported usosnvme architecture: ' + arch)
+    if modern and arch != 'x86':
+        raise ValueError('the modern usosnvme package is x86 only')
     inf = (root / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
     if INF_DATE_IN not in inf:
         raise ValueError('usosnvme.inf DriverVer changed; update the NT6 copy')
     inf = inf.replace(INF_DATE_IN, INF_DATE_OUT + b'\r\nCatalogFile=usosnvme.cat')
-    inf = inf.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+    inf = inf.replace(b'\r\n', b'\n')
+    if arch == 'amd64':
+        # 64-bit PnP reads only decorated models sections.
+        for old, new in ((b'%USOS% = Nvme_Models\n', b'%USOS% = Nvme_Models, NTamd64\n'),
+                         (b'[Nvme_Models]\n', b'[Nvme_Models.NTamd64]\n')):
+            if old not in inf:
+                raise ValueError('usosnvme INF models changed')
+            inf = inf.replace(old, new)
+    inf = inf.replace(b'\n', b'\r\n')
     if modern:
         # Separate owned package, exact IDs reviewed for the first opt-in trial.
         # Retain the boot-critical service identity without replacing its inbox file.
@@ -118,11 +130,16 @@ def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> 
     """Writes the signed package to out; returns the certificate thumbprint."""
     if arch not in ARCHES:
         raise ValueError('unsupported usosnvme architecture: ' + arch)
+    out = out.resolve()
+    if out == root.resolve() or not out.name or out == Path(out.anchor):
+        raise ValueError('unsafe signing output directory')
+    inf = nt6_inf(root, modern, arch)
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    (out / 'usosnvme.inf').write_bytes(nt6_inf(root, modern, arch))
-    shutil.copyfile(root / 'tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys', out / 'usosnvme.sys')
+    (out / 'usosnvme.inf').write_bytes(inf)
+    shutil.copyfile(root / ('tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys' if arch == 'x86' else
+                            'tools/nt/usosnvme/bin/NT6/amd64/usosnvme.sys'), out / 'usosnvme.sys')
     (out / 'usosnvme.cdf').write_bytes(
         b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n' +
         (b'CATATTR1=0x10010001:OSAttr:2:6.3,2:10.0\r\n\r\n' if modern else
@@ -130,7 +147,7 @@ def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> 
         b'[CatalogFiles]\r\n<hash>usosnvme.inf=usosnvme.inf\r\n<hash>usosnvme.sys=usosnvme.sys\r\n')
     signtool, makecat = find_tools()
     env = dict(os.environ, USOS_SIGN_OUT=str(out), USOS_SIGNTOOL=str(signtool), USOS_MAKECAT=str(makecat),
-               USOS_SIGN_BUILD=os.environ.get('USOS_BUILD_ID', 'DEV'))
+               USOS_SIGN_BUILD=os.environ.get('USOS_BUILD_ID', 'DEV') + ('' if arch == 'x86' else ' amd64'))
     result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', PS_SIGN],
                             env=env, capture_output=True, text=True)
     if result.returncode != 0:

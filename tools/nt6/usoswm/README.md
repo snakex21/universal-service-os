@@ -79,6 +79,49 @@ proof; that fixture is not a complete fresh-install acceptance. Classic-theme ch
 have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
+Diagnostic capture is OFF by default: normal installs write no BMPs and no
+screen/window records. It is enabled only by an explicit flag file
+`capture.flag` beside `usoswm.exe` (read once per launcher start).
+
+Hardware evidence (silent, no user action, flag present): after attaching, the launcher saves
+24-bit BMPs of the whole virtual screen (all monitors) as
+`logs\screen-s<session>-p<pid>-{before,after,late20s,endsession}.bmp`
+(at most 8 files in total). At the same moments the session log records the
+virtual screen, every monitor's rect/work area/current mode, and each visible
+top-level window overlapping the top eighth of the screen (class, title, rect,
+style, PID, image path). `before` shows the native paint, `after` the
+synchronous repaint by our renderer. X470 Vista x64 2026-10-21: hook attached
+and renderer active 10 s after logon with no refusal, yet the user reported a
+"Test Mode" text at the TOP of the screen, where the NT 6.0 desktop painter
+does not place it; these records identify what draws there.
+
+## Native kernel paints (X470 Vista x64, 2026-10-21)
+
+Hardware evidence: hook attached, own renderer active, no refusals, yet the
+native text flashed for ~0.5 s while a window was dragged and during
+shutdown. Two win32k paths draw the desktop (wallpaper plus version or
+test-mode text) entirely in the kernel, without USER32 PaintDesktop, so the
+shell32 import replacement cannot reach them:
+
+- Full-window drag: for windows of other threads win32k immediately
+  "redraws hung windows" in the uncovered region; for the shell background
+  window (the desktop listview) this is the internal desktop paint.
+  The launcher switches to outline drag for the session only
+  (SPI_SETDRAGFULLWINDOWS without SPIF_UPDATEINIFILE; the stored user
+  setting is unchanged). Re-enabling it in Performance Options is respected
+  until the next logon.
+- Shell exit at logoff/shutdown: the desktop window erases itself. The
+  launcher (shutdown level 1, after Explorer's level 2, as Task Manager does)
+  shows an own window directly above the shell window from the query phase,
+  below all application windows, painted by `WmPaintCover` with the same
+  reconstructed background; a cancelled shutdown removes it.
+
+The stretched wallpaper is now scaled once per monitor size and blitted;
+per-paint HALFTONE scaling of the full JPEG on XDDM/VGA was the ~0.5 s delay.
+Basis: NT 5.x source analysis of the same USER paths (movesize/hungapp/
+dtbitmap) and the observed X470 behaviour; NT 6.0 binaries not
+disassembled. Hung Explorer (5 s) still shows the native paint by design.
+
 ## Installation flow and opt-out
 
 The x64 Vista support builder adds this separate package alongside the unchanged

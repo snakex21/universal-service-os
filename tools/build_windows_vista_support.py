@@ -12,8 +12,25 @@ from nt6.usoswm.build import build as build_watermark
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
+def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None, nvme_package=None):
     tool_root = Path(tool_root) if tool_root is not None else root / 'tools'
+    nvme_files = []
+    if nvme_package is not None:
+        package = Path(nvme_package)
+        raw = (package / 'usosnvme.sys').read_bytes()
+        nt = int.from_bytes(raw[60:64], 'little')
+        if (raw[:2] != b'MZ' or raw[nt:nt+4] != b'PE\0\0' or
+                int.from_bytes(raw[nt+4:nt+6], 'little') != 0x8664 or
+                int.from_bytes(raw[nt+24:nt+26], 'little') != 0x20b or
+                not int.from_bytes(raw[nt+24+112+4*8+4:nt+24+112+4*8+8], 'little')):
+            raise ValueError('explicit NVMe package needs an embedded-signed amd64 NT6 image')
+        if b'[Nvme_Models.NTamd64]' not in (package / 'usosnvme.inf').read_bytes():
+            raise ValueError('NVMe package has no NTamd64 models')
+        for name in ('usosnvme.sys', 'usosnvme.inf', 'usosnvme.cat', 'usosnvme.cer'):
+            file = package / name
+            if not file.is_file() or not file.stat().st_size:
+                raise ValueError('explicit NVMe package is incomplete')
+            nvme_files.append((file, 'usosnvme-nt6.sys' if name.endswith('.sys') else name))
     # Keep the physically successful binaries: changing the installer must not
     # silently rebuild or alter firstboot, certificates or the driver package.
     frozen = Path(frozen_root) if frozen_root is not None else root / 'artifacts/vista/hardware-success-v11-20260920-235629'
@@ -40,12 +57,13 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
     temp=out/'tmp';temp.mkdir(exist_ok=True)
     env=dict(os.environ,TEMP=str(temp),TMP=str(temp),ZIG_GLOBAL_CACHE_DIR=str(root/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'zig-cache'))
     gate=out/'usos-vista-oobe.exe'
+    gate_flags = ['-DUSOS_GATE_NVME_X64', '-lcrypt32'] if nvme_files else []
     watermark_out=out/'usoswm'
     watermark_manifest=build_watermark(tool_root,watermark_out)
     watermark_files=[]
     for name,digest in watermark_manifest['files'].items():
         watermark_files.append((watermark_out/name,'USOS\\usoswm\\'+name,digest))
-    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-o',str(gate)],env=env,check=True)
+    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-lnetapi32','-luser32',*gate_flags,'-o',str(gate)],env=env,check=True)
     # Added independently; the 13 hardware-tested USB files stay byte-identical.
     files.append((gate,'USOS\\oobe.exe',hashlib.sha256(gate.read_bytes()).hexdigest()))
     lines = ['static const struct { const WCHAR *source, *target; BYTE sha256[32]; } vista_files[] = {']
@@ -92,6 +110,10 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
     writer=NewcWriter(destination/'vista-support.cpio.tmp')
     try:
         writer.add_file('usos-vista-install.exe',exe)
+        if nvme_files:
+            writer.add_bytes('usosnvme-amd64.ready', b'1\r\n')
+            for file, name in nvme_files:
+                writer.add_file(name, file)
         writer.add_bytes('usos-modern-vista.cmd',(root/'tools/windows_vista_modern_startup.cmd').read_bytes().replace(b'\r\n',b'\n').replace(b'\n',b'\r\n'))
         for index,(path,_,_) in enumerate(files):
             writer.add_file('vista-payload-%02d.bin'%index,path)
@@ -117,5 +139,6 @@ if __name__=='__main__':
     parser.add_argument('--intel-profile',action='store_true')
     parser.add_argument('--tool-root',type=Path)
     parser.add_argument('--frozen-root',type=Path)
+    parser.add_argument('--nvme-package',type=Path,help='signed amd64 usosnvme package (tools/build_usosnvme_nt6_signed.py arch=amd64)')
     args=parser.parse_args()
-    build(intel_profile=args.intel_profile,tool_root=args.tool_root,frozen_root=args.frozen_root)
+    build(intel_profile=args.intel_profile,tool_root=args.tool_root,frozen_root=args.frozen_root,nvme_package=args.nvme_package)
