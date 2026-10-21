@@ -71,9 +71,12 @@ usos_net_stage() {
     # (the 9x DOS flow copies NET\USOSNET.*); NT4 has no INF installer: the IDs
     # come from usosnet.inf (same chip table) and USOSNET.REG takes over the
     # inbox loopback adapter (usos_net_nt4_reg, POST.CMD).
-    _un_sys=usosnet.sys _un_dsys=USOSNET.SYS
+    _un_sys=usosnet.sys _un_dsys=USOSNET.SYS _un_ndis=04
     case "$_un_os" in
-        95) _un_inf=usosnet95.inf; _un_sys=usosnet4.sys ;;
+        95) _un_inf=usosnet95.inf; _un_sys=usosnet4.sys
+            if [ "${USOS_NET_W95_VERSION:-}" = '4 0 0 950' ]; then
+                _un_inf=usosnet95rtm.inf; _un_sys=win95-rtm/usosnet4.sys; _un_ndis=03
+            fi ;;
         NT4) _un_sys=usosnet4.sys; _un_dsys=USOSNET4.SYS ;;
     esac
     mkdir -p "$(dirname "$_un_log")" || return 1
@@ -82,6 +85,7 @@ usos_net_stage() {
     usos_net_log "PCI=${_un_cards:-none}"
     if [ ! -f "$_un_lib/network/$_un_sys" ] || [ ! -f "$_un_lib/network/$_un_inf" ]; then
         _un_state=missing; usos_net_log 'usosnet: missing from build (brak w kompilacji)'
+        [ "$_un_ndis" != 03 ] || return 1
     elif [ -z "$_un_cards" ]; then _un_state=no_card; usos_net_log 'usosnet: no Ethernet card'
     else
         for _un_card in $_un_cards; do
@@ -184,11 +188,18 @@ usos_net_w95_instance() {
 # Args: INF PCI id, devnode instance, card description, INF model section.
 # CRLF out.
 usos_net_w95_reg() {
+    _un_w95_help='USOS own NDIS 4.0 driver for Intel I211 / I210 / 82576 Ethernet (Windows 95 OSR2).'
+    _un_w95_date=10-20-2026
+    if [ "${5:-04}" = 03 ]; then
+        _un_w95_help='USOS Ethernet driver for Intel I211 / I210 / 82576 (Windows 95 RTM/OSR1).'
+        _un_w95_date=10-21-2026
+    fi
     _un_ide=$(printf '%s' "$1" | sed 's/\\/\\\\/g')
     _un_k='HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class'
     sed -e "s|@K@|$(printf '%s' "$_un_k" | sed 's/\\/\\\\/g')|g" -e "s|@ENUM@|$(printf '%s' "$1\\$2" | sed 's/\\/\\\\/g; s/&/\\&/g')|g" \
         -e "s|@IDE@|$(printf '%s' "$_un_ide" | sed 's/\\/\\\\/g; s/&/\\&/g')|g" -e "s|@DESC@|$(printf '%s' "$3" | sed 's/[\\&|]/\\&/g')|g" \
-        -e "s|@SECT@|${4:-USOSNETI211.ndi}|g" -e 's/$/\r/' <<'EOF'
+        -e "s|@SECT@|${4:-USOSNETI211.ndi}|g" -e "s|@MAJOR@|${5:-04}|g" \
+        -e "s|@HELP@|$_un_w95_help|g" -e "s|@DATE@|$_un_w95_date|g" -e 's/$/\r/' <<'EOF'
 REGEDIT4
 
 [@K@\Net\0009]
@@ -196,7 +207,7 @@ REGEDIT4
 "InfPath"="USOSNET.INF"
 "InfSection"="@SECT@"
 "ProviderName"="Universal Service OS"
-"DriverDate"="10-20-2026"
+"DriverDate"="@DATE@"
 "MatchingDeviceId"="@IDE@"
 "DevLoader"="*ndis"
 "DeviceVxDs"="usosnet.sys"
@@ -207,7 +218,7 @@ REGEDIT4
 
 [@K@\Net\0009\Ndi]
 "DeviceID"="@IDE@"
-"HelpText"="USOS own NDIS 4.0 driver for Intel I211 / I210 / 82576 Ethernet (Windows 95 OSR2)."
+"HelpText"="@HELP@"
 "InstallInf"=""
 
 [@K@\Net\0009\Ndi\params\DebugPort]
@@ -256,7 +267,7 @@ REGEDIT4
 
 [@K@\Net\0009\NDIS]
 "LogDriverName"="USOSNET"
-"MajorNdisVersion"=hex:04
+"MajorNdisVersion"=hex:@MAJOR@
 "MinorNdisVersion"=hex:00
 
 [HKEY_LOCAL_MACHINE\Enum\@ENUM@]
@@ -402,7 +413,7 @@ usos_net_w95_stage() {
             m = $0; sub(/^[^=]*=[ \t]*/, "", m); sub(/[ \t]*,.*/, "", m); sect = m }
         END { print ((want in str) ? str[want] : "USOS usosnet Ethernet") "|" sect }' "$_un_driver/USOSNET.INF")
     _un_sect=${_un_desc##*|}; _un_desc=${_un_desc%|*}
-    if usos_net_w95_reg "$_un_hwid" "$_un_inst" "$_un_desc" "$_un_sect" > "$_un_driver/NET95.REG"; then
+    if usos_net_w95_reg "$_un_hwid" "$_un_inst" "$_un_desc" "$_un_sect" "${_un_ndis:-04}" > "$_un_driver/NET95.REG"; then
         usos_net_log "usosnet4: NET95.REG staged: Enum\\$_un_hwid\\$_un_inst -> Net\\0009, TCP/IP NetTrans\\0009 (DHCP), client NetClient\\0009; path $_un_dev"
     else
         rm -f "$_un_driver/NET95.REG"; usos_net_log 'usosnet4: NET95.REG not written (PnP + USOSNET.INF)'

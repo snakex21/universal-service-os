@@ -797,6 +797,12 @@ def main() -> int:
         lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        for relative, source in (
+            ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
+            ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
+        ):
+            put(entries, Entry('usr/lib/usos/network/' + relative, stat.S_IFREG | 0o644,
+                               (root / source).read_bytes()))
         from build_usosadd import build as build_addons_runner
         from build_legacy_stage import build as build_addons_planner
         addons_out = root / "zig-out/legacy-pack"

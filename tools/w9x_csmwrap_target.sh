@@ -314,7 +314,7 @@ if [ -f "$LIB/w9x_logon.sh" ] && [ -f "$LIB/w9x/USOSME.PWL" ]; then
 fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
-usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+USOS_NET_W95_VERSION=$setup_version usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'

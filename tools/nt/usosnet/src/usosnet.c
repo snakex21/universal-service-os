@@ -41,6 +41,21 @@ void __outbyte(unsigned short Port, unsigned char Data);
 EXPORT VOID NdisQueryBuffer(IN PNDIS_BUFFER Buffer, OUT PVOID *VirtualAddress OPTIONAL, OUT PUINT Length);
 
 #if USOSNET_NDIS4
+#if USOSNET_NDIS31
+/* RTM/OSR1 NDIS.VXD predates the Ex attributes and periodic timer APIs.
+ * Undefine the modern-header macro so this is the actual four-argument
+ * NDIS 3 export, not a macro expanding back to NdisMSetAttributesEx. */
+#undef NdisMSetAttributes
+EXPORT VOID NdisMSetAttributes(NDIS_HANDLE Handle, NDIS_HANDLE Context,
+                               BOOLEAN BusMaster, NDIS_INTERFACE_TYPE BusType);
+#undef NdisMIndicateStatus
+#undef NdisMIndicateStatusComplete
+EXPORT VOID NdisMIndicateStatus(NDIS_HANDLE Handle, NDIS_STATUS Status,
+                                PVOID Buffer, UINT Length);
+EXPORT VOID NdisMIndicateStatusComplete(NDIS_HANDLE Handle);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Timer) == 0);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Dpc) == FIELD_OFFSET(NDIS_TIMER, Dpc));
+#endif
 /* NDIS 3.0 / 4.0 exports (NT4 SP6a NDIS.SYS, 95 OSR2 NDIS.VXD 4.0; still
  * exported by later NDIS.SYS), not declared by the WDK 7.1 ndis.h. */
 EXPORT VOID EthFilterDprIndicateReceive(IN PETH_FILTER Filter, IN NDIS_HANDLE MacReceiveContext,
@@ -59,8 +74,13 @@ C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);
 #define USOSNET_ETHDB(H) (((PNDIS_MINIPORT_BLOCK)(H))->EthDB)
 /* MajorNdisVersion 4: the NDIS 3.0 part + ReturnPacket / SendPackets /
  * AllocateComplete; 95 OSR2 NDIS.VXD wants at least 0x48 bytes. */
+#if USOSNET_NDIS31
+#define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, ReturnPacketHandler)
+C_ASSERT(USOSNET_CHARS_SIZE == 0x3c);
+#else
 #define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CoCreateVcHandler)
 C_ASSERT(USOSNET_CHARS_SIZE == 0x48);
+#endif
 #else
 #define USOSNET_CHARS_SIZE sizeof(NDIS_MINIPORT_CHARACTERISTICS)
 #endif
@@ -510,6 +530,11 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
     if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
     A->Chip->Ops->TxReclaim(A);
     if (A->TimerCount % TICKS_PER_SEC == 0) TimerSecond(A);
+#if USOSNET_NDIS31
+    /* Miniport timers are serialized with Halt. Only the one-shot export
+     * exists in RTM; rearm after this callback's work has completed. */
+    if (A->TimerInit) NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
+#endif
 }
 
 /* ------------------------------------------------------------------ */
@@ -669,8 +694,12 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
 
+#if USOSNET_NDIS31
+    NdisMSetAttributes(MiniportAdapterHandle, (NDIS_HANDLE)A, TRUE, NdisInterfacePci);
+#else
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
                          NDIS_ATTRIBUTE_BUS_MASTER, NdisInterfacePci);
+#endif
 
 #if USOSNET_NDIS4
     /* 95 OSR2 (PnP): the devnode's resources, PCI slot numbers are ignored.
@@ -824,7 +853,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
+#if USOSNET_NDIS31
+    NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
+#else
     NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
+#endif
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;
     A->Started = TRUE;

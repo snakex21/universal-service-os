@@ -47,7 +47,15 @@
 #ifndef USOSNET_NDIS4
 #define USOSNET_NDIS4 0
 #endif
-#if USOSNET_NDIS4
+#ifndef USOSNET_NDIS31
+#define USOSNET_NDIS31 0
+#endif
+#if USOSNET_NDIS31
+#if !USOSNET_NDIS4
+#error The RTM variant requires the legacy NDIS receive and resource paths
+#endif
+#define USOSNET_NDIS_MAJOR 3
+#elif USOSNET_NDIS4
 #define USOSNET_NDIS_MAJOR 4
 #else
 #define USOSNET_NDIS_MAJOR 5
