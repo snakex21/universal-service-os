@@ -131,7 +131,14 @@ static void ping_gateway(void)
             create = 0; close_icmp = 0; echo = 0;
         }
     }
-    if (!echo) { o("[NET] ICMP gateway %s: UNAVAILABLE (no complete ICMP API)", (LPSTR)address); return; }
+    if (!echo) {
+#ifdef USOS_NT3_RAW_ICMP
+        raw_ping_gateway();
+#else
+        o("[NET] ICMP gateway %s: UNAVAILABLE (no complete ICMP API)", (LPSTR)address);
+#endif
+        return;
+    }
     handle = create();
     if (handle == INVALID_HANDLE_VALUE || !handle) {
         o("[NET] ICMP gateway %s: create failed error %lu", (LPSTR)address, GetLastError()); return;
