@@ -68,6 +68,18 @@ static int usos_display_refresh_ok(const DEVMODEA *mode,int uniform,DWORD unifor
     if(mode->dmDisplayFrequency<=1 || mode->dmDisplayFrequency==60) return 1;
     return uniform && mode->dmDisplayFrequency==uniform_hz;
 }
+/* NT 6.x+ first sign-in (HKCU Run): every CDS_TEST of the driver's own list,
+   the running mode too, returned DISP_CHANGE_FAILED. That is win32k
+   refusing the caller (a mode change from a desktop that is not the input
+   desktop, e.g. while Winlogon still shows its first-logon screen), not
+   the modes: a mode the driver lacks fails with BADMODE, not FAILED.
+   X470 2026-10-22, fresh Win7 SP1 PL x86, Standard VGA (vgapnp, XDDM):
+   22 modes, 14 tests, all test=-1, "no tested mode", stayed at 800x600;
+   manual 1920x1080 worked. The request stays registered for a later
+   sign-in. Older NT (service / HKLM Run) keeps the old rule. */
+static int usos_display_desktop_retry(DWORD version,int state,unsigned tests,unsigned failed) {
+    return usos_display_user_run(version) && state==0 && tests && failed==tests;
+}
 static int usos_display_retry(DWORD current_bpp,int state,LONG result,int permissions) {
     return current_bpp<16 || (state==3&&result==DISP_CHANGE_NOTUPDATED) || (state==0&&permissions);
 }

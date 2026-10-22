@@ -198,6 +198,23 @@ timing of its own, so that value counts (`display_compat.h`
 several refresh values keep the strict rule. Every family now logs
 `DISPLAY active=WxHxB@Hz refresh=uniform@N|mixed` and one `DISPLAY mode
 WxHxB@Hz ok|rejected` line per mode. Host tests only; X470 recheck open.
+
+X470 2026-10-22 (fresh Win7 SP1 PL x86, route win-nt6-x86-uefi-csmwrap,
+Micron NVMe, answer=none, build B261022-161932): registration, staging and
+the refresh rule worked (`active=800x600x32@1 refresh=uniform@1`, 22 modes
+`ok`, `native=1920x1080`), but **every** CDS_TEST returned -1
+(DISP_CHANGE_FAILED), the running 800x600x32 too: `no tested mode`,
+DISPLAY.DONE, 800x600; a manual 1920x1080 worked. -1 for a listed mode is
+win32k refusing the caller (mode change from a desktop that is not the
+input desktop: the first-sign-in Run value can start while Winlogon still
+shows its screen), not the mode (a missing mode is BADMODE, -2). Fix
+(fix/w7x86-res): on NT 6.x+ USOSRES waits up to 120 s until its desktop is
+the input desktop (`DISPLAY input desktop ready|not ready after 120
+s|check unavailable`); when every test still returns -1 it logs `DISPLAY
+every test failed (-1): not the input desktop; request retained for the
+next sign-in` and exits without DISPLAY.DONE (HKCU Run kept). **X470
+hardware PASS 2026-10-22**: Win7 SP1 x86 without a profile (answer=none)
+switched 800x600 -> 1920x1080 a few seconds after logon.
 Existing installs (done before this change) have no `\USOS\NT6`: only a
 fresh preparation gets it.
 

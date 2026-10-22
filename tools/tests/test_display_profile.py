@@ -396,6 +396,19 @@ class TargetBuilds(unittest.TestCase):
         self.assertIn('"DISPLAY mode "', loop)
         self.assertNotIn('dmDisplayFrequency==60', source)
 
+    def test_nt6_waits_for_input_desktop_and_retains_on_all_failed(self):
+        # X470 Win7 x86 2026-10-22: every CDS_TEST -1 at the first sign-in
+        # (win32k: not the input desktop), DISPLAY.DONE written, 800x600.
+        source = (ROOT/'tools/windows_usos_res.c').read_text()
+        main = source[source.index('display_user=user;'):source.index('request_log(&request,count);')]
+        self.assertIn('input_desktop_ready(user,120000)', main)
+        self.assertLess(main.index('input_desktop_ready'), main.index('usos_display_enum(enumerate'))
+        self.assertIn('"OpenInputDesktop"', source)
+        self.assertIn('if(result==DISP_CHANGE_FAILED)test_failed++;', source)
+        tail = source[source.index('transaction=usos_display_execute'):]
+        retain = tail[tail.index('usos_display_desktop_retry'):]
+        self.assertLess(retain.index('leave(1)'), retain.index('finish('))
+
     def test_original_media_proves_nt35_fallback_is_required(self):
         for fixture, expected in [('nt35_display_exports.txt', False), ('nt351_display_exports.txt', True), ('nt4rtm_display_exports.txt', True)]:
             table = exports(fixture)['user32.dll']

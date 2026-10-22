@@ -56,6 +56,11 @@ void entry(void) {
     CHECK(usos_display_dm_size(0x0206)==156&&usos_display_dm_size(0x000A)==156);
     CHECK(usos_display_retry(4,0,0,0)&&usos_display_retry(16,3,DISP_CHANGE_NOTUPDATED,0));
     CHECK(usos_display_retry(32,0,0,1)&&!usos_display_retry(32,1,0,0));
+    /* Win7 x86 X470: 14 CDS_TEST, all DISP_CHANGE_FAILED -> retained on NT 6.x+ only. */
+    CHECK(usos_display_desktop_retry(0x1DB10106UL,0,14,14)&&usos_display_desktop_retry(0x23F00206UL,0,1,1));
+    CHECK(!usos_display_desktop_retry(0x1DB10106UL,0,14,13)&&!usos_display_desktop_retry(0x1DB10106UL,0,0,0));
+    CHECK(!usos_display_desktop_retry(0x1DB10106UL,1,14,14)&&!usos_display_desktop_retry(0x0A280105UL,0,14,14));
+    CHECK(!usos_display_desktop_retry(0x00000004UL|0x80000000UL,0,3,3)&&!usos_display_desktop_retry(0x05650004UL,0,3,3));
     CHECK(usos_display_parse("1920x1080x32\r\n",&r));
     CHECK(usos_display_choose(m,5,&r,0).index==3);
     m[3].valid=0; CHECK(usos_display_choose(m,5,&r,0).index==2); m[3].valid=1;
