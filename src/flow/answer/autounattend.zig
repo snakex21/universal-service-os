@@ -323,6 +323,8 @@ fn hiberboot(family: Family) bool {
 
 pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, fast_startup_on: bool, out: *Commands) !void {
     out.len = 0;
+    // display=keep: no USOSRES registration (the staging stages nothing).
+    const helper = displayHelper(family, arch) and p.display != .keep;
     if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
     // Windows 8 / 8.1 / 10: no Fast Startup (hiberboot). A shutdown then leaves
     // the NTFS volume clean instead of hibernated, which matters because USOS
@@ -357,15 +359,15 @@ pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, fast_st
     try optionCommands(p, family, false, out);
     // The staged folder takes the system drive's permissions (the
     // micro-Linux made it before Setup).
-    if (displayHelper(family, arch)) try out.add(display_guard ++ "icacls.exe \"%SystemDrive%\\USOS\" /reset /t /c /q", .{});
-    const hive = displayHelper(family, arch) or on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
+    if (helper) try out.add(display_guard ++ "icacls.exe \"%SystemDrive%\\USOS\" /reset /t /c /q", .{});
+    const hive = helper or on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
     if (hive) {
         try out.add("reg.exe load \"" ++ default_hive ++ "\" \"C:\\Users\\Default\\NTUSER.DAT\"", .{});
         if (on(p, .show_extensions, family)) try out.add(explorer_advanced, .{ "HideFileExt", 0 });
         if (on(p, .show_hidden, family)) try out.add(explorer_advanced, .{ "Hidden", 1 });
         if (on(p, .no_welcome_center, family)) try out.add("reg.exe delete \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v WindowsWelcomeCenter /f", .{});
         try optionCommands(p, family, true, out);
-        if (displayHelper(family, arch)) try out.add(display_guard ++ "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v USOSDisplay /t REG_SZ /d \"" ++ display_helper ++ "\" /f", .{});
+        if (helper) try out.add(display_guard ++ "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v USOSDisplay /t REG_SZ /d \"" ++ display_helper ++ "\" /f", .{});
         try out.add("reg.exe unload \"" ++ default_hive ++ "\"", .{});
     }
 }
@@ -673,6 +675,17 @@ test "autounattend: display helper on Vista / 7 / 8 / 8.1 / 10, explicit resolut
     const vista = try render(.{ .profile = &p, .family = .vista, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, vista, "<!-- USOS-DISPLAY=autoxauto -->") != null);
     try std.testing.expect(std.mem.indexOf(u8, vista, "<Display>") == null);
+    // keep: the keep request only; no <Display>, no registration, no icacls.
+    p.display = .keep;
+    for ([_]Family{ .vista, .windows_7, .server_2008_r2, .windows_8_1, .windows_10, .windows_11 }) |family| for ([_]Arch{ .x86, .amd64 }) |arch| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
+        errdefer std.debug.print("keep family {s} {s}\n", .{ @tagName(family), @tagName(arch) });
+        try std.testing.expectEqual(displayHelper(family, arch), std.mem.indexOf(u8, xml, "<!-- USOS-DISPLAY=keepxauto -->\n<unattend") != null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "icacls") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
+        try schema.check(xml, family, null);
+    };
 }
 
 test "autounattend: Vista and 7 OOBE answers per version" {

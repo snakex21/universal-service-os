@@ -180,15 +180,19 @@ pub const Theme = enum {
 };
 
 /// XP / Server 2003 [Display]: 32-bit colour at this resolution; auto: unchanged.
+/// keep: USOS never runs USOSRES (no request, no <Display>, no [Display]);
+/// the installation keeps the mode it had before the automatic resolution
+/// (docs/display-policy.md). Last, so the editor's indices stay stable.
 pub const Display = enum {
     auto,
     @"1024x768",
     @"1280x1024",
     @"1920x1080",
+    keep,
 
     pub fn size(self: Display) ?[2]u16 {
         return switch (self) {
-            .auto => null,
+            .auto, .keep => null,
             .@"1024x768" => .{ 1024, 768 },
             .@"1280x1024" => .{ 1280, 1024 },
             .@"1920x1080" => .{ 1920, 1080 },
@@ -1215,6 +1219,20 @@ test "display absent, explicit auto and depth survive profile round trips" {
     try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=\ndisplay_bpp=\n", &p) == .ok);
     try std.testing.expect(!p.display_explicit);
     try std.testing.expectEqual(DisplayBpp.auto, p.display_bpp);
+}
+
+test "display=keep survives profile round trips and has no size" {
+    var p: Profile = undefined;
+    var q: Profile = undefined;
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=keep\n", &p) == .ok);
+    try std.testing.expectEqual(Display.keep, p.display);
+    try std.testing.expect(p.display_explicit);
+    try std.testing.expect(p.display.size() == null);
+    const written = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, written, "display=keep\r\n") != null);
+    try std.testing.expect(parse(written, &q) == .ok);
+    try std.testing.expectEqual(Display.keep, q.display);
 }
 
 test "profile parse errors name the field and line, never the value" {

@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Oppdateringer og personvern",
   "boot.profile.section.accounts": "Kontoer og nettverk",
   "boot.profile.value.unchanged": "Uendret",
+  "boot.profile.value.display_keep": "Windows-standard",
   "boot.profile.field.show_protected": "Vis beskyttede systemfiler",
   "boot.profile.help.show_protected": "Utforsker viser også skjulte filer og de beskyttede operativsystemfilene (for hver ny bruker).",
   "boot.profile.field.launch_to_pc": "Åpne Utforsker i Denne PCen",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Windows klassisk",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Skjermoppløsning",
-  "boot.profile.help.display": "XP og Server 2003: 32-bit farger ved denne oppløsningen når skjermdriveren tilbyr den. Automatisk: uendret; uten skjermdriver (VGA-driveren, f.eks. via CSMWrap) beholder Windows grunnmodusen.",
+  "boot.profile.help.display": "XP og Server 2003: 32-bit farger ved denne oppløsningen når skjermdriveren tilbyr den. Automatisk: uendret; uten skjermdriver (VGA-driveren, f.eks. via CSMWrap) beholder Windows grunnmodusen. Windows-standard: USOS endrer ikke oppløsningen etter installasjonen.",
   "boot.profile.xp_ini.detail": "usos-xp.ini på DATA (skrivebeskyttet); Importer lager en USOS-profil av den",
   "boot.profile.section.apps": "Apper og skript",
   "boot.profile.field.shortcut_suffix_off": "Ikke «Snarvei» i snarveinavn",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "Windows installasjonsprogram spør etter brukernavn og passord under installasjonen; USOS angir dem ikke.",
   "boot.lx.logon_answer_file": "Logg på etter installasjonen med kontoen fra svarfilen din {0}.",
   "boot.profile.field.display_bpp": "Fargedybde",
-  "boot.profile.help.display_legacy": "Brukes etter installasjon på den faktiske maskinvaren. Automatisk velger en tilgjengelig modus opptil 1920x1080 med trygg tilbakeføring. Uendret beholder innstillingene. Automatisk fargedybde foretrekker 32 bit, ellers 16."
+  "boot.profile.help.display_legacy": "Brukes etter installasjon på den faktiske maskinvaren. Automatisk velger en tilgjengelig modus opptil 1920x1080 med trygg tilbakeføring. Uendret beholder innstillingene. Automatisk fargedybde foretrekker 32 bit, ellers 16. Windows-standard: USOS endrer ikke oppløsningen etter installasjonen."
 }

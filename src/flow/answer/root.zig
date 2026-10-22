@@ -143,6 +143,25 @@ test "display metadata reaches supported legacy targets only and preserves missi
     }
 }
 
+test "display=keep: the keep request for 9x / NT3.5x / NT4 and 6.x, no USOSRES registration" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Bob");
+    p.display = .keep;
+    p.display_explicit = true;
+    var buffer: [autounattend.max_size]u8 = undefined;
+    for ([_][]const u8{ "windows-nt-4", "windows-nt-3-51", "windows-nt-3-5", "windows-95", "windows-98-se", "windows-me" }) |id| {
+        const out = (try render(&p, id, .x86, null, null, false, &buffer)).?;
+        try std.testing.expect(std.mem.endsWith(u8, out.bytes, ";USOS-DISPLAY=keepxauto\r\n"));
+    }
+    for ([_][]const u8{ "windows-vista", "windows-7", "windows-10" }) |id| {
+        const xml = (try render(&p, id, .x86, null, null, false, &buffer)).?;
+        try std.testing.expect(std.mem.indexOf(u8, xml.bytes, "<!-- USOS-DISPLAY=keepxauto -->\n") != null);
+        try std.testing.expect(std.mem.indexOf(u8, xml.bytes, "USOSRES") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml.bytes, "<Display>") == null);
+    }
+}
+
 test {
     _ = tables;
     _ = profile;

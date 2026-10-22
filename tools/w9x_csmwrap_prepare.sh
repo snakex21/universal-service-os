@@ -551,6 +551,15 @@ usos_w9x_csmwrap_prepare() {
             log9x=1
         fi
     fi
+    # display-keep.txt (9x, NT 3.5x / 4.0, POSReady; every answer, also
+    # none): no USOSRES, the display keeps its own first mode
+    # (docs/display-policy.md). The target scripts read USOS_DISPLAY_KEEP.
+    USOS_DISPLAY_KEEP=0
+    if [ -z "$img$dos_iso" ] && [ -f "/mnt/data/Systems/$data_category/$folder/Unattended/display-keep.txt" ]; then
+        USOS_DISPLAY_KEEP=1
+        w9x_csmwrap_log 'DISPLAY display-keep.txt: USOSRES off, the display keeps its own mode'
+    fi
+    export USOS_DISPLAY_KEEP
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
         usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true

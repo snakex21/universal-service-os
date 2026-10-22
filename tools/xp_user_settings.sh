@@ -29,7 +29,8 @@
 # and the tweaks (src/flow/answer/nt5.zig): tweaks= a comma-separated list
 # of games msn_explorer messenger outlook_express classic_start
 # classic_theme balloons tour extensions hidden autorun, display=WxH
-# (1024x768, 1280x1024, 1920x1080). Both are written only when set, so a
+# (1024x768, 1280x1024, 1920x1080) or keep (no [Display], no USOSRES:
+# Windows' own mode, docs/display-policy.md). Both are written only when set, so a
 # profile without tweaks gives the same WINNT.SIF and accounts script.
 # The typed options (src/flow/answer/options.zig) add workgroup=, repeated
 # run= (a known command) and reg= (a usos-reg set line); usos-users.cmd
@@ -123,7 +124,7 @@ usos_xp_settings_load() {
                 n = split(tweaks, parts, ",")
                 for (i = 1; i <= n; i++) if (parts[i] !~ /^(games|msn_explorer|messenger|outlook_express|classic_start|classic_theme|balloons|tour|extensions|hidden|autorun)$/) bad("tweaks= has an unknown tweak")
                 display = tolower(values["display"])
-                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080)$/ && !(family=="2000" && display=="auto")) bad("display= must be 1024x768, 1280x1024 or 1920x1080 (2000 also accepts auto)")
+                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080|keep)$/ && !(family=="2000" && display=="auto")) bad("display= must be 1024x768, 1280x1024, 1920x1080 or keep (2000 also accepts auto)")
                 display_bpp = tolower(values["display_bpp"])
                 if (display_bpp != "" && (family!="2000" || display_bpp !~ /^(auto|16|32)$/)) bad("display_bpp= is only supported for Windows 2000: auto, 16 or 32")
                 workgroup = values["workgroup"]
@@ -239,7 +240,7 @@ usos_xp_settings_sif() {
                 if (t["classic_start"]) print "DefaultStartPanelOff=Yes"
                 if (t["classic_theme"]) print "DefaultThemesOff=Yes"
             }
-            if (v["display"] != "" && v["family"] != "2000") {
+            if (v["display"] != "" && v["display"] != "keep" && v["family"] != "2000") {
                 x = index(v["display"], "x")
                 print "[Display]"
                 print "BitsPerPel=32"

@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Ažuriranja i privatnost",
   "boot.profile.section.accounts": "Nalozi i mreža",
   "boot.profile.value.unchanged": "Bez promene",
+  "boot.profile.value.display_keep": "Podrazumevano u sistemu Windows",
   "boot.profile.field.show_protected": "Prikaži zaštićene sistemske datoteke",
   "boot.profile.help.show_protected": "Explorer prikazuje i skrivene datoteke i zaštićene datoteke operativnog sistema (za svakog novog korisnika).",
   "boot.profile.field.launch_to_pc": "Explorer se otvara na Ovaj računar",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Rezolucija ekrana",
-  "boot.profile.help.display": "XP i Server 2003: boje 32-bit u ovoj rezoluciji ako je upravljački program ekrana nudi. Automatski: bez promene; bez upravljačkog programa ekrana (VGA upravljački program, npr. preko CSMWrap) Windows ostaje u osnovnom režimu.",
+  "boot.profile.help.display": "XP i Server 2003: boje 32-bit u ovoj rezoluciji ako je upravljački program ekrana nudi. Automatski: bez promene; bez upravljačkog programa ekrana (VGA upravljački program, npr. preko CSMWrap) Windows ostaje u osnovnom režimu. Podrazumevano u sistemu Windows: USOS ne menja rezoluciju posle instalacije.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (samo za čitanje); Uvezi od nje pravi USOS profil",
   "boot.profile.section.apps": "Aplikacije i skripte",
   "boot.profile.field.shortcut_suffix_off": "Bez „Prečica“ u imenima prečica",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Instalacija Windowsa tokom instalacije traži korisničko ime i lozinku; USOS ih ne podešava.",
   "boot.lx.logon_answer_file": "Posle instalacije prijavite se nalogom iz svoje datoteke odgovora {0}.",
   "boot.profile.field.display_bpp": "Dubina boje",
-  "boot.profile.help.display_legacy": "Primenjuje se posle instalacije na stvarnom hardveru. Automatski bira dostupan režim do 1920x1080 uz bezbedan prelazak na niži. Bez promene čuva podešavanja. Automatska dubina: 32 bita ako je dostupno, inače 16."
+  "boot.profile.help.display_legacy": "Primenjuje se posle instalacije na stvarnom hardveru. Automatski bira dostupan režim do 1920x1080 uz bezbedan prelazak na niži. Bez promene čuva podešavanja. Automatska dubina: 32 bita ako je dostupno, inače 16. Podrazumevano u sistemu Windows: USOS ne menja rezoluciju posle instalacije."
 }

@@ -67,10 +67,17 @@ usos_posr_display_stage() {
         return 0
     fi
     . "$LIB/display_profile.sh"
+    # DATA's display-keep.txt (USOS_DISPLAY_KEEP=1): Windows' own mode.
+    if usos_display_keep; then
+        log 'DISPLAY keep (display-keep.txt): USOSRES not staged'
+        return 0
+    fi
     usos_display_stage "$1" "$LIB/USOSRES.EXE" autoxauto || fail 'cannot stage the display helper'
     cmp -s "$LIB/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
     log "DISPLAY request=autoxauto native=$(usos_display_native || echo unknown) apply=first-logon"
+    posr_display_staged=1
 }
+posr_display_staged=0
 
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr cp; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
@@ -209,7 +216,7 @@ sync
 umount "$work/pe" || fail 'cannot unmount the PE partition'
 mdir -a -i "$pe_loop" ::/LDLINUX.SYS >/dev/null 2>&1 || fail 'read-back: LDLINUX.SYS missing'
 mdir -i "$pe_loop" ::/Setup/unattended.xml >/dev/null 2>&1 || fail 'read-back: unattended.xml missing'
-mdir -i "$pe_loop" ::/USOS/POSR/DISPLAY.TXT >/dev/null 2>&1 || fail 'read-back: USOS/POSR/DISPLAY.TXT missing'
+[ "$posr_display_staged" = 0 ] || mdir -i "$pe_loop" ::/USOS/POSR/DISPLAY.TXT >/dev/null 2>&1 || fail 'read-back: USOS/POSR/DISPLAY.TXT missing'
 losetup -d "$pe_loop"; pe_loop=''
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true

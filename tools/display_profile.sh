@@ -2,6 +2,18 @@
 usos_display_valid() {
     printf '%s\n' "$1" | LC_ALL=C grep -Eq '^(auto|1024x768|1280x1024|1920x1080)x(auto|16|32)$'
 }
+# Keep (docs/display-policy.md "Keep Windows' own mode"): USOS does not run
+# USOSRES; the display stays at the mode the installation had before the
+# automatic resolution (Windows' choice or USOS's fixed first mode). Either
+# a profile's display=keep (request keepx..., from ;USOS-DISPLAY= /
+# <!-- USOS-DISPLAY= --> / a settings file's display=keep) or DATA's
+# Systems\<category>\<version>\Unattended\display-keep.txt, which the
+# preparation scripts pass on as USOS_DISPLAY_KEEP=1 (every answer, none too).
+usos_display_keep() {
+    [ "${USOS_DISPLAY_KEEP:-0}" = 1 ] && return 0
+    case "${1:-}" in keep|keepx*) return 0 ;; esac
+    return 1
+}
 usos_display_from_answer() {
     awk '/^;USOS-DISPLAY=/ {sub(/^[^=]*=/, ""); sub(/\r$/, ""); value=$0; n++} END {if(n>1) exit 1; if(n) print value}' "$1"
 }

@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Naujinimai ir privatumas",
   "boot.profile.section.accounts": "Paskyros ir tinklas",
   "boot.profile.value.unchanged": "Nekeičiama",
+  "boot.profile.value.display_keep": "Numatytoji Windows",
   "boot.profile.field.show_protected": "Rodyti apsaugotus sistemos failus",
   "boot.profile.help.show_protected": "Naršyklė rodo ir paslėptus failus, ir apsaugotus operacinės sistemos failus (kiekvienam naujam vartotojui).",
   "boot.profile.field.launch_to_pc": "Naršyklė atidaro Šis kompiuteris",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Ekrano skyra",
-  "boot.profile.help.display": "XP ir Server 2003: 32-bit spalvos šia skyra, jei vaizdo tvarkyklė ją siūlo. Automatinė: nekeičiama; be vaizdo tvarkyklės (VGA tvarkyklė, pvz., per CSMWrap) Windows lieka baziniu režimu.",
+  "boot.profile.help.display": "XP ir Server 2003: 32-bit spalvos šia skyra, jei vaizdo tvarkyklė ją siūlo. Automatinė: nekeičiama; be vaizdo tvarkyklės (VGA tvarkyklė, pvz., per CSMWrap) Windows lieka baziniu režimu. Numatytoji Windows: USOS po diegimo nekeičia skyros.",
   "boot.profile.xp_ini.detail": "usos-xp.ini skaidinyje DATA (tik skaityti); Importuoti iš jo sukuria USOS profilį",
   "boot.profile.section.apps": "Programėlės ir scenarijai",
   "boot.profile.field.shortcut_suffix_off": "Be „Nuoroda“ nuorodų pavadinimuose",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows sąranka diegimo metu paklaus vartotojo vardo ir slaptažodžio; USOS jų nenustato.",
   "boot.lx.logon_answer_file": "Po diegimo prisijunkite paskyra iš savo atsakymų failo {0}.",
   "boot.profile.field.display_bpp": "Spalvų gylis",
-  "boot.profile.help.display_legacy": "Taikoma po diegimo tikroje aparatinėje įrangoje. Automatiškai parenkamas galimas režimas iki 1920x1080, prireikus saugiai mažesnis. Nekeisti išlaiko nuostatas. Automatinis gylis: 32 bitai, jei galima, kitu atveju 16."
+  "boot.profile.help.display_legacy": "Taikoma po diegimo tikroje aparatinėje įrangoje. Automatiškai parenkamas galimas režimas iki 1920x1080, prireikus saugiai mažesnis. Nekeisti išlaiko nuostatas. Automatinis gylis: 32 bitai, jei galima, kitu atveju 16. Numatytoji Windows: USOS po diegimo nekeičia skyros."
 }

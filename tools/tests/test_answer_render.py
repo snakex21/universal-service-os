@@ -410,6 +410,40 @@ def check_options() -> None:
     check('usos-xp.ini refuses reg=', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415").returncode == 1)
 
 
+def check_display_keep() -> None:
+    """display=keep (docs/display-policy.md): no USOSRES request or
+    registration, no [Display] / <Display>; the keep request only where a
+    staging script reads one (9x / NT 3.5x / NT4, 2000, XP / 2003 settings,
+    the 6.x CSMWrap answers)."""
+    profile = OUT / 'display-keep.profile.ini'
+    profile.write_text((DATA / 'minimal.profile.ini').read_text() + 'display=keep\n')
+    for system, arch, ext in (('windows-vista', 'x86', 'xml'), ('windows-7', 'x86', 'xml'), ('windows-8-1', 'x86', 'xml'),
+                              ('windows-10', 'x86', 'xml'), ('windows-11', 'amd64', 'xml'),
+                              ('windows-xp', 'x86', 'sif-cmd.txt'), ('windows-2000', 'x86', 'sif-cmd.txt'),
+                              ('windows-server-2003', 'x86', 'sif-cmd.txt'),
+                              ('windows-98-se', 'x86', 'MSBATCH.INF'), ('windows-nt-4', 'x86', 'WINNT.SIF')):
+        name = f'display-keep.{system}.{arch}'
+        data = render_any(profile, system, arch, name)
+        if data is None:
+            continue
+        golden(f'{name}.{ext}', data)
+        text = data.decode(errors='replace')
+        # NT4's own [Display] (640x480x8 for Setup) is the renderer's base, with or without a request.
+        check(f'display=keep: no USOSRES / Display on {system}', 'USOSRES' not in text and '<Display>' not in text
+              and ('[Display]' not in text or system == 'windows-nt-4'))
+        if system in NT6_DISPLAY_HELPER:
+            check(f'display=keep: keep request on {system}', '<!-- USOS-DISPLAY=keepxauto -->\n<unattend' in text and 'icacls' not in text)
+        elif system == 'windows-11':
+            check('display=keep: nothing on 11', 'USOS-DISPLAY' not in text)
+        elif system == 'windows-2000':
+            check('display=keep: 2000 keep request', '----- DISPLAY.TXT -----\nkeepxauto\r\n' in text)
+        elif system in NT5_BASE:
+            normalized = (OUT / (name + '.normalized')).read_text()
+            check(f'display=keep: {system} settings keep', 'display=keep\n' in normalized)
+        else:
+            check(f'display=keep: {system} keep request', text.endswith(';USOS-DISPLAY=keepxauto\r\n'))
+
+
 def check_tweaks() -> None:
     import difflib
     base_text = (DATA / 'minimal.profile.ini').read_text()
@@ -629,6 +663,7 @@ def main() -> int:
 
     check_linux()
     check_tweaks()
+    check_display_keep()
     check_options()
 
     # Architecture-mismatch warning on a user's (Schneegans) amd64-only file.

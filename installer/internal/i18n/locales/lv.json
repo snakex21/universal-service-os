@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Atjauninājumi un konfidencialitāte",
   "boot.profile.section.accounts": "Konti un tīkls",
   "boot.profile.value.unchanged": "Bez izmaiņām",
+  "boot.profile.value.display_keep": "Windows noklusējums",
   "boot.profile.field.show_protected": "Rādīt aizsargātos sistēmas failus",
   "boot.profile.help.show_protected": "Pārlūks rāda arī slēptos failus un aizsargātos operētājsistēmas failus (katram jaunam lietotājam).",
   "boot.profile.field.launch_to_pc": "Pārlūks atveras mapē Šis dators",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Ekrāna izšķirtspēja",
-  "boot.profile.help.display": "XP un Server 2003: 32-bit krāsas ar šo izšķirtspēju, ja displeja draiveris to piedāvā. Automātiski: bez izmaiņām; bez displeja draivera (VGA draiveris, piem., caur CSMWrap) Windows paliek pamata režīmā.",
+  "boot.profile.help.display": "XP un Server 2003: 32-bit krāsas ar šo izšķirtspēju, ja displeja draiveris to piedāvā. Automātiski: bez izmaiņām; bez displeja draivera (VGA draiveris, piem., caur CSMWrap) Windows paliek pamata režīmā. Windows noklusējums: USOS pēc instalēšanas nemaina izšķirtspēju.",
   "boot.profile.xp_ini.detail": "usos-xp.ini nodalījumā DATA (tikai lasāms); Importēt no tā izveido USOS profilu",
   "boot.profile.section.apps": "Lietojumprogrammas un skripti",
   "boot.profile.field.shortcut_suffix_off": "Bez “Saīsne” saīšņu nosaukumos",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows iestatīšana instalēšanas laikā vaicā lietotājvārdu un paroli; USOS tos neiestata.",
   "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}.",
   "boot.profile.field.display_bpp": "Krāsu dziļums",
-  "boot.profile.help.display_legacy": "Tiek lietots pēc instalēšanas uz īstās aparatūras. Automātiski izvēlas pieejamu režīmu līdz 1920x1080 ar drošu pāreju uz zemāku. Bez izmaiņām saglabā iestatījumus. Automātiskais dziļums: 32 biti, ja pieejami, citādi 16."
+  "boot.profile.help.display_legacy": "Tiek lietots pēc instalēšanas uz īstās aparatūras. Automātiski izvēlas pieejamu režīmu līdz 1920x1080 ar drošu pāreju uz zemāku. Bez izmaiņām saglabā iestatījumus. Automātiskais dziļums: 32 biti, ja pieejami, citādi 16. Windows noklusējums: USOS pēc instalēšanas nemaina izšķirtspēju."
 }

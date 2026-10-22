@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Güncellemeler ve gizlilik",
   "boot.profile.section.accounts": "Hesaplar ve ağ",
   "boot.profile.value.unchanged": "Değişmez",
+  "boot.profile.value.display_keep": "Windows varsayılanı",
   "boot.profile.field.show_protected": "Korunan sistem dosyalarını göster",
   "boot.profile.help.show_protected": "Gezgin gizli dosyaları ve korunan işletim sistemi dosyalarını da gösterir (her yeni kullanıcı için).",
   "boot.profile.field.launch_to_pc": "Gezgin Bu bilgisayar ile açılsın",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Windows Klasik",
   "boot.profile.value.theme_basic": "Windows 7 Temel",
   "boot.profile.field.display": "Ekran çözünürlüğü",
-  "boot.profile.help.display": "XP ve Server 2003: ekran sürücüsü sunuyorsa bu çözünürlükte 32-bit renk. Otomatik: değişmez; ekran sürücüsü olmadan (VGA sürücüsü, ör. CSMWrap ile) Windows temel modda kalır.",
+  "boot.profile.help.display": "XP ve Server 2003: ekran sürücüsü sunuyorsa bu çözünürlükte 32-bit renk. Otomatik: değişmez; ekran sürücüsü olmadan (VGA sürücüsü, ör. CSMWrap ile) Windows temel modda kalır. Windows varsayılanı: USOS kurulumdan sonra çözünürlüğü değiştirmez.",
   "boot.profile.xp_ini.detail": "DATA üzerindeki usos-xp.ini (salt okunur); İçe aktar ondan bir USOS profili oluşturur",
   "boot.profile.section.apps": "Uygulamalar ve betikler",
   "boot.profile.field.shortcut_suffix_off": "Kısayol adlarında “Kısayol” yok",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "Windows Kurulumu kurulum sırasında kullanıcı adını ve parolayı sorar; USOS bunları ayarlamaz.",
   "boot.lx.logon_answer_file": "Kurulumdan sonra {0} yanıt dosyanızdaki hesapla oturum açın.",
   "boot.profile.field.display_bpp": "Renk derinliği",
-  "boot.profile.help.display_legacy": "Kurulumdan sonra gerçek donanımda uygulanır. Otomatik, güvenli geri dönüşle 1920x1080 değerine kadar kullanılabilir bir kip seçer. Değiştirme ayarları korur. Otomatik renk derinliği varsa 32 bit, yoksa 16 bit seçer."
+  "boot.profile.help.display_legacy": "Kurulumdan sonra gerçek donanımda uygulanır. Otomatik, güvenli geri dönüşle 1920x1080 değerine kadar kullanılabilir bir kip seçer. Değiştirme ayarları korur. Otomatik renk derinliği varsa 32 bit, yoksa 16 bit seçer. Windows varsayılanı: USOS kurulumdan sonra çözünürlüğü değiştirmez."
 }

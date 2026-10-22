@@ -222,7 +222,8 @@ pub fn tweakOn(p: *const @import("profile.zig").Profile, tweak: Tweak, family: F
     const on = switch (tweak) {
         .theme_classic => p.theme == .classic,
         .theme_basic => p.theme == .basic,
-        .display => p.display != .auto,
+        // keep is no resolution: nothing for Setup ([Display] / <Display>).
+        .display => p.display.size() != null,
         .display_bpp => p.display_bpp != .auto,
         inline else => |t| @field(p, @tagName(t)),
     };

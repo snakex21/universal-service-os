@@ -60,6 +60,67 @@ USOSRES logs `DISPLAY request=autoxauto native=2560x1440|unknown modes=N`,
 `DISPLAY registry EDID found=...`, `DISPLAY selected=WxHxB
 reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 
+## Keep Windows' own mode (display=keep / display-keep.txt, 2026-10-22)
+
+Branch `feat/res-keep-option` (base `test/x470-98se-qemu` dd6dd4cd). User
+request: an option to **not** run USOSRES and keep the resolution the
+installation had before the automatic choice ("like before"). Two ways,
+same effect: **USOSRES.EXE / DISPLAY.TXT are not staged and nothing
+registers it** (no Run value, no DISPLAY.REG, no `[USOS.Display]`, no NT6
+specialize commands).
+
+1. **Profile:** `display=keep` (editor: Screen resolution -> "Windows
+   default", last entry; every language). `Display.keep` in
+   `src/flow/answer/profile.zig` has no size, so `schema.tweakOn(.display)`
+   is false: no Shell-Setup `<Display>`, no WINNT.SIF `[Display]`. The
+   renderers pass the keep request where a staging script reads one:
+   9x / NT 3.5x / NT4 `;USOS-DISPLAY=keepxauto`, 2000 settings
+   `display=keep` + `display_bpp=auto`, XP / 2003 settings `display=keep`
+   (`xp_user_settings.sh` accepts it and writes no `[Display]`), Vista / 7 /
+   2008 / 8.x / 10 `<!-- USOS-DISPLAY=keepxauto -->` **without** the
+   icacls / Default-hive USOSDisplay specialize commands. Windows 11 /
+   Server 2012+: nothing (they never had USOSRES). The colour depth is not
+   offered with keep.
+2. **No profile (answer=none, the user's own answer file, usos-xp.ini):**
+   an empty file `display-keep.txt` in the system's `Unattended` folder on
+   DATA, e.g. `Systems\Windows\Windows 7\Unattended\display-keep.txt`
+   (same pattern as `nvme-off.txt` / `fast-startup-on.txt`). It also wins
+   over a profile's fixed or auto value (a fixed XP / 6.x value still goes
+   to Setup as `[Display]` / `<Display>`; only USOSRES is off). Read by
+   `vista_csmwrap_prepare.sh` (`vista_display_keep`, Vista / 7 / 2008 /
+   2008 R2 x86+x64 CSMWrap and 8 / 8.1 / 10 x86), `w9x_csmwrap_prepare.sh`
+   (9x, NT 3.5x / 4.0, POSReady; its `Systems\<category>\<folder>`) and
+   `legacy_xp_staging.sh` (2000, XP incl. MCE / Tablet / x64, 2003), passed
+   on as `USOS_DISPLAY_KEEP=1`.
+
+The target scripts test both with `usos_display_keep REQUEST`
+(`tools/display_profile.sh`) before staging and log `DISPLAY keep (...)`
+(9x: `display: keep (...)`). The WinPE registration step 2b only acts on a
+staged `\USOS\NT6`, so it does nothing.
+
+What stays then (the pre-auto behaviour of each path):
+
+| Family | Mode with keep |
+| --- | --- |
+| 95 | VESA95.BAT's vmdisp9x VESA first mode, 16-bit 1024x768 |
+| 98 / 98 SE / Me | vmdisp9x VESA from USOSVESA.INF, its `DEFAULT` mode (16-bit 640x480); user changes it in Display Properties |
+| NT 3.5 / 3.51 | usosvbe's 1024x768x16 default; 3.x stages USOSRES only on a profile request anyway |
+| NT 4.0 | VESA.REG's 1024x768x16 (usosvbe + framebuf) |
+| 2000 | VESA.REG's 1024x768x16 (usosvbe + framebuf, vesa.cmd) |
+| XP / 2003 / POSReady | the mode Windows' (or the driver bundle's) driver picks (X470: Full HD); POSReady VGA 640x480 after FBA until a mode is chosen |
+| Vista / 7 / 2008 / 2008 R2 CSMWrap | Standard VGA 800x600 |
+| 8 / 8.1 / 10 x86 CSMWrap | Microsoft Basic Display 1024x768 |
+| Win7 x64 UefiSeven, native UEFI 8+ | unchanged (no USOSRES by default; `native-res-on.txt` stays the Win7 x64 opt-in) |
+
+Tests (host only): Zig unit tests (profile round trip, autounattend for
+every helper family, nt5 / root renderers), answer goldens
+`src/flow/answer/testdata/golden/display-keep.*` (`test_answer_render.py`
+`check_display_keep`), `tools/tests/test_display_keep.py` (the 9x, NT3, NT4,
+2000, XP / 2003 and NT6 staging blocks on scratch folders with the keep
+request and with `USOS_DISPLAY_KEEP=1`, the prepare-script flag) and
+`test_display_posready.py` (POSReady staging + conditional read-back). No
+QEMU or X470 run.
+
 ## Per family
 
 | Family | Driver USOS uses | Before | After | X470 check |

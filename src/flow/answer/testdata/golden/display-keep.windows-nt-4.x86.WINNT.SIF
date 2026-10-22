@@ -1,0 +1,86 @@
+; WINNT.SIF rendered by USOS for Windows NT 4.0 (docs/nt4-2026-10-07.md)
+[Data]
+MsDosInitiated = 1
+Floppyless = 1
+UnattendedInstall = "Yes"
+
+[Unattended]
+OemPreinstall = Yes
+OemSkipEula = Yes
+NoWaitAfterTextMode = 1
+NoWaitAfterGUIMode = 1
+FileSystem = LeaveAlone
+ExtendOemPartition = 0
+ConfirmHardware = No
+NtUpgrade = No
+Win31Upgrade = No
+TargetPath = \WINNT
+OverwriteOemFilesOnUpgrade = No
+ComputerType = "MPS Multiprocessor PC", Retail
+
+[UserData]
+FullName = "Jan"
+OrgName = "USOS"
+ComputerName = USOS-NT4
+
+[GuiUnattended]
+OemSkipWelcome = 1
+OEMBlankAdminPassword = 1
+
+[Display]
+ConfigureAtLogon = 0
+AutoConfirm = 1
+BitsPerPel = 8
+XResolution = 640
+YResolution = 480
+VRefresh = 60
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
+
+[Network]
+JoinWorkgroup=WORKGROUP
+InstallAdapters=USOS.Adapters
+InstallProtocols=USOS.Protocols
+DoNotInstallInternetServer=Yes
+
+[USOS.Adapters]
+LOOP=USOS.Loop
+
+[USOS.Loop]
+
+[USOS.Protocols]
+TC=USOS.TCPIP
+
+[USOS.TCPIP]
+DHCP=No
+IPAddress=192.0.2.1
+Subnet=255.255.255.0
+;USOS-NETWORK=on
+;USOS-IP=dhcp
+;USOS-GATEWAY=
+;USOS-DNS=
+;USOS-HOME=about:blank
+;USOS-DIALUP=off
+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|ProxyEnable|dword|0
+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffline|dword|0
+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
+;USOS-REG=USER\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
+;USOS-REG=USER\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+;USOS-REG=USER\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+;USOS-REG=USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+;USOS-REG=USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
+;USOS-REG=DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+;USOS-REG=DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|ProxyEnable|dword|0
+;USOS-REG=DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffline|dword|0
+;USOS-REG=DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
+;USOS-REG=DEFAULT\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
+;USOS-REG=DEFAULT\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+;USOS-REG=DEFAULT\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+;USOS-REG=DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+;USOS-REG=DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
+;USOS-REG=HKLM\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+;USOS-REG=HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer|Start|dword|4
+;USOS-REG=HKLM\SYSTEM\CurrentControlSet\Services\Browser|Start|dword|4
+;USOS-DISPLAY=keepxauto

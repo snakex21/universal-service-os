@@ -222,7 +222,8 @@ fn setOptions() void {
     const offset: usize = if (legacy_display) 1 else 0;
     display_options[0] = t(if (legacy_display) .profile_value_unchanged else .profile_value_auto);
     if (legacy_display) display_options[1] = t(.profile_value_auto);
-    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i| display_options[i + offset] = f.name;
+    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i|
+        display_options[i + offset] = if (comptime std.mem.eql(u8, f.name, "keep")) t(.profile_value_display_keep) else f.name;
     display_option_count = @typeInfo(answer.profile.Display).@"enum".fields.len + offset;
     bpp_options = .{ t(.profile_value_auto), "32", "16" };
     network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
@@ -429,7 +430,7 @@ fn build(out: *Profile) void {
     if (answer.display_profile.supportsSystem(system_id)) {
         out.display = if (display_index == 0) .auto else @enumFromInt(display_index - 1);
         out.display_explicit = display_index != 0;
-        out.display_bpp = if (display_index == 0) .auto else @enumFromInt(bpp_index);
+        out.display_bpp = if (display_index == 0 or out.display == .keep) .auto else @enumFromInt(bpp_index);
     } else {
         out.display = @enumFromInt(display_index);
         out.display_bpp = @enumFromInt(bpp_index);
@@ -691,7 +692,8 @@ fn buildFields() void {
     if (answer.display_profile.supportsSystem(system_id)) {
         if (family == null) addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
         if (family == null) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
-        if (display_index != 0) addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
+        // keep: no USOSRES, so no colour depth to choose.
+        if (display_index != 0 and display_index != @intFromEnum(answer.profile.Display.keep) + 1) addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
     }
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });

@@ -83,6 +83,12 @@ vista_testmode_watermark_visible() {
     [ -f "$2/${4:-Systems/Windows/$3}/Unattended/testmode-watermark-on.txt" ]
 }
 
+# display-keep.txt in the folder's Unattended (every answer, also none): no
+# USOSRES, Windows keeps its own display mode (docs/display-policy.md).
+vista_display_keep() {
+    [ -f "$1/${3:-Systems/Windows/$2}/Unattended/display-keep.txt" ]
+}
+
 usos_vista_csmwrap_prepare() {
     VISTA_CSMWRAP_DIR=/mnt/esp/EFI/USOS/vista-csmwrap
     request=$VISTA_CSMWRAP_DIR/request.ini
@@ -298,7 +304,12 @@ usos_vista_csmwrap_prepare() {
     usos_ui_stage 4 5 'Preparing the disk' 'Copying the Windows PE helper and CSMWrap to the selected disk.' || true
     watermark_visible=0
     if vista_testmode_watermark_visible "$profile" /mnt/data "$folder" "$source_directory"; then watermark_visible=1; fi
-    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$stage_donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
+    display_keep=0
+    if vista_display_keep /mnt/data "$folder" "$source_directory"; then
+        display_keep=1
+        vista_csmwrap_log 'DISPLAY display-keep.txt: USOSRES off, Windows keeps its own mode'
+    fi
+    if ! USOS_DISPLAY_KEEP=$display_keep TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$stage_donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
         sh /usr/lib/usos/vista_csmwrap_target.sh >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f /run/vista-answer.xml
         tail -n 5 "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true
