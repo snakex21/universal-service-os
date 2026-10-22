@@ -882,6 +882,7 @@ static int say(const char *p){logcode(p,0);return 1;}
 static int same_file(const WCHAR *p,const WCHAR *q){BYTE x[32],y[32];return hash_file(p,x)&&hash_file(q,y)&&same(x,y,32);}
 #include "windows7_uefi_publish.h"
 #include "windows_csmwrap_hide.h"
+#include "windows_display_register.h"
 static BOOL install_int10_dispatcher(const WCHAR *esp,const WCHAR *loader){
  static WCHAR flag[MAX_PATH],original[MAX_PATH];
  path(flag,base,L"usos-int10-dispatcher.flag");
@@ -1045,6 +1046,13 @@ void entry(void){
    DWORD r=usos_hide_esp_letter(hive,csm_signature,csm_esp_start,&letters);
    logcode("CSMWrap: ESP drive letters removed from the target MountedDevices=",letters);
    logcode("CSMWrap: ESP no-drive-letter entry (0 written, 1 present, 100+ error; not fatal)=",r);}
+  /* Every answer (also none or the user's own): USOSRES staged by the
+   * micro-Linux in \USOS\NT6 starts at the first sign-in from the Default
+   * user's Run value (windows_display_register.h, docs/display-policy.md). */
+  DWORD acl=0,d=usos_display_register(target->root,&acl);
+  if(d==USOS_DREG_NOT_STAGED)logcode("Display: \\USOS\\NT6 not staged (user answer with its own <Display>, or staging failed); Windows keeps its mode=",0);
+  else{logcode("Display: \\USOS\\NT6 DACL set on objects (of 3)=",acl);
+   logcode("Display: USOSRES in the Default user's Run (0 written, 1 present, 100+ error; not fatal)=",d);}
  }
  logcode("Vista target ready for first boot with USB v11=",0);
  retire_prepared_disk(L".done");

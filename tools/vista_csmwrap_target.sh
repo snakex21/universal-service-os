@@ -169,23 +169,33 @@ dd if="$node" of="$work/boot.readback" bs=512 count=16 2>/dev/null
 cmp -s "$work/boot" "$work/boot.readback" || fail 'NT60 boot code readback mismatch'
 log 'NT60 NTFS boot code PASS'
 
-# 2b. Display (docs/display-policy.md): Vista / 7 / 2008 / 2008 R2
-# install on the Standard VGA driver at 800x600, 32-bit 8 / 8.1 / 10
-# (X86_SELF=1) on Microsoft Basic Display at 1024x768. A USOS answer for them
-# registers \USOS\NT6\USOSRES.EXE (autounattend.zig display_helper); its
-# request is <!-- USOS-DISPLAY=... --> or, without one, auto (native EDID
-# mode, else the highest). Staged into the new Windows partition now:
-# Setup installs into it (InstallTo, no format) and leaves the folder. A
-# user's own answer file has no registration: nothing staged. Optional:
-# any failure keeps Windows' own mode and the preparation goes on.
+# 2b. Display (docs/display-policy.md, user decision 2026-10-22): Vista / 7 /
+# 2008 / 2008 R2 install on the Standard VGA driver at 800x600, 32-bit 8 /
+# 8.1 / 10 (X86_SELF=1) on Microsoft Basic Display at 1024x768. Every
+# install gets \USOS\NT6\USOSRES.EXE + DISPLAY.TXT, staged into the new
+# Windows partition now (Setup installs into it: InstallTo, no format):
+# a USOS answer's request <!-- USOS-DISPLAY=... -->, else auto (native EDID
+# mode, else the highest), also with no answer or the user's own answer.
+# Registration: the USOS answer's specialize commands (autounattend.zig
+# display_helper) and, for every answer, the WinPE step after Setup
+# (usos-x86-csmwrap.exe display / usos-vista-install.exe,
+# windows_display_register.h: the Default user's Run value). A user's own
+# answer that sets <Display><HorizontalResolution> keeps its mode: nothing
+# staged. Optional: any failure keeps Windows' own mode and the preparation
+# goes on.
 modprobe ntfs3 2>/dev/null || true
 display_request=
-if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && [ -r "$LIB/display_profile.sh" ]; then
+if [ -r "$LIB/display_profile.sh" ]; then
     . "$LIB/display_profile.sh"
-    if usos_display_nt6_answer "$ANSWER_XML"; then
+    if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && usos_display_nt6_answer "$ANSWER_XML"; then
         display_request=$(usos_display_from_xml "$ANSWER_XML") || { display_request=; log 'DISPLAY duplicate request in the answer; display unchanged'; }
         [ -n "$display_request" ] || display_request=autoxauto
         usos_display_valid "$display_request" || { log "DISPLAY invalid request $display_request; display unchanged"; display_request=; }
+    elif [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && usos_display_xml_fixed "$ANSWER_XML"; then
+        log 'DISPLAY the user answer sets <Display>; its mode is kept, USOSRES not staged'
+    else
+        display_request=autoxauto
+        if [ -n "$ANSWER_XML" ]; then log 'DISPLAY user answer without a display request: auto'; else log 'DISPLAY no answer: auto'; fi
     fi
 fi
 if [ -n "$display_request" ]; then

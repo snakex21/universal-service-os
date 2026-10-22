@@ -68,24 +68,40 @@ usos_nt5_stage_regset() {
     printf '[NT5] registry set staged: %s entries for usos-reg.exe\n' "$(grep -vc '^;' "$work/usos-reg.txt")"
     rm -f "$work/usos-reg.txt"
 }
-# Display (docs/display-policy.md, user decision 2026-10-21): XP and Server
-# 2003, x86 and x64, from a USOS settings file get USOSRES at the first
-# logon: the monitor's native mode (prep-time EDID, else the registry EDID),
-# else the highest; nothing when the driver already runs it. DIR = the
-# setup folder; DIR's line for the setup-end script goes to stdout. A
-# user's own WINNT.SIF (XP_CUSTOM_SIF) gets nothing.
+# Display (docs/display-policy.md, user decisions 2026-10-21 / 2026-10-22):
+# XP and Server 2003, x86 and x64, get USOSRES at the first logon on every
+# install: with a USOS settings file (its display= request), and also
+# without one or with the user's own WINNT.SIF (auto). Auto = the monitor's
+# native mode (prep-time EDID, else the registry EDID), else the highest;
+# nothing when the driver already runs it. A user's .sif that sets
+# [Display] XResolution keeps its own mode (nothing staged). DIR = the
+# setup folder; DIR's line for the setup-end script goes to stdout.
 usos_nt52_display_stage() {
-    [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ] || return 0
     case "$NT5_SYSTEM" in windows-2000) return 0 ;; esac
     if [ ! -f "$SCRIPT_DIR/USOSRES.EXE" ] || [ ! -f "$SCRIPT_DIR/display_profile.sh" ]; then
         printf '[NT5] DISPLAY USOSRES.EXE missing in this build; display unchanged\n' >&2; return 0
     fi
     . "$SCRIPT_DIR/display_profile.sh"
-    _nd_request=$(usos_display_request_nt52 "$XP_USER_SETTINGS") || fail 'duplicate display request'
+    if [ -n "${XP_CUSTOM_SIF:-}" ]; then
+        if usos_display_sif_fixed "$XP_CUSTOM_SIF"; then
+            printf '[NT5] DISPLAY the selected .sif sets [Display]; its mode is kept, USOSRES not staged\n' >&2; return 0
+        fi
+        _nd_request=autoxauto
+    else
+        _nd_request=$(usos_display_request_nt52 "${XP_USER_SETTINGS:-}") || fail 'duplicate display request'
+    fi
     usos_display_stage "$1" "$SCRIPT_DIR/USOSRES.EXE" "$_nd_request" || fail 'cannot stage the display helper'
     cmp -s "$SCRIPT_DIR/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
     printf '[NT5] DISPLAY request=%s native=%s apply=first-logon\n' "$_nd_request" "$(usos_display_native || echo unknown)" >&2
     usos_display_nt52_run_line "${1##*/USOS/}"
+}
+# Without usos-xp.ini accounts (no settings file, or the user's own .sif):
+# the setup-end script only registers the display helper (stdout, CRLF).
+usos_nt52_display_only_cmd() {
+    printf '@echo off\r\nrem USOS: display helper registration at setup end (docs/display-policy.md).\r\n'
+    printf 'set USOS_LOG=%%SystemRoot%%\\usos-users.log\r\n'
+    printf '%s\r\n' "$(printf '%s' "$1" | tr -d '\r\n')"
+    printf 'exit /b 0\r\n'
 }
 # CMD (setup-end script, ends with exit /b 0) with LINE before its last line.
 usos_nt52_insert_before_exit() {
@@ -145,6 +161,13 @@ cmp -s "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd" || fail 'usos-
 rm -f "$work/accounts.cmd"
 printf '[XP_PAE] usos-users.cmd staged (accounts from usos-xp.ini, run hidden by pae.exe)\n'
 usos_nt5_stage_regset "$work/volume/USOS/XP"
+else
+# No settings file or the user's own .sif: display helper only (pae.exe runs it).
+display_line=$(usos_nt52_display_stage "$work/volume/USOS/XP")
+if [ -n "$display_line" ]; then
+usos_nt52_display_only_cmd "$display_line" > "$work/volume/USOS/XP/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+printf '[XP_PAE] usos-users.cmd staged (display helper only, run hidden by pae.exe)\n'
+fi
 fi
 # Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
 if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
@@ -213,6 +236,14 @@ cmp -s "$work/accounts.cmd" "$setup_dir/usos-users.cmd" || fail 'usos-users.cmd 
 rm -f "$work/accounts.cmd"
 printf '[NT5] usos-users.cmd staged in USOS/%s (accounts from usos-xp.ini, run by usos-setup.cmd at setup end)\n' "$NT5_SETUP_DIR"
 usos_nt5_stage_regset "$setup_dir"
+else
+# No settings file or the user's own .sif: display helper only (Server 2003
+# and XP x64; Windows 2000 registers it through vesa.cmd).
+display_line=$(usos_nt52_display_stage "$setup_dir")
+if [ -n "$display_line" ]; then
+usos_nt52_display_only_cmd "$display_line" > "$setup_dir/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+printf '[NT5] usos-users.cmd staged in USOS/%s (display helper only, run by usos-setup.cmd at setup end)\n' "$NT5_SETUP_DIR"
+fi
 fi
 sync
 umount "$work/volume"; mounted=no

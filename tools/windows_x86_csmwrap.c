@@ -39,6 +39,11 @@
  *                            the CSMWrap ESP (MBR type 0xEF at esp_start,
  *                            tools/windows_csmwrap_hide.h); never fatal for
  *                            the flow (exit 0 written / present, else 11).
+ *   display                  after Setup: when the micro-Linux staged
+ *                            \USOS\NT6\USOSRES.EXE, the installed system's
+ *                            Default user hive gets its Run value (every
+ *                            answer, also none: windows_display_register.h);
+ *                            never fatal (exit 0 done / not staged, else 11).
  *   after                    the Windows partition holds bootmgr and
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
@@ -576,6 +581,18 @@ static DWORD hide_esp(const BYTE *s) {
     return 0;
 }
 
+/* ---- display: USOSRES for every answer (windows_display_register.h) ---- */
+#include "windows_display_register.h"
+static DWORD display_register(void) {
+    if (!target_letter()) { say("[X86_CSMWRAP] display: the installed Windows volume has no drive letter; skipped\r\n"); return 11; }
+    DWORD acl = 0, r = usos_display_register(target_root, &acl);
+    if (r == USOS_DREG_NOT_STAGED) { say("[X86_CSMWRAP] display: \\USOS\\NT6 not staged (user answer with its own <Display>, or staging failed); Windows keeps its mode\r\n"); return 0; }
+    logn("display: \\USOS\\NT6 DACL set on objects (of 3)=", acl);
+    logn(r == USOS_DREG_WRITTEN ? "display: USOSRES registered in the Default user's Run (first sign-in), code=" :
+         r == USOS_DREG_PRESENT ? "display: USOSRES already in the Default user's Run, code=" : "display: FAILED, Default user hive code=", r);
+    return r >= USOS_DREG_ERR_LOAD ? 11 : 0;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -609,6 +626,17 @@ void entry(void) {
         DWORD letters = 0, r = usos_hide_esp_in_key(k, sig, lba, &letters);
         RegCloseKey(k);
         ExitProcess(r * 10 + letters);
+    }
+    /* Host test of the registration only (tools/tests/test_display_register.py):
+     * display-test <folder standing for the volume root, with a trailing \>
+     * <HKCU key standing for the Default hive root>; exit = staged * 1000 +
+     * acl objects * 100 + result (9990: the key does not open). */
+    if (lstrcmpiW(args[1], L"display-test") == 0 && arg_count == 4) {
+        HKEY k; DWORD staged = usos_display_staged(args[2]), acl = staged ? usos_display_acl(args[2]) : 0, r = USOS_DREG_NOT_STAGED;
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, args[3], 0, 0, 0, KEY_CREATE_SUB_KEY | KEY_QUERY_VALUE | KEY_SET_VALUE, 0, &k, 0) != ERROR_SUCCESS) ExitProcess(9990);
+        if (staged) r = usos_display_register_in_key(k);
+        RegCloseKey(k);
+        ExitProcess(staged * 1000 + acl * 100 + (r > 99 ? 99 : r));
     }
     if (lstrcmpiW(args[1], L"samefile") == 0 && arg_count == 4) ExitProcess(same_file(args[2], args[3]) ? 0 : 1);
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
@@ -670,6 +698,7 @@ void entry(void) {
     }
     if (lstrcmpiW(args[1], L"target") == 0 && arg_count == 3) ExitProcess(write_target(args[2]) ? 0 : 9);
     if (lstrcmpiW(args[1], L"hideesp") == 0) ExitProcess(hide_esp(s));
+    if (lstrcmpiW(args[1], L"display") == 0) ExitProcess(display_register());
     if (lstrcmpiW(args[1], L"after") == 0) {
         BOOL bootmgr = exists_on_partition(L"\\bootmgr"), winload = exists_on_partition(L"\\Windows\\System32\\winload.exe");
         logn("bootmgr on the Windows partition=", bootmgr);
