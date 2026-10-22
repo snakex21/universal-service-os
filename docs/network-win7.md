@@ -38,7 +38,7 @@ skanuje drzewo rekursywnie i nie ma żadnej listy plików do edycji.
 Jedno z dwóch miejsc na DATA (oba są czytane):
 
 ```
-DATA\Systems\Windows\Windows 7\Drivers\x86\e1r62x86\
+DATA\Systems\Windows\Windows 7\Drivers\x86\Net\e1r62x86\
 DATA\Drivers\Windows 7\e1r62x86\            (dowolny podfolder; klasy Storage/USB/Other też)
 ```
 
@@ -48,6 +48,9 @@ bezpieczniejszy, gdy na tej samej DATA leżą też paczki 64-bitowe: DISM w tym
 kroku instaluje najpierw całe `Drivers\x86`, a dopiero potem
 `Drivers\Windows 7`, więc obca architektura w drugim drzewie nie zasłoni
 poprawnej paczki (jej błąd jest tylko logowany).
+Bez KMDF 1.11 (MSU w `Windows 7\Updates`) z biblioteki idzie tylko podfolder
+`Drivers\x86\Net`: paczki USB 3 zostają poza obrazem, żeby ich niedziałająca
+usługa xHCI nie wyłączyła fallbacku `usosusb` (klawiatura i mysz na X470).
 
 Po instalacji systemu (Setup `/noreboot`, przed pierwszym rozruchem) USOS
 robi offline:

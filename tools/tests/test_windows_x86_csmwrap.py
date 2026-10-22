@@ -184,9 +184,17 @@ def main() -> int:
     assert 'for %%D in ("%USOS_DATA%") do set "USOS_USER_DRV=%%~dD\\Drivers\\Windows 7"' in script
     section = script[script.index("\n:usb3\n"):script.index("\n:usb3_done\n")]
     add_driver = [line for line in section.splitlines() if line.startswith("dism.exe") and "/Add-Driver" in line]
-    assert len(add_driver) == 2, add_driver
-    assert '/Driver:"%USOS_DRV%" /Recurse /ForceUnsigned' in add_driver[0]
-    assert '/Driver:"%USOS_USER_DRV%" /Recurse /ForceUnsigned' in add_driver[1]
+    assert len(add_driver) == 3, add_driver
+    assert '/Driver:"%USOS_DRV%\\Net" /Recurse /ForceUnsigned' in add_driver[0]
+    assert '/Driver:"%USOS_DRV%" /Recurse /ForceUnsigned' in add_driver[1]
+    assert '/Driver:"%USOS_USER_DRV%" /Recurse /ForceUnsigned' in add_driver[2]
+    # Without KMDF 1.11 only the bundled Net subtree is added: the bundled USB 3
+    # packages (whose xHCI service could not start) never switch off usosusb.
+    assert 'if "%USOS_DISM%"=="0" set "USOS_KMDF_OK=1"' in section
+    no_kmdf = "\n".join(line for line in section[section.index(":usb3_drivers"):section.index(":usb3_bundled")].splitlines()
+                        if not line.startswith("rem "))
+    assert "if defined USOS_KMDF_OK goto usb3_bundled" in no_kmdf
+    assert "USOS_USB3_INSTALLED" not in no_kmdf and '/Driver:"%USOS_DRV%"' not in no_kmdf
     # Missing / broken KMDF: a note, not a jump past the driver packages.
     before_drivers = section.split(":usb3_drivers")[0]
     assert "goto usb3_done" not in before_drivers

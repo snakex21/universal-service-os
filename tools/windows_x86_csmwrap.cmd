@@ -203,6 +203,7 @@ set "USOS_NT="
 set "USOS_WORKDIR="
 set "USOS_DRV="
 set "USOS_USER_DRV="
+set "USOS_KMDF_OK="
 "%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt"
 if errorlevel 1 (echo [USOS] USB3: installed Windows not found; skipped. & exit /b 0)
 for /f "usebackq tokens=1,2" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B")
@@ -236,6 +237,8 @@ echo [USOS] USB3: KMDF %USOS_KMDF_CAB% into %USOS_T%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-kmdf.log" /Add-Package /PackagePath:"%USOS_KMDF_CAB%"
 set "USOS_DISM=%errorlevel%"
 echo [USOS] USB3: KMDF DISM exit=%USOS_DISM%
+if "%USOS_DISM%"=="0" set "USOS_KMDF_OK=1"
+if "%USOS_DISM%"=="3010" set "USOS_KMDF_OK=1"
 if not "%USOS_DISM%"=="0" if not "%USOS_DISM%"=="3010" echo [USOS] USB3: KMDF not installed, so the USB 3 package would not start; the driver packages are still added.
 :usb3_drivers
 rem Recursive over the whole tree: every folder that holds an .inf is one package
@@ -244,6 +247,18 @@ rem The bundled library goes first, the user folder second and only its own
 rem exit code is logged: a package DISM refuses (another architecture) never
 rem hides the other tree. USOS_USB3_INSTALLED follows the bundled tree only, so
 rem a NET package here does not silence the usosusb fallback.
+rem Without KMDF 1.11 the bundled USB 3 packages stay out, as before: added
+rem anyway they would register an xHCI service that cannot start, and that
+rem service (or USOS_USB3_INSTALLED) would switch off the usosusb fallback,
+rem leaving the X470 without keyboard / mouse. Only Drivers\x86\Net (the
+rem win7-net-intel layout, Net\Intel-I211) goes in then.
+if defined USOS_KMDF_OK goto usb3_bundled
+if not exist "%USOS_DRV%\Net\" goto usb3_user_drivers
+echo [USOS] USB3: no KMDF 1.11; bundled network drivers %USOS_DRV%\Net only
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-net-drivers.log" /Add-Driver /Driver:"%USOS_DRV%\Net" /Recurse /ForceUnsigned
+echo [USOS] USB3: network driver DISM exit=%errorlevel%
+goto usb3_user_drivers
+:usb3_bundled
 if not exist "%USOS_DRV%\" goto usb3_user_drivers
 echo [USOS] USB3: drivers %USOS_DRV%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-drivers.log" /Add-Driver /Driver:"%USOS_DRV%" /Recurse /ForceUnsigned
