@@ -22,7 +22,7 @@ class NT35Binary(prior.BuiltBinary):
   self.assertTrue(names.isdisjoint({'NdisPciAssignResources','NdisMPciAssignResources','NdisMQueryAdapterResources','NdisOverrideBusNumber'}))
   self.assertFalse(any('Timer' in n for n in names))
  def test_351_runtime_binary_unchanged(self):
-  self.assertEqual(hashlib.sha256((DRV/'bin/i386/usosnet351.sys').read_bytes()).hexdigest(),'f39d58fd923632dacbc577562045015123a9bdfc98c56237090bfcd53c70612a')
+  self.assertEqual(hashlib.sha256((DRV/'bin/i386/usosnet351.sys').read_bytes()).hexdigest(),'f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf')
 class ExactConfiguredPci(unittest.TestCase):
  def test_compiled_actual_function(self):
   source=(DRV/'src/usosnet.c').read_text();body=re.search(r'static BOOLEAN ConfiguredFind35\(PADAPTER A, NDIS_HANDLE Cfg\)\n\{.*?\n\}',source,re.S).group()

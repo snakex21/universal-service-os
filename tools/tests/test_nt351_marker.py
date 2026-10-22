@@ -9,7 +9,7 @@ COLLECTION=Path(r'G:\USOS-Kolekcja')
 
 class Marker(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        if not PWSH:raise RuntimeError('Set USOS_PWSH to existing PowerShell7')
+        if not PWSH:self.skipTest('PowerShell 7 not found (set USOS_PWSH)')
         self.temp=tempfile.TemporaryDirectory(dir=PARENT);self.root=Path(self.temp.name)
         self.tag='nt351-marker-host-'+uuid.uuid4().hex[:12];self.processes=[]
         self.work=COLLECTION/'_vm'/self.tag;self.work.mkdir()

@@ -382,7 +382,8 @@ class Watcher(unittest.TestCase):
         for part in ('sec_drives();', 'sec_ios();', 'sec_scsi_registry();', 'run_usosdbg_disk("start");'):
             self.assertIn(part, disk)
         ios = grab(log, r'^static void sec_ios\(void\)\n\{.*?\n\}\n')
-        self.assertIn('copy_file(LOGDIR "\\\\IOS.LOG", disk_fb, n);', ios)
+        self.assertIn('lstrcpyA(ios_copy, LOGDIR); lstrcatA(ios_copy, "\\\\IOS.LOG");', ios)
+        self.assertIn('copy_file(ios_copy, disk_fb, n);', ios)
         self.assertIn('"real mode", "real-mode", "compatibility"', ios)
         self.assertIn('"[IOS]", "KRNL386"', ios)
         reg = grab(log, r'^static void sec_scsi_registry\(void\)\n\{.*?\n\}\n')
@@ -392,7 +393,7 @@ class Watcher(unittest.TestCase):
         self.assertNotIn('RegSetValue', log)
         self.assertNotIn('RegCreateKey', log)
         dbg = grab(log, r'^static void run_usosdbg_disk\(const char \*why\)\n\{.*?\n\}\n')
-        self.assertIn('wsprintfA(cmd, "%s /L %s /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);', dbg)
+        self.assertIn('wsprintfA(cmd, "\\"%s\\" /L \\"%s\\" /D", (LPSTR)DBGEXE, (LPSTR)DBGTMPD);', dbg)
         self.assertIn('EnterCriticalSection(&dbg_cs);', dbg)
         self.assertIn('si.wShowWindow = SW_HIDE;', dbg)
         snap = grab(log, r'^static void snapshot\(void\)\n\{.*?\n\}\n')

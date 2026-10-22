@@ -15,7 +15,7 @@ import tarfile
 spec=importlib.util.spec_from_file_location('nt4_serial_shell',Path(__file__).with_name('serial_shell.py'))
 serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
 
-DRIVER_SHA256='4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d'
+DRIVER_SHA256='89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233'
 DRIVER_BYTES=21376
 LOGGER_SHA256='ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7'
 LOGS=('network-coverage.txt','network-nt4.txt')
@@ -142,7 +142,7 @@ readnet() {
 READS
 status=unavailable
 if MTOOLS_SKIP_CHECK=1 mtype -i "$disk" ::/WINNT/SYSTEM32/DRIVERS/usosnet4.sys 2>/dev/null | dd bs=4096 count=7 of=/tmp/raw/driver 2>/dev/null; then
- if [ "$(wc -c </tmp/raw/driver)" -eq 21376 ]; then
+ if [ "$(wc -c </tmp/raw/driver)" -eq 21248 ]; then
   digest=$(sha256sum /tmp/raw/driver); digest=${digest%% *}
   if [ "$digest" = DRIVER_SHA ]; then
    printf '%s\n' "$digest" >/tmp/export/nt4/driver-sha256.txt

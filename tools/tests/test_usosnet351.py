@@ -122,7 +122,8 @@ class BuiltBinary(unittest.TestCase):
 
     def test_existing_nt4_and_ndis5_binaries_unchanged(self):
         for name, expected in {
-            'usosnet4.sys': '4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d',
+            # 89b7337c: canonical igb IRQ registers, NT4 tuple09 QEMU qualification.
+            'usosnet4.sys': '89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233',
             'usosnet.sys': '8eac15b474b23fb4e7ac2c2431a4b17e6666cc2d03788b78ec2d8e19eeef89f9',
         }.items():
             self.assertEqual(hashlib.sha256((DRV / 'bin/i386' / name).read_bytes()).hexdigest(), expected)

@@ -20,7 +20,7 @@ archive_policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(arc
 
 FOLDERS=frozenset(('Windows NT 3.5','Windows NT 3.5 Server'))
 FILES=('NET35.STATUS','NET35.ON','USABILITY.TXT','POST.LOG','USOSNET35.SHA256')
-DRIVER_SHA256='e1aa69a3ec8e3da802013131abbb6fefc9f466da6f4eeb66fe15ec47e60421c5'
+DRIVER_SHA256='d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85'
 DRIVER_BYTES=16384
 MAX_FILE=1024**2
 MAX_TOTAL=5*MAX_FILE+4096

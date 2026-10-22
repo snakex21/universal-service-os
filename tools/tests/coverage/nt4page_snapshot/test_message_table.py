@@ -1,13 +1,20 @@
 from pathlib import Path
-import ctypes,hashlib,importlib.util,json,os,random,struct,subprocess,unittest
-HERE=Path(__file__).resolve().parent;OUT=HERE/'message-tests03';ZIG=Path(r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe')
+import ctypes,hashlib,importlib.util,json,os,random,shutil,struct,subprocess,tempfile,unittest
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[3]
+def find_zig():
+ for c in (os.environ.get('USOS_ZIG'),ROOT/'tools/zig/zig.exe',shutil.which('zig')):
+  if c and Path(c).is_file():return Path(c)
+ return None
+ZIG=find_zig()
 class View(ctypes.Structure):_fields_=[('text',ctypes.c_void_p),('bytes',ctypes.c_uint),('unicode',ctypes.c_uint)]
 def synthetic(payload=b'Own synthetic public error.\0',flags=0):return struct.pack('<IIIIHH',1,1010,1010,16,4+len(payload),flags)+payload
 class ActualMessageTable(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  if OUT.exists():raise ValueError('Fresh output required')
-  OUT.mkdir();tmp=OUT/'tmp';tmp.mkdir();dll=OUT/'actual.dll';env=dict(os.environ,TEMP=str(tmp),TMP=str(tmp),ZIG_GLOBAL_CACHE_DIR=str(OUT/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-local'))
+  if ZIG is None:raise unittest.SkipTest('zig not found (USOS_ZIG, tools/zig or PATH)')
+  global OUT
+  OUT=Path(tempfile.mkdtemp(prefix='usos-msgtable-'));cls._keep_out=OUT
+  tmp=OUT/'tmp';tmp.mkdir();dll=OUT/'actual.dll';env=dict(os.environ,TEMP=str(tmp),TMP=str(tmp),ZIG_GLOBAL_CACHE_DIR=str(OUT/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-local'))
   subprocess.run([str(ZIG),'cc','-target','x86_64-windows-gnu','-Os','-shared','-nostdlib','-fno-builtin','-fno-stack-protector','-Wall','-Wextra','-Werror','-Wno-unused-function','-isystem',str(ZIG.parent/'lib/libc/include/any-windows-any'),str(HERE/'message_test.c'),'-Wl,--entry,DllMain','-o',str(dll)],check=True,env=env)
   cls.lib=ctypes.WinDLL(str(dll));cls.lib.actual_message.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_ulong,ctypes.POINTER(View)];cls.lib.actual_message.restype=ctypes.c_int;cls.lib.actual_controls.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_uint];cls.lib.actual_controls.restype=ctypes.c_int
  def parse(self,blob,id=1010):

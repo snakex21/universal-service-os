@@ -134,7 +134,7 @@ class FixtureOrdering(unittest.TestCase):
             with self.assertRaises(ValueError):fixture.nt4_observer_entries(bad,FINISH,TOKEN,b'x')
     def test_native_gui_uses_hidden_detached_process_wait_and_exact_cleanup_targets(self):
         source=(HERE/'nt4_observer/observer.c').read_text(encoding='utf-8')
-        self.assertIn('si.wShowWindow=SW_HIDE',source);self.assertIn('FALSE,DETACHED_PROCESS',source)
+        self.assertIn('si.wShowWindow=SW_HIDE',source);self.assertIn('FALSE,CREATE_NEW_CONSOLE',source)
         self.assertIn('WaitForSingleObject(pi.hProcess,INFINITE)',source);self.assertIn('GetExitCodeProcess',source)
         self.assertIn('RegDeleteValueA(key,"USOSCoverage")',source)
         self.assertIn('CurrentVersion\\\\RunOnce',source);self.assertIn('CurrentVersion\\\\Run',source)

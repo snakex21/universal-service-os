@@ -72,7 +72,9 @@ class Source(unittest.TestCase):
 
 
 def function_body(text: str, name: str) -> str:
-    start = text.index(f'static void {name}(void)\n{{')
+    # post() returns int since the NT 3.5x network / client policy gate.
+    start = next(i for i in (text.find(f'static void {name}(void)\n{{'),
+                             text.find(f'static int {name}(void)\n{{')) if i >= 0)
     return text[start:text.index('\n}\n', start)]
 
 
@@ -93,7 +95,10 @@ class Flow(unittest.TestCase):
     def test_usosnt3_registers_usosvbe(self):
         src = USOSNT3.read_text(encoding='utf-8')
         post = function_body(src, 'post')
-        self.assertTrue(post.rstrip().endswith('write_file("DRIVERS.TXT", g_text);\n    vesa();\n    display_profile();'))
+        # vesa() and the display profile run after DRIVERS.TXT and the
+        # network / client policy steps, right before a successful return.
+        self.assertTrue(post.rstrip().endswith('vesa();\n    display_profile();\n    return 1;'))
+        self.assertLess(post.index('write_file("DRIVERS.TXT", g_text);'), post.index('vesa();'))
         body = function_body(src, 'vesa')
         self.assertLess(src.index('static void vesa(void)\n{'), src.index('static void WINAPI handler(DWORD control)'))
         for want in ('static const WCHAR drivers[] = L"framebuf\\0";',
