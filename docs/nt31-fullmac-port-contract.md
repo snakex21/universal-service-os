@@ -532,3 +532,40 @@ Assessment artifacts/nt31-fullmac-runtime/r24d-usb-evaluation.json; readback
 r24d-stopped-readback/readback.json. Only SVC31/PING31 were issued in this
 boot; inherited CFG31/POST/NET31 are not new DNS/HTTP proof. Generic runner
 PASS flags remain false. No fresh automated network-installation PASS.
+
+
+### Explicit client service policy (R24e/R24f)
+
+The selected stopped R24d SYSTEM proves Browser depends on LanmanServer;
+both currently Start2. The actual ADVAPI32 hash143285c0...92ebc exports all
+SCM functions used here (r24d-policy-contract.json). The own helper adds
+explicit /client apply and read-only /clientcheck, after its existing NT31,
+local marker and exact own-adapter guards. It never creates services or
+stores application data in the registry. Only the existing Server and its
+confirmed Browser dependent can be stopped/Disabled. Workstation and TCPIP
+must be RUNNING before and after; they are never reconfigured.
+
+The production policy and12 native-C contract cases use the same finite
+function. It checks read-only failure, idempotence, absent Browser, failed
+query/stop/disable and successful calls that fail their state readback.
+There is no periodic service-status loop. After a bounded active-dependent
+check, native NET stop is waited to process completion, then status/config
+are queried once. No /y or arbitrary dependent-service traversal is used.
+Unexpected active dependents or any failed call/refused readback prevent
+CLIENT_POLICY_PASS. Stop timeout is60s, with only the owned NET child killed.
+The explicit Browser dependency is rechecked from bounded SCM data.
+
+build31_client.py compiles only NET31CFG, never the SYS. Build01 failed at
+link (stack probe/memset), with no VM started; build02 uses bounded static
+SCM buffers and own memory routines. Helper7168B SHA256
+ d00ca2bb4027f27ddee5d91f65727de3467b9d1055561ad30c70494854d72f51,
+PE3.10. All27 imports (14Kernel32/13Advapi32) match the actual stopped NT31;
+three host invocations refuse OS before SCM. Protected NT31/NT4/35/351
+binaries remain identical. No policy runtime PASS is granted from these tests.
+
+R24e is a new COW of stopped R24d with only the own helper replaced;
+SYSTEM/SYS/USB/classes/NDIS/TCPIP/STREAMS/kernel remain identical at staging.
+Manifest r24e-preparation.json pins target978ce6e2...bc8315. After a native
+apply/shutdown/readback, a separate unchanged COW R24f must cold-boot and
+pass /clientcheck, native service-list and ping, then safe shutdown/readback.
+The earlier R24d policy FAIL remains a historical result.

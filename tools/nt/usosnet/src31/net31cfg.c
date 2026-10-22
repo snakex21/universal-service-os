@@ -1,14 +1,17 @@
 /* Owned NT31 VM fixture configurator. Required OS service configuration only;
- * all application output stays beside this EXE. Never edits other services. */
+ * all application output stays beside this EXE. Explicit /client applies
+ * the stock Workstation-without-Server service policy through SCM only. */
 #include <windows.h>
 #include "cfg31_policy.h"
 void *__cdecl memcpy(void *d,const void *s,unsigned int n){volatile BYTE *to=d;const volatile BYTE *from=s;while(n--)*to++=*from++;return d;}
+void *__cdecl memset(void *d,int v,unsigned int n){volatile BYTE *to=d;while(n--)*to++=(BYTE)v;return d;}
 static HANDLE logFile=INVALID_HANDLE_VALUE;
 static DWORD length(const char *s){DWORD n=0;while(s[n])n++;return n;}
 static int same(const char *a,const char *b){char x,y;do{x=*a++;y=*b++;if(x>='a'&&x<='z')x-=32;if(y>='a'&&y<='z')y-=32;if(x!=y)return 0;}while(x);return 1;}
 static void text(const char *s){DWORD n;if(logFile!=INVALID_HANDLE_VALUE)WriteFile(logFile,s,length(s),&n,NULL);}
 static void number(DWORD v){char b[9];int i;for(i=0;i<8;i++)b[i]="0123456789ABCDEF"[(v>>(28-i*4))&15];b[8]=0;text(b);}
 static void row(const char *s,DWORD v){text(s);text("=");number(v);text("\r\n");}
+#include "client31_win32.h"
 static LONG dword(HKEY h,const char *name,DWORD value){LONG r;DWORD read=0,kind=0,size=4;r=RegSetValueExA(h,name,0,REG_DWORD,(const BYTE *)&value,4);if(!r){r=RegQueryValueExA(h,name,NULL,&kind,(BYTE *)&read,&size);if(!r&&(kind!=REG_DWORD||size!=4||read!=value))r=ERROR_INVALID_DATA;}row(name,r);return r;}
 static int existing(HKEY root,const char *name,HKEY *h){return RegOpenKeyExA(root,name,0,KEY_READ|KEY_WRITE,h)==ERROR_SUCCESS;}
 void __cdecl entry(void)
@@ -42,7 +45,9 @@ void __cdecl entry(void)
     path[n]=0;for(i=0;"USNET31.SYS"[i];i++)path[n+i]="USNET31.SYS"[i];path[n+i]=0;
     f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
     if(f==INVALID_HANDLE_VALUE){text("REFUSED_OWN_SOURCE_ABSENT\r\n");goto refused;}CloseHandle(f);
-    { const char *cmd=GetCommandLineA();DWORD z=length(cmd);configure=z>=10 && same(cmd+z-10,"/configure"); }
+    { const char *cmd=GetCommandLineA();DWORD z=length(cmd);int client=z>=7&&same(cmd+z-7,"/client");int check=z>=12&&same(cmd+z-12,"/clientcheck");
+      if(client||check){if(!Client31Run(client))goto refused;text("CLIENT_POLICY_PASS\r\n");goto done;}
+      configure=z>=10 && same(cmd+z-10,"/configure"); }
     if(!configure){text("INSPECT_ONLY_READY\r\n");goto done;}
     /* NCPA created exactly this adapter. Set only its original bus fields and
      * the owned full-MAC's explicit BDF/debug parameters; no stack guesses. */

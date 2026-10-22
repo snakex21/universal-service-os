@@ -12,5 +12,5 @@ def main():
     c.PREPARATION=c.RUNTIME/(prefix+'-preparation.json')
     c.main()
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--tag',choices=('r24b-nt31-image-entry','r24c-nt31-registermac-order','r24d-nt31-usb-fullmac'),default=TAG)
+    p=argparse.ArgumentParser();p.add_argument('--tag',choices=('r24b-nt31-image-entry','r24c-nt31-registermac-order','r24d-nt31-usb-fullmac','r24e-nt31-client-policy','r24f-nt31-client-coldboot'),default=TAG)
     TAG=p.parse_args().tag;main()

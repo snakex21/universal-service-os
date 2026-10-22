@@ -32,7 +32,7 @@ def scalar(v):
 def policy_services(values,prefix):
     # Presence/start only, never enumerate arbitrary values or user data.
     result={}
-    for name in ('lanmanworkstation','lanmanserver','rasman','remoteaccess','rasasync','rasndis','ndiswan'):
+    for name in ('lanmanworkstation','lanmanserver','browser','rasman','remoteaccess','rasasync','rasndis','ndiswan'):
         rows=values.get(prefix+name);record=dict(present=rows is not None)
         if rows is not None and 'start' in rows:record['start']=scalar(rows['start'])
         result[name]=record
@@ -95,6 +95,8 @@ def main():
                 except SystemExit:evidence['files'][name]=dict(present=False);continue
                 (OUT/name).write_bytes(data)
                 evidence['files'][name]=dict(present=True,size=len(data),sha256=digest(data))
+            data=fat.file_data(fs,'USOS/NET31/NET31CFG.EXE',65536)[0]
+            evidence['files']['NET31CFG.EXE']=dict(present=True,size=len(data),sha256=digest(data),matches_preparation=digest(data)==prep['helper_sha256'],actual_installed_imports=pre.imports_against(data,modules))
         finally:fs.f.close()
     if sha(target)!=before:raise ValueError('Read-only target changed')
     evidence.update(temporary_raw_removed=not raw.exists(),target_unchanged=True,original_base_unchanged=sha(Path(prep['base']))==prep['base_sha256'],standalone_ms_modules_exported=False)
