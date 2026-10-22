@@ -1,14 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Block on one outstanding RFB incremental update. Rearm only after its
- * reply; no timer, process/disk sampling, QMP query or persisted pixels.
- * QEMU reverse-connects after our READY notification. Only page roles leave
- * this process; the private framebuffer is erased before release.
+ * reply; no timed screen query, process/disk sampling or persisted pixels.
+ * QEMU reverse-connects after our READY notification. Only page roles and
+ * unsupported public-heading hashes leave; the framebuffer is erased.
  */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
+#include <time.h>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -19,14 +23,85 @@ typedef SOCKET Socket;
 #include <sys/un.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/select.h>
 typedef int Socket;
 #define INVALID_SOCKET (-1)
 #define CLOSE close
 #endif
 #include "win95_ui_classify.h"
 #define MAX_SIDE 2048U
+#ifndef WIN95_UI_STABLE_MS
+#define WIN95_UI_STABLE_MS 3000U
+#endif
+#ifndef WIN95_UI_UNSUPPORTED_MS
+#define WIN95_UI_UNSUPPORTED_MS 30000U
+#endif
+#ifndef WIN95_UI_READY_BUTTON_HASH
+#define WIN95_UI_READY_BUTTON_HASH UINT64_C(0x298c8b8f1795477c)
+#endif
 static unsigned char *pixels;
 static unsigned width, height;
+typedef struct {
+    const char *role;
+    uint64_t heading, button, deadline;
+    int unsupported;
+} Gate;
+static uint64_t monotonic_ms(void)
+{
+#ifdef _WIN32
+    return GetTickCount64();
+#else
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC,&now)) return 0;
+    return (uint64_t)now.tv_sec*1000+(unsigned long)now.tv_nsec/1000000;
+#endif
+}
+static int next_button_role(const char *role)
+{
+    size_t length=strlen(role);
+    if (length==sizeof("restart")-1 && !memcmp(role,"restart",sizeof("restart")-1)) return 0;
+    if (length==sizeof("reboot-confirm")-1 && !memcmp(role,"reboot-confirm",sizeof("reboot-confirm")-1)) return 0;
+    return 1;
+}
+static void gate_update(Gate *gate, const char *role, const char *previous)
+{
+    uint64_t heading,button;
+    int unsupported;
+    if (width!=640 || height!=480 || !strcmp(role,"busy")) { gate->role=NULL; return; }
+    heading=fingerprint(pixels,width,104,90,480,24);
+    button=fingerprint(pixels,width,425,395,32,10);
+    unsupported=!strcmp(role,"unknown");
+    if ((!unsupported && !strcmp(role,previous)) ||
+        ((unsupported || next_button_role(role)) && button!=WIN95_UI_READY_BUTTON_HASH)) {
+        gate->role=NULL; return;
+    }
+    if (gate->role && !strcmp(role,gate->role) && gate->heading==heading &&
+        gate->button==button && gate->unsupported==unsupported) return;
+    gate->role=role; gate->heading=heading; gate->button=button;
+    gate->unsupported=unsupported;
+    gate->deadline=monotonic_ms()+(unsupported ? WIN95_UI_UNSUPPORTED_MS:WIN95_UI_STABLE_MS);
+}
+/* Block for a real wire event or the single pending paint-stability deadline.
+ * No screen/status query or request is sent when this deadline fires. */
+static int wait_wire(Socket s, const Gate *gate)
+{
+    fd_set readset;
+    struct timeval timeout,*limit=NULL;
+    int result;
+    FD_ZERO(&readset); FD_SET(s,&readset);
+    if (gate->role) {
+        uint64_t now=monotonic_ms(),left=gate->deadline>now ? gate->deadline-now:0;
+        timeout.tv_sec=(long)(left/1000); timeout.tv_usec=(long)((left%1000)*1000);
+        limit=&timeout;
+    }
+#ifdef _WIN32
+    result=select(0,&readset,NULL,NULL,limit);
+#else
+    result=select(s+1,&readset,NULL,NULL,limit);
+    if (result<0 && errno==EINTR) return 2;
+#endif
+    return result<0 ? -1:result;
+}
 static unsigned u16(const unsigned char *p) { return ((unsigned)p[0]<<8)|p[1]; }
 static uint32_t u32(const unsigned char *p) { return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3]; }
 static void put16(unsigned char *p, unsigned v) { p[0]=(unsigned char)(v>>8); p[1]=(unsigned char)v; }
@@ -72,6 +147,7 @@ static int watch(Socket s)
     unsigned char b[32], row[MAX_SIDE*4];
     unsigned n,i,y,x,w,h,xx,yy;
     const char *previous="unknown", *role;
+    Gate gate={0};
     /* The reverse endpoint is owned QEMU; still validate every wire bound. */
     if (!exact(s,b,12,0) || memcmp(b,"RFB 003.008\n",12)) return 2;
     memcpy(b,"RFB 003.008\n",12);
@@ -94,6 +170,18 @@ static int watch(Socket s)
     b[8]=255; b[9]=255; b[10]=255; b[11]=33;
     if (!exact(s,b,12,1) || !request(s,0)) return 2;
     for (;;) {
+        int ready=wait_wire(s,&gate);
+        if (ready<0) return 2;
+        if (ready==2) continue; /* Interrupted wait: recompute its deadline. */
+        if (!ready) {
+            if (gate.unsupported) {
+                printf("unsupported %016llx\n",(unsigned long long)gate.heading);
+                fflush(stdout); return 4;
+            }
+            printf("page %s\n",gate.role); fflush(stdout);
+            previous=gate.role; gate.role=NULL;
+            continue;
+        }
         if (!exact(s,b,1,0)) return 0;
         if (b[0]==2) continue; /* Bell has no payload. */
         if (b[0]!=0 || !exact(s,b,3,0)) return 2;
@@ -106,6 +194,7 @@ static int watch(Socket s)
             if (encoding==UINT32_C(0xffffff21)) {
                 if (x || y || !resize(w,h)) return 2;
                 previous="unknown";
+                gate.role=NULL;
                 continue;
             }
             if (encoding || !w || !h || x>width || y>height || w>width-x || h>height-y) return 2;
@@ -118,9 +207,7 @@ static int watch(Socket s)
             }
         }
         role=win95_classify(pixels,width,height);
-        if (strcmp(role,"unknown") && strcmp(role,"busy") && strcmp(role,previous)) {
-            printf("page %s\n",role); fflush(stdout); previous=role;
-        }
+        gate_update(&gate,role,previous);
         if (!request(s,1)) return 2;
     }
 }

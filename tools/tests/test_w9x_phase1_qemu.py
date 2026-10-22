@@ -130,6 +130,15 @@ class Phase1Vm(unittest.TestCase):
         self.assertFalse((self.tmp/'args.txt').exists())
         self.assertIn('keymap missing',(self.tmp/'run/event-errors.log').read_text())
 
+    def test_unsupported_95_page_stops_without_typing(self):
+        self.event_helper.write_text('#!/bin/sh\necho ready\nsleep .2\necho "unsupported c001cafe"\nexit 4\n',newline='\n')
+        rc,out,err=self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
+            W9X_VM_KEY='98765001234554321',W9X_FAKE_SLEEP='2')
+        self.assertIn('rc=2',out,err)
+        self.assertIn('public heading hash=c001cafe',(self.tmp/'run/event-errors.log').read_text())
+        command=(self.tmp/'run/command.txt').read_text()
+        self.assertNotIn('95 input:',command);self.assertNotIn('98765',command)
+
     def test_the_key_is_typed_once_idle_and_never_logged(self):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')

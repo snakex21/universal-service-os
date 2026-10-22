@@ -5,6 +5,9 @@ import socket
 import struct
 import subprocess
 import unittest
+import queue
+import threading
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/win95-events'
@@ -30,17 +33,23 @@ class RfbEvents(unittest.TestCase):
         for byte in bytes((0x33,0x22,0x11))*(480*24):
             value=((value^byte)*1099511628211)&((1<<64)-1)
         profile=OUT/'synthetic-profile.h'
-        profile.write_text('static const Page pages[] = {{"coa", UINT64_C(0x'+format(value,'016x')+'), 0, 0, 0, 0, 0}};\n')
+        button=14695981039346656037
+        for byte in bytes((0x33,0x22,0x11))*(32*10):
+            button=((button^byte)*1099511628211)&((1<<64)-1)
+        profile.write_text('#define WIN95_UI_READY_BUTTON_HASH UINT64_C(0x'+format(button,'016x')+')\n'
+            'static const Page pages[] = {{"coa", UINT64_C(0x'+format(value,'016x')+'), 0, 0, 0, 0, 0}};\n')
         cls.synthetic=OUT/'win95-rfb-synthetic.exe'
         subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-std=c11','-O2',
             '-Wall','-Wextra','-Werror','-DWIN95_UI_PROFILE_TEST_HEADER="'+profile.as_posix()+'"',
+            '-DWIN95_UI_STABLE_MS=150','-DWIN95_UI_UNSUPPORTED_MS=300',
             str(ROOT/'tools/win95_rfb_events.c'),'-o',str(cls.synthetic),'-lws2_32'],check=True,capture_output=True)
 
     def setUp(self):
         with socket.socket() as temporary:
             temporary.bind(('127.0.0.1',0))
             port = temporary.getsockname()[1]
-        executable=self.synthetic if self._testMethodName=='test_recognized_role_and_private_field_updates' else self.exe
+        executable=self.synthetic if (self._testMethodName=='test_recognized_role_and_private_field_updates'
+            or self._testMethodName.startswith('test_gate_')) else self.exe
         self.process = subprocess.Popen([str(executable),'--tcp-test',str(port)],
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,
             env=dict(os.environ,TEMP=str(OUT),TMP=str(OUT)))
@@ -102,6 +111,66 @@ class RfbEvents(unittest.TestCase):
         self.update(x=120,y=200,data=bytes((99,98,97,0)))
         self.assertEqual(exact(self.peer,10),struct.pack('>BBHHHH',3,1,0,0,640,480))
         self.finish() # no duplicate role and no field pixels on stdout
+
+    def gate_frame(self):
+        self.update(width=640,height=480,data=bytes((0x11,0x22,0x33,0))*(640*480))
+        self.assertEqual(exact(self.peer,10),struct.pack('>BBHHHH',3,1,0,0,640,480))
+
+    def role_reader(self):
+        result=queue.Queue()
+        thread=threading.Thread(target=lambda:result.put(self.process.stdout.readline()),daemon=True)
+        thread.start()
+        return result,thread
+
+    def test_gate_disabled_next_cancels_pending_input(self):
+        self.hello();self.gate_frame()
+        self.update(x=425,y=395,width=32,height=10,data=b'\0'*32*10*4)
+        exact(self.peer,10)
+        result,reader=self.role_reader()
+        with self.assertRaises(queue.Empty):result.get(timeout=.3)
+        self.update(x=425,y=395,width=32,height=10,data=bytes((0x11,0x22,0x33,0))*32*10)
+        exact(self.peer,10)
+        with self.assertRaises(queue.Empty):result.get(timeout=.05)
+        self.assertEqual(result.get(timeout=3),b'page coa\r\n');reader.join()
+        # Publishing after the one deadline must not send another RFB request.
+        self.peer.settimeout(.2)
+        with self.assertRaises(socket.timeout):self.peer.recv(1)
+        self.peer.settimeout(3);self.finish()
+
+    def test_gate_changed_heading_cancels_pending_role(self):
+        self.hello();self.gate_frame()
+        self.update(x=104,y=90,data=b'\x03\x02\x01\0');exact(self.peer,10)
+        data=bytearray(bytes((0x33,0x22,0x11))*480*24);data[:3]=bytes((1,2,3))
+        heading=14695981039346656037
+        for byte in data:heading=((heading^byte)*1099511628211)&((1<<64)-1)
+        self.assertEqual(self.process.stdout.readline(),f'unsupported {heading:016x}\r\n'.encode())
+        self.finish(4)
+
+    def test_gate_unknown_disabled_page_keeps_blocking(self):
+        self.hello()
+        frame=bytearray(bytes((0x11,0x22,0x33,0))*(640*480))
+        frame[(90*640+104)*4:(90*640+104)*4+4]=b'\x03\x02\x01\0'
+        for y in range(395,405):frame[(y*640+425)*4:(y*640+457)*4]=b'\0'*32*4
+        self.update(width=640,height=480,data=frame);exact(self.peer,10)
+        self.peer.settimeout(.4)
+        with self.assertRaises(socket.timeout):self.peer.recv(1)
+        self.peer.settimeout(3);self.finish()
+
+    def test_gate_private_field_paints_do_not_postpone_public_readiness(self):
+        self.hello();self.gate_frame()
+        result,reader=self.role_reader();errors=[]
+        def field_paints():
+            try:
+                for shade in range(12):
+                    time.sleep(.05)  # Scripted private-edit/caret paint events.
+                    self.update(x=120,y=200,data=bytes((shade,shade,shade,0)))
+                    exact(self.peer,10)
+            except Exception as error:errors.append(error)
+        producer=threading.Thread(target=field_paints,daemon=True);producer.start()
+        self.assertEqual(result.get(timeout=.5),b'page coa\r\n')
+        reader.join();producer.join(timeout=3)
+        self.assertFalse(producer.is_alive());self.assertEqual(errors,[])
+        self.finish()
 
     def test_resize_changes_subscription_bounds(self):
         self.hello()

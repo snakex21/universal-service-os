@@ -83,6 +83,11 @@ EOF
                     break
                 fi
                 ;;
+            unsupported)
+                printf 'Windows 95 page unsupported; public heading hash=%s\n' "$value" >> "$W9X_VM_RUN/event-errors.log"
+                result=2
+                break
+                ;;
             exit) rc=$value; break ;;
             *) result=2; break ;;
         esac
