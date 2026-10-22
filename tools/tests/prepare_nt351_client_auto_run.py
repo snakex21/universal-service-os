@@ -14,6 +14,17 @@ TAG = 'nt351-client-auto-fresh01'
 def sha(data): return hashlib.sha256(data).hexdigest()
 
 
+def policy_collector(text):
+    """Exact351 own-name replacement, never a chained version substitution."""
+    original = "FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256')"
+    limit = 'MAX_TOTAL=5*MAX_FILE+4096'
+    if text.count(original) != 1 or text.count(limit) != 1 or 'CLNT3511' in text:
+        raise ValueError('Exact original351 collector contract required')
+    return text.replace(original,
+        "FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256','CLNT351.REQ','CLNT351.LOG','CLNT351.ERR','C351NET.LOG')").replace(
+        limit, 'MAX_TOTAL=9*MAX_FILE+4096')
+
+
 def main():
     manifest = json.loads((SOURCE/'harness-manifest.json').read_text(encoding='utf-8'))
     harness = HERE/'harness'
@@ -25,10 +36,7 @@ def main():
         if sha(data) != row['private_sha256']: raise ValueError('Closed frozen harness changed: '+leaf)
         text = data.decode('utf-8').replace(repr(str(OLD)),repr(str(ROOT)))
         if leaf == 'collect_nt351_success.py':
-            original = "FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256')"
-            if text.count(original) != 1: raise ValueError('Collector source contract changed')
-            text = text.replace(original, "FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256','CLNT3511.REQ','CLNT3511.LOG','CLNT3511.ERR','C351NET.LOG')")
-            text = text.replace('MAX_TOTAL=5*MAX_FILE+4096','MAX_TOTAL=9*MAX_FILE+4096')
+            text = policy_collector(text)
         compile(text,str(harness/leaf),'exec')
         private = text.encode('utf-8')
         (harness/leaf).write_bytes(private)

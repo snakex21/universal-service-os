@@ -1,0 +1,122 @@
+{
+  "compiled_source_commit": "aa225ad6",
+  "compiled_sources": {
+    "tools/nt3/usosnt3/src/usosnt3.c": "9726f5209c2890b6a10fba7132a471c260ad3710402ae9b34f263232ee394fc0",
+    "tools/nt3/usosnt3/src/client_prepare.h": "4acbb76e94f5352cc07a6d6c5bb39c49d1dafbd7882b0924b2e856b20246544a"
+  },
+  "build_record_reported_base_HEAD": "664d721ef1f070c9d8cce5144039d0f7c04c387f",
+  "baseline_HEAD_record_note": "Build ran with pending own source hunks; exact source/header hashes bind compiled bytes to later aa225ad6, not unmodified664d721e",
+  "actual_post_sha256": "615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b",
+  "actual_post_bytes": 30208,
+  "original351_imports": 50,
+  "original351_preflight_sha256": "15fac5b6e7f0f7ce7d3eaabe84c61566958c64c406b54d603ab809d4e8d10fb9",
+  "frozen_start_commit": "874c4bf1",
+  "later_host_tests_commit": "89bdf52d",
+  "guest_package_changed_after_start": false,
+  "historical_private_harness_unchanged": true,
+  "first_collector_policy_name_typo": "CLNT3511, preserved in its immutable manifest/zip/collection",
+  "recovery": "Stopped bounded FAT read, own CLNT351 request/log exact-public-byte match; ERR missing by directory lookup; no new VM or hive/OS export",
+  "stopped_readback_scope_text_note": "Historical scope string says four, but actual explicitly selected service rows are the six listed in readback and evaluation; future source wording corrected",
+  "completed_C_evidence": {
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\cleanup.json": {
+      "bytes": 84,
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\command.json": {
+      "bytes": 1451,
+      "sha256": "2e2c27644e54a597ab19dbac57d7c8f3a077c4e3cbfffea227f9769191695f87"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\endpoint.png": {
+      "bytes": 121959,
+      "sha256": "7fc7b0f8fb2d4a8f7fa03e23c2f85efcefb800cc3828feaab7a8e087228903e2"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\final.png": {
+      "bytes": 157270,
+      "sha256": "f370de9c9332ad5ff15924e98b1e08c1d7a21142527960e25ea21d2882575081"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\fixture.json": {
+      "bytes": 1566,
+      "sha256": "32b71c19fccbe9c92214002b89148203295603991f113d9b0def8e7d7b9cca68"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\network.json": {
+      "bytes": 877,
+      "sha256": "adb366f5e8cbc8ea1ac740ab2260687b10bf0558a0b2fe427bec7a17f7b161b6"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\network.pcap": {
+      "bytes": 26849,
+      "sha256": "134b9e769bb51459b1d372710024de0d93ccb582aaf8a0bc68a0f0a3fe5321c2"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-01.png": {
+      "bytes": 92218,
+      "sha256": "3c1eae9e6c8f8cbb2c2ef3ceb6b8890d0be4af12a3474318aaa45e30387b5cd8"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-02.png": {
+      "bytes": 96208,
+      "sha256": "ec81ab6214c19ce9ca8790884561bc6dbb6272eeba8c1db825ef59a5286821aa"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-03.png": {
+      "bytes": 96600,
+      "sha256": "07167f1635f89335b37e2b52d1223cb074c144eeeb2a3b3bfce08af8a9d83746"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-04.png": {
+      "bytes": 99467,
+      "sha256": "5bf743c51cd110a16d7b4dc90cbeb2a16f73623d33e1538734aaf61d60e04c14"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-05.png": {
+      "bytes": 99964,
+      "sha256": "f8d8f3bb18c3c7f2ce27978b8de9f1fbc7485192499b79427ceff3624baac944"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-06.png": {
+      "bytes": 100612,
+      "sha256": "339bd08e2e0bfe3715ea5262b23054f737e5d20fed452cda76d7e531be505684"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-07.png": {
+      "bytes": 100248,
+      "sha256": "677f7d1304fe5dfd2be635a30c4e92c0b60327a564d77222acc6839712738465"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-08.png": {
+      "bytes": 103250,
+      "sha256": "8d5421d86e42da8e74461752e537917e1bd728cfebd4b097737e1954aae4555a"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-09.png": {
+      "bytes": 94529,
+      "sha256": "9dcb0419d235ea80505c59a9a24db2fe7d0c8db3eeb40f6fb264c09eda65f479"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-10.png": {
+      "bytes": 94324,
+      "sha256": "045e44b5c61d61ee9375b7a9b5b32e9d4b10b38feae370fec40781d4ec8d00f3"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-11.png": {
+      "bytes": 157270,
+      "sha256": "f370de9c9332ad5ff15924e98b1e08c1d7a21142527960e25ea21d2882575081"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\operator-actions.jsonl": {
+      "bytes": 997,
+      "sha256": "b1018ab5be23b5be86ab96069212e6037fc2d4ede4c9d934226e2e973a9ea7a1"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\result.json": {
+      "bytes": 2934,
+      "sha256": "4de37e95ba4f1d3f568ee366198b4dd5e28b7221c6306e5cc74964ce756976d3"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\serial.log": {
+      "bytes": 40347,
+      "sha256": "ef6e02643d58dbf141185f57894feff835467ecfea5e50a86dacbb39337b6f2e"
+    },
+    "artifacts\\coverage\\vm\\nt351-client-auto-fresh01\\stderr.log": {
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    }
+  },
+  "public_native_log_sha256": "41b0d8aad5c1c444e9927fe9884cb0170ecaf20ec23948242effbdff8479342c",
+  "original_fresh351_policy_failure_preserved_commit": "664d721e",
+  "current_qualification": "Exact NT351 f579/POST615 PROFILE fresh install",
+  "other_NT35_tuple": "d94/POST87cb; separate agent; POST615 no native35 PASS",
+  "physical_write": false,
+  "merge_push_deploy": false,
+  "new_MS_modules_or_hives_exported": false,
+  "targeted_host_unittest_methods_PASS": 32,
+  "actual_common_C_scenarios": 50,
+  "actual351_takeover_scenarios": 15,
+  "tracked_text_snapshots_normalized_LF": true,
+  "original_C_raw_evidence_unchanged": true
+}

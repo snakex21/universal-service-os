@@ -19,3 +19,6 @@ Independent active35 tuple remains driverd94/POST87cb4325…449f; this351 tuple 
 
 
 While the frozen VM runs, independent host-only negatives expanded the common actual C contract to50scenarios across the two explicit minors, including wrong registry value type/size before any write. Three additional cache-delta and three existing selected-reader tests pass, plus three tests execute the actual newAUTO reader with its exact six-service allowlist, wrongDWORDtype/length and unselected controlsets. Total27targeted unittest methods pass; the running POST/header/cache/harness remain unchanged. No native result is inferred from these host tests.
+
+
+Completed actual qualification: **fresh exact WorkstationEN PROFILE desktop + client-no-sharing + nativeLAN PASS**; nativeSafe11/QMP0/parent0, SYSf579/POST615 exact, six-service stopped readback confirmed. See `docs/nt351-auto-client-qualification.md`. First collector CLNT3511 typo remains historical; exact public351 records were separately recovered via bounded stopped FAT RAM comparison.32targeted testsPASS. Original fresh351 policyFAIL and separate35/87cb tuple remain unchanged.

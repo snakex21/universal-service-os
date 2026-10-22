@@ -1,4 +1,4 @@
-"""After confirmed exit, read own SYS and four service Start DWORDs in RAM.
+"""After confirmed exit, read own SYS and six service Start/Type DWORD pairs in RAM.
 
 No hive, OS file, key or arbitrary registry field is written outside the
 owned whole-disk image on G. This reader never changes a service or boots VM.
@@ -56,11 +56,23 @@ def main():
     subprocess.run([str(h.QIMG),'convert','-f','qcow2','-O','raw',str(target),str(raw)],env=env,check=True)
     fs=h.BoundedFat(raw)
     native=None
+    own_policy={}
+    expected_policy={
+        'CLNT351.REQ':b'USOS NT351 client-no-sharing\r\n',
+        'CLNT351.LOG':b'configuration_readback=match\r\nBrowser=absent-or-Disabled\r\nLanmanServer=Disabled\r\nLanmanWorkstation=unchanged\r\nTcpip=unchanged\r\nnext_target_boot_required=true\r\ninstalled_runtime_pass=false\r\nclient_policy_runtime_pass=false\r\n',
+    }
     try:
         if fs.fat32 or fs.base!=32256 or fs.bps!=512:raise ValueError('Exact normal-flow FAT16 layout required')
         own,_=h.file_data(fs,'WINNT/SYSTEM32/DRIVERS/usosnet351.sys',17024)
         post,_=h.file_data(fs,'USOS/NT3/USOSNT3.EXE',30208)
         system,_=h.file_data(fs,'WINNT/SYSTEM32/CONFIG/SYSTEM',4*1024**2)
+        for leaf in ('CLNT351.REQ','CLNT351.LOG','CLNT351.ERR'):
+            try:data,_=h.file_data(fs,'USOS/NT3/'+leaf,4096)
+            except SystemExit:
+                own_policy[leaf]={'present':False};continue
+            own_policy[leaf]={'present':True,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+            if leaf in expected_policy:
+                own_policy[leaf]['matches_exact_public_record']=data==expected_policy[leaf]
         try:native,_=h.file_data(fs,'USOS/NT3/C351NET.LOG',16384)
         except SystemExit:pass
     finally:fs.f.close()
@@ -69,12 +81,13 @@ def main():
     version=struct.unpack_from('<II',system,20)
     if system[:4]!=b'regf' or version!=(1,2) or system[4:8]!=system[8:12] or h.hive.checksum(system)!=struct.unpack_from('<I',system,508)[0]:
         raise ValueError('Measured clean REGF1.2 SYSTEM required')
+    if any(not own_policy.get(leaf,{}).get('matches_exact_public_record') for leaf in expected_policy) or own_policy['CLNT351.ERR']['present']:raise ValueError('Requested exact public policy completion/refusal evidence mismatch')
     policy=policy_values(h.hive.read_hive_content(system))
     if digest(target)!=target_hash:raise ValueError('Stopped source changed during readback')
     record=dict(stopped=True,qemu_returncode=0,target_sha256=target_hash,driver_sha256=DRIVER,driver_bytes=17024,
         post_sha256=hashlib.sha256(post).hexdigest(),post_bytes=len(post),hive_version=version,system_sha256=hashlib.sha256(system).hexdigest(),policy=policy,
-        no_hive_export=True,no_ms_binary_export=True,registry_modified=False,
-        scope='Four allowlisted service Start/Type values only; runtime services require native net start evidence')
+        own_policy_records=own_policy,policy_records_RAM_only_exact_match=True,no_hive_export=True,no_ms_binary_export=True,registry_modified=False,
+        scope='Six allowlisted service Start/Type values only; runtime services require native net start evidence')
     if native is not None:
         if b'\0' in native or any(v<32 and v not in (9,10,13) for v in native):raise ValueError('Expected bounded native service text')
         (HERE/'C351NET.LOG').write_bytes(native)

@@ -1,0 +1,31 @@
+# Fresh NT3.51 AUTO client-only qualification
+
+**PASS for the exact normal USOS fresh Workstation EN PROFILE fixture**: real Program Manager 3.51 desktop, Workstation/DHCP running while Server/ComputerBrowser were absent from native `net start`, native DHCP release/renew, gateway ping3/3, strict DNS, native safe shutdown and two stopped own-driver readbacks. This is not a COW reuse or inner NIC-less/DONE inference. The new standalone blank 4 GiB target has no backing image. Elapsed 2612.14 s; parent/QEMU/readonlycollector all rc0, collector 22.95 s.
+
+Original archive SHA256 `24adda13744589cacebf6a75e21bf8999465b5637235ce55b0cf3a7578aa7975`; original WorkstationEN ISO `b9d0e8417c1f502d1de22c249401b593be2a7fe59524b27a624dfa8dedaa099c`; installed Windows 3.51 build 1057. Normal 8 GiB reserve and real Windows ConsoleMode/isatty guards passed before the single launch. Exact future ReadDirectoryChangesW subscribers retained target/stick/vars by hardlink metadata only before any content read. Every native action had its exact future frame event; no progress polling occurred.
+
+| Component | Actual pin / outcome |
+|---|---|
+| Own SYS 17024 B | `f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf` |
+| Own POST 30208 B / PE3.10 | `615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b` |
+| Frozen logger 1023488 B | `ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7` |
+| Private initrd | `91c1d72c8d1718cb47e313076cae27c0b21494a0a4ab42c508aca90fa4451c64` |
+| Stopped target | `915f6945b90cd9fb627160b22136c54bedecfed6d4ef8e8d323e0d626c9e067e` |
+| Current/Default controlset | 1/1, cleanREGF1.2 |
+| Browser / LanmanServer | Start4/Type32, each |
+| LanmanWorkstation / Tcpip | Start2/Type32; Start3/Type1 |
+| NDISLoop / USOSNT3 | Start2/Type1; Start4/Type16 |
+
+The actual installed POST/SYS match cache/build pins. All 50 static POST imports resolved against original NT351 KERNEL32/ADVAPI32 exports read only in RAM from the completed original baseline; no standalone Microsoft module/hive was exported. The canonical small POST build reported its then-baseline HEAD 664d721e with pending own hunks; the exact compiled source/header hashes are independently bound to committed aa225ad6. Frozen cache changes exactly POST + nt351 network script + target script;829 other effective entries and all other cache files remain identical. Both old qualified cache and the candidate were rehashed after runtime. Original USB/logger and storage/log features remain. The outer QEMU hardware argv matches previous fresh351 after only case-tag/localhost-port normalization.
+
+Native frames: endpoint desktop;02/03 native SCM list;04 DHCP 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3;06 native ping 3/3 with **10 ms, <10 ms, <10 ms**;08 strict DNS IDs D69F/DFE6/BE54;11 native safe-off. Explicit once-only logger completed one snapshot in 11807 ms, matched ICMP RTT 0, strict UDP DNS 1.1.1.1 in 80 ms and 8.8.8.8 in 50 ms, TCP DNS 1.1.1.1 connect 40 ms, native frogfind resolution 131 ms. Strict peer/ID/question checks belong to the two fixed UDP peers and TCP1.1.1.1; native configured resolution is separate evidence. We do not claim a strict matched configured10.0.2.3 packet. HTTP 68k returned 200/connect 130 ms. Gateway UDP53/no reply 3000 ms, gateway TCP80 and frogfind HTTP connect 4006 ms timeout negatives remain.
+
+Capture is uncapped 99 frames/26849 B, SHA256 `134b9e769bb51459b1d372710024de0d93ccb582aaf8a0bc68a0f0a3fe5321c2`. Expected WinError64 at a clean controlled shutdown boundary was distinguished from truncation and accepted by the already qualified capture code. Its original strict same-XID DORA/ICMP/DNS analyzer defaults remain false; nativeDHCP evidence and the guest's strict matched probes independently establish this LAN result. Actual DHCP packet metadata are retained in the separate evaluation, without rewriting automatic fields.
+
+The frozen first collector had my filename typo `CLNT3511.REQ/LOG/ERR`. Its first result and immutable harness remain unchanged: it collected the six intended network/native files and exact SYS hash but reported those three wrong names missing. This is a harness collection defect, not a Windows policy failure. The stopped bounded FAT reader then read exactly the real own `CLNT351.REQ` (30 B) and `CLNT351.LOG` (223 B), compared them in RAM to fixed public bytes, and confirmed ERR absent; no new VM was started. Their hashes are cf4b2cf2c614e78c7377a5dc8266721d9efef556c0ed09b58ee4dd8b17f0dfdf and86679faa05d789e84b9e01602f3bf636b3af7d4100e8a3e99c5f20e3ccd7f183. Existing six-service selectedDWORDs and actual native SCM jointly confirm the policy. No raw hive/value dump left RAM. The future collector transform is corrected with duplicate/wrong-version/typo negatives. The readback's historical human-readable scope label still says four; its actual allowlist/output is the six explicit services above, and future wording is fixed.
+
+**32 targeted unittest methods PASS**, including50 actual common C cases across explicit 50/51 configs,15 actual 351 takeover cases, actual DONE/restart/checked-write failure paths, scope/version selectors, cache-delta guards, exact selected-DWORD output and corrected collector-name/nativefield-format negatives. The exact sources, current evaluation, original-import proof, historical typo result and C-evidence hashes are tracked under `tools/tests/nt351_auto_snapshot`. All public operator frames, complete own logs, transport, PCAP and source snapshots remain under the project's C artifacts.
+
+Retained own images are in `G:\USOS-Kolekcja\_vm\nt351-client-auto-fresh01`: target-retained.qcow2, stick-retained.qcow2 and vars-retained.fd. No cleanup of this new case has been authorized/performed. Whole-disk readback scratch was removed after literal-path checks; no physical disks or USB hub/source were changed. The old fresh 351 Browser/Server RUNNING/Start2 FAIL in 664d721e remains immutable. NT35 continues its separate frozen d94/POST87cb tuple: host 50 core tests and source refactor do not give615 a native 35 PASS. No fresh DEFAULT/USER/Server/NT31, USB out/in/MSC, physical X470/I211, full IRQ route, general SMP or whole-release PASS is added.
+
+Tracked JSON/JSONL copies use LF for review; original C artifacts and their raw-byte hashes remain unchanged.
