@@ -15,7 +15,10 @@ class EvidenceTests(unittest.TestCase):
     def test_nt4_hid_and_separate_lan_keep_storage_and_source_guards(self):
         exact=list(audit.NT4_CANDIDATE03_ROW)
         usb,net=audit.capability(exact)
-        self.assertIn('brak MSC PASS',usb)
+        self.assertIn('QEMU PASS MSC04 [S17]',usb)
+        self.assertIn('frozenUSB313952/43648B',usb)
+        self.assertIn('auto-refresh nie jest PASS',usb)
+        self.assertIn('bez fresh AUTO/HID na tym SYS/X470 PASS',usb)
         self.assertIn('QEMU PASS LAN07 [S16]',net)
         self.assertIn('strict configuredUDP DNS10.0.2.3',net)
         self.assertIn('oldSYS4f2',net)
