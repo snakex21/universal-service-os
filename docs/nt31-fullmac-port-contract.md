@@ -505,3 +505,30 @@ a following unchanged-binary overlay will assess that coexistence separately.
    readback with the same pins. R24c is installed-overlay qualification,
    not fresh automatic network-installation PASS. Workstation/server and
    Dial-Up policy still need narrowly scoped presence/runtime evidence.
+
+
+### R24d USB/full-MAC coexistence: PASS, client policy: FAIL
+
+The empty COW of stopped R24c retained the same b49 SYS and f537 frozenUSB.
+Program Manager returned (02). Keyboard absent Alt-F/R did not open Run(03);
+after insertion the identical shortcut opened Run(05). With mouse absent,
+USB keyboard closed Run/opened File(06) and opened Run again(07). Reinserted
+mouse moved(09/11); the separate click12 opened File. Click10 had hit the
+title bar and is not counted as menu activation. Original native ping after
+all replug actions returned3/3(15). No NCPA/network/binary changes were made.
+
+The native service list14 revealed a distinct policy failure: Workstation,
+TCP/IP Protocol AND Server were running. Stopped readback confirmed
+LanmanWorkstation Start2 and LanmanServer Start2. It found none of selected
+RASMAN/RemoteAccess/RASASYNC/RASNDIS/NDISWAN services; this alone does not
+prove full Dial-Up installation absence. This run was not changed to hide
+the failure. A separate owned configuration correction must stop and disable
+the existing Server service and verify client/TCPIP after a following boot.
+
+Native shutdown safe17, QMP quit0,824.69s. Stopped SYSb49/USBf537 and
+ i8042prtStart4/USBStart0 unchanged; base unchanged; whole-raw scratch removed.
+Target4275a361611d238c1f3fb9c61f6aa9a7ec792474c4f865f64b1dcf5ed7843750.
+Assessment artifacts/nt31-fullmac-runtime/r24d-usb-evaluation.json; readback
+r24d-stopped-readback/readback.json. Only SVC31/PING31 were issued in this
+boot; inherited CFG31/POST/NET31 are not new DNS/HTTP proof. Generic runner
+PASS flags remain false. No fresh automated network-installation PASS.
