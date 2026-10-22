@@ -62,8 +62,32 @@ Later qualification stays separate from the fresh desktop record:
   `dc757988b9634acaa03c5a4cb90d64e268c7109e62bdd88ea73b52cd8d0493fa`.
   Completed evidence: `nt4-usb-hid/artifacts/nt4-combo/evaluation.json`.
 
-The following coexistence test09 will evaluate LAN89b/Start2 together with
-USB313952 and isolated HID/MSC. The tests above do not grant it a result.
+Completed coexistence09 now has its own **basic LAN+HID+MSC PASS** in one
+installed BIOS/q35/AHCI/igb VM. Actual frozenUSB313952/43648B and NET89b/21248B
+were read back; i8042prt Start4, NDISLoop/Workstation Start2, Server/Browser
+Start4. Negative keyboard/mouse removal controls, typing/movement/click after
+reinsertion, all three MSC stages and persisted ROUNDTRIP are native proofs.
+The final native ping after all USB operations replies4/4 (16ms then three
+<10ms). Native safe-off36, QMP exit0 and stopped readback precede the strict
+readonly collector30.970s PASS. Actual first-logon/TESTNET_DONE, matched DORA,
+gateway and configuredDNS10.0.2.3:53/id706F/questionfrogfind all pass.
+
+Root independently reviewed native operator31 (persisted file) and33 (ping),
+then cross-checked the frozen payload pins, exact three MSC status0 values,
+strict collection flags and unchanged parent08. Completed target SHA256:
+`6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743`.
+Own evaluation JSON:
+`nt4-net/artifacts/nt4-success-review/candidate09-tuple-evaluation.json`,
+SHA256 `3792ae307bd09cf87751b24d5618e4a16e7f90a97e82e1b1dda49ae5c9ef1a64`.
+Strict collection:
+`artifacts/coverage/nt4-installed09-network-excerpt/collection.json`,
+SHA256 `c6f8e11b6e8c0a4686b05382fdc859fe612e6201687f3e714e1c874d33ae7d59`.
+
+The new Explorer right pane enumerates actual drives after removal/reinsert,
+but its left tree can retain stale E:. Automatic refresh remains unqualified.
+HTTP/browser, full IRQ route, complete fresh AUTO and X470 are not granted
+PASS by this basic coexistence test. Historical raw generic false fields
+are preserved; the own evaluation is an explicit separate qualification.
 
 No Server, other source/SP, fresh AUTO combined USB/network, full hardware
 or X470 qualification is inferred. Microsoft modules/hives stay in RAM or
