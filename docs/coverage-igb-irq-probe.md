@@ -49,3 +49,15 @@ No driver or firmware fix follows from those registers alone. Native
 Shutdown was observed in operator03, followed by QMP quit/rc0; hashes of
 the entire backing chain were unchanged. Details remain in the owned
 `artifacts/coverage/vm/r23b-nt351-irq-snapshot` evidence.
+
+Later passive event traces R25/R26 resolved the timing ambiguity without
+reading guest RAM or acknowledging registers through QMP. The backend
+used0x1500/1508/150C/1510 instead of canonical ICR/IMS/IMC/IAM atC0/D0/D8/E0.
+The control R25 had no canonical IMS writes or INTx/PICIRQ11 deliveries;
+the same installed diagnostic target with only the corrected own SYS
+had65 IMS writes,32 INTx asserts and31 PICIRQ11 deliveries, no watchdog
+fallback. Native ping improved from about2003ms to all three below10ms;
+strict guest DNS and HTTP also completed. Both runs native-shutdown/rc0,
+with the original backing chain unchanged. The independently reviewed
+driver fix is `fix/nt351-net-irq` b14378d8; it does not qualify X470 or a
+fresh installer containing that candidate.
