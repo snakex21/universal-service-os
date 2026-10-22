@@ -6,6 +6,11 @@ negatywnymi; START, HOTPLUG i ROUNDTRIP pozostały czytelne po replug nośnika.
 Natywne Shutdown/safe-off25, QMP exit0 i stopped readback są zakończone.
 Historyczny osobny HID2d455 zachowuje własny zakres i dowody.
 
+Po utrwaleniu wyników własne obrazy testowe usunięto zgodnie z osobnym
+[potwierdzeniem sprzątania](nt4-usb-image-cleanup.md). Opis obrazów i odczytów
+poniżej dotyczy stanu zakończonej kwalifikacji. Źródła, helpery, klatki,
+logi i przypięte metadane w C pozostają zachowane.
+
 Osobny test `nt4-installed03-usb-combo01` startuje z COW zamkniętego
 MSC04, target SHA256
 `a6807a432891b47ea20a4eb1650fc981ae8b7fdade6cec138d9ef03818b1de5c`.
@@ -125,7 +130,8 @@ Własne nośniki USB nie mają backing parent. Przyszłe wykonanie planu należy
 do root: najpierw zebranie dowodów i ustalenie zewnętrznych zależności,
 następnie ewentualnie dziecko combo01 przed rodzicem MSC04. Wspólny
 candidate03, wszystkie NET oraz wszystkie macOS, w tym odmówione02–04,
-pozostają poza planem. W tej pracy niczego z planu nie usunięto.
+pozostają poza planem. Commit6457ab4b utrwalił wyłącznie plan; późniejsze
+autoryzowane wykonanie opisuje `docs/nt4-usb-image-cleanup.md`.
 
 Do ręcznego potwierdzenia użytkownika: czy klawiatura, mysz i pliki nośnika
 po wyjęciu/włożeniu działają razem na tym samym sterowniku: TAK/NIE.
