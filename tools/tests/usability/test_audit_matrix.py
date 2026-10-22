@@ -101,6 +101,11 @@ class EvidenceTests(unittest.TestCase):
     def test_fresh_nt351_lan_keeps_diagnostic_usb_and_storage_separate(self):
         exact=[*audit.NT351_R18F_ROW,'unused','unused','unused','unused']
         usb,net=audit.capability(exact)
+        self.assertTrue(net.startswith('QEMU PASS AUTO351 [S22]'))
+        self.assertIn('blank target PROFILE',net)
+        self.assertIn('ping3/3 (10/<10/<10ms)',net)
+        self.assertIn('Brak strict configuredDNS10.0.2.3 packet PASS',net)
+        self.assertNotIn('[S22]',usb+audit.hid_test(usb,exact))
         self.assertNotIn('PASS',usb)
         self.assertIn('QEMU PASS R22',net)
         self.assertIn('świeży normalny USOS',net)
