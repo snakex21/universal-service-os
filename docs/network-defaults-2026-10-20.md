@@ -15,11 +15,18 @@ full Windows VM installation was performed for this change.
 | NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server and Browser services disabled | usosnet4.sys takes over the loopback adapter (USOSNET.REG, POST.CMD) for a matching card; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
 | 2000 | Microsoft client + TCP/IP; no MS_Server in NetServices | Existing usosnet, matching hardware only; OEM package and merged OemPnPDriversPath | IE settings and Favorites; existing `reg=` setup path seeds defaults too |
 
-NT4's loopback uses `192.0.2.1/24`, **not a usable LAN address or DHCP
+NT4's loopback uses `198.51.100.1/24`, **not a usable LAN address or DHCP
 lease**. It keeps TCP/IP installed until an NT4-compatible NIC driver is
 available. A loopback cannot obtain a LAN DHCP lease. It is independent of
 the temporary VM's emulated NIC and is not presented as successful LAN.
 The optional static LAN request is logged as deferred on NT4.
+
+The staging address was corrected on 2026-10-22 after original NT4 PL Setup
+reported TCPCFG string 25296. Its unattended validator rejects a zero in any
+address octet, including the former `192.0.2.1`. Bounded x86 execution of the
+original TCPCFG function at RVA `0x11562` rejects the old address and accepts
+the replacement. POST still replaces the loopback configuration with the
+requested LAN policy; this correction alone does not prove DHCP or LAN.
 
 On 9x, Setup is requested to install MSTCP even with no NIC. PnP and the
 inbox networking installer determine the resulting bindings. An unbound

@@ -782,3 +782,46 @@ caller moduł/RVA i numerictemplateID. Bez lpText/EDIT/frame/stosu dowolnych
 parametrów ani eksportu RAM. Najpierw synthetic adaptertest, dopiero potem
 normalny guard i pojedynczy start diagnostyczny. Nie zaplanowano kolejnej
 próby z samą szerszą listą zasobów. Żadna własna VM nie działa po12.
+
+
+2026-10-22 — konkretna blokada natywnego Setup NT4 (UI event 13–16)
+
+Próby 13–15 zakończyły się kontrolowanym QMP quit/rc0. Rozpoznały wywołanie
+MessageBoxW, ale bez przypisania caller do pierwotnej listy modułów; nie są
+dowodem błędu Windows ani ukończenia Setup. 16 utrzymała pojedynczy event
+paused, bez kolejnych identycznych bootów. LOW16 nie dało unikatowego wyniku.
+Ograniczona lista loadera (43 moduły, FS base → TEB → PEB → Ldr, układ
+potwierdzony z oryginalnego NTDLL) wskazała TCPCFG.DLL/RVA1154F. Odczytano
+BaseDllName tylko unikatowego modułu obejmującego caller, bez FullDllName.
+Hash TCPCFG z niezmiennego targetu zgadzał się z oryginalnym PL ISO:
+adbda98abbaf38f8272c28c312ffff559f023a8465f68e6f15b1c3cc4d424ad2.
+
+Po odrębnej zgodzie roota wybrany EBP i dokładnie jeden DWORD [EBP+4],
+przy udowodnionym helperze11502 i stack delta0x24, dopasowały parent return
+11862 do publicznego STR25296 (0x62D0): nieprawidłowy adres IP parametru
+instalacji bezobsługowej TCP/IP. Żadnych odczytów lpText, EDIT, dowolnych
+parametrów, stack bulk, screenów ani eksportu RAM. Nie wykonano ACK/UI.
+16 zamknięta QMP quit/rc0 po555.801s. Callerword pozostał wyłącznie RAM.
+
+Wszystkie trzy SIF niezmiennego candidate02 mają zgodne USOS.TCPIP, znany
+placeholder192.0.2.1 i maskę255.255.255.0; inne IP parametry są puste.
+Oryginalny validator TCPCFG11562 wymaga pierwszego oktetu1..223, następnych
+1..255, więc zero w drugim oktecie odrzuca staging. Poprawka renderera:
+198.51.100.1. Końcowe DHCP/POST oraz sterowniki/huby pozostają bez zmian.
+
+Walidacja: real no-OS adapter protected32/CPL3/pushEBP PASS z wcześniejszego
+synthetic-protected02, następnie host8 low16 PASS, host8 loader policy PASS,
+host3 exact frame-to-resource PASS. Pierwszy fixture loadera miał błędne
+syntetyczne offsety; poprawiony przed użyciem na gościu. Actual-code host
+regression:4 PASS w Unicorn x86 na oryginalnej funkcji, ograniczone CRT stubs;
+stary adres odrzucony, nowy przyjęty, zera/granice/składnia sprawdzone.
+Expanded MS bytes pozostają RAM; test standalone używa krótkotrwałego
+compressed input wyłącznie w G:\USOS-Kolekcja\_audit\nt4-native-tcpip-test.
+Pierwsze uruchomienie standalone oczekiwało SZDD zamiast rzeczywistego CAB;
+poprawione na bounded7z→RAM przed końcowym4PASS. Zig test nowego kontraktu
+renderera1/1PASS; dwa wcześniejsze wywołania miały zły module root/import
+build_info, końcowy entrypoint src/test_nt4_setup_address.zig działa.
+
+Pulpit/LAN/HID/MSC: nadal NIEPOTWIERDZONE. Następna świeża pełna próba USOS
+q35/igb jest uzasadniona konkretną naprawą stagingu, nie samym kliknięciem OK.
+Fullbuild/new frozen cache i wynik VM zostaną zapisane osobno.

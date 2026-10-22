@@ -1,0 +1,73 @@
+{
+  "scope": "Research source snapshot; external stopped-image/original-media helpers remain in owned artifacts, no private data included",
+  "sources": [
+    {
+      "file": "ui_event_rsp.py",
+      "sha256": "9d99a4be30b2530dceda92814ec80824931a3d77e24f500f1042c1fb405a15b4"
+    },
+    {
+      "file": "ui_event_rsp16.py",
+      "sha256": "c1fc315182bc319b136c4a386304d3d30fa83a266ee9aa50945c2c0facbe449e"
+    },
+    {
+      "file": "ui_event_rsp_fp.py",
+      "sha256": "5763c8970c36839e66b2e5a5079956b6c5af0fcc467ea8f52c9823b406733cea"
+    },
+    {
+      "file": "ui_event_modules.py",
+      "sha256": "0868159dd71fb98e27e7fe12d26ee1fd9fda55a12d85e4df897a64a7536b51b5"
+    },
+    {
+      "file": "run_ui_event16.py",
+      "sha256": "f82a4ab0e070492cd2d5162e8948a21ab6fd4ece6672fd49f51636cb18fa17e4"
+    },
+    {
+      "file": "test_ui_event_policy.py",
+      "sha256": "6064e4ffac817e37d6d5cbd06c10405cbee5b6c0aaa05f83377bbbed89765010"
+    },
+    {
+      "file": "test_ui_event16.py",
+      "sha256": "7ce7ccd62f9ad606dfc36a7b3a5de32955e3b1db7f76c3a1d9dc78db766b47ef"
+    },
+    {
+      "file": "test_ui_event_modules.py",
+      "sha256": "4011d0c28ccd0c56b8c62450ab7334c710674feb0630f446bf8a7997ae3e7ab4"
+    },
+    {
+      "file": "test_ui_event_tcpcfg_frame.py",
+      "sha256": "d94bf86ff4cbdc9bced1f6bd9d93fe70a5753b892329f0978799fa9ac2f84947"
+    },
+    {
+      "file": "audit_ntdll_loader_names.py",
+      "sha256": "2afe09ae81fe9ea8dade1a8f31d32749d2b7ab0ce55229b88f04e103ce89a37d"
+    },
+    {
+      "file": "audit_ntdll_gethandle.py",
+      "sha256": "d8290da7e983a340925fe85c451cfc4b3defe5c8d5fa8c20e2b20fbe6f6ad646"
+    },
+    {
+      "file": "audit_tcpcfg_callsite.py",
+      "sha256": "3a08508ba8da78e530ec07e70f72c1c7a884dc07eb2ef315d4b80558e9df83e1"
+    },
+    {
+      "file": "audit_tcpcfg_unattend.py",
+      "sha256": "31d37b2ef537a087c3734f556cbc7d049c346b5c71f9af0b0202fe95099c0fb6"
+    },
+    {
+      "file": "check_tcpip_answer_booleans.py",
+      "sha256": "5d9c90e586d263cc57de3e2fff37430a13f4b0511acad2fcf043e2e764e85b9c"
+    }
+  ],
+  "completed_event16": {
+    "qemu_returncode": 0,
+    "elapsed_seconds": 555.801,
+    "public_module": "TCPCFG.DLL",
+    "public_return_rva": "0x1154f",
+    "public_resource_id": 25296,
+    "ACK_or_UI_action": false
+  },
+  "native_validator_tests": 4,
+  "native_validator_passed": true,
+  "renderer_contract_tests": 1,
+  "renderer_contract_passed": true
+}
