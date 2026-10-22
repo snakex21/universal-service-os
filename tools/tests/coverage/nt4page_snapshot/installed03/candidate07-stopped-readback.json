@@ -1,0 +1,133 @@
+{
+  "scope": "Selected service/version/own-payload facts in RAM after native safe-off; no registry/answer/key/raw log export. LAN evaluated separately from actual traffic.",
+  "system_hive": {
+    "header_checksum_valid": true,
+    "sequence_numbers_equal": true
+  },
+  "software_hive": {
+    "header_checksum_valid": true,
+    "sequence_numbers_equal": true
+  },
+  "services_start": {
+    "ndisloop": 2,
+    "tcpip": 2,
+    "dhcp": 2,
+    "lanmanworkstation": 2,
+    "lanmanserver": 4,
+    "browser": 4,
+    "i8042prt": 1,
+    "usosusb": 1,
+    "serial": 2
+  },
+  "own_payloads": {
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": {
+      "sha256": "4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d",
+      "bytes": 21376,
+      "matched": true
+    },
+    "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS": {
+      "sha256": "2d4557439d7c60f7e0d5cc53d36467cbc36ae24596eb614e078059ddc718cfe1",
+      "bytes": 32128,
+      "matched": true
+    },
+    "USOS/COVERAGE/NT4OBS.EXE": {
+      "sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "bytes": 5632,
+      "matched": true
+    },
+    "USOS/COVERAGE/USOSLOG.EXE": {
+      "sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "bytes": 1024000,
+      "matched": true
+    },
+    "USOS/COVERAGE/FIRSTLO.CMD": {
+      "sha256": "c0f82213bb319445a9ea6d1407608af2b2cec53cbc633a9931ef4802e3bdbedc",
+      "bytes": 206,
+      "matched": true
+    }
+  },
+  "observer_status": "TESTNET_DONE",
+  "arm_present": false,
+  "observer_hooks_present": {
+    "run": false,
+    "runonce": false
+  },
+  "installed_csd_enum": "SERVICE_PACK_6",
+  "own_driver_diag": {
+    "ndisloop1": {
+      "usosnetstage": {
+        "present": false
+      },
+      "usosneterror": {
+        "present": false
+      },
+      "usosnetndis": {
+        "present": false
+      },
+      "usosnetpcilocation": {
+        "present": false
+      },
+      "usosnetassign": {
+        "present": false
+      },
+      "usosnetdevice": {
+        "present": false
+      },
+      "usosnetirqstatus": {
+        "present": false
+      }
+    },
+    "ndisloop1\\parameters": {
+      "usosnetstage": {
+        "present": false
+      },
+      "usosneterror": {
+        "present": false
+      },
+      "usosnetndis": {
+        "present": false
+      },
+      "usosnetpcilocation": {
+        "present": false
+      },
+      "usosnetassign": {
+        "present": false
+      },
+      "usosnetdevice": {
+        "present": false
+      },
+      "usosnetirqstatus": {
+        "present": false
+      }
+    },
+    "ndisloop": {
+      "usosnetstage": {
+        "present": false
+      },
+      "usosneterror": {
+        "present": false
+      },
+      "usosnetndis": {
+        "present": false
+      },
+      "usosnetpcilocation": {
+        "present": false
+      },
+      "usosnetassign": {
+        "present": false
+      },
+      "usosnetdevice": {
+        "present": false
+      },
+      "usosnetirqstatus": {
+        "present": false
+      }
+    }
+  },
+  "closed_target_sha256": "29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10",
+  "native_winver_service_pack_6a_observed": true,
+  "native_safe_off_observed": true,
+  "qemu_returncode": 0,
+  "actual_first_logon_token": true,
+  "scratch_removed": true
+}

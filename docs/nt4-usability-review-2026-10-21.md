@@ -950,3 +950,48 @@ Oryginalny03 był warmUEFI→CSM, ale comparison05/06 jest coldBIOS↔coldBIOS.
 
 HID1.3 root deleguje osobno agentowi macos z immutable03. MSC pozostaje
 osobnym przyszłym frozen1.1testem; nie łączymy obu wersji USB/hubów.
+
+2026-10-22 — installed07: rzeczywisty Desktop/SP6a/DHCP/brama/configuredDNS PASS
+
+Na nowym COW03 zastosowano Start2 oraz dokładnie3własne Coveragefiles:
+NT4OBS82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284,
+USOSLOGfe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2,
+FIRSTLO206B z publicznym newline przed tokenem. Wszystkie inne virtualdisk
+bytes były identyczne w pełnym4GiB compare; QEMU raw/overlay compare PASS.
+SYS pozostał4f2eb16b...0f8d, USB1.3 bez zmian. To installed qualification
+nowych własnych komponentów, nie nowa świeża instalacja całego nowego cache.
+
+GUIhelper z ukrytą nową konsolą po exactARM zwrócił READY i przesłał dokładny
+actualfirstlogontoken, następnie /testnet zwrócił TESTNET_DONE. Nie używano
+manualFIRSTLO ani manualTESTNET. NativeWinver/operator09 potwierdza NT4
+WorkstationPL4.0 Build1381 ServicePack6 oraz osobny napis ServicePack6a.
+Native safe-off12, FINISH/QMPquit/rc0. Odrębne hostproof: helper3actualCtesty
+(hidden childconsole/wait/nonzeroexit/exactnewlogger-size); logger3actualC
+globalDNS fallback i3negative collectorpolicy tests. Źródła c06435bf.
+
+Końcowy readonlycollector30.674s PASS/rc0, guestfilter przed transportem,
+strict hostgrammar/container/pins bez rozluźnienia. collection.json:
+actualfirstlogontrue, TESTNET_DONE, driver_hash_matchestrue, dhcp_pass=true,
+gateway_pass=true, dns_pass=true i lan_traffic_matches_lease=true.
+DORA10.0.2.15/DHCP10.0.2.2/router10.0.2.2/DNS10.0.2.3 koreluje zICMP
+status0/replies1/echo_match1/rtt31ms i UDP configured10.0.2.3→peer10.0.2.3:53,
+DNS PASS dns_match1/idD7A0/questionfrogfind.com/A64.227.13.248. Sama nazwa
+resolved/fixedDNS ani regconfig nie były wystarczające. installed_runtime_pass
+pozostaje false jako domyślne pole samego kolektora — ocena Desktop i HID jest
+odrębna, nie zastępujemy jej obecnością logu.
+
+Stoppedreadback: cleanSYSTEM/SOFTWARE, NDISLoop/TCPIP/DHCP/WorkstationStart2,
+Server4/Browser4, Serial2, PS2Start1, ownhelper/logger/FIRSTLO/SYS/USBexact.
+ARM i oba hooki nieobecne; statusTESTNET_DONE; CSDVersionServicePack6.
+Finaltarget07 SHA29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10,
+G:\USOS-Kolekcja\_vm\nt4-installed03-network07\target.qcow2, zachowany.
+Hostpreflight miał helper23/logger71identycznych importów, wszystkie obecne
+w actualinstalledNT4 oraz dynamicICMP API. Root odczytał/review strictpolicy:
+tylko2jawneEXEpins, pozostałe gates oryginalne. Historię03–06 pozostawiono.
+
+Jest to LAN PASS z dotychczasowym SYS/polling latency. IRQnie otrzymał PASS;
+oddzielny08 ma zmienić tylko SYS89b7337c...2233, z pasywnym boundedQEMUtrace
+oraz rzeczywistym odczytem PCIIRQ na pojedynczej granicyendpoint, bezICRpeek.
+Agentmacos domknął osobny HID1.3keyboard/mouse out/in na03: commit0c53a3ed,
+bezPS2native, negativecontrol/safeoff/readback PASS. MSCfrozen1.1 jest osobno
+przekazany temu agentowi; nie łączymy wersji USB/hubów ani ocen. HardwarebezPASS.

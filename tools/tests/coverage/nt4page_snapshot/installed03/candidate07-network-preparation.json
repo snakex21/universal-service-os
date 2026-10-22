@@ -1,0 +1,38 @@
+{
+  "scope": "Installed NT4 NET/observer qualification only; same old SYS and USB, no fresh-install or IRQ qualification",
+  "base": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+  "base_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "overlay": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+  "own_files": [
+    {
+      "path": "USOS/COVERAGE/NT4OBS.EXE",
+      "before_sha256": "37e7a0f69846d9bab18a718f7d66c3fd937f0f35913d2b0eb22f2d7ce4eae0e9",
+      "after_sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "before_bytes": 5632,
+      "after_bytes": 5632,
+      "same_allocated_chain": true
+    },
+    {
+      "path": "USOS/COVERAGE/USOSLOG.EXE",
+      "before_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7",
+      "after_sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "before_bytes": 1023488,
+      "after_bytes": 1024000,
+      "same_allocated_chain": true
+    },
+    {
+      "path": "USOS/COVERAGE/FIRSTLO.CMD",
+      "before_sha256": "cef9eb67de26c5f956a100c4847181d6c805c7c9fef89f3a15340c61822ba8fe",
+      "after_sha256": "c0f82213bb319445a9ea6d1407608af2b2cec53cbc633a9931ef4802e3bdbedc",
+      "before_bytes": 194,
+      "after_bytes": 206,
+      "same_allocated_chain": true
+    }
+  ],
+  "full_raw_overlay_compare": true,
+  "all_unrelated_virtual_disk_bytes_identical": true,
+  "only_system_change": "NDISLoop Start3 ->2",
+  "prepared": true,
+  "driver_sha256": "4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d",
+  "scratch_removed": true
+}
