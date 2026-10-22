@@ -173,13 +173,21 @@ func main() {
 	fmt.Printf("CONFIRMED PhysicalDrive%d model=%q serial=%q size=%d\n", target.Disk.Number, target.Disk.DisplayName(), target.Disk.Serial, target.Disk.SizeBytes)
 	fmt.Printf("GPT disk=%s ESP=%s@%d+%d DATA=%s@%d+%d WORK=%s@%d+%d\n", target.Media.DiskPTUUID, target.Media.ESP.PartUUID, target.Media.ESP.StartBytes, target.Media.ESP.SizeBytes, target.Media.DATA.PartUUID, target.Media.DATA.StartBytes, target.Media.DATA.SizeBytes, target.Media.WORK.PartUUID, target.Media.WORK.StartBytes, target.Media.WORK.SizeBytes)
 	fmt.Printf("INSTALLER=%s\n", installerAbs)
-	// Component report: always read-only. Without -components this is the
-	// whole component part of the run (report only, no writes).
-	componentReport := winhost.ReportComponents(target.Media.ESP.VolumePath, target.Media.DATA.VolumePath)
-	for _, line := range componentReport.Lines() {
+	// Component report: always read-only. Without -components this and the
+	// after-update report below are the whole component part of the run
+	// (report only, no writes). Before the update the XP check compares with
+	// the stick's old micro-Linux, so the after-update report is the one that
+	// says current/outdated against this build.
+	printComponentReport := func(phase string) {
+		line := "COMPONENTS report=" + phase
 		fmt.Println(line)
 		logger.WriteLine(line)
+		for _, line := range winhost.ReportComponents(target.Media.ESP.VolumePath, target.Media.DATA.VolumePath).Lines() {
+			fmt.Println(line)
+			logger.WriteLine(line)
+		}
 	}
+	printComponentReport("before-update")
 	if len(installComponents) == 0 {
 		fmt.Println("COMPONENTS mode=report-only (pass -components xp,winpe,winpe-x86 to install)")
 	}
@@ -287,12 +295,10 @@ func main() {
 				fatalf("install component %s: %v", id, err)
 			}
 		}
-		after := winhost.ReportComponents(target.Media.ESP.VolumePath, target.Media.DATA.VolumePath)
-		for _, line := range after.Lines() {
-			fmt.Println(line)
-			logger.WriteLine(line)
-		}
+		printComponentReport("after-install")
 		fmt.Println("COMPONENTS RESULT=PASS")
+	} else {
+		printComponentReport("after-update")
 	}
 	fmt.Printf("LOG=%s\n", logAbs)
 	fmt.Println("RESULT=PASS")

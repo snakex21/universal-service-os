@@ -55,7 +55,11 @@ teraz używa bezpośrednio:
   - Stany: `current` / `outdated` / `missing`; `ComponentReport.Lines()` drukuje
     `COMPONENT <nazwa>=<stan> id=<asset> detail=<...>`.
 - Wywołanie w CLI: `installer/cmd/usos-physical-update/main.go:178` — raport jest
-  drukowany (i wpisywany do logu operacji) **zawsze**, przed aktualizacją.
+  drukowany (i wpisywany do logu operacji) **zawsze**, przed aktualizacją
+  (`COMPONENTS report=before-update`) i po niej (`report=after-update`, albo
+  `report=after-install` z `-components`). Przed aktualizacją test XP porównuje
+  z dotychczasowym mikro-Linuksem pendrive'a, więc o zgodności z tym buildem
+  rozstrzyga raport po aktualizacji (poprawka z przeglądu 2026-10-22).
 - **Domyślnie (bez `-components`): tylko raport, zero zapisów.** Widać to wprost
   w kodzie: `main.go:184` drukuje `COMPONENTS mode=report-only (...)`, a
   `InstallComponents` ma strażnik `if len(ids) == 0 { return }` na początku
