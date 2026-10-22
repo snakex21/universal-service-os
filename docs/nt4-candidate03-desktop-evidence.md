@@ -40,8 +40,30 @@ Later qualification stays separate from the fresh desktop record:
   the old4f2 SYS. Winver/operator09 confirms Build1381/Service Pack6 and
   the separate Service Pack6a label. Native safe12/QMP0 and strict
   readonly collection complete the separate LAN qualification.
-- Canonical IRQ driver89b and frozen MSC313952 are separate tests; no
-  result is granted to them by this desktop/HID/network evidence.
+- Network08 changes only the own SYS to canonical89b/21248 B. Native
+  DHCP/ping4/4 below10ms, a fresh own log, actual token/TESTNET_DONE,
+  DHCP DORA/ICMP and strict configuredDNS qualify LAN independently.
+  Native safe16/QMP0 and stopped readback precede successful readonly
+  collection08b. The first collector's literal old-size refusal remains
+  historical; the narrow generated guest guard now pins21248 and89b.
+  Source/evidence commits a2c12add/1e60b91c; usability evidence [S18].
+  Passive114IMS/57INTx/57assertedC0 clears are recorded separately;
+  full hardware IRQ route remains unqualified, automaticfalse retained.
+- Frozen MSC313952/43648 B passes separate MSC04 startup/hotplug,
+  Write/Flush/Close/read and persisted reinsert (62073133/[S17]).
+  A new Explorer window is needed to enumerate changed drives; automatic
+  Explorer refresh does not have PASS.
+- Combo01 (6457ab4b/[S19]) qualifies keyboard/mouse negative/out/in,
+  movement/click and all the above storage operations on the **same**
+  frozen313952. Native safe25/QMP0, actual payload and persisted bytes
+  confirmed by stopped readback, both parents unchanged. i8042prtStart4;
+  NDISLoopStart3, therefore this USB test does not grant a LAN result.
+  Final target SHA256:
+  `dc757988b9634acaa03c5a4cb90d64e268c7109e62bdd88ea73b52cd8d0493fa`.
+  Completed evidence: `nt4-usb-hid/artifacts/nt4-combo/evaluation.json`.
+
+The following coexistence test09 will evaluate LAN89b/Start2 together with
+USB313952 and isolated HID/MSC. The tests above do not grant it a result.
 
 No Server, other source/SP, fresh AUTO combined USB/network, full hardware
 or X470 qualification is inferred. Microsoft modules/hives stay in RAM or
