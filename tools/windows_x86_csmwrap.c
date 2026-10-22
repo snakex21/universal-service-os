@@ -44,6 +44,14 @@
  *                            Default user hive gets its Run value (every
  *                            answer, also none: windows_display_register.h);
  *                            never fatal (exit 0 done / not staged, else 11).
+ *   faststartup              after Setup: Windows 8 / 8.1 / 10 get
+ *                            HiberbootEnabled=0 in the installed system's
+ *                            offline SYSTEM hive (tools/windows_fast_startup.h),
+ *                            so a shutdown leaves a clean NTFS volume: the
+ *                            disk moves between computers. An empty
+ *                            DATA\Systems\Windows\<version>\Unattended\
+ *                            fast-startup-on.txt keeps Windows' setting;
+ *                            never fatal (exit 0 done / not applicable, else 11).
  *   after                    the Windows partition holds bootmgr and
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
@@ -593,6 +601,40 @@ static DWORD display_register(void) {
     return r >= USOS_DREG_ERR_LOAD ? 11 : 0;
 }
 
+/* ---- faststartup: Fast Startup off in the installed Windows 8 / 8.1 / 10 ----
+ * (tools/windows_fast_startup.h). The disk moves between computers, and a
+ * hibernated volume is only safe on the machine that wrote it, so every
+ * USOS-installed 8 / 8.1 / 10 starts with a full boot. The opt-out file is
+ * the one documented for DATA (Systems\Windows\<version>\Unattended). */
+#include "windows_fast_startup.h"
+static DWORD fast_startup(void) {
+    WCHAR kernel[MAX_PATH], file[MAX_PATH];
+    DWORD major = 0, minor = 0, r;
+    const WCHAR *folder;
+    if (!target_letter()) { say("[X86_CSMWRAP] faststartup: the installed Windows volume has no drive letter; skipped\r\n"); return 11; }
+    lstrcpyW(kernel, target_root); lstrcatW(kernel, L"Windows\\System32\\ntoskrnl.exe");
+    if (!file_version(kernel, &major, &minor)) { say("[X86_CSMWRAP] faststartup: cannot read the installed kernel version; skipped\r\n"); return 11; }
+    logn("faststartup: installed NT version major=", major); logn("faststartup: minor=", minor);
+    if (major < 6 || (major == 6 && minor < 2)) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
+    folder = L"Windows 10";
+    if (major == 6 && minor == 2) folder = L"Windows 8";
+    else if (major == 6 && minor == 3) folder = L"Windows 8.1";
+    /* The documented opt-out: DATA\Systems\Windows\<version>\Unattended\
+     * fast-startup-on.txt on any volume but the installed one. */
+    for (WCHAR letter = L'C'; letter <= L'Z'; letter++) {
+        file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
+        lstrcatW(file, folder); lstrcatW(file, L"\\Unattended\\fast-startup-on.txt");
+        if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES) {
+            say("[X86_CSMWRAP] faststartup: fast-startup-on.txt on DATA; Windows keeps its own setting\r\n");
+            return 0;
+        }
+    }
+    r = usos_fast_startup(target_root);
+    logn(r == USOS_FS_WRITTEN ? "faststartup: HiberbootEnabled=0 written in the installed SYSTEM hive, code=" :
+         r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" : "faststartup: FAILED, hive code=", r);
+    return r >= USOS_FS_ERR_LOAD ? 11 : 0;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -645,6 +687,17 @@ void entry(void) {
      * the expected signature from usos-csmwrap-target.ini when present.
      * For a manual check in a WinPE command prompt; exit 0. */
     if (lstrcmpiW(args[1], L"disks") == 0) { load_target(); find_disk(TRUE); ExitProcess(0); }
+    /* Host test of the hive edit only (tools/tests/test_windows_fast_startup.py):
+     * faststartup-test <key under HKCU standing for a SYSTEM hive root>;
+     * exit code is the result code (0 written, 1 present, 100+ error). */
+    if (lstrcmpiW(args[1], L"faststartup-test") == 0 && arg_count == 3) {
+        HKEY k;
+        DWORD r;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE, &k) != ERROR_SUCCESS) ExitProcess(99);
+        r = usos_fast_startup_in_system(k);
+        RegCloseKey(k);
+        ExitProcess(r > 99 ? 99 : r);
+    }
     /* setupver <setup.exe>: exit code = major * 10 + minor of the file version
      * (60 Vista / 2008, 61 Windows 7, 62 / 63 8.x, 100 Windows 10), 0 unknown.
      * usos-x86-csmwrap.cmd: NVMe target, Setup 6.0 / 6.1 only. */
@@ -699,6 +752,7 @@ void entry(void) {
     if (lstrcmpiW(args[1], L"target") == 0 && arg_count == 3) ExitProcess(write_target(args[2]) ? 0 : 9);
     if (lstrcmpiW(args[1], L"hideesp") == 0) ExitProcess(hide_esp(s));
     if (lstrcmpiW(args[1], L"display") == 0) ExitProcess(display_register());
+    if (lstrcmpiW(args[1], L"faststartup") == 0) ExitProcess(fast_startup());
     if (lstrcmpiW(args[1], L"after") == 0) {
         BOOL bootmgr = exists_on_partition(L"\\bootmgr"), winload = exists_on_partition(L"\\Windows\\System32\\winload.exe");
         logn("bootmgr on the Windows partition=", bootmgr);
