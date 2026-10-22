@@ -723,6 +723,7 @@ cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 nt3_nvme_stage
 nt3_stage_profile
 [ "$minor" != 51 ] || usos_nt351_stage "$work/c" || fail 'cannot stage verified NT351 LAN driver'
+[ "$minor" != 51 ] || usos_nt351_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT351 Workstation client policy request'
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

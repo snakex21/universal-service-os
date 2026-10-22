@@ -77,6 +77,15 @@ usos_nt351_stage() {
     printf '[NET351] staged own NDIS3 driver sha256=%s hardware=%s; original TCP/IP DHCP binding\n' "$_u351_actual" "$_u351_hwid"
 }
 
+usos_nt351_client_request() {
+    # TARGET_ROOT original-source ProductType answer-kind; never USER/Server.
+    [ "${_u351_enabled:-off}" = on ] || return 0
+    [ "$2" = 0 ] || return 0
+    case "$3" in DEFAULT|PROFILE) ;; *) return 0 ;; esac
+    [ -s "$1/USOS/NT3/NET351.ON" ] || return 1
+    printf 'USOS NT351 client-no-sharing\r\n' > "$1/USOS/NT3/CLNT351.REQ" || return 1
+}
+
 usos_nt351_loop_inf() {
     # stdin expanded original OEMNADLB; caller verifies source hash first.
     awk -v BINMODE=3 '
