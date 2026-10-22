@@ -58,7 +58,7 @@ exported; SYSTEM and binary reads remain in RAM. The actual stopped target
 SHA256 is `f798b3021c12fec3c56dd652530dc2cd3b1c1dc54a107b1e653eabe7b9e05836`;
 the original USB parent92c2 is unchanged and whole-disk scratch is removed.
 
-`readback_nt35_client.py` qualifies only completed apply03. A separate
+`readback_nt35_client.py` has explicit completed apply03/cold01 cases. A separate
 `prepare_nt35_client_cold.py` creates an empty cold01 COW; actual
 `qemu-img compare` confirms identical effective disk contents, including
 SYSTEM and USB. It retains the helper/import proof and actual apply03
@@ -69,6 +69,32 @@ atomic manifest correction, with a `validation-fix-no-vm-started.json`
 note. No image or guest content changes in that repair. This preparation
 and apply result do not qualify persistent cold policy; the separate
 native cold `/check` requires its own completion evidence.
+
+The cold reader is prepared without reading the active cold VM. Only after
+the actual completion may the operator write a bounded JSON below
+`artifacts/nt35-client/cold01/` and pass it using
+`--case cold01 --cold-evidence <absolute-review-json>`. It requires
+`case: "nt35-client-cold01"`, `reviewed_after_completion: true`, and:
+
+- `source_commands`: exact operator text under `check`, `services`, `ping`
+  and `shutdown`. The first invokes `C:\USOS\NT3\CLNT35.EXE /check`;
+  native `net start` and `ping -n 3 10.0.2.2` overwrite the respective
+  `C:\USOS\NT3\NET35.LOG` and `PING35.LOG` using `>`.
+- `reviewed_images`: actual `operator-NN.png` names under `check`, `scm`,
+  `services`, `ping` and `safeoff`. The safe-off number is supplied after
+  review. Each image must belong to the completed operator action record.
+
+Typed commands are the operator's explicit review record: the runner's
+actions JSON retains only key counts and image names, not typed text.
+The reader pins that record, images, command argv and own COM1 completion.
+It verifies the actual COW parent is the completed f798 apply03 target,
+the original92c2 USB parent remains unchanged, preparation confirms
+identical guest contents, and the new successful check log contains no
+`NativeNetExit`. Identical native service/ping text can be valid after
+fresh commands; content hashes alone do not establish execution freshness.
+No optional application staging, guest command or VM start is performed.
+Cold runtime PASS still requires this future review and stopped readback;
+preparing this reader grants none.
 
 The launcher now requires both `isatty()` and Windows `GetConsoleMode`:
 Windows NUL can satisfy `isatty()` despite having no live operator.
