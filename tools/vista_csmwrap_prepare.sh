@@ -52,16 +52,21 @@ vista_request_directory() {
     printf '%s\n' "${request_parent%/*}"
 }
 
-# First 8.1/10 trial only: scoped DATA opt-in. Older x86 paths are unchanged.
-# Scoped by profile: this flag never opens the x64 profile (vista_nvme64_enabled
-# above needs no flag).
+# 32-bit Windows 8.1 / Embedded 8.1 / 10 on NVMe (polled usosnvme "modern"
+# package): default on since the X470 Micron 3400 PASS 2026-10-22 (Embedded
+# 8.1 Industry Pro x86 and Windows 10 22H2 x86, docs/nvme-nt6-2026-10-12.md
+# section 18). No nvme-experimental.txt needed; an empty nvme-off.txt in the
+# folder's Unattended turns it off (the old stop on the picker). Scoped by
+# profile: never opens the x64 profile (vista_nvme64_enabled above).
 vista_modern_nvme_enabled() {
     [ "$1" = win-x86-uefi-csmwrap ] || return 1
     case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
-    [ -f "$2/${4:-Systems/Windows/$3}/Unattended/nvme-experimental.txt" ]
+    [ ! -f "$2/${4:-Systems/Windows/$3}/Unattended/nvme-off.txt" ]
 }
 
-# External PE10 is accepted only for the same opted-in 8.1 experiment.
+# External PE10 donor: only 8.1 / Embedded 8.1 with the NVMe route on (the
+# UEFI menu picks it automatically; Setup from 8.1's own PE stalls at 0% on
+# NVMe). A SATA target keeps 8.1's own PE (see the disk gate below).
 vista_modern_external_donor_enabled() {
     case "$3" in 'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
     vista_modern_nvme_enabled "$@"
@@ -132,7 +137,7 @@ usos_vista_csmwrap_prepare() {
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     [ -f "/mnt/data/$donor" ] || stop "the PE10 donor is not on DATA: $donor"
     if [ "$profile" = win-x86-uefi-csmwrap ] && [ "$donor" != "$iso" ]; then
-        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop 'request.ini: external x86 PE10 requires the opted-in Windows 8.1 NVMe experiment'
+        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop 'request.ini: external x86 PE10 is only for Windows 8.1 / Embedded 8.1 with the NVMe route on'
     fi
 
     answer_xml=''
@@ -199,9 +204,14 @@ usos_vista_csmwrap_prepare() {
         # vista_csmwrap_target.sh) and serves the installed system; X470
         # Micron 3400 PASS 2026-10-14 for Windows 7 SP1 x86 and Vista SP2 x86
         # (B261014-195920), Server 2008 x86 shares the Vista path. No
-        # nvme-experimental.txt is needed any more. 8.1 / 10 x86 run
-        # Microsoft's stornvme in Setup itself, which failed on the X470
-        # under CSMWrap (2026-10-13, section 12), so they still stop here.
+        # nvme-experimental.txt is needed any more. 8.1 / 10 x86: the polled
+        # usosnvme "modern" package (Setup WIM, installed system, WinRE)
+        # instead of Microsoft's stornvme, which failed on the X470 under
+        # CSMWrap (2026-10-13, section 12); X470 Micron PASS 2026-10-22 for
+        # Embedded 8.1 Industry Pro x86 and Windows 10 22H2 x86 (section 18),
+        # default on, nvme-off.txt turns it off. 8.1 needs the external x86
+        # PE10 donor on NVMe; on SATA it keeps its own PE (donor reset below).
+        # vista_csmwrap_target.sh still checks the PCI ID before any write.
         # 64-bit Vista / 2008 (vista-x64-sp2-uefi-csmwrap): the test-signed
         # amd64 usosnvme in the PE10 x64 donor (testsigning in the staging
         # BCD) and the installed system (docs/vista-x64-nvme-2026-10-21.md);
@@ -220,9 +230,15 @@ usos_vista_csmwrap_prepare() {
                     vista_csmwrap_log "NVME $folder x86: usosnvme in the WinPE and the installed system, WinPE lowmem"
                     pe_nvme=usosnvme ;;
                 win-x86-uefi-csmwrap)
-                    vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.'
+                    case "$folder" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;;
+                        *) stop "32-bit $NT5_NAME on NVMe is not supported yet on this path. No disk was changed." ;;
+                    esac
+                    vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop "NVMe for 32-bit $NT5_NAME is turned off (nvme-off.txt in Unattended on DATA). Pick a SATA disk. No disk was changed."
+                    case "$folder" in 'Windows 8.1'|'Windows Embedded 8.1 Industry')
+                        [ "$donor" != "$iso" ] || stop "32-bit $NT5_NAME on NVMe needs the WinPE x86 helper or a Windows 10 x86 Setup ISO on DATA. Pick a SATA disk. No disk was changed." ;;
+                    esac
                     pe_nvme=usosnvme-modern
-                    vista_csmwrap_log 'NVME x86 modern: experimental PE, installed system and WinRE path' ;;
+                    vista_csmwrap_log "NVME $folder x86 modern: usosnvme in the Setup PE, installed system and WinRE" ;;
             esac
             [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed." ;;
         esac
@@ -262,13 +278,23 @@ usos_vista_csmwrap_prepare() {
     done
     [ "$TARGET_DEVICE" != "$USOS_DISK_DEVICE" ] || stop 'refusing the USOS disk'
     vista_csmwrap_log "TARGET $TARGET_DEVICE model=$model serial=$serial size=$size confirmed"
+    # 8.1 / Embedded 8.1: the UEFI menu picks the x86 PE10 donor before the
+    # disk is known; only an NVMe target needs it, a SATA target keeps 8.1's
+    # own PE (the route before the NVMe default).
+    stage_donor=$donor
+    if [ "$profile" = win-x86-uefi-csmwrap ] && [ "$donor" != "$iso" ]; then
+        case "$TARGET_DEVICE" in
+            /dev/nvme*) vista_csmwrap_log "DONOR x86 PE10 $donor for $folder on NVMe" ;;
+            *) stage_donor=$iso; vista_csmwrap_log "DONOR $folder own PE (not NVMe); x86 PE10 donor not used" ;;
+        esac
+    fi
 
     # Every tool's output goes to prepare.log (none reaches the screen); the
     # stage-4 page stays up until the script ends.
     usos_ui_stage 4 5 'Preparing the disk' 'Copying the Windows PE helper and CSMWrap to the selected disk.' || true
     watermark_visible=0
     if vista_testmode_watermark_visible "$profile" /mnt/data "$folder" "$source_directory"; then watermark_visible=1; fi
-    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
+    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$stage_donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
         sh /usr/lib/usos/vista_csmwrap_target.sh >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f /run/vista-answer.xml
         tail -n 5 "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true

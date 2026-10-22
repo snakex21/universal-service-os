@@ -187,21 +187,25 @@ class Nt6Flow(unittest.TestCase):
         self.assertIn('                    pe_nvme=usosnvme ;;\n', nt6)
         self.assertNotIn('stop', nt6)
         self.assertNotIn('nvme-experimental.txt', nt6)
-        self.assertIn('Unattended/nvme-experimental.txt', prep)
-        self.assertNotIn('Unattended/nvme-experimental.txt', nt6)
+        # 8.1 / 10 x86: default on since the X470 PASS 2026-10-22 (section
+        # 18); only the opt-out file remains.
+        self.assertNotIn('Unattended/nvme-experimental.txt', prep)
+        self.assertIn('Unattended/nvme-off.txt', prep)
+        self.assertNotIn('nvme-off.txt', nt6)
         self.assertNotIn('32-bit Windows 7/Vista/2008', prep)
         self.assertLess(prep.index("pe_nvme=''"), prep.index('        usos_xp_choose_disk\n'))
         self.assertIn('X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme', prep)
         self.assertIn("                win-x86-uefi-csmwrap)\n", nv)
-        self.assertIn("stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.'", nv)
+        # Other win-x86 folders (e.g. Windows 8) keep the translated stop.
+        self.assertIn('*) stop "32-bit $NT5_NAME on NVMe is not supported yet on this path. No disk was changed." ;;', nv)
         self.assertNotIn("'win-nt6-x86-uefi-csmwrap:Windows 7'", prep)
         # Both stops come before the 512-byte check (dormant until reopened).
-        self.assertLess(nv.index("32-bit Windows 8.1/10 on NVMe"), nv.index('[ "$nvme_lbs" = 512 ] || stop'))
+        self.assertLess(nv.index("32-bit $NT5_NAME on NVMe"), nv.index('[ "$nvme_lbs" = 512 ] || stop'))
         # Translated: the stop text is a {0} template of a boot.lx key.
         en = json.loads((ROOT / 'installer/internal/i18n/locales/en.json').read_text(encoding='utf-8'))
         tmpl = en['boot.lx.nvme_x86_csmwrap_not_supported']
         self.assertEqual(tmpl, '32-bit {0} on NVMe is not supported yet on this path. No disk was changed.')
-        self.assertIn(tmpl.replace('{0}', 'Windows 8.1/10'), nv)
+        self.assertIn(tmpl.replace('{0}', '$NT5_NAME'), nv)
         for loc in (ROOT / 'installer/internal/i18n/locales').glob('*.json'):
             self.assertIn('{0}', json.loads(loc.read_text(encoding='utf-8'))['boot.lx.nvme_x86_csmwrap_not_supported'], loc.name)
         self.assertIn(tmpl, (ROOT / 'src/i18n/linux_strings.zig').read_text(encoding='utf-8'))

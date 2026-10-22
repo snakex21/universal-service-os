@@ -135,26 +135,51 @@ int main(void){
         expected=raw.replace(signing.INF_DATE_IN,signing.INF_DATE_OUT+b'\r\nCatalogFile=usosnvme.cat').replace(b'\r\n',b'\n').replace(b'\n',b'\r\n')
         self.assertEqual(signing.nt6_inf(ROOT),expected)
 
-    def test_scoped_opt_in(self):
+    def test_default_on_with_scoped_opt_out(self):
+        # X470 Micron PASS 2026-10-22 (Embedded 8.1 Industry Pro x86, Windows
+        # 10 22H2 x86): default on, Unattended/nvme-off.txt turns it off.
         sh=Path(r'C:\Program Files\Git\bin\sh.exe')
         OUT=ROOT/'zig-out/modern-tests';OUT.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=OUT) as folder:
-            data=Path(folder);flag=data/'Systems/Windows/Windows 10/Unattended/nvme-experimental.txt';flag.parent.mkdir(parents=True)
-            code='. "$1"; vista_modern_nvme_enabled "$2" "$3" "$4"'
-            def run(profile,name):return subprocess.run([str(sh),'-c',code,'test',str(ROOT/'tools/vista_csmwrap_prepare.sh'),profile,str(data),name],capture_output=True).returncode
-            self.assertNotEqual(run('win-x86-uefi-csmwrap','Windows 10'),0)
-            flag.touch();self.assertEqual(run('win-x86-uefi-csmwrap','Windows 10'),0)
-            def external(profile,name):
-                code='. "$1"; vista_modern_external_donor_enabled "$2" "$3" "$4"'
+            data=Path(folder)
+            def call(fn,profile,name):
+                code='. "$1"; '+fn+' "$2" "$3" "$4"'
                 return subprocess.run([str(sh),'-c',code,'test',str(ROOT/'tools/vista_csmwrap_prepare.sh'),profile,str(data),name],capture_output=True).returncode
+            run=lambda p,n:call('vista_modern_nvme_enabled',p,n)
+            external=lambda p,n:call('vista_modern_external_donor_enabled',p,n)
+            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry'):
+                self.assertEqual(run('win-x86-uefi-csmwrap',name),0)
             self.assertNotEqual(external('win-x86-uefi-csmwrap','Windows 10'),0)
-            self.assertNotEqual(external('win-x86-uefi-csmwrap','Windows 8.1'),0)
             for name in ('Windows 8.1','Windows Embedded 8.1 Industry'):
-                donor_flag=data/'Systems/Windows'/name/'Unattended/nvme-experimental.txt'
-                donor_flag.parent.mkdir(parents=True);donor_flag.touch()
                 self.assertEqual(external('win-x86-uefi-csmwrap',name),0)
                 self.assertNotEqual(external('win-nt6-x86-uefi-csmwrap',name),0)
-            for profile,name in [('win-nt6-x86-uefi-csmwrap','Windows 10'),('vista-x64-sp2-uefi-csmwrap','Windows 10'),('win-x86-uefi-csmwrap','Windows 7')]:self.assertNotEqual(run(profile,name),0)
+            # The old opt-in flag changes nothing.
+            old=data/'Systems/Windows/Windows 10/Unattended/nvme-experimental.txt';old.parent.mkdir(parents=True);old.touch()
+            self.assertEqual(run('win-x86-uefi-csmwrap','Windows 10'),0)
+            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry'):
+                off=data/'Systems/Windows'/name/'Unattended/nvme-off.txt';off.parent.mkdir(parents=True,exist_ok=True);off.touch()
+                self.assertNotEqual(run('win-x86-uefi-csmwrap',name),0)
+                if name!='Windows 10':self.assertNotEqual(external('win-x86-uefi-csmwrap',name),0)
+            for profile,name in [('win-nt6-x86-uefi-csmwrap','Windows 10'),('vista-x64-sp2-uefi-csmwrap','Windows 10'),('win-x86-uefi-csmwrap','Windows 7'),('win-x86-uefi-csmwrap','Windows 8')]:self.assertNotEqual(run(profile,name),0)
+
+    def test_disk_gate_keeps_checks_and_sata_keeps_own_pe(self):
+        prep=(ROOT/'tools/vista_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        nv=prep[prep.index('case "$TARGET_DEVICE" in /dev/nvme*)'):prep.index('        model=$(usos_disk_model')]
+        modern=nv[nv.index('                win-x86-uefi-csmwrap)'):]
+        self.assertNotIn('nvme-experimental',modern)
+        self.assertIn('vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop',modern)
+        self.assertIn('[ "$donor" != "$iso" ] || stop',modern)
+        self.assertIn('pe_nvme=usosnvme-modern',modern)
+        self.assertIn('[ "$nvme_lbs" = 512 ] || stop',nv)
+        self.assertIn('stage_donor=$iso',prep)
+        self.assertIn('VISTA_DONOR_ISO="/mnt/data/$stage_donor"',prep)
+        self.assertLess(prep.index('usos_xp_confirm "$screen"'),prep.index('stage_donor=$donor'))
+        target=(ROOT/'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn("case \"$modern_id\" in 'PCI\\VEN_1344&DEV_5407'|'PCI\\VEN_1B36&DEV_0010') ;; *) fail",target)
+        zig=(ROOT/'src/platform/uefi/windows_native_iso.zig').read_text(encoding='utf-8')
+        self.assertNotIn('nvme-experimental.txt',zig)
+        self.assertIn('"nvme-off.txt"',zig)
+        self.assertIn('!(try modernNvmeOff(state, folder))',zig)
 
     def test_service_api_contract_and_failures(self):
         out=ROOT/'zig-out/modern-tests';out.mkdir(parents=True,exist_ok=True);exe=out/'service.exe'
