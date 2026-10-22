@@ -97,6 +97,107 @@ adds the full and online installers described under
   MOK-signed TouchI2cDxe v1.3.1-usos1, which is loaded only on matching
   SMBIOS. Pad buttons work, and the footer shows dynamic A/B hints.
 
+## Nowe od RC / New since the RC
+
+Zmiany po pierwszym release candidate (`B260928-214844-A6711A1F`). Każdy punkt
+ma własny raport w `docs/`. / Changes after the first release candidate; each
+item has its own report in `docs/`.
+
+### Po polsku
+
+- **Vista x64 na NVMe.** Vista i Server 2008 SP2 x64 instalują się i startują z
+  NVMe (test-signed `usosnvme` amd64, 64-bit PRP, DMA powyżej 4 GB); X470 PASS
+  2026-10-21. System działa w trybie testowym, a napis "Test Mode" jest
+  zasłonięty przez usoswm. Szczegóły i odrzucona ścieżka MUI:
+  [vista-x64-nvme-2026-10-21.md](vista-x64-nvme-2026-10-21.md),
+  [vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md).
+- **Win7 x64 na NVMe z oryginalnego ISO.** Setup 6.1 przyjmuje dysk NVMe:
+  uruchamia się z kopii `sources` w RAM, której `hwcompat.txt` zawiera
+  `PCI\CC_010802`, a zainstalowany system dostaje `stornvme`; X470 PASS z
+  oryginalnego ISO Windows 7 SP1 PL x64. Szczegóły:
+  [w7x64-nvme-setup-2026-10-21.md](w7x64-nvme-setup-2026-10-21.md).
+- **Windows 8, 8.1 i 10 x86 na NVMe domyślnie.** Trasa
+  `win-x86-uefi-csmwrap` jest włączona bez flagi (8/8.1 biorą zewnętrzny donor
+  PE10 tylko dla celu NVMe); pusty `Unattended\nvme-off.txt` na DATA ją
+  wyłącza. X470 PASS (Embedded 8.1 Industry Pro x86, Windows 10 22H2 x86).
+  Szczegóły: [nvme-nt6-2026-10-12.md](nvme-nt6-2026-10-12.md), sekcje 18-19.
+- **Automatyczna natywna rozdzielczość.** USOSRES przy pierwszym logowaniu
+  ustawia natywny tryb monitora z EDID, a bez EDID najwyższy dostępny - dla
+  rodzin NT6 na CSMWrap i dla NT5 (XP, 2003, POSReady, Vista/2008 x64). Win7
+  x64 zostaje przy 1024x768; dwutrybowy wariant włącza
+  `Unattended\native-res-on.txt`. Wyłączenie automatu = jawna wartość
+  `display=WxH` w profilu/pliku odpowiedzi (wtedy idzie `<Display>`), a nie
+  flaga DATA. Opis: [display-policy.md](display-policy.md),
+  [w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md).
+- **Ukryta partycja CSMWRAP.** Po instalacji Vista / 7 / 2008 / 8.1 / 10
+  (32-bit) i Vista / 2008 x64 nie dostają litery dysku dla 64 MiB ESP CSMWrap:
+  wpis "bez litery" w offline `MountedDevices` przed pierwszym startem; MBR,
+  typ 0xEF i łańcuch bootowania bez zmian. Szczegóły:
+  [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
+- **Fast Startup wyłączony w 8 / 8.1 / 10.** Instalacje USOS zapisują
+  `HiberbootEnabled=0`, żeby wyłączony system nie zostawiał zahibernowanego
+  NTFS (dyski wędrują między komputerami). Pusty
+  `Unattended\fast-startup-on.txt` zostawia ustawienie Windowsa. Szczegóły:
+  [ds-fast-startup-2026-10-22.md](ds-fast-startup-2026-10-22.md).
+- **Huby USB i pendrive'y w usosusb.** Własny sterownik xHCI (`usosusb
+  1.3-nt6` dla Vista / 2008 / Win7 x86, `1.3-nt4` dla NT4) obsługuje huby USB
+  2.0 / 3.x, urządzenia za hubem, hot plug i pendrive'y (bulk-only); X470 PASS
+  dla klawiatury, myszy i sticka na Win7 x86, huby na razie tylko w QEMU.
+  Szczegóły: [usosusb-hubs-2026-10-21.md](usosusb-hubs-2026-10-21.md).
+- **Nowe znane ograniczenia.** Win7 x64 bez sterownika karty zostaje przy
+  1024x768; wielopartycyjny pendrive pokazuje w Win7 x64 tylko pierwszą
+  partycję (Vista x64 dostała `usosmpart`); CSMWrap rezerwuje 1 wątek CPU
+  (Vista x64 na X470 widzi 15/16). Szerszy obraz: punkty "Known issues" niżej
+  oraz [display-policy.md](display-policy.md).
+
+### In English
+
+- **Vista x64 on NVMe.** Vista and Server 2008 SP2 x64 install and boot from
+  NVMe (test-signed amd64 `usosnvme`, 64-bit PRP, DMA above 4 GB); X470 PASS
+  2026-10-21. The system runs in test mode and the "Test Mode" text is covered
+  by usoswm. Details and the rejected MUI route:
+  [vista-x64-nvme-2026-10-21.md](vista-x64-nvme-2026-10-21.md),
+  [vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md).
+- **Win7 x64 on NVMe from the original ISO.** Setup 6.1 accepts the NVMe disk:
+  it runs from a RAM copy of `sources` whose `hwcompat.txt` lists
+  `PCI\CC_010802`, and the installed system gets `stornvme`; X470 PASS from the
+  original Windows 7 SP1 PL x64 ISO. Details:
+  [w7x64-nvme-setup-2026-10-21.md](w7x64-nvme-setup-2026-10-21.md).
+- **Windows 8, 8.1 and 10 x86 on NVMe by default.** The
+  `win-x86-uefi-csmwrap` route needs no flag (8/8.1 take the external PE10
+  donor for an NVMe target only); an empty `Unattended\nvme-off.txt` on DATA
+  turns it off. X470 PASS (Embedded 8.1 Industry Pro x86, Windows 10 22H2
+  x86). Details: [nvme-nt6-2026-10-12.md](nvme-nt6-2026-10-12.md), sections
+  18-19.
+- **Automatic native resolution.** At the first logon USOSRES selects the
+  monitor's native mode from EDID, else the highest mode, for the NT6 CSMWrap
+  families and for NT5 (XP, 2003, POSReady, Vista/2008 x64). Win7 x64 stays at
+  1024x768; the two-mode variant is enabled by `Unattended\native-res-on.txt`.
+  Switching the automatic off means an explicit `display=WxH` in the
+  profile/answer (that writes `<Display>`), not a DATA flag. See
+  [display-policy.md](display-policy.md),
+  [w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md).
+- **Hidden CSMWRAP partition.** After Setup, Vista / 7 / 2008 / 8.1 / 10
+  (32-bit) and Vista / 2008 x64 get no drive letter for the 64 MiB CSMWrap
+  ESP: a no-letter entry in the offline `MountedDevices` before the first
+  boot; MBR, type 0xEF and the boot chain are unchanged. Details:
+  [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
+- **Fast Startup off in 8 / 8.1 / 10.** USOS installs write
+  `HiberbootEnabled=0` so a shutdown leaves no hibernated NTFS volume (the
+  disks move between computers). An empty `Unattended\fast-startup-on.txt`
+  keeps Windows' own setting. Details:
+  [ds-fast-startup-2026-10-22.md](ds-fast-startup-2026-10-22.md).
+- **USB hubs and flash drives in usosusb.** The own xHCI driver (`usosusb
+  1.3-nt6` for Vista / 2008 / Win7 x86, `1.3-nt4` for NT4) handles USB 2.0 /
+  3.x hubs, devices behind a hub, hot plug and bulk-only flash drives; X470
+  PASS for keyboard, mouse and a stick on Win7 x86, hubs in QEMU only so far.
+  Details: [usosusb-hubs-2026-10-21.md](usosusb-hubs-2026-10-21.md).
+- **New known limitations.** Win7 x64 without a GPU driver stays at 1024x768;
+  a multi-partition stick shows only its first partition in Win7 x64 (Vista
+  x64 got `usosmpart`); CSMWrap reserves 1 CPU thread (Vista x64 on the X470
+  sees 15/16). Wider picture: "Known issues" below and
+  [display-policy.md](display-policy.md).
+
 ## Supported systems
 
 Legend: **HW** = tested on real hardware (machines listed below), **VM** =
