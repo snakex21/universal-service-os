@@ -84,7 +84,78 @@ static BOOL service(HKEY hive,DWORD cs){
  if(e==ERROR_SUCCESS)e=put_dword(key,L"Start",0);
  if(e==ERROR_SUCCESS){HKEY over;if(RegOpenKeyExW(key,L"StartOverride",0,KEY_SET_VALUE,&over)==ERROR_SUCCESS){e=put_dword(over,L"0",0);RegCloseKey(over);}}
  if(e==ERROR_SUCCESS){HKEY pnp;e=RegCreateKeyExW(key,L"Parameters\\PnpInterface",0,0,0,KEY_SET_VALUE,0,&pnp,0);if(e==ERROR_SUCCESS){e=put_dword(pnp,L"5",1);RegCloseKey(pnp);}}
- if(e==ERROR_SUCCESS)e=flush_retry(key);RegCloseKey(key);if(e)SetLastError(e);return e==ERROR_SUCCESS;
+ RegCloseKey(key);if(e)SetLastError(e);return e==ERROR_SUCCESS;
+}
+static void say(const char *text){DWORD written;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),text,lstrlenA(text),&written,0);}
+static void say_code(const char *text,DWORD code){
+ char digits[12];unsigned at=sizeof(digits);DWORD written;digits[--at]='\n';digits[--at]='\r';
+ do{digits[--at]=(char)('0'+code%10);code/=10;}while(code);
+ say(text);WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),digits+at,sizeof(digits)-at,&written,0);
+}
+/* Diagnostic only: a 4 KiB write + FlushFileBuffers on the target volume
+ * (the package folder). A failure here points at the disk path (driver
+ * cache flush), success at the registry's own hive/log handling. */
+static DWORD flush_probe(void){
+ WCHAR probe[MAX_PATH];HANDLE h;DWORD written,e=ERROR_SUCCESS;
+ if(!join(probe,package,L"\\flush-probe.bin"))return ERROR_BUFFER_OVERFLOW;
+ h=CreateFileW(probe,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);if(h==INVALID_HANDLE_VALUE)return GetLastError();
+ if(!WriteFile(h,other,4096,&written,0)||written!=4096)e=GetLastError();else if(!FlushFileBuffers(h))e=GetLastError();
+ CloseHandle(h);DeleteFileW(probe);return e;
+}
+/* The saved file becomes the hive file; the old .LOG1/.LOG2 are set aside
+ * (renamed *.usos-stale) so the next load cannot replay them onto it. */
+static LONG replace_hive(const WCHAR *file,const WCHAR *saved){
+ WCHAR log[MAX_PATH],stale[MAX_PATH];static const WCHAR *const logs[2]={L".LOG1",L".LOG2"};
+ if(!MoveFileExW(saved,file,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))return (LONG)GetLastError();
+ for(int i=0;i<2;i++){
+  if(!join(log,file,logs[i])||!join(stale,log,L".usos-stale"))return ERROR_BUFFER_OVERFLOW;
+  if(GetFileAttributesW(log)==INVALID_FILE_ATTRIBUTES)continue;
+  SetFileAttributesW(log,FILE_ATTRIBUTE_NORMAL);
+  if(!MoveFileExW(log,stale,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))return (LONG)GetLastError();
+ }
+ return ERROR_SUCCESS;
+}
+/* Commit a loaded offline hive and unload it. X470 B261022-130215 and
+ * B261022-133852 (Windows 10 22H2 x86, Micron NVMe, WinPE 19041): RegFlushKey
+ * on the loaded SOFTWARE hive returned ERROR_REGISTRY_IO_FAILED (1016) on
+ * every try in both helper runs, although B261021-203941 committed the same
+ * post-DISM hive (byte-identical file) fine. A flush goes through the hive's
+ * .LOG1/.LOG2; RegSaveKeyExW instead writes the loaded hive's current state
+ * to a new, complete file without logs. Fallback: save, unload, the saved
+ * file replaces the hive file (replace_hive). The caller reads it back. */
+static const char *const commit_steps[2][4]={
+ {"flush-software","save-software","unload-software","replace-software"},
+ {"flush-system","save-system","unload-system","replace-system"}};
+static LONG commit_hive(HKEY *root,const WCHAR *file,const WCHAR *name,BOOL *loaded,int which){
+ WCHAR saved[MAX_PATH];LONG e;
+ operation=commit_steps[which][0];e=flush_retry(*root);
+ if(e==ERROR_SUCCESS){
+  RegCloseKey(*root);*root=0;operation=commit_steps[which][2];
+  e=RegUnLoadKeyW(HKEY_LOCAL_MACHINE,name);if(e==ERROR_SUCCESS)*loaded=FALSE;return e;
+ }
+ say(which?"[USOS] Modern NVMe: SYSTEM":"[USOS] Modern NVMe: SOFTWARE");
+ say_code(" hive RegFlushKey failed; saving the hive to a new file instead. Win32 code=",(DWORD)e);
+ say_code("[USOS] Modern NVMe: flush probe (4 KiB write + FlushFileBuffers on the target), Win32 code=",flush_probe());
+ operation=commit_steps[which][1];
+ if(!join(saved,file,L".usos-saved"))return ERROR_BUFFER_OVERFLOW;
+ SetFileAttributesW(saved,FILE_ATTRIBUTE_NORMAL);DeleteFileW(saved);
+ e=RegSaveKeyExW(*root,saved,0,REG_LATEST_FORMAT);if(e!=ERROR_SUCCESS)return e;
+ RegCloseKey(*root);*root=0;operation=commit_steps[which][2];
+ e=RegUnLoadKeyW(HKEY_LOCAL_MACHINE,name);if(e!=ERROR_SUCCESS)return e;*loaded=FALSE;
+ operation=commit_steps[which][3];e=replace_hive(file,saved);if(e!=ERROR_SUCCESS)return e;
+ say(which?"[USOS] Modern NVMe: SYSTEM hive replaced by its saved copy.\r\n":"[USOS] Modern NVMe: SOFTWARE hive replaced by its saved copy.\r\n");
+ return ERROR_SUCCESS;
+}
+static BOOL service_points_to_usosnvme(HKEY hive,DWORD cs){
+ WCHAR keypath[160],value[80],digits[4];HKEY key=0;DWORD type=0,len=sizeof(value)-sizeof(WCHAR),start=1,n=sizeof(start);LONG e;
+ if(!cs||cs>999)return FALSE;digits[0]=(WCHAR)('0'+cs/100);digits[1]=(WCHAR)('0'+cs/10%10);digits[2]=(WCHAR)('0'+cs%10);digits[3]=0;
+ lstrcpyW(keypath,L"ControlSet");lstrcatW(keypath,digits);lstrcatW(keypath,L"\\Services\\stornvme");
+ if(RegOpenKeyExW(hive,keypath,0,KEY_QUERY_VALUE,&key)!=ERROR_SUCCESS)return FALSE;
+ e=RegQueryValueExW(key,L"ImagePath",0,&type,(BYTE*)value,&len);
+ if(e==ERROR_SUCCESS)e=RegQueryValueExW(key,L"Start",0,0,(BYTE*)&start,&n);
+ RegCloseKey(key);
+ if(e!=ERROR_SUCCESS||type!=REG_EXPAND_SZ)return FALSE;value[len/sizeof(WCHAR)]=0;
+ return !lstrcmpiW(value,L"\\SystemRoot\\System32\\drivers\\usosnvme.sys")&&start==0;
 }
 static BOOL enable_privilege(const WCHAR *name){
  HANDLE token=0;TOKEN_PRIVILEGES p={0};BOOL ok=FALSE;
@@ -137,9 +208,7 @@ static BOOL configure(void){
  mount_name(sm,L"USOS_NVME_SYSTEM_");mount_name(wm,L"USOS_NVME_SOFTWARE_");
  operation="open-software";e=load_hive(soft,wm,&software,&soft_loaded);if(e)goto done;
  if(!trusted_store(software,ROOT_STORE,size,0)||!trusted_store(software,PUBLISHER_STORE,size,1))goto done;
- operation="flush-software";e=flush_retry(software);if(e)goto done;
- RegCloseKey(software);software=0;
- operation="unload-software";e=RegUnLoadKeyW(HKEY_LOCAL_MACHINE,wm);if(e)goto done;soft_loaded=FALSE;
+ e=commit_hive(&software,soft,wm,&soft_loaded,0);if(e)goto done;
  /* Readback from the hive file: both stores hold the certificate. */
  operation="verify-load-software";e=load_hive(soft,wm,&software,&soft_loaded);if(e)goto done;
  operation="verify-root-certificate";if(!has_certificate(software,ROOT_STORE,size))goto done;
@@ -152,7 +221,13 @@ static BOOL configure(void){
  read=sizeof(def);e=RegQueryValueExW(select,L"Default",0,&type,(BYTE*)&def,&read);if(!e&&(type!=REG_DWORD||read!=4))e=ERROR_INVALID_DATA;if(e)goto done;
  operation="configure-service";
  if(!service(hive,current)||(def!=current&&!service(hive,def)))goto done;
- operation="flush-system";e=flush_retry(hive);if(e)goto done;ok=TRUE;
+ RegCloseKey(select);select=0;
+ e=commit_hive(&hive,sys,sm,&sys_loaded,1);if(e)goto done;
+ /* Readback from the hive file: the boot service points at our image. */
+ operation="verify-load-system";e=load_hive(sys,sm,&hive,&sys_loaded);if(e)goto done;
+ operation="verify-system-service";
+ if(!service_points_to_usosnvme(hive,current)||(def!=current&&!service_points_to_usosnvme(hive,def))){e=ERROR_INVALID_DATA;goto done;}
+ ok=TRUE;
  done:
  if(!ok&&!failure_code)failure_code=e?(DWORD)e:GetLastError();
  if(select)RegCloseKey(select);if(hive)RegCloseKey(hive);if(software)RegCloseKey(software);
@@ -177,12 +252,8 @@ void entry(void){
  WCHAR running[MAX_PATH];GetWindowsDirectoryW(running,MAX_PATH);if(!lstrcmpiW(running,target))ExitProcess(3);
  BOOL ok=configure();
  if(!ok){
-  DWORD written,code=failure_code?failure_code:GetLastError();char digits[12];unsigned at=sizeof(digits);digits[--at]='\n';digits[--at]='\r';
-  do{digits[--at]=(char)('0'+code%10);code/=10;}while(code);
-  static const char prefix[]="USOS modern NVMe failed at ",middle[]="; Win32 code=";
-  HANDLE output=GetStdHandle(STD_OUTPUT_HANDLE);
-  WriteFile(output,prefix,sizeof(prefix)-1,&written,0);WriteFile(output,operation,lstrlenA(operation),&written,0);
-  WriteFile(output,middle,sizeof(middle)-1,&written,0);WriteFile(output,digits+at,sizeof(digits)-at,&written,0);
+  DWORD code=failure_code?failure_code:GetLastError();
+  say("USOS modern NVMe failed at ");say(operation);say_code("; Win32 code=",code);
  }
  LocalFree(argv);ExitProcess(ok?0:4);
 }

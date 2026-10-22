@@ -265,4 +265,70 @@ int main(int argc,char**argv){
         self.assertTrue(exe.is_file(),'build the helper before running this test')
         self.assertEqual(subprocess.run([str(exe)],capture_output=True).returncode,2)
 
+    def test_failed_flush_falls_back_to_saved_hive(self):
+        # X470 B261022-130215 / -133852: RegFlushKey on the loaded SOFTWARE
+        # hive returned 1016 on every try. commit_hive then saves the loaded
+        # hive with RegSaveKeyExW, unloads it, puts the saved file in place
+        # and sets the stale .LOG1/.LOG2 aside. A good flush keeps the old path.
+        source=(ROOT/'tools/windows_nvme_modern.c').read_text()
+        self.assertIn('e=commit_hive(&software,soft,wm,&soft_loaded,0);',source)
+        self.assertIn('e=commit_hive(&hive,sys,sm,&sys_loaded,1);',source)
+        self.assertIn('operation="verify-system-service"',source)
+        self.assertNotIn('operation="flush-system";e=flush_retry(hive)',source)
+        out=ROOT/'zig-out/modern-tests';out.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=out) as tmp:
+            folder=Path(tmp)
+            code=r'''#include <windows.h>
+#include <assert.h>
+#include <stdio.h>
+static int flush_fail,unloads;
+static LONG WINAPI flush_fake(HKEY h){(void)h;if(flush_fail){flush_fail--;return ERROR_REGISTRY_IO_FAILED;}return ERROR_SUCCESS;}
+static LONG WINAPI unload_fake(HKEY h,LPCWSTR n){(void)h;(void)n;unloads++;return ERROR_SUCCESS;}
+static void Sleep_fake(DWORD ms){(void)ms;}
+#define RegFlushKey flush_fake
+#define RegUnLoadKeyW unload_fake
+#define Sleep Sleep_fake
+#define entry unused_entry
+#include "SOURCE"
+static void put(const WCHAR *p,const char *t,DWORD attr){HANDLE h=CreateFileW(p,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);DWORD w;assert(h!=INVALID_HANDLE_VALUE);WriteFile(h,t,lstrlenA(t),&w,0);CloseHandle(h);if(attr)SetFileAttributesW(p,attr);}
+static BOOL there(const WCHAR *p){return GetFileAttributesW(p)!=INVALID_FILE_ATTRIBUTES;}
+int main(int argc,char**argv){
+ (void)argc;WCHAR dir[MAX_PATH],hive[MAX_PATH],p[MAX_PATH];MultiByteToWideChar(CP_ACP,0,argv[1],-1,dir,MAX_PATH);
+ lstrcpyW(package,dir);join(hive,dir,L"\\SOFTWARE");
+ put(hive,"old hive",0);join(p,hive,L".LOG1");put(p,"log1",FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM);join(p,hive,L".LOG2");put(p,"log2",FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM);
+ assert(enable_privilege(L"SeBackupPrivilege"));
+ HKEY base;BOOL loaded=TRUE;DWORD v=0x5553;
+ assert(!RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-commit",0,0,0,KEY_ALL_ACCESS,0,&base,0));
+ assert(!RegSetValueExW(base,L"marker",0,REG_DWORD,(const BYTE*)&v,4));
+ /* good flush: no save, plain unload */
+ flush_fail=0;unloads=0;assert(commit_hive(&base,hive,L"X",&loaded,0)==ERROR_SUCCESS);
+ assert(!base&&!loaded&&unloads==1&&!lstrcmpA(operation,"unload-software"));
+ join(p,hive,L".LOG1.usos-stale");assert(!there(p));
+ /* flush fails on every try: saved copy replaces the hive, logs set aside */
+ assert(!RegOpenKeyExW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-commit",0,KEY_ALL_ACCESS,&base));
+ loaded=TRUE;flush_fail=99;unloads=0;assert(commit_hive(&base,hive,L"X",&loaded,1)==ERROR_SUCCESS);
+ assert(!base&&!loaded&&unloads==1&&!lstrcmpA(operation,"replace-system"));
+ HANDLE h=CreateFileW(hive,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);char head[4];DWORD n=0;assert(h!=INVALID_HANDLE_VALUE);ReadFile(h,head,4,&n,0);CloseHandle(h);
+ assert(n==4&&head[0]=='r'&&head[1]=='e'&&head[2]=='g'&&head[3]=='f');
+ join(p,hive,L".LOG1");assert(!there(p));join(p,hive,L".LOG2");assert(!there(p));
+ join(p,hive,L".LOG1.usos-stale");assert(there(p));join(p,hive,L".LOG2.usos-stale");assert(there(p));
+ join(p,hive,L".usos-saved");assert(!there(p));join(p,dir,L"\\flush-probe.bin");assert(!there(p));
+ /* save refused: the step is reported, the hive file stays */
+ assert(!RegOpenKeyExW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-commit",0,KEY_ALL_ACCESS,&base));
+ join(p,hive,L".usos-saved");CreateDirectoryW(p,0);
+ loaded=TRUE;flush_fail=99;unloads=0;assert(commit_hive(&base,hive,L"X",&loaded,0)!=ERROR_SUCCESS);
+ assert(base&&loaded&&!unloads&&!lstrcmpA(operation,"save-software"));RemoveDirectoryW(p);
+ RegCloseKey(base);RegDeleteTreeW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-commit");RegDeleteKeyW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-commit");
+ return 0;
+}
+'''
+            (folder/'commit.c').write_text(code.replace('SOURCE',str(ROOT/'tools/windows_nvme_modern.c').replace('\\','/')))
+            exe=folder/'commit.exe'
+            subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-O2',str(folder/'commit.c'),'-ladvapi32','-lcrypt32','-lshell32','-o',str(exe)],check=True,capture_output=True)
+            r=subprocess.run([str(exe),str(folder)],capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+            self.assertIn('SYSTEM hive RegFlushKey failed; saving the hive to a new file instead. Win32 code=1016',r.stdout)
+            self.assertIn('flush probe (4 KiB write + FlushFileBuffers on the target), Win32 code=0',r.stdout)
+            self.assertIn('SYSTEM hive replaced by its saved copy.',r.stdout)
+
 if __name__=='__main__':unittest.main()
