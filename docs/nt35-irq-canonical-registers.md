@@ -141,3 +141,54 @@ Brak własnej aktywnej VM. Nie powtarzano fresh Setup ani nie zmieniano cache,
 USB/hubów, fizycznych nośników, istniejącego nt35-net, merge/push/deploy.
 Wynik dotyczy zainstalowanego NT3.5 Workstation w tej fixture QEMU. Server,
 fizyczny Intel i świeża instalacja z nowym cache wymagają odrębnych prób.
+
+## Regresja USB po poprawce IRQ: nt35-irq-usb01
+
+Drugi mały test użył nowego, efektywnie bajtowo identycznego overlay
+zakończonego fixed01. Nie podmieniał pliku gościa ani wpisu rejestru.
+Kandydat d94ec3e2…e4c85/16 384 B, frozen USB 2d455743…cfe1 i Start4 są
+przypięte zakończonym readbackiem. Parent fixed01 ma SHA-256
+`10020a0db9f57ab2b0029a9d292b0f6f055bd82747d1f20dd2609163aaa48603`.
+`qemu-img compare` rodzica i nowego targetu przed rozruchem PASS.
+
+Tag `nt35-irq-usb01`, TTY65091, jeden normalny guard 2048 + 8192 MiB rezerwy,
+jeden endpoint 300 s. Reużyto tego samego harnessu, hardware i źródłowego argv;
+zmieniły się tylko trzy własne ścieżki i dwa porty localhost. Każda jawna
+akcja miała wcześniej uzbrojony exact-frame ReadDirectoryChangesW. Brak
+odczytów postępu. Small wrapper ma tryby prepare/run/readback; niezależny
+readback dodany podczas rozruchu nie zmienił już załadowanej ścieżki run.
+Rzeczywiste źródło wrappera zachowano z hashem zgodnym z preflightem.
+
+| Akcja | Obserwacja zakończonej akcji |
+|---|---|
+| 01/02: USB CtrlAltDel i Enter | Logowanie i Program Manager Version3.5 |
+| 03: keyboard remove, potem AltF/R | Brak Run; klatka identyczna pikselowo z pulpitem02 |
+| 04/05: keyboard insert, potem AltF/R | Run faktycznie otwarte |
+| 06/07: Esc, mouse remove i AltF/R | Żywa USB klawiatura ponownie otwiera Run bez myszy |
+| 08/09: Esc i mouse insert | Powrót myszy |
+| 10/11: ruch na origin, ruch44/47 i left click | Rzeczywisty kursor, następnie otwarte menu File |
+| 12/13: native File/Shutdown i Enter | It is now safe to turn off your computer |
+
+Jednolite teal w 04 i 10 zachowano, bez wniosku o awarii. Następna konkretna
+akcja klawiatury lub menu dała widoczny wynik. Nie zaliczano samych ACK QMP.
+**Keyboard out/negative control/in/action, mouse out/live keyboard/in/menu
+click — PASS przy nowym IRQ SYS i i8042prt Start4.**
+
+Explicit finish/QMP quit, rzeczywisty wrapper exit0. Postquit FAT readback:
+installed SYS dokładnie d94ec3e2…e4c85, frozen USB, REGF1.2/CurrentDefault1/Start4,
+niezmieniony fixed01 backing. Nowy target SHA-256
+`92c2aac3c1f1028fe3caeb44b60a7ff8f49df482c7cc2456cb2c75ddc47c819a`.
+Własne wcześniejsze logi sieci są identyczne; nie są nowym pomiarem LAN w usb01.
+Wynik sieci pozostaje osobną kwalifikacją fixed01 opisaną wyżej.
+
+Dowody: `artifacts/nt35-irq-usb/preparation.json`, `assessment.json`,
+`runtime-wrapper-source.py`, `stopped-readback/`; oraz
+`artifacts/coverage/vm/nt35-irq-usb01/` z endpoint/operator01–13, akcjami,
+preflight, command i completed result. Ogólnych flag runnera nie zmieniono.
+Odczyt eksportuje tylko własne teksty; hive/MS bytes pozostają w RAM lub
+whole-disk na G:. 41 hostchecks oraz diff-check PASS.
+
+Zachowany folder `G:\USOS-Kolekcja\_vm\nt35-irq-usb01`:
+target.qcow2 3 211 264 B, stick.qcow2 197 120 B, vars.fd 540 672 B.
+Brak aktywnej własnej VM. Nie zmieniono drivera, cache, hub code, hardware
+ani istniejącego nt35-net; bez fresh Setup, fizycznych zapisów, merge/push.

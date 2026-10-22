@@ -25,6 +25,9 @@ SOURCE = PRIOR / 'artifacts/coverage/vm/r20b-nt35-usb-isolation'
 QEMU = Path(r'C:\Users\ASRock\usos-work\bety-instalacja\tools\qemu\qemu-system-x86_64.exe')
 NEW_DRIVER = 'd94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85'
 SOURCE_COMMAND_SHA256 = '9fd03a93112d29fa6f65c68ce9aaa772e44e9ae2eec52dac64189f5689b4c8be'
+PROOF_PATH = ROOT / 'artifacts/nt35-irq/preparation.json'
+EXTRA_SOURCE_PATHS = ()
+SCOPE = 'Installed NT35 driver qualification only; manual native guest evidence and stopped readback required'
 
 
 def load(name, path):
@@ -76,13 +79,16 @@ def command(prior, port, capture_port):
 async def main():
     boot = load('nt35_irq_runtime', MATRIX / 'tools/tests/coverage/boot_menu.py')
     boot.aux.require_operator_channel(True)
-    proof = json.loads((ROOT / 'artifacts/nt35-irq/preparation.json').read_text('utf-8'))
+    proof = json.loads(PROOF_PATH.read_text('utf-8'))
     meta = json.loads((WORK / 'fixture.json').read_text('utf-8'))
     if meta.get('private_profile') is not False or meta.get('folder') != 'Windows NT 3.5':
         raise ValueError('Explicit keyless NT35 required')
-    if not all(proof.get(name) is True for name in ('base_unchanged', 'system_unchanged',
-            'usb_unchanged', 'only_owned_sys_ranges_changed', 'raw_overlay_qemu_compare_pass')):
+    if not all(proof.get(name) is True for name in ('base_unchanged', 'system_unchanged', 'usb_unchanged')):
         raise ValueError('Verified owned-SYS-only overlay required')
+    if proof.get('only_owned_sys_ranges_changed') is not True and proof.get('guest_contents_unchanged') is not True:
+        raise ValueError('Only an owned-SYS change or unchanged guest is allowed')
+    if proof.get('raw_overlay_qemu_compare_pass') is not True and proof.get('effective_disk_compare_pass') is not True:
+        raise ValueError('Verified effective disk comparison required')
     if proof.get('candidate_sha256') != NEW_DRIVER or proof.get('i8042prt_start') != 4:
         raise ValueError('Pinned IRQ candidate and existing USB isolation required')
     if OUT.exists() or (WORK / 'vars.fd').exists() or (WORK / 'stick.qcow2').exists():
@@ -102,7 +108,7 @@ async def main():
         '-F', 'qcow2', '-b', str(BASE / 'stick.qcow2'), str(WORK / 'stick.qcow2')], check=True)
     sources = {str(path): digest(path) for path in (Path(__file__),
         MATRIX / 'tools/tests/coverage/boot_menu.py', MATRIX / 'tools/tests/coverage/nt351_capture.py',
-        SOURCE / 'command.json', QEMU)}
+        SOURCE / 'command.json', QEMU, *EXTRA_SOURCE_PATHS)}
     (OUT / 'preflight.json').write_text(json.dumps(dict(resources=resources,
         reserve_mib=8192, candidate_sha256=NEW_DRIVER, preparation=proof, source_sha256=sources), indent=2), encoding='utf-8')
     qmp = boot.Qmp()
@@ -177,7 +183,7 @@ async def main():
         retained_overlay=str(WORK / 'target.qcow2'), retained=True, candidate_sha256=NEW_DRIVER,
         i8042prt_start=4, installed_runtime_pass=False, irq_latency_pass=False,
         network_capture=capture, postquit_readback_pending=True,
-        scope='Installed NT35 driver qualification only; manual native guest evidence and stopped readback required')
+        scope=SCOPE)
     (OUT / 'result.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
     (OUT / 'completed.json').write_text(json.dumps(dict(stopped=True, retained_overlay=True)), encoding='utf-8')
     print('CASE_COMPLETE ' + TAG, flush=True)

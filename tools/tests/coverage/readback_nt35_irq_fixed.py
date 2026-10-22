@@ -12,6 +12,7 @@ WORK = Path(r'G:\USOS-Kolekcja\_vm\nt35-irq-fixed01')
 BASE = Path(r'G:\USOS-Kolekcja\_vm\r20b-nt35-usb-isolation\target.qcow2')
 CASE = ROOT / 'artifacts/coverage/vm/nt35-irq-fixed01'
 OUT = ROOT / 'artifacts/nt35-irq/stopped-readback'
+PROOF_PATH = ROOT / 'artifacts/nt35-irq/preparation.json'
 CANDIDATE = 'd94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85'
 USB = '2d4557439d7c60f7e0d5cc53d36467cbc36ae24596eb614e078059ddc718cfe1'
 TEXTS = ('NET35.STATUS', 'NET35.ON', 'USABILITY.TXT', 'POST.LOG', 'USOSNET35.SHA256', 'IRQPOST.LOG')
@@ -25,13 +26,15 @@ def digest(path):
 def main():
     result = json.loads((CASE / 'result.json').read_text('utf-8'))
     completed = json.loads((CASE / 'completed.json').read_text('utf-8'))
-    proof = json.loads((ROOT / 'artifacts/nt35-irq/preparation.json').read_text('utf-8'))
+    proof = json.loads(PROOF_PATH.read_text('utf-8'))
     meta = json.loads((WORK / 'fixture.json').read_text('utf-8'))
     if completed.get('stopped') is not True or result.get('qemu_returncode') != 0:
         raise ValueError('Completed writer exit0 required')
     if meta.get('private_profile') is not False or meta.get('folder') != 'Windows NT 3.5':
         raise ValueError('Explicit keyless NT35 required')
-    if OUT.exists() or WORK.resolve() != Path(r'G:\USOS-Kolekcja\_vm\nt35-irq-fixed01'):
+    allowed = (Path(r'G:\USOS-Kolekcja\_vm\nt35-irq-fixed01'),
+               Path(r'G:\USOS-Kolekcja\_vm\nt35-irq-usb01'))
+    if OUT.exists() or WORK.resolve() not in allowed:
         raise ValueError('Fresh exact owned readback required')
     if digest(BASE) != proof['base_sha256']:
         raise ValueError('Retained R20b backing changed')
