@@ -15,7 +15,7 @@ change once during review; the separate binaries are both needed.
 | Candidate | Repository binary | SHA-256 | Runtime proof |
 |---|---|---|---|
 | NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in |
-| NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | R26 DHCP/ping3/3<10ms/DNS/HTTP200 + passive IRQ trace; R27 keyboard/mouse out/in |
+| NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | Fresh normal USOS nt351-irq-fresh01: desktop/DHCP/ping3/3<10ms/DNS/HTTP200 PASS, separate Client/noSharing FAIL; R26 passive IRQ trace; R27 keyboard/mouse out/in |
 
 Both USB regressions explicitly disable the PS/2 driver with inherited
 i8042prt Start4 while leaving hardware i8042 present. They include an
@@ -31,9 +31,28 @@ source hashes from normalized CRLF/LF equivalence; use each actual build
 manifest rather than silently assigning one source hash to both builds.
 
 The original fresh R20/R22 installations used earlier drivers and retain
-their measured approximately2s delay. The corrected drivers have only
-installed-overlay qualification so far. A reviewed new cache and fresh
-normal USOS runs remain required before a fresh-install PASS claim.
+their measured approximately2s delay. Corrected NT35 d94 still has only
+installed-overlay qualification; it needs a reviewed cache and a fresh
+normal USOS run before a fresh-install PASS claim.
+
+Corrected NT351 f579 now has completed fresh normal USOS qualification,
+commit664d721e in `C:\Users\ASRock\usos-work\nt351-fresh` [S11 in the
+per-image audit]. Its private R22-derived cache changes only the own SYS
+and SHA sidecar: two of832 effective initrd entries change,830 and all
+other cache files remain identical. A new blank target reaches the native
+desktop and passes DHCP renewal, three native ping replies below10ms,
+strict UDP/TCP DNS and HTTP68k200. Native safe shutdown, exit0 and two
+independent stopped reads pin the actual17024-byte f579 SYS. PS/2 is
+allowed in this fresh case; HID out/in remains the separate R27 proof.
+Strict same-XID DORA stays false despite native lease/renew evidence.
+
+The same fresh NT351 case separately fails Client/noSharing: native
+Server/Computer Browser are RUNNING and both have Start2/Type32 in the
+selected stopped SYSTEM control set. No service policy changed in that
+case. Separate NT35/NT351 policy apply/cold trials have no completed
+qualification in this handoff. The private fresh cache result does not
+claim integration into default release assets.
+
 QEMU's working NIC IRQ does not qualify the physical I211 IRQ/polling
 behavior on X470. NT4 and other OS binaries were not rebuilt by this fix.
 
