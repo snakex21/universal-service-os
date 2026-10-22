@@ -39,3 +39,13 @@ although [QAPI permits optional subsystem IDs](https://github.com/qemu/qemu/blob
 The corrected check compares the vendor/device fields and still requires
 the exact BDF, class, ECAM identity, BAR and MMIO ranges. The original failed
 diagnostic is preserved; it is not a Windows failure or interrupt result.
+
+The corrected R23b ran against the unchanged stopped R18f NT351 installation.
+Its 300-byte snapshot found MSI and MSI-X disabled, PCI INTx allowed and all
+eight LPC PIRQ routes enabled (IRQ10/11); the NIC advertised IRQ11. IMS was
+zero at the time of its read. The snapshot does not establish when it was
+cleared relative to the driver's checker/watchdog, nor prove guest ISR entry.
+No driver or firmware fix follows from those registers alone. Native
+Shutdown was observed in operator03, followed by QMP quit/rc0; hashes of
+the entire backing chain were unchanged. Details remain in the owned
+`artifacts/coverage/vm/r23b-nt351-irq-snapshot` evidence.
