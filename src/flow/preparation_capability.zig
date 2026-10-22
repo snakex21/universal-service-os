@@ -186,7 +186,7 @@ test "Windows 10 BIOS ISO uses Windows PE without changing UEFI or other images"
     try std.testing.expectEqual(Backend.windows_iso, resolveForFirmware(win10, .iso, .direct_iso, .uefi).?);
     try std.testing.expectEqual(Backend.chainload, resolveForFirmware(win10, .iso, .chainload, .uefi).?);
     try std.testing.expect(nativeUefiIso("windows-10") and nativeUefiIso("windows-11") and nativeUefiIso("windows-7"));
-    try std.testing.expect(nativeUefiIso("windows-8-1") and nativeUefiIso("windows-8"));
+    try std.testing.expect(nativeUefiIso("windows-8-1") and !nativeUefiIso("windows-8"));
     try std.testing.expect(resolveForFirmware(win10, .wim, .direct_iso, .bios) == null);
     try std.testing.expect(resolveForFirmware(win10, .iso, .memdisk, .bios) == null);
     try std.testing.expectEqual(Backend.wimboot, resolveForFirmware(win10, .wim, .automatic, .bios).?);

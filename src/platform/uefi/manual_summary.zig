@@ -43,7 +43,7 @@ pub fn show(
     if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
-    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
+    const backend = manual_images.backendFor(system, image, method, firmware) orelse return showUnsupported();
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
@@ -209,7 +209,7 @@ pub fn show(
     var user_text: [120]u8 = undefined;
     const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
     const vista = native == .vista;
-    const modern_native = image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id);
+    const modern_native = image.kind == .iso and backend == .windows_iso and (usos.flow.preparation_capability.nativeModernNt(system.id) or usos.catalog.os_profiles.traits(system.id).x86_csmwrap);
     var modern_pe_text: [96]u8 = undefined;
     var modern_driver_text: [120]u8 = undefined;
     if (modern_native and manual_images.x86Csmwrap(system, image)) {
@@ -364,7 +364,7 @@ fn start(
     // No USB gamepad transfer may outlive the menu into another loader;
     // the pads are picked up again if the launch fails and the menu returns.
     input.stopGamepads();
-    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
+    const backend = manual_images.backendFor(system, image, method, firmware) orelse return showUnsupported();
     // Progress rows come from the selection's profile (plan).
     const os_plan = usos.flow.plan.make(system, image.kind, method, firmware);
     view.setPlanLabels(if (os_plan) |plan| plan.labels() else null);

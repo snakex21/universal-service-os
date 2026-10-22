@@ -71,8 +71,19 @@ pub fn x86Csmwrap(system: *const usos.catalog.SystemEntry, image: usos.catalog.I
     if (info.arch != .x86 or image.kind != .iso or probe.firmware() != .uefi_x64) return false;
     // Windows 7 / Vista and Server 2008 (route_as) as well: their 32-bit media
     // go through an x86 PE10 donor (win-nt6-x86-uefi-csmwrap).
-    if (!usos.flow.preparation_capability.nativeModernNt(system.id) and !nt6Legacy(system)) return false;
+    // Windows 8 RTM (x86_csmwrap): only its 32-bit media, routing unchanged.
+    if (!usos.flow.preparation_capability.nativeModernNt(system.id) and !nt6Legacy(system) and
+        !usos.catalog.os_profiles.traits(system.id).x86_csmwrap) return false;
     return !@import("secure_boot.zig").csm().likelyOn();
+}
+
+/// The backend of this selection: the routing's, except that 32-bit Windows 8
+/// RTM media (x86_csmwrap, no native route) under Automatic on 64-bit UEFI
+/// without CSM take the windows_iso x86 CSMWrap start (manual_summary).
+pub fn backendFor(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, method: usos.catalog.BootMethod, firmware: usos.firmware.Firmware) ?usos.flow.preparation_capability.Backend {
+    const routed = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return null;
+    if (method == .automatic and usos.catalog.os_profiles.traits(system.id).x86_csmwrap and x86Csmwrap(system, image)) return .windows_iso;
+    return routed;
 }
 
 /// Windows 7 / Vista routes (Server 2008 / 2008 R2 via route_as).

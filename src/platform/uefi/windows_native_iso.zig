@@ -459,24 +459,29 @@ test "32-bit Windows 7 / Vista request names the x86 PE10 donor" {
 
 pub const systemFolder = scanner.systemFolder;
 
-/// The Setup WinPE versions the native modern start runs: 6.2.9200 (Windows 8
-/// RTM), 6.3 (8.1) and 10.0.
+/// The Setup WinPE versions the native modern (x64) start runs: 6.3 and 10.0.
 pub fn modernSetupVersion(setup: wim.Setup) bool {
-    if (setup.major == 10) return true;
-    if (setup.major != 6) return false;
-    if (setup.minor == 3) return true;
-    // Windows 8 RTM (NT 6.2, build 9200): its own Setup WinPE, PE 4.0.
-    return setup.minor == 2 and setup.build == 9200;
+    return setup.major == 10 or (setup.major == 6 and setup.minor == 3);
 }
 
-test "native modern start accepts Windows 8 RTM, PE 5.0 (6.3) and PE 10, not Vista/7" {
-    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+/// The x86 CSMWrap path (win-x86-uefi-csmwrap) also takes Windows 8 RTM
+/// (NT 6.2, build 9200, PE 4.0): Setup runs in BIOS mode there, so the x64
+/// native start stays 6.3 / 10 only.
+pub fn modernX86SetupVersion(setup: wim.Setup) bool {
+    return modernSetupVersion(setup) or (setup.major == 6 and setup.minor == 2 and setup.build == 9200);
+}
+
+test "native modern start accepts PE 5.0 (6.3) and PE 10, the x86 path also Windows 8 RTM" {
     try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
     try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 10, .minor = 0, .build = 26100 }));
-    // Only the RTM build of 6.2: no pre-release / unknown 6.2 Setup media.
-    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 8400 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
     try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
-    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 0, .build = 6002 }));
+    try std.testing.expect(modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+    try std.testing.expect(modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
+    // Only the RTM build of 6.2: no pre-release / unknown 6.2 Setup media.
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 8400 }));
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 0, .build = 6002 }));
 }
 
 pub const ModernInspection = struct {
@@ -518,7 +523,7 @@ pub noinline fn inspectModern(image_directory: []const u8, name: []const u8) !Mo
 /// through CSMWrap (docs/design/csmwrap-integration.md section 11).
 fn inspectModernX86Iso(iso: anytype) !ModernInspection {
     const setup = try usos.windows7_iso.setupInfoX86(uefi.pool_allocator, iso);
-    if (!modernSetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
+    if (!modernX86SetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
     try scanner.validateBootFiles(iso);
     var node: udf.Node = undefined;
     if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;
