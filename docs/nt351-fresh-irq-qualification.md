@@ -40,6 +40,61 @@ stopped readback of the own SYS. Native `net start` and bounded stopped
 Browser/LanmanServer/LanmanWorkstation/Tcpip state are a separate
 Client/noSharing policy observation; policy is not modified in this IRQ case.
 
-Runtime result is pending. Cache creation, hashes and host checks are not a
-fresh Windows installation PASS. Historical R22 approximately 2 second ping
-latency and R25 no-IRQ failure remain preserved.
+Completed on 22 October 2026: **fresh normal installation and fast native LAN
+PASS; Client/noSharing policy FAIL**. The target was a new standalone blank
+4 GiB qcow2, with no backing image. Actual menu/profile/disk confirmations
+completed, then native Program Manager/Workstation Version 3.51 appeared.
+The normal-flow prepared-target notice occurred at 1228.76 seconds; the
+single planned initial frame was captured 300 seconds later.
+
+Native `ipconfig /release`, `/renew` and `/all` verified DHCP 10.0.2.15/24,
+gateway 10.0.2.2 and DNS 10.0.2.3. Standard native ping returned three of
+three replies, each `time<10ms`. The unchanged explicit guest logger measured
+matching ICMP RTT 0 ms, strict UDP DNS replies in 40/51 ms, strict TCP DNS
+in 20 ms, native frogfind resolution in 90 ms and 68k.news HTTP 200 with a
+130 ms connection. Its one completed snapshot and the native output remain
+separate evidence. Gateway UDP53/TCP80 and frogfind HTTP timeouts remain;
+they are not removed from the result.
+
+The completed bounded capture contains 172 frames/38921 bytes. Fresh boot
+and explicit renewal each have a correlated Discover/Offer and Request/ACK,
+but original NT351 switches transaction ID between those pairs. Strict
+same-XID DORA therefore remains **false**. Four checksum/identity-matched
+ICMP pairs correlate the three native pings and the strict guest probe.
+
+`net start` genuinely listed **Computer Browser and Server running**, along
+with DHCP Client/Workstation. The clean stopped REGF1.2 SYSTEM has
+Current=Default=1, Browser Start2/Type32, LanmanServer Start2/Type32,
+LanmanWorkstation Start2/Type32 and Tcpip Start3/Type1. Thus the requested
+Client/noSharing policy fails independently of the successful IRQ/LAN test.
+This case never stops or reconfigures those services. Its four-service
+reader exports only these allowlisted DWORDs; the Microsoft hive stays in
+RAM/whole disk on G. A separately built policy helper and separate overlay
+apply/cold-boot qualification must follow; this fresh cache stays immutable.
+
+Native shutdown reached the safe-power-off page (`operator-16.png`), then
+QMP quit and parent TTY2659 both exited 0. The stopped guest collector and
+independent whole-disk FAT readback both verify the installed 17024-byte
+f579 SYS. The outer QEMU argv is identical to R22 after normalization of
+the case path and localhost ephemeral QMP/mirror ports only. Every old
+cache file and every unrelated private-cache file was rehashed unchanged
+after runtime. No full rebuild, cache mutation, physical write, original
+Windows binary/hive export or progress polling occurred.
+
+Retained target:
+`G:\USOS-Kolekcja\_vm\nt351-irq-fresh01\target-retained.qcow2`, SHA256
+cb9d664615260a2e6b3c8e618be19b9cf785696019f41753b1461d3754b1196c.
+Target 204865536 B, stick 512557056 B and vars 540672 B remain on G
+(717963264 B total). The new scratch whole-disk readback image was removed
+only after checking its exact absolute owned path; the retained source is
+unchanged. The separately blocked old macOS cleanup was never retried.
+
+Reviewable evidence is under `artifacts/coverage/nt351-irq-fresh01/` and
+`artifacts/coverage/vm/nt351-irq-fresh01/`. Six new host cases pass (three
+cache-delta and three bounded-policy cases), and completed assessment checks
+pass for argv, cache immutability, standalone disk, native tests, capture and
+both actual driver readbacks. This case retains R22 PS/2 input allowance;
+USB out/in remains independently qualified by R27, not repeated here.
+Historical R22 approximately 2 second ping latency and R25 no-IRQ failure
+remain preserved. No NT351 Server, physical I211/X470, general SMP or whole
+USOS release qualification is added.

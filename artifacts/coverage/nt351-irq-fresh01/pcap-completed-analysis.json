@@ -1,0 +1,223 @@
+{
+  "strict_dora": {
+    "dora_observed": false,
+    "exchanges": [],
+    "records": 172,
+    "prepared_target_start_record": 4,
+    "installed_runtime_pass": false,
+    "icmp_pass": false,
+    "dns_pass": false,
+    "scope": "Pinned VM netdev exchange after requested prepared-target start; guest/OS attribution requires guest evidence"
+  },
+  "dhcp": [
+    {
+      "record": 4,
+      "decoded": {
+        "kind": 1,
+        "xid": 53604455,
+        "yiaddr": "0.0.0.0",
+        "server": null,
+        "requested": null,
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 5,
+      "decoded": {
+        "kind": 2,
+        "xid": 53604455,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 6,
+      "decoded": {
+        "kind": 3,
+        "xid": 4177721713,
+        "yiaddr": "0.0.0.0",
+        "server": "10.0.2.2",
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 7,
+      "decoded": {
+        "kind": 5,
+        "xid": 4177721713,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 99,
+      "decoded": {
+        "kind": 1,
+        "xid": 3245232753,
+        "yiaddr": "0.0.0.0",
+        "server": null,
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 100,
+      "decoded": {
+        "kind": 2,
+        "xid": 3245232753,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 101,
+      "decoded": {
+        "kind": 3,
+        "xid": 1484615979,
+        "yiaddr": "0.0.0.0",
+        "server": "10.0.2.2",
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 102,
+      "decoded": {
+        "kind": 5,
+        "xid": 1484615979,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    }
+  ],
+  "correlated_exchanges_two_xids": [
+    {
+      "records": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "discover_offer_xid": 53604455,
+      "request_ack_xid": 4177721713,
+      "lease": {
+        "kind": 5,
+        "xid": 4177721713,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "records": [
+        99,
+        100,
+        101,
+        102
+      ],
+      "discover_offer_xid": 3245232753,
+      "request_ack_xid": 1484615979,
+      "lease": {
+        "kind": 5,
+        "xid": 1484615979,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    }
+  ],
+  "icmp_pairs": [
+    {
+      "request_record": 104,
+      "reply_records": [
+        105
+      ],
+      "wire_delays_ms": [
+        0.049
+      ]
+    },
+    {
+      "request_record": 106,
+      "reply_records": [
+        107
+      ],
+      "wire_delays_ms": [
+        0.007
+      ]
+    },
+    {
+      "request_record": 108,
+      "reply_records": [
+        109
+      ],
+      "wire_delays_ms": [
+        0.007
+      ]
+    },
+    {
+      "request_record": 110,
+      "reply_records": [
+        111
+      ],
+      "wire_delays_ms": [
+        0.007
+      ]
+    }
+  ],
+  "scope": "Pinned MAC after prepared-target boundary; native guest supplies OS/timing attribution"
+}

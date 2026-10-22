@@ -1,0 +1,10 @@
+{
+  "new_host_cases_passed": 6,
+  "cache_delta_cases": 3,
+  "bounded_policy_cases": 3,
+  "completed_assessment": "PASS",
+  "candidate_rebuild_performed": false,
+  "canonical_candidate_prior_graph_tests_passed": 9,
+  "canonical_candidate_prior_graph_reference": "b14378d8 / nt351-irq-build01",
+  "diff_check": "PASS"
+}
