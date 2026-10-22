@@ -45,6 +45,9 @@ rem      donor, whose stornvme service runs usosnvme on an NVMe target):
 rem      usosnvme.sys (own GPL SCSIPORT miniport, tools/nt/usosnvme)
 rem      as a boot-start service with a CriticalDeviceDatabase entry for
 rem      PCI\CC_010802 (docs/nvme-nt6-2026-10-12.md); never fatal;
+rem   3f. every version: usos-x86-csmwrap hideesp, a "no drive letter" entry
+rem      for the CSMWrap ESP in the installed system's MountedDevices
+rem      (tools/windows_csmwrap_hide.h); never fatal;
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart.
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
@@ -91,6 +94,13 @@ if errorlevel 1 exit /b 1
 call :nvme
 if exist "%~dp0usos-nvme-modern.flag" if errorlevel 1 exit /b 1
 call :mpart
+rem Every version: no drive letter for the CSMWrap ESP (MBR type 0xEF) in the
+rem installed Windows; NT 6+ gave it one on the first boot (X470 2026-10-22,
+rem docs/csmwrap-esp-letter-2026-10-22.md). Offline SYSTEM hive entry only;
+rem never fatal.
+echo [USOS] phase=hide-csmwrap-esp
+"%~dp0usos-x86-csmwrap.exe" hideesp
+if errorlevel 1 echo [USOS] hideesp: not done; the CSMWrap ESP may show a drive letter (boot unaffected).
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" stick
 "%~dp0usos-x86-csmwrap.exe" after

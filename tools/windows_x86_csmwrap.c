@@ -34,6 +34,11 @@
  *                            fc.exe; the usosmpart copy readback of the cmd).
  *   stick                    read-only: logs the dirty bit of every volume on
  *                            a USB / removable disk (the USOS stick).
+ *   hideesp                  after Setup: the installed system's offline
+ *                            SYSTEM hive gets a "no drive letter" entry for
+ *                            the CSMWrap ESP (MBR type 0xEF at esp_start,
+ *                            tools/windows_csmwrap_hide.h); never fatal for
+ *                            the flow (exit 0 written / present, else 11).
  *   after                    the Windows partition holds bootmgr and
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
@@ -50,7 +55,7 @@
 static WCHAR base[MAX_PATH], scratch[MAX_PATH];
 static BYTE buffer[65536];
 static DWORD signature, disk = 0xffffffff, windows_number;
-static ULONGLONG staging_start, staging_sectors, windows_start, windows_sectors;
+static ULONGLONG staging_start, staging_sectors, windows_start, windows_sectors, esp_start;
 
 void *memcpy(void *d, const void *s, size_t n) { volatile BYTE *p = d; const BYTE *q = s; while (n--) *p++ = *q++; return d; }
 void *memset(void *d, int v, size_t n) { volatile BYTE *p = d; while (n--) *p++ = (BYTE)v; return d; }
@@ -90,6 +95,7 @@ static BOOL load_target(void) {
         else if ((c | 32) >= 'a' && (c | 32) <= 'f') v = v * 16 + (DWORD)((c | 32) - 'a' + 10);
         else return FALSE;
     }
+    { const char *es = ini_value(text, "esp_start"); esp_start = es ? parse_decimal(es) : 0; }
     signature = v; staging_start = parse_decimal(ss); staging_sectors = parse_decimal(sn); windows_start = parse_decimal(ws); windows_sectors = parse_decimal(wn);
     return signature && staging_start && staging_sectors && windows_start && windows_sectors;
 }
@@ -553,6 +559,23 @@ static BOOL same_file(const WCHAR *a, const WCHAR *b) {
     return equal;
 }
 
+/* ---- hideesp: no drive letter for the CSMWrap ESP (windows_csmwrap_hide.h) */
+#include "windows_csmwrap_hide.h"
+static DWORD hide_esp(const BYTE *s) {
+    if (!esp_start) { say("[X86_CSMWRAP] hideesp: esp_start missing in usos-csmwrap-target.ini; skipped\r\n"); return 11; }
+    BOOL esp = FALSE;
+    for (int i = 0; i < 4; i++) { const BYTE *e = s + 446 + 16 * i; DWORD first; memcpy(&first, e + 8, 4); if (e[4] == 0xEF && first == esp_start) esp = TRUE; }
+    if (!esp) { logn("hideesp: no MBR type 0xEF entry at esp_start (LBA low 32 bits)=", (DWORD)esp_start); return 11; }
+    if (!target_letter()) { say("[X86_CSMWRAP] hideesp: the installed Windows volume has no drive letter; skipped\r\n"); return 11; }
+    WCHAR hive[MAX_PATH]; lstrcpyW(hive, target_root); lstrcatW(hive, L"Windows\\System32\\config\\SYSTEM");
+    DWORD letters = 0, r = usos_hide_esp_letter(hive, signature, esp_start, &letters);
+    logn("hideesp: drive letters of the CSMWrap ESP removed from MountedDevices=", letters);
+    logn(r == USOS_HIDE_WRITTEN ? "hideesp: no-drive-letter entry for the CSMWrap ESP written, LBA (low 32 bits)=" :
+         r == USOS_HIDE_PRESENT ? "hideesp: no-drive-letter entry already present, LBA (low 32 bits)=" : "hideesp: FAILED (code in the next line), LBA (low 32 bits)=", (DWORD)esp_start);
+    if (r >= USOS_HIDE_ERR_LOAD) { logn("hideesp: error code=", r); return 11; }
+    return 0;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -574,6 +597,18 @@ void entry(void) {
         modern_setup = arg_count == 7 && lstrcmpiW(args[6], L"modern") == 0;
         { char d[MAX_PATH]; DWORD dn = GetEnvironmentVariableA("USOS_NVME_DRIVERS", d, MAX_PATH); if (dn && dn < MAX_PATH) lstrcpyA(nvme_drivers, d); }
         ExitProcess(write_answer(args[2], args[3]) ? 0 : 7);
+    }
+    /* Host test of the MountedDevices edit only (tools/tests/test_csmwrap_esp_hide.py):
+     * hideesp-test <HKCU key standing for MountedDevices> <signature hex> <esp LBA decimal>;
+     * exit = result * 10 + letters removed (9990: the key does not open). */
+    if (lstrcmpiW(args[1], L"hideesp-test") == 0 && arg_count == 5) {
+        DWORD sig = 0; ULONGLONG lba = 0; HKEY k;
+        for (const WCHAR *c = args[3]; *c; c++) sig = sig * 16 + (DWORD)(*c <= L'9' ? *c - L'0' : (*c | 32) - L'a' + 10);
+        for (const WCHAR *c = args[4]; *c; c++) lba = lba * 10 + (ULONGLONG)(*c - L'0');
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &k) != ERROR_SUCCESS) ExitProcess(9990);
+        DWORD letters = 0, r = usos_hide_esp_in_key(k, sig, lba, &letters);
+        RegCloseKey(k);
+        ExitProcess(r * 10 + letters);
     }
     if (lstrcmpiW(args[1], L"samefile") == 0 && arg_count == 4) ExitProcess(same_file(args[2], args[3]) ? 0 : 1);
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
@@ -634,6 +669,7 @@ void entry(void) {
         ExitProcess(write_mbr(s, "staging partition active again for a retry") ? 0 : 6);
     }
     if (lstrcmpiW(args[1], L"target") == 0 && arg_count == 3) ExitProcess(write_target(args[2]) ? 0 : 9);
+    if (lstrcmpiW(args[1], L"hideesp") == 0) ExitProcess(hide_esp(s));
     if (lstrcmpiW(args[1], L"after") == 0) {
         BOOL bootmgr = exists_on_partition(L"\\bootmgr"), winload = exists_on_partition(L"\\Windows\\System32\\winload.exe");
         logn("bootmgr on the Windows partition=", bootmgr);
