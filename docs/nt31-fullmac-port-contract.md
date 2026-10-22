@@ -182,4 +182,84 @@ packet/buffer ABI and filter/binding ownership, followed by a separate
 full-MAC source/build with import and unwind checks. Only then should an
 owned overlay from stopped R19 be prepared for static IP, ping and DNS.
 No new NT31 installation is needed. Stock DHCP remains not applicable.
-No VM, build or additional original-media audit is queued at this checkpoint.
+No VM, build or additional original-media audit was queued at that checkpoint.
+
+## Resumed implementation, 22 October 2026
+
+`lifecycle-05.json` records exact HAL instructions:5E20 jumps through
+IAT101B4,5E30 through101B8 and5E40 through101BC, relative to80400000.
+Those entries name MmAllocateContiguousMemory, MmFreeContiguousMemory
+and MmGetPhysicalAddress respectively. `lifecycle-06.json` also fixes the
+audit scanner's signed32-bit displacement comparison and records these
+resolved thunks explicitly. The earlier empty thunk map remains historical.
+The kernel resource validator89F50 has140 direct instructions; a memory
+descriptor follows89FB4–89FDE and passes the actual interface/bus through
+both endpoint translations8A019/8A03C. It does not reject interface5.
+
+There is an important unwind requirement: MapIoSpaceF45–F4E frees the old
+resource list and installs its replacement before checking conflict/status.
+Both registration and mapping use OverrideConflict=TRUE in
+IoReportResourceUsage. Therefore even failed/conflicting mapping must call
+the real NdisReleaseAdapterResources33E0 before NdisDeregisterAdapter.
+Release zeroes PartialCount at33EF and reports that empty list at340D.
+The candidate implements this on every registered cleanup path.
+
+Corrected callback labels: EthCreateFilter argument2 becomes filter+14
+(NE2000 RVA21C0, seven arguments: AddressChange). Argument3 becomes+18
+(NE2240, five arguments: FilterChange). The previous checkpoint swapped
+those names. NdisDeregisterMac2730 takes statusOut+handle and returns with
+eight stack bytes removed, unlike a one-argument miniport deregistration.
+The new declarations and import preflight use the actual old contracts.
+
+The separate own implementation is `tools/nt/usosnet/src31/`; it compiles
+the unchanged own igb source through a small wrapper. Existing NT4/95,
+NDIS5, NT35 and NT351 binaries and their shared source were not changed.
+Its runtime candidate is limited to Intel82576:8086:10C9, one explicitly
+configured BDF and an actual UP kernel. It validates PCI identity, class,
+header and BAR, reports actual MMIO, obtains shared DMA through NDIS with
+checked24-bit bounds, and disables MSI/MSI-X plus INTx for polling.
+Original PCI command/capability controls are retained for teardown.
+
+An owned thread waits20ms, copies RX under the hardware lock and indicates
+through the original Ethernet filter at DISPATCH_LEVEL after releasing that
+lock. The filter owns destination/multicast policy; hardware accepts a
+superset. Bounded software TX loopback handles local/broadcast/multicast
+destinations. Deferred close completes after the filter's last receive
+reference. Removal stops and joins the actual thread object before freeing
+DMA; bus mastering is disabled and checked before DMA memory is released.
+Impossible join/IRQL/DMA-stop violations fail-stop instead of freeing live
+state. This still needs actual Windows execution and shutdown evidence.
+
+Early Open is guarded under FilterLock: no filter callback is made while
+Filter is NULL, hardware has not started or removal has begun. The actual
+C gate is exercised by native host cases with a callback that would fail
+if invoked with NULL. Reset currently returns the real NOT_RESETTABLE
+status; a successful reset is not fabricated. There are no private NDIS
+handle writes or missing-API stubs.
+
+Build command:
+`python -I -B tools/nt/usosnet/build31.py --wdk C:/Users/ASRock/Desktop/universal-service-os/tools/WinDDK71 --out artifacts/nt31-fullmac-build/build11`.
+That completed directory is intentionally not reusable/overwritten. Its
+candidate is15104B, PE3.10, SHA256
+`f665b91d6bc8294e63c75625b19a8cc100164059a09735d8174d621801190ee7`.
+`preflight_usosnet31.py` checks all43 imports against original exports,
+17 original cleanup contracts,10 compiled callback decorations and the
+38 native policy cases. All passed. The own NET31CFG.EXE is5120B,
+SHA256`d5eee975c232971052f52619bb9455fc4fb3491df450401780bda13dd9c2819c`;
+its host OS guard refused configuration and wrote only adjacent CFG31.LOG.
+**These are host results; no installed NT31 Intel LAN PASS yet.**
+
+Stopped R19c readback proves that TCPIP/PING/IPCONFIG and network services
+were not installed. NDIS/AFD/TDI/STREAMS/WSOCK32 files are present. The
+installed UP NTOS hash differs from the MP module selected by the original
+media helper, so the final overlay preflight must also compare imports with
+the actual stopped UP kernel. No raw hive/module was exported.
+
+Original OEM identification corrects another filename assumption:
+OEMNADN2 is NE2000, while OEMNADNE is NE3200/EISA. The scoped installation
+donor is instead original OEMNADLB (NDISLoop), privately transformed in RAM
+for our real SYS/adapter identity and copied only into the owned whole VM
+disk. The original NetworkControlPanel will create stock TCP/IP STREAMS
+configuration and bindings. NET31CFG refuses absent/ambiguous own adapter
+instances and changes only the installed own adapter's bus/BDF parameters.
+The required reboot and actual driver/IP/echo/DNS proof remain ahead.

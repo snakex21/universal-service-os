@@ -44,7 +44,7 @@ def protected_binaries():
         path=ROOT.parent/tree/'tools/nt/usosnet/bin/i386'/leaf;rows[str(path)]=digest(path)
     return rows
 
-def main(out=OUT,ndis_rvas=(),field_calls=(),ne_rvas=()):
+def main(out=OUT,ndis_rvas=(),field_calls=(),ne_rvas=(),hal_rvas=(),kernel_rvas=()):
     out=out.resolve()
     if not out.is_relative_to(ROOT/'artifacts/nt31-fullmac-contract'):raise ValueError('Owned metadata only')
     if out.exists():raise FileExistsError('Never overwrite a completed original-media measurement')
@@ -61,7 +61,7 @@ def main(out=OUT,ndis_rvas=(),field_calls=(),ne_rvas=()):
     before=protected_binaries()
     report=dict(scope='Static full-MAC lifecycle/resource contract only; no Intel implementation or runtime PASS',
         archive_sha256=case['source_sha256'],iso_sha256=case['member_sha256'],script_sha256=digest(Path(__file__)),modules={},protected_binaries=before,
-        extra_ndis_rvas=[hex(v) for v in ndis_rvas],extra_ne_rvas=[hex(v) for v in ne_rvas],
+        extra_ndis_rvas=[hex(v) for v in ndis_rvas],extra_ne_rvas=[hex(v) for v in ne_rvas],extra_hal_rvas=[hex(v) for v in hal_rvas],extra_kernel_rvas=[hex(v) for v in kernel_rvas],
         indirect_call_offsets=[hex(v) for v in field_calls])
     with tempfile.TemporaryDirectory(prefix='original-',dir=OWN) as temporary:
         work=Path(temporary).resolve()
@@ -82,7 +82,10 @@ def main(out=OUT,ndis_rvas=(),field_calls=(),ne_rvas=()):
                 exports={e.name.decode('ascii'):e.address for e in pe.DIRECTORY_ENTRY_EXPORT.symbols if e.name} if hasattr(pe,'DIRECTORY_ENTRY_EXPORT') else {}
                 rvas={name:exports[name] for name in selected if name in exports}
                 if leaf=='ndis.sys':rvas.update({'internal_'+hex(v):v for v in ndis_rvas})
-                if leaf=='hal.dll':rvas['AdapterAllocator48f0']=0x48f0
+                if leaf=='ntoskrnl.exe':rvas.update({'internal_'+hex(v):v for v in kernel_rvas})
+                if leaf=='hal.dll':
+                    rvas['AdapterAllocator48f0']=0x48f0
+                    rvas.update({'internal_'+hex(v):v for v in hal_rvas})
                 if leaf=='ne2000.sys':
                     rvas={'RegisterAdapterHelper':0x940,'RemoveAdapter':0x1b40,'UnloadMac':0x1b10,
                           'OpenAdapter':0xcd0,'CloseAdapter':0xf50,'Request':0x10f0,
@@ -100,13 +103,19 @@ def main(out=OUT,ndis_rvas=(),field_calls=(),ne_rvas=()):
                     routine['unresolved_indirect_jumps']=unresolved
                 iat={i.address:i.name.decode('ascii') for m in getattr(pe,'DIRECTORY_ENTRY_IMPORT',()) for i in m.imports if i.name}
                 thunks={}
+                # Exact requested entry points need no section-wide alignment assumption.
+                for rva in hal_rvas if leaf=='hal.dll' else ():
+                    inst=next(md.disasm(mapped[rva:rva+15],base+rva),None)
+                    if inst and inst.mnemonic=='jmp' and len(inst.operands)==1 and inst.operands[0].type==decoder.X86_OP_MEM:
+                        mem=inst.operands[0].mem
+                        if not mem.base and not mem.index and (mem.disp&0xffffffff) in iat:thunks[hex(rva)]=iat[mem.disp&0xffffffff]
                 if leaf in ('ndis.sys','ne2000.sys','hal.dll'):
                     for section in pe.sections:
                         if section.Characteristics&0x20000000:
                             for inst in md.disasm(section.get_data(),base+section.VirtualAddress):
                                 if inst.mnemonic=='jmp' and len(inst.operands)==1 and inst.operands[0].type==decoder.X86_OP_MEM:
                                     mem=inst.operands[0].mem
-                                    if not mem.base and not mem.index and mem.disp in iat:thunks[hex(inst.address-base)]=iat[mem.disp]
+                                    if not mem.base and not mem.index and (mem.disp&0xffffffff) in iat:thunks[hex(inst.address-base)]=iat[mem.disp&0xffffffff]
                 info=decoder.instructions(blob,False,call_offsets=field_calls if leaf=='ndis.sys' else ()) if leaf in ('ndis.sys','ne2000.sys') else {}
                 report['modules'][leaf]=dict(member=member,sha256=sha,image_base=hex(base),exports_rva={n:hex(v) for n,v in sorted(exports.items())},
                     selected_presence={n:n in exports for n in selected},import_iat={hex(at-base):name for at,name in iat.items()},import_thunks=thunks,
@@ -125,6 +134,8 @@ if __name__=='__main__':
     parser.add_argument('--ndis-rva',action='append',default=[],type=lambda value:int(value,0))
     parser.add_argument('--field-call-offset',action='append',default=[],type=lambda value:int(value,0))
     parser.add_argument('--ne-rva',action='append',default=[],type=lambda value:int(value,0))
+    parser.add_argument('--hal-rva',action='append',default=[],type=lambda value:int(value,0))
+    parser.add_argument('--kernel-rva',action='append',default=[],type=lambda value:int(value,0))
     args=parser.parse_args()
-    if len(args.ndis_rva)>16 or len(args.ne_rva)>16 or len(args.field_call_offset)>8:raise ValueError('Narrow bounded targets required')
-    main(args.out,args.ndis_rva,args.field_call_offset,args.ne_rva)
+    if len(args.ndis_rva)>16 or len(args.ne_rva)>16 or len(args.hal_rva)>8 or len(args.kernel_rva)>8 or len(args.field_call_offset)>8:raise ValueError('Narrow bounded targets required')
+    main(args.out,args.ndis_rva,args.field_call_offset,args.ne_rva,args.hal_rva,args.kernel_rva)

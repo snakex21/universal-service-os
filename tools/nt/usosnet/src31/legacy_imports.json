@@ -1,0 +1,19 @@
+{
+  "NdisAllocateSharedMemory":20,
+  "NdisFreeSharedMemory":24,
+  "NdisCompleteCloseAdapter":8,
+  "EthFilterIndicateReceiveComplete":4,
+  "EthFilterIndicateReceive":32,
+  "EthDeleteFilter":4,
+  "NdisDeregisterAdapter":4,
+  "NdisReleaseAdapterResources":4,
+  "EthNoteFilterOpenAdapter":16,
+  "EthDeleteFilterOpenAdapter":12,
+  "EthFilterAdjust":20,
+  "EthChangeFilterAddresses":24,
+  "EthCreateFilter":28,
+  "NdisMapIoSpace":24,
+  "NdisRegisterAdapter":24,
+  "NdisDeregisterMac":8,
+  "NdisRegisterMac":24
+}
