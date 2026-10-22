@@ -825,3 +825,32 @@ build_info, końcowy entrypoint src/test_nt4_setup_address.zig działa.
 Pulpit/LAN/HID/MSC: nadal NIEPOTWIERDZONE. Następna świeża pełna próba USOS
 q35/igb jest uzasadniona konkretną naprawą stagingu, nie samym kliknięciem OK.
 Fullbuild/new frozen cache i wynik VM zostaną zapisane osobno.
+
+
+2026-10-22 — świeży candidate03 po konkretnej poprawce
+
+Canonical build.bat uruchomiony wyłącznie w nt4-net. Wariant01 zakończył
+się błędnym odziedziczonym PSModulePath/Get-FileHash;02 brakiem starego APK
+HTTP404; exactpinned Alpine inputs odtworzono z lokalnego cache. Wariant03
+ukończył589/589 testów i93/95 kroków, ale fullbuild FAIL przez niepowiązany
+brak tools/vendor/windows7-nvme/assets.zip. Nie deklarujemy fullbuild PASS.
+Nie kopiowano tego Microsoft assetu do repo ani nie zmieniano pinów.
+
+CoreEFI z zakończonego graph ma SHA256
+d96cc2a0f815c71fc47eca9584c7ad9605897337b90dd8256a4af2a91b63ad77.
+Preflight potwierdził, że odpowiedź SIF renderuje UEFI Core, a Linux fb-ui
+nie zawiera adresu; błędny wstępny wariant został odrzucony przed zapisem
+cache/VM. W nowym frozen cache ...-nt4-hid13-netdns-utc-ipfix zmieniono tylko
+zig-out/bin/usos-x86_64.efi. Pozostałe290 plików i CAŁY initrd932bb19a...efd8be
+są byte-identical, w tym HID1.3, NDIS4, logger strictDNS, SP6a, UTC i POST.
+ManifestSHA7db15b62d4f3ea825da2ac3f97ebd209c516bb991f71f3824f8bcd9dec6a4fed.
+
+Dodatkowo27 network-defaults hostPASS,2 addons RenderPASS, options NT4
+golden byte-exactPASS. Native original-code regression ponownie4PASS bez
+skip po dodaniu jawnego skip tylko dla innych środowisk bez oryginalnego
+nośnika/emulatora.
+
+Candidate03 run_plan TTY43521; retain listener56859 i endpoint/cleanup86629
+uzbrojone przed launch. Jeden zwykły guard, zero obejść i progresspollingu.
+To zapis startu, NIE wynik instalacji. Zakres główny: PS2desktop + LAN.
+USB/HID/MSC i hardware PASS pozostają osobnymi nieukończonymi sprawdzeniami.

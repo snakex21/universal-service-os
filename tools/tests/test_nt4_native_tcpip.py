@@ -6,9 +6,12 @@ compressed input for 7-Zip is kept only in the owned G: collection audit area.
 """
 from pathlib import Path
 import importlib.util,os,struct,unittest,hashlib,types,tempfile,subprocess
-import pefile
-from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_ESP,UC_X86_REG_EIP
+try:
+ import pefile
+ from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
+ from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_ESP,UC_X86_REG_EIP
+except ImportError as error:
+ raise unittest.SkipTest('Original-code test needs pefile and unicorn') from error
 ROOT=Path(__file__).resolve().parents[2]
 EXPECTED='adbda98abbaf38f8272c28c312ffff559f023a8465f68e6f15b1c3cc4d424ad2'
 ISO=Path(os.environ.get('USOS_NT4_PL_ISO',r'C:\Users\ASRock\Desktop\Universal_Service_OS\OS\Windows\Windows NT 4.0\Windows NT 4.0 Workstation PL.iso'))
@@ -77,6 +80,9 @@ def native(value):
  if not context['stopped']:raise ValueError('Native validator instruction bound')
  return uc.reg_read(UC_X86_REG_EAX)!=0
 class NativeValidator(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  if not ISO.is_file():raise unittest.SkipTest('Original NT4 PL media not available')
  def test_old_staging_address_is_rejected(self):self.assertFalse(native('192.0.2.1'))
  def test_new_staging_address_is_accepted(self):self.assertTrue(native('198.51.100.1'))
  def test_every_later_zero_octet_is_rejected(self):
