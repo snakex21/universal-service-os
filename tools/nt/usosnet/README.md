@@ -14,6 +14,14 @@ of the same source, for Windows 95 OSR2 and Windows NT 4.0 SP6a (design:
 `docs/usosnet-ndis4-2026-10-20.md`). Round 1 backend: Intel igb family
 (I211 8086:1539, I210 8086:1533/157B, 82576 8086:10C9 = QEMU `-device igb`).
 
+Status 2026-10-22: the XP x86 / Server 2003 x86 install flows stage
+`usosnet.sys` + `usosnet.inf` like 2000 (`tools/network_setup.sh`,
+`tools/tests/test_network_nt5.py`). Intel never shipped an NT5 driver for
+the I210/I211 (its e1r driver is NDIS 6, Windows 7 and later); the X470 XP SP3
+install had no driver for 8086:1539 (setupapi.log 0xe0000228). Every
+`usosnet.sys` import resolves against XP SP3 NDIS.SYS. **Not run yet** on
+NT5 in QEMU or on hardware.
+
 Status 2026-10-20: `usosnet4.sys` 0.5 builds and passes the host tests
 (imports against the 95 OSR2 and NT4 SP6a NDIS export tables, NDIS 4.0
 registration); **not run yet** on QEMU or hardware.

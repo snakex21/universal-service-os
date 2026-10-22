@@ -9,13 +9,17 @@ usos_net_answer_config() {
         (a["NETWORK"]=="on"?"on":"off"),(a["IP"]==""?"dhcp":a["IP"]),a["GATEWAY"],a["DNS"],
         (a["HOME"]==""?"about:blank":a["HOME"]),(os=="ME"?"off":(a["DIALUP"]=="on"?"on":"off"))}' "$1"
 }
+# usos-xp.ini LAN keys -> network config. SYSTEM: W2K (default), XP or W2K3
+# (the x86 NT5 systems usosnet.sys covers).
 usos_net_w2k_config() {
+    _un_nt5=${2:-W2K}
+    case "$_un_nt5" in W2K|XP|W2K3) ;; *) return 1 ;; esac
     if [ -n "${1:-}" ] && [ -f "$1" ]; then
-        awk 'BEGIN{a["network"]="on";a["ip"]="dhcp";a["home_page"]="about:blank"}
+        awk -v sys="$_un_nt5" 'BEGIN{a["network"]="on";a["ip"]="dhcp";a["home_page"]="about:blank"}
           {sub(/\r$/, "");pos=index($0,"=");k=substr($0,1,pos-1);v=substr($0,pos+1);
            if(k~/^(network|ip|gateway|dns|home_page)$/){if(seen[k]++)exit 1;a[k]=v}}
-          END{printf "system=W2K\nnetwork=%s\nip=%s\ngateway=%s\ndns=%s\nhome_page=%s\ndialup=off\n",(a["network"]==""?"on":a["network"]),(a["ip"]==""?"dhcp":a["ip"]),a["gateway"],a["dns"],(a["home_page"]==""?"about:blank":a["home_page"])}' "$1"
-    else printf '%s\n' 'system=W2K' 'network=on' 'ip=dhcp' 'gateway=' 'dns=' 'home_page=about:blank' 'dialup=off'; fi
+          END{printf "system=%s\nnetwork=%s\nip=%s\ngateway=%s\ndns=%s\nhome_page=%s\ndialup=off\n",sys,(a["network"]==""?"on":a["network"]),(a["ip"]==""?"dhcp":a["ip"]),a["gateway"],a["dns"],(a["home_page"]==""?"about:blank":a["home_page"])}' "$1"
+    else printf '%s\n' "system=$_un_nt5" 'network=on' 'ip=dhcp' 'gateway=' 'dns=' 'home_page=about:blank' 'dialup=off'; fi
 }
 usos_net_value() { awk -v k="$2" 'index($0,k"=")==1 {sub(/^[^=]*=/, "");sub(/\r$/, "");print;exit}' "$1"; }
 usos_net_valid_config() {
@@ -23,7 +27,7 @@ usos_net_valid_config() {
       function addr(s, p,n,i,r){n=split(s,p,".");if(n!=4)return -1;r=0;for(i=1;i<=4;i++){if(p[i]!~/^[0-9]+$/||length(p[i])>3||p[i]>255||(length(p[i])>1&&substr(p[i],1,1)=="0"))return -1;r=r*256+p[i]}return p[1]>0&&p[1]<224&&p[1]!=127?r:-1}
       {sub(/\r$/, "");e=index($0,"=");k=substr($0,1,e-1);v=substr($0,e+1);
        if(!e||k!~/^(system|network|ip|gateway|dns|home_page|dialup)$/||seen[k]++||length(v)>200||v~/[^ -~]/||v~/["\\|]/)bad=1;a[k]=v}
-      END{if(a["system"]!~/^(95|98|98SE|ME|NT4|W2K)$/||a["network"]!~/^(on|off)$/||a["dialup"]!~/^(on|off)$/)bad=1;
+      END{if(a["system"]!~/^(95|98|98SE|ME|NT4|W2K|XP|W2K3)$/||a["network"]!~/^(on|off)$/||a["dialup"]!~/^(on|off)$/)bad=1;
        if(a["ip"]!="dhcp"){n=split(a["ip"],p,"/");own=addr(p[1]);if(n!=2||own<0||p[2]!~/^[1-9][0-9]?$/||p[2]<1||p[2]>30)bad=1;else{span=2^(32-p[2]);net=int(own/span);host=own%span;if(host==0||host==span-1)bad=1}}
        if(a["gateway"]!=""){gw=addr(a["gateway"]);if(gw<0||a["ip"]=="dhcp"||gw==own||!span)bad=1;else if(int(gw/span)!=net||gw%span==0||gw%span==span-1)bad=1}
        if(a["dns"]!=""){n=split(a["dns"],d,",");if(n>3)bad=1;for(i=1;i<=n;i++)if(addr(d[i])<0)bad=1}
@@ -64,7 +68,7 @@ usos_net_stage() {
     if [ "$(usos_net_value "$_un_cfg" network)" = off ]; then printf '[NETSETUP] network=off; original flow\n'; return 0; fi
     case "$_un_os" in
         95|98|98SE|ME) _un_app=$_un_root/USOS9X; _un_log=$_un_app/LOGS/NETSETUP.TXT; _un_helper=USOSLAN9X.EXE; _un_inf=usosnet9x.inf; _un_driver=$_un_app/NET ;;
-        NT4|W2K) _un_app=$_un_root/USOS/$_un_os; _un_log=$_un_app/NETSETUP.TXT; _un_helper=USOSLANNT.EXE; _un_inf=usosnet.inf; _un_driver=$_un_root/USOS/Drivers/USOSNET ;;
+        NT4|W2K|XP|W2K3) _un_app=$_un_root/USOS/$_un_os; _un_log=$_un_app/NETSETUP.TXT; _un_helper=USOSLANNT.EXE; _un_inf=usosnet.inf; _un_driver=$_un_root/USOS/Drivers/USOSNET ;;
     esac
     # 95 OSR2 / NT4 (NDIS 4.0) never get the NDIS 5.0 usosnet.sys: their
     # driver is usosnet4.sys. 95 stages it as USOSNET.SYS beside its own INF
@@ -119,7 +123,7 @@ usos_net_stage() {
     fi
     if [ "$(usos_net_value "$_un_cfg" ip)" != dhcp ]; then
         case "$_un_os" in
-          W2K) [ "$_un_state" = staged ] && [ "$_un_matches" = 1 ] || usos_net_log 'static IP not applied: requires exactly one matched LAN adapter; DHCP remains available' ;;
+          W2K|XP|W2K3) [ "$_un_state" = staged ] && [ "$_un_matches" = 1 ] || usos_net_log 'static IP not applied: requires exactly one matched LAN adapter; DHCP remains available' ;;
           NT4) if [ "$_un_state" = staged ]; then usos_net_log 'static LAN IP in USOSNET.REG for the first card usosnet4 finds (NDISLoop1)'
                else usos_net_log 'static LAN IP deferred: no usosnet4 adapter staged; loopback placeholder only'; fi ;;
         esac
@@ -141,7 +145,7 @@ usos_net_stage() {
     if [ -f "$_un_lib/network/$_un_helper" ]; then
         cp "$_un_lib/network/$_un_helper" "$_un_app/USOSLAN.EXE" || return 1
         usos_net_log 'LAN helper staged: hardware desktop only; no network wait or restart'
-        if [ "$_un_os" = NT4 ] || [ "$_un_os" = W2K ]; then usos_net_run_reg "$_un_os" > "$_un_app/LAN.REG" || return 1; fi
+        case "$_un_os" in NT4|W2K|XP|W2K3) usos_net_run_reg "$_un_os" > "$_un_app/LAN.REG" || return 1 ;; esac
     else
         usos_net_log 'LAN helper missing from build; Setup registry defaults only'
         if [ -f "$_un_app/MSBATCH.INF" ]; then
@@ -152,7 +156,7 @@ usos_net_stage() {
 }
 
 usos_net_run_reg() {
-    case "$1" in NT4|W2K) ;; *) return 1 ;; esac
+    case "$1" in NT4|W2K|XP|W2K3) ;; *) return 1 ;; esac
     printf '%s\r\n' 'REGEDIT4' '' '[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run]'
     printf '"USOSLan"="C:\\\\USOS\\\\%s\\\\USOSLAN.EXE"\r\n' "$1"
 }
@@ -468,19 +472,26 @@ usos_net_nt4_reg() {
 }
 
 usos_net_w2k_sif() {
-    # After usos_net_stage: stdin answer, stdout revised answer. No XP/2003 calls.
+    # After usos_net_stage: stdin answer, stdout revised answer. Windows 2000,
+    # XP and Server 2003 x86 (system= of the config). W2K: OemPreinstall=Yes
+    # (its $OEM$ copy, usos_net_stage); XP / 2003 keep OemPreinstall as it is
+    # (No: OemPnPDriversPath works without it since XP, docs/drivers.md) and
+    # need no $OEM$ tree. USOS_NET_KEEP=yes (the user's own .sif has its own
+    # network sections): only the driver path is merged, the user's
+    # [Networking] / [NetAdapters] / ... stay and no USOS block is added.
     USOS_NET_PATH=$_un_driver_path USOS_NET_ID=$_un_hwid USOS_NET_COUNT=$_un_matches USOS_NET_CFG=$_un_cfg awk '
-      BEGIN{path=ENVIRON["USOS_NET_PATH"];id=ENVIRON["USOS_NET_ID"];
+      BEGIN{path=ENVIRON["USOS_NET_PATH"];id=ENVIRON["USOS_NET_ID"];keep=(ENVIRON["USOS_NET_KEEP"]=="yes");
         while((getline s < ENVIRON["USOS_NET_CFG"])>0){p=index(s,"=");a[substr(s,1,p-1)]=substr(s,p+1)}
-        close(ENVIRON["USOS_NET_CFG"]);static=(a["ip"]!="dhcp" && ENVIRON["USOS_NET_COUNT"]=="1" && path!="");
+        close(ENVIRON["USOS_NET_CFG"]);oem=(a["system"]=="W2K");static=!keep&&(a["ip"]!="dhcp" && ENVIRON["USOS_NET_COUNT"]=="1" && path!="");
         if(static){split(a["ip"],v,"/");ip=v[1];bits=v[2]+0;for(i=1;i<=4;i++){n=bits>8?8:bits;if(n<0)n=0;mask=mask (i==1?"":".") (256-2^(8-n));bits-=8}}}
-      {sub(/\r$/, "");low=tolower($0);if(low=="[identification]")identification=1;if(low~/^\[/){section=low;skip=(section~/^\[(networking|netclients|netprotocols|netservices|usos\.msclient|usos\.tcpip)\]$/)}}
+      {sub(/\r$/, "");low=tolower($0);if(low=="[identification]")identification=1;if(low~/^\[/){section=low;skip=!keep&&(section~/^\[(networking|netclients|netprotocols|netservices|usos\.msclient|usos\.tcpip)\]$/)}}
       skip {next}
-      path!=""&&low~/^oempreinstall[ \t]*=/ {next}
+      oem&&path!=""&&low~/^oempreinstall[ \t]*=/ {next}
       path!=""&&low~/^oempnpdriverspath[ \t]*=/ {old=$0;sub(/^[^=]*=/,"",old);gsub(/^[ \t"]+|[ \t"]+$/,"",old);next}
       {lines[++nline]=$0}
       END{for(i=1;i<=nline;i++){print lines[i] "\r";
-        if(path!=""&&tolower(lines[i])=="[unattended]")print "OemPreinstall=Yes\r\nOemPnPDriversPath=\"" path (old!=""?";"old:"") "\"\r"}
+        if(path!=""&&tolower(lines[i])=="[unattended]")print (oem?"OemPreinstall=Yes\r\n":"") "OemPnPDriversPath=\"" path (old!=""?";"old:"") "\"\r"}
+        if(keep)exit;
         if(!identification)print "\r\n[Identification]\r\nJoinWorkgroup=WORKGROUP\r";
         print "\r\n[Networking]\r\nInstallDefaultComponents=No\r\n[NetClients]\r\nMS_MSClient=USOS.MSClient\r\n[USOS.MSClient]\r\n[NetProtocols]\r\nMS_TCPIP=USOS.TCPIP\r\n[NetServices]\r\n[USOS.TCPIP]\r";
         if(static)print "AdapterSections=USOS.LAN.TCPIP\r";

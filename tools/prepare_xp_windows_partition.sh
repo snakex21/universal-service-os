@@ -107,13 +107,29 @@ if [ -n "${SOURCE_ROOT:-}" ] && ! usos_nt5_answer_has_key "$key_field" < "$work/
     media_key=
     printf '[XP_WINDOWS] product key: none answered, taken from the disc'"'"'s own I386\\WINNT.SIF (not logged)\n'
 fi
-if [ "$NT5_SYSTEM" = windows-2000 ]; then
+# LAN (tools/network_setup.sh): own usosnet.sys (NDIS 5.0, x86) for a
+# matching Intel igb card + Microsoft client and TCP/IP, no sharing. Windows
+# 2000, XP x86 and Server 2003 x86; XP x64 has no amd64 usosnet build.
+net_system=
+case "$NT5_SYSTEM:$NT5_SOURCE_DIR" in
+    windows-2000:*) net_system=W2K ;;
+    windows-xp:I386) net_system=XP ;;
+    windows-server-2003:I386) net_system=W2K3 ;;
+esac
+if [ -n "$net_system" ]; then
     . "$SCRIPT_DIR/network_setup.sh"
-    usos_net_w2k_config "${XP_USER_SETTINGS:-}" > "$work/network.ini" || fail 'invalid LAN profile'
+    usos_net_w2k_config "${XP_USER_SETTINGS:-}" "$net_system" > "$work/network.ini" || fail 'invalid LAN profile'
     usos_net_stage "$work/network.ini" "$XP_TARGET_ROOT" "$SCRIPT_DIR" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
     if [ "$(usos_net_value "$work/network.ini" network)" = on ]; then
+        # The user's own .sif with its own network sections keeps them.
+        USOS_NET_KEEP=no
+        if [ -n "${XP_CUSTOM_SIF:-}" ] && grep -Eiq '^[[:space:]]*\[(networking|netadapters|netclients|netprotocols|netservices)\]' "$XP_CUSTOM_SIF"; then
+            USOS_NET_KEEP=yes
+            printf '[XP_WINDOWS] LAN: the selected .sif has its own network sections; only the driver path is added\n'
+        fi
+        export USOS_NET_KEEP
         mv "$work/winnt.sif" "$work/winnt.base"
-        usos_net_w2k_sif < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add Windows 2000 LAN answer'
+        usos_net_w2k_sif < "$work/winnt.base" > "$work/winnt.sif" || fail "cannot add the $net_system LAN answer"
         rm -f "$work/winnt.base"
     fi
     rm -f "$work/network.ini"
