@@ -1101,3 +1101,10 @@ Nie jest to freshAUTO/X470/fullIRQroute/HTTP. Szczegóły i sourceproof:
 docs/nt4-installed09-tuple-qualification.md oraz tracked tuple09 snapshots.
 3 actual archived-class serialmux tests PASS. Aktualizacja S20 i autoryzowane
 literal qcow2 cleanup odbędą się osobno z receipt; protected03 zachowany.
+
+
+## Zakończony tuple09, S20 i sprzątanie własnych obrazów
+
+Rzeczywisty wspólny test tuple09 potwierdził basic coexistence zamrożonego USB313952/43648B (HID+MSC, i8042prt Start4), NET89b/21248B (NDISLoop Start2), świeżego DHCP/DORA, ping i strict configuredDNS. Po etapach keyboard/mouse out/in oraz FAT16 startup/hotplug/replug końcowy native ping odpowiedział4/4 (16ms, pozostałe<10ms), a Windows osiągnął native safe-off przed QMPquit/rc0. Kod i piny dowodowe: `511b44a221e171f82414618b8004d0404b021b2c`. S20 dokładnego NT4PL: `40e98cd1256384602311db13e07ae934d7830189` w usability-usb-net,15classificationPASS,96wierszy i95pozostałych bez zmian. Historyczne próby i ograniczenia Explorer/fullIRQ/freshAUTO/X470 zachowane.
+
+Po utrwaleniu manifestu/skryptu/selftestu w `1746d9adb5f6514da0f58df73e2935a45120148e` wykonano autoryzowane literalne sprzątanie wyłącznie ukończonych własnych NET04–09 oraz alias08b:14nazw/13unikalnychfileIDs,2 297 694 720B długości plików qcow2. Brak odmów/retry/obejść. Protectedcandidate03 zachowany z identycznym pełnym SHAcf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21.214plików dowodowych C zweryfikowano ponownie po usunięciu, wszystkie hashe identyczne. Nie usuwano katalogów, logów, źródeł, cache, obrazów NT3/macOS/innego agenta ani żadnych obiektów fizycznych; nie uruchomiono kolejnej VM. Szczegóły: `docs/nt4-net-closed-image-cleanup.md` i snapshot `tools/tests/coverage/nt4page_snapshot/installed03/cleanup-net09`.

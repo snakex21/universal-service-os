@@ -1,0 +1,131 @@
+{
+  "manifest_sha256": "580528652f51369d574e2b8b6e2015fccf725fb2411c0037341b4ed93b3e0a97",
+  "deleted": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+      "file_id": "1111881105:0004000000078253",
+      "sha256": "6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-boot.qcow2",
+      "file_id": "1111881105:0003000000078256",
+      "sha256": "ed90e0bfdd066c8fe6d889f8d8ac8765df826330e15a2e249d19edd3e5f6aff0",
+      "qcow2_file_length_bytes": 589824,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-hot.qcow2",
+      "file_id": "1111881105:0004000000078257",
+      "sha256": "c7a2f2b0c8aad058ab26e90176abe51660093f6dcc539fbb6e031f5a6def744c",
+      "qcow2_file_length_bytes": 589824,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly\\target.qcow2",
+      "file_id": "1111881105:000300000007822f",
+      "sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+      "file_id": "1111881105:000300000007822f",
+      "sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\blank-stick.qcow2",
+      "file_id": "1111881105:000500000007822d",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "qcow2_file_length_bytes": 197120,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+      "file_id": "1111881105:0003000000078204",
+      "sha256": "29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\blank-stick.qcow2",
+      "file_id": "1111881105:0004000000078203",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "qcow2_file_length_bytes": 197120,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\target.qcow2",
+      "file_id": "1111881105:00030000000781f9",
+      "sha256": "a57e37c5864718f23b201f3583613cb2776d475009d9938ad11f978343e8c198",
+      "qcow2_file_length_bytes": 5373952,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\blank-stick.qcow2",
+      "file_id": "1111881105:00040000000781fb",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "qcow2_file_length_bytes": 197120,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\target.qcow2",
+      "file_id": "1111881105:00030000000781ec",
+      "sha256": "6c6dd818688f3147f5d9f08731d93d0fe2ae8d8024c9da7c572b74041eecb029",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\blank-stick.qcow2",
+      "file_id": "1111881105:00050000000781eb",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "qcow2_file_length_bytes": 197120,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\target.qcow2",
+      "file_id": "1111881105:00030000000781e8",
+      "sha256": "8e9b979b33f4f5332851e4a6b8e182072e12d1ba36ad5e6546a197feacdd610c",
+      "qcow2_file_length_bytes": 458031104,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\blank-stick.qcow2",
+      "file_id": "1111881105:00040000000781e7",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "qcow2_file_length_bytes": 197120,
+      "literal_unlink_requested": true,
+      "exclusive_read_write_lease_held": true
+    }
+  ],
+  "refused": [],
+  "sourceproof_commit": "511b44a221e171f82414618b8004d0404b021b2c",
+  "S20_commit": "40e98cd1256384602311db13e07ae934d7830189",
+  "protected_before_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "started_utc_epoch": 1792690801.5913594,
+  "unique_file_length_bytes_deleted": 2297694720,
+  "no_global_process_poll": true,
+  "no_recursive_or_directory_delete": true,
+  "completed_utc_epoch": 1792690803.935948,
+  "protected_after_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "protected_unchanged": true,
+  "all_declared_names_absent": true,
+  "C_proofs_preserved": true,
+  "pass": true
+}
