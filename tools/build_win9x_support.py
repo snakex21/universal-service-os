@@ -269,8 +269,8 @@ USOSLOG_IMPORTS = {
         'CloseHandle', 'CreateDirectoryA', 'CreateFileA', 'CreateMutexA', 'CreateProcessA', 'CreateThread',
         'DeleteFileA', 'EnterCriticalSection', 'ExitProcess', 'FindClose', 'FindFirstFileA', 'FindNextFileA',
         'FlushFileBuffers', 'GetCommandLineA', 'GetComputerNameA', 'GetCurrentThreadId', 'GetFileSize',
-        'GetLastError', 'GetLocalTime', 'GetModuleHandleA', 'GetPrivateProfileStringA', 'GetProcAddress',
-        'GetProfileStringA', 'GetTickCount', 'GetVersionExA', 'GlobalMemoryStatus', 'InitializeCriticalSection',
+        'GetLastError', 'GetLocalTime', 'GetModuleFileNameA', 'GetModuleHandleA', 'GetPrivateProfileStringA', 'GetProcAddress',
+        'GetProfileStringA', 'GetTickCount', 'GetVersion', 'GetVersionExA', 'GlobalMemoryStatus', 'InitializeCriticalSection',
         'IsBadReadPtr', 'LeaveCriticalSection', 'LoadLibraryA', 'MoveFileA', 'ReadFile', 'SetFilePointer', 'Sleep',
         'WaitForSingleObject', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA', 'lstrlenA'},
     'user32.dll': {
@@ -339,7 +339,7 @@ def pe_imports(data: bytes) -> dict:
     return out
 
 
-def build_usoslog(out: Path, work: Path) -> Path:
+def build_usoslog(out: Path, work: Path, *, nt3: bool = False) -> Path:
     """USOSLOG.EXE: Win32 GUI program (OpenWatcom wcc386 / wlink, no runtime),
     PE subsystem and OS version 4.00 so Windows 95 / 98 / Me load it."""
     import sys
@@ -351,7 +351,8 @@ def build_usoslog(out: Path, work: Path) -> Path:
                PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
     obj = work / 'usoslog.obj'
     subprocess.run([str(ow / 'binnt64/wcc386.exe'), '-q', '-bt=nt', '-zl', '-s', '-5r', '-os', '-zp4',
-                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usoslog.c')], env=env, check=True, cwd=work)
+                    '-w3', '-we', *(['-dUSOS_NT3_RAW_ICMP=1'] if nt3 else []),
+                    '-fo=' + str(obj), str(SOURCE / 'usoslog.c')], env=env, check=True, cwd=work)
     exe = out / 'USOSLOG.EXE'
     subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usoslog.lnk'), 'file', str(obj),
                     'name', str(exe), 'option', 'map=' + str(work / 'usoslog.map')], env=env, check=True, cwd=work)
@@ -363,7 +364,7 @@ def build_usoslog(out: Path, work: Path) -> Path:
     if raw[pe:pe + 4] != b'PE\0\0':
         raise ValueError('USOSLOG.EXE has no PE header')
     raw[pe + 8:pe + 12] = (0).to_bytes(4, 'little')
-    data = spec.set_nt4(bytes(raw), 4, 0)
+    data = spec.set_nt4(bytes(raw), 3, 10) if nt3 else spec.set_nt4(bytes(raw), 4, 0)
     exe.write_bytes(data)
     if data[:2] != b'MZ' or b'USOSLOG' not in data:
         raise ValueError('USOSLOG.EXE is not the expected PE program')

@@ -1,0 +1,81 @@
+{
+  "stopped": true,
+  "qemu_returncode": 0,
+  "target_sha256": "915f6945b90cd9fb627160b22136c54bedecfed6d4ef8e8d323e0d626c9e067e",
+  "driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_bytes": 17024,
+  "post_sha256": "615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b",
+  "post_bytes": 30208,
+  "hive_version": [
+    1,
+    2
+  ],
+  "system_sha256": "9f97f01d55bb2f20273530c61a6a656c6c9f1d1177518639c8c5de6725d66678",
+  "policy": {
+    "selected": {
+      "current": 1,
+      "default": 1
+    },
+    "services": {
+      "1": {
+        "Browser": {
+          "present": true,
+          "start": 4,
+          "type": 32
+        },
+        "LanmanServer": {
+          "present": true,
+          "start": 4,
+          "type": 32
+        },
+        "LanmanWorkstation": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "Tcpip": {
+          "present": true,
+          "start": 3,
+          "type": 1
+        },
+        "NDISLoop": {
+          "present": true,
+          "start": 2,
+          "type": 1
+        },
+        "usosnt3": {
+          "present": true,
+          "start": 4,
+          "type": 16
+        }
+      }
+    }
+  },
+  "own_policy_records": {
+    "CLNT351.REQ": {
+      "present": true,
+      "bytes": 30,
+      "sha256": "cf4b2cf2c614e78c7377a5dc8266721d9efef556c0ed09b58ee4dd8b17f0dfdf",
+      "matches_exact_public_record": true
+    },
+    "CLNT351.LOG": {
+      "present": true,
+      "bytes": 223,
+      "sha256": "86679faa05d789e84b9e01602f3bf636b3af7d4100e8a3e99c5f20e3ccd7f183",
+      "matches_exact_public_record": true
+    },
+    "CLNT351.ERR": {
+      "present": false
+    }
+  },
+  "policy_records_RAM_only_exact_match": true,
+  "no_hive_export": true,
+  "no_ms_binary_export": true,
+  "registry_modified": false,
+  "scope": "Four allowlisted service Start/Type values only; runtime services require native net start evidence",
+  "native_services_log": {
+    "bytes": 1496,
+    "sha256": "41b0d8aad5c1c444e9927fe9884cb0170ecaf20ec23948242effbdff8479342c"
+  },
+  "scratch_whole_disk_removed": true
+}

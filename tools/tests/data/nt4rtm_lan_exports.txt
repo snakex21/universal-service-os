@@ -14,6 +14,7 @@ RegQueryValueExA
 RegSetValueExA
 RegUnLoadKeyA
 [kernel32.dll]
+CreateProcessA
 CloseHandle
 CreateDirectoryA
 CreateEventA

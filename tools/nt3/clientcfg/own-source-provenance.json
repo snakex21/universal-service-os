@@ -1,0 +1,23 @@
+{
+  "service_policy.h": {
+    "own_source_commit": "2064ae00",
+    "own_source_file": "tools/nt/usosnet/src31/client31_policy.h",
+    "own_source_sha256": "17babd1cc0d8b188ea2893e90d752aaf7a984a582b100f44bef80171b337ad0f",
+    "adapted_sha256": "231fa5cf07046a60b80a649e31a3098724b76d8f94af58dac14c7bcbc5a42a5e",
+    "changes": "Identifier/include renames only; finite policy and SCM bodies unchanged"
+  },
+  "scm_policy.h": {
+    "own_source_commit": "2064ae00",
+    "own_source_file": "tools/nt/usosnet/src31/client31_win32.h",
+    "own_source_sha256": "2a3f31f668f4c03abe413e79bcc0e10344bb08cffb0154958a331d00c8f1dee0",
+    "adapted_sha256": "9c9e48db10616ec012b1676e272f663945f4bccb95c699469732c293681b5741",
+    "changes": "Identifier/include renames only; finite policy and SCM bodies unchanged"
+  },
+  "policy_test.c": {
+    "own_source_commit": "2064ae00",
+    "own_source_file": "tools/nt/usosnet/src31/client31_test.c",
+    "own_source_sha256": "a5ffb50cf949217b0bbc2ddf867b7401d4b8e04d23daf2a4502c2ea755aa819d",
+    "adapted_sha256": "aff4518c08716fcf73086350e191cf8afd3a97ef89a229662f57cf00a184ed11",
+    "changes": "Identifier/include renames only; finite policy and SCM bodies unchanged"
+  }
+}

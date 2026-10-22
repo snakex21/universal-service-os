@@ -26,6 +26,9 @@
  */
 #include "usosnet.h"
 #include "usosnet_irq.h"
+#if USOSNET_NDIS3
+#include "usosnet351_policy.h"
+#endif
 
 #pragma warning(disable:4054 4055 4152 4201 4214)
 
@@ -59,8 +62,24 @@ C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);
 #define USOSNET_ETHDB(H) (((PNDIS_MINIPORT_BLOCK)(H))->EthDB)
 /* MajorNdisVersion 4: the NDIS 3.0 part + ReturnPacket / SendPackets /
  * AllocateComplete; 95 OSR2 NDIS.VXD wants at least 0x48 bytes. */
+#if USOSNET_NDIS3
+/* Original NT351 SHA948d...ab1b RVA179D and NT35 SHAfa392...5543 RVA1BD0
+ * accept3.0 and copy0x3C; NT35 internal RX188B/1896 also uses EthDBD8.
+ * The NT351 routine copies
+ * exactly 0x3C bytes. Inbox NE2000, ELNK3 and DC21X4 confirm EthDB+0xD8. */
+#define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, ReturnPacketHandler)
+C_ASSERT(USOSNET_CHARS_SIZE == 0x3C);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CheckForHangHandler) == 0x08);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, HaltHandler) == 0x14);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, TransferDataHandler) == 0x38);
+#undef NdisMSetAttributes
+EXPORT VOID NdisMSetAttributes(IN NDIS_HANDLE MiniportAdapterHandle,
+    IN NDIS_HANDLE MiniportAdapterContext, IN BOOLEAN BusMaster,
+    IN NDIS_INTERFACE_TYPE AdapterType);
+#else
 #define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CoCreateVcHandler)
 C_ASSERT(USOSNET_CHARS_SIZE == 0x48);
+#endif
 #else
 #define USOSNET_CHARS_SIZE sizeof(NDIS_MINIPORT_CHARACTERISTICS)
 #endif
@@ -187,6 +206,7 @@ static ULONG CfgInt(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG Def)
     return Def;
 }
 
+#if !USOSNET_NDIS3
 static void CfgPut(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG V)
 {
     NDIS_STATUS st;
@@ -259,6 +279,10 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
 
 /* ------------------------------------------------------------------ */
 /* DMA memory                                                          */
+#else
+/* This variant persists no private diagnostics in the registry. */
+#define WriteDiag(A, Cfg) ((void)0)
+#endif
 
 static BOOLEAN DmaAlloc(PADAPTER A, DMAMEM *M, ULONG Len, ULONG Align)
 {
@@ -320,10 +344,14 @@ static VOID MpShutdown(PVOID Ctx)
 static void FreeAll(PADAPTER A)
 {
     ULONG i;
+#if !USOSNET_NDIS3
     BOOLEAN cancelled;
+#endif
     if (A->Shutdown) NdisMDeregisterAdapterShutdownHandler(A->Handle);
     A->Shutdown = FALSE;
+#if !USOSNET_NDIS3
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
+#endif
     A->TimerInit = FALSE;
     if (A->IrqRegistered) NdisMDeregisterInterrupt(&A->Interrupt);
     A->IrqRegistered = FALSE;
@@ -401,6 +429,11 @@ static BOOLEAN LogBudget(PADAPTER A)
 
 static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
 {
+#if USOSNET_NDIS3
+    /* Host captures this optional serial stream beside the VM artifacts. */
+    UsLog(A, "diag nominal-sec %x event %x", Sec, Event);
+    UsLog(A, "diag rx %x tx %x", A->RxOk, A->TxOk);
+#else
     ULONG r[DIAG_REGS], pci = 0;
     if (Event == EV_REQUEST) {
         if (A->ForcedLogs >= LOG_FORCED_MAX) return;
@@ -429,6 +462,7 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
         LOG10(0x55534E35UL, Sec, S->Rx[5], S->Rx[7], S->Rx[6], S->Rx[4], S->Tx[5], S->Tx[7],
               S->Drop[USNS_N_L4E_UDP], S->Td[USNS_T_NO_FRAME]);
     }
+#endif
 }
 
 /* once a second: the core counters into the statistics page */
@@ -486,7 +520,13 @@ static void TimerSecond(PADAPTER A)
         DiagLog(A, EV_IRQ_POLL, sec);
     }
     if (A->TxBusy && A->TxDone == A->TxLastClean) {
+#if USOSNET_NDIS3
+        ULONG previous = A->TxStallSec;
+        A->TxStallSec = Usosnet351StallNext(previous);
+        if (previous < 3 && A->TxStallSec >= 3) { A->TxStalls++; DiagLog(A, EV_TX_STALL, sec); }
+#else
         if (++A->TxStallSec == 3) { A->TxStalls++; DiagLog(A, EV_TX_STALL, sec); }
+#endif
     } else {
         A->TxStallSec = 0;
     }
@@ -495,10 +535,15 @@ static void TimerSecond(PADAPTER A)
     if (A->LogRequest) { A->LogRequest = 0; DiagLog(A, EV_REQUEST, sec); }
     StatsSecond(A, sec);
     /* first round after the quiet time, then one per budget window */
+#if USOSNET_NDIS3
+    if (Usosnet351PeriodicLog(sec))
+#else
     if (sec == LOG_QUIET_SEC || sec == LOG_QUIET_SEC + LOG_WINDOW_SEC + 4 || (sec && sec % 300 == 0))
+#endif
         DiagLog(A, EV_PERIODIC, sec);
 }
 
+#if !USOSNET_NDIS3
 static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 {
     PADAPTER A = (PADAPTER)Ctx;
@@ -511,6 +556,7 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
     A->Chip->Ops->TxReclaim(A);
     if (A->TimerCount % TICKS_PER_SEC == 0) TimerSecond(A);
 }
+#endif
 
 /* ------------------------------------------------------------------ */
 /* RX indication (called by the backend from RxPoll)                   */
@@ -579,7 +625,7 @@ static const USOSNET_CHIP *FindChip(ULONG VenDev)
     return NULL;
 }
 
-#if USOSNET_NDIS4
+#if USOSNET_NDIS4 && !USOSNET_NT35
 /* NT4 (no PnP): every PCI bus, device and function for the first supported
  * card. NT4's NdisReadPciSlotInformation reads HAL bus data of the bus in
  * the miniport block with the slot number as given; NdisOverrideBusNumber
@@ -615,6 +661,30 @@ static BOOLEAN LegacyFind(PADAPTER A, NDIS_HANDLE Wcc)
     }
     NdisOverrideBusNumber(Wcc, A->Handle, 0);
     return FALSE;
+}
+#endif
+
+#if USOSNET_NT35
+/* NT35 wrapper SHAfa392...5543, RVA9258 reads BusNumber/BusType from the
+ * adapter Parameters before Initialize (9599/95C7 ->96F0/96EA). There is
+ * no bus-override API. Require the exact preflight-selected bus/slot and
+ * use the real miniport handle; never fabricate a full-MAC handle for
+ * the unrelated five-argument NdisPciAssignResources.
+ * Firmware BAR0 is checked below and NdisMMapIoSpace claims/translates
+ * that range through original NdisMapIoSpace/IoReportResourceUsage. */
+static BOOLEAN ConfiguredFind35(PADAPTER A, NDIS_HANDLE Cfg)
+{
+    NDIS_STRING bus = NDIS_STRING_CONST("BusNumber");
+    NDIS_STRING slot = NDIS_STRING_CONST("UsosPciSlot");
+    NDIS_STRING type = NDIS_STRING_CONST("BusType");
+    ULONG id = 0xFFFFFFFF;
+    if (!Cfg) return FALSE;
+    A->PciBus = CfgInt(Cfg, &bus, 0xFFFFFFFF);
+    A->PciSlot = CfgInt(Cfg, &slot, 0xFFFFFFFF);
+    if (A->PciBus > 255 || A->PciSlot > 255 || CfgInt(Cfg, &type, 0xFFFFFFFF) != NdisInterfacePci)
+        return FALSE;
+    UsLog(A, "nt35 configured bus %x slot %x", A->PciBus, A->PciSlot);
+    return NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0, &id, 4) == 4 && FindChip(id) != NULL;
 }
 #endif
 
@@ -669,14 +739,33 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
 
+#if USOSNET_NDIS3
+    NdisMSetAttributes(MiniportAdapterHandle, (NDIS_HANDLE)A, TRUE, NdisInterfacePci);
+#else
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
                          NDIS_ATTRIBUTE_BUS_MASTER, NdisInterfacePci);
+#endif
 
+#if USOSNET_NT35
+    A->Legacy = TRUE;
+    if (!ConfiguredFind35(A, cfg)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+    A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED; /* no full-MAC resources API */
+#else
 #if USOSNET_NDIS4
     /* 95 OSR2 (PnP): the devnode's resources, PCI slot numbers are ignored.
      * NT4: NDIS.SYS 4.0 answers NOT_SUPPORTED; find the card, then let the
      * HAL assign (claim) its resources for this slot. */
+#if USOSNET_NDIS3
+    /* Original NDIS351 SHA948d...ab1b, RVA3B26 only returns
+       STATUS_NOT_SUPPORTED in EAX (ret0x10); it never writes *Status.
+       Do not inherit SUCCESS from NdisOpenConfiguration or read the
+       uninitialized resource buffer as a PnP result. NT4/95 stay unchanged. */
+    st = NDIS_STATUS_NOT_SUPPORTED;
+#endif
     NdisMQueryAdapterResources(&st, WrapperConfigurationContext, res, &resLen);
+#if USOSNET_NDIS3
+    UsLog(A, "resources status %x bytes %x", st, resLen);
+#endif
     if (st == NDIS_STATUS_SUCCESS) {
         rl = res;
     } else {
@@ -686,6 +775,8 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         if (A->AssignStatus != NDIS_STATUS_SUCCESS) rl = NULL;  /* BAR0 / interrupt line below */
         UsLog(A, "nt4 assign %x list %x", A->AssignStatus, rl ? rl->Count : 0);
     }
+#endif
+
 #endif
 
     /* PCI identity; memory decode + bus master on, INTx not disabled */
@@ -822,9 +913,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Chip->Ops->LinkState(A, &A->LinkUp, &A->LinkMbps, &A->FullDuplex);
     A->LinkReported = TRUE;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
+#if !USOSNET_NDIS3
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
     NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
+#endif
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;
     A->Started = TRUE;
@@ -845,7 +938,9 @@ fail:
 static VOID MpHalt(NDIS_HANDLE Ctx)
 {
     PADAPTER A = (PADAPTER)Ctx;
+#if !USOSNET_NDIS3
     BOOLEAN cancelled;
+#endif
     UsLog(A, "halt rx %x tx %x", A->RxOk, A->TxOk);
     A->Chip->Ops->Stats(A);
     g_Last[LS_ISRCALLS] = A->IsrCalls;
@@ -858,7 +953,9 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
     g_Last[LS_HWTX] = A->HwGptc;
     g_Last[LS_FLAGS] = DiagFlags(A, 0) | (A->TxStalls << 4);
     g_LastValid = TRUE;
+#if !USOSNET_NDIS3
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
+#endif
     A->TimerInit = FALSE;
     A->Chip->Ops->IrqDisable(A);
     A->Chip->Ops->Stop(A);
@@ -883,7 +980,26 @@ static NDIS_STATUS MpReset(PBOOLEAN AddressingReset, NDIS_HANDLE Ctx)
 
 static BOOLEAN MpCheckForHang(NDIS_HANDLE Ctx)
 {
+#if USOSNET_NDIS3
+    PADAPTER A = (PADAPTER)Ctx;
+    ULONG rx;
+    if (!A->Started) return FALSE;
+    rx = A->RxOk;
+    /* Original NDIS351 RVA98E: lock+0x30 and busy+0x2E serialize this
+     * callback with the miniport. NT35 SHAfa392...5543 confirms the same
+     * gate in946 and Halt7F68; Check rearm9DD/9E9 is2000ms.
+     * It rearms its own timer for 2000 ms.
+     * Halt873C owns that same gate; no driver timer/DPC needs draining.
+     * IRQ/HandleInterrupt is the normal fast path. This is a slow fallback,
+     * not the 20 ms fallback of NT4/95. Counters below are nominal time. */
+    A->Chip->Ops->RxPoll(A);
+    if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
+    A->Chip->Ops->TxReclaim(A);
+    A->TimerCount += USOSNET351_CHECK_SECONDS * TICKS_PER_SEC;
+    TimerSecond(A);
+#else
     UNREFERENCED_PARAMETER(Ctx);
+#endif
     return FALSE;
 }
 

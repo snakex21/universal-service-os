@@ -1,0 +1,31 @@
+{
+  "children": [
+    {
+      "name": "file",
+      "info": {
+        "children": [],
+        "virtual-size": 204865536,
+        "filename": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+        "format": "file",
+        "actual-size": 204865536
+      }
+    }
+  ],
+  "virtual-size": 4294967296,
+  "filename": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+  "cluster-size": 65536,
+  "format": "qcow2",
+  "actual-size": 204865536,
+  "format-specific": {
+    "type": "qcow2",
+    "data": {
+      "compat": "1.1",
+      "compression-type": "zlib",
+      "lazy-refcounts": false,
+      "refcount-bits": 16,
+      "corrupt": false,
+      "extended-l2": false
+    }
+  },
+  "dirty-flag": false
+}

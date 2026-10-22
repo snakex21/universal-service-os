@@ -1732,12 +1732,26 @@ static void parse_args(void)
     char arg[128];
     char opt = 0;
     WORD n;
+    int quoted, truncated;
     if (!e_cmdseg) return;
     for (;;) {
         while (*t == ' ' || *t == '\t') t++;
         if (!*t || *t == '\r' || *t == '\n') break;
-        for (n = 0; *t && *t != ' ' && *t != '\t' && *t != '\r' && *t != '\n'; t++)
+        quoted = *t == '"'; truncated = 0;
+        if (quoted) t++;
+        for (n = 0; *t && *t != '\r' && *t != '\n' &&
+             (quoted ? *t != '"' : (*t != ' ' && *t != '\t')); t++) {
             if (n < sizeof(arg) - 1) arg[n++] = *t;
+            else truncated = 1;
+        }
+        if (quoted && *t != '"') truncated = 1;
+        if (quoted && *t == '"') t++;
+        if (truncated) {
+            /* A bad /L path must neither write a truncated filename nor
+             * open the normal diagnostics window during silent logging. */
+            if (opt == 'L') { log_mode = 1; log_path[0] = 0; return; }
+            opt = 0; continue;
+        }
         arg[n] = 0;
         if (opt) {
             if (opt == 'L') { lstrcpy(log_path, arg); log_mode = 1; }

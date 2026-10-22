@@ -91,6 +91,7 @@ nt4_resolve_time_zone() {
             if (k == "W. Europe") return "(GMT+01:00) Berlin, Stockholm, Rome, Bern, Brussels, Vienna"
             if (k == "Romance") return "(GMT+01:00) Paris, Madrid"
             if (k == "GMT") return "(GMT) Greenwich Mean Time; Dublin, Edinburgh, London"
+            if (k == "Greenwich") return "(GMT) Monrovia, Casablanca"
             if (k == "E. Europe") return "(GMT+02:00) Eastern Europe"
             if (k == "GTB" || k == "FLE") return "(GMT+02:00) Athens, Helsinki, Istanbul"
             if (k == "Russian") return "(GMT+03:00) Moscow, St. Petersburg"
@@ -570,6 +571,31 @@ if [ -n "$nt3" ]; then
         fail 'cannot prepare WINNT.SIF'
     profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work") || fail 'cannot read the answer profile values'
     log "answer profile: $profile_values"
+    if [ "$major:$minor" = 3:51 ]; then
+        . "$LIB/nt351_network_setup.sh"
+        # LAN is optional, as on NT4 (network_setup.sh): a refused preflight
+        # (no / two supported cards, static IP or DNS, driver check) installs
+        # without network instead of stopping the whole install.
+        if ! usos_nt351_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+            log 'NT351 LAN skipped: preflight refused (DHCP, one supported card and verified own driver required); installing without network'
+            _u351_enabled=off
+        fi
+        if [ "$_u351_enabled" = on ]; then
+            usos_nt351_answer "$work/WINNT.SIF" > "$work/WINNT.NET351" &&
+              mv "$work/WINNT.NET351" "$work/WINNT.SIF" || fail 'cannot render original NT351 LAN answer'
+        fi
+    fi
+    if [ "$major:$minor" = 3:50 ]; then
+        . "$LIB/nt35_network_setup.sh"
+        if ! usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+            log 'NT35 LAN skipped: preflight refused (DHCP, exact PCI bus/slot and verified own driver required); installing without network'
+            _u35_enabled=off
+        fi
+        if [ "$_u35_enabled" = on ]; then
+            usos_nt35_answer "$work/WINNT.SIF" > "$work/WINNT.NET35" &&
+              mv "$work/WINNT.NET35" "$work/WINNT.SIF" || fail 'cannot render original NT35 LAN answer'
+        fi
+    fi
 else
     nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
     if [ -n "$tse" ]; then
@@ -720,6 +746,10 @@ done
 cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 nt3_nvme_stage
 nt3_stage_profile
+[ "$minor" != 51 ] || usos_nt351_stage "$work/c" || fail 'cannot stage verified NT351 LAN driver'
+[ "$minor" != 51 ] || usos_nt351_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT351 Workstation client policy request'
+[ "$minor" != 50 ] || usos_nt35_stage "$work/c" || fail 'cannot stage verified NT35 LAN driver'
+[ "$minor" != 50 ] || usos_nt35_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT35 Workstation client policy request'
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

@@ -59,6 +59,7 @@ typedef LONG (NTAPI *NT_SHUTDOWN_SYSTEM)(int Action);
 static HANDLE g_log = INVALID_HANDLE_VALUE;
 static SERVICE_STATUS_HANDLE g_status_handle;
 static SERVICE_STATUS g_status;
+static int g_post_failed;
 static char g_text[4096];
 
 static int len(const char *s)
@@ -122,6 +123,20 @@ static void write_file(const char *name, const char *text)
     }
     WriteFile(h, text, len(text), &n, NULL);
     CloseHandle(h);
+}
+
+static int write_file_checked(const char *name, const char *text)
+{
+    char path[MAX_PATH];
+    DWORD n = 0, size = (DWORD)len(text);
+    HANDLE h;
+    int ok;
+    lstrcpyA(path, DIR); lstrcatA(path, name);
+    h = CreateFileA(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    ok = WriteFile(h, text, size, &n, NULL) && n == size && FlushFileBuffers(h);
+    if (!CloseHandle(h)) ok = 0;
+    return ok;
 }
 
 /* HKLM\SYSTEM\CurrentControlSet\Services\<svc>[\<sub>] opened for writing. */
@@ -924,6 +939,217 @@ static void polish(void)
 }
 
 static void vesa(void);
+static int net351_dword(HKEY h, const char *name, DWORD value)
+{
+    DWORD type, size = sizeof(DWORD), got = 0;
+    return RegSetValueExA(h, name, 0, REG_DWORD, (const BYTE *)&value, sizeof value) == ERROR_SUCCESS &&
+        RegQueryValueExA(h, name, NULL, &type, (BYTE *)&got, &size) == ERROR_SUCCESS &&
+        type == REG_DWORD && size == sizeof(DWORD) && got == value;
+}
+
+static int net351_has_binding(HKEY h)
+{
+    char data[1024];
+    DWORD type, size = sizeof data;
+    int i = 0;
+    if (RegQueryValueExA(h, "Bind", NULL, &type, (BYTE *)data, &size) != ERROR_SUCCESS ||
+        type != REG_MULTI_SZ || size < 2 || size > sizeof data || data[size-1] || data[size-2]) return 0;
+    while (i < (int)size-1 && data[i]) {
+        if (!lstrcmpiA(data+i, "\\Device\\NDISLoop1")) return 1;
+        i += len(data+i)+1;
+    }
+    return 0;
+}
+
+static int net351_equal_files(const char *source, const char *target)
+{
+    HANDLE a, b;
+    char x[1024], y[1024];
+    DWORD na, nb, i, total = 0;
+    int equal = 0;
+    a = CreateFileA(source, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    b = CreateFileA(target, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (a != INVALID_HANDLE_VALUE && b != INVALID_HANDLE_VALUE) {
+        for (;;) {
+            if (!ReadFile(a,x,sizeof x,&na,NULL) || !ReadFile(b,y,sizeof y,&nb,NULL) || na != nb) break;
+            if (!na) { equal = total != 0; break; }
+            for (i=0;i<na;i++) if (x[i] != y[i]) break;
+            if (i != na) break;
+            total += na;
+        }
+    }
+    if (a != INVALID_HANDLE_VALUE) CloseHandle(a);
+    if (b != INVALID_HANDLE_VALUE) CloseHandle(b);
+    return equal;
+}
+
+static int nt351_network(void)
+{
+    static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet351.sys";
+    HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
+    char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
+    DWORD version, type, size, medium, enabled;
+    DWORD (WINAPI *get_version)(void);
+    int ok = 0, meta_len;
+    meta_len = read_text("NET351.ON", meta, sizeof meta);
+    if (meta_len <= 0) { /* Preserve87f599: missing/empty must never enter takeover. */
+        DWORD error;
+        if (meta_len == 0 || GetFileAttributesA(DIR "NET351.ON") != 0xffffffff) return 0;
+        error = GetLastError();
+        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND ? 1 : 0;
+    }
+    if (meta_len >= sizeof meta - 1) return 0;
+    get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
+    if (!get_version) return 0;
+    version = get_version();
+    if ((version & 0x80000000) || (version & 0xff) != 3 || ((version >> 8) & 0xff) != 51) {
+        say("NET351 refused: actual Windows version is not3.51\r\n"); return 0;
+    }
+    say("NET351: configuring existing original TCP/IP DHCP binding\r\n");
+    /* Only take over the exact original Ethernet LOOP binding. Missing or
+       unexpected system configuration is a failure, never a new fake card. */
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop",0,KEY_READ|KEY_WRITE,&svc) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters",0,KEY_READ|KEY_WRITE,&params) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters\\Tcpip",0,KEY_READ,&tcp) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Tcpip\\Linkage",0,KEY_READ,&linkage) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Dhcp",0,KEY_READ,&dhcp)) goto done;
+    size=sizeof medium;
+    if (RegQueryValueExA(params,"Medium",NULL,&type,(BYTE *)&medium,&size) || type!=REG_DWORD ||
+        size!=sizeof medium || medium!=0) goto done;
+    size=sizeof enabled;
+    if (RegQueryValueExA(tcp,"EnableDHCP",NULL,&type,(BYTE *)&enabled,&size) || type!=REG_DWORD ||
+        size!=sizeof enabled || enabled!=1 || !net351_has_binding(linkage)) goto done;
+    size=sizeof previous-1;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)previous,&size) ||
+        (type!=REG_SZ && type!=REG_EXPAND_SZ)) goto done;
+    previous[size]=0;
+    if (len(previous)<8 || (lstrcmpiA(previous+len(previous)-8,"loop.sys") && lstrcmpiA(previous,image))) goto done;
+    if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
+    lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet351.sys");
+    if (!CopyFileA(DIR "USOSNET351.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET351.SYS",dst)) goto done;
+    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"PollMode",0) ||
+        !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
+        !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
+    /* Commit the new image only after byte-for-byte copy and configuration
+       readback. The existing NDISLoop1 TCP/IP/NetBT linkage stays intact. */
+    if (RegSetValueExA(svc,"ImagePath",0,REG_EXPAND_SZ,(const BYTE *)image,sizeof image)) goto done;
+    size=sizeof got;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)got,&size) ||
+        type!=REG_EXPAND_SZ || size!=sizeof image || lstrcmpiA(got,image)) goto done;
+    ok=1;
+done:
+    if (dhcp) RegCloseKey(dhcp);
+    if (linkage) RegCloseKey(linkage);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    say(ok ? "NET351: exact staged driver copy/configuration readback verified; next boot required\r\n" :
+        "NET351 FAILED: original binding or copy/configuration readback; network is unproven\r\n");
+    lstrcpyA(g_text,meta);
+    lstrcatA(g_text,ok ? "staged_copy_readback=match\r\nconfiguration_readback=match\r\ninstalled_runtime_pass=false\r\n" :
+        "staged_copy_readback=unconfirmed\r\nconfiguration_readback=failed\r\ninstalled_runtime_pass=false\r\n");
+    if (!write_file_checked("NET351.STATUS",g_text)) return 0;
+    return ok ? 2 : 0; /* 1=not selected,2=verified takeover,0=refusal */
+}
+
+static int net35_decimal(const char *text, const char *key, DWORD *out)
+{
+    const char *p=text;
+    DWORD value=0;
+    int found=0, k=len(key);
+    while (*p) {
+        int i=0, digits=0;
+        while (i<k && p[i] && (p[i]|32)==(key[i]|32)) i++;
+        if (i==k && p[k]=='=') {
+            if (found++) return 0;
+            p+=k+1;value=0;
+            while (*p>='0' && *p<='9') {
+                if (++digits>3) return 0;
+                value=value*10+(*p++-'0');
+            }
+            if (!digits || value>255 || (*p && *p!='\r' && *p!='\n')) return 0;
+        }
+        while (*p && *p!='\n') p++;
+        if (*p) p++;
+    }
+    if (found!=1) return 0;
+    *out=value;
+    return 1;
+}
+
+static int nt35_network(void)
+{
+    static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet35.sys";
+    HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
+    char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
+    DWORD version, type, size, medium, enabled, bus, slot;
+    DWORD (WINAPI *get_version)(void);
+    int ok = 0, meta_len;
+    meta_len=read_text("NET35.ON", meta, sizeof meta);
+    if (meta_len<0) {
+        DWORD error;
+        if (GetFileAttributesA(DIR "NET35.ON") != 0xffffffff) return 0;
+        error=GetLastError();
+        return error==ERROR_FILE_NOT_FOUND || error==ERROR_PATH_NOT_FOUND;
+    }
+    if (!meta_len || meta_len>=sizeof meta-1 ||
+        !net35_decimal(meta,"bus",&bus) || !net35_decimal(meta,"slot",&slot)) return 0;
+    get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
+    if (!get_version) return 0;
+    version = get_version();
+    if ((version & 0xff) != 3 || ((version >> 8) & 0xff) != 50) {
+        say("NET35 refused: actual Windows version is not3.5\r\n"); return 0;
+    }
+    say("NET35: configuring existing original TCP/IP DHCP binding\r\n");
+    /* Only take over the exact original Ethernet LOOP binding. Missing or
+       unexpected system configuration is a failure, never a new fake card. */
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop",0,KEY_READ|KEY_WRITE,&svc) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters",0,KEY_READ|KEY_WRITE,&params) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "NDISLoop1\\Parameters\\Tcpip",0,KEY_READ,&tcp) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Tcpip\\Linkage",0,KEY_READ,&linkage) ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE,SVC_KEY "Dhcp",0,KEY_READ,&dhcp)) goto done;
+    size=sizeof medium;
+    if (RegQueryValueExA(params,"Medium",NULL,&type,(BYTE *)&medium,&size) || type!=REG_DWORD ||
+        size!=sizeof medium || medium!=0) goto done;
+    size=sizeof enabled;
+    if (RegQueryValueExA(tcp,"EnableDHCP",NULL,&type,(BYTE *)&enabled,&size) || type!=REG_DWORD ||
+        size!=sizeof enabled || enabled!=1 || !net351_has_binding(linkage)) goto done;
+    size=sizeof previous-1;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)previous,&size) ||
+        (type!=REG_SZ && type!=REG_EXPAND_SZ)) goto done;
+    previous[size]=0;
+    if (len(previous)<8 || (lstrcmpiA(previous+len(previous)-8,"loop.sys") && lstrcmpiA(previous,image))) goto done;
+    if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
+    lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet35.sys");
+    if (!CopyFileA(DIR "USOSNET35.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET35.SYS",dst)) goto done;
+    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"BusNumber",bus) ||
+        !net351_dword(params,"UsosPciSlot",slot) || !net351_dword(params,"PollMode",0) ||
+        !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
+        !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
+    /* Commit the new image only after byte-for-byte copy and configuration
+       readback. The existing NDISLoop1 TCP/IP/NetBT linkage stays intact. */
+    if (RegSetValueExA(svc,"ImagePath",0,REG_EXPAND_SZ,(const BYTE *)image,sizeof image)) goto done;
+    size=sizeof got;
+    if (RegQueryValueExA(svc,"ImagePath",NULL,&type,(BYTE *)got,&size) ||
+        type!=REG_EXPAND_SZ || size!=sizeof image || lstrcmpiA(got,image)) goto done;
+    ok=1;
+done:
+    if (dhcp) RegCloseKey(dhcp);
+    if (linkage) RegCloseKey(linkage);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    say(ok ? "NET35: exact staged driver copy/configuration readback verified; next boot required\r\n" :
+        "NET35 FAILED: original binding or copy/configuration readback; network is unproven\r\n");
+    lstrcpyA(g_text,meta);
+    lstrcatA(g_text,ok ? "staged_copy_readback=match\r\nconfiguration_readback=match\r\ninstalled_runtime_pass=false\r\n" :
+        "staged_copy_readback=unconfirmed\r\nconfiguration_readback=failed\r\ninstalled_runtime_pass=false\r\n");
+    write_file("NET35.STATUS",g_text);
+    return ok ? 2 : 0; /* 1=not selected, 2=verified takeover, 0=refusal */
+}
+
+#include "client_prepare.h"
+
 static void display_profile(void)
 {
     /* The install VM must not select its own VBE modes for the real board.
@@ -937,15 +1163,16 @@ static void display_profile(void)
     set_dword("usosdisplay", NULL, "Start", 2);
     say("DISPLAY hardware service registered (VM defers)\r\n");
 }
-static void post(void)
+static int post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
     static const char *const keys[] = { "ahcint", "usosnvme", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
                                         "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint", "Scsidisk" };
     static const char ver[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
     char sys[MAX_PATH], src[MAX_PATH], dst[MAX_PATH], key[128];
-    int i, j;
+    int i, j, network351_state, network35_state, selected_state;
 
+    if (!client_request()) return 0;
     say("USOS NT 3.51 post\r\n");
     if (!GetSystemDirectoryA(sys, sizeof sys))
         lstrcpyA(sys, "C:\\WINNT\\system32");
@@ -1033,8 +1260,17 @@ static void post(void)
         dump_value(g_text, key, "Group");
     }
     write_file("DRIVERS.TXT", g_text);
+    network351_state = nt351_network();
+    network35_state = nt35_network();
+    if (!network351_state || !network35_state) {
+        if (g_client_requested) client_fail("selected network takeover refused");
+        return 0;
+    }
+    selected_state = g_client_config && g_client_config->minor == 51 ? network351_state : network35_state;
+    if (!client_prepare(selected_state)) return 0;
     vesa();
     display_profile();
+    return 1;
 }
 
 /* VESA display (docs/nt3-vesa-2026-10-14.md): usosvbe.sys (own miniport,
@@ -1143,16 +1379,26 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
-    post();
+    if (!post()) goto failed;
     polish();
     /* Once only: the service turns itself off before DONE.TXT. */
-    set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
-    write_file("DONE.TXT", "done\r\n");
+    if (g_client_requested) {
+        if (!client_commit_installer()) goto failed;
+    } else {
+        set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
+        write_file("DONE.TXT", "done\r\n");
+    }
     say("done\r\n");
     /* Let the other services finish starting (their failures reach the
        event log), then restart: the install VM ends there (-no-reboot). */
     Sleep(30000);
     restart();
+    goto stopped;
+failed:
+    g_post_failed = 1;
+    say("POST refused: no DONE/restart; inspect own local records\r\n");
+    g_status.dwWin32ExitCode = ERROR_GEN_FAILURE;
+stopped:
     g_status.dwCurrentState = SERVICE_STOPPED;
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
@@ -1211,12 +1457,11 @@ void __stdcall entry(void)
             say_hex("StartServiceCtrlDispatcher failed, error ", GetLastError());
             ExitProcess(2);
         }
-        ExitProcess(0);
+        ExitProcess(g_post_failed ? 3 : 0);
     }
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
-        post();
-        ExitProcess(0);
+        ExitProcess(post() ? 0 : 3);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
     if (lstrcmpA(opt, "polish") == 0) {

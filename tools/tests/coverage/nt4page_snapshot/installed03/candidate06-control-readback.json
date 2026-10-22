@@ -1,0 +1,52 @@
+{
+  "scope": "Stopped owned05 RAM hive; only exact DNS-location booleans/network diagnostic numbers. No raw hive/registry data exported.",
+  "hive": {
+    "header_checksum_valid": true,
+    "sequence_numbers_equal": true
+  },
+  "global": {
+    "nameserver": {
+      "present": true,
+      "type": 1,
+      "nonempty": false,
+      "equals_actual_configured_dns": false
+    },
+    "dhcpnameserver": {
+      "present": false,
+      "type": null,
+      "nonempty": false,
+      "equals_actual_configured_dns": false
+    }
+  },
+  "adapter": {
+    "nameserver": {
+      "present": false,
+      "type": null,
+      "nonempty": false,
+      "equals_actual_configured_dns": false
+    },
+    "dhcpnameserver": {
+      "present": false,
+      "type": null,
+      "nonempty": false,
+      "equals_actual_configured_dns": false
+    }
+  },
+  "own_driver_diag": {
+    "usosnetstage": null,
+    "usosneterror": null,
+    "usosnetndis": null,
+    "usosnetpcilocation": null,
+    "usosnetpciassign": null,
+    "usosnetpcidevice": null,
+    "usosnetflags": null
+  },
+  "own_driver_sha256": "4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d",
+  "ndisloop_start": 3,
+  "client_policy_start": {
+    "lanmanworkstation": 2,
+    "lanmanserver": 4,
+    "browser": 4
+  },
+  "scratch_removed": true
+}

@@ -1,0 +1,1245 @@
+{
+  "source_commit": "1feadbaf534d4546c42a051b6d34d430371d8f89",
+  "tag": "nt35-client-auto-fresh01",
+  "plan_path": "C:\\Users\\ASRock\\usos-work\\nt35-auto-client\\artifacts\\coverage\\nt35-client-auto-fresh01\\plan.json",
+  "plan_sha256": "79d9366fe00dd39a7eab72cde2a8ccff54994f60f91f2e0e9f383d7b32c06f95",
+  "cache": {
+    "base": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt35-irq-fresh01",
+    "output": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt35-client-auto01",
+    "base_initrd_sha256": "f51137a7d9cecfa7e554c58485446533ee34bcab285ee54827b2aeabdc68c3fa",
+    "initrd_sha256": "ae9568457e6af6150fb1d6fc672a7a841e73b4c2002fbef10107c0afd11e0bb5",
+    "overlay_sha256": "5684de894f2359286a48747bbad0a9c2aba21ede8411925cdec68fa5ac440721",
+    "base_prefix_preserved": true,
+    "source_commit": "1feadbaf534d4546c42a051b6d34d430371d8f89",
+    "base_layers": 4,
+    "final_layers": 5,
+    "effective_entries": 837,
+    "unchanged_effective_entries": 834,
+    "source_cache_files": {
+      "inputs.json": {
+        "bytes": 1137,
+        "sha256": "eb16211dd47c6c275478f3e42d10ca9a56b6534f335c7064b922e7f943125884"
+      },
+      "nt3-hid-private-inputs.json": {
+        "bytes": 1119,
+        "sha256": "e2adf95ab0a16c6f6dddb7cfd70caf678b4d576d8f2fb2323f932f3d9d0fa127"
+      },
+      "nt35-inputs.json": {
+        "bytes": 3604,
+        "sha256": "19db3a715560462f885b10e67bda50ff17bc6ce43befae9a2c7a38aa5c889e8f"
+      },
+      "nt35-irq-fresh-inputs.json": {
+        "bytes": 52285,
+        "sha256": "b7c9ea4a054402e39235a641e8b6727f2765b65eb08f6e5762714547d203e1a7"
+      },
+      "nt351-inputs.json": {
+        "bytes": 3487,
+        "sha256": "7209ff7fd35c1622db1b420bdc11276944506ad93a9813c097c9df31c1bf8e1c"
+      },
+      "nt6-usb-private-inputs.json": {
+        "bytes": 828,
+        "sha256": "cf37291cc9a54fe0ea79c2f682b63d985fdd580f71476bec0848cdd605f54c2c"
+      },
+      "zig-out/bin/usos-x86_64.efi": {
+        "bytes": 1464832,
+        "sha256": "5d64d0e5357d99976278028159f0fe02c7fd8679d0b9eaf1b793855516370828"
+      },
+      "zig-out/dos-native/COPYING": {
+        "bytes": 18007,
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa"
+      },
+      "zig-out/dos-native/freedos/BOOT16.BIN": {
+        "bytes": 512,
+        "sha256": "58a9154e3607063377948b0ecc2ff7498cf9ebc94d06b0c2f46712c79e9e94ce"
+      },
+      "zig-out/dos-native/freedos/COMMAND.COM": {
+        "bytes": 87772,
+        "sha256": "077808379e896476f7f69d62e6c8989d8fc23e8ef58d1c8492db1ac106784107"
+      },
+      "zig-out/dos-native/freedos/COPYING": {
+        "bytes": 18330,
+        "sha256": "2ec21c4f10e9fc6bafbc619cf905424162a0b6443e482d599a6d0d7718e9ae58"
+      },
+      "zig-out/dos-native/freedos/DOSZIP.TXT": {
+        "bytes": 17655,
+        "sha256": "7f73391e05f0d3f292ce7b09575bdcabba0eadc58bf095367af8ad84e238fc9e"
+      },
+      "zig-out/dos-native/freedos/doszip.zip": {
+        "bytes": 388461,
+        "sha256": "d1dfa5f050e7282eafb4b8ceca9d1d445629e370994563285ef4cec67f554b37"
+      },
+      "zig-out/dos-native/freedos/DZ.DOS": {
+        "bytes": 150976,
+        "sha256": "83e48c3689e71ee8ce0db72adc2e51bdb33e3be3ec1128f78e5a6548b3851bb0"
+      },
+      "zig-out/dos-native/freedos/DZ.EXE": {
+        "bytes": 659,
+        "sha256": "dcba2792686c299ef2902f8e630c8971bb19676c9fadfff003a3eb6c2179b736"
+      },
+      "zig-out/dos-native/freedos/FDAUTO.BAT": {
+        "bytes": 389,
+        "sha256": "8677247829f65b1c0787339cbaee4f3ee5c21727e288393ca65f77a945aaa4c9"
+      },
+      "zig-out/dos-native/freedos/FDCONFIG.SYS": {
+        "bytes": 100,
+        "sha256": "9f53da6b4470b3741d131ed2d38bd27d692e84e6f8b41aa65d241a8b1961317d"
+      },
+      "zig-out/dos-native/freedos/freecom.zip": {
+        "bytes": 2038253,
+        "sha256": "3a7cfa03cce242031926cd67b69e1fd030d1c27127885d927629945f3137b6f0"
+      },
+      "zig-out/dos-native/freedos/KERNEL.SYS": {
+        "bytes": 46256,
+        "sha256": "932c0c155701eddb7b902f7269a1b2ce31f5c82a6dc195172f2336d18a74e1fb"
+      },
+      "zig-out/dos-native/freedos/kernel.zip": {
+        "bytes": 772692,
+        "sha256": "43ed55fec6e795bb24e658302c7fae9eec9eb8dfeaba15734317b3f8302706d6"
+      },
+      "zig-out/dos-native/freedos/manifest.json": {
+        "bytes": 1234,
+        "sha256": "22101423c3bc7d21a54980c3c999cda27af029d38d52dcec774cdffb96130990"
+      },
+      "zig-out/dos-native/freedos/README.TXT": {
+        "bytes": 2245,
+        "sha256": "e26bd3a74bf95f32f04f0f547fbbc202fe8b7f8e61e466f213321617348b3aca"
+      },
+      "zig-out/dos-native/freedos/REBOOT.COM": {
+        "bytes": 208,
+        "sha256": "0b4de407cfc058abd38afd51a4b9a750654efda9fcc5970e69c73de3dc77829f"
+      },
+      "zig-out/dos-native/freedos/TOOLS.BAT": {
+        "bytes": 630,
+        "sha256": "3213d61957bf480c32f874a98e648bd9d33e9172c0f9902e0038e8e2168f1d84"
+      },
+      "zig-out/dos-native/freedos/VBADOS.TXT": {
+        "bytes": 19279,
+        "sha256": "88f22e4349ea13babbd0c90b38542c9f8c8660b111aa68c88371403411ccff9e"
+      },
+      "zig-out/dos-native/freedos/VBMOUSE.EXE": {
+        "bytes": 28384,
+        "sha256": "eb34c5fc0a215d310bd486cfd63dd747df63481db0bbb18635b57e67585b8c91"
+      },
+      "zig-out/dos-native/manifest.json": {
+        "bytes": 475,
+        "sha256": "e33ca5d5df7fd1abbe825a0d712fd3aea336c36d7260973bcccf222b59ec7d5c"
+      },
+      "zig-out/dos-native/memdisk": {
+        "bytes": 26140,
+        "sha256": "3f6cd656b8a14109cd3f906fee2dd2e75418f983a5e1bfdb64f44f7765588cbb"
+      },
+      "zig-out/dos-native/msdos/COPYDOS.BAT": {
+        "bytes": 139,
+        "sha256": "7c507330346ed19567c102c993b023138b11ce4190a464a44806a16f9a40d45e"
+      },
+      "zig-out/dos-native/msdos/CSMESP.IMG": {
+        "bytes": 2202112,
+        "sha256": "d77ed40fc60b2840ac7d962f338325eaf989e8bb0951fbee1c1dcc62b57b7c60"
+      },
+      "zig-out/dos-native/msdos/HIMEMSRC.ZIP": {
+        "bytes": 39927,
+        "sha256": "e6e9913f26aec2e264bf514ddd1910cde319122cafeeda1b46cc0756beae25f8"
+      },
+      "zig-out/dos-native/msdos/HIMEMX.EXE": {
+        "bytes": 6100,
+        "sha256": "95557fe6d35ff7801a9baa072f7cef1f8a6d53a46f00c90785ad7e59c094cba9"
+      },
+      "zig-out/dos-native/msdos/HIMEMX.TXT": {
+        "bytes": 1954,
+        "sha256": "be54cf4a34e96935e2abe2c1cd86ea902c7680be96b5b2d155ed55419edc5dbd"
+      },
+      "zig-out/dos-native/msdos/INSTALL.BAT": {
+        "bytes": 8693,
+        "sha256": "79040674c3b3199eb23295c4e633e09e114f59edc3d5548f16e064d5dd41cc42"
+      },
+      "zig-out/dos-native/msdos/LICENSE.TXT": {
+        "bytes": 18007,
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa"
+      },
+      "zig-out/dos-native/msdos/LIVE.BAT": {
+        "bytes": 768,
+        "sha256": "f182f986a0d6c5fe2abf99a74cc0a35c0316403cd2cc81c637a275588af31818"
+      },
+      "zig-out/dos-native/msdos/manifest.json": {
+        "bytes": 675,
+        "sha256": "a3098586cfb5d04805992fc9eda6826b105270ca311879258bb2aaa8d1ab9588"
+      },
+      "zig-out/dos-native/msdos/PREPDOS.BAT": {
+        "bytes": 1401,
+        "sha256": "cb835454e5dacdf165e74a871bf6498bb3b74356e682d83bcc64904db57f11f2"
+      },
+      "zig-out/dos-native/msdos/REBOOT.COM": {
+        "bytes": 208,
+        "sha256": "0b4de407cfc058abd38afd51a4b9a750654efda9fcc5970e69c73de3dc77829f"
+      },
+      "zig-out/dos-native/msdos/UNPACK.BAT": {
+        "bytes": 100,
+        "sha256": "1e355d27a8ec4374349db8d0318d5bf76f1efc1f4dd5568cdabc0de05d37ad7c"
+      },
+      "zig-out/dos-native/msdos/USOS.SHH": {
+        "bytes": 663,
+        "sha256": "c8c793eeb9f7fa05cb44de46c16f18479d07eaed73a65e05b46d0422e63458a0"
+      },
+      "zig-out/dos-native/msdos/USOSKBC.COM": {
+        "bytes": 1758,
+        "sha256": "15199d738d50c3fd288fe5cabfc2cd5c802a9c407c37886f66dc0c5491a0c87c"
+      },
+      "zig-out/dos-native/msdos/USOSKEY.COM": {
+        "bytes": 1391,
+        "sha256": "e6f7be601120eed94cacb5e16fc9b5c9706130106440cd3b1243351ab0cf2c01"
+      },
+      "zig-out/dos-native/msdos/USOSKEY.DRV": {
+        "bytes": 8364,
+        "sha256": "36e76b91670456cea34e9e610289f3052367397bf5dca93b20eec987b3e99488"
+      },
+      "zig-out/dos-native/msdos/USOSMOUS.DRV": {
+        "bytes": 4672,
+        "sha256": "abf69a4a34c30dd7e77cd65f835202af441b111a9a7f478bf133f9126af4531c"
+      },
+      "zig-out/dos-native/msdos/USOSMS1.DRV": {
+        "bytes": 1466,
+        "sha256": "bfd68c01b39df5172f7c973c677ca3db4cb5e84fab298dd63fb732cb522cb58c"
+      },
+      "zig-out/dos-native/msdos/USOSV10.COM": {
+        "bytes": 2684,
+        "sha256": "2b6d2f19f5cec389e7b563a0cd9d9150edb2612638cd6f4e836d37593cedbc99"
+      },
+      "zig-out/dos-native/msdos/USOSVMD.VXD": {
+        "bytes": 2591,
+        "sha256": "00a4325c3954328ec8808b124ee68558f18606098a658f81f7f15b3d38f55b3e"
+      },
+      "zig-out/dos-native/msdos/USOSWHER.COM": {
+        "bytes": 3887,
+        "sha256": "ec9dccdeabd8892df2a3d53e651e1a3a4cc4e4aa3ff53d238ea6598f224541ab"
+      },
+      "zig-out/dos-native/msdos/VBADOS.TGZ": {
+        "bytes": 117675,
+        "sha256": "ad93163858a943b2f75e4ecde2839a06c7341fe90f11503508f860d74c2e0cf7"
+      },
+      "zig-out/dos-native/msdos/VBADOS.TXT": {
+        "bytes": 19279,
+        "sha256": "88f22e4349ea13babbd0c90b38542c9f8c8660b111aa68c88371403411ccff9e"
+      },
+      "zig-out/dos-native/msdos/VBMOUSE.DRV": {
+        "bytes": 2700,
+        "sha256": "6d55493289a71fc99e99f8f8cce9232b74bdeac9ac85abc4724a2381900f7c72"
+      },
+      "zig-out/dos-native/msdos/VBMOUSE.EXE": {
+        "bytes": 28384,
+        "sha256": "eb34c5fc0a215d310bd486cfd63dd747df63481db0bbb18635b57e67585b8c91"
+      },
+      "zig-out/dos-native/msdos/W101.KEY": {
+        "bytes": 464,
+        "sha256": "e321594f9dcc5116a9b85767bcf21ac68c714b3b7d1f01a6e6337b10a89b8ffa"
+      },
+      "zig-out/dos-native/msdos/W104.KEY": {
+        "bytes": 536,
+        "sha256": "2f3abd62a3153f32d8635fca9673e292ba258e0d42013e54ba5276ea090090eb"
+      },
+      "zig-out/dos-native/msdos/W1AUTO.BAT": {
+        "bytes": 3908,
+        "sha256": "e315eee3e2c2214bb3c9bcee57b564ac9f5b3868a55d93354eaa938b1abd6f64"
+      },
+      "zig-out/dos-native/msdos/W1AUTO.CSM": {
+        "bytes": 3908,
+        "sha256": "e315eee3e2c2214bb3c9bcee57b564ac9f5b3868a55d93354eaa938b1abd6f64"
+      },
+      "zig-out/dos-native/msdos/W1CONFIG.CSM": {
+        "bytes": 1659,
+        "sha256": "919c3aeda379fea12072b4a2883058bfaae8506abb5eda217379c413f2e9f00a"
+      },
+      "zig-out/dos-native/msdos/W1CONFIG.SYS": {
+        "bytes": 1634,
+        "sha256": "a9e369d5eff22dbe9878e2cd2d0b88f63a91bb91e94073875dfaaf101c1045ea"
+      },
+      "zig-out/dos-native/msdos/W1SETUP.BAT": {
+        "bytes": 995,
+        "sha256": "c712a316164a828935dcf00b0e9caf532f40d1832483139cff4ba9cec1aa9d62"
+      },
+      "zig-out/dos-native/msdos/W203.KEY": {
+        "bytes": 501,
+        "sha256": "02fa06420739e419a65508c183b961f3f74f5bee42e7c84e776741b283896c3a"
+      },
+      "zig-out/dos-native/msdos/W211.KEY": {
+        "bytes": 419,
+        "sha256": "93ff116a565933a244fd3957a265ccd701cec43c0b11e346916388f1168ce7af"
+      },
+      "zig-out/dos-native/msdos/W30.KEY": {
+        "bytes": 201,
+        "sha256": "696aee08c207cc381d5e968b908d06a835b668287cecffe87320a063fc198d61"
+      },
+      "zig-out/dos-native/msdos/W386.KEY": {
+        "bytes": 397,
+        "sha256": "c2b1bd3dd208ec99f1bde8e37bbde05d625d054aeccaeac9fd0342d36ce6240f"
+      },
+      "zig-out/dos-native/msdos/W3AUTO.BAT": {
+        "bytes": 1752,
+        "sha256": "a5a41051a9748beca7a70eee1e7a3ddf7ffbfc5a3639ad4e105e0ab8cd86593c"
+      },
+      "zig-out/dos-native/msdos/W3AUTO.CSM": {
+        "bytes": 1792,
+        "sha256": "86b5d7fde466c313bbd4b029b180d957ec62cc3ad741df84a78ec53f349defc9"
+      },
+      "zig-out/dos-native/msdos/W3CONFIG.CSM": {
+        "bytes": 508,
+        "sha256": "44405dbdcbb4bb23a1e8e239af13645d3afec34d587a345fa4399b329bf5b82d"
+      },
+      "zig-out/dos-native/msdos/W3CONFIG.SYS": {
+        "bytes": 503,
+        "sha256": "b4c1d07a5d13f74b1f3ed81ab10a7f478bbdec3014eb5efec2321f4a68095fdf"
+      },
+      "zig-out/dos-native/msdos/W3INF.BAS": {
+        "bytes": 1769,
+        "sha256": "953eb052c4399f8e3e5f38a6edce7f3671bb09360474211fdbc13d520aeed075"
+      },
+      "zig-out/dos-native/msdos/W3INI.BAS": {
+        "bytes": 2224,
+        "sha256": "10934ac6c9d173e39ec2d050654cab68d83f927e92e5d98b3c87b8c6601ae3b7"
+      },
+      "zig-out/dos-native/msdos/W3PL.KEY": {
+        "bytes": 58,
+        "sha256": "bfaf94c100a6bf9dabdd4bf46f4221ab5231fa1902e05bfdbd901e6cd69770c4"
+      },
+      "zig-out/dos-native/msdos/W3START.BAT": {
+        "bytes": 1359,
+        "sha256": "be4e60982cc883c52b6e3c2814beb0e0218bc4226cd2f24c118c8a5bfb05ef14"
+      },
+      "zig-out/dos-native/msdos/WINMENU.BAT": {
+        "bytes": 3660,
+        "sha256": "67a4f377d2d72d43e89ff2cff10cc4b9ad077b35aefe99dc20fd9d3802e92b78"
+      },
+      "zig-out/dos-native/ram-patch/CWSDPMI.EXE": {
+        "bytes": 21325,
+        "sha256": "2de899fecaa90632b8b9bdfc0305cb0375e59ae252c37e32d06c1ed3f98a8f44"
+      },
+      "zig-out/dos-native/ram-patch/CWSDPMI.TXT": {
+        "bytes": 9623,
+        "sha256": "4d278854e4ae881ebad408bb9c94dc4072f954875f29dc502b7847e06ba65978"
+      },
+      "zig-out/dos-native/ram-patch/INSTALL.BAT": {
+        "bytes": 19523,
+        "sha256": "bae9420a836d4514d1aeaf553a4c059ba8f49af62d8ca897200d529c129c596a"
+      },
+      "zig-out/dos-native/ram-patch/LICENSE.TXT": {
+        "bytes": 1067,
+        "sha256": "e4900f554b4de46e0c5cdfe32c3af03e8e92d9e273e31fa81ef4ce508772f257"
+      },
+      "zig-out/dos-native/ram-patch/manifest.json": {
+        "bytes": 833,
+        "sha256": "011004d400fb6dbba65ec4d1120a61d8341d729eb09b8c0419d136d1927b6634"
+      },
+      "zig-out/dos-native/ram-patch/NOTICE.TXT": {
+        "bytes": 842,
+        "sha256": "9f50c1d3d6e109feb86193b9e8a1a7e37760599bd0dcda7584ed27fae5eb0018"
+      },
+      "zig-out/dos-native/ram-patch/PATCH9X.EXE": {
+        "bytes": 314880,
+        "sha256": "c37f9a119772cd4814419168f09a692c376fef007e00ed2bbe520346e2f66b6f"
+      },
+      "zig-out/dos-native/ram-patch/README.TXT": {
+        "bytes": 15727,
+        "sha256": "c2e814708429fc4475727b7fe35b7d79ba579c828a0a6dbbbfda8305d20edd45"
+      },
+      "zig-out/dos-native/ram-patch/REPAIR.BAT": {
+        "bytes": 1592,
+        "sha256": "b78c3369494caca44e8bbeea516417d51a6e6f87e108873293bf2848043d6886"
+      },
+      "zig-out/dos-native/ram-patch/source.zip": {
+        "bytes": 862548,
+        "sha256": "751f7a07950d61a7906ea7a68c1a304ee9802d6ee6e68930d7c067ab8c8cefac"
+      },
+      "zig-out/dos-native/source.zip": {
+        "bytes": 13449911,
+        "sha256": "390d8d6a5ec069dbefeb5a6d4f36cdbb13f998aeedc6a2c36fbf412c3d59639e"
+      },
+      "zig-out/dos-native/win9x/CREGFIX.SYS": {
+        "bytes": 115,
+        "sha256": "fa87a564d824969ab59db9831d32c2b8c1d662574ed9f798ebfc44c8436e2314"
+      },
+      "zig-out/dos-native/win9x/CREGFIX.TXT": {
+        "bytes": 1818,
+        "sha256": "04010dcab44d8d630c819c461706122a4dbc415958e5fa9e15121c8089ce1ab9"
+      },
+      "zig-out/dos-native/win9x/DOSMOUSE.BAT": {
+        "bytes": 1832,
+        "sha256": "eb08193404ea130ae95ab13c41ed78da24ed8008d017fa9b3df8ed9641a9431b"
+      },
+      "zig-out/dos-native/win9x/INWIN.COM": {
+        "bytes": 17,
+        "sha256": "22f239940921d5e82fb4e712eb085a5b5ab3eb570ed5e2f9af224cdb48f60590"
+      },
+      "zig-out/dos-native/win9x/MSBATCH.INF": {
+        "bytes": 3896,
+        "sha256": "7342a692d58620c2cdfb765542d7d4ea29f850d8dd3a26088d727e796948f065"
+      },
+      "zig-out/dos-native/win9x/U9FIX.COM": {
+        "bytes": 2848,
+        "sha256": "567f88ea9f779ef26b764827dc7a163643b036250e9be2bba337af721cfb86d8"
+      },
+      "zig-out/dos-native/win9x/U9FIX.TXT": {
+        "bytes": 1065,
+        "sha256": "eb5d8edb6769f8ca58372147c24bdeba66167148f95666bda614f03ec8fa6718"
+      },
+      "zig-out/dos-native/win9x/USOSDBG.EXE": {
+        "bytes": 31130,
+        "sha256": "f73831da3a0e1e43d8bb59d7bd34727263efeb32a5a530fae8dbca56574fb447"
+      },
+      "zig-out/dos-native/win9x/USOSDIAG.COM": {
+        "bytes": 6400,
+        "sha256": "b633cd3353c9463658ae06f8f2d6aa78515a00b0bc9997c5147203dd1606c10a"
+      },
+      "zig-out/dos-native/win9x/USOSHPET.COM": {
+        "bytes": 3712,
+        "sha256": "fd9ef3ae9f3e08c61f21af7cefdb5ff9c84a0b1b2102134efc875f08a5281f57"
+      },
+      "zig-out/dos-native/win9x/USOSKEY.COM": {
+        "bytes": 1391,
+        "sha256": "e6f7be601120eed94cacb5e16fc9b5c9706130106440cd3b1243351ab0cf2c01"
+      },
+      "zig-out/dos-native/win9x/USOSKEY.DRV": {
+        "bytes": 8364,
+        "sha256": "36e76b91670456cea34e9e610289f3052367397bf5dca93b20eec987b3e99488"
+      },
+      "zig-out/dos-native/win9x/USOSLAN.EXE": {
+        "bytes": 15360,
+        "sha256": "915b38b894fa3565f575d6a21601359fb3d48b83f74a1d22e32f988b57e56dd9"
+      },
+      "zig-out/dos-native/win9x/USOSLOG.EXE": {
+        "bytes": 1017344,
+        "sha256": "3b0d777d578dc1751d673184782c969b346194350976852176529314d0427fef"
+      },
+      "zig-out/dos-native/win9x/USOSMOUS.DRV": {
+        "bytes": 4672,
+        "sha256": "abf69a4a34c30dd7e77cd65f835202af441b111a9a7f478bf133f9126af4531c"
+      },
+      "zig-out/dos-native/win9x/USOSNVME.INF": {
+        "bytes": 1243,
+        "sha256": "4c78c30c5a8340311005b4fcdf2ced0c0edd21727e3dae93767fdacded68d847"
+      },
+      "zig-out/dos-native/win9x/USOSNVME.MPD": {
+        "bytes": 12544,
+        "sha256": "a18720b207d5bcbdbdcbbd98fea527085f1ed957158bd602c0c18c81303445a1"
+      },
+      "zig-out/dos-native/win9x/USOSUSB.INF": {
+        "bytes": 1345,
+        "sha256": "a69c73d5b0452021cbcd70947118d969152d915d1542df384635697d3f7dfd69"
+      },
+      "zig-out/dos-native/win9x/USOSUSB.MPD": {
+        "bytes": 12160,
+        "sha256": "9ffbaafb0ad702272acf375c358df1e8b8c7bec56af2c18b270a0d65fe3318fe"
+      },
+      "zig-out/dos-native/win9x/USOSUSB.REG": {
+        "bytes": 558,
+        "sha256": "28cfd2e357abeb98d98372d467983b532295a7d95ddaf7e74443821be28a5a3d"
+      },
+      "zig-out/dos-native/win9x/USOSV10.COM": {
+        "bytes": 2684,
+        "sha256": "2b6d2f19f5cec389e7b563a0cd9d9150edb2612638cd6f4e836d37593cedbc99"
+      },
+      "zig-out/dos-native/win9x/USOSVESA.INF": {
+        "bytes": 3850,
+        "sha256": "947719282a7cba585f1ddab9ec2a076faee7be90b316acc4a585329dc0c9c755"
+      },
+      "zig-out/dos-native/win9x/USOSVMD.VXD": {
+        "bytes": 2591,
+        "sha256": "00a4325c3954328ec8808b124ee68558f18606098a658f81f7f15b3d38f55b3e"
+      },
+      "zig-out/dos-native/win9x/USOSWHERE.COM": {
+        "bytes": 3887,
+        "sha256": "ec9dccdeabd8892df2a3d53e651e1a3a4cc4e4aa3ff53d238ea6598f224541ab"
+      },
+      "zig-out/dos-native/win9x/VBADOS.TXT": {
+        "bytes": 19279,
+        "sha256": "88f22e4349ea13babbd0c90b38542c9f8c8660b111aa68c88371403411ccff9e"
+      },
+      "zig-out/dos-native/win9x/VBMOUSE.DRV": {
+        "bytes": 2700,
+        "sha256": "6d55493289a71fc99e99f8f8cce9232b74bdeac9ac85abc4724a2381900f7c72"
+      },
+      "zig-out/dos-native/win9x/VBMOUSE.EXE": {
+        "bytes": 28384,
+        "sha256": "eb34c5fc0a215d310bd486cfd63dd747df63481db0bbb18635b57e67585b8c91"
+      },
+      "zig-out/dos-native/win9x/VESAMINI.DRV": {
+        "bytes": 15618,
+        "sha256": "2e661f2c17b5e7d6bcaa2c93cf3f79d38e70ab901850d7e5e3d26658aa697ddc"
+      },
+      "zig-out/dos-native/win9x/VESAMINI.VXD": {
+        "bytes": 26331,
+        "sha256": "3a8fec2ad24e2c9b6c0a44e3d616a227d6b974d407d4ee16d33d88c3ca9d803a"
+      },
+      "zig-out/dos-native/win9x/VMDISP9X.DLL": {
+        "bytes": 39936,
+        "sha256": "227d849b42815bd6b2f644ebfda54df1b43dfdd86a56aeda7dc7d1cbe3b07123"
+      },
+      "zig-out/dos-native/win9x/VMDISP9X.TGZ": {
+        "bytes": 327566,
+        "sha256": "29f52124467f5f4978e2b312c1ea8b74fb5d150aabc5d1b48d2cd7c30c0c74e9"
+      },
+      "zig-out/dos-native/win9x/VMDISP9X.TXT": {
+        "bytes": 2388,
+        "sha256": "2c6128c21e030cf8a23dd905b8f53200bb48432a8c2a527e006c3f897a4fae58"
+      },
+      "zig-out/dos-native/win9x/VMHAL486.DLL": {
+        "bytes": 151552,
+        "sha256": "e2d35b6646a895638947a06fdfb0ad6fe5ca7d5fc0a5331d44fda65201d9e132"
+      },
+      "zig-out/dos-native/win9x/VMHAL9X.DLL": {
+        "bytes": 386048,
+        "sha256": "974c5e17aa63ea6ee43c3ecfee68bef1518d62294b4ece67718988bb916d190b"
+      },
+      "zig-out/dos-native/win9x/XHCI98.INF": {
+        "bytes": 9874,
+        "sha256": "9b4b9746501ce8c3dec811bc3ea0db91d0455ae000081c1a5e66932f2027e8d0"
+      },
+      "zig-out/dos-native/win9x/XHCI98.SYS": {
+        "bytes": 81920,
+        "sha256": "8e0165982e6c4059f60034bd958914ee1a3a0616af043b6272c8f0a374c4edee"
+      },
+      "zig-out/dos-native/win9x/XHCI98.TXT": {
+        "bytes": 34686,
+        "sha256": "2c6bfd491019bf65dadd2e46b1e7adf9c71a04b2bf76971cf6c42283ef0b9d4a"
+      },
+      "zig-out/micro-linux/initramfs-usos": {
+        "bytes": 41500318,
+        "sha256": "f51137a7d9cecfa7e554c58485446533ee34bcab285ee54827b2aeabdc68c3fa"
+      },
+      "zig-out/micro-linux/manifest.json": {
+        "bytes": 9808,
+        "sha256": "f86d87ca964622d26232e754bc5180c2d78833aff88cee4a76229de64cb2e051"
+      },
+      "zig-out/micro-linux/qemu9x.cpio": {
+        "bytes": 13809240,
+        "sha256": "d68ffbedc553431e583967d3871c5a8781f4e63b53da180b0248b6264a62b3df"
+      },
+      "zig-out/micro-linux/systemd-bootx64.efi": {
+        "bytes": 112656,
+        "sha256": "5d9b8ac613de68cfbf42f9e1f4b1ed4b2552c296310ec873635c2849635bfbd0"
+      },
+      "zig-out/micro-linux/usos-fb-ui": {
+        "bytes": 7456008,
+        "sha256": "d6dd15a82f35dbe3a096e5bb3d628c21d5314c36eba151a0a86829468621397d"
+      },
+      "zig-out/micro-linux/vmlinuz-virt": {
+        "bytes": 14469648,
+        "sha256": "155c0f9fa7fc7af9c3f172cab86ac0f498604c20d45af4d8cb8ff3b4045a1670"
+      },
+      "zig-out/usb/EFI/BOOT/BOOTAA64.EFI": {
+        "bytes": 10240,
+        "sha256": "b0da90ea12808a44f6d47755493cc76d0d2c5b4379e58909bf8ebe24012a4960"
+      },
+      "zig-out/usb/EFI/BOOT/BOOTX64.EFI": {
+        "bytes": 1036008,
+        "sha256": "351e131d3c4a636704e9cae7d1296baf8a05beca9922cfebbfa48933c9bf1ad3"
+      },
+      "zig-out/usb/EFI/BOOT/grubx64.efi": {
+        "bytes": 2159120,
+        "sha256": "0584180a825ae0b3016079ed36ee4b8d9d75031ad77c3e61792d88d7ffde5931"
+      },
+      "zig-out/usb/EFI/BOOT/mmx64.efi": {
+        "bytes": 874360,
+        "sha256": "ed4442fa88cccba3a9e6a32d21a8f4c56bf5aab184f1fb9aadde8d3a9d04dc27"
+      },
+      "zig-out/usb/EFI/USOS/build-info.ini": {
+        "bytes": 176,
+        "sha256": "f9169499930c1cf979428d81eeade86e3d979d61e5172b61e4a2e4173aabbfe6"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt": {
+        "bytes": 35823,
+        "sha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/COPYING-SeaBIOS-LGPLv3.txt": {
+        "bytes": 7651,
+        "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/csmwrap-3.1.2-src.tar.xz": {
+        "bytes": 1010220,
+        "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/csmwrapx64.efi": {
+        "bytes": 503808,
+        "sha256": "3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/LICENSE-CSMWrap-LGPL-2.1.txt": {
+        "bytes": 26526,
+        "sha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/cc-runtime-LICENSE.txt": {
+        "bytes": 16708,
+        "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/CSMWrap-LICENSE-LGPL-2.1.txt": {
+        "bytes": 26526,
+        "sha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/flanterm-LICENSE.txt": {
+        "bytes": 1297,
+        "sha256": "4d1e2a6be17497c194c916c9c53b9a4371868b9861367099fecc319ee32da0d5"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/freestnd-c-hdrs-LICENSE.txt": {
+        "bytes": 659,
+        "sha256": "ff7ea00a764e90de714436e89585fe4cc6fc5235241f2b1b44d0939771db3129"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/nanoprintf-LICENSE.txt": {
+        "bytes": 2565,
+        "sha256": "161c07e5ac2244db45e53b7923df8364c2d96fd1dd59804faf7f817e32a6ca98"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/picoefi-COPYING.txt": {
+        "bytes": 2263,
+        "sha256": "cb04faf9e77880504160aae38d8a7cee59c038c5f1c1de95d0c133c85ecb25ef"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/picoefi-LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt": {
+        "bytes": 437,
+        "sha256": "6c9f956b69757821cbc3dfe33d84707dcc00c405c7da921b0e6ad268f1f6672a"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/SeaBIOS-COPYING-GPLv3.txt": {
+        "bytes": 35147,
+        "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/SeaBIOS-COPYING.LESSER-LGPLv3.txt": {
+        "bytes": 7639,
+        "sha256": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/licenses/uACPI-LICENSE.txt": {
+        "bytes": 1077,
+        "sha256": "4df79580512f5c0f701d18fe4d87cb05383a214b9f64d85abe0d55200fd98f3f"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0001-csmwrap-logo-only-when-verbose.patch": {
+        "bytes": 1400,
+        "sha256": "7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0002-quiet-flag-no-seabios-banner-or-boot-messages.patch": {
+        "bytes": 4867,
+        "sha256": "9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0003-seabios-no-boot-menu-when-quiet.patch": {
+        "bytes": 1095,
+        "sha256": "e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0004-seabios-csm-bbs-priority-by-pci-address.patch": {
+        "bytes": 4039,
+        "sha256": "7b85e08e2f554066c3c092813aaaa784486332df3cbfd0dafca15b44d2b0d9b3"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0005-boot-disk-by-sector0-hash.patch": {
+        "bytes": 10720,
+        "sha256": "3433a2323e333a70196440070540ed65b9f5697e00fbc54a794c6c51ba2264fd"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch": {
+        "bytes": 30610,
+        "sha256": "17f0675395b70ab4ce63ad6ef6882524dfda4a603e030dae5900bd9ebf4e1d9c"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0007-acpi-enable-before-legacy-boot.patch": {
+        "bytes": 20329,
+        "sha256": "be231170e2401dfd3b67089eafb2f9b765bda2c60c9a711815455963f0bc194e"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0008-apm-poweroff.patch": {
+        "bytes": 25984,
+        "sha256": "ad16991640f1a50ac2467f77296b36f13323693130e2c26c6ef16ef706404699"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch": {
+        "bytes": 18842,
+        "sha256": "37819d6e41989e69405c8d119a2e7e8a0ae86567f85a46ea2a48fca238e47f76"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0010-nvme-runtime-rearm.patch": {
+        "bytes": 8008,
+        "sha256": "847f9d05a580d20d749f362e6e6f917dbbca12101554c6a345a7f9eaaaa211e0"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0012-w2k-hide-hpet-amd-gpio.patch": {
+        "bytes": 21161,
+        "sha256": "731168d73bb6855fb40b53ee6f1874a6a8d28997ff5e38d6d993a27668d36d6c"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0014-int13-boot-disk-only.patch": {
+        "bytes": 6765,
+        "sha256": "dc46d2844df69c6ea2b52eafa59202bc78663b5ab24503d7b242e66d915a9d76"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0015-pci-irq-routing.patch": {
+        "bytes": 28397,
+        "sha256": "e04d7bf4505298ec63442d061817b15610be9e8380c58ee90582109a6dd17306"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0016-usb-mouse-wheel.patch": {
+        "bytes": 17667,
+        "sha256": "e7cee39e888e4ca79c410949deea0bc43e5533f2dad28616d36a9958c129e56f"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0017-seabios-config-no-romfile-features.patch": {
+        "bytes": 1174,
+        "sha256": "7ca0720e705e1d2e803b791f4ede8f2fa210ba6289e87a99233d0829501a4f0b"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0018-usb-mouse-wheel-diag.patch": {
+        "bytes": 13179,
+        "sha256": "0bed54a46ff1b20b7340c6b2ce467f5e0c05baeff7b498572e8f5e85353bca2e"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0019-usb-mouse-long-reports-and-composite.patch": {
+        "bytes": 11308,
+        "sha256": "775932facd009f1750981be487ca4e32ef2ec35d5f3176816e1c94e690c0bc8c"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0020-usb-mouse-wheel-z-always-c2-ring.patch": {
+        "bytes": 6400,
+        "sha256": "cac38b0946160bc1a9cd8b0c527d8ba860287f5021cbb737cd60a4aa75b53b4b"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0021-usb-disk-service.patch": {
+        "bytes": 43830,
+        "sha256": "a218bd071370a0bd2a7edcd7a1526518e7fbc084695996fdb75280876f566eef"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/patches/0022-usb-disk-hotswap.patch": {
+        "bytes": 43500,
+        "sha256": "750b72f687b6bc1326dc30d3773cf526b471a753933fd631bd51ea742a6549d3"
+      },
+      "zig-out/usb/EFI/USOS/csmwrap/SOURCES.txt": {
+        "bytes": 6223,
+        "sha256": "3d1fb691bb3a6ee5390fde943540ff0b382a817fdfea7a96fdf4acbe6ee7414d"
+      },
+      "zig-out/usb/EFI/USOS/ENROLL-README.txt": {
+        "bytes": 12583,
+        "sha256": "5f4c2451a69411dbd44781106ed77af570139dd5083059c87ea01f876c22035f"
+      },
+      "zig-out/usb/EFI/USOS/ENROLL_THIS_KEY_IN_MOKMANAGER.cer": {
+        "bytes": 851,
+        "sha256": "1039d6f0c8cddf1769f13766edaaac4a30daf55986654655f9d41d6ea517d230"
+      },
+      "zig-out/usb/EFI/USOS/licenses/shim/LICENSE": {
+        "bytes": 1441,
+        "sha256": "61b7745a2c3d7f99cce132bc8157f8f4618f8896480e6eee0527749ba03a8ee9"
+      },
+      "zig-out/usb/EFI/USOS/licenses/shim/README.md": {
+        "bytes": 2051,
+        "sha256": "391595e8053e480f5dabf88e6343851da81ed4b8bb91f4fae6b400a97ff2bb7f"
+      },
+      "zig-out/usb/EFI/USOS/licenses/touchi2cdxe/LICENSE": {
+        "bytes": 2677,
+        "sha256": "da440a8b65d810013ad1d2f56ec0c961f123ad70c75564b794d96283a03c3ac3"
+      },
+      "zig-out/usb/EFI/USOS/linux/usos-linux.cpio": {
+        "bytes": 22360,
+        "sha256": "dd4a80cf62f4c4003a824ffb2106455ad8da54337feafe18e40224546f5de87b"
+      },
+      "zig-out/usb/EFI/USOS/secure-boot.ini": {
+        "bytes": 314,
+        "sha256": "6881ac9151facf7bf15d4ef055eb59ebaafce0067676a86cf4587d8ee9558c6d"
+      },
+      "zig-out/usb/EFI/USOS/shell/License.txt": {
+        "bytes": 2732,
+        "sha256": "50ce20c9cfdb0e19ee34fe0a51fc0afe961f743697b068359ab2f862b494df80"
+      },
+      "zig-out/usb/EFI/USOS/shell/Shell.efi": {
+        "bytes": 941200,
+        "sha256": "6af370697e0c1088056c6a4bccac968f45599897e2d0a970e221d42acadcec4f"
+      },
+      "zig-out/usb/EFI/USOS/shell/SOURCES.txt": {
+        "bytes": 1305,
+        "sha256": "0930d61a4b4558136af72f892ab7db2717b694c6eaba171c96b55451a9e73364"
+      },
+      "zig-out/usb/EFI/USOS/shell/startup.nsh": {
+        "bytes": 1847,
+        "sha256": "f55333d82fb84c81bbffdba8976565f5f7251aaa4f68c77d0f51352f326e84fa"
+      },
+      "zig-out/usb/EFI/USOS/touchi2c_x64.efi": {
+        "bytes": 24592,
+        "sha256": "917045fd385df424d836f6ee91636647542cfe363ab0a41504a13c9352229c1c"
+      },
+      "zig-out/usb/Programs/README.txt": {
+        "bytes": 617,
+        "sha256": "e04e3e44570213992330567b1fee63e1c8362cb23e79b4c8d28c595152128e86"
+      },
+      "zig-out/usb/Systems/Linux/Other Linux/USOS-SliTaz.txt": {
+        "bytes": 1144,
+        "sha256": "0bbfd8aef54046ca7e423624960fd7d129527a8c714cd65228970d7e081f7e3b"
+      },
+      "zig-out/usb/Systems/README.txt": {
+        "bytes": 579,
+        "sha256": "a3f9bdff50eb15ec48612ede5a0954caa2a20946b54aa55f98e8d3f7704cc66f"
+      },
+      "zig-out/usb/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml": {
+        "bytes": 68642,
+        "sha256": "fd775e9a1430905094bb93b0df7045fb8950e81d9b35ed326afabcb6083a0ab1"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/README_PL.txt": {
+        "bytes": 6827,
+        "sha256": "1935dbbfb16fd0319fb6364b01130b5d9bf82c183f75353fcf868c8c31f3fe2a"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/NVMe/.gitkeep": {
+        "bytes": 51,
+        "sha256": "4d6f673a2f756b59e465b77468a9712d2190f35713aeeb2d1d6e2c2ac0a2bc55"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/NVMe/MS_StorNVMe/stornvme.inf": {
+        "bytes": 8670,
+        "sha256": "927357f3f87cae3752ca28c814588b5b0d6e22eeb84352219dd78bf262b6d850"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/NVMe/MS_StorNVMe/stornvme.sys": {
+        "bytes": 50616,
+        "sha256": "040289582e64d60907703f9d1d092441505dc4820299fa203c0710d8aa4f75cb"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_AMD/.gitkeep": {
+        "bytes": 51,
+        "sha256": "4d6f673a2f756b59e465b77468a9712d2190f35713aeeb2d1d6e2c2ac0a2bc55"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/.gitkeep": {
+        "bytes": 51,
+        "sha256": "4d6f673a2f756b59e465b77468a9712d2190f35713aeeb2d1d6e2c2ac0a2bc55"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/uaspstor.cat": {
+        "bytes": 8489,
+        "sha256": "fc2f895b6ff61ed99c967fb0a6cd7b8e370bf0019cd1ad4516b75b4fc98748e6"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/uaspstor.inf": {
+        "bytes": 14910,
+        "sha256": "f8a215c06eb713d081a8f58b3f9b7bffa4c02b6b11ae95601fdfece935bd9cd1"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/uaspstor.sys": {
+        "bytes": 79320,
+        "sha256": "0543fc06970c4f928c9b991dc42f3d82a4a161abf48e850d50d130e2550a40e6"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/ucx01000.sys": {
+        "bytes": 211952,
+        "sha256": "ae910a5f24deeabf008a8b645a693f04ef4b9b3bf9d36b5100ecabc7a80538ca"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbd8.sys": {
+        "bytes": 22000,
+        "sha256": "ae140ef9b0dfcd87a11ecf8316257fe223ae04ab90edcb442a047506e9e14a32"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbhub3.sys": {
+        "bytes": 459376,
+        "sha256": "87212491d875cfa0034d441cec154720ce66cb654fd40ef292cf2f70afb5cbd5"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbxhci.cat": {
+        "bytes": 13100,
+        "sha256": "34509db698966032e251acb2034028d8f738e3130832ddb241c4c356182b6f48"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbxhci.inf": {
+        "bytes": 140242,
+        "sha256": "990b18594f062e77fa04c6cb5ecc24a7153756103c524c112e955ec2a5b98f03"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbxhci.sys": {
+        "bytes": 337904,
+        "sha256": "d736a3a2386a1ae815fe7dd839884268b48bbc7b2468883bf9ec2c3b6202316d"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Drivers/x64/USB_Intel/.gitkeep": {
+        "bytes": 51,
+        "sha256": "4d6f673a2f756b59e465b77468a9712d2190f35713aeeb2d1d6e2c2ac0a2bc55"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Updates/.gitkeep": {
+        "bytes": 51,
+        "sha256": "4d6f673a2f756b59e465b77468a9712d2190f35713aeeb2d1d6e2c2ac0a2bc55"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Updates/README_PL.txt": {
+        "bytes": 555,
+        "sha256": "c217b441bc1caa215ce5999fe86dbeb4d4a99f303f5f694a335d286ca3d3484c"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Updates/windows6.1-kb2990941-v3-x64.msu": {
+        "bytes": 6213911,
+        "sha256": "d1acbdd8652d6c78ce284bf511f3a7f5f776a0a91357aca060039a99c6a93a16"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Updates/Windows6.1-KB3087873-v2-x64.msu": {
+        "bytes": 699191,
+        "sha256": "6d511fb126495579f681ecf5f4052dcb2c4c21154a0a9faa5d9d8ae06d4be538"
+      },
+      "zig-out/usb/Systems/Windows/Windows 7/Updates/windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu": {
+        "bytes": 55853327,
+        "sha256": "99312df792b376f02e25607d2eb3355725c47d124d8da253193195515fe90213"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Host/amdxhc31.cat": {
+        "bytes": 13142,
+        "sha256": "8a73f2bf546f3047a3801dd2f606da5e97a094c93675cfbfb04f92d9f0b6c82f"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Host/amdxhc31.inf": {
+        "bytes": 36269,
+        "sha256": "a77e9c890ee1559115abe387be1a83dbbfb1dd09b354dc4e5746fb2eb834c864"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Host/x64/amdxhc31.sys": {
+        "bytes": 465248,
+        "sha256": "cd4e891937f5d4386f11c91859503bd73dccbe7472138741b7431b8c2612a16e"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Hub/amdhub31.cat": {
+        "bytes": 13142,
+        "sha256": "2eb6830bddb8b206f0499f5057f8e01433568db4c026c7c24e9c76ee5375c9d9"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Hub/amdhub31.inf": {
+        "bytes": 23069,
+        "sha256": "58285395660c84e3e682c1576f70ff1a6dca6d4bc181166b6732ddd61dd351d4"
+      },
+      "zig-out/usb/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Hub/x64/amdhub31.sys": {
+        "bytes": 154464,
+        "sha256": "bc51a36d3bbb3fd155b1738b59e901ecb03809aaf3098707f73100076f008f7a"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/acpi.sys": {
+        "bytes": 327680,
+        "sha256": "2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/ReadMe.txt": {
+        "bytes": 2074,
+        "sha256": "7970f7d88118ab745fced58c79b39637fda4e141357f875b0b51a5b0afd8252a"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/manifest.json": {
+        "bytes": 796,
+        "sha256": "ff0da2a5dff5cbc6aa443cc93773d9c1c50a3efdd560859d01e6107a97d1c957"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/README.md": {
+        "bytes": 878,
+        "sha256": "9b63ed7cd818a208d39bb6c81d94330c59416081879eb41eb1391dea3283f92f"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 5048 - 2020.10.24 - daniel_k, diderius6/acpi.sys": {
+        "bytes": 239616,
+        "sha256": "b386ca0307942806fe2b18e9f2693e133d183faea13a349f1a06958027bc3057"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 5048 - 2020.10.24 - daniel_k, diderius6/checksums.sha1": {
+        "bytes": 164,
+        "sha256": "d0224d2cee7e3bdeb044dc5ffe10b189695c32e08947a3c148782d7408a32547"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 5048 - 2020.10.24 - daniel_k, diderius6/ReadMe.txt": {
+        "bytes": 103,
+        "sha256": "6913bcc2223b08ef6bcb9345a4fae08dc54eff5978f5b0132de46cbcc03cc325"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 6666 - 2021.8.28 - daniel_k, diderius6/acpi.sys": {
+        "bytes": 195968,
+        "sha256": "c5a2d5c9627cd30d86fdd579ee2c4cdb2e4ebdd3fe92b1261195053e254f45a3"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 6666 - 2021.8.28 - daniel_k, diderius6/checksums.sha1": {
+        "bytes": 164,
+        "sha256": "c832c24b77de6e75ea17c3399ffa19d0c6b71a473b76b9d6656a2c5f2708fadf"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 6666 - 2021.8.28 - daniel_k, diderius6/ReadMe.txt": {
+        "bytes": 103,
+        "sha256": "afebf5ae859fcb001c180c4612445122a7741d67b08d1904fcb17c8533ba0eaa"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 7777.8 - 2024.11.7 - Dietmar/acpi.sys": {
+        "bytes": 185472,
+        "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 7777.8 - 2024.11.7 - Dietmar/checksums.sha1": {
+        "bytes": 164,
+        "sha256": "e42ee9f28df4695acfa961887e7eee62138a66df765ea0b002781adc340d4ab9"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 7777.8 - 2024.11.7 - Dietmar/ReadMe.txt": {
+        "bytes": 136,
+        "sha256": "a15152c9a1ea769ddaf19f8395597c638824d5253a05a7e8af1c775710ff0bee"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi.sys": {
+        "bytes": 185472,
+        "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/ReadMe.txt": {
+        "bytes": 197,
+        "sha256": "4b487b5897170ed81fa5beb451f8ff8d42ea5077b26c389ebb269bc4826350b8"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/ntoskrn8.sys": {
+        "bytes": 141952,
+        "sha256": "1f603da5938fc8a80efde4e98293b4bd20dd6a4140f825a682611e6a490325b9"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/ReadMe.txt": {
+        "bytes": 290,
+        "sha256": "548b7abbcdec977528b982845c8abda35256c40db8689725e0a488541d16ef5c"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/storpor8.sys": {
+        "bytes": 19456,
+        "sha256": "06f407cb155ed16730c7788ea000e9c3d70a55b0046f5786a4d7e2a2daff283a"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/storport.sys": {
+        "bytes": 151808,
+        "sha256": "fc49d785021de49c3649c2d2e5adddd1867212121f14327d49ffa3bc75f8d442"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB2862330/KB2862330.CAT": {
+        "bytes": 10287,
+        "sha256": "e2cacaa1ec59fa9b012d9346181b49d51c82d6f55bb1570d4a3c4c15b9f20149"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB2862330/usbd.sys": {
+        "bytes": 5760,
+        "sha256": "62d2cd8fb4acd60c47f64b8b13e388aa8c5bfcd9290bb9b149d99484fd76e8df"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB2862330/usbport.sys": {
+        "bytes": 146432,
+        "sha256": "d311eed36e89f6db1fbad3ebb427856ad4346356e942f7e4d5c3370456fe5f5d"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB3139398/KB3139398.CAT": {
+        "bytes": 8252,
+        "sha256": "4968e8c1215ee2dab7abea298445dfcb7900381f59eb736c00e77362bad6beb8"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB3139398/usbstor.sys": {
+        "bytes": 28160,
+        "sha256": "e4a6ccc986568dbd28638c1f8a54fb41d602c7fc655b57e3ffdaff452c9ef29d"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/ReadMe.txt": {
+        "bytes": 295,
+        "sha256": "362cd9e74671af1937daf31da638993b62a348696fd0618a8ae13fb6f8094682"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/wdf01000.sys": {
+        "bytes": 527064,
+        "sha256": "b1c119f541c46100731b5781964f1c9bed9cdf316cd73e40a5c328eba3933000"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/wdf01011.inf": {
+        "bytes": 4768,
+        "sha256": "415ce0ebafe3871870bfedc6b9670d3c21ce467daecff1487de9e855965a9d02"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/wdfldr.sys": {
+        "bytes": 47720,
+        "sha256": "149de723bf02d8449fb63b71406857db54decf2dae7be0d51d003fbcf5c2a39b"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/manifest.json": {
+        "bytes": 15533,
+        "sha256": "fd0c61c108435983f478443c01574d392445b571472bffbcc1736e577cce51b9"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/README.md": {
+        "bytes": 3282,
+        "sha256": "452330c2934ec334a05b9096bb601b162da9349310cff63238ea28a2ff153ece"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/SATA/genahci.inf": {
+        "bytes": 1464,
+        "sha256": "f1ca668691305951a257d7cbde4b0c6bad6c66e57d46bdfc399af4be1cb4ff12"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/SATA/genahci.sys": {
+        "bytes": 60928,
+        "sha256": "de7e22d16bc4d94530789c2061900a0dd5178b2967b5c302c5fe1c9296fb3edd"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/SATA/ReadMe.txt": {
+        "bytes": 347,
+        "sha256": "481ae0124b607d83e4f8940a8a12ce8b7c5d3c7266bc6e5486dc1bc91263ce76"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/ksecd8.sys": {
+        "bytes": 392160,
+        "sha256": "2ba1f6e253dd9a252816d6dd4aa70604f62ca5ff5c8aa683fdf788aca5a3ca58"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/ReadMe.txt": {
+        "bytes": 525,
+        "sha256": "614d1d3ae1c6574e8729259c2c0aafadbf974b968f81e303f899345f88d87729"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/uaspstor.inf": {
+        "bytes": 2140,
+        "sha256": "901f05be9f51b2a098e5458c114e1add8a1ffadd07a5d04025d06e16788f5b48"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/uaspstor.sys": {
+        "bytes": 66048,
+        "sha256": "c18eb77252f393d75a455ac203f1dc72e2f73685ea43423715c9d593b689f418"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/ucx01000.sys": {
+        "bytes": 179032,
+        "sha256": "376cc4ac12e1b1241005ef5227f45057bc381cef286d66fc9b17a5b0f84a65aa"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbd8.sys": {
+        "bytes": 18776,
+        "sha256": "33dfba5429864696c351beb76ac1a6b5141b61a8793ca6e416ec8d0278a7ca99"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbhub3.inf": {
+        "bytes": 2575,
+        "sha256": "a4658961dc6679c7640f761d45a933177f1d679112d7af8ebe6d4d84ba3bc20e"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbhub3.sys": {
+        "bytes": 363328,
+        "sha256": "7648152c456e48f38fdecad3d637e5b46d86c3a2d190612772f53f6c286de90d"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbxhci.inf": {
+        "bytes": 2751,
+        "sha256": "bb27f4772b9e5dd49246a4489c3345c5cf948f88618034375dedbb2ef8fbe7cd"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbxhci.sys": {
+        "bytes": 268128,
+        "sha256": "ce3c1c5aaabd91f20edc55697f4959e39a68b9c823f63cf8dcb433220d8b57af"
+      },
+      "zig-out/usb/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/wpprecor.sys": {
+        "bytes": 21232,
+        "sha256": "a2636f0b9747c032bf3bda44c9c35783f0e11d2f2ede3b6c831f2b1f420436ef"
+      },
+      "zig-out/usb/UI/Icons/Systems/ms-dos.png": {
+        "bytes": 488571,
+        "sha256": "69cef269677fa48e97cacb69e9c558207088a54c01a0923c3151e36468609f85"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-10.png": {
+        "bytes": 556044,
+        "sha256": "52364301c5c89d15416b8a9b7eac05ade2d7e43890c69a00f6cd32e1d052690b"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-11.png": {
+        "bytes": 437906,
+        "sha256": "46d1162011078d743f7f59b79c49cd29c05059aeaebf9870cf08a488727470c2"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-2000.png": {
+        "bytes": 594342,
+        "sha256": "9e7f9509dfaa40641a71d65ae420ee9f44c4ac2254c2958461c19f1b8608bb4e"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-3-1.png": {
+        "bytes": 377751,
+        "sha256": "4dec600e352a7af2b9da1eaf27e843073e288d280facbb99e4eb1f66562e334f"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-3-11.png": {
+        "bytes": 377751,
+        "sha256": "4dec600e352a7af2b9da1eaf27e843073e288d280facbb99e4eb1f66562e334f"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-7.png": {
+        "bytes": 647413,
+        "sha256": "01fa0da8a6162ae0cb043b2fda9209f11b031e314b48d568f4a40fc9e2dc6aa6"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-8-1.png": {
+        "bytes": 354400,
+        "sha256": "e6b7a54f870f4380f0c5ebdfc5cc877c3221ea928a82cc5508b643c93fe0cbcf"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-8.png": {
+        "bytes": 433971,
+        "sha256": "2ca93cd5535eba27535e2aea640803d9bd78329e82e76141f5daabce0a8584fa"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-95.png": {
+        "bytes": 379805,
+        "sha256": "db7d351fe785d0259f24c0f9b01153866a5117331c83d8ef35c4ba920da6db41"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-98-se.png": {
+        "bytes": 680491,
+        "sha256": "4b589e599233eef363c43f763ccb775023c66fa48ad87c1e960d56b743d1ea8a"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-98.png": {
+        "bytes": 701172,
+        "sha256": "4bfcff86f83a7048e2ebe0fe23e30816cfbda5b88491bf642e040556e1a04b37"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-chicago.png": {
+        "bytes": 529660,
+        "sha256": "fff7e96549b251c88ebe03453e8cb7b818aabf46b90e553c00ebdce3e616ab03"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-longhorn.png": {
+        "bytes": 589664,
+        "sha256": "df6568ea6e7939e52b010833ce76f6262b6950bfb9f6f40261da45231d1bab08"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-me.png": {
+        "bytes": 453208,
+        "sha256": "3418345a0edae42ab112e072127e4113d59d05c76b406eeb5808b12973db8dc1"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-memphis.png": {
+        "bytes": 505317,
+        "sha256": "996fe6f9ba0a60e0872d1a439cf1cd8b5edcd08fed63e700a46d09f3b535aa45"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-nashville.png": {
+        "bytes": 523977,
+        "sha256": "28eb9e4f837b90b9776422757602d0c48d651d129ba22d6b8414f525dfdce19b"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-neptune.png": {
+        "bytes": 575926,
+        "sha256": "72f6681bdb59999e2db427c93e00e111e6dc5bafa51b3afefdf300d0d271b532"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-nt-4.png": {
+        "bytes": 956753,
+        "sha256": "445f9249d66c0026be6931ba045de7a092167fe551a0909b9ff7a84c9afd36bf"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-vista.png": {
+        "bytes": 875388,
+        "sha256": "cf00f2cec2061ec0077d8365e31e62583be8c53e30adaf4ed98d578afe5744b3"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-whistler.png": {
+        "bytes": 538455,
+        "sha256": "e7e39b30c5845fd54d163ce6d9fe6201c598eee3596e743057b8b6e7f14f311a"
+      },
+      "zig-out/usb/UI/Icons/Systems/windows-xp.png": {
+        "bytes": 678405,
+        "sha256": "d1880d761abcffe546f681be756b6dfce9c97dbe55de3dd656035fb19ace3de4"
+      },
+      "zig-out/usb/UI/index.html": {
+        "bytes": 1637,
+        "sha256": "f2f789c9c6954eda63151ee65a9dfb4445e0d165ef182e3a51d2a730eaa6ef65"
+      },
+      "zig-out/usb/UI/theme.css": {
+        "bytes": 206,
+        "sha256": "0f4d552d5e5fb9b67354fb40b51d5c0686c65be7a689cb6f0f6ed4715c50af43"
+      },
+      "zig-out/usb/USOS-KEY.cer": {
+        "bytes": 851,
+        "sha256": "1039d6f0c8cddf1769f13766edaaac4a30daf55986654655f9d41d6ea517d230"
+      },
+      "zig-out/usb/Utilities/README.txt": {
+        "bytes": 2237,
+        "sha256": "aead3f18358f60c8b2bb9573775ddf51e3dd563c831f14c2f1c404be7ec265d5"
+      },
+      "zig-out/windows-native/int10.efi": {
+        "bytes": 96896,
+        "sha256": "0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947"
+      },
+      "zig-out/windows-native/int10.original.efi": {
+        "bytes": 2560,
+        "sha256": "7273fa54c52b96f92a7c5448faa3fffd853ec80ac4f893b09eef06641904fb3c"
+      },
+      "zig-out/windows-native/modern-support.cpio": {
+        "bytes": 252972,
+        "sha256": "db959203bac433c6de61282233b58c7a478200484562eb2912cb815a66b59506"
+      },
+      "zig-out/windows-native/support.cpio": {
+        "bytes": 1134668,
+        "sha256": "c781c4c36befbdd009aa402f8f46d7ba23b427ba42783d92d712c1ee3fb89baf"
+      },
+      "zig-out/windows-native/uefiseven-LICENSE.txt": {
+        "bytes": 1328,
+        "sha256": "30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd"
+      },
+      "zig-out/windows-native/UefiSeven.ini": {
+        "bytes": 46,
+        "sha256": "38472461c9472a5415f07277c3d309ced69e9f387ea4caa0d3897d826be3ead0"
+      },
+      "zig-out/windows-native/vista-support.cpio": {
+        "bytes": 1858156,
+        "sha256": "74d9dc7bde231d6aac0a0def0dfc9b2f89ca56d7481ed6097772128355d9658e"
+      },
+      "zig-out/windows-native/wimboot": {
+        "bytes": 76064,
+        "sha256": "5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3"
+      },
+      "zig-out/windows-native/win7-support.cpio": {
+        "bytes": 63356480,
+        "sha256": "9607b2b1bd55ce8b2f9743af44781aead0eecd6caf48b78801eed4c165f357c8"
+      }
+    },
+    "changed_entries": [
+      {
+        "entry": "usr/lib/usos/nt3/USOSNT3.EXE",
+        "old_sha256": "8ab10c79cbbdab08c7f6d722219cbf14e034df9cb798739fdae3e64fab477024",
+        "sha256": "87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f",
+        "bytes": 30208
+      },
+      {
+        "entry": "usr/lib/usos/nt35_network_setup.sh",
+        "old_sha256": "2cc9f10d1aefda59e8786f7dc537789b1f9358e3fd521c45fdac75574f6b2d55",
+        "sha256": "0b670398dbc497eea0b2631f138fd7281c4ec6e9d33c32566a0b36533cc0fe98",
+        "bytes": 8243
+      },
+      {
+        "entry": "usr/lib/usos/nt4_csmwrap_target.sh",
+        "old_sha256": "d263b70cb7549fae08cab188c9e7860481ed89f9bca8701555fa366aa1938b17",
+        "sha256": "56248e5e84d028324dc672cae4fb8b4a16d634913eb94fb23cc6fbb975192f43",
+        "bytes": 68784
+      }
+    ],
+    "post_sha256": "87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f",
+    "post_bytes": 30208,
+    "driver_sha256": "d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85",
+    "driver_bytes": 16384,
+    "logger_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7",
+    "old_cache_modified": false,
+    "other_cache_files_identical": true,
+    "frozen_usb_unchanged": true,
+    "secondary_initrd_overrides_candidate": false,
+    "physical_writes": false,
+    "runtime_pass": false
+  },
+  "harness_manifest_sha256": "9496091570af36f544ea383b62469a4eea89b02f97d6e35a109b8aaccc2746c9",
+  "post_original_preflight": {
+    "binary_sha256": "87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f",
+    "binary_bytes": 30208,
+    "subsystem": [
+      3,
+      10
+    ],
+    "imports": 50,
+    "missing": [],
+    "modules": {
+      "kernel32.dll": {
+        "sha256": "08b74f4b1848347c39ed11488a6b3e97aab6e3df54da671b7604ef6a4b2c8809",
+        "bytes": 391840,
+        "exports": 616
+      },
+      "advapi32.dll": {
+        "sha256": "d653996a43c8928221cda2cb21a5a5e43bc3d21fbe07a635ad9ba86d2c7e7bde",
+        "bytes": 192752,
+        "exports": 284
+      }
+    },
+    "target": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-fresh01\\target-retained.qcow2",
+    "target_sha256": "3b76f15ac5eeb410ee3ca21711ef4a8f34729e3a9082427b3e849fb9586e4c6b",
+    "target_unchanged": true,
+    "ms_modules_ram_only": true,
+    "standalone_ms_exports": false,
+    "runtime_pass": false,
+    "scratch_whole_disk_removed": true
+  },
+  "fresh_runtime_pass": false,
+  "client_policy_runtime_pass": false,
+  "usb_test": false
+}

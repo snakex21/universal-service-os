@@ -1,0 +1,31 @@
+{
+  "files": [
+    "C351NET.LOG",
+    "NET351.ON",
+    "NET351.STATUS",
+    "POST.LOG",
+    "USABILITY.TXT",
+    "USOSNET351.SHA256"
+  ],
+  "missing": [
+    "CLNT3511.REQ",
+    "CLNT3511.LOG",
+    "CLNT3511.ERR"
+  ],
+  "driver_readback_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "expected_driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_hash_matches": true,
+  "installed_runtime_pass": false,
+  "scope": "Own stopped-target evidence only; file/status presence is not runtime PASS",
+  "collector_result": {
+    "ram_mib": 1024,
+    "cpu": "qemu64",
+    "result": "PASS",
+    "stage": "serial shell and selected module loads",
+    "seconds": 22.95,
+    "timed_out": false,
+    "exit_code": 0,
+    "commands_sent": true,
+    "directory": "G:\\USOS-Kolekcja\\_vm\\nt351-client-auto-fresh01\\read-nt351-own\\1024-qemu64-nt351-own"
+  }
+}

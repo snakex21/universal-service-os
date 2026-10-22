@@ -1,0 +1,134 @@
+{
+  "service_start": {
+    "i8042prt": 4,
+    "usosusb": 1,
+    "kbdclass": 1,
+    "mouclass": 1,
+    "ndisloop": 2,
+    "tcpip": 2,
+    "dhcp": 2,
+    "lanmanworkstation": 2,
+    "lanmanserver": 4,
+    "browser": 4
+  },
+  "system_sha256": "5288d0295e35f0bfcf698835ee52631b2ba80f3de3e081b0cfeda582b86a8e6e",
+  "actual_own_pins": {
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": {
+      "sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+      "bytes": 21248
+    },
+    "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS": {
+      "sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+      "bytes": 43648
+    },
+    "USOS/COVERAGE/NT4OBS.EXE": {
+      "sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "bytes": 5632
+    },
+    "USOS/COVERAGE/USOSLOG.EXE": {
+      "sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "bytes": 1024000
+    },
+    "USOS/COVERAGE/FIRSTLO.CMD": {
+      "sha256": "c0f82213bb319445a9ea6d1407608af2b2cec53cbc633a9931ef4802e3bdbedc",
+      "bytes": 206
+    },
+    "USOS/NT4/MSC4TEST.EXE": {
+      "sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+      "bytes": 5120
+    }
+  },
+  "actual_imports": {
+    "frozen_msc": {
+      "count": 38,
+      "resolved": true
+    },
+    "quiet_msc_helper": {
+      "count": 14,
+      "resolved": true
+    }
+  },
+  "original_modules_sha256": {
+    "ntoskrnl.exe": "8c9e1143aecf56db2570f011cbd056c2c1925e1816940ce3cc700994487f4d84",
+    "hal.dll": "50e00d5bcbdedf4fb1d6c2e2a1ff88e012ecd1ab061ebdcc48ce601f86963eea",
+    "kernel32.dll": "9767952ac7f0cb7e745fb416a1a34b017b5c4076631e2289d97bc8434c72897b"
+  },
+  "scope": "One installed frozen USB313952 HID+MSC +NET89b coexistence, no fresh AUTO/X470 or full IRQroute claim",
+  "base": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+  "base_sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+  "target": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+  "target_sha256": "f8dbce61ce2ace63ff918aa2e5120ef75fc8482f37fa00a22df080404108109d",
+  "own_usb_change": {
+    "path": "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS",
+    "before_sha256": "2d4557439d7c60f7e0d5cc53d36467cbc36ae24596eb614e078059ddc718cfe1",
+    "after_sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+    "before_bytes": 32128,
+    "after_bytes": 43648,
+    "before_clusters": 1,
+    "after_clusters": 2,
+    "first_cluster_unchanged": true,
+    "extra_owned_cluster": 86
+  },
+  "new_own_files": [
+    {
+      "short_name": "MSC4TESTEXE",
+      "bytes": 5120,
+      "sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+      "cluster": 87
+    },
+    {
+      "short_name": "MSC4TESTON ",
+      "bytes": 27,
+      "sha256": "3157172199135d40fb88db8775de674c2282118594259a9686de7ff993d7097d",
+      "cluster": 88
+    }
+  ],
+  "only_system_dword": "i8042prtStart1->4",
+  "hive_dword_offset": 143284,
+  "hive_binary_compare": true,
+  "all_unrelated_virtual_disk_bytes_identical": true,
+  "modified_raw_cow_compare": "Images are identical.",
+  "independent_full_inventory_readback": true,
+  "unchanged_original_file_count": 2051,
+  "original_file_count": 2053,
+  "test_media": {
+    "boot": {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-boot.qcow2",
+      "sha256": "cabf0e03ffce26f749db652764e7a18cee1de37ba94630887fe6f7552edd1a28",
+      "proof": {
+        "file": "START.TXT",
+        "payload_matches": true,
+        "marker_matches": true,
+        "root_bpb_label_matches": true,
+        "fat16": true,
+        "mbr_partition_type": 6
+      }
+    },
+    "hot": {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-hot.qcow2",
+      "sha256": "29760ec7cbb2dc7e1fbcbbe55fdf3fe6d0155a28484ec002bb75f2f4d0cfe44c",
+      "proof": {
+        "file": "HOTPLUG.TXT",
+        "payload_matches": true,
+        "marker_matches": true,
+        "root_bpb_label_matches": true,
+        "fat16": true,
+        "mbr_partition_type": 6
+      }
+    }
+  },
+  "topology": {
+    "boot": 1,
+    "hot": 2,
+    "keyboard": 3,
+    "mouse": 4
+  },
+  "shared_aux_sha256": "0af79fcbf890268569aa613370831352b5694543ea3c135a4d70ba177446f7ca",
+  "source_reuse_commit": "nt4-usb-hid/6457ab4b",
+  "base_unchanged": true,
+  "prepared": true,
+  "measured_cluster_bytes": 32768,
+  "offline_first_layout_guard_rejection_not_windows_failure": true,
+  "raw_scratch_removed": true,
+  "ms_bytes_exported": false
+}

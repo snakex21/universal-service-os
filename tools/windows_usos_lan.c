@@ -1,5 +1,6 @@
 /* USOS LAN first desktop step, GPL-3.0-or-later.
- * No CRT, console, network traffic or restart. Desktop readiness is bounded
+ * No CRT, console or restart. NT4 can launch the own silent network evidence
+ * logger once after applying defaults. Desktop readiness is bounded
  * and event-driven. Private data live beside this executable. Favorites,
  * verified ICW shortcuts and the requested OS settings are the
  * only writes outside that directory. NDIS/IRQ configuration is untouched.
@@ -267,6 +268,22 @@ static void unregister(void){HKEY k;
   Sleep(USOS_RUN_DELETE_DELAY);
 #endif
   if(!RegOpenKeyExA(HKEY_LOCAL_MACHINE,run,0,KEY_SET_VALUE,&k)){RegDeleteValueA(k,"USOSLan");RegCloseKey(k);}}
+
+#ifdef USOS_LAN_NT
+static void network_evidence(void){
+  char exe[MAX_PATH],out[MAX_PATH],cmd[MAX_PATH*2+80];STARTUPINFOA si;PROCESS_INFORMATION pi;
+  if(!eq(system_id,"NT4"))return;
+  local(exe,"USOSLOG.EXE");local(out,"USABILITY.TXT");
+  if(GetFileAttributesA(exe)==INVALID_FILE_ATTRIBUTES){log_line("NT4 evidence helper missing; no connectivity result");return;}
+  lstrcpyA(cmd,"\"");lstrcatA(cmd,exe);lstrcatA(cmd,"\" /once /nodbg /nohook /out \"");
+  lstrcatA(cmd,out);lstrcatA(cmd,"\"");
+  memset(&si,0,sizeof(si));si.cb=sizeof(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;
+  if(CreateProcessA(exe,cmd,0,0,FALSE,0,0,dir,&si,&pi)){
+    CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+    log_line("NT4 silent evidence started: USABILITY.TXT; launch alone is not DHCP/ping/DNS PASS");
+  }else log_line("NT4 evidence launch failed; no connectivity result");
+}
+#endif
 static unsigned long config_hash(void){unsigned long hash=2166136261UL;const char *p;
   for(p=system_id;*p;p++)hash=(hash^(BYTE)*p)*16777619UL;hash=(hash^'|')*16777619UL;
   for(p=home;*p;p++)hash=(hash^(BYTE)*p)*16777619UL;return hash;}
@@ -336,6 +353,9 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
   else{
     log_line("LAN defaults applied: IE LAN, autodial/proxy/offline off, ICW completed, 68k.news Favorite");
     log_line("TCP/IP requested by Setup; connectivity and DHCP lease not asserted");
+#ifdef USOS_LAN_NT
+    network_evidence();
+#endif
     unregister();
   }
   CloseHandle(log_handle);ExitProcess(failures?2:0);

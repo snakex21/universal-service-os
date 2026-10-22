@@ -98,6 +98,8 @@ class Stage(unittest.TestCase):
         (self.lib / 'network').mkdir(parents=True)
         shutil.copyfile(INF95, self.lib / 'network/usosnet95.inf')
         (self.lib / 'network/usosnet4.sys').write_bytes(b'own NDIS 4 test fixture, not a driver')
+        # NT4 staging also copies the silent network evidence logger.
+        (self.lib / 'network/USOSLOG.EXE').write_bytes(b'own logger test fixture, not a program')
         self.pci = self.tmp / 'pci'
         self.target = self.tmp / 'target'
         self.target.mkdir()

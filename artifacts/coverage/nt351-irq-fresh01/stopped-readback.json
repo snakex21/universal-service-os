@@ -1,0 +1,51 @@
+{
+  "stopped": true,
+  "qemu_returncode": 0,
+  "target_sha256": "cb9d664615260a2e6b3c8e618be19b9cf785696019f41753b1461d3754b1196c",
+  "driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_bytes": 17024,
+  "hive_version": [
+    1,
+    2
+  ],
+  "system_sha256": "e8f6295b58248e6568c804eab170af2a165d934a93a1bf8bfe9789424fa0ca65",
+  "policy": {
+    "selected": {
+      "current": 1,
+      "default": 1
+    },
+    "services": {
+      "1": {
+        "Browser": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanServer": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanWorkstation": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "Tcpip": {
+          "present": true,
+          "start": 3,
+          "type": 1
+        }
+      }
+    }
+  },
+  "no_hive_export": true,
+  "no_ms_binary_export": true,
+  "registry_modified": false,
+  "scope": "Four allowlisted service Start/Type values only; runtime services require native net start evidence",
+  "native_services_log": {
+    "bytes": 1528,
+    "sha256": "17f082867dbb49c05b966dfc0f395af915ec8655988197ab46b09f239026ed34"
+  },
+  "scratch_whole_disk_removed": true
+}

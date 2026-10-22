@@ -47,7 +47,22 @@
 #ifndef USOSNET_NDIS4
 #define USOSNET_NDIS4 0
 #endif
-#if USOSNET_NDIS4
+#ifndef USOSNET_NT351
+#define USOSNET_NT351 0
+#endif
+#ifndef USOSNET_NT35
+#define USOSNET_NT35 0
+#endif
+#define USOSNET_NDIS3 (USOSNET_NT351 || USOSNET_NT35)
+#if USOSNET_NT351 && USOSNET_NT35
+#error Select one NT3 target
+#endif
+#if USOSNET_NDIS3 && !USOSNET_NDIS4
+#error NT351 uses the legacy receive and PCI paths
+#endif
+#if USOSNET_NDIS3
+#define USOSNET_NDIS_MAJOR 3
+#elif USOSNET_NDIS4
 #define USOSNET_NDIS_MAJOR 4
 #else
 #define USOSNET_NDIS_MAJOR 5
@@ -65,9 +80,11 @@
 #define BUF_SIZE 2048          /* one RX / TX buffer, 2 per 4 KiB page */
 #define BUFS_PER_PAGE 2
 
-/* One timer for every mode: RX / TX housekeeping every tick (also with
+/* NT4/95/NDIS5: one timer for every mode, RX / TX housekeeping every tick (also with
  * interrupts: a lost or misrouted INTx then costs latency, not the link),
- * link, statistics, watchdogs and the diagnostic log once a second. */
+ * link, statistics, watchdogs and the diagnostic log once a second.
+ * NT351 creates no driver timer; its NDIS-owned CheckForHang is a slow
+ * nominal2000ms fallback. IRQ is the normal RX/TX path in that variant. */
 #define TICK_MS         20
 #define TICKS_PER_SEC   (1000 / TICK_MS)
 #define LOG_MAX         40      /* NdisWriteErrorLogEntry rounds per start */

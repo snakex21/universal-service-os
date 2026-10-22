@@ -1,0 +1,108 @@
+{
+  "result": "ASSESS_ENDPOINT",
+  "error": null,
+  "source": "G:\\USOS-Kolekcja\\_inputs\\nt351-client-auto-fresh01\\en_winnt_3.51.wks.iso",
+  "folder": "Windows NT 3.51",
+  "events": [
+    {
+      "seconds": 2.62,
+      "text": "Home frame presented"
+    },
+    {
+      "seconds": 2.98,
+      "text": "[UI_SCREEN] list Windows"
+    },
+    {
+      "seconds": 9.48,
+      "text": "[UI_SCREEN] list Windows NT 3.51"
+    },
+    {
+      "seconds": 9.84,
+      "text": "[UI_SCREEN] list Unattended setup"
+    },
+    {
+      "seconds": 10.93,
+      "text": "Selected real USOS profile"
+    },
+    {
+      "seconds": 10.93,
+      "text": "[UI_SCREEN] summary Ready to start"
+    },
+    {
+      "seconds": 25.65,
+      "text": "[COVERAGE_MENU] /run/xp-disk-menu.state"
+    },
+    {
+      "seconds": 30.01,
+      "text": "[COVERAGE_MENU] /run/xp-confirm-menu.state"
+    },
+    {
+      "seconds": 1450.38,
+      "text": "[COVERAGE_NOTICE] Windows NT 3.51: start the prepared disk"
+    }
+  ],
+  "elapsed": 2612.14,
+  "resources": {
+    "disk_free": 1766727811072,
+    "host_available": 27202756608,
+    "host_total": 34280775680,
+    "requested_mib": 2048
+  },
+  "disk_bytes": {
+    "stick.qcow2": 512622592,
+    "target.qcow2": 204931072
+  },
+  "total_disk_bytes": 717553664,
+  "menu_observation": true,
+  "product_failure": null,
+  "input": "PS/2",
+  "ps2_controller_enabled": true,
+  "usb_only_input": false,
+  "accel": "tcg",
+  "cpu": "EPYC-Rome",
+  "shutdown_method": "QMP quit",
+  "qemu_returncode": 0,
+  "first_logon_observed": false,
+  "nt5_target_started": false,
+  "native_fixed_input_scenario": false,
+  "nic": "igb",
+  "usb_test_images": false,
+  "usb_pointer": null,
+  "allocated_disk_bytes": {
+    "stick.qcow2": 512622592,
+    "target.qcow2": 204931072
+  },
+  "total_allocated_disk_bytes": 717553664,
+  "network_capture": {
+    "path": "network.pcap",
+    "mac": "52:54:00:55:53:01",
+    "netdev": "usabilitynet",
+    "hard_byte_cap": 8388608,
+    "boundary_disconnect": {
+      "type": "ConnectionResetError",
+      "errno": 22,
+      "winerror": 64,
+      "during_controlled_shutdown": true
+    },
+    "controlled_boundary_reset_accepted": true,
+    "stored_bytes": 26849,
+    "stored_frames": 99,
+    "received_frames": 99,
+    "discarded_frames": 0,
+    "capped": false,
+    "connected": true,
+    "error": null,
+    "sha256": "134b9e769bb51459b1d372710024de0d93ccb582aaf8a0bc68a0f0a3fe5321c2",
+    "analysis": {
+      "dora_observed": false,
+      "exchanges": [],
+      "records": 99,
+      "prepared_target_start_record": 4,
+      "installed_runtime_pass": false,
+      "icmp_pass": false,
+      "dns_pass": false,
+      "scope": "Pinned VM netdev exchange after requested prepared-target start; guest/OS attribution requires guest evidence"
+    }
+  },
+  "nt351_own_evidence": "nt351-own-evidence/collection.json"
+}

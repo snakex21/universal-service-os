@@ -216,7 +216,7 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S|', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
         self.assertIn('if [ "$nt_major" = 4 ]; then', text)
         self.assertIn('3:none)', text)
-        self.assertIn('w9x_nt3_default_sif "$time_zone" > "$answer_inf"', text)
+        self.assertIn('w9x_nt3_default_sif "$time_zone" "$tag" > "$answer_inf"', text)
 
     def test_messages_match_the_translations(self):
         # The micro-Linux UI translates by the English text (linux_strings.zig).
