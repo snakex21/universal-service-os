@@ -569,3 +569,45 @@ Manifest r24e-preparation.json pins target978ce6e2...bc8315. After a native
 apply/shutdown/readback, a separate unchanged COW R24f must cold-boot and
 pass /clientcheck, native service-list and ping, then safe shutdown/readback.
 The earlier R24d policy FAIL remains a historical result.
+
+
+### R24e apply and R24f actual cold-boot client policy PASS
+
+R24e executed the actual d00c helper /client (operator04). Native NET stop
+returned0 for Browser and LanmanServer. Both SCM state1/Start4 were read
+back; Workstation and TCPIP remained state4. Native list05 omitted the exact
+Server and Computer Browser entries. Native safe shutdown07/QMP quit0
+retained target1e0e84a8755db49d7128332375574333237a434c7b66ab63553daaf1822e8871.
+Stopped SYSTEM independently confirmed both Start4; SYSb49/USBf537 unchanged.
+
+R24f was a logically identical empty COW, new QEMU process, following that
+completed native shutdown. Program Manager02 returned without an SCM alert.
+The explicit read-only /clientcheck04 reported Server and Browser STOPPED/
+Disabled, Workstation/TCPIP RUNNING. Its CFG31.LOG has no NativeNetExit;
+apply was not repeated. Native service list05 confirms the same state and
+native ping06 returned3/3. Original ping gives no RTT. Native safe08 then
+QMP quit0. Final target SHA256
+ca9afba30faa044d2df2a93eaf1cd559be5f037597c27361e45a19cd245533a7.
+Stopped readback again confirms Server4/Browser4, Workstation2, actual
+helperd00c/27imports, SYSb49/43imports, frozenUSBf537 and i8042prtStart4.
+Base unchanged and raw scratch removed in both cases.
+
+Manual assessments are artifacts/nt31-fullmac-runtime/r24e-client-evaluation.json
+and r24f-client-evaluation.json; selected own logs/readback are in the
+corresponding r24e-stopped-readback/ and r24f-stopped-readback/ directories.
+R24e's new logs are CFG31/SVC31 only; R24f also issued PING31. Their inherited
+POST/NET31 logs are not new DNS/HTTP proof. R24d's policy FAIL is preserved.
+ClipBook Server and Network DDE are distinct legacy services, unchanged;
+this result concerns the requested LanmanServer/Browser policy. Selected
+RAS service names remain absent; full Dial-Up installation absence is not
+established. No IE browser page was tested; prior HTTP200 came from logger.
+
+The integrator must invoke /client after native NT31 adapter/TCPIP binding
+setup and require /clientcheck after the required reboot. This service step
+is now qualified in an installed overlay. The earlier five-step fresh AUTO
+integration backlog remains open: NT31-specific selector/OEM8.3 staging,
+original NCPA/STREAMS/static address automation, latest cache pins, scoped
+normal-run collector and a fresh blank-target end-to-end qualification.
+Neither R24c nor R24f is fresh automated network installation PASS. Driver
+and USB were not rebuilt for this correction. The separate35/351 IRQ fix
+is not part of this NT31 polling binary.
