@@ -1,0 +1,1240 @@
+{
+  "started": "2026-10-22T16:58:59.411431+00:00",
+  "authorization": "Parent /root explicitly authorized only target.qcow2 and stick.qcow2 in the six plan leaves",
+  "plan_commit": "4c309e5790fe30849352bf3ed97789e7b0c3ef43",
+  "plan_sha256": "dd2c75b4374714d8f8728437f395b6425c948f09064a9e11adfc2bd86c8cb545",
+  "helper_sha256": "2bda754ed659617acce42b526ef2d80bb35047017a91b7c1ed39175bea41c2a0",
+  "selected": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\target.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "2814749767591369"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930619224"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\target.qcow2",
+      "bytes": 112525312,
+      "file_id": [
+        "10827293489797395857",
+        "1688849860754674"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930622708"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\target.qcow2",
+      "bytes": 203358208,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623561"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623563"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\target.qcow2",
+      "bytes": 240648192,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623532"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "1407374884044840"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\target.qcow2",
+      "bytes": 240648192,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623540"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "1407374884044848"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\target.qcow2",
+      "bytes": 3211264,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623510"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623554"
+      ],
+      "hardlink_count": 1
+    }
+  ],
+  "closure_checks": [
+    {
+      "case": "r18b-nt351-network-hid",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r18b-nt351-network-hid\\result.json",
+      "sha256": "ab5b974ade09cae2e9b12cb85745e79ae0a8426f81915eda8728ecff6cb8b204",
+      "matched": true
+    },
+    {
+      "case": "r18b-nt351-network-hid",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r18b-nt351-network-hid\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "r18b-nt351-preserved",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r18b-nt351-network-hid\\result.json",
+      "sha256": "ab5b974ade09cae2e9b12cb85745e79ae0a8426f81915eda8728ecff6cb8b204",
+      "matched": true
+    },
+    {
+      "case": "r18b-nt351-preserved",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r18b-nt351-network-hid\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "r18c-nt351-cold-i8042-off",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18c-nt351-cold-i8042-off\\result.json",
+      "sha256": "299bd5bd147d5deb1fda9063dfad89522f82bd292879a2465b049ca8b8c2e858",
+      "matched": true
+    },
+    {
+      "case": "r18c-nt351-cold-i8042-off",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18c-nt351-cold-i8042-off\\completed.json",
+      "sha256": "cc86d0d7b25e34f406b877c29ea6cdaffc76cbe8607623c2d9be87c04dac8f79",
+      "matched": true
+    },
+    {
+      "case": "r18c-nt351-cold-i8042-on",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18c-nt351-cold-i8042-on\\result.json",
+      "sha256": "ce6ed87f029bba49108aa4fb115cd7ee78fd9985d635c1ff3c940f4da3fdc68b",
+      "matched": true
+    },
+    {
+      "case": "r18c-nt351-cold-i8042-on",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18c-nt351-cold-i8042-on\\completed.json",
+      "sha256": "cc86d0d7b25e34f406b877c29ea6cdaffc76cbe8607623c2d9be87c04dac8f79",
+      "matched": true
+    },
+    {
+      "case": "r18d-nt351-debug-e9",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18d-nt351-debug-e9\\result.json",
+      "sha256": "f09ad31cdaf601b3593537071427be2aa070f2493c278d98799bf749d3b2f046",
+      "matched": true
+    },
+    {
+      "case": "r18d-nt351-debug-e9",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18d-nt351-debug-e9\\completed.json",
+      "sha256": "cc86d0d7b25e34f406b877c29ea6cdaffc76cbe8607623c2d9be87c04dac8f79",
+      "matched": true
+    },
+    {
+      "case": "r18e-nt351-stubfix-e9",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18e-nt351-stubfix-e9\\result.json",
+      "sha256": "249983ed2dd3871098c2bedea39a1f7e45fa49c9f595d23469277cfef0089cca",
+      "matched": true
+    },
+    {
+      "case": "r18e-nt351-stubfix-e9",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18e-nt351-stubfix-e9\\completed.json",
+      "sha256": "cc86d0d7b25e34f406b877c29ea6cdaffc76cbe8607623c2d9be87c04dac8f79",
+      "matched": true
+    },
+    {
+      "case": "r18f-nt351-usb-port-isolation",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18f-nt351-usb-port-isolation\\result.json",
+      "sha256": "2b83971659e163e1800ad241b70a2d95334868c390851bf044354ddf72e9df1f",
+      "matched": true
+    },
+    {
+      "case": "r18f-nt351-usb-port-isolation",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\coverage\\vm\\r18f-nt351-usb-port-isolation\\completed.json",
+      "sha256": "cc86d0d7b25e34f406b877c29ea6cdaffc76cbe8607623c2d9be87c04dac8f79",
+      "matched": true
+    },
+    {
+      "case": "r20-nt35-network-hid",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\result.json",
+      "sha256": "b6bfb19d03ad5b3f3572f78b69898642b00bba7c66b3a923b0a2179048cda3a6",
+      "matched": true
+    },
+    {
+      "case": "r20-nt35-network-hid",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "r20-nt35-preserved",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\result.json",
+      "sha256": "b6bfb19d03ad5b3f3572f78b69898642b00bba7c66b3a923b0a2179048cda3a6",
+      "matched": true
+    },
+    {
+      "case": "r20-nt35-preserved",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "r20-stopped-analysis",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\result.json",
+      "sha256": "b6bfb19d03ad5b3f3572f78b69898642b00bba7c66b3a923b0a2179048cda3a6",
+      "matched": true
+    },
+    {
+      "case": "r20-stopped-analysis",
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\vm\\r20-nt35-network-hid\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "r20b-nt35-usb-isolation",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-net\\artifacts\\coverage\\vm\\r20b-nt35-usb-isolation\\result.json",
+      "sha256": "255215ebcf22aefffed76bb727503bacd6952602b514a5e5cb8a0e6b647f1c45",
+      "matched": true
+    },
+    {
+      "case": "r20b-nt35-usb-isolation",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-net\\artifacts\\coverage\\vm\\r20b-nt35-usb-isolation\\completed.json",
+      "sha256": "8509f93667e76c6c2a28fd58d9b37096ab8f948cb1597435390f5f2e00d24d86",
+      "matched": true
+    },
+    {
+      "case": "r24-nt31-intel-fullmac",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24-nt31-intel-fullmac\\result.json",
+      "sha256": "a7c42589b1489442eaba71710ee43584f288544f81409a87ca3ffd14d80c3b3b",
+      "matched": true
+    },
+    {
+      "case": "r24-nt31-intel-fullmac",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24-nt31-intel-fullmac\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "r24b-nt31-image-entry",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24b-nt31-image-entry\\result.json",
+      "sha256": "4a177e84f855413ede976b9f771a7a0d2da7fd6116be31def454d50b32be2935",
+      "matched": true
+    },
+    {
+      "case": "r24b-nt31-image-entry",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24b-nt31-image-entry\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "r24c-nt31-registermac-order",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24c-nt31-registermac-order\\result.json",
+      "sha256": "476a73d048e9238a0dfaa8d9ad347c33424359eece8943ccb176d801f1fde1b9",
+      "matched": true
+    },
+    {
+      "case": "r24c-nt31-registermac-order",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24c-nt31-registermac-order\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "r24d-nt31-usb-fullmac",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24d-nt31-usb-fullmac\\result.json",
+      "sha256": "dcf3182b1e8a9c8da5f8f8906e7e898f3f01ef9e5162a9cdfe9b157d973a1b29",
+      "matched": true
+    },
+    {
+      "case": "r24d-nt31-usb-fullmac",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24d-nt31-usb-fullmac\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "r24e-nt31-client-policy",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24e-nt31-client-policy\\result.json",
+      "sha256": "1e8de82440aa354b6438b95f757a7358e71020931a2fb2e2b8a93bce9ccf0518",
+      "matched": true
+    },
+    {
+      "case": "r24e-nt31-client-policy",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24e-nt31-client-policy\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "r24f-nt31-client-coldboot",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24f-nt31-client-coldboot\\result.json",
+      "sha256": "d127b22c75527bf6d7014fcf5bdb2eae6867b1606a3555d88f90eb7c3903e92c",
+      "matched": true
+    },
+    {
+      "case": "r24f-nt31-client-coldboot",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\vm\\r24f-nt31-client-coldboot\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "nt351-client-apply02",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\vm\\nt351-client-apply02\\result.json",
+      "sha256": "11c8faaf1cd16a2f58179fb19a5b9ae20fa216fe3ae04635a519c35182d64138",
+      "matched": true
+    },
+    {
+      "case": "nt351-client-apply02",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\vm\\nt351-client-apply02\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "nt351-client-cold01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\vm\\nt351-client-cold01\\result.json",
+      "sha256": "3cbf1d2c197f56c56b23fa3279fdd0d977056812c900a32cdebe74aed9a2b139",
+      "matched": true
+    },
+    {
+      "case": "nt351-client-cold01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\vm\\nt351-client-cold01\\completed.json",
+      "sha256": "a2c25fb61db06dc34f0b9e6277ea112be02875d6361d8e03e493b4e73645b343",
+      "matched": true
+    },
+    {
+      "case": "nt351-client-apply01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\vm\\nt351-client-apply01\\harness-failure.json",
+      "sha256": "93794a6ec274864477d31ee79235c10c485f69be210ae209e4ff6c548d54c35b",
+      "matched": true
+    },
+    {
+      "case": "nt35-irq-fresh01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-fresh\\artifacts\\coverage\\vm\\nt35-irq-fresh01\\result.json",
+      "sha256": "9f33bf81c3322a27029cfdd81df84f326122fb123e39d651d17a029ab06962df",
+      "matched": true
+    },
+    {
+      "case": "nt35-irq-fresh01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-fresh\\artifacts\\coverage\\vm\\nt35-irq-fresh01\\cleanup.json",
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73",
+      "matched": true
+    },
+    {
+      "case": "nt35-irq-fresh01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-fresh\\artifacts\\coverage\\nt35-irq-fresh01\\process-exit.json",
+      "sha256": "df4d721d233a2334088d2d2e0110346ae9e509ff46bf0b379fbcfa85c715af4d",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply01\\result.json",
+      "sha256": "7f2192a65f86b4a170d3766e6591ee6a17bd178caab96e385f118b45c2109b9e",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply01\\completed.json",
+      "sha256": "d88f3d3ce04e4b204a40c4155086089022e5383f93652e2ed9ea4c2057ae4d8c",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply01\\command.json",
+      "sha256": "f2f7d365cf4f1425cda1d2add32345f680e636e99e7202cdb0752e1885fc0afa",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply02",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply02\\result.json",
+      "sha256": "061aef4532d92c7719f959a4debd2a2b00fa4c1f226ed9d23707783f5fa07158",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply02",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply02\\completed.json",
+      "sha256": "d88f3d3ce04e4b204a40c4155086089022e5383f93652e2ed9ea4c2057ae4d8c",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply02",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply02\\command.json",
+      "sha256": "f43b344d028fd2c5c1b6f99f7fb2f229ab3b29cc69bcf07128a5e870572b64e9",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-baseline01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-baseline01\\result.json",
+      "sha256": "2b6d724c064288bfaf6ce9e00237d25119c8dcfd11325a8ec106c01cbf904d4a",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-baseline01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-baseline01\\completed.json",
+      "sha256": "d88f3d3ce04e4b204a40c4155086089022e5383f93652e2ed9ea4c2057ae4d8c",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-baseline01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-baseline01\\command.json",
+      "sha256": "18eac83f1a9f1d9dd081538e0f24317d6e9407d4ad5f2a57384a0701857a1faa",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply03",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply03\\result.json",
+      "sha256": "43121276879f166a1e57d9e41d79303b81c173e4822e05bf5d8e839dd3b022e8",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply03",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply03\\completed.json",
+      "sha256": "d88f3d3ce04e4b204a40c4155086089022e5383f93652e2ed9ea4c2057ae4d8c",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-apply03",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-apply03\\command.json",
+      "sha256": "9275f55271357c3c56d153bc3cd6ebf6abaccd67534af8aa7a8e3bcbd9d44567",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-cold01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-cold01\\result.json",
+      "sha256": "da1258b7a7b24b54575ddb7f799f3a4a633d61ca95e48bb7602d7eb1a28c698d",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-cold01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-cold01\\completed.json",
+      "sha256": "d88f3d3ce04e4b204a40c4155086089022e5383f93652e2ed9ea4c2057ae4d8c",
+      "matched": true
+    },
+    {
+      "case": "nt35-client-cold01",
+      "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\coverage\\vm\\nt35-client-cold01\\command.json",
+      "sha256": "807d131f01467438acd3867b66a3c4dc087013dac12e5f380e150de2c5bb4fcc",
+      "matched": true
+    }
+  ],
+  "backing_checks": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18b-nt351-preserved\\target.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r18b-nt351-preserved\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-on\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-on\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r18b-nt351-preserved\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18d-nt351-debug-e9\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18d-nt351-debug-e9\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-on\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18e-nt351-stubfix-e9\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18e-nt351-stubfix-e9\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r18d-nt351-debug-e9\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18f-nt351-usb-port-isolation\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18f-nt351-usb-port-isolation\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r18e-nt351-stubfix-e9\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\stick.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\target.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20b-nt35-usb-isolation\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20b-nt35-usb-isolation\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r19c-nt31-usb-isolation\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r19c-nt31-usb-isolation\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24f-nt31-client-coldboot\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24f-nt31-client-coldboot\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\stick-retained.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-cold01\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-cold01\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\stick-retained.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-fresh01\\stick-final-retained.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-fresh01\\stick-retained.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-fresh01\\target-retained.qcow2",
+      "backing": null,
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-cold01\\stick.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\stick.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-cold01\\target.qcow2",
+      "backing": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\target.qcow2",
+      "matched_plan": true,
+      "dirty": false
+    }
+  ],
+  "removed": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\target.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "2814749767591369"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.040481+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-off\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930619224"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.076104+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\target.qcow2",
+      "bytes": 112525312,
+      "file_id": [
+        "10827293489797395857",
+        "1688849860754674"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.086762+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930622708"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.093139+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\target.qcow2",
+      "bytes": 203358208,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623561"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.133007+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623563"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.139758+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\target.qcow2",
+      "bytes": 240648192,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623532"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.146953+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "1407374884044840"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.153386+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\target.qcow2",
+      "bytes": 240648192,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623540"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.160160+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "1407374884044848"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.166660+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\target.qcow2",
+      "bytes": 3211264,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623510"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.173547+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-baseline01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623554"
+      ],
+      "hardlink_count": 1,
+      "removed_at": "2026-10-22T16:59:02.179896+00:00",
+      "method": "exclusive Win32 handle, FileDispositionInfo, CloseHandle",
+      "path_absent_after_close": true
+    }
+  ],
+  "refused": [],
+  "status": "COMPLETED_EXACTLY_TWELVE",
+  "preparation_reference_check": {
+    "documents": [
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24-preparation-failure-01.json",
+        "sha256": "66b57904ce7fb245a85136e511b151c31492c46a4d5b53811b6c3b0d21c4c8a9"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24-preparation.json",
+        "sha256": "8da1a63bd0fbe37e6918180d147f771e969debb63be097213a161bb7ea234d8a"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24b-preparation-failure-01.json",
+        "sha256": "a0640a8e4edfaf41909df7d0a233db8e9f3e3065d9f09e5b82c785e50fec6a3d"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24b-preparation.json",
+        "sha256": "514cff3729de3209d09e8e19d34f3911dc80ef72d441143c7c561c5aaa3debc9"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24c-preparation.json",
+        "sha256": "f945e661fa208962f8142794331238fdae6dcffbf3dd74a87f8a9d19a551a518"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24d-preparation.json",
+        "sha256": "4d2310c513e3b5d493e92562066413a0b5fae847dc3cf824ca25666e92983603"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24e-preparation.json",
+        "sha256": "629d6da224c46a40a134c036cd664a9c9b213d913a90d0edcd06f823f95f3a08"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24f-preparation.json",
+        "sha256": "2f7a562d080a358f9851d85df85ce5878d42a8de92980cb799d401a352bbd95c"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply\\preparation.json",
+        "sha256": "b8091c5e5f4236299cdb462a86f8ea865efbe8c35a3b8d26bd6be08ca5671e53"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply02\\preparation-source-context.json",
+        "sha256": "3c61d73045ed62be8e8ce748e848862ca646b92f010d6519e418d5c210f732ea"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply02\\preparation.json",
+        "sha256": "af536de8c0fa8c54fd982a4827184d062c9ddf54b2b96928bdc65ac9dcfae8d4"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply03\\preparation.json",
+        "sha256": "f536989a0a4b0c1550fef04d04f17fb1620d8072e106b47d43caba036a6bcd5e"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\baseline01\\preparation.json",
+        "sha256": "000d4c39cace9db31ff5427240f54adf3dad0bddb8ac6b6300b42278a1d10c3a"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\cold01\\preparation.json",
+        "sha256": "6e71828ac559da10bdacaadaefd804d81fa8e4f8d624cc333c7090b3867d99db"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-irq\\artifacts\\nt35-irq\\preparation.json",
+        "sha256": "e966e4a84a2b3a4ffe1be8373044da8288c1efbddeb7e9e02aeaf9cc71f16131"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-irq\\artifacts\\nt35-irq-usb\\preparation.json",
+        "sha256": "ceb76c71ba73bdeb21c221b768e8abddfd85054000dcbbd33d3bab898776e590"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt35-net\\artifacts\\nt35-network\\r20b-usb-isolation-preparation.json",
+        "sha256": "c62eb94dae15fb787850319693338daf7ea357e3759e21ed8698be04333ed9db"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\apply01\\preparation.json",
+        "sha256": "9b3ff58abc6220326e2ec26cfaec33d96e3ed0e39991a6bcb0d83fcecf4a411c"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\apply02\\preparation.json",
+        "sha256": "9e8044f16dd3c0266db289e9512af1b28d93652c9f502df63c7f30b976e052d2"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-client\\artifacts\\nt351-client\\cold01\\preparation.json",
+        "sha256": "c876b937eb7727d271e20bbfc9c06575ba5b9969140c6fb2276417a3be0e4db6"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-irq\\artifacts\\nt351-irq-r26\\preparation.json",
+        "sha256": "1e7f1343beea51a525c458c01c7d7c2d4d8c8483b0cc3535c01a45f6a724c214"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\nt351-network\\r18d-debug-preparation.json",
+        "sha256": "f7f66a269d4833d1b26ce03fdfbd5398723363134a772a437b0cf77348ced70a"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\nt351-network\\r18e-stubfix-preparation.json",
+        "sha256": "472e47598656adc0f976e39b1da264237707724935245ef2ed15c2f3129c422e"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\usos-work\\nt351-net\\artifacts\\nt351-network\\r18f-usb-isolation-preparation.json",
+        "sha256": "4012e052fe084dba8229c84cdae752cfe28fe52599f84c2f2090b7bd82e05acf"
+      }
+    ],
+    "known_candidate_references": [
+      {
+        "file": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24b-preparation.json",
+        "key": ".overlay",
+        "value": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\target.qcow2"
+      },
+      {
+        "file": "C:\\Users\\ASRock\\usos-work\\nt31-net\\artifacts\\nt31-fullmac-runtime\\r24b-preparation.json",
+        "key": ".overlay",
+        "value": "G:\\USOS-Kolekcja\\_vm\\r24b-nt31-image-entry\\target.qcow2"
+      },
+      {
+        "file": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply02\\preparation-source-context.json",
+        "key": ".module_override.WORK",
+        "value": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02"
+      },
+      {
+        "file": "C:\\Users\\ASRock\\usos-work\\nt35-client\\artifacts\\nt35-client\\apply02\\preparation-source-context.json",
+        "key": ".module_override.WORK",
+        "value": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply02"
+      }
+    ],
+    "scope": "Static preparation JSON under literal nt3* worktree artifacts; no global hidden-descendant claim"
+  },
+  "retained_parents": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "1125899907334235"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-client-apply03\\target.qcow2",
+      "bytes": 240648192,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623580"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623111"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-usb01\\target.qcow2",
+      "bytes": 3211264,
+      "file_id": [
+        "10827293489797395857",
+        "1125899907333764"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623572"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-client-apply02\\target.qcow2",
+      "bytes": 203358208,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623570"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\stick-retained.qcow2",
+      "bytes": 512557056,
+      "file_id": [
+        "10827293489797395857",
+        "562949953913206"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+      "bytes": 204865536,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623512"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18b-nt351-preserved\\target.qcow2",
+      "bytes": 204865536,
+      "file_id": [
+        "10827293489797395857",
+        "1407374884040188"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18c-nt351-cold-i8042-on\\target.qcow2",
+      "bytes": 2752512,
+      "file_id": [
+        "10827293489797395857",
+        "562949953909395"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18d-nt351-debug-e9\\target.qcow2",
+      "bytes": 203358208,
+      "file_id": [
+        "10827293489797395857",
+        "844424930620521"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r18e-nt351-stubfix-e9\\target.qcow2",
+      "bytes": 203358208,
+      "file_id": [
+        "10827293489797395857",
+        "844424930620535"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r19c-nt31-usb-isolation\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930621583"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r19c-nt31-usb-isolation\\target.qcow2",
+      "bytes": 100728832,
+      "file_id": [
+        "10827293489797395857",
+        "844424930621572"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\stick.qcow2",
+      "bytes": 498073600,
+      "file_id": [
+        "10827293489797395857",
+        "562949953910779"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r20-nt35-preserved\\target.qcow2",
+      "bytes": 242089984,
+      "file_id": [
+        "10827293489797395857",
+        "844424930621085"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "5910974511414399"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24-nt31-intel-fullmac\\target.qcow2",
+      "bytes": 112590848,
+      "file_id": [
+        "10827293489797395857",
+        "1688849860754551"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930622725"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24c-nt31-registermac-order\\target.qcow2",
+      "bytes": 112656384,
+      "file_id": [
+        "10827293489797395857",
+        "844424930622723"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623127"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24d-nt31-usb-fullmac\\target.qcow2",
+      "bytes": 3014656,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623126"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\stick.qcow2",
+      "bytes": 197120,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623137"
+      ],
+      "hardlink_count": 1
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\r24e-nt31-client-policy\\target.qcow2",
+      "bytes": 112721920,
+      "file_id": [
+        "10827293489797395857",
+        "844424930623135"
+      ],
+      "hardlink_count": 1
+    }
+  ],
+  "preserved_file_count": 136,
+  "process_safety_gate": {
+    "queried_at": "2026-10-22T16:59:01.963641+00:00",
+    "query_count": 1,
+    "qemu_process_count": 0,
+    "candidate_matches": [],
+    "command_lines_persisted": false
+  },
+  "preserved_file_metadata_unchanged": true,
+  "removed_bytes_logical": 801771008,
+  "allocated_space_reclaimed_not_measured": true,
+  "finished": "2026-10-22T16:59:02.192061+00:00"
+}
