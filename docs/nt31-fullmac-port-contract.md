@@ -400,3 +400,43 @@ The fixed `boot_nt31_fullmac_retry.py` adapter uses the same one-guard runner,
 firmware, CPU, memory, USB isolation and explicit igb BDF; it retains its
 overlay and uses a passive300-second endpoint. At startup R24b has no LAN
 PASS. Original TCP/IP and its configured static addressing are reused.
+
+### R24b actual ABI failure; R24c call-order correction
+
+R24b reached the own DriverEntry at CPUcount1/IRQL0 and created a wrapper
+(E9 trace), confirming that the previous demand-image rejection was passed.
+It then bugchecked1E/C0000005 in NDIS.SYS RVA2633, address34. This is an
+actual own ABI error: the call supplied MacMacContext as argument3 and the
+wrapper as argument4. The callee at2567–2633 reads argument3 into EDI,
+loads EDI[0] as DriverObject and writes DriverObject+34. Our wrong argument
+was also the just-zeroed output Mac variable, producing NULL.
+
+The original NE2000 caller independently confirms order: local wrapper is
+read at510, context pushed at514, wrapper at519, MacOut at51E, status at523,
+call at524 (lifecycle05 internal420). The corrected own call is
+`NdisRegisterMac(&st,&Mac,Wrapper,&Mac,&chars,sizeof(chars))`.
+The full named declaration now documents Wrapper3/Context4; equal handle
+types and a ret18 cleanup check alone did not establish this contract.
+
+No HID was sent to the STOP. Normal finish/QMP quit returned0 and retained
+R24b; no native clean shutdown was possible. It is an ABI FAIL, not a network
+result. Assessment: `artifacts/nt31-fullmac-runtime/r24b-guest-evaluation.json`.
+The following overlay uses clean stopped R24, never the faulted R24b disk.
+
+`registration_test.c` compiles the exact current DriverEntry and U31_MAC
+declaration extracted from own source. Its fake callee requires two distinct
+handles with wrapper in position3/context4, verifies the wrapper DriverObject,
+and checks four actual-C paths: success, SMP refusal, failed wrapper creation,
+and failed registration with wrapper termination. These passed in build16,
+alongside52 other native policy cases,43 imports and10 callback decorations.
+Build15's test-shim compile error (missing NULL definition) is retained; it
+was never a completed candidate or VM run.
+
+Build16 SYS16384B SHA256
+`b49f2445a2e48dbf75b50f426ccc1cef09943a84e779d351747d4cbc8df27a8d`,
+helper5120B`a481fa745879eef9ef48f8d1c0870b097d8850111a35c7e5be0d409d9028fb7c`.
+R24c manifest pins new overlay
+`ef0983e2b227079263e093e08cf992b503d217bd17b0c715f818aeac0cdc1df9`,
+with clean R24 backing. Original SYSTEM/TCPIP/USB and BDF settings remain
+byte-identical; only own files change. R24c started after one normal guard
+and awaits its passive endpoint. Its LAN result is still unqualified.

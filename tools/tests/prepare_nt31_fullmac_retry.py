@@ -108,4 +108,8 @@ def main(build):
     result.update(scratch_raw_removed=True,standalone_microsoft_modules_exported=False)
     OUT.write_bytes((json.dumps(result,indent=2)+'\n').encode('utf-8'));print(json.dumps(result,indent=2))
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--build',type=Path,required=True);a=p.parse_args();main(a.build)
+    p=argparse.ArgumentParser();p.add_argument('--build',type=Path,required=True)
+    p.add_argument('--tag',choices=('r24b-nt31-image-entry','r24c-nt31-registermac-order'),default=TAG)
+    a=p.parse_args();TAG=a.tag;WORK=COLLECTION/'_vm'/TAG
+    OUT=RUNTIME/('r24c-preparation.json' if TAG.startswith('r24c-') else 'r24b-preparation.json')
+    main(a.build)

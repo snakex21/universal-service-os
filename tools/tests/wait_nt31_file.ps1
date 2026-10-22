@@ -1,5 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$Name,
-      [ValidateSet('r24-nt31-intel-fullmac','r24b-nt31-image-entry')][string]$Tag='r24-nt31-intel-fullmac')
+      [ValidateSet('r24-nt31-intel-fullmac','r24b-nt31-image-entry','r24c-nt31-registermac-order')][string]$Tag='r24-nt31-intel-fullmac')
 $ErrorActionPreference = 'Stop'
 if ($Name -cnotmatch '^(endpoint\.png|operator-[0-9]{2}\.png|completed\.json)$') { throw 'Fixed completion filename required' }
 $waitRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\artifacts\nt31-fullmac-runtime'))

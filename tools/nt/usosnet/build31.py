@@ -13,9 +13,16 @@ def main():
     protected={str(p):sha(p) for tree,leaf in [('nt351-net','usosnet4.sys'),('nt351-net','usosnet.sys'),('nt351-net','usosnet351.sys'),('nt35-net','usosnet35.sys')] for p in [ROOT.parent/tree/'tools/nt/usosnet/bin/i386'/leaf]}
     out.mkdir(parents=True);tmp=out/'tmp';tmp.mkdir();src=out/'src';src.mkdir()
     inputs={}
-    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','u31_policy.h','cfg31_policy.h','policy_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
+    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','u31_policy.h','cfg31_policy.h','policy_test.c','registration_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
         for name in names:
             source=HERE/folder/name;shutil.copy(source,src/name);inputs[folder+'/'+name]=sha(source)
+    driver_text=(src/'usosnet31.c').read_text(encoding='utf-8')
+    entry=driver_text[driver_text.index('NTSTATUS DriverEntry('):]
+    if not entry.rstrip().endswith('}'):raise ValueError('Actual DriverEntry extraction failed')
+    (src/'driver_entry_actual.inc').write_bytes(entry.encode('utf-8'))
+    header=(src/'usosnet31.h').read_text(encoding='utf-8')
+    characteristics=header[header.index('typedef struct _U31_MAC {'):header.index('} U31_MAC;')+len('} U31_MAC;')]
+    (src/'mac_characteristics_actual.inc').write_bytes(characteristics.encode('utf-8'))
     # Own import library: public names/stdcall sizes, no MS code.
     legacy=json.loads((HERE/'src31/legacy_imports.json').read_text(encoding='utf-8'))
     measured=json.loads((ROOT/'artifacts/nt31-fullmac-contract/lifecycle-06.json').read_text(encoding='utf-8'))['modules']['ndis.sys']['exports_rva']
@@ -32,18 +39,21 @@ def main():
     script.write_bytes((f'@echo off\ncall "{wdk}\\bin\\setenv.bat" {wdk} fre x86 WXP no_oacr\nif errorlevel 1 exit /b 2\ncd /d "{src}"\nset "BUILD_ALT_DIR=fre"\nbuild -cZ\nif not exist objfre\\i386\\usosnet31.sys exit /b 3\n'
         f'cl /nologo /c /W3 /O2 /Gd /GS- /Zl /Fopolicy_test.obj policy_test.c\nif errorlevel 1 exit /b 4\nlink /nologo /nodefaultlib /entry:entry /subsystem:console /machine:x86 /out:"{out}\\policy-test.exe" policy_test.obj "{wdk}\\lib\\wxp\\i386\\kernel32.lib"\nif errorlevel 1 exit /b 5\n'
         f'cl /nologo /c /W3 /O1 /Gd /GS- /Zl /DWIN32 /D_WIN32_WINNT=0x0400 /DWINVER=0x0400 /I"{wdk}\\inc\\api" /I"{wdk}\\inc\\crt" /Fonet31cfg.obj net31cfg.c\nif errorlevel 1 exit /b 6\nlink /nologo /nodefaultlib /entry:entry /subsystem:console /machine:x86 /out:"{out}\\NET31CFG.EXE" net31cfg.obj "{wdk}\\lib\\wxp\\i386\\kernel32.lib" "{wdk}\\lib\\wxp\\i386\\advapi32.lib"\nif errorlevel 1 exit /b 7\n').encode('utf-8'))
+    with script.open('ab') as f:f.write((f'cl /nologo /c /W3 /Od /Gd /GS- /Zl /Foregistration_test.obj registration_test.c\nif errorlevel 1 exit /b 8\nlink /nologo /nodefaultlib /entry:entry /subsystem:console /machine:x86 /out:"{out}\\registration-test.exe" registration_test.obj "{wdk}\\lib\\wxp\\i386\\kernel32.lib"\nif errorlevel 1 exit /b 9\n').encode('utf-8'))
     r=subprocess.run(['cmd','/d','/c',str(script)],env=env,capture_output=True)
     (out/'build-output.txt').write_bytes((r.stdout+r.stderr).decode('mbcs',errors='replace').encode('utf-8'))
     if {p:sha(Path(p)) for p in protected}!=protected:raise ValueError('Protected other OS binaries changed')
     if r.returncode:raise RuntimeError('Build failed: '+str(out/'build-output.txt'))
     host=subprocess.run([str(out/'policy-test.exe')],env=env,capture_output=True,timeout=10)
     if host.returncode:raise RuntimeError('Actual policy test failed at C source line '+str(host.returncode))
+    registration=subprocess.run([str(out/'registration-test.exe')],env=env,capture_output=True,timeout=10)
+    if registration.returncode:raise RuntimeError('Actual DriverEntry contract test failed at C source line '+str(registration.returncode))
     binary=out/'usosnet31.sys';shutil.copy(src/'objfre/i386/usosnet31.sys',binary)
     for image in (binary,out/'NET31CFG.EXE'):
         subprocess.run([sys.executable,'-I','-B',str(ROOT/'tools/nt4/pe_nt4_version.py'),'--version','3.10',str(image)],env=env,check=True,capture_output=True)
     helper=out/'NET31CFG.EXE'
     refused=subprocess.run([str(helper),'/configure'],env=env,capture_output=True,timeout=10)
     if refused.returncode!=3 or b'REFUSED_OS' not in (out/'CFG31.LOG').read_bytes():raise RuntimeError('Host configurator OS guard failed')
-    result=dict(scope='Experimental NT31 full-MAC 3.0 UP/QEMU 82576 only; no runtime PASS',binary=str(binary),sha256=sha(binary),size=binary.stat().st_size,source_sha256=inputs,protected_binaries=protected,protected_binaries_unchanged=True,host_policy_cases=52,helper_identity_cases=14,host_policy_pass=True,helper_sha256=sha(helper),helper_size=helper.stat().st_size,helper_host_os_refusal_pass=True,runtime_pass=False)
+    result=dict(scope='Experimental NT31 full-MAC 3.0 UP/QEMU 82576 only; no runtime PASS',binary=str(binary),sha256=sha(binary),size=binary.stat().st_size,source_sha256=inputs,protected_binaries=protected,protected_binaries_unchanged=True,host_policy_cases=52,helper_identity_cases=14,host_policy_pass=True,registration_contract_cases=4,registration_contract_pass=True,driver_entry_sha256=sha(src/'driver_entry_actual.inc'),helper_sha256=sha(helper),helper_size=helper.stat().st_size,helper_host_os_refusal_pass=True,runtime_pass=False)
     (out/'build.json').write_bytes((json.dumps(result,indent=2)+'\n').encode('utf-8'));print(json.dumps(result,indent=2))
 if __name__=='__main__':main()

@@ -511,7 +511,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver,PUNICODE_STRING path)
     UsZero(&chars,sizeof(chars));chars.Major=3;chars.Minor=0;chars.Open=Open;chars.Close=Close;chars.Send=Send;chars.Transfer=Transfer;
     chars.Reset=Reset;chars.Request=Request;chars.GlobalQuery=GlobalQuery;chars.Unload=Unload;chars.Add=Add;chars.Remove=Remove;chars.Name=name;
     NdisInitializeWrapper(&Wrapper,driver,path,NULL);InitialTrace("US31 wrapper",(ULONG)Wrapper,0);if(!Wrapper)return STATUS_INSUFFICIENT_RESOURCES;
-    NdisRegisterMac(&st,&Mac,&Mac,Wrapper,&chars,sizeof(chars));
+    NdisRegisterMac(&st,&Mac,Wrapper,&Mac,&chars,sizeof(chars));
     InitialTrace("US31 RegisterMac",st,(ULONG)Mac);
     if(st!=NDIS_STATUS_SUCCESS)NdisTerminateWrapper(Wrapper,NULL);return st;
 }
