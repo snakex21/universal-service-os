@@ -459,16 +459,24 @@ test "32-bit Windows 7 / Vista request names the x86 PE10 donor" {
 
 pub const systemFolder = scanner.systemFolder;
 
-/// The Setup WinPE versions the native modern start runs: 6.3 and 10.0.
+/// The Setup WinPE versions the native modern start runs: 6.2.9200 (Windows 8
+/// RTM), 6.3 (8.1) and 10.0.
 pub fn modernSetupVersion(setup: wim.Setup) bool {
-    return setup.major == 10 or (setup.major == 6 and setup.minor == 3);
+    if (setup.major == 10) return true;
+    if (setup.major != 6) return false;
+    if (setup.minor == 3) return true;
+    // Windows 8 RTM (NT 6.2, build 9200): its own Setup WinPE, PE 4.0.
+    return setup.minor == 2 and setup.build == 9200;
 }
 
-test "native modern start accepts PE 5.0 (6.3) and PE 10, not PE 7/4" {
+test "native modern start accepts Windows 8 RTM, PE 5.0 (6.3) and PE 10, not Vista/7" {
+    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
     try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
     try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 10, .minor = 0, .build = 26100 }));
-    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+    // Only the RTM build of 6.2: no pre-release / unknown 6.2 Setup media.
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 8400 }));
     try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 0, .build = 6002 }));
 }
 
 pub const ModernInspection = struct {
@@ -533,13 +541,17 @@ pub noinline fn inspectModernX86(image_directory: []const u8, name: []const u8) 
 
 pub const x86_csmwrap_profile = "win-x86-uefi-csmwrap";
 
-/// 8.1 / Embedded 8.1 x86 on NVMe needs PE10's setup host (8.1's own PE
-/// stalls at 0%). Default on since the X470 PASS 2026-10-22: the donor is
-/// picked here before the disk is known; micro-Linux uses it only for an
-/// NVMe target (a SATA target keeps 8.1's own PE). Windows 10 keeps its PE.
+/// 8 / 8.1 / Embedded 8.1 x86 on NVMe needs PE10's setup host (their own PE
+/// stalls at 0% or has no usosnvme package). Default on since the X470 PASS
+/// 2026-10-22: the donor is picked here before the disk is known; micro-Linux
+/// uses it only for an NVMe target (a SATA target keeps 8's own PE). Windows
+/// 10 keeps its PE.
 pub fn modernX86ExternalDonor(setup: wim.Setup, folder: []const u8, nvme_on: bool) bool {
-    return nvme_on and setup.major == 6 and setup.minor == 3 and
+    if (!nvme_on or setup.major != 6) return false;
+    const windows8 = setup.minor == 2 and setup.build == 9200 and std.mem.eql(u8, folder, "Windows 8");
+    const windows81 = setup.minor == 3 and
         (std.mem.eql(u8, folder, "Windows 8.1") or std.mem.eql(u8, folder, "Windows Embedded 8.1 Industry"));
+    return windows8 or windows81;
 }
 
 /// Unattended\nvme-off.txt on DATA turns the 32-bit 8.1 / 10 NVMe route off.
@@ -554,14 +566,20 @@ fn modernNvmeOff(state: *BootState, folder: []const u8) !bool {
     return true;
 }
 
-test "modern x86 PE10 donor is confined to 8.1 folders with the NVMe route on" {
+test "modern x86 PE10 donor is confined to Windows 8 / 8.1 folders with the NVMe route on" {
+    const pe8 = wim.Setup{ .index = 2, .major = 6, .minor = 2, .build = 9200 };
     const pe81 = wim.Setup{ .index = 2, .major = 6, .minor = 3, .build = 9600 };
     const pe10 = wim.Setup{ .index = 2, .major = 10, .minor = 0, .build = 19041 };
+    try std.testing.expect(modernX86ExternalDonor(pe8, "Windows 8", true));
     try std.testing.expect(modernX86ExternalDonor(pe81, "Windows 8.1", true));
     try std.testing.expect(modernX86ExternalDonor(pe81, "Windows Embedded 8.1 Industry", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe8, "Windows 8", false));
     try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 8.1", false));
     try std.testing.expect(!modernX86ExternalDonor(pe10, "Windows 10", true));
     try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 7", true));
+    // The folder and the Setup version must match: no 8.1 PE for a Windows 8 ISO.
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 8", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe8, "Windows 8.1", true));
 }
 
 /// request.ini of the x86 path: the ISO is its own boot source (donor = iso).

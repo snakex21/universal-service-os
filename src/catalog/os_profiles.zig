@@ -105,11 +105,15 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
     .{ .system_id = "windows-11", .native_uefi = .modern },
-    // Windows 8.1 (PE 5.0, build 9600): on UEFI the same native start as
-    // 10/11 (the ISO's own WinPE, ESP guard and finalizer); Server 2012 R2
-    // and Embedded 8.1 Industry follow it. BIOS keeps the WORK copy
-    // (profile win81-bios-chainload); Windows 8 / Server 2012 keep it on both.
+    // Windows 8 RTM (PE 4.0, build 9200) and 8.1 (PE 5.0, build 9600): on
+    // UEFI the same native start as 10/11 (the ISO's own WinPE, ESP guard and
+    // finalizer); Server 2012 R2 / 2012 and Embedded 8.1 Industry follow them.
+    // Their 32-bit media take the CSMWrap path (win-x86-uefi-csmwrap: the
+    // ISO's own PE on SATA, the x86 PE10 donor on NVMe, usosnvme "modern").
+    // BIOS keeps the WORK copy (win81-bios-chainload; Windows 8 / Server 2012:
+    // iso-work-chainload).
     .{ .system_id = "windows-8-1", .native_uefi = .modern },
+    .{ .system_id = "windows-8", .native_uefi = .modern },
     // Windows Server (src/catalog/windows_server.zig): the client release
     // with the same Setup. 2016-2025: the Windows 10/11 native UEFI start and
     // the Windows 10 BIOS Core start; 2012 R2 / 2012: Windows 8.1 / 8;
@@ -403,10 +407,11 @@ pub const profiles = (if (native_windows7_enabled) uefi_profiles else [_]Profile
     // Windows 95/98/Me: the ISO's own DOS boot floppy + DOS Setup from a RAM
     // disk (docs/win9x-modern-2026-09-30.md); also under CSMWrap.
     .{ .id = "win9x-dos-bios", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
-    // Windows 8.1 / Server 2012 R2 on BIOS: the WORK copy as before the
-    // UEFI native start (the BIOS Core's native start is Windows 7/Vista/10).
-    .{ .id = "win81-bios-chainload", .systems = .{ .ids = &.{"windows-8-1"} }, .images = iso, .methods = &.{.automatic}, .firmware = .bios, .backend = .chainload, .progress = .micro_linux },
-    .{ .id = "win81-bios-other-iso", .systems = .{ .ids = &.{"windows-8-1"} }, .images = iso, .methods = &.{.direct_iso}, .firmware = .bios, .backend = null, .progress = .none },
+    // Windows 8 / 8.1 and Server 2012 / 2012 R2 on BIOS: the WORK copy as
+    // before the UEFI native start (the BIOS Core's native start is Windows
+    // 7/Vista/10).
+    .{ .id = "win81-bios-chainload", .systems = .{ .ids = &.{ "windows-8-1", "windows-8" } }, .images = iso, .methods = &.{.automatic}, .firmware = .bios, .backend = .chainload, .progress = .micro_linux },
+    .{ .id = "win81-bios-other-iso", .systems = .{ .ids = &.{ "windows-8-1", "windows-8" } }, .images = iso, .methods = &.{.direct_iso}, .firmware = .bios, .backend = null, .progress = .none },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
     .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },
@@ -587,11 +592,16 @@ test "Windows 10/11 and 7/Vista native UEFI profiles" {
     try std.testing.expectEqualStrings("vista-uefi-pe10", select(systems.findById("windows-vista").?, .iso, .automatic, .uefi).?.id);
     try std.testing.expectEqual(NativeUefi.vista, traits("windows-vista").native_uefi);
     try std.testing.expectEqual(NativeUefi.modern, traits("windows-8-1").native_uefi);
-    try std.testing.expectEqual(NativeUefi.none, traits("windows-8").native_uefi);
+    // Windows 8 RTM (NT 6.2 build 9200) takes the same native UEFI start, so
+    // its x86 media reach win-x86-uefi-csmwrap (own PE 4.0 on SATA, x86 PE10
+    // donor + usosnvme "modern" on NVMe).
+    try std.testing.expectEqual(NativeUefi.modern, traits("windows-8").native_uefi);
     try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-8-1").?, .iso, .automatic, .uefi).?.id);
     try std.testing.expectEqualStrings("win81-bios-chainload", select(systems.findById("windows-8-1").?, .iso, .automatic, .bios).?.id);
     try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-server-2012-r2").?, .iso, .automatic, .uefi).?.id);
-    try std.testing.expectEqualStrings("iso-work-chainload", select(systems.findById("windows-8").?, .iso, .automatic, .uefi).?.id);
+    try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-8").?, .iso, .automatic, .uefi).?.id);
+    // BIOS keeps the WORK copy for Windows 8 / Server 2012.
+    try std.testing.expectEqualStrings("win81-bios-chainload", select(systems.findById("windows-8").?, .iso, .automatic, .bios).?.id);
     if (native_windows7_enabled) {
         try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-embedded-8-1-industry").?, .iso, .automatic, .uefi).?.id);
         try std.testing.expectEqualStrings("windows-8-1", iconId("windows-embedded-8-1-industry"));

@@ -120,7 +120,7 @@ int main(void){
         with tempfile.TemporaryDirectory(dir=out) as tmp:
             script=Path(tmp)/'guard.cmd'
             script.write_text('@echo off\ncall :supported_nt "%~1" "%~2"\nexit /b %errorlevel%\n'+function)
-            for version,build,expected in [('6.2','19041',0),('6.2','9600',0),('10.0','19041',0),('6.3','9600',0),('6.2','9200',1),('6.0','6002',1),('10.0','22000',1),('10.0','',1),('6.2','oops',1)]:
+            for version,build,expected in [('6.2','19041',0),('6.2','9600',0),('10.0','19041',0),('6.3','9600',0),('6.2','9200',0),('6.2','8400',1),('6.1','9200',1),('6.0','6002',1),('10.0','22000',1),('10.0','',1),('6.2','oops',1)]:
                 with self.subTest(version=version,build=build):
                     r=subprocess.run(['cmd.exe','/d','/c',str(script),version,build],capture_output=True)
                     self.assertEqual(r.returncode,expected)
@@ -147,20 +147,22 @@ int main(void){
                 return subprocess.run([str(sh),'-c',code,'test',str(ROOT/'tools/vista_csmwrap_prepare.sh'),profile,str(data),name],capture_output=True).returncode
             run=lambda p,n:call('vista_modern_nvme_enabled',p,n)
             external=lambda p,n:call('vista_modern_external_donor_enabled',p,n)
-            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry'):
+            # Windows 8 RTM (NT 6.2, build 9200) has no inbox NVMe driver either:
+            # the same "modern" package, default on (unchecked on media).
+            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry','Windows 8'):
                 self.assertEqual(run('win-x86-uefi-csmwrap',name),0)
             self.assertNotEqual(external('win-x86-uefi-csmwrap','Windows 10'),0)
-            for name in ('Windows 8.1','Windows Embedded 8.1 Industry'):
+            for name in ('Windows 8.1','Windows Embedded 8.1 Industry','Windows 8'):
                 self.assertEqual(external('win-x86-uefi-csmwrap',name),0)
                 self.assertNotEqual(external('win-nt6-x86-uefi-csmwrap',name),0)
             # The old opt-in flag changes nothing.
             old=data/'Systems/Windows/Windows 10/Unattended/nvme-experimental.txt';old.parent.mkdir(parents=True);old.touch()
             self.assertEqual(run('win-x86-uefi-csmwrap','Windows 10'),0)
-            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry'):
+            for name in ('Windows 10','Windows 8.1','Windows Embedded 8.1 Industry','Windows 8'):
                 off=data/'Systems/Windows'/name/'Unattended/nvme-off.txt';off.parent.mkdir(parents=True,exist_ok=True);off.touch()
                 self.assertNotEqual(run('win-x86-uefi-csmwrap',name),0)
                 if name!='Windows 10':self.assertNotEqual(external('win-x86-uefi-csmwrap',name),0)
-            for profile,name in [('win-nt6-x86-uefi-csmwrap','Windows 10'),('vista-x64-sp2-uefi-csmwrap','Windows 10'),('win-x86-uefi-csmwrap','Windows 7'),('win-x86-uefi-csmwrap','Windows 8')]:self.assertNotEqual(run(profile,name),0)
+            for profile,name in [('win-nt6-x86-uefi-csmwrap','Windows 10'),('vista-x64-sp2-uefi-csmwrap','Windows 10'),('win-x86-uefi-csmwrap','Windows 7'),('win-x86-uefi-csmwrap','Windows Vista')]:self.assertNotEqual(run(profile,name),0)
 
     def test_disk_gate_keeps_checks_and_sata_keeps_own_pe(self):
         prep=(ROOT/'tools/vista_csmwrap_prepare.sh').read_text(encoding='utf-8')
@@ -170,6 +172,8 @@ int main(void){
         self.assertIn('vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop',modern)
         self.assertIn('[ "$donor" != "$iso" ] || stop',modern)
         self.assertIn('pe_nvme=usosnvme-modern',modern)
+        # Windows 8 RTM takes the modern package and the external donor too.
+        self.assertEqual(modern.count("'Windows 8'"),2,modern)
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop',nv)
         self.assertIn('stage_donor=$iso',prep)
         self.assertIn('VISTA_DONOR_ISO="/mnt/data/$stage_donor"',prep)
