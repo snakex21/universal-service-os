@@ -1,3 +1,7 @@
 semantic*/
 cross-process*/
 __pycache__/
+
+message-tests*/
+template-tests*/
+named-tests*/

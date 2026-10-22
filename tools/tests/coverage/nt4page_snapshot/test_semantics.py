@@ -2,7 +2,7 @@ from pathlib import Path
 import ctypes,hashlib,json,os,subprocess,unittest
 HERE=Path(__file__).resolve().parent
 ZIG=Path(r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe')
-OUT=HERE/'semantic06'
+OUT=HERE/'semantic09'
 class RealCPolicy(unittest.TestCase):
  @classmethod
  def setUpClass(cls):

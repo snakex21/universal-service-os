@@ -3,7 +3,7 @@ from pathlib import Path
 import ctypes,hashlib,json,os,subprocess,sys,threading,time,unittest
 from ctypes import wintypes as w
 HERE=Path(__file__).resolve().parent
-OUT=HERE/'cross-process03'
+OUT=HERE/'cross-process05'
 ZIG=Path(r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe')
 def child():
  u=ctypes.WinDLL('user32',use_last_error=True);k=ctypes.WinDLL('kernel32',use_last_error=True)

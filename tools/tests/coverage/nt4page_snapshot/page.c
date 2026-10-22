@@ -1,6 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "core.h"
+#include "template.h"
+#include "message_table.h"
 #include "public_ids.h"
 #define TEXT_CAP 768u
 #define CONTROL_CAP 128u
@@ -15,7 +17,8 @@ static HMODULE modules[N4_MODULE_COUNT];
 static WCHAR texts[CONTROL_CAP][TEXT_CAP];
 static HWND windows[CONTROL_CAP],owners[CONTROL_CAP];
 static unsigned roles[CONTROL_CAP],text_count;
-static WCHAR message[TEXT_CAP],normalized[TEXT_CAP];
+static WCHAR message[TEXT_CAP],prepared[TEXT_CAP],normalized[TEXT_CAP];
+static unsigned message1010_read,modules_complete,matched_static[CONTROL_CAP];
 static HWND ok_button,next_button;
 static HWND error_owner;
 static unsigned ambiguous_error;
@@ -68,11 +71,22 @@ static BOOL CALLBACK top(HWND hwnd,LPARAM unused){
  remember(hwnd,hwnd,1);EnumChildWindows(hwnd,child,(LPARAM)hwnd);return TRUE;
 }
 static int read_resource(const N4ID *id){
- DWORD n;
+ DWORD n=0;
  if(!modules[id->module])return 0;
  if(id->message){
-  n=FormatMessageW(FORMAT_MESSAGE_FROM_HMODULE|FORMAT_MESSAGE_IGNORE_INSERTS|FORMAT_MESSAGE_MAX_WIDTH_MASK,modules[id->module],id->id,0,message,TEXT_CAP,0);
- }else n=(DWORD)LoadStringW(modules[id->module],id->id,message,TEXT_CAP);
+  HRSRC resource;HGLOBAL loaded;const BYTE *data;DWORD size;N4MESSAGE view;
+  resource=FindResourceW(modules[id->module],MAKEINTRESOURCEW(1),MAKEINTRESOURCEW(11));if(!resource)return 0;
+  size=SizeofResource(modules[id->module],resource);if(size>1024u*1024u)return 0;
+  loaded=LoadResource(modules[id->module],resource);if(!loaded)return 0;data=(const BYTE*)LockResource(loaded);
+  if(!n4_message_view(data,(unsigned)size,id->id,&view))return 0;
+  if(view.unicode){unsigned i;n=view.bytes/2;if(n>=TEXT_CAP-1)return 0;for(i=0;i<n;i++)message[i]=(WCHAR)n4_msg16(view.text+2*i);message[n]=0;}
+  else {int count;if(view.bytes>TEXT_CAP*2)return 0;count=MultiByteToWideChar(CP_ACP,0,(const char*)view.text,(int)view.bytes,message,TEXT_CAP-1);if(count<=0)return 0;n=(DWORD)count;message[n]=0;}
+  if(!n4_message_controls((const N4W*)message,(N4W*)prepared,TEXT_CAP))return 0;
+  n=n4_normalize((const N4W*)prepared,(N4W*)normalized,TEXT_CAP);
+  if(id->id==1010&&lstrcmpA(n4_module_names[id->module],"KERNEL32")==0)message1010_read=n!=0;
+  return n!=0;
+ }
+ n=(DWORD)LoadStringW(modules[id->module],id->id,message,TEXT_CAP);
  if(!n||n>=TEXT_CAP-1)return 0;
  return n4_normalize((const N4W*)message,(N4W*)normalized,TEXT_CAP)!=0;
 }
@@ -92,13 +106,14 @@ static void compare_dialog_text(const N4DIALOG *id,unsigned slot,const WCHAR *so
  unsigned j;
  if(!source||!n4_normalize((const N4W*)source,(N4W*)normalized,TEXT_CAP))return;
  for(j=0;j<text_count;j++)if(n4_public_exact((const N4W*)texts[j],(const N4W*)normalized)){
-  emit("NT4PAGE DIALOG ");emit(n4_module_names[id->module]);emit(" ");number(id->id);emit(" ");number(slot);emit(" ");emit(roles[j]==0?"TITLE\r\n":roles[j]==1?"STATIC\r\n":"BUTTON\r\n");
+  if(roles[j]==1)matched_static[j]=1;
+  emit(id->name?"NT4PAGE DIALOGNAME ":"NT4PAGE DIALOG ");emit(n4_module_names[id->module]);emit(" ");if(id->name)emit(id->public_name);else number(id->id);emit(" ");number(slot);emit(" ");emit(roles[j]==0?"TITLE\r\n":roles[j]==1?"STATIC\r\n":"BUTTON\r\n");
  }
 }
 static void compare_dialog(const N4DIALOG *id){
  HRSRC resource;HGLOBAL loaded;const BYTE *data;DWORD size,pos,style;unsigned extended,count,i;const WCHAR *text;
  if(!modules[id->module])return;
- resource=FindResourceW(modules[id->module],MAKEINTRESOURCEW(id->id),MAKEINTRESOURCEW(5));if(!resource)return;
+ resource=FindResourceW(modules[id->module],id->name?id->name:MAKEINTRESOURCEW(id->id),MAKEINTRESOURCEW(5));if(!resource)return;
  size=SizeofResource(modules[id->module],resource);if(size<18||size>1024*1024)return;
  loaded=LoadResource(modules[id->module],resource);if(!loaded)return;data=(const BYTE*)LockResource(loaded);if(!data)return;
  extended=read16(data+2)==0xffff;
@@ -117,12 +132,19 @@ static void compare_cached(void){
  unsigned i,j;
  if(!lock_output())return;
  if(stopping){ReleaseMutex(output_lock);return;}
- error_match_count=0;error_owner=0;ambiguous_error=0;ok_button=0;
+ error_match_count=0;error_owner=0;ambiguous_error=0;ok_button=0;message1010_read=0;
+ for(j=0;j<CONTROL_CAP;j++)matched_static[j]=0;
  emit("NT4PAGE BEGIN\r\n");
  for(i=0;i<N4_ID_COUNT;i++){
   if(!read_resource(&n4_ids[i]))continue;
   for(j=0;j<text_count;j++){
-   if(!n4_public_exact((const N4W*)texts[j],(const N4W*)normalized))continue;
+   if(!n4_public_template((const N4W*)texts[j],(const N4W*)normalized)){
+    if(roles[j]==1&&n4_public_fragment((const N4W*)texts[j],(const N4W*)normalized)){
+     emit("NT4PAGE FRAGMENT ");emit(n4_module_names[n4_ids[i].module]);emit(n4_ids[i].message?" MSG ":" STR ");number(n4_ids[i].id);emit(" STATIC\r\n");
+    }
+    continue;
+   }
+   if(roles[j]==1)matched_static[j]=1;
    emit("NT4PAGE MATCH ");emit(n4_module_names[n4_ids[i].module]);emit(n4_ids[i].message?" MSG ":" STR ");number(n4_ids[i].id);emit(" ");emit(roles[j]==0?"TITLE\r\n":roles[j]==1?"STATIC\r\n":"BUTTON\r\n");
    if(roles[j]==1&&n4_ids[i].error){
     error_match_count++;
@@ -137,6 +159,8 @@ static void compare_cached(void){
  }
  fixed("EXCLUDED_EDIT_PRESENT",excluded_edit);fixed("POLISH_NEXT_PRESENT",has_next);fixed("OK_PRESENT",has_ok);fixed("PUBLIC_ERROR_MATCH",error_match_count!=0);fixed("ERROR_OWNER_UNIQUE",error_owner&&!ambiguous_error);
  fixed("CAPTURE_BUDGET_EXHAUSTED",capture_timed_out);
+ fixed("ORACLE_MODULES_COMPLETE",modules_complete);fixed("ORACLE_MESSAGE1010_READ",message1010_read);fixed("ORACLE_CODEPAGE1250",GetACP()==1250);
+ {unsigned unmatched=0;for(j=0;j<text_count;j++)if(roles[j]==1&&!matched_static[j])unmatched=1;fixed("UNMATCHED_STATIC_PRESENT",unmatched);}
  emit("NT4PAGE END\r\n");
  if(public_file!=INVALID_HANDLE_VALUE)FlushFileBuffers(public_file);
  ReleaseMutex(output_lock);
@@ -164,7 +188,7 @@ static void open_serial(void){
 static DWORD WINAPI observe(void *unused){
  unsigned i,pos=0;char command[32];DWORD got;HDESK input;(void)unused;
  if(serial==INVALID_HANDLE_VALUE&&public_file==INVALID_HANDLE_VALUE)return 1;
- for(i=0;i<N4_MODULE_COUNT;i++)modules[i]=LoadLibraryExW(n4_module_paths[i],0,LOAD_LIBRARY_AS_DATAFILE);
+ modules_complete=1;for(i=0;i<N4_MODULE_COUNT;i++){modules[i]=LoadLibraryExW(n4_module_paths[i],0,LOAD_LIBRARY_AS_DATAFILE);if(!modules[i])modules_complete=0;}
  worker_state("NT4PAGE READY\r\n");
  if(WaitForSingleObject(native_process,OBSERVE_AFTER_MS)!=WAIT_TIMEOUT)return 0;
  input=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_ENUMERATE);

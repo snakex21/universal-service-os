@@ -701,3 +701,84 @@ Po wznowieniu jedyną przygotowaną akcją jest run_nativepage07.py: 150 s,
 QMP quit, a dopiero potem odczyt własnego allowlist logu. Aktualnie zakaz startu.
 06 transport-timeout nadal nie jest Windows FAIL. Pulpit i LAN NT4 oraz osobne
 HID/MSC i sprzęt fizyczny pozostają niepotwierdzone.
+
+
+## Wznowienie: loader-selected SYSTEM.SAV i ukończone próby07–10
+
+Oryginalny NTLDR PL (SHA256263acfea3d3143a34fa4f2bfbda809898fb87883c1d317a7b52342f6c824748f)
+przy Setup/RestartSetup REGDWORD>=1 ładuje WINNT/SYSTEM32/CONFIG/SYSTEM.SAV.
+Dowód z oryginalnego kodu: chronione RVA14b00 tworzy ścieżkę config, 14b59/14b65
+ładuje SYSTEM, 16a7e/16b48 odczytuje i testuje RestartSetup, 14bcd/14beb wybiera
+SYSTEM.SAV. Wybrany SAV ma RestartSetup1 i SetupType1. Pozostałości SYSLINUX.CFG
+są nieaktywne: rzeczywisty kod VBR ładuje NTLDR, zgodny bajtowo z oryginalnym CD.
+Metadane bez surowych bajtów: nt4page/ntldr-restart-hive-dataflow-v2.json,
+base-boot-chain-identity.json i base-vbr-filename-dataflow.json.
+
+Próby06–08 nie zmieniały loader-selected SAV. Brak uruchomienia wrappera był
+błędem instrumentacji wrong-hive, nie Windows FAIL ani dowodem problemu klucza.
+07:150.36s/QMPquitrc0, 08:150.17s/QMPquitrc0, bez UIactions; własny log niedostępny.
+Nie przepisano ich historycznych plików wynikowych. Wczesny model replay legacy
+LOG miał trzy errors; wynik zachowano. Poprawione5 testów rozróżniają niezależne
+primary/ALT i odrzucają rzeczywiście niezgodną geometrię LOG, bez udawania
+potwierdzenia natywnego recovery.
+
+09: na nowym overlay zmieniono wyłącznie CmdLine w SYSTEM.SAV oraz dodano własny
+NT4PAGE.EXE. RestartSetup/primary/ALT/LOG i wszystkie inne wirtualne bajty poza
+jawnie dozwolonymi zakresami niezmienione; readback/full compare PASS, RAW usunięty.
+Jedna zwykła kontrola zasobów,150.17s, QMPquitrc0. Własny public-ID log odczytany
+dopiero po quit: native child STARTED, pełna zsynchronizowana ramka, input desktop
+attachedYES, FILE_ONLY_COM_UNAVAILABLE. SYSSETUP STR1 to ogólny tytuł; NETSETUP
+DIALOG8170slot1 opisuje etap składników sieci. ModalOK pozostaje nierozpoznany:
+PUBLIC_ERROR_MATCHfalse, żadnego Next ani ACK. To nie jest konkretny błąd rejestru
+ani dowód przejścia Setup. Wszystkie12 zainstalowanych modułów oracle mają hashe
+identyczne z oryginalnym PL CD. 5 rzeczywistych SAV dispatch tests i6 adaptera PASS.
+
+10: ten sam natywny Setup/RestartSetup, tylko własny matcher publicznych szablonów
+oraz native Serial Start2→1 w wybranym SAV na tym jednym overlay. Zmiana Serial
+objęta4 rzeczywistymi testami, readback i pełnym porównaniem pozostałych bajtów.
+Default=LKG1/Current0 przed startem; driverSerial Type1, oryginalny serial.sys SHA256
+ aebf5f45aab49186182c4f60b2735353abf2856a3d73d8e06fa197b99dfd52ac.
+Build12 SHA25666fca64af6d37fe4e14dd54dcf7e9e9aa7fa585529802d401871375e0925745f,
+34816B, wszystkie37 importów w oryginalnych PL/EN. 7 testów bounded template C,
+ponownie7 lifecycle/EDIT i4 rzeczywiste cross-process WM_GETTEXT PASS;4 operatora
+oraz6 exact-path post-quit policy PASS. Parametry szablonów pozostają tylko RAM.
+
+10 uzyskała działający UART i public-ID endpoint105.38s. Ramka nadal pokazuje
+wyłącznie ten sam etap NETSETUP i nierozpoznanyOK. Zakończona FINISH/QMPquitrc0
+po157.03s, actions=[], bez screenów i bez odczytu EDIT. Aktywnej VM nie zostawiono.
+Aktualny zakres jest diagnostyczny: brak NT4 desktop/LAN/HID/MSC/hardware PASS.
+Dalszy krok wymaga rozpoznania konkretnego publicznego komunikatu; samo dodanie
+transportu nie odblokowało instalatora. Końcowy stan10: nativepage10-runtime/result.json.
+
+
+## Ukończone11–12: oracle dostępny, modal nadal nierozpoznany
+
+11: nowy bounded RT_MESSAGETABLE parser i NTDLL w tym samym wrapperze.
+Oryginalny NTDLL z celu zgodny bajtowo z PL CD. Actual-C parser odczytał oryginalny
+KERNEL32 MSG1010 w RAM; testy negatywne i1500 mutacji PASS. Pierwszy test adaptera
+miał2 errors typu Python bytearray/ctypes; wynik zachowano, po poprawieniu konwersji
+7 tests PASS. Pierwszy test protokołu odrzucał nowe nazwy flag z cyframi; ścisłą
+allowlist zachowano, poprawiono klasę znaków i8 tests PASS. Parametry wiadomości
+nie są eksportowane. Fragmenty publicznych literałów są diagnostyczne, bez ACK.
+
+11 endpoint104.71s potwierdził ORACLE_MODULES_COMPLETE/ORACLE_MESSAGE1010_READ/
+ORACLE_CODEPAGE1250=true oraz UNMATCHED_STATIC_PRESENT=true. Żadnego MSG ani
+fragmentu, tylko dotychczasowy tytuł/NETSETUP8170. FINISH/QMPquitrc0, actions=[].
+Hipoteza samej niedostępności FormatMessage/NTDLL nie wyjaśnia braku identyfikacji.
+
+Statycznie znaleziono75 pomijanych nazwanych dialogów SETUPDLL, m.in.CRITERR.
+12 włącza exactallowlist tych nazw, bez nowych dowolnych ścieżek. Actual-C test
+potwierdził named FindResource→parser→publicznyID, unknownresource failclosed.
+Build15 ce94990ed569aaeccbb68086c02d3e618eb98f512dfca837dcf21660517b6667,
+46080B,38 importów oryginalnychPL/EN PASS. Readback i fullcompare SAVCmdLine/
+SerialStart1/ownEXEonly PASS. Endpoint114.66s nie dodał MSG/fragment/namedDialog;
+wszystkie trzy oracleflags nadaltrue. FINISH/QMPquitrc0 po174.67s, zeroUIactions.
+
+Snapshot tools/tests/coverage/nt4page_snapshot zawiera aktualne własne źródła,
+publiczny katalog samych identyfikatorów i38 samodzielnych hosttests PASS. Nie
+uzyskano desktop/LAN/HID/MSC PASS. Dalszy plan zatwierdzony przez root: wąski
+QEMU event breakpoint na statycznie ustalonym oryginalnym APIUI, wyłącznie enumAPI,
+caller moduł/RVA i numerictemplateID. Bez lpText/EDIT/frame/stosu dowolnych
+parametrów ani eksportu RAM. Najpierw synthetic adaptertest, dopiero potem
+normalny guard i pojedynczy start diagnostyczny. Nie zaplanowano kolejnej
+próby z samą szerszą listą zasobów. Żadna własna VM nie działa po12.
