@@ -1,0 +1,36 @@
+{
+  "tag": "nt351-client-auto-fresh01",
+  "plan_sha256": "dd602928334d7e9bab9c8df6466289202730e0d39d783126b106c581044e9bc6",
+  "assets": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt351-client-auto01",
+  "initrd_sha256": "91c1d72c8d1718cb47e313076cae27c0b21494a0a4ab42c508aca90fa4451c64",
+  "profile_sha256": "e0753e9efb0207e41ef9c603bc96581bb2672ba538e57a159047f0e3f28563c5",
+  "driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_bytes": 17024,
+  "collector_expected_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "post_sha256": "615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b",
+  "post_bytes": 30208,
+  "qemu_sha256": "47d57a6072e0bb3bd98f87926eb129eb1736dfe818c67b3b81ef7ce4edd0b3cd",
+  "resources": {
+    "disk_free": 1767505727488,
+    "host_available": 28688138240,
+    "host_total": 34280775680,
+    "requested_mib": 2048
+  },
+  "command": [
+    "C:\\Users\\ASRock\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+    "-I",
+    "-B",
+    "C:\\Users\\ASRock\\usos-work\\nt351-auto-client\\artifacts\\coverage\\nt351-client-auto-fresh01\\harness\\run_plan.py",
+    "--plan",
+    "C:\\Users\\ASRock\\usos-work\\nt351-auto-client\\artifacts\\coverage\\nt351-client-auto-fresh01\\plan.json",
+    "--assets",
+    "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt351-client-auto01",
+    "--qemu",
+    "C:\\Users\\ASRock\\usos-work\\bety-instalacja\\tools\\qemu\\qemu-system-x86_64.exe",
+    "--profile",
+    "C:\\Users\\ASRock\\usos-work\\nt351-auto-client\\artifacts\\coverage\\nt351-client-auto-fresh01\\keyless.profile.ini",
+    "--nested"
+  ],
+  "source_commit": "874c4bf1ce71a63344f0eeb5aae6c85daaa874c6",
+  "scope": "Fresh normal USOS NT351 f579 with requested pre-target-boot client policy; no physical or USB qualification"
+}

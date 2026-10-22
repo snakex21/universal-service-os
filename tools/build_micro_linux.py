@@ -601,6 +601,7 @@ def main() -> int:
             ("tools/display_profile.sh", "usr/lib/usos/display_profile.sh"),
             ("tools/w9x_logon.sh", "usr/lib/usos/w9x_logon.sh"),
             ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
+            ("tools/nt351_network_setup.sh", "usr/lib/usos/nt351_network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -786,6 +787,14 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
         nt3_post = build_nt3(root)
         put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        net351 = (root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net351).hexdigest()+'  USOSNET351.SYS\n').encode('ascii')))
+        logger351 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.EXE', stat.S_IFREG | 0o644, logger351))
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(logger351).hexdigest()+'  USOSLOG351.EXE\n').encode('ascii')))
         res9x_out = root / "zig-out/windows-usos-res/9x"
         res9x = build_usos_res(root, res9x_out, win9x=True)
         collector = build_vbe_collector(root, res9x_out)

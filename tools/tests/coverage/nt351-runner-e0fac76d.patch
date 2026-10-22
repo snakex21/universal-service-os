@@ -1,0 +1,128 @@
+--- a/tools/tests/coverage/boot_menu.py
++++ b/tools/tests/coverage/boot_menu.py
+@@ -23,6 +23,10 @@
+ spec = importlib.util.spec_from_file_location('usability_aux', Path(__file__).with_name('usability_aux.py'))
+ aux = importlib.util.module_from_spec(spec)
+ spec.loader.exec_module(aux)
++spec = importlib.util.spec_from_file_location('nt351_own', Path(__file__).with_name('collect_nt351_success.py'))
++nt351_own = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_own)
++spec = importlib.util.spec_from_file_location('nt351_capture', Path(__file__).with_name('nt351_capture.py'))
++nt351_capture = importlib.util.module_from_spec(spec); spec.loader.exec_module(nt351_capture)
+ 
+ 
+ class Qmp:
+@@ -215,6 +219,14 @@
+     metadata = json.loads((work/'fixture.json').read_text(encoding='utf-8'))
+     aux.validate_failure_collection(getattr(args,'collect_nt4_failure',False),metadata,
+                                     getattr(args,'evidence_assets',None),fixture.COLLECTION)
++    collect_nt351=getattr(args,'collect_nt351_success',False)
++    capture_nt351=getattr(args,'capture_nt351_network',False)
++    if capture_nt351 and (not collect_nt351 or args.nic!='igb'):
++        raise ValueError('NT351 capture requires its own collector and the sole pinned igb')
++    if collect_nt351:
++        if args.evidence_assets is None:raise ValueError('NT351 collector needs explicit frozen assets')
++        nt351_own.validate(metadata,work,args.evidence_assets,args.out/'nt351-own-evidence',
++            fixture.COLLECTION,Path(__file__).resolve().parents[3],require_target=False)
+     if metadata['result']['result'] != 'PASS':
+         raise ValueError('Fixture preparation was not successful')
+     if args.auto_native and args.interactive:
+@@ -254,6 +266,14 @@
+         '-drive',f'if=none,id=stick,format=qcow2,file={(work/"stick.qcow2").as_posix()}',
+         '-device','qemu-xhci,id=xhci']
+     command += aux.network_arguments(getattr(args,'nic','none'))
++    network_capture=None
++    network_capture_result=None
++    if capture_nt351:
++        # The sole NIC and MAC are defined by network_arguments('igb').
++        expected=['-netdev','user,id=usabilitynet,hostname=usos-test',
++                  '-device','igb,netdev=usabilitynet,mac='+nt351_capture.MAC]
++        if aux.network_arguments('igb')!=expected:raise ValueError('Pinned capture NIC changed')
++        network_capture=nt351_capture.Capture(args.out/'network.pcap')
+     usb_disks=aux.create_sticks(work,args.qemu) if usb_test else []
+     for kind,path in zip(('boot','hot'),usb_disks):
+         command+=['-drive',f'if=none,id=usability{kind},format=qcow2,file={path.as_posix()}']
+@@ -276,7 +296,6 @@
+         command += ['-drive',f'if=none,id=evidencecd,format=raw,readonly=on,media=cdrom,file={(work/"observer.iso").as_posix()}']
+         controller='piix3-ide' if metadata.get('observer_ide') else 'ich9-ahci'
+         command += ['-device',controller+',id=evidencehba','-device','ide-cd,drive=evidencecd,bus=evidencehba.0']
+-    (args.out/'command.json').write_text(json.dumps(command,indent=2))
+     start = time.monotonic()
+     events = []
+     ui_count = 0
+@@ -295,8 +314,17 @@
+     nt5_started=False
+     env = dict(os.environ, TEMP=str(work), TMP=str(work), APPDATA=str(work), LOCALAPPDATA=str(work))
+     with (args.out/'stderr.log').open('wb') as errors, (args.out/'serial.log').open('w',encoding='utf-8') as log:
+-        process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
+-            stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
++        try:
++            if network_capture:
++                capture_port=await network_capture.start()
++                command+=nt351_capture.arguments(capture_port)
++            (args.out/'command.json').write_text(json.dumps(command,indent=2))
++            process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.PIPE,
++                stdout=asyncio.subprocess.PIPE, stderr=errors, env=env)
++        except BaseException:
++            if network_capture and network_capture.server:await network_capture.finish()
++            server.close();await server.wait_closed()
++            raise
+         (args.out/'pid.txt').write_text(str(process.pid))
+         async def consume():
+             nonlocal ui_count, last_screen, answer_row, product_failure, native_started, boot_usb_attached, nt5_synced, nt5_started
+@@ -383,6 +411,8 @@
+                             'bus':'xhci.0','drive':'usabilityboot','removable':True,'serial':'USOS-USB-BOOT-TEST'})
+                         events.append(dict(seconds=round(time.monotonic()-start,2),text='Own FAT16 test stick attached before first prepared-target boot'))
+                         boot_usb_attached=True
++                    if 'start the prepared disk' in line and network_capture:
++                        network_capture.mark_prepared_target()
+                     await qmp.key('ret')
+                     if 'start the prepared disk' in line:
+                         prepared.set()
+@@ -456,6 +486,9 @@
+                 qmp.writer.close()
+                 try: await qmp.writer.wait_closed()
+                 except (ConnectionResetError, OSError): pass
++    if network_capture:
++        try:network_capture_result=await network_capture.finish()
++        except Exception as error:network_capture_result={'error':type(error).__name__+': '+str(error),'installed_runtime_pass':False}
+     all_disks=[work/'stick.qcow2',target,*usb_disks]
+     sizes = {path.name:path.stat().st_size for path in all_disks}
+     allocated = {path.name:fixture.allocated_bytes(path) for path in all_disks}
+@@ -485,6 +518,17 @@
+     result['usb_pointer']=None if args.ps2_input else getattr(args,'usb_pointer','tablet')
+     result['allocated_disk_bytes'] = allocated
+     result['total_allocated_disk_bytes'] = sum(allocated.values())
++    result['network_capture']=network_capture_result
++    if collect_nt351:
++        # Only after outer QEMU ended, before this exact target is deleted.
++        # Fits the existing nested reservation; does not run alongside it.
++        try:
++            from types import SimpleNamespace
++            await nt351_own.main(SimpleNamespace(qemu=args.qemu,assets=args.evidence_assets,
++                fixture=work,out=args.out/'nt351-own-evidence'))
++            result['nt351_own_evidence']='nt351-own-evidence/collection.json'
++        except Exception as error:
++            result['nt351_own_evidence_error']=type(error).__name__+': '+str(error)
+     if product_failure and getattr(args,'collect_nt4_failure',False):
+         # Outer QEMU and its nested installer have ended. One read-only
+         # collector fits the already reserved nested lane; no extra live OS.
+@@ -533,6 +577,8 @@
+     parser.add_argument('--usb-only-input',action='store_true',help='Disable q35 i8042 so USB HID cannot be replaced by default PS/2 input')
+     parser.add_argument('--auto-native',action='store_true',help='Known language-auto + selected-image profile: Enter language, then real disk UI; requires endpoint review')
+     parser.add_argument('--nic',choices=('none','igb'),default='none',help='82576 is explicitly supported by usosnet; user-mode networking only')
++    parser.add_argument('--collect-nt351-success',action='store_true',help='Read-only five own NT351 files plus installed own-driver hash before cleanup; never runtime PASS')
++    parser.add_argument('--capture-nt351-network',action='store_true',help='Passive 8 MiB-capped localhost mirror of sole pinned igb; needs keyless NT351 collector')
+     parser.add_argument('--collect-nt4-failure',action='store_true',help='Read-only inner Setup evidence before cleanup; exact allowlisted keyless NT3/NT4 cases only')
+     parser.add_argument('--collect-nt4-text',action='store_true',help='Read-only sanitized NT4 Setup text logs; no native screenshots or answers')
+     parser.add_argument('--evidence-assets',type=Path,help='Explicit frozen cache for the one post-failure collector')
+--- a/tools/tests/coverage/run_plan.py
++++ b/tools/tests/coverage/run_plan.py
+@@ -191,6 +191,8 @@
+             if case.get('usability_usb'):boot+=['--usability-usb']
+             if case.get('collect_nt4_failure'):boot+=['--collect-nt4-failure','--evidence-assets',str(args.assets)]
+             if case.get('collect_nt4_text'):boot+=['--collect-nt4-text','--evidence-assets',str(args.assets)]
++            if case.get('collect_nt351_success'):boot+=['--collect-nt351-success','--evidence-assets',str(args.assets)]
++            if case.get('capture_nt351_network'):boot+=['--capture-nt351-network']
+             with (logdir/(tag+'.log')).open('w',encoding='utf-8') as log:
+                 subprocess.run(prepare,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
+                 subprocess.run(boot,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)

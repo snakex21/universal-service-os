@@ -1,0 +1,26 @@
+[
+  {
+    "tag": "nt351-client-auto-fresh01",
+    "source": "C:\\Users\\ASRock\\Desktop\\Universal_Service_OS\\OS\\Windows\\Windows NT 3.51\\Windows NT 3.51 Workstation 3.51.1057.1 EN.7z",
+    "source_sha256": "24adda13744589cacebf6a75e21bf8999465b5637235ce55b0cf3a7578aa7975",
+    "member": "Microsoft Windows NT 3.51 Workstation (3.51.1057.1)\\en_winnt_3.51.wks.iso",
+    "member_sha256": "b9d0e8417c1f502d1de22c249401b593be2a7fe59524b27a624dfa8dedaa099c",
+    "folder": "Windows NT 3.51",
+    "system": "windows-nt-3-51",
+    "target_gib": 4,
+    "target_bus": "ahci",
+    "seconds": 10800,
+    "boot_seconds": 300,
+    "ps2_input": true,
+    "usb_pointer": "mouse",
+    "nic": "igb",
+    "usability_usb": false,
+    "interactive": true,
+    "collect_nt4_failure": true,
+    "collect_nt351_success": true,
+    "capture_nt351_network": true,
+    "usb_only_input": false,
+    "expected_own_driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+    "expected_logger_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7"
+  }
+]

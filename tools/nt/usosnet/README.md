@@ -1,5 +1,10 @@
 # usosnet - USOS own Ethernet driver (NDIS 5.0 / 4.0 miniport)
 
+Experimental NT3.51 has a separate usosnet351.sys build and source flag.
+It uses proven original NDIS3.0/0x3C registration, IRQ plus a slow NDIS-owned
+CheckForHang fallback, and has no installed-Windows network PASS yet.
+See [exact evidence and NT351 staging](../../../docs/nt351-network-port-audit-2026-10-21.md).
+
 Copyright (C) 2026 Maksymilian and the USOS Authors, GPL-3.0-or-later.
 Design: `docs/usosnet-design-2026-10-18.md`.
 

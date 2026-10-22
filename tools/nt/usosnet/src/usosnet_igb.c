@@ -42,6 +42,9 @@
 #define MDIC        0x0020
 #define RCTL        0x0100
 #define TCTL        0x0400
+/* Canonical legacy interrupt registers, shared by 82576/I210/I211.
+ * The 0x1500 block is not an alias for these in QEMU's 82576 model.
+ * See Intel igb e1000_regs.h; extended EIM* remains in the 0x15xx block. */
 #define ICR         0x00C0
 #define IMS         0x00D0
 #define IMC         0x00D8

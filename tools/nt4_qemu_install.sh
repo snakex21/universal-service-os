@@ -355,6 +355,14 @@ nt4_vm_install() {
             W9X_VM_TICK_FN=''
             return 2
         fi
+        if [ -n "$nt3" ] && [ -z "$nt31" ]; then
+            . "${USOS_LIB_DIR:-/usr/lib/usos}/nt351_network_setup.sh"
+            if ! usos_nt351_vm_patch "$target"; then
+                printf 'run %s: NT351 original LAN INF contract/readback failed\n' "$boot" >> "$logs/runs.txt"
+                W9X_VM_TICK_FN=''
+                return 2
+            fi
+        fi
         # NT 3.1 Advanced Server: GUI Setup stops first at Domain Settings
         # (3.1 has no unattended form of it, QEMU 2026-10-10): controller of
         # the new domain USOSDOMAIN (NT31_DOMAIN_KEYS), then the Date/Time
@@ -467,6 +475,11 @@ nt4_vm_finish() {
     for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG VERSION.TXT DRIVERS.TXT SETUP.LOG DONE.TXT SOURCE.TXT; do
         src=$(nt4_ci_path "$c" "USOS/$sub/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
+    if [ "$sub" = NT3 ]; then
+        for file in NET351.ON NET351.STATUS USOSNET351.SHA256; do
+            src=$(nt4_ci_path "$c" "USOS/NT3/$file") && cp "$src" "$logs/$file" 2>/dev/null
+        done
+    fi
     status=0
     reason=''
     [ "$sub" = NT4 ] || reason='NT 3.x;'

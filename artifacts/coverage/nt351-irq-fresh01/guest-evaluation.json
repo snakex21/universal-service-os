@@ -1,0 +1,123 @@
+{
+  "case": "nt351-irq-fresh01",
+  "scope": "Exact QEMU NT351 Workstation EN only; no Server/physical/SMP/full release claim",
+  "fresh_normal_usos_install": true,
+  "new_blank_target_at_start": true,
+  "standalone_target_no_backing": true,
+  "fresh_install_desktop": "PASS",
+  "fresh_corrected_irq_lan": "PASS",
+  "client_no_sharing_policy": "FAIL",
+  "native_input_route": "PS/2, same R22 allowance; no USB replug/MSC retest",
+  "driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_bytes": 17024,
+  "driver_verified_by_independent_readbacks": 2,
+  "initrd_sha256": "2540baab9efb257396fc21d58a3572f9a774bf2212593ea37ad25e61c4a8d820",
+  "newc_changed_entries": 2,
+  "newc_unchanged_entries": 830,
+  "old_frozen_cache_unchanged_after_runtime": true,
+  "other_new_cache_files_identical_after_runtime": true,
+  "outer_qemu_argv_identical_after_case_path_and_local_port_normalization": true,
+  "native_dhcp_release_renew": true,
+  "address": "10.0.2.15",
+  "mask": "255.255.255.0",
+  "gateway": "10.0.2.2",
+  "dns": "10.0.2.3",
+  "native_ping_replies": 3,
+  "native_ping_rtt_upper_bound_ms": 10,
+  "strict_guest_icmp_rtt_ms": 0,
+  "strict_guest_dns": [
+    [
+      "UDP DNS 1.1.1.1 (fixed): reply after 40 ms from 1.1.1.1:53: 46 bytes ",
+      " id=951D question=frogfind.com A=64.227.13.248"
+    ],
+    [
+      "UDP DNS 8.8.8.8 (fixed): reply after 51 ms from 8.8.8.8:53: 46 bytes ",
+      " id=9C4C question=frogfind.com A=64.227.13.248"
+    ],
+    [
+      "TCP DNS 1.1.1.1:53: connected in 20 ms, reply: 46 bytes ",
+      " id=FA1D question=frogfind.com A=64.227.13.248"
+    ]
+  ],
+  "native_resolution": true,
+  "http_68k": "HTTP/1.1 200 OK",
+  "http_connect_ms": 130,
+  "strict_same_xid_dora": false,
+  "correlated_lease_exchanges_two_xids": 2,
+  "native_running_services": [
+    "Computer Browser",
+    "DHCP Client",
+    "EventLog",
+    "Messenger",
+    "OLE",
+    "Server",
+    "Spooler",
+    "TCP/IP NetBIOS Helper",
+    "Workstation"
+  ],
+  "stopped_service_policy": {
+    "selected": {
+      "current": 1,
+      "default": 1
+    },
+    "services": {
+      "1": {
+        "Browser": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanServer": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanWorkstation": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "Tcpip": {
+          "present": true,
+          "start": 3,
+          "type": 1
+        }
+      }
+    }
+  },
+  "policy_modified_this_case": false,
+  "retained_failures": [
+    "Frogfind HTTP connect timeout4005ms",
+    "Gateway UDP53 no reply3000ms",
+    "Gateway TCP80 connect timeout4006ms",
+    "Historical R22 about2s replies and R25 absent canonical IMS/IRQ remain failures"
+  ],
+  "desktop_image_sha256": "7fc7b0f8fb2d4a8f7fa03e23c2f85efcefb800cc3828feaab7a8e087228903e2",
+  "native_ping_image": "operator-09.png",
+  "native_services_image": "operator-10.png",
+  "native_dhcp_image": "operator-11.png",
+  "safe_shutdown_image": "operator-16.png",
+  "native_safe_shutdown": true,
+  "qemu_returncode": 0,
+  "process_returncode": 0,
+  "target_sha256": "cb9d664615260a2e6b3c8e618be19b9cf785696019f41753b1461d3754b1196c",
+  "retained_images": {
+    "stick-retained.qcow2": {
+      "bytes": 512557056,
+      "sha256": "43bf5b2bd4829d6ad009f6c0a63b0c2ac115b1ebc3b98af9d0f229ce96eb1379"
+    },
+    "target-retained.qcow2": {
+      "bytes": 204865536,
+      "sha256": "cb9d664615260a2e6b3c8e618be19b9cf785696019f41753b1461d3754b1196c"
+    },
+    "vars-retained.fd": {
+      "bytes": 540672,
+      "sha256": "c47156ab8bba0fd8f0ce8de10ce2170ed0613c97cee0f41e3e5024b7e4b13740"
+    }
+  },
+  "retained_image_bytes": 717963264,
+  "no_ms_binary_or_hive_export": true,
+  "no_physical_writes": true,
+  "no_progress_polling": true,
+  "qualification": "Fresh normal installation and native fast LAN with f579; Client/noSharing still fails separately"
+}

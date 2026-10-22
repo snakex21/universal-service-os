@@ -1,0 +1,29 @@
+{
+  "binary_sha256": "615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b",
+  "binary_bytes": 30208,
+  "subsystem": [
+    3,
+    10
+  ],
+  "imports": 50,
+  "missing": [],
+  "modules": {
+    "kernel32.dll": {
+      "sha256": "78c9331410cdbfa3ecc9fae20a89f919580824a218bb4c05b734b53192f9f21e",
+      "bytes": 336624,
+      "exports": 631
+    },
+    "advapi32.dll": {
+      "sha256": "691d044ad2a155c61b68340ca5c6564543d03e1b7e5bd80f6dccb5eaccfff143",
+      "bytes": 177920,
+      "exports": 301
+    }
+  },
+  "target": "G:\\USOS-Kolekcja\\_vm\\nt351-irq-fresh01\\target-retained.qcow2",
+  "target_sha256": "cb9d664615260a2e6b3c8e618be19b9cf785696019f41753b1461d3754b1196c",
+  "target_unchanged": true,
+  "ms_modules_ram_only": true,
+  "standalone_ms_exports": false,
+  "runtime_pass": false,
+  "scratch_whole_disk_removed": true
+}

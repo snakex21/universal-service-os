@@ -117,6 +117,36 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     return w.buffered();
 }
 
+/// System-bound LAN request. The detected original 3.51 media is checked
+/// again by micro-Linux before it enables its own NDIS3 build and TCP/IP.
+pub fn renderForSystem(p: *const Profile, system_id: []const u8, buffer: []u8) ![]const u8 {
+    const base = try render(p, buffer);
+    if (!std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51") and
+        !std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51-server")) return base;
+    var tail: std.Io.Writer = .fixed(buffer[base.len..]);
+    try tail.print(";USOS-NT351-NETWORK={s}\r\n", .{@tagName(p.network)});
+    var group: [15]u8 = undefined;
+    try tail.print(";USOS-NT351-WORKGROUP={s}\r\n", .{netbiosName(if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &group)});
+    try @import("network_defaults.zig").metadata(p, false, &tail);
+    return buffer[0 .. base.len + tail.buffered().len];
+}
+
+test "NT351 LAN is system-bound and respects network off" {
+    var p = Profile{};
+    var buffer: [4096]u8 = undefined;
+    const on = try renderForSystem(&p, "windows-nt-3-51", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, on, ";USOS-NT351-NETWORK=on\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, on, ";USOS-IP=dhcp\r\n") != null);
+    p.network = .off;
+    const off = try renderForSystem(&p, "windows-nt-3-51-server", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, off, ";USOS-NT351-NETWORK=off\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, off, ";USOS-NETWORK=on") == null);
+    for ([_][]const u8{ "windows-nt-3-5", "windows-nt-3-1", "windows-nt-4" }) |id| {
+        const other = try renderForSystem(&p, id, &buffer);
+        try std.testing.expect(std.mem.indexOf(u8, other, "USOS-NT351-NETWORK") == null);
+    }
+}
+
 test "NT 3.51 / 3.5 ids" {
     try std.testing.expect(isNt3("windows-nt-3-51") and isNt3("Windows-NT-3-51-Server"));
     try std.testing.expect(isNt3("windows-nt-3-5") and isNt3("windows-nt-3-5-server"));
