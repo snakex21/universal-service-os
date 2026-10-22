@@ -357,3 +357,46 @@ helper5120B`ae531c0f159232a9e338c5b92e41d740d2777ed1bb8f4ec5e2115b2ff5b23848`.
 Build13 has not run in Windows. Other OS binaries/shared backend remain
 unchanged. A following test must use a new overlay of stopped R24, preserving
 the completed failure rather than reinstalling the OS.
+
+### Demand-loader contract and R24b
+
+Root measured the original NT31 media kernel, SHA256
+`7848c8e6dc7348ff1cb121b9f638fd9d0a5b5b0bc19c94ad618d9d6cd766dbaf`,
+image base80100000. At RVA772E4 it reads IMAGE_NT_HEADERS+3C
+(FileAlignment),772E7 tests mask1FF and772EE returns C000007B when nonzero.
+The following77300–7730C checks a power of two and7731A requires
+SectionAlignment>=FileAlignment. Evidence is the completed metadata
+`macierz-windows/artifacts/coverage/nt31-loader-review-r24.json`.
+R24's128-byte file alignment fails this measured demand-loader contract.
+Its comparison with a boot-start USB driver did not establish compatibility
+with the later kernel loader. The installed UP kernel is a distinct hash;
+R24b execution remains the final check of this correction in that guest.
+
+Only the NT31 `sources` file now sets DRIVER_ALIGNMENT=0x1000. Build14
+has FileAlignment0x200, SectionAlignment0x1000 and PE3.10. Its16384B SHA256
+is`08ac4bb5a384629ba047926ff7867a10b01d485f38811bf47410b919d7ed310b`.
+The helper5120B SHA256 is
+`ab05aa9c414f3136039d065eaabbf611ecbdec5df5e989815d4d9657d397d7e3`.
+Preflight now explicitly enforces the measured file-alignment checks,
+section alignment and actual section RVAs, alongside52 native policy cases,
+17 original cleanup contracts and10 compiled callbacks. Existing other OS
+binaries and shared backend remain byte-identical.
+
+`prepare_nt31_fullmac_retry.py --build artifacts/nt31-fullmac-build/build14`
+creates only a new R24b overlay, not another installation. It verifies all
+43 SYS and14 helper imports against the actual stopped installation,
+preserves SYSTEM/USB/classes/NDIS/TCPIP/STREAMS/kernel/HAL bytes and changes
+only three copies of the own SYS, the own helper and own command script.
+R24 logs move only within the new guest overlay to USOS/NET31/R24BASE, so
+stale output cannot be mistaken for a new test. The original R24 is unchanged.
+A pyfatfs1.1 wb-growth failure removed its raw and left no started VM; the
+completed fix recreates only the exact allowlisted own files and verifies
+them independently. No failed preparation is called a Windows result.
+
+Manifest `artifacts/nt31-fullmac-runtime/r24b-preparation.json` pins the new
+overlay SHA256
+`1a8ae8b03336a666bb70cc190ae558c23006aa9b7292d47ad25a3fb40a907b94`.
+The fixed `boot_nt31_fullmac_retry.py` adapter uses the same one-guard runner,
+firmware, CPU, memory, USB isolation and explicit igb BDF; it retains its
+overlay and uses a passive300-second endpoint. At startup R24b has no LAN
+PASS. Original TCP/IP and its configured static addressing are reused.

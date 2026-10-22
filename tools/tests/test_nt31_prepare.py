@@ -5,6 +5,14 @@ import unittest
 s=importlib.util.spec_from_file_location('nt31_prepare',Path(__file__).with_name('prepare_nt31_fullmac.py'))
 p=importlib.util.module_from_spec(s);s.loader.exec_module(p)
 class SourcePolicy(unittest.TestCase):
+    def test_actual_nt31_command_compatibility(self):
+        text=p.native_commands()
+        self.assertNotIn(b'IPCONFIG',text.upper())
+        self.assertNotIn(b'/WAIT',text.upper())
+        self.assertNotIn(b' -w ',text)
+        self.assertIn(b'ping -n 3 10.0.2.2',text)
+        self.assertIn(b'cd \\USOS\\NET31',text)
+        self.assertIn(b'NATIVE_COMMANDS_ISSUED',text)
     def test_original_empty_extensions(self):
         self.assertEqual(p.source_path('i386/disk1.'),'N31SRC/DISK1')
         self.assertEqual(p.source_path('i386/setupldr.'),'N31SRC/SETUPLDR')

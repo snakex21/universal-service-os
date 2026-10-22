@@ -8,6 +8,7 @@ WORK=Path(r'G:\USOS-Kolekcja\_vm\r24-nt31-intel-fullmac')
 RUNTIME=ROOT/'artifacts/nt31-fullmac-runtime'
 VM=RUNTIME/'vm/r24-nt31-intel-fullmac'
 OUT=RUNTIME/'r24-stopped-readback-02'
+PREPARATION=RUNTIME/'r24-preparation.json'
 LOGS=('CFG31.LOG','POST.LOG','NET31.LOG','SVC31.LOG','PING31.LOG')
 def load(name,path):
     s=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
@@ -29,7 +30,7 @@ def scalar(v):
     raise ValueError('Unbounded or unexpected selected registry value')
 def main():
     if OUT.exists():raise FileExistsError('Completed readback must not be overwritten')
-    prep=json.loads((RUNTIME/'r24-preparation.json').read_text(encoding='utf-8'))
+    prep=json.loads(PREPARATION.read_text(encoding='utf-8'))
     done=json.loads((VM/'completed.json').read_text(encoding='utf-8'))
     result=json.loads((VM/'result.json').read_text(encoding='utf-8'))
     fixture=json.loads((WORK/'fixture.json').read_text(encoding='utf-8'))

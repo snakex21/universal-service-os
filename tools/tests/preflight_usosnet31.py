@@ -24,6 +24,11 @@ def check(build):
     assert measured['protected_binaries_unchanged'] and measured['temporary_iso_removed']
     pe=pefile.PE(data=raw);oh=pe.OPTIONAL_HEADER
     assert (oh.MajorOperatingSystemVersion,oh.MinorOperatingSystemVersion,oh.MajorSubsystemVersion,oh.MinorSubsystemVersion)==(3,10,3,10)
+    # Original NT31 demand-loader772E4 rejects FileAlignment&0x1ff, then
+    # requires a power of two and SectionAlignment>=FileAlignment.
+    assert oh.FileAlignment>=0x200 and oh.FileAlignment&0x1ff==0 and oh.FileAlignment&(oh.FileAlignment-1)==0
+    assert oh.SectionAlignment==0x1000 and oh.SectionAlignment>=oh.FileAlignment
+    assert all(section.VirtualAddress%0x1000==0 for section in pe.sections)
     imports={d.dll.decode().lower():[i.name.decode() for i in d.imports] for d in pe.DIRECTORY_ENTRY_IMPORT}
     assert set(imports)=={'ndis.sys','hal.dll','ntoskrnl.exe'}
     for dll,names in imports.items():assert set(names)<=set(measured['modules'][dll]['exports_rva']),dll
