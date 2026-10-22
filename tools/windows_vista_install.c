@@ -43,7 +43,7 @@ static BOOL have_selected_esp;
 static BOOL csmwrap;
 static BOOL csm_target_nvme;
 static DWORD csm_signature,csm_disk=0xffffffff;
-static ULONGLONG csm_staging_start,csm_staging_sectors,csm_windows_start,csm_windows_sectors;
+static ULONGLONG csm_staging_start,csm_staging_sectors,csm_windows_start,csm_windows_sectors,csm_esp_start;
 /* The prepared Windows partition (slot 1, NTFS, before the staging partition)
  * as Windows numbers it: Setup gets InstallTo = this disk and partition, so it
  * shows no disk page (the disk was chosen once, in micro-Linux step 610). */
@@ -274,6 +274,7 @@ static BOOL load_csmwrap_target(void){
  DWORD v=0;for(int i=0;i<8;i++){char c=sig[i];if(c>='0'&&c<='9')v=v*16+(DWORD)(c-'0');else if((c|32)>='a'&&(c|32)<='f')v=v*16+(DWORD)((c|32)-'a'+10);else return FALSE;}
  csm_signature=v;csm_staging_start=parse_decimal(start);csm_staging_sectors=parse_decimal(count);
  csm_windows_start=parse_decimal(wstart);csm_windows_sectors=parse_decimal(wcount);
+ {const char *esp=ini_value(text,"esp_start");csm_esp_start=esp?parse_decimal(esp):0;}
  if(!csm_signature||!csm_staging_start||!csm_staging_sectors||!csm_windows_start||!csm_windows_sectors)return FALSE;
  logcode("CSMWrap: target disk signature=",csm_signature);logcode("CSMWrap: staging partition start LBA (low)=",(DWORD)csm_staging_start);
  return TRUE;
@@ -880,6 +881,7 @@ static void copy(WCHAR *p,const WCHAR *q){lstrcpyW(p,q);}
 static int say(const char *p){logcode(p,0);return 1;}
 static int same_file(const WCHAR *p,const WCHAR *q){BYTE x[32],y[32];return hash_file(p,x)&&hash_file(q,y)&&same(x,y,32);}
 #include "windows7_uefi_publish.h"
+#include "windows_csmwrap_hide.h"
 static BOOL install_int10_dispatcher(const WCHAR *esp,const WCHAR *loader){
  static WCHAR flag[MAX_PATH],original[MAX_PATH];
  path(flag,base,L"usos-int10-dispatcher.flag");
@@ -1034,6 +1036,16 @@ void entry(void){
  /* PE10 runs from RAM: the staging partition is not needed any more unless
   * Setup made it the system partition. Not fatal. */
  if(csmwrap&&!system_is_staging&&!staging_entry(STAGING_REMOVE))logcode("CSMWrap: staging partition kept (not fatal)=",1);
+ /* CSMWrap: no drive letter for the CSMWrap ESP (MBR type 0xEF) in the
+  * installed Vista; NT 6 gave it one on the first boot (windows_csmwrap_hide.h,
+  * docs/csmwrap-esp-letter-2026-10-22.md). Not fatal. */
+ if(csmwrap){
+  if(!csm_esp_start)logcode("CSMWrap: esp_start missing; the CSMWrap ESP may get a drive letter (not fatal)=",1);
+  else{WCHAR hive[MAX_PATH];DWORD letters=0;path(hive,target->root,L"Windows\\System32\\config\\SYSTEM");
+   DWORD r=usos_hide_esp_letter(hive,csm_signature,csm_esp_start,&letters);
+   logcode("CSMWrap: ESP drive letters removed from the target MountedDevices=",letters);
+   logcode("CSMWrap: ESP no-drive-letter entry (0 written, 1 present, 100+ error; not fatal)=",r);}
+ }
  logcode("Vista target ready for first boot with USB v11=",0);
  retire_prepared_disk(L".done");
  CloseHandle(log_file);path(scratch,base,L"usos-vista-install.log");WCHAR target_log[MAX_PATH];path(target_log,target->root,L"USOS\\Vista\\installation-from-usb.log");
