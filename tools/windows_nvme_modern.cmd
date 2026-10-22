@@ -1,6 +1,6 @@
 @echo off
 setlocal
-rem Opt-in 8.1/10 x86 only. All writes are to Setup's already selected image.
+rem Opt-in 8 RTM / 8.1 / 10 x86 only. All writes are to Setup's already selected image.
 set "T=%~1"
 call :supported_nt "%~2" "%~3"
 if errorlevel 1 exit /b 1
@@ -48,11 +48,14 @@ echo [USOS] Modern NVMe: recovery configuration failed; restart refused.
 exit /b 1
 
 rem ntoskrnl's fixed version can report 6.2 even for build 9600/19041.
-rem Match the build as well; do not admit Windows 8 or Windows 11.
+rem Match the build as well; admit Windows 8 RTM (6.2.9200, no inbox NVMe)
+rem and 8.1 / 10, not Vista / 7 or Windows 11.
 :supported_nt
 if "%~1"=="6.3" if "%~2"=="9600" exit /b 0
 if not "%~1"=="6.2" if not "%~1"=="10.0" exit /b 1
 if "%~1"=="6.2" if "%~2"=="9600" exit /b 0
+rem Windows 8 RTM: NT 6.2 build 9200, the only 6.2 media USOS accepts.
+if "%~1"=="6.2" if "%~2"=="9200" exit /b 0
 if "%~2"=="" exit /b 1
 for /f "delims=0123456789" %%B in ("%~2") do exit /b 1
 if %~2 LSS 10240 exit /b 1

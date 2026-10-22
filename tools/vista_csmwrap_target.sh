@@ -20,7 +20,7 @@
 # staging partition's active flag before Setup (so Vista puts its boot files on
 # its own partition) and removes the staging partition after a good install.
 #
-# X86_SELF=1 (profile win-x86-uefi-csmwrap: 32-bit Windows 8.1 / 10, section
+# X86_SELF=1 (profile win-x86-uefi-csmwrap: 32-bit Windows 8 / 8.1 / 10, section
 # 11 of the design doc): VISTA_DONOR_ISO is the selected Windows ISO itself
 # (its own x86 WinPE has USB 3, AHCI and NVMe); bootmgr comes from the ISO
 # root; the same layout, the staging partition is "USOS-SETUP" with
@@ -78,7 +78,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-# Pre-write NVMe package checks: USOS_PE_NVME=usosnvme-modern (8.1 / 10 x86)
+# Pre-write NVMe package checks: USOS_PE_NVME=usosnvme-modern (8 / 8.1 / 10 x86)
 # here, the Vista / 2008 x64 amd64 package below.
 modern_nvme=0
 if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then

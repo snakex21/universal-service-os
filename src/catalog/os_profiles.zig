@@ -94,6 +94,13 @@ pub const SystemTraits = struct {
     /// for a system without its own: XP x64 and Server 2003 (NT 5.2) show
     /// the XP icon, as the routed Servers show their client release's.
     icon_as: ?[]const u8 = null,
+    /// 32-bit media of this system on 64-bit UEFI without a firmware CSM
+    /// take win-x86-uefi-csmwrap (the ISO's own WinPE, or the x86 PE10 donor
+    /// on NVMe), although its routing stays non-native: Windows 8 RTM (6.2,
+    /// build 9200). Its x64 media keep the WORK copy on UEFI and BIOS (the
+    /// native x64 start was never run with PE 4.0; Server 2012, routed as
+    /// Windows 8, has no x86 media and is unchanged).
+    x86_csmwrap: bool = false,
 };
 
 pub const traits_table = [_]SystemTraits{
@@ -109,7 +116,10 @@ pub const traits_table = [_]SystemTraits{
     // 10/11 (the ISO's own WinPE, ESP guard and finalizer); Server 2012 R2
     // and Embedded 8.1 Industry follow it. BIOS keeps the WORK copy
     // (profile win81-bios-chainload); Windows 8 / Server 2012 keep it on both.
+    // Windows 8 RTM: only its 32-bit media without CSM take the x86 CSMWrap
+    // path (x86_csmwrap; manual_images.x86Csmwrap).
     .{ .system_id = "windows-8-1", .native_uefi = .modern },
+    .{ .system_id = "windows-8", .x86_csmwrap = true },
     // Windows Server (src/catalog/windows_server.zig): the client release
     // with the same Setup. 2016-2025: the Windows 10/11 native UEFI start and
     // the Windows 10 BIOS Core start; 2012 R2 / 2012: Windows 8.1 / 8;
@@ -592,6 +602,9 @@ test "Windows 10/11 and 7/Vista native UEFI profiles" {
     try std.testing.expectEqualStrings("win81-bios-chainload", select(systems.findById("windows-8-1").?, .iso, .automatic, .bios).?.id);
     try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-server-2012-r2").?, .iso, .automatic, .uefi).?.id);
     try std.testing.expectEqualStrings("iso-work-chainload", select(systems.findById("windows-8").?, .iso, .automatic, .uefi).?.id);
+    // Windows 8: x86 CSMWrap only for its 32-bit media, the routing unchanged;
+    // Server 2012 (route_as windows-8) takes the trait but has no x86 media.
+    try std.testing.expect(traits("windows-8").x86_csmwrap and !traits("windows-8-1").x86_csmwrap and !traits("windows-10").x86_csmwrap);
     if (native_windows7_enabled) {
         try std.testing.expectEqualStrings("win10-11-uefi-native", select(systems.findById("windows-embedded-8-1-industry").?, .iso, .automatic, .uefi).?.id);
         try std.testing.expectEqualStrings("windows-8-1", iconId("windows-embedded-8-1-industry"));

@@ -14,7 +14,7 @@
 # VistaCsmwrapStage, tools/micro_linux_ui.sh); /dev/console is the serial
 # port (vista_preparation.formatCommand), every tool writes to prepare.log.
 #
-# profile=win-x86-uefi-csmwrap in request.ini (32-bit Windows 8.1 / 10,
+# profile=win-x86-uefi-csmwrap in request.ini (32-bit Windows 8 / 8.1 / 10,
 # design doc section 11): no donor (donor= is the Windows ISO itself), the
 # target script runs with X86_SELF=1 and prepares the Windows partition too.
 
@@ -52,23 +52,27 @@ vista_request_directory() {
     printf '%s\n' "${request_parent%/*}"
 }
 
-# 32-bit Windows 8.1 / Embedded 8.1 / 10 on NVMe (polled usosnvme "modern"
-# package): default on since the X470 Micron 3400 PASS 2026-10-22 (Embedded
-# 8.1 Industry Pro x86 and Windows 10 22H2 x86, docs/nvme-nt6-2026-10-12.md
-# section 18). No nvme-experimental.txt needed; an empty nvme-off.txt in the
-# folder's Unattended turns it off (the old stop on the picker). Scoped by
-# profile: never opens the x64 profile (vista_nvme64_enabled above).
+# 32-bit Windows 8 / 8.1 / Embedded 8.1 / 10 on NVMe (polled usosnvme
+# "modern" package): default on since the X470 Micron 3400 PASS 2026-10-22
+# (Embedded 8.1 Industry Pro x86 and Windows 10 22H2 x86,
+# docs/nvme-nt6-2026-10-12.md section 18). Windows 8 RTM (NT 6.2, build 9200)
+# has no inbox stornvme either, so it takes the same package (32-bit Windows
+# does not enforce kernel signatures; unchecked on media, no Windows 8 ISO).
+# No nvme-experimental.txt needed; an empty nvme-off.txt in the folder's
+# Unattended turns it off (the old stop on the picker). Scoped by profile:
+# never opens the x64 profile (vista_nvme64_enabled above).
 vista_modern_nvme_enabled() {
     [ "$1" = win-x86-uefi-csmwrap ] || return 1
-    case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
+    case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry'|'Windows 8') ;; *) return 1 ;; esac
     [ ! -f "$2/${4:-Systems/Windows/$3}/Unattended/nvme-off.txt" ]
 }
 
-# External PE10 donor: only 8.1 / Embedded 8.1 with the NVMe route on (the
-# UEFI menu picks it automatically; Setup from 8.1's own PE stalls at 0% on
-# NVMe). A SATA target keeps 8.1's own PE (see the disk gate below).
+# External PE10 donor: only Windows 8 / 8.1 / Embedded 8.1 with the NVMe
+# route on (the UEFI menu picks it automatically; Setup from 8's or 8.1's own
+# PE stalls at 0% on NVMe and carries no usosnvme package). A SATA target
+# keeps the ISO's own PE (see the disk gate below).
 vista_modern_external_donor_enabled() {
-    case "$3" in 'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
+    case "$3" in 'Windows 8.1'|'Windows Embedded 8.1 Industry'|'Windows 8') ;; *) return 1 ;; esac
     vista_modern_nvme_enabled "$@"
 }
 
@@ -137,7 +141,7 @@ usos_vista_csmwrap_prepare() {
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     [ -f "/mnt/data/$donor" ] || stop "the PE10 donor is not on DATA: $donor"
     if [ "$profile" = win-x86-uefi-csmwrap ] && [ "$donor" != "$iso" ]; then
-        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop 'request.ini: external x86 PE10 is only for Windows 8.1 / Embedded 8.1 with the NVMe route on'
+        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop 'request.ini: external x86 PE10 is only for Windows 8 / 8.1 / Embedded 8.1 with the NVMe route on'
     fi
 
     answer_xml=''
@@ -230,11 +234,11 @@ usos_vista_csmwrap_prepare() {
                     vista_csmwrap_log "NVME $folder x86: usosnvme in the WinPE and the installed system, WinPE lowmem"
                     pe_nvme=usosnvme ;;
                 win-x86-uefi-csmwrap)
-                    case "$folder" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;;
+                    case "$folder" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry'|'Windows 8') ;;
                         *) stop "32-bit $NT5_NAME on NVMe is not supported yet on this path. No disk was changed." ;;
                     esac
                     vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop "NVMe for 32-bit $NT5_NAME is turned off (nvme-off.txt in Unattended on DATA). Pick a SATA disk. No disk was changed."
-                    case "$folder" in 'Windows 8.1'|'Windows Embedded 8.1 Industry')
+                    case "$folder" in 'Windows 8.1'|'Windows Embedded 8.1 Industry'|'Windows 8')
                         [ "$donor" != "$iso" ] || stop "32-bit $NT5_NAME on NVMe needs the WinPE x86 helper or a Windows 10 x86 Setup ISO on DATA. Pick a SATA disk. No disk was changed." ;;
                     esac
                     pe_nvme=usosnvme-modern
