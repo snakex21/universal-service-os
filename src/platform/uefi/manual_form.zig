@@ -114,7 +114,13 @@ pub const Outcome = union(enum) {
     y_on: usize,
 };
 
-const max_fields = 40;
+/// Rows one form can hold. The profile editor of Windows 10 / 11 has about
+/// 70 (every typed option of answer.options plus the general rows); its
+/// own bound is checked against this one at compile time
+/// (profile_editor.max_fields). More rows than this used to be written past
+/// `items` / `value_text` in ReleaseFast and corrupt the neighbouring
+/// globals (X470 B261022-203217: garbage help title, freeze on Enter).
+pub const max_fields = 128;
 
 var items: [max_fields]gui.form.Item = undefined;
 var value_text: [max_fields][80]u8 = undefined;
@@ -313,8 +319,10 @@ fn wheelTarget(fields: []const Field, current: usize, notches: i32) usize {
 
 /// Runs the form until an action button, Back, or X/Y. `selected` is kept
 /// across calls (the owner reopens the form after a confirmation).
-pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hooks, selected: *usize) Outcome {
-    std.debug.assert(fields.len <= max_fields and fields.len > 0);
+pub fn run(title: []const u8, subtitle: []const u8, all_fields: []Field, hooks: ?Hooks, selected: *usize) Outcome {
+    std.debug.assert(all_fields.len <= max_fields and all_fields.len > 0);
+    // Never index past items / value_text (ReleaseFast drops the assert).
+    const fields = all_fields[0..@min(all_fields.len, max_fields)];
     form_fields = fields;
     form_hooks = hooks;
     editing = null;

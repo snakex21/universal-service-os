@@ -189,6 +189,10 @@ const org_chars = form.cleanAscii(true);
 const password_chars = form.cleanAscii(false);
 
 const max_fields = @typeInfo(F).@"enum".fields.len + options.count;
+comptime {
+    // Every row the editor can add must fit the form (manual_form.items).
+    if (max_fields > form.max_fields) @compileError("profile editor rows exceed manual_form.max_fields");
+}
 var fields_storage: [max_fields]form.Field = undefined;
 var field_ids: [max_fields]F = undefined;
 /// For an F.option row: its index in answer.options.table.
@@ -779,4 +783,34 @@ pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u
             },
         }
     }
+}
+
+test "every system's profile editor fits the form; labels and help titles are valid UTF-8" {
+    const systems = usos.catalog.systems.all;
+    var widest: usize = 0;
+    for (systems) |entry| {
+        system_id = entry.id;
+        system_name = entry.name;
+        edition_images = null;
+        previous_stem = null;
+        base = defaults("pl");
+        load(&base);
+        setOptions();
+        // Also with a sized display (adds the colour depth row on 9x / NT).
+        for ([_]usize{ 0, 2 }) |display| {
+            display_index = @min(display, display_option_count - 1);
+            buildFields();
+            widest = @max(widest, field_count);
+            try std.testing.expect(field_count <= form.max_fields);
+            for (fields_storage[0..field_count], 0..) |field, i| {
+                try std.testing.expect(std.unicode.utf8ValidateSlice(field.label));
+                if (field.kind == .section) continue;
+                const help = hookHelp(&dummy_context, i);
+                try std.testing.expect(help.title.ptr == field.label.ptr);
+                for (help.lines) |line| try std.testing.expect(std.unicode.utf8ValidateSlice(line));
+            }
+        }
+    }
+    // Windows 10 / 11 have more rows than the old limit of 40.
+    try std.testing.expect(widest > 40);
 }
