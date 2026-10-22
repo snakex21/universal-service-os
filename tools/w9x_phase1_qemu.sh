@@ -405,7 +405,7 @@ w9x_phase1_fsck() {
 # RTM Setup can leave a WINDOWS95 root label and a blank FAT16 BPB label.
 # Normalize only that known pair with fatlabel; the strict fsck still follows.
 w9x_phase1_label95() {
-    [ -n "${W9X_VM_KEY:-}" ] || return 0
+    [ "${3:-}" = 95 ] || return 0
     w95_label_dev=$1 w95_label_log=$2
     w95_label_before=$W9X_VM_RUN/label-boot.before
     w95_label_expected=$W9X_VM_RUN/label-boot.expected
@@ -454,7 +454,7 @@ w9x_phase1_verify() {
     blockdev --flushbufs "$target" 2>/dev/null || true
     loop=$(losetup -f) || return 1
     losetup -o 1048576 "$loop" "$target" || return 1
-    if ! w9x_phase1_label95 "$loop" "$logs/fsck.txt"; then
+    if ! w9x_phase1_label95 "$loop" "$logs/fsck.txt" "${3:-}"; then
         losetup -d "$loop" 2>/dev/null || true
         echo 'Windows 95 FAT16 label normalization failed (fsck.txt)'
         return 1

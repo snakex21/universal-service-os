@@ -24,8 +24,8 @@ if [ "${FAKE_EXTRA_BYTE:-0}" = 1 ]; then printf X | dd of="$1" bs=1 seek=90 conv
     def invoke(self,body=None,**extra):
         posix=self.bin.as_posix();posix='/'+posix[0].lower()+posix[2:] if posix[1:2]==':' else posix
         script=f'. "{(ROOT/"tools/w9x_phase1_qemu.sh").as_posix()}"\nPATH="{posix}:$PATH"\nsync() {{ :; }}\n'
-        script+=body or 'w9x_phase1_label95 "$PARTITION" "$LABEL_LOG"; echo rc=$?'
-        env=dict(os.environ,W9X_VM_KEY='synthetic95scope',W9X_VM_RUN=self.run.as_posix(),
+        script+=body or 'w9x_phase1_label95 "$PARTITION" "$LABEL_LOG" "$FAKE_RELEASE"; echo rc=$?'
+        env=dict(os.environ,W9X_VM_KEY='',FAKE_RELEASE='95',W9X_VM_RUN=self.run.as_posix(),
             PARTITION=self.disk.as_posix(),LABEL_LOG=(self.folder/'label.log').as_posix(),
             FAKE_LABEL_CALLS=self.calls.as_posix(),TEMP=str(self.folder),TMP=str(self.folder))
         env.update(extra)
@@ -35,8 +35,10 @@ if [ "${FAKE_EXTRA_BYTE:-0}" = 1 ]; then printf X | dd of="$1" bs=1 seek=90 conv
         expected=bytearray(before);expected[43:54]=b'WINDOWS95  '
         self.assertEqual(self.disk.read_bytes(),expected);self.assertEqual(self.calls.read_text().splitlines(),['write:WINDOWS95'])
     def test_non_windows95_is_unchanged(self):
-        before=self.disk.read_bytes();r=self.invoke(W9X_VM_KEY='')
-        self.assertIn('rc=0',r.stdout);self.assertEqual(self.disk.read_bytes(),before);self.assertFalse(self.calls.exists())
+        before=self.disk.read_bytes()
+        for release in ('','98'):
+            r=self.invoke(FAKE_RELEASE=release,W9X_VM_KEY='synthetic-nonempty-context')
+            self.assertIn('rc=0',r.stdout);self.assertEqual(self.disk.read_bytes(),before);self.assertFalse(self.calls.exists())
     def test_fat32_is_unchanged(self):
         data=bytearray(self.disk.read_bytes());data[54:62]=b'FAT32   ';self.disk.write_bytes(data)
         r=self.invoke();self.assertIn('rc=0',r.stdout);self.assertEqual(self.disk.read_bytes(),data);self.assertFalse(self.calls.exists())
@@ -66,7 +68,7 @@ if [ "${FAKE_EXTRA_BYTE:-0}" = 1 ]; then printf X | dd of="$1" bs=1 seek=90 conv
 blockdev() { :; }
 losetup() { if [ "$1" = -f ]; then echo "$PARTITION"; fi; return 0; }
 mount() { echo FORBIDDEN_MOUNT; return 1; }
-w9x_phase1_verify /dev/fake "$W9X_VM_RUN/logs"; echo rc=$?
+w9x_phase1_verify /dev/fake "$W9X_VM_RUN/logs" "$FAKE_RELEASE"; echo rc=$?
 '''
         r=self.invoke(body)
         self.assertIn('rc=1',r.stdout,r.stderr);self.assertIn('fsck.fat found errors',r.stdout)

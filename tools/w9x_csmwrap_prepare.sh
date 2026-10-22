@@ -663,7 +663,7 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "PHASE1 vm rc=$vm_rc elapsed=${W9X_VM_ELAPSED:-?}s"
         w9x_phase1_keep_logs "$W9X_LOG/phase1"
         usos_ui_stage 5 5 'Checking the result of stage 1' '' || true
-        if [ "$vm_rc" != 0 ] || ! vm_check=$(w9x_phase1_verify "$TARGET_DEVICE" "$W9X_LOG/phase1"); then
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(w9x_phase1_verify "$TARGET_DEVICE" "$W9X_LOG/phase1" "$tag"); then
             w9x_csmwrap_log "PHASE1 FAILED rc=$vm_rc ${vm_check:-}"
             umount /mnt/data 2>/dev/null || true
             sync
