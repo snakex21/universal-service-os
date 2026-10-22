@@ -2,11 +2,33 @@
 # Experimental XP (and Server 2003 x86 SP2: the same bundle format, built by
 # tools/xp_driver_overlay.py on the system's own StorPort/ACPI). Source
 # preflight runs BEFORE the disk-reset dialog.
+
+# Service level of the Setup source (RTM, SP1, SP2, SP3, unknown) from the disc
+# root markers, the same markers Setup itself checks. RTM, SP1 and SP2 share the
+# 5.1.2600 setup build, so only these files tell them apart.
+usos_xp_media_service_pack() {
+    sp_root=${1:-}
+    for sp_marker in WIN51IP.SP3 WIN51IP.SP2 WIN51IP.SP1; do
+        sp_lower=$(printf '%s' "$sp_marker" | tr 'A-Z' 'a-z')
+        for sp_name in "$sp_marker" "$sp_lower"; do
+            [ -f "$sp_root/$sp_name" ] || continue
+            printf '%s\n' "${sp_marker#WIN51IP.}"
+            return 0
+        done
+    done
+    # An XP disc without a service-pack marker is the RTM build.
+    if [ -f "$sp_root/WIN51IP" ] || [ -f "$sp_root/win51ip" ]; then
+        printf 'RTM\n'
+        return 0
+    fi
+    printf 'unknown\n'
+}
+
 usos_xp_driver_preflight() {
     if [ "${NT5_SYSTEM:-windows-xp}" = windows-server-2003 ]; then
         ls "$SOURCE_ROOT"/WIN51I?.SP2 >/dev/null 2>&1 || { echo '[XP_DRIVERS] STOP: this driver set requires Windows Server 2003 SP2'; return 1; }
     else
-    [ -f "$SOURCE_ROOT/WIN51IP.SP3" ] || { echo '[XP_DRIVERS] STOP: this driver set requires XP Professional SP3'; return 1; }
+    [ -f "$SOURCE_ROOT/WIN51IP.SP3" ] || { printf '[XP_DRIVERS] STOP: this driver set requires XP Professional SP3 (media: %s)\n' "$(usos_xp_media_service_pack "$SOURCE_ROOT")"; return 1; }
     fi
     XP_DRIVER_BUNDLE=''
     for bundle in /usr/lib/usos/xp-drivers/*; do

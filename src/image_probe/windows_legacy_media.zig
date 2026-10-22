@@ -4,6 +4,47 @@ const std = @import("std");
 const media = @import("windows_media.zig");
 const release = @import("windows_release.zig");
 
+/// Root markers of an XP x86 Setup source, most specific first. Setup itself
+/// refuses a disc whose marker does not match its own service level, and RTM,
+/// SP1 and SP2 share the 5.1.2600 setup build, so the marker -- not the setup
+/// executable's file version -- names the service level.
+pub const sp_markers = [_][]const u8{ "WIN51IP.SP3", "WIN51IP.SP2", "WIN51IP.SP1" };
+/// Every XP disc carries this one; the `.SPn` markers are added per service pack.
+pub const rtm_marker = "WIN51IP";
+
+/// XP x86 service level. The requirements change with it: EHCI (SP1+), 48-bit
+/// LBA above 137 GB (SP1+), the HAL/ACPI choice (RTM differs) and the SP3-only
+/// driver bundle of profile xp-x86-sp3-uefi-csm (tools/xp_driver_stage.sh).
+pub const ServicePack = enum {
+    /// Only the RTM marker: the disc predates SP1.
+    none,
+    sp1,
+    sp2,
+    sp3,
+    /// No XP marker at all: another product, or an incomplete disc.
+    unknown,
+
+    pub fn label(self: ServicePack) []const u8 {
+        return switch (self) {
+            .none => "RTM",
+            .sp1 => "SP1",
+            .sp2 => "SP2",
+            .sp3 => "SP3",
+            .unknown => "unknown",
+        };
+    }
+};
+
+/// Service level of an XP x86 disc from its root markers. `exists` does the
+/// case-insensitive lookup (pressed media store them upper case, hand-built
+/// copies and unpacked folders often lower case).
+pub fn servicePack(context: anytype, comptime exists: fn (@TypeOf(context), []const u8) bool) ServicePack {
+    for (sp_markers, [_]ServicePack{ .sp3, .sp2, .sp1 }) |marker, sp| {
+        if (exists(context, marker)) return sp;
+    }
+    return if (exists(context, rtm_marker)) .none else .unknown;
+}
+
 pub const Source = struct {
     txtsetup: []const u8 = "",
     dosnet: []const u8 = "",
@@ -15,6 +56,9 @@ pub const Source = struct {
     posready_wim: bool = false,
     media_center: bool = false,
     tablet_pc: bool = false,
+    /// Supplied by the caller from servicePack(): the probe reads only the
+    /// SIF/INF text and cannot see the disc root.
+    service_pack: ?ServicePack = null,
 };
 
 pub const Info = struct {
@@ -28,6 +72,8 @@ pub const Info = struct {
     home: bool = false,
     media_center: bool = false,
     tablet_pc: bool = false,
+    /// XP x86 service level (ServicePack); null when the caller did not look.
+    service_pack: ?ServicePack = null,
     /// The Setup's SIF describes its WinPE, not the OS in Setup/WIM.
     pe_installer: bool = false,
     system_id: ?[]const u8 = null,
@@ -58,7 +104,7 @@ fn number(text: []const u8, key: []const u8) ?u32 {
 }
 
 pub fn inspect(source: Source) Info {
-    var info = Info{ .arch = source.setup_arch, .version = source.setup_version, .media_center = source.media_center, .tablet_pc = source.tablet_pc };
+    var info = Info{ .arch = source.setup_arch, .version = source.setup_version, .media_center = source.media_center, .tablet_pc = source.tablet_pc, .service_pack = source.service_pack };
     if (iniValue(source.txtsetup, "SetupData", "Architecture")) |arch| {
         if (std.ascii.eqlIgnoreCase(arch, "i386")) info.arch = .x86;
         if (std.ascii.eqlIgnoreCase(arch, "amd64")) info.arch = .x64;
@@ -198,4 +244,33 @@ test "DriverVer identifies NT5 betas without PE resources or filename guesses" {
         var b: [128]u8 = undefined;
         try std.testing.expect(driverVersion(try std.fmt.bufPrint(&b, "[Version]\nDriverVer=07/01/2001,{s}\n", .{bad})) == null);
     }
+}
+
+test "XP service level comes from the disc root markers, not the setup build" {
+    const Disc = struct {
+        present: []const []const u8,
+        fn exists(self: @This(), path: []const u8) bool {
+            for (self.present) |p| if (std.ascii.eqlIgnoreCase(p, path)) return true;
+            return false;
+        }
+    };
+    // RTM carries only the base marker; the SPn markers are cumulative.
+    const rtm = Disc{ .present = &.{ "WIN51", "WIN51IP" } };
+    try std.testing.expectEqual(ServicePack.none, servicePack(rtm, Disc.exists));
+    try std.testing.expectEqualStrings("RTM", ServicePack.none.label());
+    const sp1 = Disc{ .present = &.{ "WIN51", "WIN51IP", "WIN51IP.SP1" } };
+    try std.testing.expectEqual(ServicePack.sp1, servicePack(sp1, Disc.exists));
+    const sp2 = Disc{ .present = &.{ "WIN51IP", "WIN51IP.SP1", "WIN51IP.SP2" } };
+    try std.testing.expectEqual(ServicePack.sp2, servicePack(sp2, Disc.exists));
+    const sp3 = Disc{ .present = &.{ "WIN51IP", "WIN51IP.SP1", "WIN51IP.SP2", "WIN51IP.SP3" } };
+    try std.testing.expectEqual(ServicePack.sp3, servicePack(sp3, Disc.exists));
+    try std.testing.expectEqualStrings("SP3", ServicePack.sp3.label());
+    // A hand-built copy with lower-case names is still identified.
+    try std.testing.expectEqual(ServicePack.sp2, servicePack(Disc{ .present = &.{"win51ip.sp2"} }, Disc.exists));
+    // Not an XP x86 disc (or an incomplete copy): no conclusion.
+    try std.testing.expectEqual(ServicePack.unknown, servicePack(Disc{ .present = &.{} }, Disc.exists));
+    try std.testing.expectEqualStrings("unknown", ServicePack.unknown.label());
+    // inspect() carries the caller's level through; text alone has no marker.
+    try std.testing.expectEqual(ServicePack.sp2, inspect(.{ .service_pack = .sp2 }).service_pack.?);
+    try std.testing.expect(inspect(.{}).service_pack == null);
 }
