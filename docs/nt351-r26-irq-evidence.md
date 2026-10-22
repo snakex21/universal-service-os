@@ -19,7 +19,16 @@ This independently qualifies the installed driver fix, with9 relevant
 host checks. Fresh R22 uses the olderf39 driver and retains its measured
 approximately2s latency. No cache/physical deployment, new USB-only or
 MSC test, other OS or X470 qualification is inferred. The same fix is
-under a separate NT35 test. All historical failures remain.
+qualified separately for NT35 [S9]. All historical failures remain.
+
+R27 now separately confirms USB keyboard/mouse out/in with this f579
+candidate: absent-keyboard negative control, menu action after insertion,
+live keyboard while mouse absent, and mouse movement plus menu click after
+insertion. Native safeShutdown/operator17, rc0 and actual installed f579
+readback pass. Inherited i8042prt remains Start4; no driver/hive change
+from R26. This is an installed cold-boot regression, not fresh Setup or MSC.
+Assessment: `nt351-irq/artifacts/nt351-irq-r27/evaluation.json`;
+full note: `nt351-irq/docs/nt351-r27-usb-regression.md`.
 
 Full source, primary register references and evidence are in
 nt351-irq/docs/nt351-canonical-irq-registers.md and

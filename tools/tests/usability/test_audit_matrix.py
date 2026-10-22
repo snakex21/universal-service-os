@@ -68,10 +68,14 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('full-MAC',net)
         self.assertNotIn('PASS',usb+net)
 
-    def test_nt31_completed_hid_does_not_qualify_storage_or_intel(self):
+    def test_nt31_fullmac_result_keeps_storage_and_fresh_install_limits(self):
         exact=list(audit.NT31_R19C_ROW)
         usb,net=audit.capability(exact)
-        self.assertNotIn('PASS',usb+net)
+        self.assertNotIn('PASS',usb)
+        self.assertIn('QEMU PASS R24c',net)
+        self.assertIn('DHCP nie dotyczy',net)
+        self.assertIn('UP',net)
+        self.assertIn('bez fresh auto networkflow',net)
         self.assertIn('QEMU PASS R19c',audit.hid_test(usb,exact))
         self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
 

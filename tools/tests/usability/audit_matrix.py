@@ -61,7 +61,9 @@ def capability(row):
         if nt351_r18f(row):
             net='QEMU PASS R22: świeży normalny USOS, usosnet351 NDIS 3 + igb 8086:10C9, DHCP renew, ping3/3, ścisłe DNS, HTTP68k.news200 [S7]; dawny SYS około2s. R26 z osobną poprawką IRQ: ping3/3<10ms, DNS/HTTP PASS [S8], bez wdrożenia do cache. R18f [S4] pozostaje osobnym diagnostycznym USB/HID'
         elif nt35_r20(row):
-            net='QEMU PASS R20: usosnet35 NDIS 3 + igb 8086:10C9, DHCP, ping bramy, ścisłe DNS, HTTP68k.news200; świeży USOS [S6]; około2s, pierwszy ping2/3 i warm3/3, ograniczenia zachowane'
+            net='QEMU PASS R20: usosnet35 NDIS 3 + igb 8086:10C9, DHCP, ping bramy, ścisłe DNS, HTTP68k.news200; świeży USOS [S6]; około2s, pierwszy ping2/3 i warm3/3, historia zachowana. Osobny installed IRQ candidate d94: ping3/3<10ms, DHCP/DNS/HTTP PASS [S9]; bez nowego cache/fresh Setup'
+        elif nt31_r19c(row):
+            net='QEMU PASS R24c: usosnet31 full-MAC, UP + igb 8086:10C9/BDF00:05.0; statyczny TCP/IP, DHCP nie dotyczy; dwa ping3/3, strict DNS30ms, native DNS i HTTP68k200 [S10]. Ręczna integracja NCPA na zachowanej instalacji, bez fresh auto networkflow'
         elif 'windows-nt-3-1' in r:
             net='brak portu Intel: wymagany full-MAC, nie miniport NDIS 3; stock NT3.1 ma statyczny TCP/IP, DHCP nie dotyczy; LAN nie zmierzono'
         elif 'windows-nt-3-51' in r:
@@ -121,9 +123,9 @@ def hid_test(usb,row=None):
     if row and nt31_r19c(row):
         return 'QEMU PASS R19c: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje File; sprzęt i8042 obecny, i8042prt Start4 [S5]; osobny overlay po świeżym USOS, nie konfiguracja domyślna instalatora'
     if row and nt35_r20(row):
-        return 'QEMU PASS R20b: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run/File; i8042 obecny, i8042prt Start4, stopped readback [S6]; osobny overlay po świeżym R20'
+        return 'QEMU PASS R20b: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run/File [S6]. Osobny nt35-irq-usb01 powtarza negative keyboard control, out/in i Filemenu click z SYS d94 [S9]; i8042 obecny, i8042prt Start4, stopped readback; osobne overlay po świeżym R20'
     if row and nt351_r18f(row):
-        return 'QEMU PASS R18f: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run; sprzęt i8042 obecny, i8042prt Start4 [S4]; nie konfiguracja domyślna instalatora'
+        return 'QEMU PASS R18f: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run [S4]. R27 powtarza out/in z poprawionym IRQ SYS f579, negative controls i kliknięciem File [S8]; sprzęt i8042 obecny, i8042prt Start4; osobny installed overlay, nie konfiguracja domyślna instalatora'
     if row and 'windows-7' in row[3] and '7601' in row[1] and 'pl-PL' in row[2] and 'x86' in row[2] and 'x64' not in row[2]:
         return 'X470 PASS rodziny Win7 SP1 PL x86: klawiatura i mysz out/in, tył i przód, usosusb 1.3-nt6 [S3]; brak powiązania z hashem tego ISO'
     return 'brak pomiaru: odpięcie i ponowne podłączenie klawiatury oraz myszy; wejście na pulpicie T4 / T5'
@@ -143,18 +145,20 @@ def main(args):
         '[S6] `docs/nt35-r20-usability-evidence.md`: świeży NT3.5 Workstation R20 doszedł do pulpitu i przeszedł LAN; osobny R20b izoluje USB przy i8042prt Start4. Pierwszy ping2/3 i opóźnienia około2s pozostają ograniczeniami; R20b logger1s ICMP FAIL zachowany. Bez MSC i bez przenoszenia wyniku na Server.','',
         '[S7] `docs/nt351-r22-fresh-usability-evidence.md`: świeży normalny USOS R22, pulpit Workstation3.51 build1057, native DHCP renew, ping3/3, ścisłe DNS i HTTP68k200. PS/2 dozwolone; bez nowego USB PASS. Native safeShutdown i rc0. Około2s latencji pozostaje wadą.','',
         '[S8] `docs/nt351-r26-irq-evidence.md`: osobny installed overlay R26 zmienia tylko własny SYS/4offsety IRQ. Native ping3/3<10ms, ICMP0ms, ścisły DNS60/40ms i HTTP200. Trace65IMS/32INTx/31PICIRQ11; nativeShutdown/rc0 i stoppedreadback. Nie jest świeżym instalatorem z nowymSYS ani testem X470.','',
-        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 nie doszedł do logowania; diagnoza działa na osobnych overlay. Wcześniejsza awaria stagingu nie jest wynikiem Windows ani MSC.','',
+        '[S9] `docs/nt35-irq-qualified-evidence.md`: osobny installed NT35 IRQ candidate d94, DHCPrenew, ping3/3<10ms, strict DNS/HTTP200, nativeShutdown/rc0 i actualSYSreadback. R20 pozostaje świeżym instalatorem z dawnym wolnymSYS. R27 w [S8] potwierdza HID po poprawce NT351; bez MSC/X470.','',
+        '[S10] `docs/nt31-r24c-network-evidence.md`: rzeczywisty own full-MAC b49, statyczny TCP/IP, native ping/DNS/HTTP i stopped readback. R24/error193 i R24b/STOP zachowane. UP i jawny BDF, manual NCPA; bez DHCP/fresh auto networkflow/X470.','',
+        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 nie doszedł do logowania; po poprawieniu placeholdera IP trwa świeży candidate03. Bez desktop/MSC/LAN PASS do faktycznego wyniku.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
     for row in entries:
         usb,net=capability(row)
         tests='nie zlecać teraz: brak ścieżki / poza zakresem' if 'nie dotyczy' in usb or 'osobna ścieżka' in usb or 'NT3 po 1.0' in usb else 'T1 / T2 / T3 / T4 / T5 po gotowym QEMU i cichym loggerze'
         if nt351_r18f(row):tests='T3 / T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0'
-        if nt31_r19c(row):tests='T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0, Intel LAN brak'
-        if nt35_r20(row):tests='T3 / T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0, latencja LAN do poprawy'
+        if nt31_r19c(row):tests='T3 / T4 / T5 po integracji/przeglądzie zgodnej konfiguracji; statyczne IP [S10], MSC po 1.0'
+        if nt35_r20(row):tests='T3 / T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0; poprawka IRQ [S9] wymaga integracji/przeglądu'
         out.append('| '+' | '.join([*row[:4],usb,net,hid_test(usb,row),tests])+' |')
     out+=['','## Ograniczenia i kolejność','',
-        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9). Candidate02 nie ukończył Setup; USB MSC i HID wymagają osobnych dowodów, bez przenoszenia wyników NT351.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: [S7] potwierdza świeży Workstation R22 i LAN; [S4] osobny diagnostyczny USB/HID. Bez MSC. Fallback sieci około2s pozostaje istotnym ograniczeniem. Inne nośniki i Server wymagają osobnych testów.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
+        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9). Candidate02 nie ukończył Setup; USB MSC i HID wymagają osobnych dowodów, bez przenoszenia wyników NT351.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: [S7] potwierdza świeży Workstation R22 i LAN; [S4] osobny diagnostyczny USB/HID. Bez MSC. Dawne około2s opóźnienie zachowano jako historię; installed candidate [S8] je usuwa i przechodzi osobną regresję HID R27. Inne nośniki i Server wymagają osobnych testów.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
     out+=['## Pytania sprzętowe — odpowiedzi tylko tak/nie','',
         '- T1: Czy po uruchomieniu systemu widać pendrive i można otworzyć jego START.TXT bez propozycji formatowania?',
         '- T2: Czy po dopięciu drugiego pendrive na pulpicie widać go i można otworzyć HOTPLUG.TXT bez restartu, konsoli i AutoPlay?',
