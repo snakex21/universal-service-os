@@ -64,7 +64,17 @@ class X86VistaOobeGate(unittest.TestCase):
         self.assertNotIn(b'WM_SETUP_GATE_DESKTOP', x64)
 
     def test_cmd_arms_gate_for_nt60_sp2_only(self):
-        self.assertIn('call :usb3\ncall :nt60_gate\n', CMD)
+        # Order after a successful setup: USB 3 package, the Windows 8+ Fast
+        # Startup opt-out (96e9b7b2, a no-op on Vista / 7 that never fails the
+        # install), then the NT 6.0 OOBE gate and the usosusb fallback.
+        usb3 = CMD.index('\ncall :usb3\n')
+        gate_call = CMD.index('\ncall :nt60_gate\n')
+        usb_call = CMD.index('\ncall :nt60_usb\n')
+        self.assertLess(usb3, gate_call)
+        self.assertLess(gate_call, usb_call)
+        between = CMD[usb3:gate_call]
+        self.assertNotIn('exit /b', between)
+        self.assertNotIn('goto', between)
         gate = CMD.split('\n:nt60_gate\n', 1)[1].split('\n:nt60_usb\n', 1)[0]
         self.assertIn('if not "%USOS_NT%"=="6.0" exit /b 0', gate)
         self.assertIn('if not "%USOS_BUILD%"=="6002"', gate)

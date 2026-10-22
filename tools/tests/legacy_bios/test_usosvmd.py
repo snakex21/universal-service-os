@@ -688,6 +688,9 @@ class UsosVmd(unittest.TestCase):
 
     # --- the companion driver changes --------------------------------------
     def test_usosmous_vmouse_mode_and_imports(self):
+        sys.path.insert(0, str(ROOT / 'tools/tests'))
+        import depguard
+        depguard.require_zig('kompilator Zig (USOSKEY TSR dla USOSMOUS)')
         work = self.work
         com = build_tsr(work, work)
         write_tsr_header(com, work / 'usoskey.elf', work)
