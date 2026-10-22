@@ -58,12 +58,13 @@ void UsCopy(void *D,const void *S,ULONG N) { UCHAR *d=D;const UCHAR *s=S;while(N
 BOOLEAN UsEqual(const void *A,const void *B,ULONG N) { const UCHAR *a=A,*b=B;while(N--)if(*a++!=*b++)return FALSE;return TRUE; }
 void UsStall(ULONG Us) { NdisStallExecution(Us); }
 static void Hex(ULONG v) { int n;for(n=28;n>=0;n-=4)__outbyte(0xe9,"0123456789ABCDEF"[(v>>n)&15]); }
-void UsLog(PADAPTER A,const char *Text,ULONG V1,ULONG V2)
+static void InitialTrace(const char *Text,ULONG V1,ULONG V2)
 {
-    if(!A || A->DebugPort!=0xe9)return;
     while(*Text)__outbyte(0xe9,(UCHAR)*Text++);
     __outbyte(0xe9,' ');Hex(V1);__outbyte(0xe9,' ');Hex(V2);__outbyte(0xe9,'\n');
 }
+void UsLog(PADAPTER A,const char *Text,ULONG V1,ULONG V2)
+{if(A && A->DebugPort==0xe9)InitialTrace(Text,V1,V2);}
 static void *Alloc(ULONG n)
 {
     PVOID p=NULL;NDIS_PHYSICAL_ADDRESS max;max.LowPart=0xffffffff;max.HighPart=0;
@@ -460,6 +461,7 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
 {
     U31_FULL *a;NDIS_HANDLE cfg=NULL;NDIS_STATUS st;U31_INFO info;USHORT command;
     UNREFERENCED_PARAMETER(macContext);
+    InitialTrace("US31 Add entry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1 || OnlyAdapter || KeGetCurrentIrql()!=PASSIVE_LEVEL)return NDIS_STATUS_NOT_SUPPORTED;
     a=Alloc(sizeof(*a));if(!a)return NDIS_STATUS_RESOURCES;
     a->Hw.Chip=&Chip;a->Hw.DebugPort=0xe9;
@@ -502,10 +504,14 @@ static VOID __stdcall Unload(NDIS_HANDLE context)
 NTSTATUS DriverEntry(PDRIVER_OBJECT driver,PUNICODE_STRING path)
 {
     U31_MAC chars;NDIS_STATUS st;NDIS_STRING name=NDIS_STRING_CONST("USOSNET31");
+    /* The explicitly owned UP/QEMU diagnostic candidate uses E9 before an
+     * adapter configuration exists, separating loader/registration failures. */
+    InitialTrace("US31 DriverEntry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1)return STATUS_NOT_SUPPORTED;
     UsZero(&chars,sizeof(chars));chars.Major=3;chars.Minor=0;chars.Open=Open;chars.Close=Close;chars.Send=Send;chars.Transfer=Transfer;
     chars.Reset=Reset;chars.Request=Request;chars.GlobalQuery=GlobalQuery;chars.Unload=Unload;chars.Add=Add;chars.Remove=Remove;chars.Name=name;
-    NdisInitializeWrapper(&Wrapper,driver,path,NULL);if(!Wrapper)return STATUS_INSUFFICIENT_RESOURCES;
+    NdisInitializeWrapper(&Wrapper,driver,path,NULL);InitialTrace("US31 wrapper",(ULONG)Wrapper,0);if(!Wrapper)return STATUS_INSUFFICIENT_RESOURCES;
     NdisRegisterMac(&st,&Mac,&Mac,Wrapper,&chars,sizeof(chars));
+    InitialTrace("US31 RegisterMac",st,(ULONG)Mac);
     if(st!=NDIS_STATUS_SUCCESS)NdisTerminateWrapper(Wrapper,NULL);return st;
 }

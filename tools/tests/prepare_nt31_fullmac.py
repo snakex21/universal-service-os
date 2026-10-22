@@ -133,7 +133,7 @@ def main():
                     if not filesystem.exists(p):add(p,b'')
             own={'USNET31.SYS':(BUILD/'usosnet31.sys').read_bytes(),'NET31CFG.EXE':(BUILD/'NET31CFG.EXE').read_bytes(),'USOSLOG.EXE':LOGGER.read_bytes(),
                 'NET31.ON':(TAG+'\r\n').encode('ascii'),
-                'TESTNET.CMD':b'@echo off\r\ncd /d C:\\USOS\\NET31\r\necho NT31_REAL_GUEST>POST.LOG\r\nver>>POST.LOG\r\nipconfig /all>>POST.LOG\r\nroute print>>POST.LOG\r\nping -n 3 -w 5000 10.0.2.2>>POST.LOG\r\nstart /wait USOSLOG.EXE /once /nohook /nodbg /nodisk /out C:\\USOS\\NET31\\NET31.LOG\r\necho NATIVE_TEST_DONE>>POST.LOG\r\ntype POST.LOG\r\n',
+                'TESTNET.CMD':b'@echo off\r\nc:\r\ncd \\USOS\\NET31\r\necho NT31_REAL_GUEST>POST.LOG\r\nver>>POST.LOG\r\nping -n 3 10.0.2.2>>POST.LOG\r\nUSOSLOG.EXE /once /nohook /nodbg /nodisk /out C:\\USOS\\NET31\\NET31.LOG\r\necho NATIVE_COMMANDS_ISSUED>>POST.LOG\r\ntype POST.LOG\r\n',
                 'README.TXT':b'Owned NT31 Intel test. Install adapter via NCPA Other C:\\N31OEM.\r\nUse C:\\N31SRC for original NT31 network files. Add original TCP/IP.\r\nSet IP10.0.2.15 mask255.255.255.0 gw10.0.2.2 DNS10.0.2.3.\r\nRun C:\\USOS\\NET31\\NET31CFG.EXE /configure before required reboot.\r\nAfter reboot run C:\\USOS\\NET31\\TESTNET.CMD. No DHCP in NT31.\r\n'}
             add('N31OEM/USNET31.SYS',own['USNET31.SYS'])
             for name,data in own.items():add('USOS/NET31/'+name,data)

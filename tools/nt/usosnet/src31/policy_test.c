@@ -1,5 +1,6 @@
 /* Native host execution of the exact pure policy used by the driver. */
 #include "u31_policy.h"
+#include "cfg31_policy.h"
 __declspec(dllimport) void __stdcall ExitProcess(unsigned long);
 #define CHECK(x) do { if(!(x))ExitProcess(__LINE__); } while(0)
 static int calls;
@@ -41,5 +42,19 @@ void __cdecl entry(void)
     CHECK(!U31NoteOpenIfReady(0,&calls,0,NoteMock,&calls));CHECK(calls==0);
     CHECK(!U31NoteOpenIfReady(1,&calls,1,NoteMock,&calls));CHECK(calls==0);
     CHECK(U31NoteOpenIfReady(0,&calls,1,NoteMock,&calls));CHECK(calls==1);
+    CHECK(U31OwnService("USOSNET31")==1);
+    CHECK(U31OwnService("usosnet31")==1);
+    CHECK(U31OwnService("USOSNET3101")==2);
+    CHECK(U31OwnService("usosnet3101")==2);
+    CHECK(U31OwnService("USOSNET311")==3);
+    CHECK(U31OwnService("USOSNET3102")==3);
+    CHECK(U31OwnService("USOSNET3101x")==3);
+    CHECK(U31OwnService("NDISLoop")==0);
+    CHECK(!U31OneOwnAdapter(0,0));
+    CHECK(!U31OneOwnAdapter(1,0));
+    CHECK(!U31OneOwnAdapter(0,1));
+    CHECK(U31OneOwnAdapter(1,1));
+    CHECK(!U31OneOwnAdapter(1,2));
+    CHECK(!U31OneOwnAdapter(2,1));
     ExitProcess(0);
 }

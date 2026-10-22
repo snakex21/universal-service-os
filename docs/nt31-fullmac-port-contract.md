@@ -307,3 +307,53 @@ false until actual guest echo/DNS evidence and stopped SYS readback exist.
 Host command-adapter and source-name tests passed6cases. The actual-C
 38policy/10callback/17original-cleanup preflight also passed. These results
 do not qualify installed NT31 LAN, reset support or X470 hardware.
+
+### R24 actual guest result: Intel LAN failed before working IP
+
+The original NCPA accepted our OEM adapter, installed original TCP/IP and
+created the real instance `USOSNET3101` (suffix01, not suffix1). The helper
+correctly refused its unexpected identity; that refusal remains evidence.
+Read-only native registry inspection and later stopped REGF1.1 readback
+confirmed exactly one own driver plus one instance, BusType5/BusNumber0,
+PciBus0/PciDevice5/PciFunction0, DebugPort233, Medium0 and static settings.
+The editor changed no value. Stock TCPIP.SYS now exists,125172B SHA256
+`a8b3bca004a3908dc0bb529d918936428c521b3ff374b010986ab9392b724bd0`.
+
+After the required native reboot the Program Manager returned, but the
+own service start failed with system error193: invalid Windows NT image
+(`operator-64.png`). Compatible `ping -n 3 10.0.2.2` failed to open the IP
+stream (`operator-65.png`). Direct USOSLOG execution worked and recorded
+Winsock10050/DNS11004; ICMP was skipped because its newer adapter discovery
+did not recognize NT31's original global gateway schema. **No LAN PASS.**
+The first staged script separately used unsupported ping-w and START/wait,
+and IPCONFIG is absent. Those failures remain in operator62/63 and POST.LOG;
+future script text removes those assumptions. A completion marker merely
+means commands were issued; it cannot qualify network replies.
+
+Native shutdown reached safe-to-turn-off (`operator-70.png`), then normal
+finish/QMP quit returned0. R24 elapsed3278.92s and retains its overlay
+SHA256`769e75a2f9f13ba35a9912bb658a55213c7ae756e3c9a45dfc3a0c02dce8ff17`.
+Stopped readback confirms the installed SYS is exactly build12's15104B,
+all43 import names exist, frozen USB is unchanged and i8042prt remains4.
+The6-frame bounded mirror does not imply working guest traffic. Base R19c
+was unchanged; no Microsoft module/hive was exported.
+
+Evidence: `artifacts/nt31-fullmac-runtime/r24-guest-evaluation.json`,
+`r24-native-install-observations.json`, and `r24-stopped-readback-02/`.
+The initial collector rejected a legitimate zero-byte redirected own log;
+its partial output/failure.json remains. The fixed collector permits empty
+selected text while preserving bounds/NUL/name checks (5host cases PASS).
+No VM rerun was needed for that collection repair.
+
+Code193 is still a concrete unresolved loader/entry failure, not an assumed
+PCI problem. R24 debug logging starts only at Add, so its empty E9 stream
+does not distinguish loader from earlier registration failure. Build13
+adds explicit DriverEntry/wrapper/RegisterMac/Add trace and corrects helper
+identity to the observed01, with14 actual-C identity/absence/ambiguity cases.
+All52 native policy cases,17 original cleanup contracts and10 compiled
+callbacks pass. SYS15360B SHA256
+`1d2451df303712354f5bdfcb2d2334dd743f3456564090e038b9cfedc941b8e1`,
+helper5120B`ae531c0f159232a9e338c5b92e41d740d2777ed1bb8f4ec5e2115b2ff5b23848`.
+Build13 has not run in Windows. Other OS binaries/shared backend remain
+unchanged. A following test must use a new overlay of stopped R24, preserving
+the completed failure rather than reinstalling the OS.

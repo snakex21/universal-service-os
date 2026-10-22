@@ -17,7 +17,7 @@ def check(build):
     build=build.resolve();manifest=json.loads((build/'build.json').read_text(encoding='utf-8'))
     binary=build/'usosnet31.sys';raw=binary.read_bytes()
     assert hashlib.sha256(raw).hexdigest()==manifest['sha256']
-    assert manifest['host_policy_pass'] and manifest['host_policy_cases']==38
+    assert manifest['host_policy_pass'] and manifest['host_policy_cases']==52 and manifest['helper_identity_cases']==14
     for rel,sha in manifest['source_sha256'].items():
         assert hashlib.sha256((ROOT/'tools/nt/usosnet'/rel).read_bytes()).hexdigest()==sha,rel
     measured=json.loads((ROOT/'artifacts/nt31-fullmac-contract/lifecycle-06.json').read_text(encoding='utf-8'))
@@ -39,7 +39,7 @@ def check(build):
     callbacks={'Open':36,'Close':4,'Send':8,'Transfer':24,'Reset':4,'Request':8,'GlobalQuery':8,'Unload':4,'Add':12,'Remove':4}
     assert {'_'+name+'@'+str(n) for name,n in callbacks.items()}<=compiled
     for path,sha in manifest['protected_binaries'].items():assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==sha,path
-    result=dict(scope='Host build/import/ABI/policy only; no Windows runtime PASS',binary_sha256=manifest['sha256'],imports={k:len(v) for k,v in imports.items()},original_cleanup_contracts=len(legacy),compiled_callbacks=len(callbacks),host_policy_cases=38,protected_binaries_unchanged=True,runtime_pass=False)
+    result=dict(scope='Host build/import/ABI/policy only; no Windows runtime PASS',binary_sha256=manifest['sha256'],imports={k:len(v) for k,v in imports.items()},original_cleanup_contracts=len(legacy),compiled_callbacks=len(callbacks),host_policy_cases=52,helper_identity_cases=14,protected_binaries_unchanged=True,runtime_pass=False)
     (build/'preflight.json').write_bytes((json.dumps(result,indent=2)+'\n').encode('utf-8'));return result
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('build',type=Path);a=p.parse_args();print(json.dumps(check(a.build),indent=2))

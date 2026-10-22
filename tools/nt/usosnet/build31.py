@@ -13,7 +13,7 @@ def main():
     protected={str(p):sha(p) for tree,leaf in [('nt351-net','usosnet4.sys'),('nt351-net','usosnet.sys'),('nt351-net','usosnet351.sys'),('nt35-net','usosnet35.sys')] for p in [ROOT.parent/tree/'tools/nt/usosnet/bin/i386'/leaf]}
     out.mkdir(parents=True);tmp=out/'tmp';tmp.mkdir();src=out/'src';src.mkdir()
     inputs={}
-    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','u31_policy.h','policy_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
+    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','u31_policy.h','cfg31_policy.h','policy_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
         for name in names:
             source=HERE/folder/name;shutil.copy(source,src/name);inputs[folder+'/'+name]=sha(source)
     # Own import library: public names/stdcall sizes, no MS code.
@@ -44,6 +44,6 @@ def main():
     helper=out/'NET31CFG.EXE'
     refused=subprocess.run([str(helper),'/configure'],env=env,capture_output=True,timeout=10)
     if refused.returncode!=3 or b'REFUSED_OS' not in (out/'CFG31.LOG').read_bytes():raise RuntimeError('Host configurator OS guard failed')
-    result=dict(scope='Experimental NT31 full-MAC 3.0 UP/QEMU 82576 only; no runtime PASS',binary=str(binary),sha256=sha(binary),size=binary.stat().st_size,source_sha256=inputs,protected_binaries=protected,protected_binaries_unchanged=True,host_policy_cases=38,host_policy_pass=True,helper_sha256=sha(helper),helper_size=helper.stat().st_size,helper_host_os_refusal_pass=True,runtime_pass=False)
+    result=dict(scope='Experimental NT31 full-MAC 3.0 UP/QEMU 82576 only; no runtime PASS',binary=str(binary),sha256=sha(binary),size=binary.stat().st_size,source_sha256=inputs,protected_binaries=protected,protected_binaries_unchanged=True,host_policy_cases=52,helper_identity_cases=14,host_policy_pass=True,helper_sha256=sha(helper),helper_size=helper.stat().st_size,helper_host_os_refusal_pass=True,runtime_pass=False)
     (out/'build.json').write_bytes((json.dumps(result,indent=2)+'\n').encode('utf-8'));print(json.dumps(result,indent=2))
 if __name__=='__main__':main()

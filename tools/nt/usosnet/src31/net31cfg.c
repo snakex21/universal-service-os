@@ -1,11 +1,11 @@
 /* Owned NT31 VM fixture configurator. Required OS service configuration only;
  * all application output stays beside this EXE. Never edits other services. */
 #include <windows.h>
+#include "cfg31_policy.h"
 void *__cdecl memcpy(void *d,const void *s,unsigned int n){volatile BYTE *to=d;const volatile BYTE *from=s;while(n--)*to++=*from++;return d;}
 static HANDLE logFile=INVALID_HANDLE_VALUE;
 static DWORD length(const char *s){DWORD n=0;while(s[n])n++;return n;}
 static int same(const char *a,const char *b){char x,y;do{x=*a++;y=*b++;if(x>='a'&&x<='z')x-=32;if(y>='a'&&y<='z')y-=32;if(x!=y)return 0;}while(x);return 1;}
-static int starts(const char *a,const char *b){char x,y;while(*b){x=*a++;y=*b++;if(x>='a'&&x<='z')x-=32;if(y>='a'&&y<='z')y-=32;if(x!=y)return 0;}return 1;}
 static void text(const char *s){DWORD n;if(logFile!=INVALID_HANDLE_VALUE)WriteFile(logFile,s,length(s),&n,NULL);}
 static void number(DWORD v){char b[9];int i;for(i=0;i<8;i++)b[i]="0123456789ABCDEF"[(v>>(28-i*4))&15];b[8]=0;text(b);}
 static void row(const char *s,DWORD v){text(s);text("=");number(v);text("\r\n");}
@@ -29,12 +29,13 @@ void __cdecl entry(void)
     for(i=0;i<4096;i++){
         bytes=sizeof(name);r=RegEnumKeyExA(services,i,name,&bytes,NULL,NULL,NULL,NULL);
         if(r==ERROR_NO_MORE_ITEMS)break;if(r!=ERROR_SUCCESS)goto refused;
-        if(!starts(name,"USOSNET31"))continue;
-        if(same(name,"USOSNET31"))roots++;else if(same(name,"USOSNET311"))instances++;else{ text("REFUSED_OTHER_OWN_INSTANCE\r\n");goto refused;}
+        switch(U31OwnService(name)){
+        case 0:break;case 1:roots++;break;case 2:instances++;break;
+        default:text("REFUSED_OTHER_OWN_INSTANCE\r\n");goto refused;}
     }
     row("own_driver_count",roots);row("own_adapter_count",instances);
-    if(i==4096 || roots!=1 || instances!=1){text("REFUSED_INSTANCE_SHAPE\r\n");goto refused;}
-    if(!existing(services,"USOSNET31",&driver) || !existing(services,"USOSNET311",&adapter) || !existing(adapter,"Parameters",&parameters))goto refused;
+    if(i==4096 || !U31OneOwnAdapter(roots,instances)){text("REFUSED_INSTANCE_SHAPE\r\n");goto refused;}
+    if(!existing(services,"USOSNET31",&driver) || !existing(services,"USOSNET3101",&adapter) || !existing(adapter,"Parameters",&parameters))goto refused;
     bytes=sizeof(image);kind=0;r=RegQueryValueExA(driver,"ImagePath",NULL,&kind,(BYTE *)image,&bytes);
     if(r || (kind!=REG_SZ&&kind!=REG_EXPAND_SZ) || !bytes || bytes>=sizeof(image) || image[bytes-1]!=0 ||
       (!same(image,"\\SystemRoot\\System32\\drivers\\USNET31.SYS")&&!same(image,"%SystemRoot%\\System32\\drivers\\USNET31.SYS"))){text("REFUSED_IMAGEPATH\r\n");goto refused;}
