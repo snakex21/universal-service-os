@@ -33,6 +33,7 @@ static ChangeMode change_mode;
 static HMODULE display_user;
 static DWORD display_flags;
 static int permission_failure;
+static unsigned test_count,test_failed;
 static const char run_key[] = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 #ifndef USOSRES_9X
 static SERVICE_STATUS service_status;
@@ -214,12 +215,47 @@ static long action_test(void *context,int index,const char *reason) {
     result=change_mode(&settings[index],CDS_TEST);
     lstrcpyA(line,"DISPLAY selected=");describe(&modes[index]);lstrcatA(line," reason=");
     if(result==DISP_CHANGE_NOTUPDATED)permission_failure=1;
+    test_count++; if(result==DISP_CHANGE_FAILED)test_failed++;
     lstrcatA(line,reason);lstrcatA(line," test=");signed_number(result);
     lstrcatA(line,"\r\n");say(line);return result;
 }
 static int action_backup(void *context) {(void)context;return save_current();}
 static long action_apply(void *context,int index) {(void)context;return usos_display_change(change_mode,&settings[index],display_flags);}
 static long action_rollback(void *context) {(void)context;return usos_display_change(change_mode,&current,display_flags);}
+#ifndef USOSRES_9X
+/* win32k refuses every mode change (CDS_TEST too: DISP_CHANGE_FAILED) from
+   a desktop that is not the input desktop. A first-sign-in Run value can
+   start while Winlogon still shows its screen (Win7 x86 X470 2026-10-22),
+   so wait until this thread's desktop takes input; OpenInputDesktop fails
+   for the user while the Winlogon desktop has it. Returns 1 ready, 0 not
+   ready after the timeout, -1 no API (old USER32: rule unchanged). */
+typedef HDESK (WINAPI *UsosOpenInput)(DWORD,BOOL,ACCESS_MASK);
+typedef HDESK (WINAPI *UsosThreadDesktop)(DWORD);
+typedef BOOL (WINAPI *UsosObjectInfo)(HANDLE,int,PVOID,DWORD,LPDWORD);
+typedef BOOL (WINAPI *UsosCloseDesktop)(HDESK);
+static int input_desktop_ready(HMODULE user,DWORD timeout_ms) {
+    UsosOpenInput open_input=(UsosOpenInput)GetProcAddress(user,"OpenInputDesktop");
+    UsosThreadDesktop thread_desktop=(UsosThreadDesktop)GetProcAddress(user,"GetThreadDesktop");
+    UsosObjectInfo info=(UsosObjectInfo)GetProcAddress(user,"GetUserObjectInformationA");
+    UsosCloseDesktop close_desktop=(UsosCloseDesktop)GetProcAddress(user,"CloseDesktop");
+    char own[64],input[64]; DWORD waited=0,got; HDESK mine,desk; BOOL named;
+    if(!open_input||!thread_desktop||!info||!close_desktop) return -1;
+    mine=thread_desktop(GetCurrentThreadId());
+    zero(own,sizeof own);
+    if(!mine||!info(mine,UOI_NAME,own,sizeof(own)-1,&got)) return -1;
+    for(;;) {
+        desk=open_input(0,FALSE,DESKTOP_READOBJECTS);
+        if(desk) {
+            zero(input,sizeof input);
+            named=info(desk,UOI_NAME,input,sizeof(input)-1,&got);
+            close_desktop(desk);
+            if(named&&!lstrcmpiA(own,input)) return 1;
+        }
+        if(waited>=timeout_ms) return 0;
+        Sleep(1000); waited+=1000;
+    }
+}
+#endif
 static int current_caps(DWORD *width,DWORD *height,DWORD *bpp) {
     HMODULE gdi=LoadLibraryA("gdi32.dll");HDC dc;int ok=0;
     HDC(WINAPI *get_dc)(HWND);int(WINAPI *release_dc)(HWND,HDC);int(WINAPI *caps)(HDC,int);
@@ -370,6 +406,12 @@ static void run(void) {
         CloseHandle(log_file); leave(0);
     }
     display_user=user;
+#ifndef USOSRES_9X
+    if(usos_display_user_run(GetVersion())) {
+        int ready=input_desktop_ready(user,120000);
+        say(ready>0?"DISPLAY input desktop ready\r\n":ready==0?"DISPLAY input desktop not ready after 120 s\r\n":"DISPLAY input desktop check unavailable\r\n");
+    }
+#endif
     if(!usos_display_current(enumerate,GetVersion(),current_caps,&current)) { say("DISPLAY no current mode for rollback; request retained\r\n"); CloseHandle(log_file); leave(1); }
     if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
 #ifndef USOSRES_9X
@@ -424,6 +466,12 @@ static void run(void) {
     if(usos_display_retry(current.dmBitsPerPel,transaction.state,transaction.apply_result,permission_failure)) {
         say("DISPLAY permissions prevent saving; request retained\r\n");CloseHandle(log_file);leave(1);
     }
+#ifndef USOSRES_9X
+    if(usos_display_desktop_retry(GetVersion(),transaction.state,test_count,test_failed)) {
+        say("DISPLAY every test failed (-1): not the input desktop; request retained for the next sign-in\r\n");
+        CloseHandle(log_file);leave(1);
+    }
+#endif
     if(transaction.state==4) say("DISPLAY cannot save rollback mode; unchanged\r\n");
     else if(transaction.state==3) {
         lstrcpyA(line,"DISPLAY apply failed; rollback=");signed_number(transaction.rollback_result);
