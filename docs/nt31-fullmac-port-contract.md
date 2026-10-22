@@ -263,3 +263,47 @@ disk. The original NetworkControlPanel will create stock TCP/IP STREAMS
 configuration and bindings. NET31CFG refuses absent/ambiguous own adapter
 instances and changes only the installed own adapter's bus/BDF parameters.
 The required reboot and actual driver/IP/echo/DNS proof remain ahead.
+
+### R24 prepared native installation overlay
+
+Build12 retains the same driver source but has a fresh linker timestamp:
+SYS15104B SHA256`1b6d3150f40ac1df88334c727ecccfb0dd23fe526525136996918fd1f9b0daab`.
+NET31CFG now verifies each DWORD readback and RegFlushKey success;
+its5120B SHA256 is`a46bf32cca31500ac7c435b4d43e33ab181f2462bc118a56f4caa88789c996aa`.
+The strict DNS logger remains`ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7`.
+All43 driver,14 helper and71 logger imports are available in the actual
+stopped UP installation, not only in the original MP media module.
+
+`tools/tests/prepare_nt31_fullmac.py` constructs only a new owned whole-disk
+overlay of stopped R19c. Protected SYSTEM/USB/classes/kernel files remain
+byte-identical. It stages1183 original compressed source files (30893968B),
+the private OEM installer and own binaries; no Microsoft module or hive is
+exported as a standalone artifact. ISO9660 DISK1./SETUPLDR. normalize only
+the empty extension to FAT names. Arbitrary long names and collisions fail.
+The first source guard failure removed its scratch raw; the verified-empty
+directory was recreated. That was preparation failure, with no VM started.
+
+The final preparation is recorded in
+`artifacts/nt31-fullmac-runtime/r24-preparation.json`. Target overlay SHA256
+`15a13789415fb171cf0c85d244f9300145b4aa758dfbc81c3f316e3709c0c6a1`
+backs onto readonly R19c SHA256
+`d736f6509fba4780e73a74ab7164dd4bfe7a1e6664ba1f0cfbc80c9e6169f644`.
+`boot_nt31_fullmac.py` starts one retained overlay after one normal host
+resource guard, using the same hardware i8042/USB isolation, firmware,
+EPYC-Rome and2GiB. The added sole igb has explicit BDF00:05.0 and MAC
+52:54:00:55:53:01. The own driver additionally requires an actual UP kernel.
+The localhost VM-only network mirror has an8MiB hard cap. DHCP analysis is
+not applicable to original NT31 static TCP/IP and cannot imply LAN PASS.
+
+The native NetworkControlPanel must install the own OEM adapter and stock
+TCP/IP, create STREAMS/bindings, configure10.0.2.15/24, gateway10.0.2.2 and
+DNS10.0.2.3, then reboot. The private donor writes own BDF parameters into
+its actual adapter HardwareParameterKey before first bind. NET31CFG verifies
+one unambiguous USOSNET311 and the real USNET31.SYS ImagePath, and readbacks
+only those own parameters. No offline guessed network hive schema is used.
+At startup R24 is an unqualified candidate; all runtime PASS fields remain
+false until actual guest echo/DNS evidence and stopped SYS readback exist.
+
+Host command-adapter and source-name tests passed6cases. The actual-C
+38policy/10callback/17original-cleanup preflight also passed. These results
+do not qualify installed NT31 LAN, reset support or X470 hardware.

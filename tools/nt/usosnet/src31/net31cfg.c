@@ -9,7 +9,7 @@ static int starts(const char *a,const char *b){char x,y;while(*b){x=*a++;y=*b++;
 static void text(const char *s){DWORD n;if(logFile!=INVALID_HANDLE_VALUE)WriteFile(logFile,s,length(s),&n,NULL);}
 static void number(DWORD v){char b[9];int i;for(i=0;i<8;i++)b[i]="0123456789ABCDEF"[(v>>(28-i*4))&15];b[8]=0;text(b);}
 static void row(const char *s,DWORD v){text(s);text("=");number(v);text("\r\n");}
-static LONG dword(HKEY h,const char *name,DWORD value){LONG r;r=RegSetValueExA(h,name,0,REG_DWORD,(const BYTE *)&value,4);row(name,r);return r;}
+static LONG dword(HKEY h,const char *name,DWORD value){LONG r;DWORD read=0,kind=0,size=4;r=RegSetValueExA(h,name,0,REG_DWORD,(const BYTE *)&value,4);if(!r){r=RegQueryValueExA(h,name,NULL,&kind,(BYTE *)&read,&size);if(!r&&(kind!=REG_DWORD||size!=4||read!=value))r=ERROR_INVALID_DATA;}row(name,r);return r;}
 static int existing(HKEY root,const char *name,HKEY *h){return RegOpenKeyExA(root,name,0,KEY_READ|KEY_WRITE,h)==ERROR_SUCCESS;}
 void __cdecl entry(void)
 {
@@ -48,7 +48,7 @@ void __cdecl entry(void)
     if(dword(parameters,"BusType",5) || dword(parameters,"BusNumber",0) ||
        dword(parameters,"PciBus",0) || dword(parameters,"PciDevice",5) ||
        dword(parameters,"PciFunction",0) || dword(parameters,"DebugPort",233))goto refused;
-    RegFlushKey(parameters);text("CONFIGURED_REBOOT_REQUIRED\r\n");
+    r=RegFlushKey(parameters);row("RegFlushKey",r);if(r)goto refused;text("CONFIGURED_REBOOT_REQUIRED\r\n");
 done:
     if(parameters)RegCloseKey(parameters);if(adapter)RegCloseKey(adapter);if(driver)RegCloseKey(driver);if(services)RegCloseKey(services);
     if(logFile!=INVALID_HANDLE_VALUE)CloseHandle(logFile);ExitProcess(0);
