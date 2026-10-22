@@ -6,6 +6,9 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
+import sys
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 HEADER = ROOT / 'src/platform/win3/usoskey_xlat.h'
 
 HARNESS = r'''
@@ -46,6 +49,7 @@ def ev(vk, up=False, scan=None, ext=False):
 class UsosKeyXlat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         work = ROOT / 'zig-out/usoskey-xlat-test'
         work.mkdir(parents=True, exist_ok=True)
         (work / 'harness.c').write_text(HARNESS)

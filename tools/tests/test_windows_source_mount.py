@@ -30,6 +30,8 @@ def rewrite(data,table):
 class Reader(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import depguard
+        depguard.require_zig()
         sys.path.insert(0,str(ROOT/'tools'))
         from build_windows_source_mount import build
         build(ROOT,ROOT/'zig-out/windows-source-mount')

@@ -2,6 +2,8 @@ from pathlib import Path
 import hashlib,os,subprocess,sys,tempfile,unittest
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools'))
+sys.path.insert(0,str(ROOT/'tools/tests'))
+import depguard
 import build_usosnvme_nt6_signed as signing
 
 class ModernNVMe(unittest.TestCase):
@@ -265,7 +267,7 @@ int main(int argc,char**argv){
             self.assertEqual(r.returncode,0,r.stderr)
 
     def test_host_is_refused_before_writes(self):
-        exe=ROOT/'zig-out/windows-modern/usos-nvme-modern.exe'
+        exe=depguard.require_path('zig-out/windows-modern/usos-nvme-modern.exe', 'brak helpera NVMe - uruchom build.bat')
         self.assertTrue(exe.is_file(),'build the helper before running this test')
         self.assertEqual(subprocess.run([str(exe)],capture_output=True).returncode,2)
 

@@ -7,12 +7,14 @@ the generated payload headers.
 from pathlib import Path
 import os, shutil, subprocess, tempfile, unittest
 ROOT = Path(__file__).resolve().parents[2]
+import depguard
 VISTA_LOADER = b'Vista 6.0.6001 bootmgfw.efi'
 
 
 class VistaInt10(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.work = ROOT / 'zig-out/vista-int10-tests'
         cls.work.mkdir(parents=True, exist_ok=True)
         cls.exe = cls.work / 'vista-int10.exe'

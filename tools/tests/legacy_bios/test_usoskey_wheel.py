@@ -13,6 +13,9 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
+import sys
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 WIN3 = ROOT / 'src/platform/win3'
 HEADER = WIN3 / 'usoskey_wheel.h'
 
@@ -80,6 +83,7 @@ def body(text: str, name: str) -> str:
 class UsosKeyWheel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         work = ROOT / 'zig-out/usoskey-wheel-test'
         work.mkdir(parents=True, exist_ok=True)
         (work / 'harness.c').write_text(HARNESS)

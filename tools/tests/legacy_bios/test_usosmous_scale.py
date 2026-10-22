@@ -8,6 +8,9 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
+import sys
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 HEADER = ROOT / 'src/platform/win3/usosmous_scale.h'
 
 HARNESS = r'''
@@ -35,6 +38,7 @@ int main(int argc, char **argv)
 class UsosMouseScale(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         work = ROOT / 'zig-out/usosmous-scale-test'
         work.mkdir(parents=True, exist_ok=True)
         (work / 'harness.c').write_text(HARNESS)

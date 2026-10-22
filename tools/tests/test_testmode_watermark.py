@@ -10,6 +10,8 @@ TOOLS=ROOT/'tools'
 class WatermarkStaging(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import depguard
+        depguard.require_zig()
         cls.work=ROOT/'zig-out/watermark/staging-tests';cls.work.mkdir(parents=True,exist_ok=True)
         cls.generated=ROOT/'zig-out/vista/usb-install'
         cls.bash=Path(r'C:\Program Files\Git\bin\bash.exe')

@@ -3,15 +3,19 @@ from pathlib import Path
 import os
 import struct
 import subprocess
+import sys
 import unittest
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE, UC_HOOK_INTR
 from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 OUT = ROOT / 'zig-out/dos-disk-filter'
 
 
 def build(name, section):
+    depguard.require_zig()
     OUT.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env['ZIG_GLOBAL_CACHE_DIR'] = str(ROOT / 'tools/cache/zig-global')

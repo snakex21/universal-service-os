@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/tests')]
 from build_windows_usos_lan import build, stage_driver
 from check_nt52_driver_imports import pe
+import depguard
 
 OUT = ROOT/'artifacts/network-defaults/host'
 OUT.mkdir(parents=True, exist_ok=True)
@@ -153,7 +154,7 @@ class Stage(unittest.TestCase):
 
 class Builds(unittest.TestCase):
     def test_retry_policy_native_config_and_target_matching(self):
-        zig=Path(os.environ.get('USOS_ZIG',ROOT/'tools/zig/zig.exe'));out=OUT/'policy';out.mkdir(exist_ok=True)
+        zig=depguard.require_zig();out=OUT/'policy';out.mkdir(exist_ok=True)
         env=dict(os.environ,TEMP=str(out),TMP=str(out),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'zig-cache'))
         for name in ('lan_policy_test','desktop_wait_test'):
             exe=out/(name+'.exe')
@@ -162,6 +163,7 @@ class Builds(unittest.TestCase):
                             '-Wl,--entry,entry','-lkernel32','-ladvapi32','-o',str(exe)],env=env,check=True)
             self.assertEqual(subprocess.run([str(exe)],env=env).returncode,0,name)
     def test_windowless_pe4_no_crt_and_nt4_exports(self):
+        depguard.require_zig()
         files=build(ROOT,OUT/'build')
         table={};current=None
         for line in (ROOT/'tools/tests/data/nt4rtm_lan_exports.txt').read_text().splitlines():
@@ -213,6 +215,7 @@ class RunValueAndStartPage(unittest.TestCase):
 class Render(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         subprocess.run([os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')),'build','answer-tool',
                         '--cache-dir','tools/cache/zig-local','--global-cache-dir','tools/cache/zig-global'],cwd=ROOT,check=True)
     def test_off_matches_pre_network_answers_byte_for_byte(self):

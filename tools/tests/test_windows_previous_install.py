@@ -20,6 +20,8 @@ def tree(folder):
 class PreviousInstall(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import depguard
+        depguard.require_zig()
         OUT.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, TEMP=str(OUT), TMP=str(OUT), ZIG_LOCAL_CACHE_DIR=str(OUT / 'cache'), ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
         cls.helper = OUT / 'previous.exe'

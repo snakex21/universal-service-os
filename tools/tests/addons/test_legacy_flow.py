@@ -3,6 +3,8 @@ from pathlib import Path
 import hashlib,importlib.util,os,shutil,struct,subprocess,sys,tempfile,unittest,zipfile
 ROOT=Path(__file__).resolve().parents[3]
 sys.path[:0]=[str(ROOT/'tools'),str(ROOT/'tools/addons')]
+sys.path.insert(0,str(ROOT/'tools/tests'))
+import depguard
 import legacy_manifest as lm
 import prepare_legacy_user_files as prepare_user
 from build_legacy_stage import build
@@ -45,6 +47,7 @@ class Policy(unittest.TestCase):
 class Stage(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
+  depguard.require_zig('kompilator Zig (build_legacy_stage)')
   cls.exe=build(ROOT,(OUT/'native').resolve(),host=True)
   cls.linux=build(ROOT,(OUT/'linux').resolve())
  def setUp(self):
@@ -186,6 +189,7 @@ file1=SETUP.EXE|demo.bin|HASH|SIZE
 
 class Render(unittest.TestCase):
  def test_none_matches_pre_addons_answer_bytes(self):
+  depguard.require_zig('kompilator Zig (build_legacy_stage)')
   exe=ROOT/'zig-out/bin/usos-answer.exe'
   with tempfile.TemporaryDirectory() as d:
    root=Path(d);profile=root/'none.ini'
@@ -196,6 +200,7 @@ class Render(unittest.TestCase):
     expected=ROOT/'tools/tests/data'/('addons-none.'+os_id+'.txt')
     self.assertEqual(out.read_bytes(),expected.read_bytes())
  def test_default_render_and_source_register_run_without_new_ui(self):
+  depguard.require_zig('kompilator Zig (build_legacy_stage)')
   exe=ROOT/'zig-out/bin/usos-answer.exe'
   self.assertIn('USOSAddons,,"C:\\USOS\\ADDONS\\USOSADD.EXE"',(ROOT/'src/platform/bios/win9x/msbatch.inf').read_text())
   with tempfile.TemporaryDirectory() as d:

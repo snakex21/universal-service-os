@@ -15,6 +15,8 @@ from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 from build_win3_usb_keyboard import build_tsr, build_mouse_driver, elf_symbols, write_tsr_header, ne_imported_modules
 
 SEG = 0x2000
@@ -25,6 +27,7 @@ MHEAD, MTAIL, MALIVE, MCB, MDROPPED, MIGNORED, MPACKETS, MLAST, MRING = 396, 397
 class UsosMouse(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         work = ROOT / 'zig-out/win3-usb-mouse-test'
         work.mkdir(parents=True, exist_ok=True)
         com = build_tsr(work, work)
@@ -187,6 +190,7 @@ class MeBridge(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.mouse = (ROOT / 'src/platform/win3/usosmous.c').read_text(encoding='utf-8')
         cls.key = (ROOT / 'src/platform/win3/usoskey.c').read_text(encoding='utf-8')
         cls.resident = (ROOT / 'src/platform/win3/usos_resident.h').read_text(encoding='utf-8')

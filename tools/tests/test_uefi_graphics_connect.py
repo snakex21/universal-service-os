@@ -2,6 +2,8 @@
 from pathlib import Path
 import os, subprocess
 ROOT = Path(__file__).resolve().parents[2]
+import depguard
+depguard.require_zig('kompilator Zig (sonda UEFI GOP)')
 out = ROOT / 'zig-out/graphics-connect-test'
 boot = out / 'media/EFI/BOOT'
 boot.mkdir(parents=True, exist_ok=True)

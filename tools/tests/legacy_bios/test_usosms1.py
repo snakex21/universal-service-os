@@ -21,6 +21,8 @@ from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 
 BIOS = 0xF000
 DRV = 0x2000
@@ -176,6 +178,8 @@ class Machine:
 class Usosms1(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if not os.environ.get('USOSMS1_DRV'):
+            depguard.require_zig()
         cls.data = driver_file()
         cls.ne = parse_ne(cls.data)
 
