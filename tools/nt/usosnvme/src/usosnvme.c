@@ -1516,7 +1516,10 @@ static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext, ULONG Source)
         }
         d->LastFlushUs = us;
         if (us > d->MaxFlushUs) d->MaxFlushUs = us;
-        d->TotalFlushMs += us / 1000;
+        /* sub-ms flushes add up: carry the microsecond remainder */
+        Ext->FlushUsCarry += us % 1000;
+        d->TotalFlushMs += us / 1000 + Ext->FlushUsCarry / 1000;
+        Ext->FlushUsCarry %= 1000;
         d->LastFlushStatus = status;
         if (status == 0) {
             d->FlushOk++;

@@ -204,7 +204,17 @@ int main(void) {
         memcpy(h->Signature, "USOSNVME", 8); srb.DataTransferLength = sizeof(*h) + 8; NvmeIoControl(&ext, &srb);
         assert(srb.SrbStatus == SRB_STATUS_INVALID_REQUEST && h->ReturnCode == 1);
     }
-    /* 10. CID FFFFh is never used */
+    /* 10. sub-ms flushes still add up in TotalFlushMs (us remainder carried):
+       ten ~300 us flushes = ~3 ms, the old us / 1000 counted 0 */
+    reset(); latency_us = 300; overhead_us = 1;
+    for (int i = 0; i < 10; i++) { ext.Dirty = 1; assert(NvmeFlush(&ext, USOSNVME_FLUSH_SYNC_CACHE) == 0); }
+    assert(ext.Diag.LastFlushUs < 1000 && ext.Diag.FlushOk == 10);
+    assert(ext.Diag.TotalFlushMs >= 2 && ext.Diag.TotalFlushMs <= 4 && ext.FlushUsCarry < 1000);
+    {
+        ULONG sum = 0; for (int i = 0; i < 8; i++) sum += ext.Diag.Ring[i].Us;
+        assert(ext.Diag.TotalFlushMs * 1000 + ext.FlushUsCarry >= sum);
+    }
+    /* 11. CID FFFFh is never used */
     reset(); ext.CommandId = 0xFFFD;
     for (int i = 0; i < 4; i++) { ext.Dirty = 1; assert(NvmeFlush(&ext, USOSNVME_FLUSH_SYNC_CACHE) == 0); }
     return 0;

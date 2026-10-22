@@ -217,6 +217,7 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG LastStatus;            /* last failing NVMe status (SCT << 8 | SC) */
     ULONG LastWaitUs;            /* NvmeWait: duration of the last command */
     ULONG ShutdownMs;            /* CC.SHN limit (RTD3E clamped) */
+    ULONG FlushUsCarry;          /* Diag.TotalFlushMs: microseconds below 1 ms */
     USOSNVME_DIAG Diag;          /* IOCTL_SCSI_MINIPORT "USOSNVME" */
     PUSHORT Vga;
     ULONG InitStage;
