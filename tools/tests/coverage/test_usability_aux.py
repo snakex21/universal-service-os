@@ -4,6 +4,7 @@ import importlib.util
 import struct
 import unittest
 import io
+import json
 from types import SimpleNamespace
 
 spec=importlib.util.spec_from_file_location('aux',Path(__file__).with_name('usability_aux.py'))
@@ -11,6 +12,17 @@ aux=importlib.util.module_from_spec(spec);spec.loader.exec_module(aux)
 
 
 class AuxiliaryTests(unittest.TestCase):
+    def test_persistent_block_node_preserves_special_filename_and_restricts_inputs(self):
+        path=Path(__file__).resolve().parent/'comma, Polish ł and space.qcow2'
+        flag,value=aux.usb_block_arguments('hot',path)
+        self.assertEqual(flag,'-blockdev')
+        node=json.loads(value)
+        self.assertEqual(node['node-name'],'usabilityhot')
+        self.assertEqual(node['driver'],'qcow2')
+        self.assertEqual(node['file']['filename'],str(path))
+        for kind,file in (('target',path),('hot',Path('relative.qcow2')),('hot',path.with_suffix('.raw'))):
+            with self.assertRaises(ValueError):aux.usb_block_arguments(kind,file)
+
     def test_nt5_manual_actions_need_an_exact_post_logon_notification(self):
         token='USOS_COVERAGE_FIRST_LOGON_'+'a'*32
         self.assertTrue(aux.manual_test_supported(True,False,token))

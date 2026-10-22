@@ -5,6 +5,7 @@ import base64
 import importlib.util
 import io
 import json
+import os
 import shutil
 import struct
 import subprocess
@@ -125,7 +126,7 @@ class EvidencePolicy(unittest.TestCase):
     def test_actual_shell_tar_base64_and_driver_hash_transport(self):
         source=self.root/'source';source.mkdir()
         for name in own.FILES:(source/name).write_text(name+' own text\n',encoding='utf-8')
-        driver=ROOT/'tools/nt/usosnet/bin/i386/usosnet351.sys'
+        driver=Path(os.environ.get('USOSNET351_TEST_DRIVER',ROOT/'tools/nt/usosnet/bin/i386/usosnet351.sys'))
         shutil.copy(driver,source/'usosnet351.sys')
         runtime=self.root/'runtime';runtime.mkdir()
         runtime_shell=runtime.as_posix()

@@ -7,16 +7,20 @@ from pathlib import Path
 import argparse
 import asyncio
 import base64
-import gzip
 import importlib.util
 import io
 import json
 import re
 import tarfile
 
+spec=importlib.util.spec_from_file_location('nt351_serial_shell',Path(__file__).with_name('serial_shell.py'))
+serial_shell=importlib.util.module_from_spec(spec);spec.loader.exec_module(serial_shell)
+spec=importlib.util.spec_from_file_location('nt351_archive_policy',Path(__file__).with_name('evidence_archive.py'))
+archive_policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(archive_policy)
+
 FOLDERS=frozenset(('Windows NT 3.51','Windows NT 3.51 Server'))
 FILES=('NET351.STATUS','NET351.ON','USABILITY.TXT','POST.LOG','USOSNET351.SHA256')
-DRIVER_SHA256='dc8827954e6fe75ee8264c7382e87899cc9761890998198c126c7ea8aa5c55b6'
+DRIVER_SHA256='f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf'
 DRIVER_BYTES=17024
 MAX_FILE=1024**2
 MAX_TOTAL=5*MAX_FILE+4096
@@ -120,9 +124,7 @@ def export_evidence(payload,output):
     # Validate the entire archive before writing anything. No extractall,
     # permissive basenames, traversal, duplicate members or binary logs.
     records={};total=0
-    with gzip.GzipFile(fileobj=io.BytesIO(payload)) as compressed:
-        plain=compressed.read(MAX_TOTAL+65536+1)
-    if len(plain)>MAX_TOTAL+65536:raise ValueError('Decompressed archive limit exceeded')
+    plain=archive_policy.single_gzip(payload,MAX_TOTAL+65536)
     with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
         for member in archive:
             if member.name in ('.','./') and member.isdir():continue
@@ -135,6 +137,7 @@ def export_evidence(payload,output):
             data=archive.extractfile(member).read(MAX_FILE+1)
             if len(data)!=member.size or b'\0' in data:raise ValueError('Invalid text evidence')
             records[name]=data.decode('utf-8',errors='strict')
+        archive_policy.tar_end(plain,archive.offset)
     digest=records.pop('DRIVER-READBACK.SHA256',None)
     if digest is not None:
         digest=digest.strip()
@@ -159,7 +162,7 @@ async def main(args):
     result=await fixture.load_bootstrap().run_case(args.qemu,args.assets/'zig-out/micro-linux/vmlinuz-virt',
         args.assets/'zig-out/micro-linux/initramfs-usos',work/'read-nt351-own',1024,'qemu64',180,
         ['-drive',f'file={(work/"target.qcow2").as_posix()},format=qcow2,if=virtio,readonly=on'],
-        commands=commands(),suffix='-nt351-own')
+        commands=serial_shell.wrap(commands()),suffix='-nt351-own')
     if result['result']!='PASS':raise RuntimeError('Read-only collector failed; no runtime assessment')
     serial=Path(result['directory'])/'serial.log'
     if serial.stat().st_size>MAX_TRANSPORT:raise ValueError('Transport byte limit exceeded')
