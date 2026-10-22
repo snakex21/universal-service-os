@@ -112,6 +112,7 @@ def main():
         target_sha256=readback['target_sha256'],retained_images=retained,
         bounded_vm_capture_sha256=capture['sha256'],strict_dora_observed=strict['dora_observed'],
         packet_capture_alone_never_guest_pass=True,ps2_baseline=True,new_usb_or_msc_qualification=False,
+        failure_stop_scope='Requested CLIENT/NET35 and checked DONE/restart only; legacy drivers[] CopyFile logging and void set_dword are not generally hardened or USB-failure qualified',
         previous_fresh_sharing_fail_and_overlay_policy_pass_unchanged=True,
         no_ms_binary_hive_export=True,no_physical_writes=True,no_progress_polling=True,
         scope='Exact NT3.5 Workstation EN/QEMU/AHCI/igb; no NT31/NT351/Server/physical/SMP or SMB-client transfer qualification')

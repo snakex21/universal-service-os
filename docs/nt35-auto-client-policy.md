@@ -46,6 +46,14 @@ PROFILE/DEFAULT/USER/unknown answer and missing NET35 staging. Existing
 NT35 parser/network-flow tests remain relevant. No test runs real POST on
 the host or changes its services/registry.
 
+Failure-stop qualification is limited to the newly requested CLIENT/NET35
+path and its real DONE/restart gate. The pre-existing drivers[] copy loop
+still only logs failed AHCINT/USOSRST/USOSUSB CopyFileA, and legacy
+set_dword remains void. This experiment does not harden or qualify general
+storage/USB-copy/registry-failure handling, and grants no fresh USB PASS.
+A separate later change/test would be needed for those failure paths;
+the frozen active POST/cache are not changed for this clarification.
+
 Canonical build is tools/build_windows_usos_res.py:build_nt3. Original NT35
 KERNEL32/ADVAPI bytes are read only in RAM from the pinned, closed previous
 fresh target, via a temporary whole G disk. Only API/hash metadata are
