@@ -29,6 +29,9 @@ pub const Input = struct {
     /// The install image (1-based index) matching the profile's edition on
     /// the chosen media (editions.match); null: Setup shows its edition list.
     image_index: ?u16 = null,
+    /// DATA carries Systems\Windows\<version>\Unattended\fast-startup-on.txt:
+    /// the user keeps Windows' own Fast Startup (docs/ds-fast-startup-2026-10-22.md).
+    fast_startup_on: bool = false,
 };
 
 const W = std.Io.Writer;
@@ -310,9 +313,23 @@ fn hasUserOptions(p: *const Profile, family: Family) bool {
     return false;
 }
 
-pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, out: *Commands) !void {
+/// Windows 8 / 8.1 / 10 (client) boot with Fast Startup; Server SKUs hide it.
+fn hiberboot(family: Family) bool {
+    return switch (family) {
+        .windows_8, .windows_8_1, .windows_10 => true,
+        else => false,
+    };
+}
+
+pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, fast_startup_on: bool, out: *Commands) !void {
     out.len = 0;
     if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
+    // Windows 8 / 8.1 / 10: no Fast Startup (hiberboot). A shutdown then leaves
+    // the NTFS volume clean instead of hibernated, which matters because USOS
+    // installs move between computers; fast-startup-on.txt on DATA keeps
+    // Windows' setting (docs/ds-fast-startup-2026-10-22.md).
+    if (!fast_startup_on and hiberboot(family))
+        try out.add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power\" /v HiberbootEnabled /t REG_DWORD /d 0 /f", .{});
     const on = struct {
         fn f(profile: *const Profile, tweak: schema.Tweak, fam: Family) bool {
             return schema.tweakOn(profile, tweak, fam);
@@ -416,7 +433,7 @@ fn specialize(w: *W, input: Input) !void {
         try endComponent(w);
     }
     var commands: Commands = .{};
-    try specializeCommands(p, input.family, input.arch, &commands);
+    try specializeCommands(p, input.family, input.arch, input.fast_startup_on, &commands);
     if (commands.len > 0) {
         try component(w, "Microsoft-Windows-Deployment", input.arch);
         try open(w, 3, "RunSynchronous");
@@ -610,7 +627,7 @@ test "autounattend: tweaks per version, nothing for versions without them" {
     try std.testing.expect(std.mem.indexOf(u8, r2, "<EnableLUA>false</EnableLUA>") != null);
     for ([_][]const u8{ "TurnOffSidebar", "powercfg", "InboxGames", "Themes" }) |k| try std.testing.expect(std.mem.indexOf(u8, r2, k) == null);
     var commands: Commands = .{};
-    try specializeCommands(&p, .windows_7, .x86, &commands);
+    try specializeCommands(&p, .windows_7, .x86, false, &commands);
     for (commands.slice()) |command| try std.testing.expect(command.len <= 259);
 }
 
@@ -743,10 +760,28 @@ test "autounattend: every option on stays within the limits on every version" {
             try schema.check(xml, family, null);
         }
         var commands: Commands = .{};
-        try specializeCommands(&p, family, .amd64, &commands);
+        try specializeCommands(&p, family, .amd64, false, &commands);
         for (commands.slice()) |command| {
             try std.testing.expect(command.len <= 259);
             if (std.mem.startsWith(u8, command, "cmd.exe /c reg")) try std.testing.expect(command.len <= packed_limit);
+        }
+    }
+}
+
+test "autounattend: Fast Startup off on 8 / 8.1 / 10 clients only, opt-out keeps it" {
+    const p: Profile = .{};
+    const hiber = "/v HiberbootEnabled /t REG_DWORD /d 0 /f";
+    var buffer: [max_size]u8 = undefined;
+    inline for (@typeInfo(Family).@"enum".fields) |f| {
+        const family: Family = @enumFromInt(f.value);
+        if (comptime family.nt5()) continue;
+        const expected = family == .windows_8 or family == .windows_8_1 or family == .windows_10;
+        for ([_]Arch{ .x86, .amd64 }) |arch| {
+            const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
+            errdefer std.debug.print("{s} {s}\n", .{ f.name, @tagName(arch) });
+            try std.testing.expectEqual(expected, std.mem.indexOf(u8, xml, hiber) != null);
+            const kept = try render(.{ .profile = &p, .family = family, .arch = arch, .fast_startup_on = true }, &buffer);
+            try std.testing.expect(std.mem.indexOf(u8, kept, hiber) == null);
         }
     }
 }

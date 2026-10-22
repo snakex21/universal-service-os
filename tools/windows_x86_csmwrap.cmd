@@ -26,6 +26,12 @@ rem      xHCI keyboard / mouse port driver, tools/nt4/usosusb build-nt6)
 rem      copied to system32\drivers and registered offline as a system-start
 rem      "Keyboard Port" service; a copy/registration error stops the reboot
 rem      (design doc sections 12.6 / 12.8);
+rem   3h. Windows 8 / 8.1 / 10: Fast Startup (hiberboot) off in the installed
+rem      system (HiberbootEnabled=0 in its offline SYSTEM hive,
+rem      tools/windows_fast_startup.h): the disk moves between computers and a
+rem      hibernated NTFS volume is only safe on the machine that wrote it. An
+rem      empty DATA\Systems\Windows\<version>\Unattended\fast-startup-on.txt
+rem      keeps Windows' own setting. Never fatal.
 rem   3e. Windows 7 / 8.x / 10 before 1703 x86 (NT 6.1 to 10.0.14393):
 rem      usosmpart.sys (own GPL USB multi-partition disk filter,
 rem      tools/nt/usosmpart) copied to system32\drivers and registered offline
@@ -91,6 +97,13 @@ if not "%USOS_SETUP_RESULT%"=="0" (
     exit /b %USOS_SETUP_RESULT%
 )
 call :usb3
+rem Windows 8 / 8.1 / 10: no Fast Startup (the disk is carried between
+rem computers). The helper reads the installed kernel version itself (Vista /
+rem 7 do nothing), honours fast-startup-on.txt on DATA and never fails the
+rem installation; see the header comment and docs/ds-fast-startup-2026-10-22.md.
+echo [USOS] phase=fast-startup-off
+"%~dp0usos-x86-csmwrap.exe" faststartup
+if errorlevel 1 echo [USOS] fast-startup: not changed, Windows keeps its setting (boot unaffected).
 call :nt60_gate
 call :nt60_usb
 if errorlevel 1 exit /b 1

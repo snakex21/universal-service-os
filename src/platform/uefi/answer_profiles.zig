@@ -17,9 +17,11 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
 const directory_scan = @import("directory_scan.zig");
+const data_volume = @import("data_volume.zig");
 const file_read = @import("file_read.zig");
 const settings_store = @import("settings_store.zig");
 const serial = @import("serial.zig");
+const ntfs = usos.storage.ntfs;
 
 const answer = usos.flow.answer;
 pub const Profile = answer.Profile;
@@ -261,7 +263,48 @@ pub fn images() ?*const answer.editions.List {
 
 /// The answer rendered in memory (valid until the next render).
 pub fn render(profile: *const Profile, system_id: []const u8, arch: answer.Arch) !answer.Rendered {
-    return (try answer.render(profile, system_id, arch, null, images(), &rendered)) orelse error.NoGeneratedAnswer;
+    return (try answer.render(profile, system_id, arch, null, images(), fastStartupOn(system_id), &rendered)) orelse error.NoGeneratedAnswer;
+}
+
+/// <system's Unattended folder on DATA>\fast-startup-on.txt (for example
+/// DATA\Systems\Windows\Windows 10\Unattended): the user keeps Windows' own
+/// Fast Startup for this version (docs/ds-fast-startup-2026-10-22.md). The
+/// folder is the catalog entry's own, so Embedded 8.1 Industry and routed
+/// variants use theirs. Unreadable DATA or a version without Fast Startup:
+/// false, so the answer disables it where it applies.
+fn fastStartupOn(system_id: []const u8) bool {
+    const family = answer.target.familyFor(system_id) orelse return false;
+    switch (family) {
+        .windows_8, .windows_8_1, .windows_10 => {},
+        else => return false,
+    }
+    const system = usos.catalog.systems.findById(system_id) orelse return false;
+    const directory = system.unattended_directory orelse return false;
+    // NTFS path components (openFile looks each one up in its parent).
+    var storage: [192]u16 = undefined;
+    var slices: [8][]const u16 = undefined;
+    var count: usize = 0;
+    var at: usize = 0;
+    var parts = std.mem.tokenizeScalar(u8, directory, '\\');
+    var done = false;
+    while (!done) {
+        const part = parts.next() orelse blk: {
+            done = true;
+            break :blk "fast-startup-on.txt";
+        };
+        if (count == slices.len or at + part.len > storage.len) return false;
+        for (part, 0..) |ch, i| storage[at + i] = ch;
+        slices[count] = storage[at .. at + part.len];
+        at += part.len;
+        count += 1;
+    }
+    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return false;
+    defer uefi.pool_allocator.destroy(catalog);
+    catalog.* = data_volume.openCatalog() catch return false;
+    var file: ntfs.File = undefined;
+    ntfs.openFile(catalog.fs, catalog.reader(), slices[0..count], &file) catch return false;
+    serial.writeAscii("[PROFILE] fast-startup-on.txt on DATA: Windows keeps its Fast Startup\n");
+    return true;
 }
 
 /// Removes rendered answers and the plan left on the ESP by an earlier
@@ -303,22 +346,22 @@ pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
     try ensureDirectory(root, plan_file.directory);
     var path: [96]u8 = undefined;
     for (answer.msbatch.staged) |entry| {
-        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }
     // Windows NT 4.0 (same micro-Linux step 620): NT4.SIF / NT4S.SIF.
     for (answer.nt4.staged) |entry| {
-        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }
     // Windows NT 3.51 / 3.5 / 3.1 (same step 620): NT351.SIF / NT351S.SIF, NT35.SIF / NT35S.SIF, NT31.SIF / NT31S.SIF.
     for (answer.nt3.staged) |entry| {
-        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }
     // Windows Embedded POSReady 2009 (same step 620): POSR.SIF.
     for (answer.posready.staged) |entry| {
-        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }
     var line: [96]u8 = undefined;

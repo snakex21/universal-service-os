@@ -71,7 +71,10 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 /// answer). `key` overrides the profile's key for this system (a key typed
 /// at start); null uses the profile's. `images`: the install images of the
 /// chosen media, for the profile's edition (null: no edition written).
-pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, buffer: []u8) !?Rendered {
+/// `fast_startup_on`: DATA carries the fast-startup-on.txt opt-out for this
+/// version (docs/ds-fast-startup-2026-10-22.md); false disables Fast Startup in
+/// the answer of Windows 8 / 8.1 / 10.
+pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, fast_startup_on: bool, buffer: []u8) !?Rendered {
     const use_key = key orelse p.keyFor(system_id);
     // The catalog id covers several milestones. Without a measured build
     // this layer cannot dispatch the 5048-only schema safely. A user XML
@@ -90,7 +93,7 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
         .found => |image| image.index,
         else => null,
     };
-    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = nt_key, .image_index = image_index }, buffer);
+    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = nt_key, .image_index = image_index, .fast_startup_on = fast_startup_on }, buffer);
     try xml_check.wellFormed(xml);
     try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };
@@ -121,20 +124,20 @@ test "display metadata reaches supported legacy targets only and preserves missi
     var buffer: [autounattend.max_size]u8 = undefined;
     for ([_][]const u8{ "windows-nt-4", "windows-nt-3-51", "windows-nt-3-5", "windows-95", "windows-98-se", "windows-me" }) |id| {
         p.display_explicit = false;
-        const plain = (try render(&p, id, .x86, null, null, &buffer)).?;
+        const plain = (try render(&p, id, .x86, null, null, false, &buffer)).?;
         try std.testing.expect(std.mem.indexOf(u8, plain.bytes, "USOS-DISPLAY=") == null);
         p.display_explicit = true;
-        const chosen = (try render(&p, id, .x86, null, null, &buffer)).?;
+        const chosen = (try render(&p, id, .x86, null, null, false, &buffer)).?;
         try std.testing.expect(std.mem.endsWith(u8, chosen.bytes, ";USOS-DISPLAY=autoxauto\r\n"));
     }
     for ([_][]const u8{ "windows-xp", "windows-server-2003", "windows-nt-3-1", "windows-11" }) |id| {
-        const out = (try render(&p, id, .x86, null, null, &buffer)).?;
+        const out = (try render(&p, id, .x86, null, null, false, &buffer)).?;
         try std.testing.expect(std.mem.indexOf(u8, out.bytes, "USOS-DISPLAY=") == null);
         try std.testing.expect(std.mem.indexOf(u8, out.bytes, "display_bpp=") == null);
     }
     // Vista / 7 / 8 / 8.1 / 10: an XML comment for the CSMWrap staging (autounattend.zig).
     for ([_][]const u8{ "windows-vista", "windows-7", "windows-8-1", "windows-10" }) |id| {
-        const xml = (try render(&p, id, .x86, null, null, &buffer)).?;
+        const xml = (try render(&p, id, .x86, null, null, false, &buffer)).?;
         try std.testing.expect(std.mem.indexOf(u8, xml.bytes, "<!-- USOS-DISPLAY=autoxauto -->\n") != null);
         try std.testing.expect(std.mem.indexOf(u8, xml.bytes, ";USOS-DISPLAY=") == null);
     }
@@ -169,18 +172,18 @@ test "render dispatch per system" {
     try p.user.set("Tester");
     try p.setSystemKey("windows-xp", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
     var buffer: [autounattend.max_size]u8 = undefined;
-    const xp = (try render(&p, "windows-xp", .x86, null, null, &buffer)).?;
+    const xp = (try render(&p, "windows-xp", .x86, null, null, false, &buffer)).?;
     try std.testing.expectEqual(plan_file.Format.nt5_settings, xp.format);
     try std.testing.expect(std.mem.indexOf(u8, xp.bytes, "key=AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") != null);
-    const ten = (try render(&p, "windows-10", .amd64, null, null, &buffer)).?;
+    const ten = (try render(&p, "windows-10", .amd64, null, null, false, &buffer)).?;
     try std.testing.expectEqual(plan_file.Format.autounattend_xml, ten.format);
     try std.testing.expect(std.mem.indexOf(u8, ten.bytes, "AAAAA") == null);
-    const ninety_eight = (try render(&p, "windows-98-se", .x86, null, null, &buffer)).?;
+    const ninety_eight = (try render(&p, "windows-98-se", .x86, null, null, false, &buffer)).?;
     try std.testing.expectEqual(plan_file.Format.msbatch_inf, ninety_eight.format);
     try std.testing.expect(std.mem.indexOf(u8, ninety_eight.bytes, "Name=\"Tester\"") != null);
-    try std.testing.expect((try render(&p, "windows-3-1", .x86, null, null, &buffer)) == null);
+    try std.testing.expect((try render(&p, "windows-3-1", .x86, null, null, false, &buffer)) == null);
     // NT 3.51: WINNT.SIF without a key, even when the profile holds one.
-    const nt351 = (try render(&p, "windows-nt-3-51-server", .x86, "123-4567890", null, &buffer)).?;
+    const nt351 = (try render(&p, "windows-nt-3-51-server", .x86, "123-4567890", null, false, &buffer)).?;
     try std.testing.expectEqual(plan_file.Format.nt4_sif, nt351.format);
     try std.testing.expect(std.mem.indexOf(u8, nt351.bytes, "for Windows NT 3.51") != null);
     try std.testing.expect(std.mem.indexOf(u8, nt351.bytes, "123-4567890") == null);
@@ -196,9 +199,9 @@ test "a key typed without dashes renders dashed in WINNT.SIF settings and autoun
     try p.setSystemKey("windows-10", typed);
     try std.testing.expect(profile.validate(&p) == null);
     var buffer: [autounattend.max_size]u8 = undefined;
-    const xp = (try render(&p, "windows-xp", .x86, null, null, &buffer)).?;
+    const xp = (try render(&p, "windows-xp", .x86, null, null, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, xp.bytes, "key=ABCDE-12345-FGHIJ-67890-KLMNO\n") != null);
-    const ten = (try render(&p, "windows-10", .amd64, null, null, &buffer)).?;
+    const ten = (try render(&p, "windows-10", .amd64, null, null, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, ten.bytes, "<Key>ABCDE-12345-FGHIJ-67890-KLMNO</Key>") != null);
 }
 
@@ -213,9 +216,9 @@ test "edition from the media: found, missing, per system" {
     list.items[0] = image;
     list.len = 1;
     var buffer: [autounattend.max_size]u8 = undefined;
-    const seven = (try render(&p, "windows-7", .amd64, null, &list, &buffer)).?;
+    const seven = (try render(&p, "windows-7", .amd64, null, &list, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, seven.bytes, "<Value>3</Value>") != null);
-    const unknown = (try render(&p, "windows-7", .amd64, null, null, &buffer)).?;
+    const unknown = (try render(&p, "windows-7", .amd64, null, null, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, unknown.bytes, "ImageInstall") == null);
     try std.testing.expect(matchEdition(&p, "windows-7", null) == .missing);
     try p.setSystemEdition("windows-7", "Ultimate");
@@ -245,7 +248,7 @@ test "Server without an edition: Standard full installation by default" {
     list.len = images.len;
     try std.testing.expectEqual(@as(u16, 1), matchEdition(&p, "windows-server-2008-r2", &list).found.index);
     var buffer: [autounattend.max_size]u8 = undefined;
-    const r2 = (try render(&p, "windows-server-2008-r2", .amd64, null, &list, &buffer)).?;
+    const r2 = (try render(&p, "windows-server-2008-r2", .amd64, null, &list, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, r2.bytes, "<Value>1</Value>") != null);
     // A chosen edition wins; Core on request.
     try p.setSystemEdition("windows-server-2008-r2", "Datacenter Core");
@@ -290,15 +293,15 @@ test "beta and variant answers reuse base schemas with their own keys and editio
         .{ "windows-memphis", plan_file.Format.msbatch_inf },
     };
     inline for (cases) |row| {
-        const rendered = (try render(&p, row[0], .x86, null, null, &buffer)).?;
+        const rendered = (try render(&p, row[0], .x86, null, null, false, &buffer)).?;
         try std.testing.expectEqual(row[1], rendered.format);
         try std.testing.expect(rendered.bytes.len > 40);
     }
-    try std.testing.expect((try render(&p, "windows-longhorn", .x86, null, null, &buffer)) == null);
+    try std.testing.expect((try render(&p, "windows-longhorn", .x86, null, null, false, &buffer)) == null);
     try p.beta_clock.set("1999-12-11");
-    const me_answer = (try render(&p, "windows-millennium", .x86, null, null, &buffer)).?;
+    const me_answer = (try render(&p, "windows-millennium", .x86, null, null, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, me_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
-    const nt3_answer = (try render(&p, "windows-nt-3-beta", .x86, null, null, &buffer)).?;
+    const nt3_answer = (try render(&p, "windows-nt-3-beta", .x86, null, null, false, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, nt3_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
 }
 
@@ -310,7 +313,7 @@ test "shared beta clock profile never emits metadata for RTM legacy systems" {
     for ([_][]const u8{ "auto", "2005-05-01" }) |setting| {
         try p.beta_clock.set(setting);
         for ([_][]const u8{ "windows-nt-4", "windows-98-se", "windows-me", "windows-95", "windows-nt-3-51", "windows-embedded-posready-2009", "citrix-winframe-1-8" }) |id| {
-            const result = (try render(&p, id, .x86, null, null, &buffer)).?;
+            const result = (try render(&p, id, .x86, null, null, false, &buffer)).?;
             try std.testing.expect(std.mem.indexOf(u8, result.bytes, "USOS-BETA-CLOCK") == null);
         }
     }
