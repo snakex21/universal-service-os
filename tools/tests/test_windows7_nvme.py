@@ -4,6 +4,7 @@ import hashlib,struct,subprocess,sys,unittest,uuid,shutil,xml.etree.ElementTree 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools'))
 from build_windows7_nvme import build_helpers,read_assets
+import depguard
 NS='urn:schemas-microsoft-com:unattend'
 OUT=ROOT/'zig-out/windows7-nvme'
 
@@ -25,6 +26,7 @@ def version_pe(version):
 class Nvme(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         build_helpers(ROOT,OUT);cls.assets=read_assets(ROOT)
         cls.work=OUT/('tests-'+uuid.uuid4().hex[:8]);cls.work.mkdir()
     def invoke(self,text,ok=True,source='0',encoding='utf-8'):

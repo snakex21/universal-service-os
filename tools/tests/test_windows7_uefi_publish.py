@@ -2,10 +2,12 @@
 from pathlib import Path
 import os, shutil, subprocess, tempfile, unittest
 ROOT=Path(__file__).resolve().parents[2]
+import depguard
 
 class Publish(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.work=ROOT/'zig-out/uefi-publish-tests';cls.work.mkdir(exist_ok=True)
         cls.exe=cls.work/'publish.exe'
         env=dict(os.environ,TEMP=str(cls.work),TMP=str(cls.work),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(cls.work/'zig-cache'))

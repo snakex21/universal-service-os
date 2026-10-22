@@ -8,12 +8,15 @@ from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 from build_dos_reboot import build
 
 
 class DosRestart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.code = build(ROOT, ROOT / 'zig-out/dos-reboot-test').read_bytes()
 
     def run_helper(self, command=b'', pending=(), fail_after=None):

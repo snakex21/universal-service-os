@@ -6,6 +6,10 @@ synthetic non-executable PE fixtures and WIMs live in guest RAM only.
 from pathlib import Path
 import sys,stat,gzip,subprocess,os,json
 root=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(root/'tools/tests'))
+import depguard
+depguard.require_path('zig-out/micro-linux/initramfs-usos', 'brak zbudowanego micro-Linux - uruchom build.bat')
+depguard.require_path('zig-out/micro-linux/vmlinuz-virt', 'brak zbudowanego micro-Linux - uruchom build.bat')
 out=root/'zig-out/windows7-nvme-version-test';out.mkdir(parents=True,exist_ok=True)
 (out/'tmp').mkdir(exist_ok=True)
 sys.path.insert(0,str(root/'tools'));sys.path.insert(0,str(root/'tools/tests'))

@@ -3,11 +3,13 @@ used by tools/windows_vista_oobe_gate.c). Host-only; no registry is touched."""
 from pathlib import Path
 import os, subprocess, unittest
 ROOT = Path(__file__).resolve().parents[2]
+import depguard
 
 
 class VistaAutochk(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         work = ROOT / 'zig-out/vista-autochk-tests'
         work.mkdir(parents=True, exist_ok=True)
         cls.exe = work / 'vista-autochk.exe'

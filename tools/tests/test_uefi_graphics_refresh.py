@@ -2,6 +2,8 @@
 from pathlib import Path
 import os, subprocess
 ROOT=Path(__file__).resolve().parents[2]
+import depguard
+depguard.require_zig('kompilator Zig (sonda UEFI GOP refresh)')
 out=ROOT/'zig-out/graphics-refresh-test'
 boot=out/'media/EFI/BOOT';boot.mkdir(parents=True,exist_ok=True)
 temp=out/'tmp';temp.mkdir(exist_ok=True)

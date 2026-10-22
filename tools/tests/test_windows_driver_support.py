@@ -4,6 +4,7 @@ import struct, subprocess, sys, tempfile, unittest
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
+import depguard
 HELPERS = ROOT / 'zig-out/windows7-uefi'
 NS = 'urn:schemas-microsoft-com:unattend'
 WCM = 'http://schemas.microsoft.com/WMIConfig/2002/State'
@@ -20,6 +21,7 @@ def archive(entries):
 class Support(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         sys.path.insert(0,str(ROOT/'tools'))
         from build_windows7_uefi import build
         build(ROOT,HELPERS)

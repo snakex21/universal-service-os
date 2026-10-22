@@ -5,10 +5,14 @@ from unicorn import Uc,UC_ARCH_X86,UC_MODE_16,UC_HOOK_CODE,UC_HOOK_INTR
 from unicorn.x86_const import UC_X86_REG_AX,UC_X86_REG_BX,UC_X86_REG_CX,UC_X86_REG_DX,UC_X86_REG_SI,UC_X86_REG_EFLAGS
 
 ROOT=Path(__file__).resolve().parents[3]
+import sys
+sys.path.insert(0,str(ROOT/'tools/tests'))
+import depguard
 OUT=ROOT/'zig-out/mbr-timestamp'
 ZIG=Path(os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')))
 
 def build(name,section):
+    depguard.require_zig()
     OUT.mkdir(parents=True,exist_ok=True)
     env=dict(os.environ,ZIG_GLOBAL_CACHE_DIR=str(ROOT/'zig-out/zig-global'))
     elf=OUT/(name+'.elf');binary=OUT/(name+'.bin')

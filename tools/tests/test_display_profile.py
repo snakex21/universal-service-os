@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT/'tools'))
 sys.path.insert(0, str(ROOT/'tools/tests'))
 from build_windows_usos_res import build, build_collector
 from check_nt52_driver_imports import pe
+import depguard
 
 OUT = ROOT/'artifacts/display-from-profile/host'
 OUT.mkdir(parents=True, exist_ok=True)
@@ -329,7 +330,7 @@ class DisplayTransport(unittest.TestCase):
     def test_collector_uses_pinned_buildkit_resolver_when_no_override(self):
         from unittest.mock import patch
         import build_win3_usb_keyboard
-        watcom=Path(os.environ['USOS_WATCOM'])
+        watcom=depguard.require_watcom('binnt64/wcc.exe (kolektor USOSVBI)')
         with patch.dict(os.environ,{},clear=False):
             os.environ.pop('USOS_WATCOM',None)
             with patch.object(build_win3_usb_keyboard,'openwatcom',return_value=watcom) as resolve:
@@ -340,6 +341,8 @@ class DisplayTransport(unittest.TestCase):
 class TargetBuilds(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
+        depguard.require_watcom('binnt64/wcc.exe (kolektor USOSVBI)')
         cls.nt = build(ROOT, OUT/'nt')
         cls.registrar = build(ROOT, OUT/'nt', registrar=True)
         cls.w9x = build(ROOT, OUT/'9x', win9x=True)
@@ -416,7 +419,7 @@ class TargetBuilds(unittest.TestCase):
                 self.assertEqual(name in table, expected)
 
     def test_compiled_selector_memory_inf_and_apply_transactions(self):
-        zig = Path(os.environ.get('USOS_ZIG', ROOT/'tools/zig/zig.exe'))
+        zig = depguard.require_zig()
         exe = OUT/'policy.exe'
         env = dict(os.environ, TEMP=str(OUT), TMP=str(OUT), ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'), ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
         subprocess.run([str(zig), 'cc', '-target', 'x86_64-windows-gnu', '-O2', '-nostdlib',

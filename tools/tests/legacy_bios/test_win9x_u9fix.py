@@ -8,6 +8,8 @@ from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 from build_win9x_support import build_u9fix
 
 INI = 'C:\\WINDOWS\\SYSTEM.INI'
@@ -17,6 +19,7 @@ TEMP = 'C:\\WINDOWS\\SYSTEM.U9$'
 class U9Fix(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         out = ROOT / 'zig-out/win9x-support-test'
         out.mkdir(parents=True, exist_ok=True)
         cls.code = build_u9fix(out, out).read_bytes()

@@ -7,10 +7,13 @@
 from pathlib import Path
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 ZIG = ROOT / 'tools' / 'zig' / 'zig.exe'
 
 
@@ -18,6 +21,7 @@ class ModernFinalizeSimulation(unittest.TestCase):
     def test_guard_restores_the_stick_and_finds_the_target(self):
         if os.name != 'nt':
             raise unittest.SkipTest('Win32 simulation')
+        depguard.require_zig()
         with tempfile.TemporaryDirectory(prefix='usos-finalize-') as temp:
             exe = Path(temp) / 'selftest.exe'
             env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'), ZIG_LOCAL_CACHE_DIR=str(Path(temp) / 'cache'))

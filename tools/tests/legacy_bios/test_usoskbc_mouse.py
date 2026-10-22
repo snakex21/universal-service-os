@@ -15,6 +15,8 @@ from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 from build_win3_usb_keyboard import build_kbc, elf_symbols
 
 TSR = 0x1000          # PSP of USOSKBC (COM image at TSR:0100)
@@ -237,6 +239,7 @@ class Machine:
 class UsosKbcMouse(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         out = ROOT / 'zig-out/usoskbc-mouse-test'
         out.mkdir(parents=True, exist_ok=True)
         cls.com = build_kbc(out, out).read_bytes()

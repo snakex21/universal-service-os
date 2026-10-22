@@ -14,11 +14,15 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+import sys
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 ZIG = ROOT / 'tools/zig/zig.exe'
 CMD = (ROOT / 'tools/windows_x86_csmwrap.cmd').read_text(encoding='ascii')
 
 
 def build_gate(out: Path, target: str, native: bool) -> bytes:
+    depguard.require_zig('kompilator Zig (bramka OOBE Vista x86)')
     env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'), ZIG_LOCAL_CACHE_DIR=str(out.parent / 'zig-cache'))
     args = [str(ZIG), 'cc', '-target', target, '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin']
     if native:
@@ -31,6 +35,7 @@ def build_gate(out: Path, target: str, native: bool) -> bytes:
 
 class X86VistaOobeGate(unittest.TestCase):
     def test_hidden_console_chain_retains_stdout(self):
+        depguard.require_zig('kompilator Zig (hidden console chain)')
         with tempfile.TemporaryDirectory() as temporary:
             folder=Path(temporary)
             env=dict(os.environ,ZIG_GLOBAL_CACHE_DIR=str(folder/'global'),ZIG_LOCAL_CACHE_DIR=str(folder/'local'))
