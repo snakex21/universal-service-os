@@ -1,0 +1,257 @@
+{
+  "scope": "Plan only: current owned completed NT4 NET installed cases04\u201308 + readonly alias. No deletion performed. No USB-agent target inspected. Historical Setup/nativepage scratch folders excluded until separate ownership inventory.",
+  "delete_executed": false,
+  "keep_parent": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03",
+  "keep_parent_reason": "Immutable03 is backing parent of NET and other agent USB HID/MSC cases. Retain whole directory pending root cross-agent cleanup.",
+  "cases": [
+    {
+      "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04",
+      "writer_result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\result.json",
+      "completed": true,
+      "qemu_returncode": 0,
+      "runtime_error": "JSONDecodeError: Invalid control character at: line 1 column 511 (char 510)",
+      "images": [
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\blank-stick.qcow2",
+          "bytes": 197120,
+          "nlink": 1,
+          "inode": 1125899907334631,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\blank-stick.qcow2",
+              "format": "qcow2",
+              "virtual_size": 10737418240,
+              "backing_filename": null
+            }
+          ]
+        },
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\target.qcow2",
+          "bytes": 458031104,
+          "nlink": 1,
+          "inode": 844424930623976,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": null
+            }
+          ]
+        }
+      ],
+      "deletion_condition": "After root confirms no external dependent; remove child targets first, never parent03."
+    },
+    {
+      "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05",
+      "writer_result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\result.json",
+      "completed": true,
+      "qemu_returncode": 0,
+      "runtime_error": null,
+      "images": [
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\blank-stick.qcow2",
+          "bytes": 197120,
+          "nlink": 1,
+          "inode": 1407374884045291,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\blank-stick.qcow2",
+              "format": "qcow2",
+              "virtual_size": 10737418240,
+              "backing_filename": null
+            }
+          ]
+        },
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\target.qcow2",
+          "bytes": 458031104,
+          "nlink": 1,
+          "inode": 844424930623980,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": null
+            }
+          ]
+        }
+      ],
+      "deletion_condition": "After root confirms no external dependent; remove child targets first, never parent03."
+    },
+    {
+      "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06",
+      "writer_result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\result.json",
+      "completed": true,
+      "qemu_returncode": 0,
+      "runtime_error": null,
+      "images": [
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\blank-stick.qcow2",
+          "bytes": 197120,
+          "nlink": 1,
+          "inode": 1125899907334651,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\blank-stick.qcow2",
+              "format": "qcow2",
+              "virtual_size": 10737418240,
+              "backing_filename": null
+            }
+          ]
+        },
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\target.qcow2",
+          "bytes": 5373952,
+          "nlink": 1,
+          "inode": 844424930623993,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": null
+            }
+          ]
+        }
+      ],
+      "deletion_condition": "After root confirms no external dependent; remove child targets first, never parent03."
+    },
+    {
+      "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07",
+      "writer_result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\result.json",
+      "completed": true,
+      "qemu_returncode": 0,
+      "runtime_error": null,
+      "images": [
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\blank-stick.qcow2",
+          "bytes": 197120,
+          "nlink": 1,
+          "inode": 1125899907334659,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\blank-stick.qcow2",
+              "format": "qcow2",
+              "virtual_size": 10737418240,
+              "backing_filename": null
+            }
+          ]
+        },
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "bytes": 458031104,
+          "nlink": 1,
+          "inode": 844424930624004,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": null
+            }
+          ]
+        }
+      ],
+      "deletion_condition": "After root confirms no external dependent; remove child targets first, never parent03."
+    },
+    {
+      "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08",
+      "writer_result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\result.json",
+      "completed": true,
+      "qemu_returncode": 0,
+      "runtime_error": null,
+      "images": [
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\blank-stick.qcow2",
+          "bytes": 197120,
+          "nlink": 1,
+          "inode": 1407374884045357,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\blank-stick.qcow2",
+              "format": "qcow2",
+              "virtual_size": 10737418240,
+              "backing_filename": null
+            }
+          ]
+        },
+        {
+          "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+          "bytes": 458031104,
+          "nlink": 2,
+          "inode": 844424930624047,
+          "chain": [
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2"
+            },
+            {
+              "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+              "format": "qcow2",
+              "virtual_size": 4294967296,
+              "backing_filename": null
+            }
+          ]
+        }
+      ],
+      "deletion_condition": "After root confirms no external dependent; remove child targets first, never parent03."
+    }
+  ],
+  "readonly_alias": {
+    "root": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly",
+    "same_inode_as08": true,
+    "inode": 844424930624047,
+    "nlink": 2,
+    "collector_stopped": true,
+    "condition": "Unlink alias first; it shares08 inode, deleting one link does not free bytes while another exists. Readonly mount only; no alias payload mutation."
+  },
+  "suggested_dependency_order": [
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04"
+  ],
+  "prohibited_in_this_plan": [
+    "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03",
+    "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-usb-hid01",
+    "all MSC/USB agent folders",
+    "all physical disks",
+    "all original source ISOs and frozen _assets caches"
+  ]
+}

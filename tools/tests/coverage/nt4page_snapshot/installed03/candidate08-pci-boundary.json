@@ -1,0 +1,11 @@
+{
+  "selected": {
+    "bus": 0,
+    "slot": 3,
+    "function": 0,
+    "irq": 12,
+    "irq_pin": 1
+  },
+  "monotonic_ns": 22800106396700,
+  "scope": "one bounded query-pci, no MMIO read"
+}

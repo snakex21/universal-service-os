@@ -1,0 +1,74 @@
+{
+  "scope": "Installed08 BIOS q35/igb native NT4 Workstation PL SP6a, single new own SYS89b/21248 versus completed07; no fresh full-cache, HID/MSC or hardware qualification",
+  "source_iso_sha256": "7aae3d7c36619c4edab58c8dccf9d350c78639f88afa36ae6b21e2e9cee9611b",
+  "driver_sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+  "driver_bytes": 21248,
+  "native_desktop_observed": true,
+  "native_ping": {
+    "sent": 4,
+    "received": 4,
+    "all_rtt_below_ms": 10,
+    "image": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-09.png"
+  },
+  "native_ipconfig": {
+    "dhcp_enabled": true,
+    "address": "10.0.2.15",
+    "mask": "255.255.255.0",
+    "dhcp_server": "10.0.2.2",
+    "gateway": "10.0.2.2",
+    "dns": "10.0.2.3",
+    "image": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-13.png"
+  },
+  "fresh_net_log": {
+    "old_coverage_log_deleted_at_step": 10,
+    "old_nt4_log_delete_reported_unavailable": true,
+    "helper_rerun_step": 11,
+    "status": "TESTNET_DONE",
+    "own_network_lines": 7,
+    "configured_dns_id": "2B11",
+    "peer": "10.0.2.3:53",
+    "question": "frogfind.com A",
+    "response_A": "64.227.13.248"
+  },
+  "strict_collection": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\collection.json",
+  "strict_lan_pass": true,
+  "native_safe_off": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-16.png",
+  "qemu_returncode": 0,
+  "closed_target_sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+  "base07_unchanged": true,
+  "irq_assessment_preserved": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\irq-assessment.json",
+  "irq_additional_metadata": {
+    "canonical_asserted_icr_clears_after_actual_first_logon": 57,
+    "trace_sha256": "6e1ede8d186915c2e809dd61085166f0a75238966b9201b1dc9fbe0e2a8e78a9",
+    "trace_bytes": 229404,
+    "selected_pci_config_irq": 12,
+    "full_pic_route_observed": false,
+    "interpretation": "Positive canonical ICR clear and INTx evidence; actual HAL/PIRQ route unqualified. No negative Windows IRQ verdict and no full route PASS.",
+    "public_qemu_reference": "https://github.com/qemu/qemu/blob/master/hw/net/igb_core.c#L2698",
+    "public_source_inference": "INT_ASSERTED branch clears ICR before the special nonmsix-read trace branch. That selected event is not a general ICR-read counter.",
+    "exact_qemu_build_source_available": false,
+    "runtime_version": "11.1.0 (v11.1.0-12130-ge470268ff4)"
+  },
+  "initial_collector_not_rewritten": {
+    "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08-network-excerpt\\collection.json",
+    "driver_status": "mismatch",
+    "reason": "Inherited guest script used literal size21376; c.DRIVER_BYTES override did not alter that literal. Own policy now replaces exactly that one guard to21248 and retains hash gate.",
+    "instrumentation_error_not_windows_failure": true
+  },
+  "final_policy_sha256": "2e449f70569d53467f4b52f6f9b941747ce7296173a2144ec90e004615ad666e",
+  "runtime_instrumentation": {
+    "runtime_sha256": "7b0eff8ab34581065df3f58893f38ff26a8677c86daa5953b91079ed5104f85c",
+    "policy_sha256": "811aadb789b9d0d6919be589518119567e5bbd1317acc3319e4156abbc3e9d0c",
+    "trace_policy_sha256": "6f4204f6ea350045a5b68fa922f3c33aba5733de967c5c76442e5481cfe6c305",
+    "driver_sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+    "driver_bytes": 21248,
+    "active_mmio_reads": false,
+    "pci_reads": 1
+  },
+  "host_tests": {
+    "new_trace": 4,
+    "explicit08_policy": 4
+  },
+  "scratch_removed": true,
+  "no_vm_running": true
+}

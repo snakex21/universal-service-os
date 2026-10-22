@@ -1,0 +1,20 @@
+{
+  "scope": "Installed08, exactly own SYS replacement from completed LAN07. No SYSTEM/helper/logger/USB/source hub change; not fresh installation. Passive IRQ instrumentation separate.",
+  "base": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+  "base_sha256": "29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10",
+  "overlay": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+  "only_own_file_change": {
+    "path": "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS",
+    "before_sha256": "4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d",
+    "after_sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+    "before_bytes": 21376,
+    "after_bytes": 21248,
+    "same_allocated_chain": true
+  },
+  "all_other_virtual_disk_bytes_identical": true,
+  "system_unchanged": true,
+  "system_sha256": "f8b10db5f792ab328e5cb74bde69a2ae1c264a7ee18d6fce34ccfb9349caa370",
+  "full_raw_overlay_compare": true,
+  "prepared": true,
+  "scratch_removed": true
+}

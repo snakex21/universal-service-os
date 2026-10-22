@@ -1,0 +1,11 @@
+{
+  "scope": "Stopped original HAL public VERSIONINFO only, bytes retained in RAM",
+  "image_sha256": "50e00d5bcbdedf4fb1d6c2e2a1ff88e012ecd1ab061ebdcc48ce601f86963eea",
+  "bytes": 68960,
+  "public_version_names": {
+    "InternalName": "hal.dll",
+    "OriginalFilename": "hal.dll"
+  },
+  "raw_microsoft_exported": false,
+  "scratch_removed": true
+}

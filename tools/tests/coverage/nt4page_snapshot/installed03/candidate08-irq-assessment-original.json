@@ -1,0 +1,14 @@
+{
+  "scope": "Passive public IRQ events after actual first-logon boundary, no guest MMIO read",
+  "pci_irq": 12,
+  "after_first_logon": {
+    "canonical_ims_writes": 114,
+    "intx_assertions": 57,
+    "pic_nic_interrupts": 0,
+    "native_icr_reads": 0
+  },
+  "trace_dropped": 0,
+  "error": null,
+  "irq_delivery_observed": false,
+  "before_pci_pic_events_drained": 147282
+}

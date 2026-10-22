@@ -995,3 +995,89 @@ oraz rzeczywistym odczytem PCIIRQ na pojedynczej granicyendpoint, bezICRpeek.
 Agentmacos domknął osobny HID1.3keyboard/mouse out/in na03: commit0c53a3ed,
 bezPS2native, negativecontrol/safeoff/readback PASS. MSCfrozen1.1 jest osobno
 przekazany temu agentowi; nie łączymy wersji USB/hubów ani ocen. HardwarebezPASS.
+
+
+2026-10-22 — installed08: nowy SYS canonical IRQ, rzeczywisty LAN PASS
+
+Na ukończonym target07 utworzono osobny COW. Pełny compare całego 4 GiB
+potwierdził wyłącznie wymianę własnego WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS:
+4f2eb16b...0f8d / 21376 B ->
+89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233 / 21248 B.
+SYSTEM, helper 82279b..., logger fe4ffa..., USB HID 1.3 i wszystkie pozostałe
+bajty były identyczne. Źródła fixu czterech IRQ defines są w f8a87c46.
+To kwalifikacja zainstalowanego systemu BIOS q35/AHCI/igb, nie nowy pełny
+fresh-cache ani wspólny PASS HID/MSC/hardware.
+
+Po jednym normalnym guardzie uruchomiono TTY13013. Endpoint po 150 s,
+następnie rzeczywisty pulpit, exact ARM -> GUI helper READY + actual UART
+token, /testnet -> TESTNET_DONE. Native ping odpowiedział 4/4, wszystkie
+czasy <10 ms (operator-09). Native IPCONFIG /ALL (operator-13) potwierdza
+NDISLoop1, DHCP Tak, 10.0.2.15 / 255.255.255.0, DHCP/brama 10.0.2.2,
+DNS 10.0.2.3. Stary własny log odziedziczony z parent07 usunięto w gościu
+na kroku10 i powtórzono /testnet w tej samej VM. Finalne 7 NET linii
+pochodzi z tego przebiegu, nie ze starego sukcesu07. NT4/USABILITY.TXT
+był niedostępny; nie jest nazywany brakującym plikiem na podstawie read failure.
+Końcowy configured DNS: peer10.0.2.3:53, dns_match=1, ID2B11,
+question=frogfind.com A, answer64.227.13.248. ICMP echo_match=1, status0,
+replies1, RTT0ms. Sam gethostbyname/fixed DNS nie wystarczał.
+
+Native safe-off operator-16, FINISH/QMP quit/rc0, 841.441 s; żaden własny
+Windows/QEMU nie pozostał aktywny. Pierwszy readonly collector zachował
+false flags, ponieważ oryginalny guest script ma literalny guard21376 B;
+sama zmiana DRIVER_BYTES w module go nie zmieniła. To błąd instrumentacji,
+nie Windows/SYS FAIL. Jawna własna policy08 podmienia dokładnie jeden
+znany guard21376->21248, nadal wymaga hash89b..., pozostałych pins,
+actual token, TESTNET_DONE, poprawnej gramatyki i DORA. Regresja sprawdza
+rzeczywisty wygenerowany guest command. Historyczny pierwszy wynik nie
+został nadpisany. Drugi collector08b dostał własny readonly hardlink alias
+w G:\USOS-Kolekcja\_vm\nt4-installed08b-network-readonly; target ma ten sam
+inode co08 i nie był modyfikowany przez kolektor.
+
+Readonly recollection08b 30.151 s PASS/rc0: driver_hash_matches,
+first_logon_observed, dhcp_pass, gateway_pass, dns_pass oraz
+lan_traffic_matches_lease są true. Dwie rzeczywiste DORA po tokenie,
+każda 10.0.2.15 / DHCP10.0.2.2 / router10.0.2.2 / DNS10.0.2.3.
+Wynik: C:\Users\ASRock\usos-work\macierz-windows\artifacts\coverage\
+nt4-installed08b-network-excerpt\collection.json.
+Stopreadback potwierdza clean SYSTEM/SOFTWARE, exact SYS89b/21248,
+NDISLoop/TCPIP/DHCP/Workstation2, Server4/Browser4, USB1/PS2driver1/Serial2,
+status TESTNET_DONE, brak ARM i obu hooków. Base07 zachowany z dokładnym
+SHA29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10.
+Finalny target08:
+G:\USOS-Kolekcja\_vm\nt4-installed07-canonical-irq08\target.qcow2,
+SHAf0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee.
+
+Pasywny trace: zero active MMIO/ICR peek, 512 KiB cap, zero overflow/drop,
+147282 PIC events pominięte przed jednorazową granicą actual PCI metadata.
+PCI configuration wskazało IRQ12. Po actual tokenie: 114 canonical IMS
+writes, 57 INTx assertions oraz 57 dokładnych clearC0 0x80000080->0.
+Pierwotny automat IRQ_delivery_observed=false pozostaje bez zmian:
+PIC12interrupt=0 i wybrany special nonmsix-ICR-read event=0. To nie jest
+negatywny werdykt IRQ Windows. Publiczny kod QEMU igb_mac_icr_read ma
+wcześniejszą gałąź INT_ASSERTED, która czyści ICR bez special eventu;
+wybrany event nie jest ogólnym licznikiem odczytów ICR:
+https://github.com/qemu/qemu/blob/master/hw/net/igb_core.c#L2698 .
+Ta referencja wyjaśnia obserwację, ale dokładny source build e470268ff4
+nie był dostępny pod jego URL; nie przedstawiam master jako exact build.
+Own IgbIrqRead jest wywołany przez MpIsr, TimerFn nie czyta ICR; Reset także
+czyta ICR przy inicjalizacji. Dodatkowe metadane stanowią pozytywny dowód
+canonical clear, bez pełnego PASS ścieżki HAL/PIRQ/PIC. IRQ delivery jako
+cała ścieżka pozostaje niezakwalifikowane; nie ma powodu nowej ślepej VM.
+
+Nowe focused host tests: trace4 + explicit policy08 4 PASS; ponadto policy07
+3 PASS (łącznie11). Dokumenty/selected evidence są w tracked
+ tools/tests/coverage/nt4page_snapshot/installed03/candidate08-*.json,
+ candidate08b-collection.json, network08_policy.py i irq08_trace.py.
+Runtime/collector source snapshots zachowują dokładne użyte źródła;
+artefakty aktywnego startu zawierają wcześniejszy hash policy, późniejszy
+collector ma jawny final policy hash. Nie przepisano historii uruchomienia.
+
+Plan sprzątania (WYŁĄCZNIE plan, bez kasowania): tracked
+ tools/tests/coverage/nt4page_snapshot/installed03/nt4-net-cleanup-plan.json.
+Zawiera absolutne rooty własnych zakończonych NET04–08, 10 obrazów i ich
+rzeczywiste backing chains oraz osobny readonly alias08b. Sugerowana
+kolejność: alias08b, child08, parent07, pozostałe children04/05/06.
+Cały candidate03 KEEP: jest rodzicem USB drugiego agenta. HID/MSC, źródła
+ISO, cache _assets i physical media są poza planem. Historyczne Setup /
+nativepage scratch foldery wymagają osobnego ownership inventory; niczego
+stamtąd nie kasowano. Root zarządza ostatecznym wspólnym sprzątaniem.
