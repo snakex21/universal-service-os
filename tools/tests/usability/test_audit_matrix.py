@@ -22,15 +22,23 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('QEMU PASS LAN07 [S16]',net)
         self.assertIn('strict configuredUDP DNS10.0.2.3',net)
         self.assertIn('oldSYS4f2',net)
-        self.assertIn('bez fresh AUTO/nowego IRQ89/MSC/X470 PASS',net)
+        self.assertIn('QEMU PASS LAN08b [S18]',net)
+        self.assertIn('actualSYS89b/21248B',net)
+        self.assertIn('native ping4/4<10ms',net)
+        self.assertIn('IRQ_delivery_observed=false',net)
+        self.assertIn('57 assertedC0 clears/114IMS/57INTx',net)
+        self.assertIn('bez pełnego IRQ PASS',net)
+        self.assertIn('bez fresh AUTO/combinedMSC/HTTP/Server/X470 PASS',net)
         self.assertIn('LAN05 false',net)
         self.assertIn('control06',net)
         self.assertNotIn('[S16]',audit.hid_test(usb,exact))
+        self.assertNotIn('[S18]',usb+audit.hid_test(usb,exact))
         self.assertIn('QEMU PASS NT4 HID01',audit.hid_test(usb,exact))
         self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
 
     def test_nt4_hid_never_spreads_to_other_media_or_server(self):
-        for index,value in ((0,r'Windows NT 4.0\Other.iso'),(1,'4.0 SP3'),
+        for index,value in ((0,r'Windows NT 4.0\Other.iso'),
+                            (0,r'Windows NT 4.0 Server\Windows NT 4.0 Server PL.iso'),(1,'4.0 SP3'),
                             (2,'en-US / x86'),(2,'pl-PL / x64'),
                             (3,'windows-nt-4-server / nt4-x86-qemu-csmwrap')):
             changed=list(audit.NT4_CANDIDATE03_ROW);changed[index]=value
