@@ -8,9 +8,13 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[3]
 WATCH=ROOT/'artifacts/coverage'
-CASE=WATCH/'vm/nt35-client-apply02'
+CASE=WATCH/'vm/nt35-client-apply03'
 
 def main():
+    global CASE
+    if len(sys.argv)==3:
+        if sys.argv[2] not in ('nt35-client-apply03','nt35-client-cold01'):raise ValueError('Exact owned case required')
+        CASE=WATCH/'vm'/sys.argv[2]
     mode=sys.argv[1]
     if mode=='endpoint':wanted=[CASE/'endpoint.png',CASE/'completed.json']
     elif mode.startswith('policy'):

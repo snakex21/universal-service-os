@@ -1,4 +1,4 @@
-# NT35 client-only service policy — experimental QEMU qualification
+# NT35 client-only service policy — QEMU qualification
 
 A bounded read of the completed NT35 USB regression finds Browser and
 LanmanServer Start2, alongside the functional client/TCPIP. IRQ/LAN and
@@ -39,8 +39,27 @@ stops with C000021A/C0000005 before any operator/helper invocation. The
 own helper log is absent in stopped readback; the failed disk is unchanged
 during that read and whole-disk scratch is removed. This is not a helper
 or policy runtime PASS. An unchanged clean-parent cold control baseline01,
-without adding any files, is running to isolate the startup failure.
-Runtime qualification and a separate cold-boot policy check remain open.
+without adding any files, reaches Program Manager and native safe shutdown
+(operator05, QMP quit/exit0). A new apply03 prepared from that same clean
+parent reaches the desktop and executes the explicitly requested helper.
+The isolated apply02 startup failure remains unresolved; a preferred-address
+match in WINSRV is not a measured runtime call stack or a causal diagnosis.
+
+Apply03 receives exact own COM1 completion `USOS_CLIENT35_DONE=0`.
+Native log (operator09) reports Browser and LanmanServer STOPPED/Disabled,
+with Workstation and TCPIP RUNNING. Native `net start` (operator11) lists
+Workstation/DHCP Client and no Server/Computer Browser. The separately
+logged native ping (operator13) receives three replies below10ms each.
+Native Shutdown reaches safe-off on operator17, followed by QMP quit/exit0.
+Stopped disk readback and a separate unchanged cold-boot `/check` remain
+pending; this apply result alone does not qualify persistent cold policy.
+
+The launcher now requires both `isatty()` and Windows `GetConsoleMode`:
+Windows NUL can satisfy `isatty()` despite having no live operator.
+Actual redirected-pipe and DEVNULL subprocess tests refuse before VM
+start; the DEVNULL test covers both apply and cold phase launch paths.
+Only an explicit owned phase selects the helper-only preparation or the
+unchanged effective-disk cold check. No network/USB SYS is rebuilt.
 
 The own helper emits a completion marker to virtual COM1 only inside
 the explicitly marked NT35 fixture. The runner writes an atomic completion
