@@ -97,6 +97,16 @@ usos_nt35_stage() {
     printf '[NET35] staged own NDIS3 driver sha256=%s hardware=%s; original TCP/IP DHCP binding\n' "$_u35_actual" "$_u35_hwid"
 }
 
+usos_nt35_client_request() {
+    # TARGET_ROOT original-source ProductType answer-kind. No inference from
+    # filename, generated account data, or a Server/private answer.
+    [ "${_u35_enabled:-off}" = on ] || return 0
+    [ "$2" = 0 ] || return 0
+    case "$3" in DEFAULT|PROFILE) ;; *) return 0 ;; esac
+    [ -s "$1/USOS/NT3/NET35.ON" ] || return 1
+    printf 'USOS NT35 client-no-sharing\r\n' > "$1/USOS/NT3/CLNT35.REQ" || return 1
+}
+
 usos_nt35_loop_inf() {
     # stdin expanded original OEMNADLB; caller verifies source hash first.
     awk -v BINMODE=3 '

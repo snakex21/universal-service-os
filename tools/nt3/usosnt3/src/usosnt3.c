@@ -59,6 +59,7 @@ typedef LONG (NTAPI *NT_SHUTDOWN_SYSTEM)(int Action);
 static HANDLE g_log = INVALID_HANDLE_VALUE;
 static SERVICE_STATUS_HANDLE g_status_handle;
 static SERVICE_STATUS g_status;
+static int g_post_failed;
 static char g_text[4096];
 
 static int len(const char *s)
@@ -122,6 +123,21 @@ static void write_file(const char *name, const char *text)
     }
     WriteFile(h, text, len(text), &n, NULL);
     CloseHandle(h);
+}
+
+/* Checked local record used by requested NT35 policy and its real DONE gate. */
+static int write_file_checked(const char *name, const char *text)
+{
+    char path[MAX_PATH];
+    DWORD n = 0, size = (DWORD)len(text);
+    HANDLE h;
+    int ok;
+    lstrcpyA(path, DIR); lstrcatA(path, name);
+    h = CreateFileA(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    ok = WriteFile(h, text, size, &n, NULL) && n == size && FlushFileBuffers(h);
+    if (!CloseHandle(h)) ok = 0;
+    return ok;
 }
 
 /* HKLM\SYSTEM\CurrentControlSet\Services\<svc>[\<sub>] opened for writing. */
@@ -1056,7 +1072,7 @@ static int net35_decimal(const char *text, const char *key, DWORD *out)
     return 1;
 }
 
-static void nt35_network(void)
+static int nt35_network(void)
 {
     static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet35.sys";
     HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
@@ -1065,13 +1081,19 @@ static void nt35_network(void)
     DWORD (WINAPI *get_version)(void);
     int ok = 0, meta_len;
     meta_len=read_text("NET35.ON", meta, sizeof meta);
-    if (meta_len<=0 || meta_len>=sizeof meta-1 ||
-        !net35_decimal(meta,"bus",&bus) || !net35_decimal(meta,"slot",&slot)) return;
+    if (meta_len<0) {
+        DWORD error;
+        if (GetFileAttributesA(DIR "NET35.ON") != 0xffffffff) return 0;
+        error=GetLastError();
+        return error==ERROR_FILE_NOT_FOUND || error==ERROR_PATH_NOT_FOUND;
+    }
+    if (!meta_len || meta_len>=sizeof meta-1 ||
+        !net35_decimal(meta,"bus",&bus) || !net35_decimal(meta,"slot",&slot)) return 0;
     get_version = (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetVersion");
-    if (!get_version) return;
+    if (!get_version) return 0;
     version = get_version();
     if ((version & 0xff) != 3 || ((version >> 8) & 0xff) != 50) {
-        say("NET35 refused: actual Windows version is not3.5\r\n"); return;
+        say("NET35 refused: actual Windows version is not3.5\r\n"); return 0;
     }
     say("NET35: configuring existing original TCP/IP DHCP binding\r\n");
     /* Only take over the exact original Ethernet LOOP binding. Missing or
@@ -1118,8 +1140,10 @@ done:
     lstrcatA(g_text,ok ? "staged_copy_readback=match\r\nconfiguration_readback=match\r\ninstalled_runtime_pass=false\r\n" :
         "staged_copy_readback=unconfirmed\r\nconfiguration_readback=failed\r\ninstalled_runtime_pass=false\r\n");
     write_file("NET35.STATUS",g_text);
+    return ok ? 2 : 0; /* 1=not selected, 2=verified takeover, 0=refusal */
 }
 
+#include "client35_prepare.h"
 
 static void display_profile(void)
 {
@@ -1134,15 +1158,16 @@ static void display_profile(void)
     set_dword("usosdisplay", NULL, "Start", 2);
     say("DISPLAY hardware service registered (VM defers)\r\n");
 }
-static void post(void)
+static int post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
     static const char *const keys[] = { "ahcint", "usosnvme", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
                                         "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint", "Scsidisk" };
     static const char ver[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
     char sys[MAX_PATH], src[MAX_PATH], dst[MAX_PATH], key[128];
-    int i, j;
+    int i, j, network_state;
 
+    if (!client35_request()) return 0;
     say("USOS NT 3.51 post\r\n");
     if (!GetSystemDirectoryA(sys, sizeof sys))
         lstrcpyA(sys, "C:\\WINNT\\system32");
@@ -1231,9 +1256,15 @@ static void post(void)
     }
     write_file("DRIVERS.TXT", g_text);
     nt351_network();
-    nt35_network();
+    network_state=nt35_network();
+    if (!network_state) {
+        if (g_client35_requested) client35_fail("NET35 takeover refused");
+        return 0;
+    }
+    if (!client35_prepare(network_state)) return 0;
     vesa();
     display_profile();
+    return 1;
 }
 
 /* VESA display (docs/nt3-vesa-2026-10-14.md): usosvbe.sys (own miniport,
@@ -1342,16 +1373,26 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
-    post();
+    if (!post()) goto failed;
     polish();
     /* Once only: the service turns itself off before DONE.TXT. */
-    set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
-    write_file("DONE.TXT", "done\r\n");
+    if (g_client35_requested) {
+        if (!client35_commit_installer()) goto failed;
+    } else {
+        set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
+        write_file("DONE.TXT", "done\r\n");
+    }
     say("done\r\n");
     /* Let the other services finish starting (their failures reach the
        event log), then restart: the install VM ends there (-no-reboot). */
     Sleep(30000);
     restart();
+    goto stopped;
+failed:
+    g_post_failed = 1;
+    say("POST refused: no DONE/restart; inspect own local records\r\n");
+    g_status.dwWin32ExitCode = ERROR_GEN_FAILURE;
+stopped:
     g_status.dwCurrentState = SERVICE_STOPPED;
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
@@ -1410,12 +1451,11 @@ void __stdcall entry(void)
             say_hex("StartServiceCtrlDispatcher failed, error ", GetLastError());
             ExitProcess(2);
         }
-        ExitProcess(0);
+        ExitProcess(g_post_failed ? 3 : 0);
     }
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
-        post();
-        ExitProcess(0);
+        ExitProcess(post() ? 0 : 3);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
     if (lstrcmpA(opt, "polish") == 0) {

@@ -25,8 +25,8 @@ int main(void){
    r=subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-std=c99','-Wall','-Werror',str(c),'-o',str(exe)],capture_output=True,text=True,env=env);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
    r=subprocess.run([str(exe)],capture_output=True,text=True,env=env);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
  def test_only_nt35_commits_driver_after_verified_binding_and_bus(self):
-  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8');body=source[source.index('static void nt35_network(void)'):source.index('static void display_profile(void)')]
-  self.assertIn('meta_len<=0 || meta_len>=sizeof meta-1',body);self.assertIn('((version >> 8) & 0xff) != 50)',body)
+  source=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8');body=source[source.index('static int nt35_network(void)'):source.index('static void display_profile(void)')]
+  self.assertIn('!meta_len || meta_len>=sizeof meta-1',body);self.assertIn('((version >> 8) & 0xff) != 50)',body)
   self.assertLess(body.index('!net351_has_binding(linkage)'),body.index('CopyFileA('))
   for key in ('BusNumber','UsosPciSlot'):
    self.assertLess(body.index('net351_dword(params,"'+key+'"'),body.index('RegSetValueExA(svc,"ImagePath"'))
