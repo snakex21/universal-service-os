@@ -41,13 +41,14 @@ static UsosDisplayModeList registry_modes;
 #endif
 static void run(void);
 #ifndef USOSRES_9X
-/* Vista / 7 (docs/display-policy.md): every new user gets a HKCU Run
- * value from the Default hive. Display settings are per machine there, so
- * the first hardware sign-in applies; each user's value is removed without
- * elevation (UAC), also once DISPLAY.DONE exists. Never on older Windows. */
+/* Vista / 7 / 8 / 8.1 / 10 (docs/display-policy.md): every new user gets a
+ * HKCU Run value from the Default hive. Display settings are per machine
+ * there, so the first hardware sign-in applies; each user's value is
+ * removed without elevation (UAC), also once DISPLAY.DONE exists. Never on
+ * older Windows. */
 static void forget_user_run(void) {
     HKEY key;
-    if((GetVersion()&255)<6) return;
+    if(!usos_display_user_run(GetVersion())) return;
     if(RegOpenKeyExA(HKEY_CURRENT_USER,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
     }
@@ -371,12 +372,15 @@ static void run(void) {
     display_user=user;
     if(!usos_display_current(enumerate,GetVersion(),current_caps,&current)) { say("DISPLAY no current mode for rollback; request retained\r\n"); CloseHandle(log_file); leave(1); }
     if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
-    display_flags=CDS_UPDATEREGISTRY;
 #ifndef USOSRES_9X
-    /* NT5 only: on 6.x the settings are per machine already, and CDS_GLOBAL
-       needs an elevated token the first sign-in may lack (UAC). */
-    if((GetVersion()&255)==5)display_flags|=CDS_GLOBAL;
+    /* CDS_GLOBAL on NT5 only (display_compat.h usos_display_flags). */
+    display_flags=usos_display_flags(GetVersion());
+#else
+    display_flags=CDS_UPDATEREGISTRY;
 #endif
+    /* Candidates are only the driver's own list (EnumDisplaySettings): the
+       real VBIOS / driver mode set, switched fullscreen. Never a synthetic
+       or centred-window mode (docs/display-policy.md). */
     for(i=0;i<USOS_DISPLAY_MAX;i++) {
         if(!usos_display_enum(enumerate,GetVersion(),i,&settings[count])) break;
         modes[count].width=settings[count].dmPelsWidth; modes[count].height=settings[count].dmPelsHeight;
@@ -395,9 +399,8 @@ static void run(void) {
     change_mode=change;
     {   /* The driver already runs the mode the policy picks (e.g. an XP
            driver at the monitor's native mode): nothing to change. */
-        UsosDisplayChoice chosen=usos_display_choose(modes,count,&request,DISPLAY_BUFFERS);
-        if(chosen.index>=0 && modes[chosen.index].width==current.dmPelsWidth &&
-           modes[chosen.index].height==current.dmPelsHeight && modes[chosen.index].bpp==current.dmBitsPerPel) {
+        UsosDisplayChoice chosen;
+        if(usos_display_already(modes,count,&request,DISPLAY_BUFFERS,current.dmPelsWidth,current.dmPelsHeight,current.dmBitsPerPel,&chosen)>=0) {
             lstrcpyA(line,"DISPLAY current=");describe(&modes[chosen.index]);lstrcatA(line," reason=");
             lstrcatA(line,chosen.reason);lstrcatA(line,"\r\n");say(line);
             finish("DISPLAY already at the selected mode; unchanged");CloseHandle(log_file);leave(0);

@@ -246,7 +246,10 @@ def check_linux() -> None:
 # independent copy of src/flow/answer/schema.zig tweak_support). Every other
 # system must render byte for byte what it renders without the tweak.
 NT6_ALL = {s for s, _ in NT6}
-NT6_DISPLAY_HELPER = {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'}
+# Systems whose USOS answer registers USOSRES (CSMWrap paths: Vista / 7 /
+# 2008 / 2008 R2, and 32-bit 8 / 8.1 / 10 on win-x86-uefi-csmwrap).
+NT6_DISPLAY_HELPER = {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2',
+                      'windows-8', 'windows-8-1', 'windows-10'}
 NT5_BASE = {system: base for system, base, _ in NT5}
 TWEAKS = {
     'skip_games=yes': {'windows-xp', 'windows-vista', 'windows-7'},

@@ -170,7 +170,8 @@ cmp -s "$work/boot" "$work/boot.readback" || fail 'NT60 boot code readback misma
 log 'NT60 NTFS boot code PASS'
 
 # 2b. Display (docs/display-policy.md): Vista / 7 / 2008 / 2008 R2
-# install on the Standard VGA driver at 800x600. A USOS answer for them
+# install on the Standard VGA driver at 800x600, 32-bit 8 / 8.1 / 10
+# (X86_SELF=1) on Microsoft Basic Display at 1024x768. A USOS answer for them
 # registers \USOS\NT6\USOSRES.EXE (autounattend.zig display_helper); its
 # request is <!-- USOS-DISPLAY=... --> or, without one, auto (native EDID
 # mode, else the highest). Staged into the new Windows partition now:

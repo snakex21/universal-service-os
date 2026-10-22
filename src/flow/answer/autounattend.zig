@@ -170,18 +170,25 @@ const default_hive = "HKU\\USOSDefault";
 const explorer_advanced = "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v {s} /t REG_DWORD /d {d} /f";
 
 /// Vista / 7 / 2008 / 2008 R2 without a firmware CSM (vista_csmwrap_target.sh)
-/// install on the Standard VGA (XDDM) driver at 800x600. The micro-Linux
-/// stages USOSRES.EXE + DISPLAY.TXT into this folder of the Windows
-/// partition before Setup; these answers register it for every new user
-/// (Default hive Run: it removes its own value, no elevation needed) only
-/// when the file is there. The other paths (UEFI with CSM, UefiSeven,
-/// native UEFI) never have the file, so the commands do nothing there.
+/// install on the Standard VGA (XDDM) driver at 800x600, 32-bit Windows
+/// 8 / 8.1 / 10 (win-x86-uefi-csmwrap, the same script) on Microsoft Basic
+/// Display at 1024x768. The micro-Linux stages USOSRES.EXE + DISPLAY.TXT
+/// into this folder of the Windows partition before Setup; these answers
+/// register it for every new user (Default hive Run: it removes its own
+/// value, no elevation needed) only when the file is there. The other paths
+/// (UEFI with CSM, native UEFI, Win7 x64 UefiSeven without its opt-in flag)
+/// never have the file, so the commands do nothing there. Server 2012 and
+/// later have no 32-bit release (never on the x86 CSMWrap path).
 /// docs/display-policy.md.
 pub const display_helper = "%SystemDrive%\\USOS\\NT6\\USOSRES.EXE";
 const display_guard = "cmd.exe /c if exist \"" ++ display_helper ++ "\" ";
 
-fn displayHelper(family: Family) bool {
-    return @intFromEnum(schema.Level.of(family)) <= @intFromEnum(schema.Level.windows_7);
+fn displayHelper(family: Family, arch: Arch) bool {
+    return switch (schema.Level.of(family)) {
+        .vista, .windows_7 => true,
+        .windows_8, .windows_8_1, .windows_10 => !family.server() and arch != .arm64,
+        .windows_11 => false,
+    };
 }
 
 /// The specialize commands of the profile for this version (Deployment
@@ -303,7 +310,7 @@ fn hasUserOptions(p: *const Profile, family: Family) bool {
     return false;
 }
 
-pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !void {
+pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, out: *Commands) !void {
     out.len = 0;
     if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
     const on = struct {
@@ -333,15 +340,15 @@ pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !vo
     try optionCommands(p, family, false, out);
     // The staged folder takes the system drive's permissions (the
     // micro-Linux made it before Setup).
-    if (displayHelper(family)) try out.add(display_guard ++ "icacls.exe \"%SystemDrive%\\USOS\" /reset /t /c /q", .{});
-    const hive = displayHelper(family) or on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
+    if (displayHelper(family, arch)) try out.add(display_guard ++ "icacls.exe \"%SystemDrive%\\USOS\" /reset /t /c /q", .{});
+    const hive = displayHelper(family, arch) or on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
     if (hive) {
         try out.add("reg.exe load \"" ++ default_hive ++ "\" \"C:\\Users\\Default\\NTUSER.DAT\"", .{});
         if (on(p, .show_extensions, family)) try out.add(explorer_advanced, .{ "HideFileExt", 0 });
         if (on(p, .show_hidden, family)) try out.add(explorer_advanced, .{ "Hidden", 1 });
         if (on(p, .no_welcome_center, family)) try out.add("reg.exe delete \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v WindowsWelcomeCenter /f", .{});
         try optionCommands(p, family, true, out);
-        if (displayHelper(family)) try out.add(display_guard ++ "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v USOSDisplay /t REG_SZ /d \"" ++ display_helper ++ "\" /f", .{});
+        if (displayHelper(family, arch)) try out.add(display_guard ++ "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v USOSDisplay /t REG_SZ /d \"" ++ display_helper ++ "\" /f", .{});
         try out.add("reg.exe unload \"" ++ default_hive ++ "\"", .{});
     }
 }
@@ -352,7 +359,7 @@ fn specialize(w: *W, input: Input) !void {
     try component(w, "Microsoft-Windows-Shell-Setup", input.arch);
     try element(w, 3, "ComputerName", if (p.computer.len > 0) p.computer.slice() else "*");
     // An explicit resolution (tweak display); auto leaves the choice to
-    // Windows (GOP / WDDM driver) or, Vista / 7 on CSMWrap, to USOSRES.
+    // Windows (GOP / WDDM driver) or, Vista / 7 / 8.x / 10 on CSMWrap, to USOSRES.
     if (schema.tweakOn(p, .display, input.family)) {
         const tag = @tagName(p.display);
         const x = std.mem.indexOfScalar(u8, tag, 'x').?;
@@ -409,7 +416,7 @@ fn specialize(w: *W, input: Input) !void {
         try endComponent(w);
     }
     var commands: Commands = .{};
-    try specializeCommands(p, input.family, &commands);
+    try specializeCommands(p, input.family, input.arch, &commands);
     if (commands.len > 0) {
         try component(w, "Microsoft-Windows-Deployment", input.arch);
         try open(w, 3, "RunSynchronous");
@@ -507,7 +514,7 @@ pub fn render(input: Input, buffer: []u8) ![]const u8 {
     try w.print("<!-- USOS answer profile rendered for {s} ({s}); the target disk is chosen in Setup. docs/answer-profiles.md -->\n", .{ target.systemId(input.family), @tagName(input.arch) });
     // The profile's display request for the CSMWrap staging (DISPLAY.TXT,
     // tools/display_profile.sh usos_display_from_xml); none: default auto.
-    if (displayHelper(input.family) and display_profile.requested(input.profile))
+    if (displayHelper(input.family, input.arch) and display_profile.requested(input.profile))
         try w.print("<!-- USOS-DISPLAY={s}x{s} -->\n", .{ @tagName(input.profile.display), @tagName(input.profile.display_bpp) });
     try w.writeAll("<unattend xmlns=\"urn:schemas-microsoft-com:unattend\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n");
     try w.writeAll("  <settings pass=\"windowsPE\">\n");
@@ -603,18 +610,20 @@ test "autounattend: tweaks per version, nothing for versions without them" {
     try std.testing.expect(std.mem.indexOf(u8, r2, "<EnableLUA>false</EnableLUA>") != null);
     for ([_][]const u8{ "TurnOffSidebar", "powercfg", "InboxGames", "Themes" }) |k| try std.testing.expect(std.mem.indexOf(u8, r2, k) == null);
     var commands: Commands = .{};
-    try specializeCommands(&p, .windows_7, &commands);
+    try specializeCommands(&p, .windows_7, .x86, &commands);
     for (commands.slice()) |command| try std.testing.expect(command.len <= 259);
 }
 
-test "autounattend: display helper on Vista / 7, explicit resolution on every 6.x+" {
+test "autounattend: display helper on Vista / 7 / 8 / 8.1 / 10, explicit resolution on every 6.x+" {
     var p = Profile{};
     try p.name.set("A");
     try p.user.set("Tester");
     var buffer: [max_size]u8 = undefined;
     const registration = "reg.exe add &quot;HKU\\USOSDefault\\Software\\Microsoft\\Windows\\CurrentVersion\\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; /f";
-    for ([_]Family{ .vista, .windows_7, .server_2008, .server_2008_r2 }) |family| {
-        const xml = try render(.{ .profile = &p, .family = family, .arch = .amd64 }, &buffer);
+    // amd64 too: an x86 CSMWrap start may get an amd64-rendered answer,
+    // retargeted in the WinPE (windows_installto.h usos_it_arch).
+    for ([_]Family{ .vista, .windows_7, .server_2008, .server_2008_r2, .windows_8, .windows_8_1, .windows_10 }) |family| for ([_]Arch{ .x86, .amd64 }) |arch| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
         errdefer std.debug.print("family {s}\n", .{@tagName(family)});
         try std.testing.expect(std.mem.indexOf(u8, xml, "cmd.exe /c if exist &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; " ++ registration) != null);
         try std.testing.expect(std.mem.indexOf(u8, xml, "icacls.exe &quot;%SystemDrive%\\USOS&quot; /reset /t /c /q") != null);
@@ -622,8 +631,13 @@ test "autounattend: display helper on Vista / 7, explicit resolution on every 6.
         try std.testing.expect(std.mem.indexOf(u8, xml, "USOS-DISPLAY=") == null);
         try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
         try schema.check(xml, family, null);
+    };
+    // No 32-bit release (11, Server 2012+) or never CSMWrap (arm64): nothing.
+    for ([_]Family{ .windows_10, .windows_11 }) |family| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = .arm64 }, &buffer);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
     }
-    for ([_]Family{ .windows_8, .windows_8_1, .windows_10, .windows_11, .server_2012 }) |family| {
+    for ([_]Family{ .windows_11, .server_2012, .server_2012_r2, .server_2016, .server_2019, .server_2022, .server_2025 }) |family| {
         const xml = try render(.{ .profile = &p, .family = family, .arch = .amd64 }, &buffer);
         try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
         try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
@@ -632,7 +646,7 @@ test "autounattend: display helper on Vista / 7, explicit resolution on every 6.
     for ([_]Family{ .vista, .windows_7, .windows_10, .windows_11 }) |family| {
         const xml = try render(.{ .profile = &p, .family = family, .arch = .x86 }, &buffer);
         try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>\n        <ColorDepth>32</ColorDepth>\n        <HorizontalResolution>1920</HorizontalResolution>\n        <VerticalResolution>1080</VerticalResolution>\n      </Display>") != null);
-        try std.testing.expectEqual(displayHelper(family), std.mem.indexOf(u8, xml, "<!-- USOS-DISPLAY=1920x1080xauto -->\n<unattend") != null);
+        try std.testing.expectEqual(displayHelper(family, .x86), std.mem.indexOf(u8, xml, "<!-- USOS-DISPLAY=1920x1080xauto -->\n<unattend") != null);
         try @import("xml_check.zig").wellFormed(xml);
         try schema.check(xml, family, null);
     }
@@ -729,7 +743,7 @@ test "autounattend: every option on stays within the limits on every version" {
             try schema.check(xml, family, null);
         }
         var commands: Commands = .{};
-        try specializeCommands(&p, family, &commands);
+        try specializeCommands(&p, family, .amd64, &commands);
         for (commands.slice()) |command| {
             try std.testing.expect(command.len <= 259);
             if (std.mem.startsWith(u8, command, "cmd.exe /c reg")) try std.testing.expect(command.len <= packed_limit);

@@ -31,6 +31,16 @@ static int usos_display_current(UsosEnumModes enumerate,DWORD version,UsosCurren
     }
     return 0;
 }
+/* NT version policy (GetVersion(): low byte major, next byte minor). NT5:
+   CDS_GLOBAL (the setup-end user is an administrator). 6.x and later
+   (Vista 6.0, 7 6.1, 8 6.2, 8.1 6.3, 10 as 6.2 without a supportedOS
+   manifest, 10.0 with one): no CDS_GLOBAL, the settings are per machine and
+   CDS_GLOBAL needs an elevated token the first sign-in under UAC lacks;
+   each user's HKCU Run value is removed (Default-hive registration). */
+static DWORD usos_display_flags(DWORD version) {
+    return CDS_UPDATEREGISTRY|((version&255)==5?CDS_GLOBAL:0);
+}
+static int usos_display_user_run(DWORD version) {return (version&0x80000000UL)==0 && (version&255)>=6;}
 static LONG usos_display_change(UsosChangeMode change,DEVMODEA *mode,DWORD flags) {
     LONG result=change(mode,flags);
     if(result==DISP_CHANGE_BADFLAGS&&(flags&CDS_GLOBAL))result=change(mode,flags&~CDS_GLOBAL);

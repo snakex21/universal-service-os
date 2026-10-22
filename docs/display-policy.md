@@ -75,7 +75,7 @@ reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 | XP x86 (incl. CSMWrap/PAE, MCE, Tablet) / XP x64 / 2003 x86+x64 | no USOS display driver; Windows' or the driver bundle's driver | Full HD on X470 (user, 2026-10-17); profile value -> WINNT.SIF [Display] | **USOSRES at the first logon** (user decision 2026-10-21): native (prep EDID, else registry EDID) / highest; **nothing when the driver already runs that mode** | yes |
 | 95 / 98 / 98 SE / Me | vmdisp9x VESA (USOSVESA.INF) + USOSRES 9x | default auto = highest up to 1920x1080 | default auto = **native up to 1920x1080**, else highest up to 1920x1080 | yes |
 | Vista / 7 / 2008 / 2008 R2 CSMWrap | Standard VGA (vgapnp, XDDM) on the CSMWrap VBE | 800x600 | default auto = **native (prep EDID, else registry EDID) / highest**; USOSRES at the first sign-in (below) | yes |
-| 8.1 / 10 x86 CSMWrap | Microsoft Basic Display | Windows' choice | unchanged (open) | no |
+| 8 / 8.1 / 10 x86 CSMWrap (win-x86-uefi-csmwrap) | Microsoft Basic Display on the card's real VBIOS VBE (CSMWrap) | 1024x768 (X470 2026-10-22, Embedded 8.1 Industry Pro x86, NVMe; 1280x1024 / 1920x1080 listed, manual switch works) | default auto = **native (prep EDID, else registry EDID) / highest of the driver's own list**, fullscreen VBIOS modes only; USOSRES at the first sign-in (below) | yes |
 | Win7 x64 UefiSeven | UefiSeven VBE shim | 1024x768 fullscreen | **stays 1024x768** (user decision 2026-10-22); opt-in two-mode + USOSRES with `Systems\Windows\Windows 7\Unattended\native-res-on.txt` (X470 PASS 2026-10-21, centred-window cosmetics rejected, off by default); no CSMWrap route (reserves 1 logical CPU); full resolution = user's AMD/NVIDIA driver in `DATA\Drivers` (`docs/w7x64-native-res-2026-10-21.md`) | opt-in only |
 | Native UEFI Win8+ | GOP / WDDM | Windows' choice | unchanged; a fixed profile value -> `<Display>` | no |
 
@@ -98,9 +98,12 @@ monitor). On the VGA driver (4 bpp) the request stays registered until a
 real driver is there. POSReady 2009 (its own VM-install flow,
 `\USOS\POSR`) is **not** covered yet.
 
-## Vista / 7 / 2008 CSMWrap chain (commit 1b6fea70)
+## Vista / 7 / 2008 / 8.x / 10 x86 CSMWrap chain (commit 1b6fea70; 8.x / 10 x86: feat/x86-modern-display)
 
-1. **Answer** (`autounattend.zig`): Vista / 7 / 2008 / 2008 R2 answers get
+1. **Answer** (`autounattend.zig`): Vista / 7 / 2008 / 2008 R2 answers and
+   Windows 8 / 8.1 / 10 client answers (x86 and amd64: the x86 WinPE
+   retargets an amd64-rendered answer, windows_installto.h; not arm64, not
+   Windows 11, not Server 2012+, which have no 32-bit release) get
    two specialize commands guarded by
    `if exist "%SystemDrive%\USOS\NT6\USOSRES.EXE"`: `icacls ... /reset`
    and a Default-hive `HKCU\...\Run USOSDisplay`. A profile request adds
@@ -112,6 +115,40 @@ real driver is there. POSReady 2009 (its own VM-install flow,
    answer: nothing. Failures are logged and never stop the preparation.
 3. **First sign-in**: USOSRES (no CDS_GLOBAL on 6.x), removes its HKCU Run
    value; later users exit at DISPLAY.DONE. Log `C:\USOS\NT6\USOSRES.LOG`.
+
+### 8 / 8.1 / 10 x86 (win-x86-uefi-csmwrap, 2026-10-22)
+
+The path runs the same `vista_csmwrap_target.sh` (X86_SELF=1) and the same
+prep-time EDID record (`vista_preparation.zig`, before the micro-Linux), so
+steps 2-3 were already path-neutral; only the answer lacked the
+registration. On NT 6.2 / 6.3 / 10 USOSRES behaves as on 6.0 / 6.1
+(`display_compat.h` `usos_display_flags` / `usos_display_user_run`, host
+test for 6.2, 6.3, 10 reported as 6.2 without a manifest and as 10.0):
+`CDS_UPDATEREGISTRY` without `CDS_GLOBAL` (the first sign-in runs with the
+filtered UAC token; display settings are per machine), the user's own
+HKCU Run value is removed, and it exits with `DISPLAY already at the
+selected mode; unchanged` when the chosen mode is the current one
+(`display_apply.h` `usos_display_already`). `C:\USOS` is reset to
+inherited ACLs in specialize (Authenticated Users: modify), so the
+unmanifested 32-bit helper writes its log and markers without UAC file
+virtualization.
+
+**Modes: only the driver's own list, fullscreen.** On this path the
+card's real VBIOS switches modes (CSMWrap passes its VBE through) and
+Microsoft Basic Display lists exactly those modes. USOSRES picks only from
+`EnumDisplaySettings` and applies with `ChangeDisplaySettings`: no
+synthetic mode, no centred-window ("square") mode, nothing of the Win7
+x64 UefiSeven two-mode handler (user constraint 2026-10-22). A native size
+the list lacks gives the largest listed mode inside it (`below-native`),
+never an invented one.
+
+X470 expectation (BenQ GL2250H, 1080p): `native=1920x1080` in DISPLAY.TXT,
+`DISPLAY selected=1920x1080x32 reason=native test=0`, `DISPLAY applied`.
+Host tests only; not yet run on the X470. Risk: the 60 Hz /
+default-refresh filter; a Basic Display mode reported with another
+refresh is skipped (`DISPLAY no tested mode; current retained`).
+Existing installs (done before this change) have no `\USOS\NT6`: only a
+fresh preparation gets it.
 
 A fixed profile value renders Shell-Setup `Display` (specialize) for every
 6.x+ version; Windows ignores a mode the adapter lacks. Auto writes no
