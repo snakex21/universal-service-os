@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Az XP-kernel, az initramfs és az USB-meghajtó azonosságának ellenőrzése",
   "boot.xp_prep.loading": "A mikro-Linux kernel betöltése az USB-meghajtóról",
   "boot.xp_prep.starting": "A kernel betölti az XP-környezetet; ezután következik a lemezválasztás",
+  "boot.xp_prep.package_missing": "Windows XP csomag (EFI\\USOS-XP) nincs ezen az USB-meghajtón. Nélküle a Windows XP nem telepíthető az UEFI menüből. Később hozzáadhatja az USOS frissítése vagy a Javítás funkcióval.",
   "winpe.setup_title": "USOS - Windows telepítő",
   "winpe.cancelled": "A Windows telepítése megszakadt.\n\nMit szeretne tenni?",
   "winpe.restart": "Újraindítás",

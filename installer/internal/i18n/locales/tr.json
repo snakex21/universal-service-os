@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "XP çekirdeği, initramfs ve USB sürücü kimliği denetleniyor",
   "boot.xp_prep.loading": "Mikro-Linux çekirdeği USB sürücüden yükleniyor",
   "boot.xp_prep.starting": "Çekirdek XP ortamını yüklüyor; ardından disk seçimi gelecek",
+  "boot.xp_prep.package_missing": "Windows XP paketi (EFI\\USOS-XP) bu USB bellekte yok. Bu olmadan Windows XP UEFI menüsünden kurulamaz. Daha sonra USOS'u Güncelle veya Onar ile ekleyebilirsiniz.",
   "winpe.setup_title": "USOS - Windows Kurulumu",
   "winpe.cancelled": "Windows yüklemesi iptal edildi.\n\nNe yapmak istiyorsunuz?",
   "winpe.restart": "Yeniden başlat",

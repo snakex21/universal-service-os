@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Kontrola jadra XP, initramfs a identity jednotky USB",
   "boot.xp_prep.loading": "Načítava sa jadro mikro-Linuxu z jednotky USB",
   "boot.xp_prep.starting": "Jadro načítava prostredie XP; potom nasleduje výber disku",
+  "boot.xp_prep.package_missing": "Balík Windows XP (EFI\\USOS-XP) na tomto USB disku chýba. Bez neho sa Windows XP nedá nainštalovať z ponuky UEFI. Môžete ho pridať neskôr cez Aktualizovať USOS alebo Opraviť.",
   "winpe.setup_title": "USOS - Inštalácia systému Windows",
   "winpe.cancelled": "Inštalácia systému Windows bola zrušená.\n\nČo chcete urobiť?",
   "winpe.restart": "Reštartovať",

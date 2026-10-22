@@ -950,6 +950,7 @@
   "boot.xp_prep.checking": "Preverjanje jedra XP, initramfs in identitete pogona USB",
   "boot.xp_prep.loading": "Nalaganje jedra mikro-Linux s pogona USB",
   "boot.xp_prep.starting": "Jedro nalaga okolje XP; nato sledi izbira diska",
+  "boot.xp_prep.package_missing": "Paketa za Windows XP (EFI\\USOS-XP) ni na tem pogonu USB. Brez njega sistema Windows XP ni mogoče namestiti iz menija UEFI. Dodate ga lahko pozneje z Posodobi USOS ali Popravi.",
   "winpe.setup_title": "USOS - Namestitev sistema Windows",
   "winpe.cancelled": "Namestitev sistema Windows je bila preklicana.\n\nKaj želite storiti?",
   "winpe.restart": "Znova zaženi",

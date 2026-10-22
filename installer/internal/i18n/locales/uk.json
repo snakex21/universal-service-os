@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Перевірка ядра XP, initramfs та ідентифікатора USB-накопичувача",
   "boot.xp_prep.loading": "Завантаження ядра мікро-Linux з USB-накопичувача",
   "boot.xp_prep.starting": "Ядро завантажує середовище XP; далі відкриється вибір диска",
+  "boot.xp_prep.package_missing": "Пакет Windows XP (EFI\\USOS-XP) відсутній на цьому USB-накопичувачі. Без нього Windows XP не можна встановити з меню UEFI. Додати пакет можна пізніше через «Оновити USOS» або «Відновити».",
   "winpe.setup_title": "USOS - Інсталяція Windows",
   "winpe.cancelled": "Інсталяцію Windows скасовано.\n\nЩо ви хочете зробити?",
   "winpe.restart": "Перезавантажити",

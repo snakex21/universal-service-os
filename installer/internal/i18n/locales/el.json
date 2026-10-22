@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Έλεγχος πυρήνα XP, initramfs και ταυτότητας μονάδας USB",
   "boot.xp_prep.loading": "Φόρτωση πυρήνα micro-Linux από τη μονάδα USB",
   "boot.xp_prep.starting": "Ο πυρήνας φορτώνει το περιβάλλον XP, στη συνέχεια ακολουθεί η επιλογή δίσκου",
+  "boot.xp_prep.package_missing": "Πακέτο Windows XP (EFI\\USOS-XP) λείπει από αυτή τη μονάδα USB. Χωρίς αυτό, τα Windows XP δεν εγκαθίστανται από το μενού UEFI. Μπορείτε να το προσθέσετε αργότερα με Ενημέρωση USOS ή Επισκευή.",
   "winpe.setup_title": "USOS - Εγκατάσταση των Windows",
   "winpe.cancelled": "Η εγκατάσταση των Windows ακυρώθηκε.\n\nΤι θέλετε να κάνετε;",
   "winpe.restart": "Επανεκκίνηση",

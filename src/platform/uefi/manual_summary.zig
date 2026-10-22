@@ -184,6 +184,13 @@ pub fn show(
         fields.add(view.t(.summary_preparation), if (secure_boot.csm().likelyOn()) view.t(.summary_xp_preparation) else view.t(.summary_xp_csmwrap));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
+        // No XP package on this stick (an optional installer component): say
+        // so here instead of failing with "NotFound" after Start.
+        if (!@import("xp_preparation.zig").packagePresent(root)) {
+            can_start = false;
+            notes[note_count] = view.t(.xp_prep_package_missing);
+            note_count += 1;
+        }
         // Windows 2000 shares the preparation, not the XP driver bundle or PAE;
         // Server 2003 and XP x64 (NT 5.2) get GenAHCI instead of the bundle.
         if (std.mem.eql(u8, system.id, "windows-2000")) {
@@ -699,6 +706,7 @@ fn showError(title: []const u8, err: anyerror) void {
         error.IsoNotContiguousEnough, error.IsoResidentOrSparse => view.t(.error_linux_fragmented),
         error.NoLinuxEntry => view.t(.error_linux_no_entry),
         error.HelperMissing => view.t(.error_linux_helper),
+        error.XpPackageMissing => view.t(.xp_prep_package_missing),
         else => view.t(.error_stopped),
     };
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };

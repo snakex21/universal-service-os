@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Pārbauda XP kodolu, initramfs un USB diska identitāti",
   "boot.xp_prep.loading": "Ielādē mikro-Linux kodolu no USB diska",
   "boot.xp_prep.starting": "Kodols ielādē XP vidi; pēc tam sekos diska izvēle",
+  "boot.xp_prep.package_missing": "Windows XP pakotnes (EFI\\USOS-XP) šajā USB diskā nav. Bez tās Windows XP nevar instalēt no UEFI izvēlnes. To var pievienot vēlāk ar Atjaunināt USOS vai Labot.",
   "winpe.setup_title": "USOS - Windows iestatīšana",
   "winpe.cancelled": "Windows instalēšana tika atcelta.\n\nKo vēlaties darīt?",
   "winpe.restart": "Restartēt",

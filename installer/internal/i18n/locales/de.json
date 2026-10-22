@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "XP-Kernel, Initramfs und USB-Laufwerkskennung werden geprüft",
   "boot.xp_prep.loading": "Micro-Linux-Kernel wird vom USB-Laufwerk geladen",
   "boot.xp_prep.starting": "Der Kernel lädt die XP-Umgebung; danach folgt die Datenträgerauswahl",
+  "boot.xp_prep.package_missing": "Windows-XP-Paket (EFI\\USOS-XP) fehlt auf diesem USB-Stick. Ohne es lässt sich Windows XP nicht aus dem UEFI-Menü installieren. Sie können es später mit „USOS aktualisieren“ oder „Reparieren“ hinzufügen.",
   "winpe.setup_title": "USOS - Windows-Setup",
   "winpe.cancelled": "Die Windows-Installation wurde abgebrochen.\n\nWas möchten Sie tun?",
   "winpe.restart": "Neu starten",

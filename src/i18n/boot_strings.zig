@@ -812,6 +812,7 @@ pub const Key = enum(u16) {
     xp_prep_copy_verify,
     xp_prep_environment,
     xp_prep_loading,
+    xp_prep_package_missing,
     xp_prep_starting,
 };
 
@@ -1627,6 +1628,7 @@ pub const hashes = [_]u32{
     0x8a502c84, // xp_prep.copy_verify
     0xe5b1ef16, // xp_prep.environment
     0x6e3859d3, // xp_prep.loading
+    0x2faf0730, // xp_prep.package_missing
     0xb07b1d15, // xp_prep.starting
 };
 
@@ -1967,6 +1969,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -3259,5 +3262,6 @@ pub const english = [_][]const u8{
     "Copying and verifying files",
     "Loading the preparation environment",
     "Loading the micro-Linux kernel from the USB drive",
+    "Windows XP package (EFI\\USOS-XP) is not on this USB drive. Without it, Windows XP cannot be installed from the UEFI menu. You can add it later with Update USOS or Repair.",
     "The kernel is loading the XP environment; the disk selection follows",
 };

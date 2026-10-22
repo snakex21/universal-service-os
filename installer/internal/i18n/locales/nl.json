@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "XP-kernel, initramfs en identiteit van het USB-station controleren",
   "boot.xp_prep.loading": "Micro-Linux-kernel laden vanaf het USB-station",
   "boot.xp_prep.starting": "De kernel laadt de XP-omgeving; daarna volgt de schijfselectie",
+  "boot.xp_prep.package_missing": "Windows XP-pakket (EFI\\USOS-XP) ontbreekt op deze USB-stick. Zonder dit kan Windows XP niet vanuit het UEFI-menu worden geïnstalleerd. Je kunt het later toevoegen met USOS bijwerken of Repareren.",
   "winpe.setup_title": "USOS - Windows Setup",
   "winpe.cancelled": "De Windows-installatie is geannuleerd.\n\nWat wilt u doen?",
   "winpe.restart": "Opnieuw opstarten",

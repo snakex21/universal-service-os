@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "XP tuuma, initramfs-i ja USB-draivi identiteedi kontrollimine",
   "boot.xp_prep.loading": "Mikro-Linuxi tuuma laadimine USB-draivilt",
   "boot.xp_prep.starting": "Tuum laadib XP keskkonda; seejärel järgneb ketta valik",
+  "boot.xp_prep.package_missing": "Windows XP pakett (EFI\\USOS-XP) puudub sellel USB-kettal. Ilma selleta ei saa Windows XP-d UEFI menüüst paigaldada. Saate selle hiljem lisada funktsiooniga Uuenda USOS või Paranda.",
   "winpe.setup_title": "USOS - Windowsi häälestus",
   "winpe.cancelled": "Windowsi installimine tühistati.\n\nMida soovite teha?",
   "winpe.restart": "Taaskäivita",

@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Comprobando el kernel de XP, el initramfs y la identidad de la unidad USB",
   "boot.xp_prep.loading": "Cargando el kernel de micro-Linux desde la unidad USB",
   "boot.xp_prep.starting": "El kernel está cargando el entorno de XP; a continuación se mostrará la selección de disco",
+  "boot.xp_prep.package_missing": "Paquete de Windows XP (EFI\\USOS-XP) no está en esta unidad USB. Sin él, Windows XP no se puede instalar desde el menú UEFI. Puede añadirlo más tarde con Actualizar USOS o Reparar.",
   "winpe.setup_title": "USOS - Instalación de Windows",
   "winpe.cancelled": "La instalación de Windows se ha cancelado.\n\n¿Qué desea hacer?",
   "winpe.restart": "Reiniciar",

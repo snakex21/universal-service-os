@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Kontrollerar XP-kärnan, initramfs och USB-enhetens identitet",
   "boot.xp_prep.loading": "Läser in mikro-Linux-kärnan från USB-enheten",
   "boot.xp_prep.starting": "Kärnan läser in XP-miljön; därefter följer diskvalet",
+  "boot.xp_prep.package_missing": "Windows XP-paket (EFI\\USOS-XP) saknas på denna USB-enhet. Utan det kan Windows XP inte installeras från UEFI-menyn. Du kan lägga till det senare med Uppdatera USOS eller Reparera.",
   "winpe.setup_title": "USOS - Windows installationsprogram",
   "winpe.cancelled": "Windows-installationen avbröts.\n\nVad vill du göra?",
   "winpe.restart": "Starta om",

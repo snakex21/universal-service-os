@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Tarkistetaan XP-ydin, initramfs ja USB-aseman tunniste",
   "boot.xp_prep.loading": "Ladataan mikro-Linux-ydintä USB-asemalta",
   "boot.xp_prep.starting": "Ydin lataa XP-ympäristöä; seuraavaksi tulee levyn valinta",
+  "boot.xp_prep.package_missing": "Windows XP -paketti (EFI\\USOS-XP) puuttuu tältä USB-asemalta. Ilman sitä Windows XP:tä ei voi asentaa UEFI-valikosta. Voit lisätä sen myöhemmin toiminnoilla Päivitä USOS tai Korjaa.",
   "winpe.setup_title": "USOS - Windowsin asennus",
   "winpe.cancelled": "Windowsin asennus peruutettiin.\n\nMitä haluat tehdä?",
   "winpe.restart": "Käynnistä uudelleen",
