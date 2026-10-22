@@ -21,5 +21,5 @@ rem EDID mode, else the highest, only modes from the driver's list, full
 rem screen. posready_csmwrap_target.sh staged it in \USOS\POSR; the helper
 rem waits for a real driver and logs C:\USOS\POSR\USOSRES.LOG.
 if exist "%S%USOSRES.EXE" reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v USOSDisplay /t REG_SZ /d "%SystemDrive%\USOS\POSR\USOSRES.EXE" /f >> "%S%FIRST.LOG" 2>&1
-echo display registered %ERRORLEVEL% >> "%S%FIRST.LOG"
+if exist "%S%USOSRES.EXE" echo display registered %ERRORLEVEL% >> "%S%FIRST.LOG"
 shutdown -s -f -t 0

@@ -129,7 +129,8 @@ class Wiring(unittest.TestCase):
         self.assertIn(RUN_LINE, logon)
         # Before the shutdown of the first logon, after the ACPI check.
         self.assertLess(logon.index(RUN_LINE), logon.index(b"shutdown -s -f -t 0"))
-        self.assertIn(b'echo display registered %ERRORLEVEL% >> "%S%FIRST.LOG"', logon)
+        # Logged only with the helper staged: %ERRORLEVEL% is then reg add's.
+        self.assertIn(b'if exist "%S%USOSRES.EXE" echo display registered %ERRORLEVEL% >> "%S%FIRST.LOG"', logon)
         # The XP contract: the same value name and hive (usos-users.cmd path).
         profile = (ROOT / "tools/display_profile.sh").read_text(encoding="utf-8")
         self.assertIn('/v USOSDisplay /t REG_SZ', profile)
