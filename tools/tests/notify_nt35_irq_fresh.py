@@ -15,6 +15,7 @@ def main():
         source=CASE/names[mode];link=source.with_name(source.stem+'-retained'+source.suffix)
         n.CASE=CASE;n.SOURCE=source;n.LINK=link
         paths=[source];kind='retain'
+    elif mode=='cleanup':paths=[OUT/'cleanup.json'];kind='cleanup'
     elif mode=='endpoint':paths=[OUT/'endpoint.png',OUT/'cleanup.json'];kind='endpoint'
     else:
         number=int(mode)

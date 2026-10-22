@@ -72,7 +72,7 @@ def main():
     record=dict(stopped=True,qemu_returncode=0,target_sha256=target_hash,driver_sha256=DRIVER,driver_bytes=16384,
         hive_version=version,system_sha256=hashlib.sha256(system).hexdigest(),policy=policy,
         no_hive_export=True,no_ms_binary_export=True,registry_modified=False,
-        scope='Four allowlisted service Start/Type values only; runtime services require native net start evidence')
+        scope='Seven allowlisted service Start/Type values only; runtime services require native net start evidence')
     if native is not None:
         if b'\0' in native or any(v<32 and v not in (9,10,13) for v in native):raise ValueError('Expected bounded native service text')
         (HERE/'FRESHNET.LOG').write_bytes(native)

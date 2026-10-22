@@ -44,7 +44,7 @@ def main():
         if cmd.count(option)!=1 or cmd[cmd.index(option)+1]!=value:raise ValueError('Unexpected fresh topology '+option)
     if cmd.count('igb,netdev=usabilitynet,mac=52:54:00:55:53:01')!=1:raise ValueError('Exact sole igb MAC required')
     # Preserve strict same-XID DORA as false when original NT35 switches XID.
-    spec=importlib.util.spec_from_file_location('fresh_capture',HERE/'harness/nt35_capture.py')
+    spec=importlib.util.spec_from_file_location('fresh_capture',HERE/'harness/nt351_capture.py')
     cap=importlib.util.module_from_spec(spec);spec.loader.exec_module(cap)
     data=(CASE/'network.pcap').read_bytes()
     if sha(data)!=result['network_capture']['sha256'] or result['network_capture']['capped']:raise ValueError('Completed uncapped pinned capture required')
@@ -109,13 +109,13 @@ def main():
         input_changed_from_r20='PS/2 enabled; hardware i8042 remains present',
         native_dhcp_release_renew=True,address='10.0.2.15',mask='255.255.255.0',gateway='10.0.2.2',dns='10.0.2.3',
         native_ping_replies=3,native_ping_rtt_upper_bound_ms=10,strict_guest_icmp_rtt_ms=int(icmp[1]),
-        strict_guest_dns=dns,native_resolution=True,http_68k='HTTP/1.1 200 OK',http_connect_ms=int(re.search(r'HTTP GET http://68k.news/[^\n]*\n\[NET\]   connected in (\d+) ms',log)[1]),
+        strict_fixed_dns=dns,strict_configured_dns_10_0_2_3=False,configured_dns_in_native_ipconfig='10.0.2.3',native_resolution=True,http_68k='HTTP/1.1 200 OK',http_connect_ms=int(re.search(r'HTTP GET http://68k.news/[^\n]*\n\[NET\]   connected in (\d+) ms',log)[1]),
         strict_same_xid_dora=strict['dora_observed'],correlated_lease_exchanges_two_xids=len(renewals),
         native_running_services=native_services,
         stopped_service_policy=policy,policy_modified_this_case=False,
         retained_failures=[line for line in log.splitlines() if any(token in line for token in ('TIMEOUT','NO REPLY','FAIL'))],historical_r20_first_2_of_3_and_2s_warm_results_unchanged=True,
         desktop_image_sha256=file_sha(CASE/'endpoint.png'),native_ping_image='operator-09.png',native_services_image='operator-10.png',
-        native_dhcp_image='operator-11.png',safe_shutdown_image='operator-16.png',native_safe_shutdown=True,qemu_returncode=0,process_returncode=0,
+        native_dhcp_image='operator-11.png',completed_logger_image='operator-13.png',safe_shutdown_image='operator-17.png',native_safe_shutdown=True,qemu_returncode=0,process_returncode=0,
         target_sha256=readback['target_sha256'],retained_images=retained,
         retained_image_bytes=sum(row['bytes'] for row in retained.values()),
         no_ms_binary_or_hive_export=True,no_physical_writes=True,no_progress_polling=True,

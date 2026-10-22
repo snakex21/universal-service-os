@@ -1,0 +1,245 @@
+{
+  "case": "nt35-irq-fresh01",
+  "fresh_install_desktop": "PASS",
+  "fresh_corrected_irq_lan": "PASS",
+  "client_no_sharing_policy": "FAIL",
+  "actual_runtime_not_host_inference": true,
+  "input": "Explicit PS/2 baseline; i8042 hardware present; d94 USB qualified separately by nt35-irq-usb01",
+  "source_base_commit": "cf8f7ca0",
+  "startup_source_commit": "380bf3a4",
+  "private_harness_source_commit": "46c7de26b0e2d68e3f79cf1b5b56903793d873a9",
+  "r20_observer_commit": "c0c5ab26",
+  "plan_sha256": "c98bc1e627be13c1ad47acccdd15fd8584633ad1b1b44aba0c9f0768b6e73994",
+  "initrd_sha256": "f51137a7d9cecfa7e554c58485446533ee34bcab285ee54827b2aeabdc68c3fa",
+  "driver_sha256": "d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85",
+  "driver_bytes": 16384,
+  "driver_independent_readbacks": 2,
+  "cache_delta": [
+    "USOSNET35.SYS",
+    "USOSNET35.SHA256"
+  ],
+  "other_effective_entries_identical": 835,
+  "old_cache_unchanged": true,
+  "no_full_build": true,
+  "original_archive_sha256": "e63ce7b63906cfad0b705200ca8f1318d8620d88370ab26ce5ba6fbe8bdd5236",
+  "original_iso_sha256": "109d2c28e3d774e01987434b11c622fbf336e01f28eec2eafe40544f166852d1",
+  "elapsed_seconds": 3543.99,
+  "prepared_target_seconds": 2633.1,
+  "native_dhcp_release_renew": true,
+  "native_ip": "10.0.2.15",
+  "mask": "255.255.255.0",
+  "gateway": "10.0.2.2",
+  "configured_dns": "10.0.2.3",
+  "native_ping": "3/3, each time<10ms",
+  "strict_guest_icmp": "rtt0ms echo_match1",
+  "strict_fixed_dns": [
+    [
+      "UDP DNS 1.1.1.1 (fixed): reply after 30 ms from 1.1.1.1:53: 46 bytes ",
+      " id=3526 question=frogfind.com A=64.227.13.248"
+    ],
+    [
+      "UDP DNS 8.8.8.8 (fixed): reply after 40 ms from 8.8.8.8:53: 46 bytes ",
+      " id=3C4D question=frogfind.com A=64.227.13.248"
+    ],
+    [
+      "TCP DNS 1.1.1.1:53: connected in 21 ms, reply: 46 bytes ",
+      " id=1A64 question=frogfind.com A=64.227.13.248"
+    ]
+  ],
+  "strict_configured_dns": "NOT_TESTED",
+  "native_resolution": [
+    "[NET] gethostbyname(frogfind.com): 64.227.13.248 after 40 ms",
+    "[NET] gethostbyname(example.com): ok error 0 after 20 ms",
+    "[NET] gethostbyname(68k.news): ok error 0 after 60 ms"
+  ],
+  "http": "68k.news HTTP/1.1 200 OK, connect130ms, 4095B; own logger, no IE claim",
+  "remaining_negatives": [
+    "[NET] UDP DNS 10.0.2.2 (gateway): query 30 bytes sent, NO REPLY in 3000 ms",
+    "[NET] TCP connect 10.0.2.2:80: connect TIMEOUT after 4005 ms",
+    "[NET]   HTTP 64.227.13.248:80: connect TIMEOUT after 4006 ms"
+  ],
+  "strict_same_xid_dora": false,
+  "correlated_lease_exchanges": [
+    {
+      "records": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "discover_offer_xid": 1611913278,
+      "request_ack_xid": 3054907666,
+      "lease": {
+        "kind": 5,
+        "xid": 3054907666,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "records": [
+        103,
+        104,
+        105,
+        106
+      ],
+      "discover_offer_xid": 1562303233,
+      "request_ack_xid": 391711279,
+      "lease": {
+        "kind": 5,
+        "xid": 391711279,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    }
+  ],
+  "icmp_wire_pairs": [
+    {
+      "request_record": 108,
+      "reply_records": [
+        109
+      ],
+      "wire_delays_ms": [
+        0.006
+      ]
+    },
+    {
+      "request_record": 110,
+      "reply_records": [
+        111
+      ],
+      "wire_delays_ms": [
+        0.007
+      ]
+    },
+    {
+      "request_record": 112,
+      "reply_records": [
+        113
+      ],
+      "wire_delays_ms": [
+        0.012
+      ]
+    },
+    {
+      "request_record": 116,
+      "reply_records": [
+        117
+      ],
+      "wire_delays_ms": [
+        0.006
+      ]
+    }
+  ],
+  "capture_sha256": "1a0c7f6518d8efd20ac6e77f7d15c92f6adf2039bceb7546e8dfb1b6c5a7e636",
+  "capture_bytes": 48257,
+  "capture_frames": 184,
+  "capped": false,
+  "native_services": [
+    "Computer Browser",
+    "DHCP Client",
+    "EventLog",
+    "Messenger",
+    "OLE",
+    "Server",
+    "Spooler",
+    "TCP/IP NetBIOS Helper",
+    "Workstation"
+  ],
+  "service_policy": {
+    "selected": {
+      "current": 1,
+      "default": 1
+    },
+    "services": {
+      "1": {
+        "Browser": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanServer": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "LanmanWorkstation": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "Tcpip": {
+          "present": true,
+          "start": 3,
+          "type": 1
+        },
+        "RasMan": {
+          "present": false
+        },
+        "RasAcd": {
+          "present": false
+        },
+        "RemoteAccess": {
+          "present": false
+        }
+      }
+    }
+  },
+  "policy_modified": false,
+  "ras_scope": "RasMan/RasAcd/RemoteAccess names absent only; no complete Dial-Up package absence claim",
+  "native_safe_shutdown_image": "operator-17.png",
+  "process_returncode": 0,
+  "qemu_returncode": 0,
+  "target_sha256": "3b76f15ac5eeb410ee3ca21711ef4a8f34729e3a9082427b3e849fb9586e4c6b",
+  "system_sha256": "881147a22ccac179837d89524d48cd9b28cdc57a3f1244b568c495e0319ae2fc",
+  "system_version": [
+    1,
+    2
+  ],
+  "system_clean": true,
+  "retained_unique_file_bytes": 741097472,
+  "retained_unique_files": [
+    {
+      "bytes": 498073600,
+      "names": [
+        "stick-final-retained.qcow2",
+        "stick-retained.qcow2"
+      ]
+    },
+    {
+      "bytes": 242483200,
+      "names": [
+        "target-retained.qcow2"
+      ]
+    },
+    {
+      "bytes": 540672,
+      "names": [
+        "vars-retained.fd"
+      ]
+    }
+  ],
+  "stopped_target": "G:\\USOS-Kolekcja\\_vm\\nt35-irq-fresh01\\target-retained.qcow2",
+  "evidence": "C:\\Users\\ASRock\\usos-work\\nt35-fresh\\artifacts\\coverage\\nt35-irq-fresh01",
+  "runtime": "C:\\Users\\ASRock\\usos-work\\nt35-fresh\\artifacts\\coverage\\vm\\nt35-irq-fresh01",
+  "no_ms_binary_or_hive_export": true,
+  "scratch_whole_disk_removed": true,
+  "generic_runner_flags_preserved": "ASSESS_ENDPOINT/installed_runtime_pass=false remain unchanged; manual assessment binds actual guest replies and stopped installed SYS",
+  "scope": "Exact NT3.5 Workstation EN/QEMU82576 only; no ServerSKU/physical/X470/SMP/full-release/MSC/newUSB or freshAUTO noSharing qualification"
+}
