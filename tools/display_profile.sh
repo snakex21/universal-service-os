@@ -24,6 +24,22 @@ usos_display_request_nt52() {
     fi
     printf '%s\n' "${_dr:-autoxauto}"
 }
+# A user's own WINNT.SIF that sets a resolution ([Display] XResolution=):
+# its mode wins, USOSRES is not staged (docs/display-policy.md).
+usos_display_sif_fixed() {
+    [ -f "$1" ] || return 1
+    awk '{sub(/\r$/, ""); t=$0; gsub(/^[ \t]+|[ \t]+$/, "", t); low=tolower(t)}
+        substr(t, 1, 1) == "[" {s=low; next}
+        s == "[display]" && low ~ /^xresolution[ \t]*=[ \t]*[^ \t]/ {found=1}
+        END {exit !found}' "$1"
+}
+# Vista / 7 / 8.x / 10 answer (the user's own file) that sets a resolution
+# (Shell-Setup <Display><HorizontalResolution>), without the USOS
+# registration of a USOS-made answer: its mode wins, nothing staged.
+usos_display_xml_fixed() {
+    [ -f "$1" ] || return 1
+    grep -qi '<HorizontalResolution>' "$1" && ! usos_display_nt6_answer "$1"
+}
 # The setup-end line that registers the helper (XP / 2003 have reg.exe).
 usos_display_nt52_run_line() {
     printf 'if exist "%%SystemDrive%%\\USOS\\%s\\USOSRES.EXE" reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" /v USOSDisplay /t REG_SZ /d "%%SystemDrive%%\\USOS\\%s\\USOSRES.EXE" /f >> "%%USOS_LOG%%" 2>&1\r\n' "$1" "$1"

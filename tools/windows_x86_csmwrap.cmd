@@ -48,6 +48,9 @@ rem      PCI\CC_010802 (docs/nvme-nt6-2026-10-12.md); never fatal;
 rem   3f. every version: usos-x86-csmwrap hideesp, a "no drive letter" entry
 rem      for the CSMWrap ESP in the installed system's MountedDevices
 rem      (tools/windows_csmwrap_hide.h); never fatal;
+rem   3g. every version, every answer: usos-x86-csmwrap display, the Default
+rem      user's Run value for \USOS\NT6\USOSRES.EXE when the micro-Linux
+rem      staged it (tools/windows_display_register.h); never fatal;
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart.
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
@@ -98,6 +101,13 @@ rem Every version: no drive letter for the CSMWrap ESP (MBR type 0xEF) in the
 rem installed Windows; NT 6+ gave it one on the first boot (X470 2026-10-22,
 rem docs/csmwrap-esp-letter-2026-10-22.md). Offline SYSTEM hive entry only;
 rem never fatal.
+rem Every version, every answer (also none or the user's own): USOSRES
+rem (staged by the micro-Linux in \USOS\NT6) starts at the first sign-in
+rem from the Default user's Run value (docs/display-policy.md, user
+rem decision 2026-10-22). Offline Default hive only; never fatal.
+echo [USOS] phase=display-helper
+"%~dp0usos-x86-csmwrap.exe" display
+if errorlevel 1 echo [USOS] display: not registered; Windows keeps its own resolution.
 echo [USOS] phase=hide-csmwrap-esp
 "%~dp0usos-x86-csmwrap.exe" hideesp
 if errorlevel 1 echo [USOS] hideesp: not done; the CSMWrap ESP may show a drive letter (boot unaffected).

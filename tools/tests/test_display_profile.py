@@ -110,8 +110,11 @@ class DisplayTransport(unittest.TestCase):
             self.assertEqual(cmd.read_bytes(), b'@echo off\r\nnet user Bob /add\r\n'
                 b'if exist "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" /v USOSDisplay /t REG_SZ /d "%SystemDrive%\\USOS\\XP\\USOSRES.EXE" /f >> "%USOS_LOG%" 2>&1\r\nexit /b 0\r\n')
             (setup/'DISPLAY.TXT').unlink()
-        # A user's own WINNT.SIF or Windows 2000 (vesa.cmd path): nothing here.
-        for env in ('NT5_SYSTEM=windows-xp XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=/x.sif; ',
+        # Windows 2000 (vesa.cmd path) or a user's .sif that sets [Display]:
+        # nothing here (user decision 2026-10-22: a user's .sif without one
+        # gets auto, tools/tests/test_display_register.py).
+        fixed = self.tmp/'fixed.sif'; fixed.write_bytes(b'[Display]\r\nXResolution=1280\r\n')
+        for env in ('NT5_SYSTEM=windows-xp XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF='+quote(fixed)+'; ',
                     'NT5_SYSTEM=windows-2000 XP_USER_SETTINGS='+quote(settings)+' XP_CUSTOM_SIF=; '):
             r = shell(pre+env+funcs+'line=$(usos_nt52_display_stage '+quote(setup)+'); [ -z "$line" ]')
             self.assertEqual(r.returncode, 0, r.stderr)
@@ -228,7 +231,7 @@ class DisplayTransport(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return work/'windows/USOS/NT6', r.stdout
 
-    def test_nt6_csmwrap_stages_auto_or_request_only_for_usos_answers(self):
+    def test_nt6_csmwrap_stages_for_every_answer(self):
         registered = b'<!-- USOS answer profile rendered for windows-vista (amd64) -->\n<unattend><Path>cmd.exe /c if exist &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; reg.exe add</Path></unattend>\n'
         folder, out = self.nt6_display_block(registered)
         self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
@@ -236,10 +239,14 @@ class DisplayTransport(unittest.TestCase):
         self.assertIn(b'DISPLAY request=autoxauto', out)
         folder, _ = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=1280x1024x32 -->\n<unattend>'))
         self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'1280x1024x32\r\n')
-        # A user's own answer (no registration), no answer, or no helper: nothing.
+        # User decision 2026-10-22: a user's own answer (no registration) or
+        # no answer gets auto as well (registered by the WinPE step after
+        # Setup); a user's own <Display> keeps its mode.
         for answer in (b'<unattend/>\n', None):
             folder, _ = self.nt6_display_block(answer)
-            self.assertFalse(folder.exists())
+            self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
+        folder, _ = self.nt6_display_block(b'<unattend><HorizontalResolution>1280</HorizontalResolution></unattend>\n')
+        self.assertFalse(folder.exists())
         folder, out = self.nt6_display_block(registered.replace(b'<unattend>', b'<!-- USOS-DISPLAY=800x600xauto -->\n<unattend>'))
         self.assertFalse(folder.exists()); self.assertIn(b'invalid request', out)
         shutil.rmtree(self.tmp/'lib-nt6')
@@ -260,11 +267,11 @@ class DisplayTransport(unittest.TestCase):
             self.assertIn(b'DISPLAY request=autoxauto apply=first-sign-in', out, name)
         folder, _ = self.nt6_display_block((golden/'tweaks.windows-8-1.x86.xml').read_bytes())
         self.assertTrue((folder/'DISPLAY.TXT').read_bytes().startswith(b'1024x768x'))
-        # Windows 11 / Server 2012+ / arm64 never register it: nothing staged.
+        # Windows 11 / Server 2012+ / arm64 answers never reach this script
+        # (no 32-bit or Vista-x64 CSMWrap route) and never register it.
         for name in ('full.windows-11.amd64.xml', 'full.windows-10.arm64.xml', 'full.windows-server-2012-r2.amd64.xml'):
             if (golden/name).exists():
-                folder, _ = self.nt6_display_block((golden/name).read_bytes())
-                self.assertFalse(folder.exists(), name)
+                self.assertNotIn(b'\\USOS\\NT6\\USOSRES.EXE', (golden/name).read_bytes(), name)
 
     def test_display_section_stays_before_usos_csm(self):
         # INSTALL.BAT appends Me's usoskey.drv line to the last section, which

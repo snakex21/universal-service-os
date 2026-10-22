@@ -81,16 +81,23 @@ reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 
 ### XP / Server 2003 (user decision 2026-10-21)
 
-`prepare_xp_ntfs_target.sh` (`usos_nt52_display_stage`): with a USOS
-settings file (profile or usos-xp.ini; not with the user's own WINNT.SIF)
-it stages `USOSRES.EXE` + `DISPLAY.TXT` into the setup folder
+`prepare_xp_ntfs_target.sh` (`usos_nt52_display_stage`): on **every**
+install (user decision 2026-10-22: with a USOS settings file, profile or
+usos-xp.ini, also without one and with the user's own WINNT.SIF) it
+stages `USOSRES.EXE` + `DISPLAY.TXT` into the setup folder
 (`USOS\XP` on the XP x86 path incl. CSMWrap/PAE, MCE and Tablet, which
 route as XP; `USOS\<setup dir>` for Server 2003 and XP x64) and adds
 `reg add HKLM\...\Run /v USOSDisplay` to usos-users.cmd before its
 `exit /b 0` (run at setup end: by pae.exe on XP x86, by usos-setup.cmd on
-the others). Request: a fixed profile `display=WxH` (WINNT.SIF [Display]
-still sets it too) as `WxHxauto`, else `autoxauto`, plus `native=` from
-the prep EDID. USOSRES on NT5 uses CDS_GLOBAL (the setup-end user is an
+the others). Without usos-xp.ini accounts (no settings file, or a user's
+.sif) usos-users.cmd holds only that line (`usos_nt52_display_only_cmd`);
+the setup-end hook is USOS's in every case (`[SetupParams] UserExecute`
+is a protected key of the .sif merge). Request: a fixed profile
+`display=WxH` (WINNT.SIF [Display] still sets it too) as `WxHxauto`, else
+`autoxauto`, plus `native=` from the prep EDID. A user's .sif whose
+`[Display]` sets `XResolution` keeps its own mode: nothing is staged
+(`usos_display_sif_fixed`). Windows 2000 is unchanged (its `vesa.cmd`
+already registers auto without settings). USOSRES on NT5 uses CDS_GLOBAL (the setup-end user is an
 administrator) and, before any test/apply, **exits with
 `DISPLAY already at the selected mode; unchanged`** when the driver
 already runs the chosen mode (the X470 Full HD case with a 1080p
@@ -108,13 +115,48 @@ real driver is there. POSReady 2009 (its own VM-install flow,
    `if exist "%SystemDrive%\USOS\NT6\USOSRES.EXE"`: `icacls ... /reset`
    and a Default-hive `HKCU\...\Run USOSDisplay`. A profile request adds
    `<!-- USOS-DISPLAY=WxHxbpp -->` before `<unattend>`.
-2. **Staging** (`vista_csmwrap_target.sh` 2b): after mkntfs, when the answer
-   has the registration, `\USOS\NT6\USOSRES.EXE` + `DISPLAY.TXT` (request
-   or `autoxauto`, plus `native=`) go onto the Windows partition; Setup
-   installs into it (InstallTo, no format). A user's own answer file or no
-   answer: nothing. Failures are logged and never stop the preparation.
+2. **Staging** (`vista_csmwrap_target.sh` 2b): after mkntfs, on **every**
+   install (user decision 2026-10-22), `\USOS\NT6\USOSRES.EXE` +
+   `DISPLAY.TXT` go onto the Windows partition; Setup installs into it
+   (InstallTo, no format). Request: a USOS answer's
+   `<!-- USOS-DISPLAY=... -->`, else `autoxauto` (also with no answer and
+   with a user's own answer), plus `native=`. A user's own answer with
+   `<HorizontalResolution>` (and without the USOS registration) keeps its
+   mode: nothing staged (`usos_display_xml_fixed`). Failures are logged and
+   never stop the preparation.
+2b. **Registration for every answer** (WinPE, after Setup returned, before
+   the first boot; `tools/windows_display_register.h`): when `\USOS\NT6`
+   holds USOSRES.EXE + DISPLAY.TXT, the installed
+   `Users\Default\NTUSER.DAT` is loaded (RegLoadKey) and gets
+   `Software\Microsoft\Windows\CurrentVersion\Run USOSDisplay =
+   %SystemDrive%\USOS\NT6\USOSRES.EXE` (REG_EXPAND_SZ, read back), and
+   `\USOS\NT6` + both files get an explicit DACL (SYSTEM / Administrators
+   full, Authenticated Users modify), so the unelevated helper writes its
+   log and markers (a USOS answer's `icacls /reset` replaces it later).
+   x86 paths (Vista / 7 / 2008 / 8.x / 10 x86): `usos-x86-csmwrap.exe
+   display` (cmd step 3g, after usosmpart, before hideesp); Vista / 2008
+   x64: `usos-vista-install.exe` on the CSMWrap path, after hideesp. A USOS
+   answer's specialize command later writes the same value name again
+   (harmless). Never fatal; startup-log lines `display: ...` (x86) /
+   `Display: ...` (x64). Why the Default hive and not HKLM Run / RunOnce /
+   Active Setup: every profile (the OOBE account, a user answer's built-in
+   Administrator, later users) is copied from it; the first sign-in runs
+   with the filtered UAC token, which can delete its own HKCU value (USOSRES
+   does) but not an HKLM one; later users exit at DISPLAY.DONE and remove
+   their own value.
 3. **First sign-in**: USOSRES (no CDS_GLOBAL on 6.x), removes its HKCU Run
-   value; later users exit at DISPLAY.DONE. Log `C:\USOS\NT6\USOSRES.LOG`.
+   value; later users exit at DISPLAY.DONE; a driver already at the chosen
+   mode gives `DISPLAY already at the selected mode; unchanged`. Log
+   `C:\USOS\NT6\USOSRES.LOG`.
+
+Status of the answer-less registration (2026-10-22, branch
+`feat/res-without-answer`): **host-tested only**
+(`tools/tests/test_display_register.py`: the helper's display-test on a
+scratch HKCU key incl. DACL and idempotence, the 2b block and the NT5
+staging as shell tests; `test_display_profile.py` updated). No QEMU or X470
+run yet; the offline load of NTUSER.DAT in the WinPE is the same
+RegLoadKey pattern as hideesp's SYSTEM hive but not yet exercised on a real
+install. Win7 x64 UefiSeven and native UEFI Win8+ are unchanged.
 
 ### 8 / 8.1 / 10 x86 (win-x86-uefi-csmwrap, 2026-10-22)
 
