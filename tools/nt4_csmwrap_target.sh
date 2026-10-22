@@ -570,7 +570,13 @@ if [ -n "$nt3" ]; then
     log "answer profile: $profile_values"
     if [ "$major:$minor" = 3:51 ]; then
         . "$LIB/nt351_network_setup.sh"
-        usos_nt351_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'NT351 LAN preflight failed (DHCP, one supported card and verified own driver required)'
+        # LAN is optional, as on NT4 (network_setup.sh): a refused preflight
+        # (no / two supported cards, static IP or DNS, driver check) installs
+        # without network instead of stopping the whole install.
+        if ! usos_nt351_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+            log 'NT351 LAN skipped: preflight refused (DHCP, one supported card and verified own driver required); installing without network'
+            _u351_enabled=off
+        fi
         if [ "$_u351_enabled" = on ]; then
             usos_nt351_answer "$work/WINNT.SIF" > "$work/WINNT.NET351" &&
               mv "$work/WINNT.NET351" "$work/WINNT.SIF" || fail 'cannot render original NT351 LAN answer'
@@ -578,7 +584,10 @@ if [ -n "$nt3" ]; then
     fi
     if [ "$major:$minor" = 3:50 ]; then
         . "$LIB/nt35_network_setup.sh"
-        usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'NT35 LAN preflight failed (DHCP, exact PCI bus/slot and verified own driver required)'
+        if ! usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+            log 'NT35 LAN skipped: preflight refused (DHCP, exact PCI bus/slot and verified own driver required); installing without network'
+            _u35_enabled=off
+        fi
         if [ "$_u35_enabled" = on ]; then
             usos_nt35_answer "$work/WINNT.SIF" > "$work/WINNT.NET35" &&
               mv "$work/WINNT.NET35" "$work/WINNT.SIF" || fail 'cannot render original NT35 LAN answer'
