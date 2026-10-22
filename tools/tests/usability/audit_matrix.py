@@ -59,7 +59,7 @@ def capability(row):
     if any(s in r for s in ('windows-nt-3-1','windows-nt-3-5','windows-nt-3-51')):
         usb='brak MSC; obecne HID; pendrive dla NT3 po 1.0'
         if nt351_r18f(row):
-            net='QEMU PASS R22: świeży normalny USOS, usosnet351 NDIS 3 + igb 8086:10C9, DHCP renew, ping3/3, ścisłe DNS, HTTP68k.news200 [S7]; około2s. R18f [S4] pozostaje osobnym diagnostycznym USB/HID'
+            net='QEMU PASS R22: świeży normalny USOS, usosnet351 NDIS 3 + igb 8086:10C9, DHCP renew, ping3/3, ścisłe DNS, HTTP68k.news200 [S7]; dawny SYS około2s. R26 z osobną poprawką IRQ: ping3/3<10ms, DNS/HTTP PASS [S8], bez wdrożenia do cache. R18f [S4] pozostaje osobnym diagnostycznym USB/HID'
         elif nt35_r20(row):
             net='QEMU PASS R20: usosnet35 NDIS 3 + igb 8086:10C9, DHCP, ping bramy, ścisłe DNS, HTTP68k.news200; świeży USOS [S6]; około2s, pierwszy ping2/3 i warm3/3, ograniczenia zachowane'
         elif 'windows-nt-3-1' in r:
@@ -142,6 +142,7 @@ def main(args):
         '[S5] `docs/nt31-r19c-usb-evidence.md`: normalny USOS R19 doszedł do pulpitu NT3.1; osobny overlay R19c z wyłączeniem i8042prt przeszedł USB HID out/in. Sterownik przypięty hashem i odczytany po native Shutdown. Nie jest to MSC ani Intel LAN PASS.','',
         '[S6] `docs/nt35-r20-usability-evidence.md`: świeży NT3.5 Workstation R20 doszedł do pulpitu i przeszedł LAN; osobny R20b izoluje USB przy i8042prt Start4. Pierwszy ping2/3 i opóźnienia około2s pozostają ograniczeniami; R20b logger1s ICMP FAIL zachowany. Bez MSC i bez przenoszenia wyniku na Server.','',
         '[S7] `docs/nt351-r22-fresh-usability-evidence.md`: świeży normalny USOS R22, pulpit Workstation3.51 build1057, native DHCP renew, ping3/3, ścisłe DNS i HTTP68k200. PS/2 dozwolone; bez nowego USB PASS. Native safeShutdown i rc0. Około2s latencji pozostaje wadą.','',
+        '[S8] `docs/nt351-r26-irq-evidence.md`: osobny installed overlay R26 zmienia tylko własny SYS/4offsety IRQ. Native ping3/3<10ms, ICMP0ms, ścisły DNS60/40ms i HTTP200. Trace65IMS/32INTx/31PICIRQ11; nativeShutdown/rc0 i stoppedreadback. Nie jest świeżym instalatorem z nowymSYS ani testem X470.','',
         'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 nie doszedł do logowania; diagnoza działa na osobnych overlay. Wcześniejsza awaria stagingu nie jest wynikiem Windows ani MSC.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
