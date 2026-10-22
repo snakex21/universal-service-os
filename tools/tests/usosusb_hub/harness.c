@@ -12,7 +12,9 @@
  * <make> d|u", "MOU <dx> <dy> <buttons>"), then the worker thread runs on
  * the boot CPU. The mount thread does not run (no mount manager), so
  * sticks stop at their Diag entry "(<MiB>M wp<n> <n>v)", which needs the
- * BOT bring-up and an LBA 0 read through the hub.
+ * BOT bring-up and an LBA 0 read through the hub. NT 4.0 build: the mount
+ * queue (drive letter links) is run in the worker's idle wait instead
+ * (harness_idle).
  */
 #pragma warning(disable:4505)   /* driver routines the harness does not reach */
 #include "usosusb.c"
@@ -80,6 +82,34 @@ static void connect(PDEVICE_OBJECT d, PVOID cb)
     x->connected = 1;
     x->enabled = 1;
     x->enable_seen = 1;
+}
+
+/* Called by the shim's KeWaitForSingleObject for the worker's idle wait.
+   NT 4.0 build: runs the mount thread's queue (mnt_arrive / mnt_remove)
+   there, so drive letter links (shim: "LINK + \DosDevices\D: -> ...",
+   "LINK - ...") show up for sticks behind hubs; the boot letter wait
+   (wait_boot_letters) is skipped. Other builds: nothing. */
+void __stdcall harness_idle(void)
+{
+#ifdef USOSUSB_NT4MSC
+    static int busy;
+    VOL *v;
+    UCHAR op;
+    if (busy)
+        return;
+    busy = 1;
+    while (g_mhead != g_mtail) {
+        v = g_mvol[g_mhead & 63];
+        op = g_mop[g_mhead & 63];
+        g_mhead++;
+        harness_puts(op ? "MNT arrive\n" : "MNT remove\n");
+        if (op)
+            mnt_arrive(v);
+        else
+            mnt_remove(v);
+    }
+    busy = 0;
+#endif
 }
 
 typedef struct _MBMARK { char tag[8]; void (__cdecl *entry)(void); } MBMARK;

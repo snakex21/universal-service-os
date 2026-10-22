@@ -142,7 +142,7 @@ unsigned driver loads. `tools/tests/test_nt60_usosusb.py` checks the imports
 against the Server 2008 SP2 x86 kernels and HALs (export-name fixture) and
 the flow wiring.
 
-### USB mass storage (NT 6.0 build only)
+### USB mass storage (NT 6.0 build; NT 4.0 below)
 
 The same bundled NT6 binary is also used by Windows 7 SP1 x86 when the
 optional DATA USB package was not installed and the offline SYSTEM has no
@@ -211,6 +211,93 @@ descriptions.
   finished), Explorer may need F5 / reopening after a hot plug (a kernel
   driver cannot broadcast WM_DEVICECHANGE), no media change polling for card
   readers.
+
+## USB mass storage on NT 4.0 (usosusb 1.4-nt4, 2026-10-20, hubs 2026-10-22)
+
+The NT 4.0 build (`bin/i386/usosusb.sys`, also used by NT 3.5 / 3.51) drives
+USB sticks with the same code as the NT 6.0 build (`USOSUSB_MSC`, section
+below) plus `USOSUSB_NT4MSC`. Not run on NT 4.0 yet (no NT 4.0 image for a VM
+run on this machine; the X470 run is the first test).
+
+Versions: the sticks branch was 1.1-nt4 (on top of 1.0-nt4); rebased onto the
+hub code (1.3-nt4) it is `usosusb 1.4-nt4`. The rebase also made the NT 6.0
+build `usosusb 1.4-nt6`: `Parameters\Storage` and the `storage-off` Diag tag
+come from the shared `USOSUSB_MSC` code (without the value the NT 6.0
+behaviour is that of 1.3-nt6). NT 3.1 has no storage code and stays 1.2-nt31.
+
+Sticks behind hubs: the mass storage interface is picked in `dev_enum()`,
+which root ports and hub ports both call, and `msc_attach()` runs from there.
+The volume removal (letter link deleted by the mount thread) hangs off
+`dev_drop()` -> `msc_detach()`, so a stick goes the same way on a root port
+unplug, a hub port disconnect and a hub unplug (children first); a dropped
+device is not dropped again, and `msc_detach()` clears its volume list, so a
+volume is removed once. Stick I/O checks `port_present()` (root port of the
+chain connected, device not `gone`). The log names the stick by its path
+(`p5` on a root port, `p5.3` behind a hub).
+
+Why not the Windows 9x path (SeaBIOS's USB disk service, UDS, used by
+`USOSUSB.MPD`): on NT 4.0 this driver is already the xHCI owner for the
+keyboard and mouse. It takes every xHCI from the firmware and resets it
+(HCRST), so SeaBIOS's rings and device slots are gone once usosusb runs. A UDS
+miniport would also arm SeaBIOS's port watch on the helper core (patch 0022,
+armed by the first channel 1 request), which would then process event rings
+and write registers of a controller that usosusb owns. One owner per
+controller: storage goes into the driver that has the controller.
+
+Differences from the NT 6.0 build:
+
+* No mount manager before Windows 2000. Each volume is a `\Device\UsosUsbDiskN`
+  (FILE_DEVICE_DISK, FILE_REMOVABLE_MEDIA) with a plain `\DosDevices\X:` link
+  (`IoCreateSymbolicLink`): the first free letter from D:, or the letter the
+  same stick had before in this boot. A second thread makes the links. It
+  waits until `\DosDevices\C:` exists (at most 2 minutes, then 3 s more), so a
+  stick plugged in at boot never takes a letter that the I/O manager hands to a
+  disk or CD-ROM (`IoAssignDriveLetters`, Disk Administrator's sticky letters).
+* Unplug: the link is deleted, the volume device stays (32 per boot). Its next
+  request gets STATUS_VERIFY_REQUIRED, then STATUS_NO_MEDIA_IN_DEVICE, and the
+  file system dismounts. The NT 6.0 build's forced verify open and
+  `IoSetThreadHardErrorMode` are left out: neither exists on NT 3.5x, and the
+  binary is shared.
+* Only what NT 4.0's file systems read: FAT12 / FAT16 and NTFS, on an MBR
+  stick (primary partitions) or a superfloppy. FAT32, exFAT and unformatted
+  volumes get no letter: NT 4.0 would mount them as RAW and Explorer would offer
+  to format them. GPT sticks (the USOS stick among them) get no volume at all.
+  Diag tags: `p1:fat32-skip`, `p0:exfat-skip` (superfloppy), `(gpt-skip)`.
+* `MmGetSystemAddressForMdl` (MmMapLockedPages) instead of the `...Safe` form,
+  no FILE_DEVICE_SECURE_OPEN, no OBJ_KERNEL_HANDLE (Windows 2000 additions).
+* `Parameters\Storage` (DWORD, default 1): 0 = keyboard and mouse only; MSC
+  interfaces are then ignored.
+* `Parameters\LogFile` (REG_SZ, NT device path): one line per stick arrival
+  (`E: = UsosUsbDisk0 (p5, usb 0781:5581, fat, LBA 2048, 1905 MiB)`), per
+  removal and per Diag change, with the local time; 256 KiB per boot at most,
+  a file above 1 MiB starts again.
+
+NT 4.0 flow (`tools/nt4_csmwrap_target.sh`, DRIVERS.REG, imported by POST.CMD
+in the install VM; the VM has no xHCI, so it only takes effect on the real
+machine):
+
+    [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosusb\Parameters]
+    "Storage"=dword:00000001            (0 with usb-storage-off.txt)
+    "LogFile"="\\DosDevices\\C:\\USOS\\NT4\\USOSUSB.LOG"
+
+The opt-out is the 9x one: an empty `usb-storage-off.txt` in DATA's
+`Systems\Windows\<NT 4.0 folder>\Unattended` (read by
+`tools/w9x_csmwrap_prepare.sh`, passed as `NT4_USB_STORAGE`). CSMWrap's
+`int13_boot_disk_only` is not set for NT 4.0: it only matters for SeaBIOS's
+own USB disk service, which NT 4.0 does not use. NT 3.5x has no opt-out yet
+(its registry comes from `usosnt3.exe`); there the driver defaults apply
+(storage on, no log file; Diag / Msc in the registry).
+
+Tests: `tools/tests/test_nt4_usosusb_storage.py` (imports on NT 4.0 RTM, SP6a,
+TSE and NT 3.51; the volume code of `msc_attach` cut out of this file and run
+on the host against FAT16 / FAT32 / NTFS / exFAT / GPT / superfloppy images,
+NT4 and NT6 variants; the hub attach / removal hooks; the flow). QEMU hub
+harness (`tools/tests/usosusb_hub/run_hub_qemu.py --variant nt4`, QEMU only, no
+NT 4.0 kernel): a FAT16 stick on hub port 1.3 at boot, unplugged and plugged
+again, then the hub unplugged, then a stick on a root port in and out; the
+harness runs the mount queue in the worker's idle wait and checks one
+`\DosDevices\D:` link per arrival and one removal per unplug (3 / 3). The NT 4.0
+I/O manager, file systems and the boot letter wait are not part of it.
 
 ## NT 3.1 build
 

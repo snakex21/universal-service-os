@@ -20,6 +20,12 @@ Scenarios (one QEMU run, monitor commands in between):
   mouse     mouse out / in on root port 3 and on hub port 1.2; mouse_move
             and a button must reach the mouse class callback after each
             reattach (X470 2026-10-21: mouse replug failed with -addr4)
+  sticks    (NT6 and NT 4.0 builds) the hub with the stick out (its stick
+            goes with it), then a stick on root port 4 in and out; NT 4.0:
+            every arrival / removal through the mount queue (run by the
+            harness in the worker's idle wait) gives exactly one
+            LINK + / LINK - of a \\DosDevices letter on COM1. The NT 4.0
+            stick is FAT16 (that build publishes FAT12 / FAT16 / NTFS only).
 
 QEMU's usb-hub is a full-speed USB 1.1 hub: the transaction translator
 fields (TT hub slot / port) and SuperSpeed hubs (SET_HUB_DEPTH, the USB 3
@@ -139,19 +145,35 @@ def to_multiboot(pe_path: Path, out: Path) -> None:
     out.write_bytes(bytes(img))
 
 
-def make_stick(path: Path, mib: int = 64) -> None:
-    """MBR with one FAT32 LBA partition (type 0Ch) from sector 2048."""
+def make_stick(path: Path, mib: int = 64, fat16: bool = False) -> None:
+    """MBR with one FAT32 LBA partition (type 0Ch) from sector 2048, or
+    (fat16, for the NT 4.0 build) a FAT16 partition (type 06h) with a FAT16
+    boot sector."""
     sectors = mib * 2048
     with open(path, 'wb') as f:
         f.truncate(sectors * 512)
         mbr = bytearray(512)
         struct.pack_into('<I', mbr, 440, 0x55534F53)
         e = 446
-        mbr[e + 4] = 0x0C
+        mbr[e + 4] = 0x06 if fat16 else 0x0C
         struct.pack_into('<II', mbr, e + 8, 2048, sectors - 2048)
         mbr[510:512] = b'\x55\xAA'
         f.seek(0)
         f.write(mbr)
+        if fat16:
+            bs = bytearray(512)
+            bs[0:3] = b'\xEB\x3C\x90'
+            bs[3:11] = b'MSDOS5.0'
+            # BPB: 512 B/sector, 4 sectors/cluster, 1 reserved, 2 FATs, 512 root
+            # entries, no 16-bit total, F8h, 128 sectors/FAT, CHS 63/255, hidden, total
+            struct.pack_into('<HBHBHHBHHHII', bs, 11, 512, 4, 1, 2, 512, 0, 0xF8, 128, 63, 255, 2048,
+                             sectors - 2048)
+            bs[38] = 0x29
+            struct.pack_into('<I', bs, 39, 0x12345678)
+            bs[54:62] = b'FAT16   '
+            bs[510:512] = b'\x55\xAA'
+            f.seek(2048 * 512)
+            f.write(bs)
 
 
 class Vm:
@@ -248,8 +270,9 @@ def main() -> int:
     kernel = work / 'usosusb-hub.mb'
     to_multiboot(pe, kernel)
     stick = work / 'stick.img'
-    make_stick(stick)
-    msc = a.variant == 'nt6'
+    nt4 = a.variant == 'nt4'
+    make_stick(stick, fat16=nt4)
+    msc = a.variant in ('nt6', 'nt4')
     vm = Vm(kernel, stick, work)
     try:
         # boot: everything enumerated
@@ -320,6 +343,46 @@ def main() -> int:
         vm.hmp('device_add usb-mouse,bus=xhci.0,port=1.2,id=m4')
         check('mouse hub port 1.2 back in', vm.wait(r'p5\.2-gone.* p5\.2:s\d+-M', 30))
         mouse_records('mouse records after hub port replug')
+
+        if msc:
+            def links(sign: str) -> list[str]:
+                return re.findall(r'^LINK ' + re.escape(sign) + r' (.*?)\r?$', vm.text(), re.M)
+
+            def wait_links(sign: str, n: int, timeout: float) -> bool:
+                end = time.monotonic() + timeout
+                while time.monotonic() < end:
+                    if len(links(sign)) >= n:
+                        return True
+                    time.sleep(0.5)
+                return False
+
+            if nt4:
+                # boot stick and replugged stick on hub port 1.3: a letter each, one removal
+                check('nt4 stick 1.3 letters (boot, replug)', wait_links('+', 2, 30), str(links('+')))
+                check('nt4 stick 1.3 unplug removed its letter once', len(links('-')) == 1, str(links('-')))
+            # the hub with the stick goes: the stick behind it goes too
+            vm.hmp('device_del hub1')
+            check('hub 1 out takes stick 1.3 along', vm.wait(r'p5\.3:s\d+--S\(64M wp0 1v\).* p5\.3-gone.* p5-gone', 30))
+            if nt4:
+                ok = wait_links('-', 2, 30)
+                check('nt4 hub unplug removed the stick letter once', ok and len(links('-')) == 2, str(links('-')))
+            # a stick on a root port: in and out
+            vm.hmp(f'drive_add 0 if=none,id=stick3,format=raw,file={stick.as_posix()}')
+            vm.hmp('device_add usb-storage,bus=xhci.0,port=4,drive=stick3,id=s3,removable=on')
+            check('stick root port 4 in', vm.wait(r' p4:s\d+--S\(64M wp0 1v\)', 60))
+            if nt4:
+                check('nt4 stick root port 4 letter', wait_links('+', 3, 30), str(links('+')))
+            vm.hmp('device_del s3')
+            check('stick root port 4 out', vm.wait(r'p4:s\d+--S\(64M wp0 1v\).* p4-gone', 30))
+            if nt4:
+                ok = wait_links('-', 3, 30)
+                time.sleep(3)
+                check('nt4 root port unplug removed the letter once', ok and len(links('-')) == 3, str(links('-')))
+                arr, rem = vm.text().count('MNT arrive'), vm.text().count('MNT remove')
+                check('nt4 mount queue: 3 arrivals, 3 removals', (arr, rem) == (3, 3), f'{arr}/{rem}')
+                check('nt4 letters are \\DosDevices links to UsosUsbDiskN',
+                      all(re.fullmatch(r'\\DosDevices\\[D-Z]: -> \\Device\\UsosUsbDisk\d+', l) for l in links('+')),
+                      str(links('+')))
         print('DIAG', vm.diag(), flush=True)
     finally:
         vm.stop()

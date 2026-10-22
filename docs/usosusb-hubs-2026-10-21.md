@@ -218,3 +218,13 @@ What changed under the sticks code (auto-merged, but check it):
   retry marks.
 * Run `tools/tests/test_nt60_usosusb.py`, `test_usosusb_hubs.py` and the
   NT4 sticks tests after the rebase; `USOS_QEMU_HUB=1` runs the hub harness.
+
+**Done 2026-10-22**: branch `feat/nt4-usb-sticks-hubs` (from
+`test/x470-98se-qemu` 77fc9f37), `usosusb 1.4-nt4`. The attach is in
+`dev_enum()`, the volume removal in `dev_drop()` -> `msc_detach()` (no root
+port special case). The shared `USOSUSB_MSC` changes (`Parameters\Storage`,
+`storage-off` Diag) also go into the NT 6.0 build, now `usosusb 1.4-nt6`;
+NT 3.1 unchanged (1.2-nt31). The harness now runs sticks on nt4 too (FAT16
+stick; letters through the mount queue) and adds a hub-with-stick unplug and
+a root port stick in / out for nt4 and nt6. QEMU only: nt4 35/35, nt6 28/28,
+nt31 22/22.

@@ -45,9 +45,11 @@
 #include <ntddkbd.h>
 #include <ntddmou.h>
 #include <kbdmou.h>
-#ifdef USOSUSB_NT6
+#ifndef USOSUSB_NT31
 #include <ntdddisk.h>
 #include <ntddstor.h>
+#endif
+#ifdef USOSUSB_NT6
 #include <mountdev.h>
 #include <mountmgr.h>
 #endif
@@ -71,13 +73,21 @@ __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
    driver connected even before its ENABLE, and a Conn value shows the
    connect / enable state. */
 #pragma warning(disable:4996)   /* HalGetBusDataByOffset is marked obsolete */
-#define USOSUSB_VERSION L"usosusb 1.3-nt6"
+#define USOSUSB_VERSION L"usosusb 1.4-nt6"
 /* USB mass storage (bulk-only transport, SCSI transparent command set):
    removable volumes for the file systems, drive letters via the mount
-   manager. */
+   manager; Parameters\Storage = 0 turns it off (shared with the NT 4.0
+   sticks code since 1.4). */
 #define USOSUSB_MSC 1
 #else
-#define USOSUSB_VERSION L"usosusb 1.3-nt4"
+/* NT 4.0 and NT 3.5x (the same binary): USB sticks too (USOSUSB_MSC), with
+   drive letters as plain \DosDevices links (no mount manager before
+   Windows 2000), MBR / superfloppy media with FAT12 / FAT16 / NTFS only
+   (what these file systems read; FAT32, exFAT and GPT sticks such as the
+   USOS stick get no volume), Parameters\Storage = 0 turns it off. */
+#define USOSUSB_VERSION L"usosusb 1.4-nt4"
+#define USOSUSB_MSC 1
+#define USOSUSB_NT4MSC 1
 #endif
 
 #define MAXHC 4
@@ -208,6 +218,9 @@ static UNICODE_STRING g_regpath;
 static WCHAR g_regbuf[256];
 static WCHAR g_diag[1024];
 static volatile LONG g_ledseq;
+#ifdef USOSUSB_MSC
+static ULONG g_storage = 1;     /* Parameters\Storage (DWORD): 0 = keyboard and mouse only */
+#endif
 #ifdef USOSUSB_NT6
 static volatile LONG g_connseq;  /* bumped on connect / enable / disable */
 static ULONG g_kbd_sent, g_mou_sent;   /* input records passed to the class drivers */
@@ -216,6 +229,9 @@ static ULONG g_kbd_sent, g_mou_sent;   /* input records passed to the class driv
 #ifdef USOSUSB_MSC
 static void msc_attach(DEV *d);
 static void msc_detach(DEV *d);
+#endif
+#ifdef USOSUSB_NT4MSC
+static void diag_snapshot(void);
 #endif
 
 /* typematic state (worker thread only) */
@@ -319,6 +335,9 @@ static void diag_write(void)
     RtlCreateRegistryKey(RTL_REGISTRY_ABSOLUTE, path);
     RtlWriteRegistryValue(RTL_REGISTRY_ABSOLUTE, path, L"Diag", REG_SZ, g_diag,
                           (ULONG)(wcslen(g_diag) + 1) * sizeof(WCHAR));
+#ifdef USOSUSB_NT4MSC
+    diag_snapshot();
+#endif
 }
 
 #ifdef USOSUSB_NT6
@@ -1298,7 +1317,7 @@ static DEV *dev_enum(HC *hc, DEV *hub, ULONG p, ULONG speed)
                 kind = 4;
 #ifdef USOSUSB_MSC
             /* mass storage, SCSI transparent, bulk-only, alternate setting 0 */
-            if (!kind && b[off + 3] == 0 && b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50 && !d->sidci && !d->sodci) {
+            if (!kind && g_storage && b[off + 3] == 0 && b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50 && !d->sidci && !d->sodci) {
                 kind = 3;
                 d->sintf = b[off + 2];
             }
@@ -1476,6 +1495,10 @@ typedef struct _VOL {
     WCHAR name[40];             /* \Device\UsosUsbDiskN */
     UCHAR uid[20];
     PDEVICE_OBJECT dobj;
+    UCHAR port, fs;             /* root port, FS_* (NT4 log) */
+#ifdef USOSUSB_NT4MSC
+    WCHAR path[24];             /* device path for the log, e.g. p5 or p5.2 (behind a hub) */
+#endif
 } VOL;
 #define VOL_MAGIC 0x4C4F5655u
 
@@ -1495,6 +1518,17 @@ static KEVENT g_mwake;
 static UCHAR g_mmbuf[4096];     /* mount thread only */
 static UCHAR g_mmout[4096];
 static WCHAR g_msc[512];        /* Parameters\Msc (mount thread only) */
+#ifdef USOSUSB_NT4MSC
+static WCHAR g_logpath[160];    /* Parameters\LogFile (REG_SZ), e.g. \DosDevices\C:\USOS\NT4\USOSUSB.LOG */
+static WCHAR g_dsnap[512];      /* Diag copy for the log (worker -> mount thread, g_mlock) */
+static volatile LONG g_dsnap_new;
+#endif
+/* file system kinds (volume classification) */
+#define FS_FAT 1
+#define FS_NTFS 2
+#define FS_FAT32 3
+#define FS_EXFAT 4
+#define FS_OTHER 5
 
 static ULONG be32(const UCHAR *p) { return ((ULONG)p[0] << 24) | ((ULONG)p[1] << 16) | ((ULONG)p[2] << 8) | p[3]; }
 static ULONG le32(const UCHAR *p) { return p[0] | ((ULONG)p[1] << 8) | ((ULONG)p[2] << 16) | ((ULONG)p[3] << 24); }
@@ -1713,7 +1747,7 @@ static int is_boot_sector(const UCHAR *s)
            s[16] >= 1 && s[16] <= 2 && (s[14] | s[15]);
 }
 
-static void vol_create(DEV *d, ULONG start, ULONG count, UCHAR ptype, UCHAR boot, ULONG sig)
+static void vol_create(DEV *d, ULONG start, ULONG count, UCHAR ptype, UCHAR boot, ULONG sig, UCHAR fs)
 {
     WCHAR name[40];
     UNICODE_STRING us;
@@ -1725,9 +1759,16 @@ static void vol_create(DEV *d, ULONG start, ULONG count, UCHAR ptype, UCHAR boot
     a[0] = g_volseq;
     wfmt(name, 40, L"\\Device\\UsosUsbDisk%u", a);
     RtlInitUnicodeString(&us, name);
+#ifdef USOSUSB_NT4MSC
+    /* NT 4.0 / 3.5x know no FILE_DEVICE_SECURE_OPEN */
+    if (!NT_SUCCESS(IoCreateDevice(g_drv, sizeof(VOL), &us, FILE_DEVICE_DISK,
+                                   FILE_REMOVABLE_MEDIA, FALSE, &dobj)))
+        return;
+#else
     if (!NT_SUCCESS(IoCreateDevice(g_drv, sizeof(VOL), &us, FILE_DEVICE_DISK,
                                    FILE_REMOVABLE_MEDIA | FILE_DEVICE_SECURE_OPEN, FALSE, &dobj)))
         return;
+#endif
     v = (VOL *)dobj->DeviceExtension;
     RtlZeroMemory(v, sizeof(*v));
     v->magic = VOL_MAGIC;
@@ -1738,6 +1779,11 @@ static void vol_create(DEV *d, ULONG start, ULONG count, UCHAR ptype, UCHAR boot
     v->boot = boot;
     v->index = (UCHAR)(d->nvol + 1);
     v->dobj = dobj;
+    v->port = d->port;
+#ifdef USOSUSB_NT4MSC
+    RtlCopyMemory(v->path, d->path, sizeof(v->path));
+#endif
+    v->fs = fs;
     RtlCopyMemory(v->name, name, sizeof(name));
     v->namelen = (USHORT)(wcslen(name) * sizeof(WCHAR));
     RtlCopyMemory(v->uid, "USOSUSB:", 8);
@@ -1794,9 +1840,48 @@ static void gpt_volumes(DEV *d)
         last = le32(e + 40);
         if (le32(e + 36) || le32(e + 44) || !first || last < first || last >= d->blocks)
             continue;
-        vol_create(d, first, last - first + 1, 0x07, 0, sig);
+        vol_create(d, first, last - first + 1, 0x07, 0, sig, FS_OTHER);
     }
 }
+
+/* What a boot sector holds: FS_FAT (FAT12 / FAT16), FS_FAT32, FS_NTFS,
+   FS_EXFAT or FS_OTHER (no file system NT 4.0 knows). */
+static UCHAR fs_kind(const UCHAR *s)
+{
+    if (s[510] != 0x55 || s[511] != 0xAA)
+        return FS_OTHER;
+    if (RtlCompareMemory(s + 3, "NTFS    ", 8) == 8)
+        return FS_NTFS;
+    if (RtlCompareMemory(s + 3, "EXFAT   ", 8) == 8)
+        return FS_EXFAT;
+    if (!is_boot_sector(s))
+        return FS_OTHER;
+    return (s[22] | s[23]) ? FS_FAT : FS_FAT32;     /* BPB_FATSz16 = 0: FAT32 */
+}
+
+static const WCHAR *fs_name(UCHAR fs)
+{
+    switch (fs) {
+    case FS_FAT: return L"fat";
+    case FS_NTFS: return L"ntfs";
+    case FS_FAT32: return L"fat32";
+    case FS_EXFAT: return L"exfat";
+    }
+    return L"other";
+}
+
+#ifdef USOSUSB_NT4MSC
+/* NT 4.0 / 3.5x read FAT12 / FAT16 and NTFS. A FAT32 or exFAT volume would
+   mount as RAW, and Explorer would offer to format it: such a volume gets no
+   device and no letter (tagged in Diag, e.g. "p1:fat32-skip"). */
+static int nt4_fs_ok(UCHAR fs, ULONG part)
+{
+    if (fs == FS_FAT || fs == FS_NTFS)
+        return 1;
+    diag_add(L" p%u:%s-skip", part, (ULONG_PTR)fs_name(fs), 0, 0);
+    return 0;
+}
+#endif
 
 /* worker, after SET_CONFIGURATION: bring the medium up and publish its volumes */
 static void msc_attach(DEV *d)
@@ -1875,30 +1960,55 @@ static void msc_attach(DEV *d)
         diag_add(L"(lba0)", 0, 0, 0, 0);
         return;
     }
+    /* volumes: begin (tools/tests/test_nt4_usosusb.py runs this block on the host) */
     s = g_bva;
     sig = le32(s + 440);
     if (s[510] == 0x55 && s[511] == 0xAA && is_boot_sector(s)) {
         /* superfloppy: the whole medium is one volume; id = volume serial */
+        UCHAR fs = fs_kind(s);
         sig = RtlCompareMemory(s + 82, "FAT32", 5) == 5 ? le32(s + 67) : le32(s + 39);
-        vol_create(d, 0, d->blocks, (UCHAR)(RtlCompareMemory(s + 3, "NTFS", 4) == 4 ? 7 : 0x0C), 0, sig);
+#ifdef USOSUSB_NT4MSC
+        if (nt4_fs_ok(fs, 0))
+            vol_create(d, 0, d->blocks, (UCHAR)(fs == FS_NTFS ? 7 : 6), 0, sig, fs);
+#else
+        vol_create(d, 0, d->blocks, (UCHAR)(RtlCompareMemory(s + 3, "NTFS", 4) == 4 ? 7 : 0x0C), 0, sig, fs);
+#endif
     } else if (s[510] == 0x55 && s[511] == 0xAA) {
         int ok = 1;
+        UCHAR pt[64];                       /* g_bva is reused for the boot sectors */
+        RtlCopyMemory(pt, s + 446, sizeof(pt));
         for (i = 0; i < 4; i++)
-            if (s[446 + i * 16] & 0x7F)
+            if (pt[i * 16] & 0x7F)
                 ok = 0;
+#ifdef USOSUSB_NT4MSC
+        if (ok && pt[4] == 0xEE) {
+            /* GPT (the USOS stick among them): NT 4.0 knows no GPT */
+            diag_add(L"(gpt-skip)", 0, 0, 0, 0);
+            ok = 0;
+        }
+#endif
         for (i = 0; ok && i < 4; i++) {
-            const UCHAR *e = s + 446 + i * 16;
+            const UCHAR *e = pt + i * 16;
             ULONG st = le32(e + 8), n = le32(e + 12);
-            UCHAR t = e[4];
+            UCHAR t = e[4], fs = FS_OTHER;
             if (!t || t == 0x05 || t == 0x0F || t == 0x85 || t == 0xEE || t == 0xEF || !st || !n || st >= d->blocks)
                 continue;
             if (n > d->blocks - st)
                 n = d->blocks - st;
-            vol_create(d, st, n, t, e[0], sig);
+#ifdef USOSUSB_NT4MSC
+            if (NT_SUCCESS(scsi_rw(d, 0, st, 1)))
+                fs = fs_kind(g_bva);
+            if (!nt4_fs_ok(fs, i + 1))
+                continue;
+#endif
+            vol_create(d, st, n, t, e[0], sig, fs);
         }
-        if (ok && s[446 + 4] == 0xEE)
+#ifndef USOSUSB_NT4MSC
+        if (ok && pt[4] == 0xEE)
             gpt_volumes(d);
+#endif
     }
+    /* volumes: end */
     diag_add(L"(%uM wp%u %uv)", d->blocks >> 11, d->wp, d->nvol, 0);
 }
 
@@ -1951,7 +2061,13 @@ static void msc_irp(PIRP irp)
         st = STATUS_INVALID_PARAMETER;
     else if (wr && d->wp)
         st = STATUS_MEDIA_WRITE_PROTECTED;
+#ifdef USOSUSB_NT4MSC
+    /* NT 4.0 / 3.5x: no MmMapLockedPagesSpecifyCache (the ...Safe form) */
+    else if (!irp->MdlAddress || (va = (UCHAR *)((irp->MdlAddress->MdlFlags & (MDL_MAPPED_TO_SYSTEM_VA | MDL_SOURCE_IS_NONPAGED_POOL)) ?
+                                                 irp->MdlAddress->MappedSystemVa : MmMapLockedPages(irp->MdlAddress, KernelMode))) == NULL)
+#else
     else if (!irp->MdlAddress || (va = (UCHAR *)MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority)) == NULL)
+#endif
         st = STATUS_INSUFFICIENT_RESOURCES;
     else {
         st = msc_rw(d, wr, v->start + (ULONG)(off >> 9), len >> 9, va);
@@ -1989,6 +2105,7 @@ static NTSTATUS vol_ioctl(VOL *v, PIO_STACK_LOCATION s, PIRP irp, PVOID sb, ULON
     ULONG outl = s->Parameters.DeviceIoControl.OutputBufferLength;
     LONGLONG bytes = (LONGLONG)v->count << 9;
     switch (s->Parameters.DeviceIoControl.IoControlCode) {
+#ifdef USOSUSB_NT6
     case IOCTL_MOUNTDEV_QUERY_DEVICE_NAME: {
         PMOUNTDEV_NAME n = (PMOUNTDEV_NAME)sb;
         if (outl < sizeof(MOUNTDEV_NAME))
@@ -2018,6 +2135,7 @@ static NTSTATUS vol_ioctl(VOL *v, PIO_STACK_LOCATION s, PIRP irp, PVOID sb, ULON
     case IOCTL_MOUNTDEV_LINK_CREATED:
     case IOCTL_MOUNTDEV_LINK_DELETED:
         return STATUS_SUCCESS;
+#endif
     case IOCTL_DISK_GET_DRIVE_GEOMETRY:
     case IOCTL_DISK_GET_MEDIA_TYPES:
     case IOCTL_STORAGE_GET_MEDIA_TYPES: {
@@ -2167,6 +2285,7 @@ static void msc_note(const WCHAR *fmt, ULONG_PTR a, ULONG_PTR b, ULONG_PTR c)
                           (ULONG)(wcslen(g_msc) + 1) * sizeof(WCHAR));
 }
 
+#ifdef USOSUSB_NT6
 static NTSTATUS mm_ioctl(ULONG code, PVOID in, ULONG inl, PVOID out, ULONG outl)
 {
     UNICODE_STRING n;
@@ -2322,10 +2441,231 @@ static void mnt_remove(VOL *v)
     v->letter = 0;
 }
 
+#else /* USOSUSB_NT4MSC: no mount manager before Windows 2000 */
+
+/* Log line to Parameters\LogFile (ASCII, CRLF), with the local time. At most
+   256 KiB per boot; a file above 1 MiB is started again at the first line. */
+static void log_line(const WCHAR *w)
+{
+    static ULONG written, opened;
+    char b[700];
+    ULONG n = 0;
+    UNICODE_STRING us;
+    OBJECT_ATTRIBUTES oa;
+    IO_STATUS_BLOCK io;
+    HANDLE h;
+    LARGE_INTEGER now, off;
+    TIME_FIELDS tf;
+    ULONG_PTR a[6];
+    WCHAR ts[40];
+    ULONG disp = FILE_OPEN_IF;
+    if (!g_logpath[0] || written > 262144)
+        return;
+    KeQuerySystemTime(&now);
+    ExSystemTimeToLocalTime(&now, &now);
+    RtlTimeToTimeFields(&now, &tf);
+    a[0] = (ULONG)tf.Year; a[1] = (ULONG)tf.Month; a[2] = (ULONG)tf.Day;
+    a[3] = (ULONG)tf.Hour; a[4] = (ULONG)tf.Minute; a[5] = (ULONG)tf.Second;
+    wfmt(ts, 40, L"%u-%02u-%02u %02u:%02u:", a);
+    wfmt(ts + wcslen(ts), 40 - wcslen(ts), L"%02u ", a + 5);
+    for (; ts[n] && n < 30; n++)
+        b[n] = (char)ts[n];
+    for (; *w && n < sizeof(b) - 3; w++)
+        b[n++] = (char)(*w < 0x80 ? *w : '?');
+    b[n++] = '\r';
+    b[n++] = '\n';
+    RtlInitUnicodeString(&us, g_logpath);
+    InitializeObjectAttributes(&oa, &us, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (!opened) {
+        FILE_STANDARD_INFORMATION si;
+        opened = 1;
+        if (NT_SUCCESS(ZwCreateFile(&h, FILE_READ_ATTRIBUTES | SYNCHRONIZE, &oa, &io, NULL, 0,
+                                    FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN,
+                                    FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0))) {
+            if (NT_SUCCESS(ZwQueryInformationFile(h, &io, &si, sizeof(si), FileStandardInformation)) &&
+                si.EndOfFile.QuadPart > 0x100000)
+                disp = FILE_OVERWRITE_IF;
+            ZwClose(h);
+        }
+    }
+    if (!NT_SUCCESS(ZwCreateFile(&h, (disp == FILE_OPEN_IF ? FILE_APPEND_DATA : FILE_WRITE_DATA) | SYNCHRONIZE, &oa, &io,
+                                 NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, disp,
+                                 FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0)))
+        return;
+    off.LowPart = FILE_WRITE_TO_END_OF_FILE;
+    off.HighPart = -1;
+    ZwWriteFile(h, NULL, NULL, NULL, &io, b, n, &off, NULL);
+    ZwClose(h);
+    written += n;
+}
+
+/* worker: Diag changed; the mount thread logs the new part */
+static void diag_snapshot(void)
+{
+    KIRQL old;
+    KeAcquireSpinLock(&g_mlock, &old);
+    RtlCopyMemory(g_dsnap, g_diag, sizeof(g_dsnap));
+    g_dsnap[sizeof(g_dsnap) / sizeof(WCHAR) - 1] = 0;
+    g_dsnap_new = 1;
+    KeReleaseSpinLock(&g_mlock, old);
+    KeSetEvent(&g_mwake, 0, FALSE);
+}
+
+static void wcopy(WCHAR *d, const WCHAR *s, size_t cap)
+{
+    while (*s && cap > 1) {
+        *d++ = *s++;
+        cap--;
+    }
+    *d = 0;
+}
+
+static void log_diag(void)
+{
+    static WCHAR last[512];
+    static WCHAR cur[512];
+    WCHAR line[560];
+    size_t n;
+    KIRQL old;
+    if (!g_dsnap_new)
+        return;
+    KeAcquireSpinLock(&g_mlock, &old);
+    RtlCopyMemory(cur, g_dsnap, sizeof(cur));
+    g_dsnap_new = 0;
+    KeReleaseSpinLock(&g_mlock, old);
+    n = wcslen(last);
+    RtlCopyMemory(line, L"diag: ", 7 * sizeof(WCHAR));
+    if (n && wcslen(cur) >= n && RtlCompareMemory(cur, last, n * sizeof(WCHAR)) == n * sizeof(WCHAR)) {
+        if (!cur[n])
+            return;
+        RtlCopyMemory(line + 6, L"...", 4 * sizeof(WCHAR));
+        wcopy(line + 9, cur + n, 550);
+    } else {
+        wcopy(line + 6, cur, 553);
+    }
+    line[559] = 0;
+    RtlCopyMemory(last, cur, sizeof(last));
+    log_line(line);
+}
+
+static void dos_link(WCHAR *link, WCHAR c)
+{
+    RtlCopyMemory(link, L"\\DosDevices\\X:", 15 * sizeof(WCHAR));
+    link[12] = c;
+}
+
+/* a drive letter that exists now (disk, CD-ROM, network, subst) */
+static int letter_used(WCHAR c)
+{
+    WCHAR link[16];
+    UNICODE_STRING us;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE h;
+    dos_link(link, c);
+    RtlInitUnicodeString(&us, link);
+    InitializeObjectAttributes(&oa, &us, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (NT_SUCCESS(ZwOpenSymbolicLinkObject(&h, GENERIC_READ, &oa))) {
+        ZwClose(h);
+        return 1;
+    }
+    return 0;
+}
+
+/* The I/O manager gives the disks and CD-ROMs their letters at boot
+   (IoAssignDriveLetters, Disk Administrator's sticky letters) once the
+   system drivers are loaded: no stick letter before C: exists, so a stick
+   plugged in at boot never takes the letter of a disk or CD-ROM. */
+static void wait_boot_letters(void)
+{
+    ULONG i;
+    for (i = 0; i < 240 && !letter_used(L'C'); i++)
+        delay_ms(500);
+    delay_ms(3000);
+}
+
+/* the letter a stick (same unique id) had before in this boot */
+static UCHAR g_lastuid[8][20];
+static WCHAR g_lastlet[8];
+
+static void mnt_arrive(VOL *v)
+{
+    WCHAR link[16], c = 0, k = 0, line[160];
+    UNICODE_STRING ul, ud;
+    ULONG i;
+    ULONG_PTR a[8];
+    for (i = 0; i < 8; i++)
+        if (g_lastlet[i] && RtlCompareMemory(g_lastuid[i], v->uid, 20) == 20)
+            k = g_lastlet[i];
+    ud.Buffer = v->name;
+    ud.Length = v->namelen;
+    ud.MaximumLength = sizeof(v->name);
+    for (i = 0; !c && !v->gone && i <= 23; i++) {
+        WCHAR t = i == 0 ? k : (WCHAR)(L'D' + i - 1);
+        if (!t || (i && t == k) || letter_used(t))
+            continue;
+        dos_link(link, t);
+        RtlInitUnicodeString(&ul, link);
+        if (NT_SUCCESS(IoCreateSymbolicLink(&ul, &ud)))
+            c = t;
+    }
+    v->letter = (UCHAR)c;
+    if (c) {
+        for (i = 0; i < 8 && g_lastlet[i] && RtlCompareMemory(g_lastuid[i], v->uid, 20) != 20; i++)
+            ;
+        if (i < 8) {
+            RtlCopyMemory(g_lastuid[i], v->uid, 20);
+            g_lastlet[i] = c;
+        }
+    }
+    msc_note(L"%s:%c ", (ULONG_PTR)(v->name + 8), c ? c : L'-', 0);
+    a[0] = c ? c : L'-'; a[1] = (ULONG_PTR)(v->name + 8); a[2] = (ULONG_PTR)v->path;
+    a[3] = v->uid[8] | ((ULONG)v->uid[9] << 8); a[4] = v->uid[10] | ((ULONG)v->uid[11] << 8);
+    a[5] = (ULONG_PTR)fs_name(v->fs); a[6] = v->start; a[7] = v->count >> 11;
+    wfmt(line, 160, L"%c: = %s (%s, usb %04x:%04x, ", a);
+    wfmt(line + wcslen(line), 160 - wcslen(line), L"%s, LBA %u, %u MiB)", a + 5);
+    if (!c)
+        wfmt(line + wcslen(line), 160 - wcslen(line), v->gone ? L" gone before a letter" : L" no free letter", a);
+    log_line(line);
+}
+
+/* The stick is gone: its letter goes. A file system still mounted on the old
+   device fails its next request (STATUS_VERIFY_REQUIRED, then
+   STATUS_NO_MEDIA_IN_DEVICE) and dismounts. */
+static void mnt_remove(VOL *v)
+{
+    WCHAR link[16], line[96];
+    UNICODE_STRING ul;
+    ULONG_PTR a[2];
+    a[0] = v->letter ? v->letter : L'-';
+    a[1] = (ULONG_PTR)(v->name + 8);
+    if (v->letter) {
+        dos_link(link, v->letter);
+        RtlInitUnicodeString(&ul, link);
+        IoDeleteSymbolicLink(&ul);
+    }
+    msc_note(L"%s:gone ", (ULONG_PTR)(v->name + 8), 0, 0);
+    wfmt(line, 96, L"%c: removed (%s, stick unplugged)", a);
+    log_line(line);
+    v->letter = 0;
+}
+#endif /* USOSUSB_NT6 */
+
 static VOID mount_thread(PVOID ctx)
 {
     UNREFERENCED_PARAMETER(ctx);
+#ifdef USOSUSB_NT6
     IoSetThreadHardErrorMode(FALSE);    /* no "insert a disk" pop-ups for a stick that is gone */
+#else
+    wait_boot_letters();
+    {
+        WCHAR line[120];
+        ULONG_PTR a[2];
+        a[0] = (ULONG_PTR)USOSUSB_VERSION;
+        a[1] = (ULONG_PTR)(g_storage ? L"on (FAT12/FAT16/NTFS on MBR or superfloppy sticks)" : L"off (Parameters\\Storage = 0)");
+        wfmt(line, 120, L"%s start, USB sticks %s", a);
+        log_line(line);
+    }
+#endif
     for (;;) {
         VOL *v;
         UCHAR op = 0;
@@ -2347,6 +2687,9 @@ static VOID mount_thread(PVOID ctx)
             else
                 mnt_remove(v);
         }
+#ifdef USOSUSB_NT4MSC
+        log_diag();
+#endif
     }
 }
 #endif /* USOSUSB_MSC */
@@ -2546,6 +2889,10 @@ static VOID worker(PVOID ctx)
 
     g_diag[0] = 0;
     diag_add(L"%s:", (ULONG_PTR)USOSUSB_VERSION, 0, 0, 0);
+#ifdef USOSUSB_MSC
+    if (!g_storage)
+        diag_add(L" storage-off", 0, 0, 0, 0);
+#endif
     for (bus = 0; bus < 256 && g_nhc < MAXHC; bus++)
         for (dv = 0; dv < 32 && g_nhc < MAXHC; dv++)
             for (fn = 0; fn < 8 && g_nhc < MAXHC; fn++) {
@@ -2832,6 +3179,38 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT drv, PUNICODE_STRING reg)
     drv->MajorFunction[IRP_MJ_DEVICE_CONTROL] = dispatch;
     drv->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = dispatch;
 #ifdef USOSUSB_MSC
+    {
+        /* Parameters\Storage (DWORD, default 1), NT 4.0: Parameters\LogFile (REG_SZ) */
+        RTL_QUERY_REGISTRY_TABLE q[3];
+        WCHAR path[300];
+        ULONG storage = 1;
+#ifdef USOSUSB_NT4MSC
+        UNICODE_STRING lf;
+        lf.Buffer = g_logpath;
+        lf.Length = 0;
+        lf.MaximumLength = sizeof(g_logpath) - sizeof(WCHAR);
+#endif
+        if (g_regpath.Length / sizeof(WCHAR) + 12 < sizeof(path) / sizeof(WCHAR)) {
+            RtlCopyMemory(path, g_regpath.Buffer, g_regpath.Length);
+            RtlCopyMemory(path + g_regpath.Length / sizeof(WCHAR), L"\\Parameters", 12 * sizeof(WCHAR));
+            RtlZeroMemory(q, sizeof(q));
+            q[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+            q[0].Name = L"Storage";
+            q[0].EntryContext = &storage;
+            q[0].DefaultType = REG_NONE;
+#ifdef USOSUSB_NT4MSC
+            q[1].Flags = RTL_QUERY_REGISTRY_DIRECT;
+            q[1].Name = L"LogFile";
+            q[1].EntryContext = &lf;
+            q[1].DefaultType = REG_NONE;
+#endif
+            RtlQueryRegistryValues(RTL_REGISTRY_ABSOLUTE, path, q, NULL, NULL);
+        }
+        g_storage = storage ? 1 : 0;
+#ifdef USOSUSB_NT4MSC
+        g_logpath[lf.Length / sizeof(WCHAR)] = 0;
+#endif
+    }
     g_drv = drv;
     InitializeListHead(&g_q);
     KeInitializeSpinLock(&g_qlock);
