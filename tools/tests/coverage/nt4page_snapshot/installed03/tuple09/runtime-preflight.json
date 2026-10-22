@@ -1,0 +1,33 @@
+{
+  "resources": {
+    "disk_free": 1771757666304,
+    "host_available": 22605733888,
+    "host_total": 34280775680,
+    "requested_mib": 2048
+  },
+  "preparation_sha256": "1960450136509e4b5b5840c67a7a9c762376623e8d06f2e9cc96d191d27c02ed",
+  "source_pins": {
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\boot_candidate09_tuple.py": "1f2d31a5a13904160abed563ab14b17e28856c71fe1f1825ca30842d370a57a8",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\prepare_candidate09_tuple.py": "34fbec09cbd74a26b774293e8d89a4277cb894a50f605ca1c7d62a338c79cd0b",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\boot_nt4_combo.py": "7a34d19796b1a1ef2d0068afa82a78d38be304798314e6f7ac5f64c181b2a931",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\boot_nt4_msc.py": "83f5fdb6008e727be772c30e64cd1e18bbf290b9edd96521639733e8e6c22290",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\boot_nt4_hid.py": "aa5798a47ddc30b5a5308ab2669f7a45eebfd320589059ae399701e135a6974a",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\nt4_combo_fixture.py": "65c56bed21e2e129c6520762c5c24f511112f7e19527bc05ce008d17090d6fd8",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\nt4_msc_fixture.py": "7a8cdb47acb1bf490e4d9fc746461fb0686258c46fdabb7ddb17c44e5e8ee71c",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\nt4_hid_fixture.py": "e46b4c5c21c2547506f71c225be87248ce12809920909b99f6412922ba432c96",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\network08_policy.py": "2e449f70569d53467f4b52f6f9b941747ce7296173a2144ec90e004615ad666e",
+    "C:\\Users\\ASRock\\usos-work\\macierz-windows\\tools\\tests\\coverage\\boot_menu.py": "1b166e7adb67203901c413777299dec58617493f5ca4bafb386f75e418041cc0",
+    "C:\\Users\\ASRock\\usos-work\\macierz-windows\\tools\\tests\\coverage\\usability_aux.py": "0af79fcbf890268569aa613370831352b5694543ea3c135a4d70ba177446f7ca",
+    "C:\\Users\\ASRock\\usos-work\\macierz-windows\\tools\\tests\\coverage\\nt4_capture.py": "a54b1967e433158b8d1ebcf55a9cfcb8291a15463cb8a65a4d344126330800c7"
+  },
+  "usb_sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+  "msc_helper_sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+  "network_sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+  "network_bytes": 21248,
+  "topology": {
+    "boot": 1,
+    "hot": 2,
+    "keyboard": 3,
+    "mouse": 4
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "scope": "One installed NT4 Workstation PL SP6a frozenUSB313952 HID+MSC with NET89b/Start2, BIOS q35/AHCI/igb, native i8042prtStart4; basic coexistence only",
+  "pass": true,
+  "combined_basic_pass": true,
+  "lan_pass": true,
+  "hid_pass": true,
+  "msc_pass": true,
+  "fresh_auto_pass": false,
+  "x470_pass": false,
+  "http_tested": false,
+  "full_irq_route_pass": false,
+  "explorer_auto_refresh_pass": false,
+  "explorer_left_tree_stale_after_remove": true,
+  "explorer_scope": "New Explorer right pane showed C,D only after removal and C,D,E after reinsert; left tree retained staleE after removal. No automatic refresh PASS.",
+  "native_frames": {
+    "desktop": [
+      2
+    ],
+    "fresh_own_net_log_delete": [
+      4
+    ],
+    "actual_net_arm_ready": [
+      5,
+      6,
+      7
+    ],
+    "testnet_done_strict_configured_dns": [
+      8,
+      9
+    ],
+    "native_dhcp": [
+      10
+    ],
+    "keyboard_out_negative": [
+      11,
+      12
+    ],
+    "keyboard_in_typing": [
+      13,
+      14
+    ],
+    "mouse_out_negative_live_keyboard": [
+      15
+    ],
+    "mouse_in_move_click": [
+      16,
+      17,
+      18
+    ],
+    "msc_startup_native_file": [
+      19,
+      20
+    ],
+    "msc_hot_write_flush_close_native_files": [
+      21,
+      22,
+      23,
+      24,
+      25
+    ],
+    "msc_remove_new_explorer_right_pane": [
+      26,
+      27
+    ],
+    "msc_replug_persisted_read_only": [
+      28,
+      29,
+      30,
+      31
+    ],
+    "mouse_click_after_msc": [
+      32
+    ],
+    "native_ping_after_all_usb": [
+      33
+    ],
+    "native_safe_shutdown": [
+      34,
+      35,
+      36
+    ]
+  },
+  "native_ping_after_usb": {
+    "sent": 4,
+    "replies": 4,
+    "rtt_ms": [
+      16,
+      "<10",
+      "<10",
+      "<10"
+    ],
+    "image": "operator-33.png"
+  },
+  "configured_dns": {
+    "server_peer": "10.0.2.3:53",
+    "id": "706F",
+    "question": "frogfind.com A",
+    "answer": "64.227.13.248",
+    "reply_ms": 15,
+    "dns_match": 1
+  },
+  "native_safe_off_image": "operator-36.png",
+  "qemu_returncode": 0,
+  "runtime_seconds": 1149.226,
+  "collector_seconds": 30.97,
+  "collector_file": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\collection.json",
+  "actual_first_logon": true,
+  "observer_status": "TESTNET_DONE",
+  "native_msc_completion": {
+    "STARTUP": 0,
+    "HOT": 0,
+    "REPLUG": 0
+  },
+  "actual_own_pins": {
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": {
+      "sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+      "bytes": 21248
+    },
+    "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS": {
+      "sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+      "bytes": 43648
+    },
+    "USOS/COVERAGE/NT4OBS.EXE": {
+      "sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "bytes": 5632
+    },
+    "USOS/COVERAGE/USOSLOG.EXE": {
+      "sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "bytes": 1024000
+    },
+    "USOS/COVERAGE/FIRSTLO.CMD": {
+      "sha256": "c0f82213bb319445a9ea6d1407608af2b2cec53cbc633a9931ef4802e3bdbedc",
+      "bytes": 206
+    },
+    "USOS/NT4/MSC4TEST.EXE": {
+      "sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+      "bytes": 5120
+    }
+  },
+  "target": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+  "closed_target_sha256": "6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743",
+  "base08_sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+  "base08_unchanged": true,
+  "network_capture": {
+    "path": "network.pcap",
+    "mac": "52:54:00:55:53:01",
+    "netdev": "usabilitynet",
+    "hard_byte_cap": 8388608,
+    "boundary_disconnect": {
+      "type": "ConnectionResetError",
+      "errno": 22,
+      "winerror": 64,
+      "during_controlled_shutdown": true
+    },
+    "controlled_boundary_reset_accepted": true,
+    "stored_bytes": 1952,
+    "stored_frames": 4,
+    "received_frames": 124,
+    "discarded_frames": 0,
+    "capped": false,
+    "connected": true,
+    "error": null,
+    "sha256": "82105e319c531e95745c7696cc25edfebc82964d675a90d06a7064d053b3ddb2",
+    "analysis": {
+      "dora_observed": true,
+      "exchanges": [
+        {
+          "xid": "0f3d643a",
+          "mac": "52:54:00:55:53:01",
+          "address": "10.0.2.15",
+          "server": "10.0.2.2",
+          "lease_seconds": 86400,
+          "routers": [
+            "10.0.2.2"
+          ],
+          "dns": [
+            "10.0.2.3"
+          ],
+          "records": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "records": 4,
+      "installed_runtime_pass": false,
+      "icmp_pass": false,
+      "dns_pass": false,
+      "scope": "Only pinned-MAC DHCP frames received after the actual NT4 first-logon token; separate own guest evidence required",
+      "first_logon_observed": true
+    },
+    "policy": "NT4_DHCP_ONLY_AFTER_ACTUAL_FIRST_LOGON",
+    "first_logon_observed": true,
+    "before_logon_frames": 42,
+    "non_dhcp_frames": 78
+  },
+  "source_reuse": "nt4-usb-hid/6457ab4b completed operator/quiet MSC4TEST75cef; frozen USB source/hubs unchanged",
+  "source_files": {
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\prepare_candidate09_tuple.py": "34fbec09cbd74a26b774293e8d89a4277cb894a50f605ca1c7d62a338c79cd0b",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\boot_candidate09_tuple.py": "1f2d31a5a13904160abed563ab14b17e28856c71fe1f1825ca30842d370a57a8",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\collect_candidate09_tuple.py": "08a00d41547d66063cd7843ab4a6a5b64332c748e6c0e714139f7b995babeac8",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\read_candidate09_tuple_stopped.py": "76846aa48b46a7e011c6b0d2e79128055b25bfe7843050013bb38eb77f8944fd",
+    "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\wait_candidate09_tuple.py": "286967faef04c8406d663f668760ea78dddf85570b03390ac84729ceecbf6b2e",
+    "C:\\Users\\ASRock\\usos-work\\nt4-usb-hid\\tools\\tests\\coverage\\boot_nt4_msc.py": "83f5fdb6008e727be772c30e64cd1e18bbf290b9edd96521639733e8e6c22290"
+  },
+  "raw_scratch_removed": true,
+  "ms_bytes_exported": false
+}

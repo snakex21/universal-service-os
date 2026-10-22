@@ -1081,3 +1081,23 @@ Cały candidate03 KEEP: jest rodzicem USB drugiego agenta. HID/MSC, źródła
 ISO, cache _assets i physical media są poza planem. Historyczne Setup /
 nativepage scratch foldery wymagają osobnego ownership inventory; niczego
 stamtąd nie kasowano. Root zarządza ostatecznym wspólnym sprzątaniem.
+
+
+2026-10-22 — tuple09: basic coexistence PASS w jednej rzeczywistej VM
+
+Frozen USB313952/43648B (MSC+HID), i8042prtStart4 oraz NET89b/21248B/Start2
+przeszły wspólny installed BIOS q35/AHCI/igb test. Fresh own NET log,
+actual token/TESTNET_DONE, DORA/lease+ICMP+strict configuredDNS706F PASS;
+strict readonly collector30.970s/rc0. Keyboard/mouse out/in z negativecontrol,
+startup FAT16, hot write/flush/close/newread i persisted reinsert PASS.
+Po MSC mysz klika Start, finalping4/4 (16,<10,<10,<10ms). NativeSafe36,
+QMP0/errornull/1149.226s. Stopped exact6payloads/38+14imports, USB313952,
+NET89b, client2/server-browser4; ownMSC3PASS/write1/read2; media persisted.
+Target09 SHA6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743;
+parent08 f0f976...820ee unchanged. Source/hubs/binaries/tester bez zmian.
+Runtime genericfalse nieprzepisane, osobny evaluation combined_basic_pass=true.
+Explorer rightpane nowego okna działa, ale treeghostE/autoRefresh nie maPASS.
+Nie jest to freshAUTO/X470/fullIRQroute/HTTP. Szczegóły i sourceproof:
+docs/nt4-installed09-tuple-qualification.md oraz tracked tuple09 snapshots.
+3 actual archived-class serialmux tests PASS. Aktualizacja S20 i autoryzowane
+literal qcow2 cleanup odbędą się osobno z receipt; protected03 zachowany.

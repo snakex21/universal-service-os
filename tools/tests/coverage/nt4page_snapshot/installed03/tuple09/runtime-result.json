@@ -1,0 +1,91 @@
+{
+  "scope": "One frozen USB313952 isolated HID+MSC plus NET89b/Start2 installed coexistence; no fresh AUTO/X470 or full IRQroute qualification",
+  "resources": {
+    "disk_free": 1771757666304,
+    "host_available": 22605733888,
+    "host_total": 34280775680,
+    "requested_mib": 2048
+  },
+  "elapsed": 1149.226,
+  "qemu_returncode": 0,
+  "shutdown": "QMP quit",
+  "error": null,
+  "base_sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+  "retained_target": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+  "first_logon_observed": true,
+  "network_capture": {
+    "path": "network.pcap",
+    "mac": "52:54:00:55:53:01",
+    "netdev": "usabilitynet",
+    "hard_byte_cap": 8388608,
+    "boundary_disconnect": {
+      "type": "ConnectionResetError",
+      "errno": 22,
+      "winerror": 64,
+      "during_controlled_shutdown": true
+    },
+    "controlled_boundary_reset_accepted": true,
+    "stored_bytes": 1952,
+    "stored_frames": 4,
+    "received_frames": 124,
+    "discarded_frames": 0,
+    "capped": false,
+    "connected": true,
+    "error": null,
+    "sha256": "82105e319c531e95745c7696cc25edfebc82964d675a90d06a7064d053b3ddb2",
+    "analysis": {
+      "dora_observed": true,
+      "exchanges": [
+        {
+          "xid": "0f3d643a",
+          "mac": "52:54:00:55:53:01",
+          "address": "10.0.2.15",
+          "server": "10.0.2.2",
+          "lease_seconds": 86400,
+          "routers": [
+            "10.0.2.2"
+          ],
+          "dns": [
+            "10.0.2.3"
+          ],
+          "records": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "records": 4,
+      "installed_runtime_pass": false,
+      "icmp_pass": false,
+      "dns_pass": false,
+      "scope": "Only pinned-MAC DHCP frames received after the actual NT4 first-logon token; separate own guest evidence required",
+      "first_logon_observed": true
+    },
+    "policy": "NT4_DHCP_ONLY_AFTER_ACTUAL_FIRST_LOGON",
+    "first_logon_observed": true,
+    "before_logon_frames": 42,
+    "non_dhcp_frames": 78
+  },
+  "native_observer_completions": {
+    "STARTUP": 0,
+    "HOT": 0,
+    "REPLUG": 0
+  },
+  "usb_sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+  "msc_helper_sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+  "network_sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+  "i8042prt_start": 4,
+  "ndisloop_start": 2,
+  "topology": {
+    "boot": 1,
+    "hot": 2,
+    "keyboard": 3,
+    "mouse": 4
+  },
+  "lan_pass": false,
+  "hid_pass": false,
+  "msc_pass": false,
+  "combined_pass": false
+}
