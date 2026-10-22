@@ -15,4 +15,11 @@ reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Defau
 reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /f > nul 2>&1
 fc /b "%S%DRV\acpi.sys" %SystemRoot%\system32\drivers\acpi.sys > nul
 if not errorlevel 1 echo done> "%S%DONE.TXT"
+rem USOSRES (docs/display-policy.md): the automatic display resolution for this
+rem NT 5.1 core, the same contract and Run value as XP / Server 2003: native
+rem EDID mode, else the highest, only modes from the driver's list, full
+rem screen. posready_csmwrap_target.sh staged it in \USOS\POSR; the helper
+rem waits for a real driver and logs C:\USOS\POSR\USOSRES.LOG.
+if exist "%S%USOSRES.EXE" reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v USOSDisplay /t REG_SZ /d "%SystemDrive%\USOS\POSR\USOSRES.EXE" /f >> "%S%FIRST.LOG" 2>&1
+if exist "%S%USOSRES.EXE" echo display registered %ERRORLEVEL% >> "%S%FIRST.LOG"
 shutdown -s -f -t 0
