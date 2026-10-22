@@ -266,27 +266,43 @@ pub fn render(profile: *const Profile, system_id: []const u8, arch: answer.Arch)
     return (try answer.render(profile, system_id, arch, null, images(), fastStartupOn(system_id), &rendered)) orelse error.NoGeneratedAnswer;
 }
 
-/// DATA\Systems\Windows\<folder>\Unattended\fast-startup-on.txt: the user
-/// keeps Windows' own Fast Startup for this version
-/// (docs/fast-startup-2026-10-22.md). Unreadable DATA or a version without
-/// Fast Startup: false, so the answer disables it where it applies.
+/// <system's Unattended folder on DATA>\fast-startup-on.txt (for example
+/// DATA\Systems\Windows\Windows 10\Unattended): the user keeps Windows' own
+/// Fast Startup for this version (docs/ds-fast-startup-2026-10-22.md). The
+/// folder is the catalog entry's own, so Embedded 8.1 Industry and routed
+/// variants use theirs. Unreadable DATA or a version without Fast Startup:
+/// false, so the answer disables it where it applies.
 fn fastStartupOn(system_id: []const u8) bool {
     const family = answer.target.familyFor(system_id) orelse return false;
-    const folder: []const u8 = switch (family) {
-        .windows_8 => "Windows 8",
-        .windows_8_1 => "Windows 8.1",
-        .windows_10 => "Windows 10",
+    switch (family) {
+        .windows_8, .windows_8_1, .windows_10 => {},
         else => return false,
-    };
+    }
+    const system = usos.catalog.systems.findById(system_id) orelse return false;
+    const directory = system.unattended_directory orelse return false;
+    // NTFS path components (openFile looks each one up in its parent).
+    var storage: [192]u16 = undefined;
+    var slices: [8][]const u16 = undefined;
+    var count: usize = 0;
+    var at: usize = 0;
+    var parts = std.mem.tokenizeScalar(u8, directory, '\\');
+    var done = false;
+    while (!done) {
+        const part = parts.next() orelse blk: {
+            done = true;
+            break :blk "fast-startup-on.txt";
+        };
+        if (count == slices.len or at + part.len > storage.len) return false;
+        for (part, 0..) |ch, i| storage[at + i] = ch;
+        slices[count] = storage[at .. at + part.len];
+        at += part.len;
+        count += 1;
+    }
     const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return false;
     defer uefi.pool_allocator.destroy(catalog);
     catalog.* = data_volume.openCatalog() catch return false;
-    var text: [160]u8 = undefined;
-    const path = std.fmt.bufPrint(&text, "\\Systems\\Windows\\{s}\\Unattended\\fast-startup-on.txt", .{folder}) catch return false;
-    var wide: [160]u16 = undefined;
-    const wide_len = std.unicode.utf8ToUtf16Le(&wide, path) catch return false;
-    var file: usos.storage.ntfs.File = undefined;
-    usos.storage.ntfs.openFile(catalog.fs, catalog.reader(), &[_][]const u16{wide[0..wide_len]}, &file) catch return false;
+    var file: ntfs.File = undefined;
+    ntfs.openFile(catalog.fs, catalog.reader(), slices[0..count], &file) catch return false;
     serial.writeAscii("[PROFILE] fast-startup-on.txt on DATA: Windows keeps its Fast Startup\n");
     return true;
 }

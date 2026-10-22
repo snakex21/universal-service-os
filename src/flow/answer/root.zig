@@ -72,7 +72,7 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 /// at start); null uses the profile's. `images`: the install images of the
 /// chosen media, for the profile's edition (null: no edition written).
 /// `fast_startup_on`: DATA carries the fast-startup-on.txt opt-out for this
-/// version (docs/fast-startup-2026-10-22.md); false disables Fast Startup in
+/// version (docs/ds-fast-startup-2026-10-22.md); false disables Fast Startup in
 /// the answer of Windows 8 / 8.1 / 10.
 pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, fast_startup_on: bool, buffer: []u8) !?Rendered {
     const use_key = key orelse p.keyFor(system_id);

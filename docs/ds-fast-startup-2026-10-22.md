@@ -105,3 +105,21 @@ pliku `.c` / `.cmd` oraz w tym raporcie.
 * Aby w ogóle uruchomić `build.bat` w worktree, skopiowałem **tylko**
   kompilator `tools\zig` (177 MB), bez `tools\cache` (16 GB) — build zbudował
   własny cache w worktree.
+
+## Przegląd przed merge'em (Claude, 2026-10-22)
+
+* **Błąd naprawiony:** opt-out na ścieżce natywnej UEFI nigdy nie działał —
+  `ntfs.openFile` dostawało całą ścieżkę jako jeden komponent. Teraz ścieżka
+  jest dzielona na komponenty i bierze folder `Unattended` z wpisu katalogu
+  (Embedded 8.1 Industry ma własny folder `Windows Embedded 8.1 Industry`).
+* WinPE (`faststartup`): pomija wolumin zainstalowanego systemu przy szukaniu
+  opt-outu; dla 6.3 sprawdza też folder Embedded 8.1 Industry; wynik
+  `RegFlushKey` jest logowany (1016 w WinPE na NVMe — unload i tak zapisuje
+  hive, krok pozostaje niefatalny); `RegUnLoadKey` ponawiany 10× co 200 ms,
+  żeby nie zostawić hive'a załadowanego przed `mpart` / `hideesp`.
+* Serwery (2012+) celowo bez zmiany: osobne rodziny `server_*`, hibernacja
+  i Fast Startup są tam domyślnie wyłączone. Windows 11 poza zakresem tej
+  gałęzi.
+* Nowy test Zig: komenda tylko dla 8 / 8.1 / 10 (x86 i amd64), nigdy dla
+  Vista / 7 / 11 / serwerów; `fast_startup_on` ją usuwa.
+* Odwołania do `docs/fast-startup-2026-10-22.md` poprawione na ten plik.

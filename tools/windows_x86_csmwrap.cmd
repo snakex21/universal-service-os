@@ -100,7 +100,7 @@ call :usb3
 rem Windows 8 / 8.1 / 10: no Fast Startup (the disk is carried between
 rem computers). The helper reads the installed kernel version itself (Vista /
 rem 7 do nothing), honours fast-startup-on.txt on DATA and never fails the
-rem installation; see the header comment and docs/fast-startup-2026-10-22.md.
+rem installation; see the header comment and docs/ds-fast-startup-2026-10-22.md.
 echo [USOS] phase=fast-startup-off
 "%~dp0usos-x86-csmwrap.exe" faststartup
 if errorlevel 1 echo [USOS] fast-startup: not changed, Windows keeps its setting (boot unaffected).

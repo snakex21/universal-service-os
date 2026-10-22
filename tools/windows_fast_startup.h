@@ -1,5 +1,5 @@
 /* Fast Startup (hiberboot) off in an installed Windows 8 / 8.1 / 10
- * (docs/fast-startup-2026-10-22.md). Shared by tools/windows_x86_csmwrap.c
+ * (docs/ds-fast-startup-2026-10-22.md). Shared by tools/windows_x86_csmwrap.c
  * (32-bit 8 / 8.1 / 10 through CSMWrap), run in the WinPE after Setup and
  * before the first boot of the installed system. No C runtime.
  *
@@ -29,6 +29,11 @@
 #define USOS_FS_ERR_UNLOAD 104
 
 static const WCHAR usos_fs_power[] = L"Control\\Session Manager\\Power";
+/* RegFlushKey's result of the last edit (ERROR_SUCCESS when not reached).
+ * WinPE on an NVMe target returned ERROR_REGISTRY_IO_FAILED (1016) there
+ * (tools/windows_nvme_modern.c commit_hive, X470 B261022); the unload still
+ * writes the hive, so a failed flush is logged by the caller, never fatal. */
+static LONG usos_fs_flush_error;
 static const WCHAR usos_fs_name[] = L"HiberbootEnabled";
 
 static void usos_fs_privilege(const WCHAR *name) {
@@ -50,7 +55,7 @@ static DWORD usos_fs_in_key(HKEY power) {
     if (usos_fs_same(power)) return USOS_FS_PRESENT;
     if (RegSetValueExW(power, usos_fs_name, 0, REG_DWORD, (const BYTE *)&value, sizeof(value)) != ERROR_SUCCESS) result = USOS_FS_ERR_WRITE;
     else result = usos_fs_same(power) ? USOS_FS_WRITTEN : USOS_FS_ERR_READBACK;
-    RegFlushKey(power);
+    usos_fs_flush_error = RegFlushKey(power);
     return result;
 }
 /* Select\Current -> "ControlSet00N" in OUT[15]; 1 when unreadable. */
@@ -94,6 +99,10 @@ static DWORD usos_fast_startup(const WCHAR *root) {
         result = usos_fast_startup_in_system(system);
         RegCloseKey(system);
     }
-    if (RegUnLoadKeyW(HKEY_LOCAL_MACHINE, mount) != ERROR_SUCCESS && result < USOS_FS_ERR_LOAD) result = USOS_FS_ERR_UNLOAD;
+    /* A hive left loaded would block the later SYSTEM edits (mpart, hideesp):
+     * retry a busy unload like windows_usos_reg.c does. */
+    LONG unload;
+    for (int tries = 0; (unload = RegUnLoadKeyW(HKEY_LOCAL_MACHINE, mount)) != ERROR_SUCCESS && tries < 10; tries++) Sleep(200);
+    if (unload != ERROR_SUCCESS && result < USOS_FS_ERR_LOAD) result = USOS_FS_ERR_UNLOAD;
     return result;
 }

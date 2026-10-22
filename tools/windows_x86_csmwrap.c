@@ -610,28 +610,39 @@ static DWORD display_register(void) {
 static DWORD fast_startup(void) {
     WCHAR kernel[MAX_PATH], file[MAX_PATH];
     DWORD major = 0, minor = 0, r;
-    const WCHAR *folder;
+    const WCHAR *folder, *folder2;
     if (!target_letter()) { say("[X86_CSMWRAP] faststartup: the installed Windows volume has no drive letter; skipped\r\n"); return 11; }
     lstrcpyW(kernel, target_root); lstrcatW(kernel, L"Windows\\System32\\ntoskrnl.exe");
     if (!file_version(kernel, &major, &minor)) { say("[X86_CSMWRAP] faststartup: cannot read the installed kernel version; skipped\r\n"); return 11; }
     logn("faststartup: installed NT version major=", major); logn("faststartup: minor=", minor);
     if (major < 6 || (major == 6 && minor < 2)) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
     folder = L"Windows 10";
+    folder2 = 0;
     if (major == 6 && minor == 2) folder = L"Windows 8";
-    else if (major == 6 && minor == 3) folder = L"Windows 8.1";
+    /* 6.3: Windows 8.1, or Embedded 8.1 Industry with its own DATA folder
+     * (the WinPE cannot tell them apart; either folder's file counts). */
+    else if (major == 6 && minor == 3) { folder = L"Windows 8.1"; folder2 = L"Windows Embedded 8.1 Industry"; }
     /* The documented opt-out: DATA\Systems\Windows\<version>\Unattended\
      * fast-startup-on.txt on any volume but the installed one. */
     for (WCHAR letter = L'C'; letter <= L'Z'; letter++) {
-        file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
-        lstrcatW(file, folder); lstrcatW(file, L"\\Unattended\\fast-startup-on.txt");
-        if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES) {
-            say("[X86_CSMWRAP] faststartup: fast-startup-on.txt on DATA; Windows keeps its own setting\r\n");
-            return 0;
+        if (letter == target_root[0]) continue;
+        for (int i = 0; i < 2; i++) {
+            const WCHAR *name = i ? folder2 : folder;
+            if (!name) continue;
+            file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
+            lstrcatW(file, name); lstrcatW(file, L"\\Unattended\\fast-startup-on.txt");
+            if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES) {
+                say("[X86_CSMWRAP] faststartup: fast-startup-on.txt on DATA; Windows keeps its own setting\r\n");
+                return 0;
+            }
         }
     }
     r = usos_fast_startup(target_root);
     logn(r == USOS_FS_WRITTEN ? "faststartup: HiberbootEnabled=0 written in the installed SYSTEM hive, code=" :
          r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" : "faststartup: FAILED, hive code=", r);
+    /* Not fatal: the hive unload writes the value as well (logged for the
+     * X470 report; see windows_fast_startup.h). */
+    if (r == USOS_FS_WRITTEN && usos_fs_flush_error != ERROR_SUCCESS) logn("faststartup: RegFlushKey failed (unload still commits), Win32 code=", (DWORD)usos_fs_flush_error);
     return r >= USOS_FS_ERR_LOAD ? 11 : 0;
 }
 
