@@ -28,6 +28,15 @@ def scalar(v):
     if kind==4 and len(data)==4:return struct.unpack('<I',data)[0]
     if kind in (1,2,7) and len(data)<=2048 and len(data)%2==0:return data.decode('utf-16-le').rstrip('\0')
     raise ValueError('Unbounded or unexpected selected registry value')
+
+def policy_services(values,prefix):
+    # Presence/start only, never enumerate arbitrary values or user data.
+    result={}
+    for name in ('lanmanworkstation','lanmanserver','rasman','remoteaccess','rasasync','rasndis','ndiswan'):
+        rows=values.get(prefix+name);record=dict(present=rows is not None)
+        if rows is not None and 'start' in rows:record['start']=scalar(rows['start'])
+        result[name]=record
+    return result
 def main():
     if OUT.exists():raise FileExistsError('Completed readback must not be overwritten')
     prep=json.loads(PREPARATION.read_text(encoding='utf-8'))
@@ -55,6 +64,7 @@ def main():
             selected=values['select']['current']
             if selected!=values['select']['default'] or selected!=(4,struct.pack('<I',1)):raise ValueError('Ambiguous current controlset')
             prefix='controlset001\\services\\'
+            evidence['policy_services']=policy_services(values,prefix)
             own_names=sorted(k[len(prefix):] for k in values if k.startswith(prefix+'usosnet31') and '\\' not in k[len(prefix):])
             evidence['own_service_names']=own_names
             allow=('usosnet31','usosnet3101','ndis','tcpip','tcpipsys','streams','afd','netbios','i8042prt','usosusb')

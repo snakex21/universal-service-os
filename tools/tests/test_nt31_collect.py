@@ -9,6 +9,13 @@ class FatEntry:
         if path!='USOS/NET31/SVC31.LOG':raise AssertionError(path)
         return 0,self.attr,self.size
 class OwnLogs(unittest.TestCase):
+    def test_policy_is_only_named_presence_and_start(self):
+        rows={'p/lanmanworkstation':{'start':(4,b'\x02\0\0\0'),'secret':(1,b'private')},'p/other':{'secret':(1,b'private')}}
+        result=c.policy_services(rows,'p/')
+        self.assertEqual(result['lanmanworkstation'],dict(present=True,start=2))
+        self.assertEqual(result['lanmanserver'],dict(present=False))
+        self.assertNotIn('other',result)
+        self.assertNotIn('private',str(result))
     def test_real_empty_redirect_shape(self):
         def not_called(*args):raise AssertionError('No cluster reader for empty file')
         self.assertEqual(c.own_log(FatEntry(0),'SVC31.LOG',not_called),b'')

@@ -7,10 +7,10 @@ def main():
     s=importlib.util.spec_from_file_location('nt31_retry_collect',Path(__file__).with_name('collect_nt31_fullmac.py'))
     c=importlib.util.module_from_spec(s);s.loader.exec_module(c)
     c.WORK=Path(r'G:\USOS-Kolekcja\_vm')/TAG
-    prefix='r24c' if TAG.startswith('r24c-') else 'r24b'
+    prefix=TAG.split('-')[0]
     c.VM=c.RUNTIME/'vm'/TAG;c.OUT=c.RUNTIME/(prefix+'-stopped-readback')
     c.PREPARATION=c.RUNTIME/(prefix+'-preparation.json')
     c.main()
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--tag',choices=('r24b-nt31-image-entry','r24c-nt31-registermac-order'),default=TAG)
+    p=argparse.ArgumentParser();p.add_argument('--tag',choices=('r24b-nt31-image-entry','r24c-nt31-registermac-order','r24d-nt31-usb-fullmac'),default=TAG)
     TAG=p.parse_args().tag;main()
