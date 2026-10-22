@@ -1369,5 +1369,5 @@
   "boot.lx.logon_setup_asks": "Instalacija Windowsa tokom instalacije traži korisničko ime i lozinku; USOS ih ne podešava.",
   "boot.lx.logon_answer_file": "Posle instalacije prijavite se nalogom iz svoje datoteke odgovora {0}.",
   "boot.profile.field.display_bpp": "Dubina boje",
-  "boot.profile.help.display_legacy": "Primenjuje se posle instalacije na stvarnom hardveru. Automatski bira dostupan režim do 1920x1080 uz bezbedan prelazak na niži. Bez promene čuva podešavanja. Automatska dubina: 32 bita ako je dostupno, inače 16. Podrazumevano u sistemu Windows: USOS ne menja rezoluciju posle instalacije."
+  "boot.profile.help.display_legacy": "Primenjuje se posle instalacije na stvarnom hardveru. Automatski bira izvorni režim monitora (EDID), inače najviši dostupni (Windows 9x: najviše 1920x1080), uz bezbedan prelazak na niži. Automatska (izvorna za monitor) radi isto. Automatska dubina: 32 bita ako je dostupno, inače 16. Podrazumevano u sistemu Windows: USOS ne menja rezoluciju posle instalacije."
 }

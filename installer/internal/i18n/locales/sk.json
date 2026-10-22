@@ -1369,5 +1369,5 @@
   "boot.lx.logon_setup_asks": "Inštalátor Windows sa počas inštalácie opýta na meno používateľa a heslo; USOS ich nenastavuje.",
   "boot.lx.logon_answer_file": "Po inštalácii sa prihláste účtom zo svojho súboru odpovedí {0}.",
   "boot.profile.field.display_bpp": "Počet bitov farby",
-  "boot.profile.help.display_legacy": "Použije sa po inštalácii na skutočnom hardvéri. Automaticky vyberie dostupný režim do 1920x1080 s bezpečným prechodom na nižší. Bez zmeny zachová nastavenia. Automatický počet bitov: 32, ak sú dostupné, inak 16. Predvolené Windows: USOS po inštalácii nemení rozlíšenie."
+  "boot.profile.help.display_legacy": "Použije sa po inštalácii na skutočnom hardvéri. Automaticky vyberie natívny režim monitora (EDID), inak najvyšší dostupný (Windows 9x: najviac 1920x1080), s bezpečným prechodom na nižší. Automatické (natívne pre monitor) funguje rovnako. Automatický počet bitov: 32, ak sú dostupné, inak 16. Predvolené Windows: USOS po inštalácii nemení rozlíšenie."
 }

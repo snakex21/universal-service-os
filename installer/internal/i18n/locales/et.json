@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windowsi installiprogramm küsib installimise ajal kasutajanime ja parooli; USOS neid ei määra.",
   "boot.lx.logon_answer_file": "Pärast installimist logi sisse oma vastusefaili {0} kontoga.",
   "boot.profile.field.display_bpp": "Värvisügavus",
-  "boot.profile.help.display_legacy": "Rakendatakse pärast paigaldamist päris riistvaral. Automaatne valib saadaoleva režiimi kuni 1920x1080 ja vajadusel turvaliselt madalama. Muutmata säilitab sätted. Automaatne värvisügavus eelistab 32 bitti, muidu 16. Windowsi vaikeväärtus: USOS ei muuda pärast paigaldamist eraldusvõimet."
+  "boot.profile.help.display_legacy": "Rakendatakse pärast paigaldamist päris riistvaral. Automaatne valib monitori loomuliku režiimi (EDID), muidu kõrgeima saadaoleva (Windows 9x: kuni 1920x1080), ja vajadusel turvaliselt madalama. Automaatne (monitori loomulik) toimib samamoodi. Automaatne värvisügavus eelistab 32 bitti, muidu 16. Windowsi vaikeväärtus: USOS ei muuda pärast paigaldamist eraldusvõimet."
 }

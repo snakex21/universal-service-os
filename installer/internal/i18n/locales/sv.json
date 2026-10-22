@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows installationsprogram frågar efter användarnamn och lösenord under installationen; USOS anger dem inte.",
   "boot.lx.logon_answer_file": "Logga in efter installationen med kontot från din svarsfil {0}.",
   "boot.profile.field.display_bpp": "Färgdjup",
-  "boot.profile.help.display_legacy": "Används efter installation på den riktiga maskinvaran. Automatiskt väljer ett tillgängligt läge upp till 1920x1080 med säker återgång. Oförändrat behåller inställningarna. Automatiskt färgdjup föredrar 32 bitar, annars 16. Windows-standard: USOS ändrar inte upplösningen efter installationen."
+  "boot.profile.help.display_legacy": "Används efter installation på den riktiga maskinvaran. Automatiskt väljer skärmens eget läge (EDID), annars det högsta tillgängliga (Windows 9x: högst 1920x1080), med säker återgång. Automatisk (skärmens egen) fungerar likadant. Automatiskt färgdjup föredrar 32 bitar, annars 16. Windows-standard: USOS ändrar inte upplösningen efter installationen."
 }

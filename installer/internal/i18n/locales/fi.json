@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windowsin asennus kysyy käyttäjänimen ja salasanan asennuksen aikana; USOS ei aseta niitä.",
   "boot.lx.logon_answer_file": "Kirjaudu asennuksen jälkeen vastaustiedostosi {0} tilillä.",
   "boot.profile.field.display_bpp": "Värisyvyys",
-  "boot.profile.help.display_legacy": "Otetaan käyttöön asennuksen jälkeen oikealla laitteistolla. Automaattinen valitsee saatavilla olevan tilan enintään 1920x1080 ja turvallisen varatilan. Ei muutoksia säilyttää asetukset. Automaattinen värisyvyys suosii 32 bittiä, muuten 16. Windowsin oletus: USOS ei muuta näytön tarkkuutta asennuksen jälkeen."
+  "boot.profile.help.display_legacy": "Otetaan käyttöön asennuksen jälkeen oikealla laitteistolla. Automaattinen valitsee näytön oman tilan (EDID), muuten korkeimman saatavilla olevan (Windows 9x: enintään 1920x1080), ja turvallisen varatilan. Automaattinen (näytön oma) toimii samoin. Automaattinen värisyvyys suosii 32 bittiä, muuten 16. Windowsin oletus: USOS ei muuta näytön tarkkuutta asennuksen jälkeen."
 }

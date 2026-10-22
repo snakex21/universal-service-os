@@ -1372,5 +1372,5 @@
   "boot.lx.logon_setup_asks": "Namestitveni program Windows med namestitvijo vpraša za uporabniško ime in geslo; USOS ju ne nastavi.",
   "boot.lx.logon_answer_file": "Po namestitvi se prijavite z računom iz svoje datoteke odgovorov {0}.",
   "boot.profile.field.display_bpp": "Barvna globina",
-  "boot.profile.help.display_legacy": "Uporabi se po namestitvi na pravi strojni opremi. Samodejno izbere razpoložljivi način do 1920x1080 z varnim prehodom na nižjega. Nespremenjeno ohrani nastavitve. Samodejna globina: 32 bitov, če je na voljo, sicer 16. Privzeto v sistemu Windows: USOS po namestitvi ne spremeni ločljivosti."
+  "boot.profile.help.display_legacy": "Uporabi se po namestitvi na pravi strojni opremi. Samodejno izbere izvorni način monitorja (EDID), sicer najvišjega razpoložljivega (Windows 9x: največ 1920x1080), z varnim prehodom na nižjega. Samodejno (izvorna za monitor) deluje enako. Samodejna globina: 32 bitov, če je na voljo, sicer 16. Privzeto v sistemu Windows: USOS po namestitvi ne spremeni ločljivosti."
 }

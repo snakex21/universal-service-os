@@ -134,7 +134,7 @@ item has its own report in `docs/`.
   wpis "bez litery" w offline `MountedDevices` przed pierwszym startem; MBR,
   typ 0xEF i łańcuch bootowania bez zmian. Szczegóły:
   [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
-- **Fast Startup wyłączony w 8 / 8.1 / 10.** Instalacje USOS zapisują
+- **Fast Startup wyłączony w 8 / 8.1 / 10 / 11.** Instalacje USOS zapisują
   `HiberbootEnabled=0`, żeby wyłączony system nie zostawiał zahibernowanego
   NTFS (dyski wędrują między komputerami). Pusty
   `Unattended\fast-startup-on.txt` zostawia ustawienie Windowsa. Szczegóły:
@@ -182,7 +182,7 @@ item has its own report in `docs/`.
   ESP: a no-letter entry in the offline `MountedDevices` before the first
   boot; MBR, type 0xEF and the boot chain are unchanged. Details:
   [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
-- **Fast Startup off in 8 / 8.1 / 10.** USOS installs write
+- **Fast Startup off in 8 / 8.1 / 10 / 11.** USOS installs write
   `HiberbootEnabled=0` so a shutdown leaves no hibernated NTFS volume (the
   disks move between computers). An empty `Unattended\fast-startup-on.txt`
   keeps Windows' own setting. Details:

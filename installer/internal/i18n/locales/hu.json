@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "A Windows telepítője a telepítés közben kéri a felhasználónevet és a jelszót; a USOS nem állítja be őket.",
   "boot.lx.logon_answer_file": "A telepítés után jelentkezzen be a(z) {0} válaszfájlban megadott fiókkal.",
   "boot.profile.field.display_bpp": "Színmélység",
-  "boot.profile.help.display_legacy": "A telepítés után, valódi hardveren lép érvénybe. Az automatikus mód legfeljebb 1920x1080-as elérhető módot választ biztonságos visszalépéssel. A változatlan megőrzi a beállításokat. Automatikus színmélység: 32 bit, ha elérhető, különben 16. Windows alapértelmezés: az USOS a telepítés után nem módosítja a felbontást."
+  "boot.profile.help.display_legacy": "A telepítés után, valódi hardveren lép érvénybe. Az automatikus mód a monitor natív módját választja (EDID), különben a legmagasabb elérhetőt (Windows 9x: legfeljebb 1920x1080), biztonságos visszalépéssel. Az Automatikus (a monitor natív) ugyanígy működik. Automatikus színmélység: 32 bit, ha elérhető, különben 16. Windows alapértelmezés: az USOS a telepítés után nem módosítja a felbontást."
 }

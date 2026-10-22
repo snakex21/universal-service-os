@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "A Instalação do Windows pede o nome de usuário e a senha durante a instalação; o USOS não os define.",
   "boot.lx.logon_answer_file": "Após a instalação, entre com a conta do seu arquivo de respostas {0}.",
   "boot.profile.field.display_bpp": "Profundidade de cor",
-  "boot.profile.help.display_legacy": "Aplicada após a instalação no hardware real. Automático escolhe um modo disponível até 1920x1080 com alternativa segura. Sem alterações mantém as configurações. A profundidade automática prefere 32 bits quando disponíveis; caso contrário, 16. Padrão do Windows: o USOS não altera a resolução após a instalação."
+  "boot.profile.help.display_legacy": "Aplicada após a instalação no hardware real. Automático escolhe o modo nativo do monitor (EDID) ou, sem ele, o mais alto disponível (Windows 9x: no máximo 1920x1080), com alternativa segura. Automática (nativa do monitor) funciona da mesma forma. A profundidade automática prefere 32 bits quando disponíveis; caso contrário, 16. Padrão do Windows: o USOS não altera a resolução após a instalação."
 }

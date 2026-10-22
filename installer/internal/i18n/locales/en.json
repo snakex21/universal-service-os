@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
   "boot.lx.logon_answer_file": "After the installation log on with the account from your answer file {0}.",
   "boot.profile.field.display_bpp": "Color depth",
-  "boot.profile.help.display_legacy": "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit. Windows default: USOS does not change the resolution after installation."
+  "boot.profile.help.display_legacy": "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Automatic (monitor native) works the same way. Color depth: automatic prefers 32-bit where available, otherwise 16-bit. Windows default: USOS does not change the resolution after installation."
 }
