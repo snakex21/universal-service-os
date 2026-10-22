@@ -1,4 +1,4 @@
-"""Fast Startup off in every USOS 8 / 8.1 / 10 install (2026-10-22).
+"""Fast Startup off in every USOS 8 / 8.1 / 10 / 11 install (2026-10-22).
 
     python tools/tests/test_windows_fast_startup.py [path-to-usos-x86-csmwrap.exe]
 
@@ -9,7 +9,7 @@
    hideesp / display).
 2. Wiring: the x86 CSMWrap cmd calls faststartup after Setup and never fails
    the installation; the answer generator writes the same value for the native
-   UEFI 8 / 8.1 / 10 path, with the DATA fast-startup-on.txt opt-out honoured
+   UEFI 8 / 8.1 / 10 / 11 path, with the DATA fast-startup-on.txt opt-out honoured
    before the render.
 """
 
@@ -97,7 +97,7 @@ def wiring() -> None:
     assert "HiberbootEnabled" in header and "USOS_FASTSTARTUP" in header
     answer = (ROOT / "src/flow/answer/autounattend.zig").read_text(encoding="utf-8")
     assert "/v HiberbootEnabled /t REG_DWORD /d 0 /f" in answer
-    assert ".windows_8, .windows_8_1, .windows_10 => true" in answer
+    assert ".windows_8, .windows_8_1, .windows_10, .windows_11 => true" in answer
     uefi = (ROOT / "src/platform/uefi/answer_profiles.zig").read_text(encoding="utf-8")
     assert "fast-startup-on.txt" in uefi and "fastStartupOn(system_id)" in uefi
     print("[wiring] x86 cmd after Setup, never fatal; answer + DATA opt-out on the native path")
