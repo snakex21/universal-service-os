@@ -49,7 +49,7 @@ def main():
     case,=r22
     before=dict(case);case['tag']=TAG;case['expected_own_driver_sha256']=DRIVER
     if {key for key in before if case[key]!=before[key]}!={'tag','expected_own_driver_sha256'}:raise ValueError('Unexpected plan difference')
-    (HERE/'plan.json').write_text(json.dumps([case],indent=2)+'\n',encoding='utf-8')
+    (HERE/'plan.json').write_bytes((json.dumps([case],indent=2)+'\n').encode('utf-8'))
     # Keep the original run_plan and boot_menu cleanup paths byte-identical;
     # three creation-event notifiers retain same-file hard links on G only.
     notify=(SOURCE/'artifacts/coverage/nt31-runtime-r19/notify.py').read_bytes()
@@ -61,7 +61,7 @@ def main():
         harness_functional_change='Collector expected own SYS digest only; root paths relocated',
         guest_package_functional_change='Only canonical-IRQ own SYS and sidecar in private cache',
         physical_writes=False,runtime_pass=False)
-    (HERE/'harness-manifest.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    (HERE/'harness-manifest.json').write_bytes((json.dumps(report,indent=2)+'\n').encode('utf-8'))
     with zipfile.ZipFile(HERE/'harness-snapshot.zip','x',compression=zipfile.ZIP_DEFLATED) as z:
         for path in sorted(harness.glob('*.py')):z.write(path,path.name)
     print(json.dumps(dict(prepared=True,harness_files=len(manifest),plan_sha256=report['plan_sha256']),indent=2))
