@@ -28,7 +28,7 @@ IMPORTS = {
     'IoAttachDeviceToDeviceStack', 'IoCreateDevice', 'IoDeleteDevice', 'IoDetachDevice', 'IoFreeIrp', 'IoFreeMdl',
     'IoGetDeviceProperty', 'IoInitializeRemoveLockEx', 'IoReleaseRemoveLockAndWaitEx', 'IoReleaseRemoveLockEx',
     'IoReuseIrp', 'IofCallDriver', 'IofCompleteRequest', 'KeClearEvent', 'KeInitializeEvent', 'KeSetEvent',
-    'KeWaitForSingleObject', 'MmBuildMdlForNonPagedPool', 'PoCallDriver', 'PoStartNextPowerIrp', 'PsGetVersion',
+    'KeWaitForSingleObject', 'MmBuildMdlForNonPagedPool', 'MmMapLockedPagesSpecifyCache', 'MmSystemRangeStart', 'PoCallDriver', 'PoStartNextPowerIrp', 'PsGetVersion',
     'RtlAppendUnicodeStringToString', 'RtlAppendUnicodeToString', 'RtlCompareMemory', 'RtlQueryRegistryValues',
     'memcpy', 'memset', 'KeGetCurrentIrql'}
 
@@ -96,13 +96,16 @@ class Binaries(unittest.TestCase):
         self.assertIn('DevicePropertyEnumeratorName', src)   # USBSTOR disks only
         self.assertIn('d->BusType == BusTypeUsb && d->RemovableMedia', src)
         self.assertIn('ext->Partitions > 1', src)            # single-partition sticks unchanged
-        # GPT stick on 2000 / XP x86: pure protective MBR -> hidden (fixed) + writes blocked
-        self.assertIn('*GptHidden = (BOOLEAN)(count == 0);', src)
-        self.assertIn('ext->Partitions > 1 ? MpFlip : gptHidden ? MpHide : MpKeep', src)
+        # GPT stick on 2000 / XP x86: pure protective MBR -> synthetic MBR view
+        # (MpMap) or hidden (MpHide), fixed; writes limited / blocked
+        # (builder + write rule: test_usosmpart_gpt.py)
+        self.assertIn('if (count == 0) {', src)
+        self.assertIn('ext->Partitions > 1 ? MpFlip : gpt != MpUnknown ? gpt : MpKeep', src)
         self.assertIn('Drv->MajorFunction[IRP_MJ_SCSI] = MpScsiRequest;', src)
-        self.assertIn('ext->Decision == MpHide && srb && srb->Function == SRB_FUNCTION_EXECUTE_SCSI', src)
-        for op in ('0x0A', '0x2A', '0xAA', '0x8A', '0x2E', '0xAE', '0x8E', '0x41', '0x93'):
-            self.assertIn('Op == %s' % op, src)
+        self.assertIn('(decision == MpHide || decision == MpMap) && srb && srb->Function == SRB_FUNCTION_EXECUTE_SCSI', src)
+        hdr = (ROOT / 'tools/nt/usosmpart/src/mpgpt.h').read_text()
+        for op in ('0x0A', '0x2A', '0xAA', '0x8A', '0x2E', '0xAE', '0x8E', '0x41', '0x93', '0x04', '0x42'):
+            self.assertIn('case %s:' % op, hdr)
         self.assertIn('sense[2] = 0x07;', src)
         self.assertIn('sense[12] = 0x27;', src)
 

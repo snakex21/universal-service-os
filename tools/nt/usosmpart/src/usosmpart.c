@@ -42,17 +42,24 @@
  * hands out the protective MBR's 0xEE entry, and on a removable disk that
  * single partition gets a drive letter and mounts RAW ("0 bytes", Explorer
  * offers to format it; a format would overwrite the GPT and the stick's
- * partitions, the USOS stick's DATA among them). A stick whose MBR holds
- * nothing but the 0xEE entry is therefore started as a fixed disk too: on a
- * fixed disk the volume manager keeps a partition of an unknown type hidden
- * (no drive letter, as for any GPT disk on these systems), and the filter
- * fails every write command to it with "write protected", so no tool of
- * the old system can damage the GPT data the system cannot read.
+ * partitions, the USOS stick's DATA among them). For a stick whose MBR
+ * holds nothing but the 0xEE entry the filter reads the GPT and, when it is
+ * valid and every LBA fits 32 bits, builds an MBR view of it (mpgpt.h:
+ * NTFS / exFAT / FAT basic data partitions as 0x07 / 0x0C / 0x0E, the ESP as
+ * 0xEF without a letter, MSR / hidden / no-letter / read-only / unknown
+ * entries left out, at most four). The disk is started as a fixed disk
+ * (every partition gets a letter), every read of LBA 0 returns that MBR
+ * instead of the protective one (MpMap), and a write is let through only
+ * when it lies inside one of the lettered partitions: the protective MBR,
+ * both GPT copies, the ESP and the gaps stay untouchable ("write
+ * protected"). A GPT the filter cannot map (CRC error, > 2 TiB, no
+ * partition with a known file system) keeps the hidden view (MpHide): fixed
+ * disk, the 0xEE partition without a letter, every write refused.
  *
  * Limits: a card reader that held a multi-partition card at plug-in time
  * becomes a fixed disk until it is unplugged (a card swap is not seen).
- * GPT media count only on NT 5.2 and later (2000 / XP x86 cannot use GPT
- * data disks). Opt-out: Services\usosmpart\Parameters\Disabled = 1.
+ * GPT media count only on NT 5.2 and later; on 2000 / XP x86 a GPT stick is
+ * mapped or hidden as above. Opt-out: Services\usosmpart\Parameters\Disabled = 1.
  *
  * Provenance: own code from the public WDK documentation of filter
  * drivers, IOCTL_STORAGE_QUERY_PROPERTY, SCSI_REQUEST_BLOCK and the
@@ -66,13 +73,17 @@
 #include <ntddstor.h>
 #include <srb.h>
 #include <scsi.h>
+#include <ntddscsi.h>
+#include "mpgpt.h"
 
 #define MP_TAG          'pMsU'
 #define MP_MAX_SECTOR   4096
 #define MP_GPT_ENTRIES  128
 
-/* MpHide: GPT stick on a system without GPT data disks (fixed + no writes). */
-typedef enum { MpUnknown = 0, MpFlip, MpKeep, MpHide } MP_DECISION;
+/* GPT stick on a system without GPT data disks (NT 5.0 / 5.1):
+ * MpMap = fixed, synthetic MBR at LBA 0, writes only inside lettered
+ * partitions; MpHide = fixed, protective MBR as it is, no writes. */
+typedef enum { MpUnknown = 0, MpFlip, MpKeep, MpHide, MpMap } MP_DECISION;
 
 typedef struct _MP_EXT {
     PDEVICE_OBJECT  Self;
@@ -81,6 +92,8 @@ typedef struct _MP_EXT {
     IO_REMOVE_LOCK  RemoveLock;
     MP_DECISION     Decision;
     ULONG           Partitions;
+    ULONG           BlockSize;
+    MPG_MAP         Map;        /* MpMap only */
 } MP_EXT, *PMP_EXT;
 
 static BOOLEAN MpDisabled;
@@ -241,19 +254,26 @@ static BOOLEAN MpRead(PMP_EXT Ext, ULONG Lba, USHORT Blocks, ULONG BlockSize, PU
     return MpScsi(Ext, cdb, 10, Buf, (ULONG)Blocks * BlockSize);
 }
 
+static int MpGptRead(void *Ctx, mpg_u32 Lba, mpg_u8 *Buf)
+{
+    PMP_EXT ext = (PMP_EXT)Ctx;
+    return MpRead(ext, Lba, 1, ext->BlockSize, Buf);
+}
+
 /* Partitions on the media: 0 = no media / unreadable / no partition
  * table, else the count (an MBR extended entry counts as two: it holds at
  * least one logical drive next to the primary that brought it).
- * *GptHidden: TRUE when the MBR holds only a protective 0xEE entry and this
- * system cannot use GPT data disks (NT 5.0 / 5.1). */
-static ULONG MpCountPartitions(PMP_EXT Ext, BOOLEAN *GptHidden)
+ * *Gpt: when the MBR holds only a protective 0xEE entry and this system
+ * cannot use GPT data disks (NT 5.0 / 5.1), MpMap (Ext->Map filled) or
+ * MpHide; else MpUnknown. */
+static ULONG MpCountPartitions(PMP_EXT Ext, MP_DECISION *Gpt)
 {
     UCHAR cdb[10];
     PUCHAR buf;
     ULONG blockSize = 0, lastLba = 0, count = 0, i, attempt;
     BOOLEAN gpt = FALSE;
 
-    *GptHidden = FALSE;
+    *Gpt = MpUnknown;
     buf = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, MP_MAX_SECTOR * 4, MP_TAG);
     if (!buf)
         return 0;
@@ -289,7 +309,10 @@ static ULONG MpCountPartitions(PMP_EXT Ext, BOOLEAN *GptHidden)
         ULONG entriesLba, entries, entrySize, perBlock, blocks, b, j;
         if (!MpGptOk) {
             /* Pure protective MBR only; a hybrid MBR keeps today's path. */
-            *GptHidden = (BOOLEAN)(count == 0);
+            if (count == 0) {
+                Ext->BlockSize = blockSize;
+                *Gpt = MpgBuild(MpGptRead, Ext, lastLba, blockSize, buf, &Ext->Map) == MPG_OK ? MpMap : MpHide;
+            }
             count = 0;
             goto out;
         }
@@ -337,6 +360,16 @@ static NTSTATUS MpDeviceControl(PDEVICE_OBJECT Dev, PIRP Irp)
         return st;
     }
     q = (PSTORAGE_PROPERTY_QUERY)Irp->AssociatedIrp.SystemBuffer;
+    if ((ext->Decision == MpMap || ext->Decision == MpHide) &&
+        (sp->Parameters.DeviceIoControl.IoControlCode == IOCTL_SCSI_PASS_THROUGH ||
+         sp->Parameters.DeviceIoControl.IoControlCode == IOCTL_SCSI_PASS_THROUGH_DIRECT)) {
+        /* Raw SCSI from user mode would bypass the write rules below. */
+        Irp->IoStatus.Status = STATUS_ACCESS_DENIED;
+        Irp->IoStatus.Information = 0;
+        IoCompleteRequest(Irp, IO_NO_INCREMENT);
+        IoReleaseRemoveLock(&ext->RemoveLock, Irp);
+        return STATUS_ACCESS_DENIED;
+    }
     if (MpDisabled || KeGetCurrentIrql() != PASSIVE_LEVEL ||
         sp->Parameters.DeviceIoControl.IoControlCode != IOCTL_STORAGE_QUERY_PROPERTY ||
         sp->Parameters.DeviceIoControl.InputBufferLength < FIELD_OFFSET(STORAGE_PROPERTY_QUERY, AdditionalParameters) ||
@@ -351,12 +384,12 @@ static NTSTATUS MpDeviceControl(PDEVICE_OBJECT Dev, PIRP Irp)
     if (NT_SUCCESS(st) && d &&
         Irp->IoStatus.Information >= FIELD_OFFSET(STORAGE_DEVICE_DESCRIPTOR, RawPropertiesLength) &&
         d->BusType == BusTypeUsb && d->RemovableMedia) {
-        if (ext->Decision != MpFlip && ext->Decision != MpHide) {
-            BOOLEAN gptHidden;
-            ext->Partitions = MpCountPartitions(ext, &gptHidden);
-            ext->Decision = ext->Partitions > 1 ? MpFlip : gptHidden ? MpHide : MpKeep;
+        if (ext->Decision != MpFlip && ext->Decision != MpHide && ext->Decision != MpMap) {
+            MP_DECISION gpt;
+            ext->Partitions = MpCountPartitions(ext, &gpt);
+            ext->Decision = ext->Partitions > 1 ? MpFlip : gpt != MpUnknown ? gpt : MpKeep;
         }
-        if (ext->Decision == MpFlip || ext->Decision == MpHide) {
+        if (ext->Decision == MpFlip || ext->Decision == MpHide || ext->Decision == MpMap) {
             PDEVICE_OBJECT o;
             d->RemovableMedia = FALSE;
             /* Windows 7 and later: the port driver's PDO carries
@@ -375,23 +408,77 @@ static NTSTATUS MpDeviceControl(PDEVICE_OBJECT Dev, PIRP Irp)
     return st;
 }
 
-/* SCSI write commands: WRITE 6/10/12/16, WRITE AND VERIFY 10/12/16,
- * WRITE SAME 10/16. */
-static BOOLEAN MpIsWrite(UCHAR Op)
+/* A read of LBA 0 on an MpMap disk completed: put the synthetic MBR tail
+ * (signature, partition table, 0x55AA) over the protective one. Runs at
+ * IRQL <= DISPATCH_LEVEL. */
+static IO_COMPLETION_ROUTINE MpReadDone;
+static NTSTATUS MpReadDone(PDEVICE_OBJECT Dev, PIRP Irp, PVOID Ctx)
 {
-    return (BOOLEAN)(Op == 0x0A || Op == 0x2A || Op == 0xAA || Op == 0x8A ||
-                     Op == 0x2E || Op == 0xAE || Op == 0x8E || Op == 0x41 || Op == 0x93);
+    PMP_EXT ext = (PMP_EXT)Ctx;
+    PSCSI_REQUEST_BLOCK srb = (PSCSI_REQUEST_BLOCK)IoGetCurrentIrpStackLocation(Irp)->Parameters.Scsi.Srb;
+    PUCHAR va = NULL;
+    UNREFERENCED_PARAMETER(Dev);
+    if (Irp->PendingReturned)
+        IoMarkIrpPending(Irp);
+    if (NT_SUCCESS(Irp->IoStatus.Status) && srb && SRB_STATUS(srb->SrbStatus) == SRB_STATUS_SUCCESS &&
+        srb->DataTransferLength >= 512 && srb->DataBuffer) {
+        PMDL mdl = Irp->MdlAddress;
+        if (mdl) {
+            ULONG_PTR off = (ULONG_PTR)srb->DataBuffer - (ULONG_PTR)MmGetMdlVirtualAddress(mdl);
+            if (off < MmGetMdlByteCount(mdl) && MmGetMdlByteCount(mdl) - off >= 512) {
+                PUCHAR base = (PUCHAR)MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority);
+                if (base)
+                    va = base + off;
+            }
+        } else if ((ULONG_PTR)srb->DataBuffer >= (ULONG_PTR)MM_SYSTEM_RANGE_START) {
+            va = (PUCHAR)srb->DataBuffer;
+        }
+        if (va)
+            RtlCopyMemory(va + 440, ext->Map.tail, sizeof(ext->Map.tail));
+    }
+    IoReleaseRemoveLock(&ext->RemoveLock, Irp);
+    return STATUS_CONTINUE_COMPLETION;
 }
 
-/* IRP_MJ_SCSI from disk.sys. On a hidden GPT stick (MpHide) every write
- * command fails as CHECK CONDITION, DATA PROTECT / WRITE PROTECTED (sense
- * 07/27/00), which the class driver reports as STATUS_MEDIA_WRITE_PROTECTED
- * without retries; everything else passes down unchanged. */
+/* Fail an SRB as CHECK CONDITION, DATA PROTECT / WRITE PROTECTED (sense
+ * 07/27/00): the class driver reports STATUS_MEDIA_WRITE_PROTECTED for that
+ * request without retries. */
+static NTSTATUS MpRefuseWrite(PMP_EXT Ext, PIRP Irp, PSCSI_REQUEST_BLOCK Srb)
+{
+    Srb->SrbStatus = SRB_STATUS_ERROR;
+    Srb->ScsiStatus = SCSISTAT_CHECK_CONDITION;
+    Srb->DataTransferLength = 0;
+    if (Srb->SenseInfoBuffer && Srb->SenseInfoBufferLength >= 14 &&
+        !(Srb->SrbFlags & SRB_FLAGS_DISABLE_AUTOSENSE)) {
+        PUCHAR sense = (PUCHAR)Srb->SenseInfoBuffer;
+        UCHAR len = Srb->SenseInfoBufferLength > 18 ? 18 : Srb->SenseInfoBufferLength;
+        RtlZeroMemory(sense, len);
+        sense[0] = 0x70;            /* current error, fixed format */
+        sense[2] = 0x07;            /* DATA PROTECT */
+        sense[7] = (UCHAR)(len - 8); /* additional sense length */
+        sense[12] = 0x27;           /* WRITE PROTECTED */
+        Srb->SenseInfoBufferLength = len;
+        Srb->SrbStatus |= SRB_STATUS_AUTOSENSE_VALID;
+    }
+    Irp->IoStatus.Status = STATUS_MEDIA_WRITE_PROTECTED;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    IoReleaseRemoveLock(&Ext->RemoveLock, Irp);
+    return STATUS_MEDIA_WRITE_PROTECTED;
+}
+
+/* IRP_MJ_SCSI from disk.sys. GPT stick on NT 5.0 / 5.1:
+ *  - MpHide: every command that changes the medium is refused;
+ *  - MpMap: a write is let through only inside a lettered partition
+ *    (MpgWriteAllowed), FORMAT UNIT / UNMAP / WRITE BUFFER are refused,
+ *    and a read that starts at LBA 0 gets the synthetic MBR.
+ * Everything else passes down unchanged. */
 static NTSTATUS MpScsiRequest(PDEVICE_OBJECT Dev, PIRP Irp)
 {
     PMP_EXT ext = (PMP_EXT)Dev->DeviceExtension;
     PIO_STACK_LOCATION sp = IoGetCurrentIrpStackLocation(Irp);
     PSCSI_REQUEST_BLOCK srb = (PSCSI_REQUEST_BLOCK)sp->Parameters.Scsi.Srb;
+    MP_DECISION decision = ext->Decision;
     NTSTATUS st = IoAcquireRemoveLock(&ext->RemoveLock, Irp);
     if (!NT_SUCCESS(st)) {
         Irp->IoStatus.Status = st;
@@ -399,28 +486,18 @@ static NTSTATUS MpScsiRequest(PDEVICE_OBJECT Dev, PIRP Irp)
         IoCompleteRequest(Irp, IO_NO_INCREMENT);
         return st;
     }
-    if (ext->Decision == MpHide && srb && srb->Function == SRB_FUNCTION_EXECUTE_SCSI &&
-        srb->CdbLength && MpIsWrite(srb->Cdb[0])) {
-        srb->SrbStatus = SRB_STATUS_ERROR;
-        srb->ScsiStatus = SCSISTAT_CHECK_CONDITION;
-        srb->DataTransferLength = 0;
-        if (srb->SenseInfoBuffer && srb->SenseInfoBufferLength >= 14 &&
-            !(srb->SrbFlags & SRB_FLAGS_DISABLE_AUTOSENSE)) {
-            PUCHAR sense = (PUCHAR)srb->SenseInfoBuffer;
-            UCHAR len = srb->SenseInfoBufferLength > 18 ? 18 : srb->SenseInfoBufferLength;
-            RtlZeroMemory(sense, len);
-            sense[0] = 0x70;            /* current error, fixed format */
-            sense[2] = 0x07;            /* DATA PROTECT */
-            sense[7] = (UCHAR)(len - 8); /* additional sense length */
-            sense[12] = 0x27;           /* WRITE PROTECTED */
-            srb->SenseInfoBufferLength = len;
-            srb->SrbStatus |= SRB_STATUS_AUTOSENSE_VALID;
+    if ((decision == MpHide || decision == MpMap) && srb && srb->Function == SRB_FUNCTION_EXECUTE_SCSI) {
+        mpg_u64 lba = 0;
+        mpg_u32 n = 0;
+        int kind = MpgCdb(srb->Cdb, srb->CdbLength, &lba, &n);
+        if (kind == MPG_CDB_WRITEX ||
+            (kind == MPG_CDB_WRITE && (decision == MpHide || !MpgWriteAllowed(&ext->Map, lba, n))))
+            return MpRefuseWrite(ext, Irp, srb);
+        if (kind == MPG_CDB_READ && decision == MpMap && lba == 0 && (srb->SrbFlags & SRB_FLAGS_DATA_IN)) {
+            IoCopyCurrentIrpStackLocationToNext(Irp);
+            IoSetCompletionRoutine(Irp, MpReadDone, ext, TRUE, TRUE, TRUE);
+            return IoCallDriver(ext->Lower, Irp); /* MpReadDone releases the lock */
         }
-        Irp->IoStatus.Status = STATUS_MEDIA_WRITE_PROTECTED;
-        Irp->IoStatus.Information = 0;
-        IoCompleteRequest(Irp, IO_NO_INCREMENT);
-        IoReleaseRemoveLock(&ext->RemoveLock, Irp);
-        return STATUS_MEDIA_WRITE_PROTECTED;
     }
     IoSkipCurrentIrpStackLocation(Irp);
     st = IoCallDriver(ext->Lower, Irp);

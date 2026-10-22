@@ -34,10 +34,29 @@ mass-storage port driver:
 4. Windows 2000 / XP x86 and a GPT stick (MBR = only the protective 0xEE
    entry, the USOS stick): these systems cannot use GPT data disks and
    would show the 0xEE entry as a removable RAW drive that Explorer offers
-   to format (a format destroys the GPT and the partitions). The disk is
-   started as a fixed disk instead, where the 0xEE partition stays hidden
-   (no letter), and every SCSI write command to it fails with "write
-   protected" (sense 07/27/00).
+   to format (a format destroys the GPT and the partitions). The filter
+   reads the GPT itself and shows the stick through an MBR view of it
+   (`src/mpgpt.h`, "MpMap"):
+   - the disk is started as a fixed disk (every partition gets a letter);
+   - every read of LBA 0 that reaches the stick returns an MBR built from
+     the GPT instead of the protective one: Microsoft basic data partitions
+     with an NTFS / exFAT boot sector as type 0x07, FAT32 as 0x0C, FAT12/16
+     as 0x0E; the ESP as 0xEF (no letter); MSR, other GPT types, entries
+     with GPT attribute 63 (no drive letter), 62 (hidden) or 60 (read-only)
+     and partitions without a known file system are left out; at most four
+     entries (the ESP is dropped first), sorted by start. Disk signature:
+     the protective MBR's, or (when 0) the four dwords of the GPT disk GUID
+     XOR-ed, so letters stay the same per stick;
+   - a write is let through only when it lies entirely inside one lettered
+     partition. The protective MBR, both GPT copies, the ESP and the gaps
+     fail with "write protected" (sense 07/27/00), as do FORMAT UNIT,
+     UNMAP, WRITE BUFFER and `IOCTL_SCSI_PASS_THROUGH(_DIRECT)` (access
+     denied), so nothing on the old system can change the partition table.
+   The GPT is used only when the header and entry-array CRCs match, the
+   entries lie inside the usable area and do not overlap, every LBA fits 32
+   bits (< 2 TiB with 512-byte sectors) and at least one partition gets a
+   letter. Otherwise ("MpHide") the disk is still started fixed with the
+   0xEE partition hidden (no letter), and every write command fails.
 
 ## What does not change
 
@@ -63,9 +82,14 @@ mass-storage port driver:
 - A card reader whose card held more than one partition when the reader was
   plugged in becomes a fixed disk: a card swap is not seen until the reader is
   unplugged (the filter decides once per device start).
-- GPT media count only on NT 5.2 and later; Windows 2000 / XP x86 cannot
-  use GPT data disks, so a GPT stick (the USOS stick) is hidden and
-  write-blocked there (point 4), not opened.
+- GPT media count only on NT 5.2 and later; on Windows 2000 / XP x86 a GPT
+  stick gets the MBR view of point 4 (or is hidden). There Disk Management
+  cannot create, delete or change partitions on it (LBA 0 is write
+  protected), and formatting a partition with a different file system may
+  end with an error when Windows tries to update the partition type; the
+  file system itself is written and the type is worked out again from the
+  boot sector at the next plug-in. A hybrid MBR (0xEE next to other
+  entries) keeps the plain MBR path.
 - Windows Vista / 7 / 8.x **x64** enforce kernel-mode code signing for a
   boot-start filter: the x64 build loads only on XP x64 / Server 2003 x64 and
   on x64 NT 6 systems running with test signing (USOS Vista x64). Windows 7 /
@@ -105,8 +129,11 @@ against the 2000 SP4 `ntoskrnl.exe`).
 ## Provenance
 
 Written from the public WDK documentation (WDM filter drivers, remove locks,
-`IOCTL_STORAGE_QUERY_PROPERTY`, `SCSI_REQUEST_BLOCK`) and the MBR / UEFI GPT
-on-disk formats. To confirm which descriptor field selects the removable
+`IOCTL_STORAGE_QUERY_PROPERTY`, `SCSI_REQUEST_BLOCK`, completion routines /
+`MmGetSystemAddressForMdlSafe`), the MBR / UEFI GPT on-disk formats (UEFI
+specification: header and entry layout, CRC32, attribute bits) and the
+public SCSI block command set; the GPT entry rules follow USOS's own NT 4
+`usosusb` `gpt_volumes()`. To confirm which descriptor field selects the removable
 path in the disk class driver, that USB mass storage sets no removable
 device characteristic of its own, and that the quick-removal policy follows
 the removal policy rather than `RemovableMedia`, the user-supplied NT 5

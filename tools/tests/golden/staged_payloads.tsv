@@ -66,9 +66,9 @@ initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	de96470f5df824a89a0a7002cccc
 initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	5fb78b40b879ea819d46806f1be941e2a828ba722072e91c52e84fe836da366a
 initramfs	usr/lib/usos/nt5-usosmpart	40755	dir
 initramfs	usr/lib/usos/nt5-usosmpart/amd64	40755	dir
-initramfs	usr/lib/usos/nt5-usosmpart/amd64/usosmpart.sys	100644	432753e0f53bcc38e051100523cf5b48fd56daf6bc88617efafc5cd8a777eb2e
+initramfs	usr/lib/usos/nt5-usosmpart/amd64/usosmpart.sys	100644	0998443aa1341992035f531064858280c59f8b82b4f7a3303736a5690da6429d
 initramfs	usr/lib/usos/nt5-usosmpart/i386	40755	dir
-initramfs	usr/lib/usos/nt5-usosmpart/i386/usosmpart.sys	100644	9abbccabbe18d78bd9ea7711849c1c09fa5f9cfed2569b85225c5e86ed829fbe
+initramfs	usr/lib/usos/nt5-usosmpart/i386/usosmpart.sys	100644	3824353d5b13430e3d3a5145eb43b3c5c4c227808eebddca0a33f1b7b8bce1b4
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	32280cd7d12e0db9fbabfaf311ade7695311c3c9af3f8c884c5f112009ba9e93
 initramfs	usr/lib/usos/nt5_media_key.sh	100755	9f62ee0e64af21ec8a641b1bde227f8d1c2ae8e63938ec69c20c9d1d13d5db41
 initramfs	usr/lib/usos/nt5_profile.sh	100755	d3bfe986a7680fdadf94080e1ab9add7401d7668fd0f43184657f139b00d5287
@@ -101,7 +101,7 @@ initramfs	usr/lib/usos/posready/DRV/usbhub3.inf	100644	a4658961dc6679c7640f761d4
 initramfs	usr/lib/usos/posready/DRV/usbhub3.sys	100644	7648152c456e48f38fdecad3d637e5b46d86c3a2d190612772f53f6c286de90d
 initramfs	usr/lib/usos/posready/DRV/usbxhci.inf	100644	bb27f4772b9e5dd49246a4489c3345c5cf948f88618034375dedbb2ef8fbe7cd
 initramfs	usr/lib/usos/posready/DRV/usbxhci.sys	100644	ce3c1c5aaabd91f20edc55697f4959e39a68b9c823f63cf8dcb433220d8b57af
-initramfs	usr/lib/usos/posready/DRV/usosmpart.sys	100644	9abbccabbe18d78bd9ea7711849c1c09fa5f9cfed2569b85225c5e86ed829fbe
+initramfs	usr/lib/usos/posready/DRV/usosmpart.sys	100644	3824353d5b13430e3d3a5145eb43b3c5c4c227808eebddca0a33f1b7b8bce1b4
 initramfs	usr/lib/usos/posready/DRV/wdf01000.sys	100644	b1c119f541c46100731b5781964f1c9bed9cdf316cd73e40a5c328eba3933000
 initramfs	usr/lib/usos/posready/DRV/wdfldr.sys	100644	149de723bf02d8449fb63b71406857db54decf2dae7be0d51d003fbcf5c2a39b
 initramfs	usr/lib/usos/posready/DRV/wpprecor.sys	100644	a2636f0b9747c032bf3bda44c9c35783f0e11d2f2ede3b6c831f2b1f420436ef
@@ -521,7 +521,7 @@ native_cpio	modern-support.cpio	usos-x86-csmwrap.exe	37888	6a2ee6e6a50efd60406ff
 native_cpio	modern-support.cpio	usos-vista-oobe-x86.exe	12800	3c8d1691a19c27e9beccbac6aa2f3a87debaa2ff89545bad0535f262e953e296
 native_cpio	modern-support.cpio	usosusb-nt6.sys	56320	3b412e9a74aa8611401e7ce1a99ff6fe0aaf465843d9f43f21615b1e4f49026d
 native_cpio	modern-support.cpio	usos-drivenotify.exe	6144	1be1d6c1dc8b2f45efc9edf4d2e8c3dafd25d55e9650532c091a5d3034a4ef7c
-native_cpio	modern-support.cpio	usosmpart-x86.sys	7552	9abbccabbe18d78bd9ea7711849c1c09fa5f9cfed2569b85225c5e86ed829fbe
+native_cpio	modern-support.cpio	usosmpart-x86.sys	10752	3824353d5b13430e3d3a5145eb43b3c5c4c227808eebddca0a33f1b7b8bce1b4
 native_cpio	modern-support.cpio	usos-usbreenum.exe	8704	33badba4ea6e904e77e27db6cc34eec55c93b7c3f5cfd0e076f06d59bc857d2a
 native_cpio	modern-support.cpio	usosnvme-nt6.sys	13968	216db8912369a683d80ef62b28940e24eff4a9dd4cdedcf4f1274f33f3b16898
 native_cpio	modern-support.cpio	usosnvme.inf	1383	cff13446e8d7ff163828cf3ecaa588ba65f290808c7bb9704f4a58a7043eda22
