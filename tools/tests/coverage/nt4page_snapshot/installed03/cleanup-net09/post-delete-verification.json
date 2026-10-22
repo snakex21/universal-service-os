@@ -1,0 +1,14 @@
+{
+  "pass": true,
+  "receipt_sha256": "6d0fc34d3552abc2bc618d1e052569b36e38a3b236ed697735c0ed639979496d",
+  "actual_C_proof_hashes_rechecked_after_unlink": 214,
+  "C_proof_files_changed": [],
+  "source_and_manifest_identical_to_predelete_commit": true,
+  "predelete_commit": "1746d9adb5f6514da0f58df73e2935a45120148e",
+  "deleted_literal_names": 14,
+  "deleted_unique_file_ids": 13,
+  "deleted_unique_qcow2_file_length_bytes": 2297694720,
+  "protected_parent_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "no_new_VM": true,
+  "no_process_poll": true
+}

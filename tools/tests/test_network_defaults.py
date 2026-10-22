@@ -42,7 +42,7 @@ class Stage(unittest.TestCase):
         for name in ('usosnet.inf','usosnet9x.inf'):
             (self.lib/'network'/name).write_text('[Models]\n%Card%=Install,'+id+'\n[Settings]\nHKR,,PollMode,0x10001,1\n')
         (self.lib/'network/usosnet.sys').write_bytes(b'own test fixture, not a driver')
-        for name in ('USOSLAN9X.EXE','USOSLANNT.EXE'):
+        for name in ('USOSLAN9X.EXE','USOSLANNT.EXE','USOSLOG.EXE'):
             (self.lib/'network'/name).write_bytes(b'own helper fixture')
     def run_stage(self,extra=''):
         return shell('usos_net_stage '+' '.join(map(q,(self.cfg,self.target,self.lib,self.pci)))+extra)
@@ -98,6 +98,7 @@ class Stage(unittest.TestCase):
         self.assertTrue(reg.startswith(b'REGEDIT4\r\n'));self.assertNotIn(b'\n',reg.replace(b'\r\n',b''))
         text=reg.decode('ascii')
         for token in ('[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\NDISLoop]\r\n"ImagePath"="\\\\SystemRoot\\\\System32\\\\drivers\\\\usosnet4.sys"',
+                      '"ImagePath"="\\\\SystemRoot\\\\System32\\\\drivers\\\\usosnet4.sys"\r\n"Start"=dword:00000002',
                       'Services\\NDISLoop1\\Parameters]\r\n"BusType"=dword:00000005','"EnableDHCP"=dword:00000001',
                       '"IPAddress"=hex(7):30,2e,30,2e,30,2e,30,00,00','"DefaultGateway"=hex(7):00,00','Services\\DHCP]\r\n"Start"=dword:00000002'):
             self.assertIn(token,text)
@@ -115,6 +116,15 @@ class Stage(unittest.TestCase):
         self.driver();self.driver4();self.config('NT4')
         self.state(self.run_stage(),'no Ethernet card')
         self.assertFalse((self.target/'USOS/NT4/USOSNET.REG').exists())
+    def test_nt4_silent_logger_is_copied_and_read_back(self):
+        self.driver();self.config('NT4')
+        self.assertEqual(self.run_stage().returncode,0)
+        self.assertEqual((self.target/'USOS/NT4/USOSLOG.EXE').read_bytes(),(self.lib/'network/USOSLOG.EXE').read_bytes())
+    def test_nt4_missing_logger_stops_preparation(self):
+        self.driver();self.config('NT4');(self.lib/'network/USOSLOG.EXE').unlink()
+        r=self.run_stage()
+        self.assertNotEqual(r.returncode,0)
+        self.assertIn(b'silent network evidence helper missing',r.stdout)
     def test_network_off_writes_nothing(self):
         self.config(network='off');self.card();self.driver();self.state(self.run_stage(),'original flow')
         self.assertEqual(list(self.target.iterdir()),[])

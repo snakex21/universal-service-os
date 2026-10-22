@@ -1,0 +1,506 @@
+{
+  "scope": "Stopped owned target; selected hive facts and exact own status only; raw values remain RAM. No answer/key/process dump/network-log export. Configuration is not LAN PASS.",
+  "image": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+  "image_bytes_from_open_handle": 460390400,
+  "system_hive": {
+    "header_checksum_valid": true,
+    "sequence_numbers_equal": true
+  },
+  "software_hive": {
+    "header_checksum_valid": true,
+    "sequence_numbers_equal": true
+  },
+  "selected_controlset": 1,
+  "services": {
+    "ndisloop": {
+      "present": true,
+      "start": 3,
+      "type": 1,
+      "image_enum": "USOSNET4_SYS",
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "ndisloop1": {
+      "present": true,
+      "start": 3,
+      "type": 4,
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "tcpip": {
+      "present": true,
+      "start": 2,
+      "type": 1,
+      "image_enum": "TCPIP_SYS",
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "dhcp": {
+      "present": true,
+      "start": 2,
+      "type": 32,
+      "image_enum": "OTHER",
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "ndis": {
+      "present": true,
+      "start": 1,
+      "type": 1,
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "netbt": {
+      "present": true,
+      "start": 2,
+      "type": 1,
+      "image_enum": "NETBT_SYS",
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "lanmanworkstation": {
+      "present": true,
+      "start": 2,
+      "type": 32,
+      "image_enum": "OTHER",
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "lanmanserver": {
+      "present": true,
+      "start": 4,
+      "type": 32,
+      "image_enum": "OTHER",
+      "linkage": {
+        "bind": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": true,
+          "entry_count": 1,
+          "contains_ndisloop1": true,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "browser": {
+      "present": true,
+      "start": 4,
+      "type": 32,
+      "image_enum": "OTHER",
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "i8042prt": {
+      "present": true,
+      "start": 1,
+      "type": 1,
+      "image_enum": "I8042PRT_SYS",
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "kbdclass": {
+      "present": true,
+      "start": 1,
+      "type": 1,
+      "image_enum": "KBDCLASS_SYS",
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "mouclass": {
+      "present": true,
+      "start": 1,
+      "type": 1,
+      "image_enum": "MOUCLASS_SYS",
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "usosusb": {
+      "present": true,
+      "start": 1,
+      "type": 1,
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    },
+    "serial": {
+      "present": true,
+      "start": 2,
+      "type": 1,
+      "linkage": {
+        "bind": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "export": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        },
+        "route": {
+          "present": false,
+          "entry_count": 0,
+          "contains_ndisloop1": false,
+          "contains_ndisloop": false
+        }
+      }
+    }
+  },
+  "adapter_parameters": {
+    "bustype": 5,
+    "busnumber": 0,
+    "pollmode": 0,
+    "debugport": null,
+    "enable_dhcp": 1,
+    "tcpip_present": true,
+    "tcpip_address_values": {
+      "ipaddress": {
+        "present": true,
+        "all_ipv4_or_empty": true,
+        "zero_only": true
+      },
+      "subnetmask": {
+        "present": true,
+        "all_ipv4_or_empty": true,
+        "zero_only": true
+      },
+      "defaultgateway": {
+        "present": true,
+        "all_ipv4_or_empty": true,
+        "zero_only": true
+      },
+      "dhcpipaddress": {
+        "present": false,
+        "all_ipv4_or_empty": true,
+        "zero_only": false
+      },
+      "dhcpsubnetmask": {
+        "present": false,
+        "all_ipv4_or_empty": true,
+        "zero_only": false
+      },
+      "dhcpdefaultgateway": {
+        "present": false,
+        "all_ipv4_or_empty": true,
+        "zero_only": false
+      },
+      "dhcpserver": {
+        "present": false,
+        "all_ipv4_or_empty": true,
+        "zero_only": false
+      },
+      "dhcpnameserver": {
+        "present": false,
+        "all_ipv4_or_empty": true,
+        "zero_only": false
+      }
+    }
+  },
+  "files": {
+    "USOS/NT4/POST.OK": {
+      "present": true,
+      "regular": true,
+      "bytes": 5
+    },
+    "USOS/NT4/NETSETUP.TXT": {
+      "present": true,
+      "regular": true,
+      "bytes": 636
+    },
+    "USOS/NT4/LOOPCHK.REG": {
+      "present": true,
+      "regular": true,
+      "bytes": 1206
+    },
+    "USOS/NT4/NET4CHK.REG": {
+      "present": true,
+      "regular": true,
+      "bytes": 1697
+    },
+    "USOS/COVERAGE/ARMED.TXT": {
+      "present": false
+    },
+    "USOS/COVERAGE/OBSERVER.STATUS": {
+      "present": true,
+      "regular": true,
+      "bytes": 31
+    },
+    "USOS/COVERAGE/USABILITY.TXT": {
+      "present": false
+    },
+    "USOS/NT4/USABILITY.TXT": {
+      "present": false
+    },
+    "USOS/COVERAGE/FIRSTLO.CMD": {
+      "present": true,
+      "regular": true,
+      "bytes": 194
+    },
+    "USOS/COVERAGE/TESTNET.CMD": {
+      "present": true,
+      "regular": true,
+      "bytes": 320
+    },
+    "USOS/COVERAGE/NT4OBS.EXE": {
+      "present": true,
+      "regular": true,
+      "bytes": 5632
+    },
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": {
+      "present": true,
+      "regular": true,
+      "bytes": 21376
+    }
+  },
+  "observer_status": "NOT_READY",
+  "observer_hooks_present": {
+    "run": false,
+    "runonce": false
+  },
+  "netsetup_exact_markers": {
+    "takeover_success": false,
+    "no_loopback": false,
+    "copy_or_readback_failure": false
+  },
+  "own_hashes": {
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": "4f2eb16b71753baab740302025b9e8ba02c38a676670b13626c757bdb3700f8d",
+    "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS": "2d4557439d7c60f7e0d5cc53d36467cbc36ae24596eb614e078059ddc718cfe1",
+    "USOS/COVERAGE/NT4OBS.EXE": "37e7a0f69846d9bab18a718f7d66c3fd937f0f35913d2b0eb22f2d7ce4eae0e9",
+    "USOS/COVERAGE/USOSLOG.EXE": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7"
+  },
+  "native_desktop_observed": true,
+  "native_ipconfig_has_no_adapters": true,
+  "native_ndisloop_manual_start_success": true,
+  "native_safe_off_observed": true,
+  "qemu_returncode": 0,
+  "lan_pass": false,
+  "hid_pass": false,
+  "msc_pass": false
+}

@@ -1,0 +1,8 @@
+{
+  "raw_scratch_removed": true,
+  "ms_bytes_exported": false,
+  "prepared": false,
+  "vm_started": false,
+  "guard_attempted": false,
+  "error": "OFFLINE_ASSUMED_CLUSTER_SIZE_REJECTED; actual BPB512*64=32768, twoFATs; raw scratch removed before any patch"
+}

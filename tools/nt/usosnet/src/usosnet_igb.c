@@ -42,10 +42,10 @@
 #define MDIC        0x0020
 #define RCTL        0x0100
 #define TCTL        0x0400
-#define ICR         0x1500
-#define IMS         0x1508
-#define IMC         0x150C
-#define IAM         0x1510
+#define ICR         0x00C0
+#define IMS         0x00D0
+#define IMC         0x00D8
+#define IAM         0x00E0
 #define GPIE        0x1514
 #define EIMC        0x1528
 #define EIMC_ALL    0xFFFFFFFFUL

@@ -78,9 +78,10 @@ pub fn ntRegistry(p: *const Profile, prefix: []const u8, w: *std.Io.Writer) !voi
 pub fn nt4(p: *const Profile, workgroup: []const u8, w: *std.Io.Writer) !void {
     if (p.network == .off) return;
     // Q197302: install TCP/IP using the inbox loopback, independent of the VM NIC.
-    // This is an unconnected placeholder until an NT4-compatible LAN driver exists.
+    // Native TCPCFG's unattended parser rejects zero in every address octet.
+    // POST replaces this unconnected address with the requested LAN policy.
     try w.print("\r\n[Network]\r\nJoinWorkgroup={s}\r\nInstallAdapters=USOS.Adapters\r\nInstallProtocols=USOS.Protocols\r\nDoNotInstallInternetServer=Yes\r\n", .{workgroup});
-    try w.writeAll("\r\n[USOS.Adapters]\r\nLOOP=USOS.Loop\r\n\r\n[USOS.Loop]\r\n\r\n[USOS.Protocols]\r\nTC=USOS.TCPIP\r\n\r\n[USOS.TCPIP]\r\nDHCP=No\r\nIPAddress=192.0.2.1\r\nSubnet=255.255.255.0\r\n");
+    try w.writeAll("\r\n[USOS.Adapters]\r\nLOOP=USOS.Loop\r\n\r\n[USOS.Loop]\r\n\r\n[USOS.Protocols]\r\nTC=USOS.TCPIP\r\n\r\n[USOS.TCPIP]\r\nDHCP=No\r\nIPAddress=198.51.100.1\r\nSubnet=255.255.255.0\r\n");
     try metadata(p, false, w);
     try ntRegistry(p, ";USOS-REG=", w);
     try w.writeAll(";USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer|Start|dword|4\r\n");
@@ -97,4 +98,20 @@ test "LAN off preserves the pre-network byte stream" {
     w = .fixed(&buf);
     try nt4(&p, "WORKGROUP", &w);
     try std.testing.expectEqual(@as(usize, 0), w.buffered().len);
+}
+
+test "NT4 setup address satisfies the original TCPCFG unattended octet bounds" {
+    const p = Profile{};
+    var buf: [8192]u8 = undefined;
+    var w: std.Io.Writer = .fixed(&buf);
+    try nt4(&p, "WORKGROUP", &w);
+    const start = (std.mem.indexOf(u8, w.buffered(), "\r\nIPAddress=") orelse return error.MissingAddress) + "\r\nIPAddress=".len;
+    const end = start + (std.mem.indexOf(u8, w.buffered()[start..], "\r\n") orelse return error.MissingLineEnd);
+    var octets = std.mem.splitScalar(u8, w.buffered()[start..end], '.');
+    var count: usize = 0;
+    while (octets.next()) |octet| : (count += 1) {
+        const value = try std.fmt.parseInt(u16, octet, 10);
+        try std.testing.expect(value >= 1 and value <= (if (count == 0) @as(u16, 223) else 255));
+    }
+    try std.testing.expectEqual(@as(usize, 4), count);
 }
