@@ -48,26 +48,22 @@ show_protected=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 show_protected=yes	windows-10	+          <Order>6</Order>
 show_protected=yes	windows-10	-          <Order>5</Order>
 show_protected=yes	windows-10	+          <Order>7</Order>
-show_protected=yes	windows-11	+    </component>
-show_protected=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_protected=yes	windows-11	+      <RunSynchronous>
-show_protected=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-show_protected=yes	windows-11	+          <Order>1</Order>
-show_protected=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_protected=yes	windows-11	+        </RunSynchronousCommand>
 show_protected=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_protected=yes	windows-11	+          <Order>2</Order>
-show_protected=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
+show_protected=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_protected=yes	windows-11	+        </RunSynchronousCommand>
 show_protected=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_protected=yes	windows-11	+          <Order>3</Order>
-show_protected=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f</Path>
+show_protected=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_protected=yes	windows-11	+        </RunSynchronousCommand>
 show_protected=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_protected=yes	windows-11	+          <Order>4</Order>
-show_protected=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+show_protected=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f</Path>
 show_protected=yes	windows-11	+        </RunSynchronousCommand>
-show_protected=yes	windows-11	+      </RunSynchronous>
+show_protected=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+show_protected=yes	windows-11	+          <Order>5</Order>
+show_protected=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 show_protected=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_protected=yes	windows-server-2008	+        </RunSynchronousCommand>
 show_protected=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -236,22 +232,18 @@ launch_to_pc=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 launch_to_pc=yes	windows-10	+          <Order>5</Order>
 launch_to_pc=yes	windows-10	-          <Order>5</Order>
 launch_to_pc=yes	windows-10	+          <Order>6</Order>
-launch_to_pc=yes	windows-11	+    </component>
-launch_to_pc=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-launch_to_pc=yes	windows-11	+      <RunSynchronous>
-launch_to_pc=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-launch_to_pc=yes	windows-11	+          <Order>1</Order>
-launch_to_pc=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 launch_to_pc=yes	windows-11	+        </RunSynchronousCommand>
 launch_to_pc=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 launch_to_pc=yes	windows-11	+          <Order>2</Order>
-launch_to_pc=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v LaunchTo /t REG_DWORD /d 1 /f</Path>
+launch_to_pc=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 launch_to_pc=yes	windows-11	+        </RunSynchronousCommand>
 launch_to_pc=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 launch_to_pc=yes	windows-11	+          <Order>3</Order>
-launch_to_pc=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+launch_to_pc=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v LaunchTo /t REG_DWORD /d 1 /f</Path>
 launch_to_pc=yes	windows-11	+        </RunSynchronousCommand>
-launch_to_pc=yes	windows-11	+      </RunSynchronous>
+launch_to_pc=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+launch_to_pc=yes	windows-11	+          <Order>4</Order>
+launch_to_pc=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 launch_to_pc=yes	windows-server-2016	+    </component>
 launch_to_pc=yes	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 launch_to_pc=yes	windows-server-2016	+      <RunSynchronous>
@@ -316,22 +308,18 @@ launch_to_pc=yes	windows-server-2025	+          <Order>3</Order>
 launch_to_pc=yes	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 launch_to_pc=yes	windows-server-2025	+        </RunSynchronousCommand>
 launch_to_pc=yes	windows-server-2025	+      </RunSynchronous>
-end_task=yes	windows-11	+    </component>
-end_task=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-end_task=yes	windows-11	+      <RunSynchronous>
-end_task=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-end_task=yes	windows-11	+          <Order>1</Order>
-end_task=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 end_task=yes	windows-11	+        </RunSynchronousCommand>
 end_task=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 end_task=yes	windows-11	+          <Order>2</Order>
-end_task=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings&quot; /v TaskbarEndTask /t REG_DWORD /d 1 /f</Path>
+end_task=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 end_task=yes	windows-11	+        </RunSynchronousCommand>
 end_task=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 end_task=yes	windows-11	+          <Order>3</Order>
-end_task=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+end_task=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings&quot; /v TaskbarEndTask /t REG_DWORD /d 1 /f</Path>
 end_task=yes	windows-11	+        </RunSynchronousCommand>
-end_task=yes	windows-11	+      </RunSynchronous>
+end_task=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+end_task=yes	windows-11	+          <Order>4</Order>
+end_task=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 end_task=yes	windows-server-2025	+    </component>
 end_task=yes	windows-server-2025	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 end_task=yes	windows-server-2025	+      <RunSynchronous>
@@ -370,26 +358,22 @@ taskbar_search=hidden	windows-10	+        <RunSynchronousCommand wcm:action="add
 taskbar_search=hidden	windows-10	+          <Order>5</Order>
 taskbar_search=hidden	windows-10	-          <Order>5</Order>
 taskbar_search=hidden	windows-10	+          <Order>6</Order>
-taskbar_search=hidden	windows-11	+    </component>
-taskbar_search=hidden	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-taskbar_search=hidden	windows-11	+      <RunSynchronous>
-taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
-taskbar_search=hidden	windows-11	+          <Order>1</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 0 /f</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>2</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 0 /f</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>3</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>4</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
-taskbar_search=hidden	windows-11	+      </RunSynchronous>
+taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=hidden	windows-11	+          <Order>5</Order>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=hidden	windows-server-2016	+    </component>
 taskbar_search=hidden	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 taskbar_search=hidden	windows-server-2016	+      <RunSynchronous>
@@ -464,26 +448,22 @@ taskbar_search=icon	windows-10	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-10	+          <Order>5</Order>
 taskbar_search=icon	windows-10	-          <Order>5</Order>
 taskbar_search=icon	windows-10	+          <Order>6</Order>
-taskbar_search=icon	windows-11	+    </component>
-taskbar_search=icon	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-taskbar_search=icon	windows-11	+      <RunSynchronous>
-taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
-taskbar_search=icon	windows-11	+          <Order>1</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 1 /f</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>2</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 1 /f</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>3</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
+taskbar_search=icon	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>4</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
-taskbar_search=icon	windows-11	+      </RunSynchronous>
+taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=icon	windows-11	+          <Order>5</Order>
+taskbar_search=icon	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=icon	windows-server-2016	+    </component>
 taskbar_search=icon	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 taskbar_search=icon	windows-server-2016	+      <RunSynchronous>
@@ -558,26 +538,22 @@ taskbar_search=box	windows-10	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-10	+          <Order>5</Order>
 taskbar_search=box	windows-10	-          <Order>5</Order>
 taskbar_search=box	windows-10	+          <Order>6</Order>
-taskbar_search=box	windows-11	+    </component>
-taskbar_search=box	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-taskbar_search=box	windows-11	+      <RunSynchronous>
-taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
-taskbar_search=box	windows-11	+          <Order>1</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 3 /f</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>2</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 3 /f</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>3</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
+taskbar_search=box	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>4</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
-taskbar_search=box	windows-11	+      </RunSynchronous>
+taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=box	windows-11	+          <Order>5</Order>
+taskbar_search=box	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=box	windows-server-2016	+    </component>
 taskbar_search=box	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 taskbar_search=box	windows-server-2016	+      <RunSynchronous>
@@ -646,44 +622,36 @@ taskbar_search=box	windows-server-2025	+          <Order>4</Order>
 taskbar_search=box	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=box	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=box	windows-server-2025	+      </RunSynchronous>
-taskbar_left=yes	windows-11	+    </component>
-taskbar_left=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-taskbar_left=yes	windows-11	+      <RunSynchronous>
-taskbar_left=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-taskbar_left=yes	windows-11	+          <Order>1</Order>
-taskbar_left=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_left=yes	windows-11	+        </RunSynchronousCommand>
 taskbar_left=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_left=yes	windows-11	+          <Order>2</Order>
-taskbar_left=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAl /t REG_DWORD /d 0 /f</Path>
+taskbar_left=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_left=yes	windows-11	+        </RunSynchronousCommand>
 taskbar_left=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_left=yes	windows-11	+          <Order>3</Order>
-taskbar_left=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+taskbar_left=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAl /t REG_DWORD /d 0 /f</Path>
 taskbar_left=yes	windows-11	+        </RunSynchronousCommand>
-taskbar_left=yes	windows-11	+      </RunSynchronous>
+taskbar_left=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_left=yes	windows-11	+          <Order>4</Order>
+taskbar_left=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 task_view_off=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowTaskViewButton /t REG_DWORD /d 0 /f</Path>
 task_view_off=yes	windows-10	+        </RunSynchronousCommand>
 task_view_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 task_view_off=yes	windows-10	+          <Order>5</Order>
 task_view_off=yes	windows-10	-          <Order>5</Order>
 task_view_off=yes	windows-10	+          <Order>6</Order>
-task_view_off=yes	windows-11	+    </component>
-task_view_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-task_view_off=yes	windows-11	+      <RunSynchronous>
-task_view_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-task_view_off=yes	windows-11	+          <Order>1</Order>
-task_view_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 task_view_off=yes	windows-11	+        </RunSynchronousCommand>
 task_view_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 task_view_off=yes	windows-11	+          <Order>2</Order>
-task_view_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowTaskViewButton /t REG_DWORD /d 0 /f</Path>
+task_view_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 task_view_off=yes	windows-11	+        </RunSynchronousCommand>
 task_view_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 task_view_off=yes	windows-11	+          <Order>3</Order>
-task_view_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+task_view_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowTaskViewButton /t REG_DWORD /d 0 /f</Path>
 task_view_off=yes	windows-11	+        </RunSynchronousCommand>
-task_view_off=yes	windows-11	+      </RunSynchronous>
+task_view_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+task_view_off=yes	windows-11	+          <Order>4</Order>
+task_view_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 task_view_off=yes	windows-server-2016	+    </component>
 task_view_off=yes	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 task_view_off=yes	windows-server-2016	+      <RunSynchronous>
@@ -758,36 +726,28 @@ widgets_off=yes	windows-10	-          <Order>4</Order>
 widgets_off=yes	windows-10	+          <Order>5</Order>
 widgets_off=yes	windows-10	-          <Order>5</Order>
 widgets_off=yes	windows-10	+          <Order>6</Order>
-widgets_off=yes	windows-11	+    </component>
-widgets_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-widgets_off=yes	windows-11	+      <RunSynchronous>
-widgets_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-widgets_off=yes	windows-11	+          <Order>1</Order>
-widgets_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Dsh&quot; /v AllowNewsAndInterests /t REG_DWORD /d 0 /f</Path>
 widgets_off=yes	windows-11	+        </RunSynchronousCommand>
-widgets_off=yes	windows-11	+      </RunSynchronous>
+widgets_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+widgets_off=yes	windows-11	+          <Order>2</Order>
+widgets_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Dsh&quot; /v AllowNewsAndInterests /t REG_DWORD /d 0 /f</Path>
 bing_search_off=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\Explorer&quot; /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f</Path>
 bing_search_off=yes	windows-10	+        </RunSynchronousCommand>
 bing_search_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 bing_search_off=yes	windows-10	+          <Order>5</Order>
 bing_search_off=yes	windows-10	-          <Order>5</Order>
 bing_search_off=yes	windows-10	+          <Order>6</Order>
-bing_search_off=yes	windows-11	+    </component>
-bing_search_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-bing_search_off=yes	windows-11	+      <RunSynchronous>
-bing_search_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-bing_search_off=yes	windows-11	+          <Order>1</Order>
-bing_search_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 bing_search_off=yes	windows-11	+        </RunSynchronousCommand>
 bing_search_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 bing_search_off=yes	windows-11	+          <Order>2</Order>
-bing_search_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\Explorer&quot; /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f</Path>
+bing_search_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 bing_search_off=yes	windows-11	+        </RunSynchronousCommand>
 bing_search_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 bing_search_off=yes	windows-11	+          <Order>3</Order>
-bing_search_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+bing_search_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\Explorer&quot; /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f</Path>
 bing_search_off=yes	windows-11	+        </RunSynchronousCommand>
-bing_search_off=yes	windows-11	+      </RunSynchronous>
+bing_search_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+bing_search_off=yes	windows-11	+          <Order>4</Order>
+bing_search_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 bing_search_off=yes	windows-server-2016	+    </component>
 bing_search_off=yes	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 bing_search_off=yes	windows-server-2016	+      <RunSynchronous>
@@ -922,18 +882,14 @@ uac_level=no_dim	windows-10	-          <Order>4</Order>
 uac_level=no_dim	windows-10	+          <Order>6</Order>
 uac_level=no_dim	windows-10	-          <Order>5</Order>
 uac_level=no_dim	windows-10	+          <Order>7</Order>
-uac_level=no_dim	windows-11	+    </component>
-uac_level=no_dim	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-uac_level=no_dim	windows-11	+      <RunSynchronous>
-uac_level=no_dim	windows-11	+        <RunSynchronousCommand wcm:action="add">
-uac_level=no_dim	windows-11	+          <Order>1</Order>
-uac_level=no_dim	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 5 /f</Path>
 uac_level=no_dim	windows-11	+        </RunSynchronousCommand>
 uac_level=no_dim	windows-11	+        <RunSynchronousCommand wcm:action="add">
 uac_level=no_dim	windows-11	+          <Order>2</Order>
-uac_level=no_dim	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v PromptOnSecureDesktop /t REG_DWORD /d 0 /f</Path>
+uac_level=no_dim	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 5 /f</Path>
 uac_level=no_dim	windows-11	+        </RunSynchronousCommand>
-uac_level=no_dim	windows-11	+      </RunSynchronous>
+uac_level=no_dim	windows-11	+        <RunSynchronousCommand wcm:action="add">
+uac_level=no_dim	windows-11	+          <Order>3</Order>
+uac_level=no_dim	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v PromptOnSecureDesktop /t REG_DWORD /d 0 /f</Path>
 uac_level=no_dim	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 5 /f</Path>
 uac_level=no_dim	windows-server-2008	+        </RunSynchronousCommand>
 uac_level=no_dim	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -1104,18 +1060,14 @@ uac_level=never	windows-10	-          <Order>4</Order>
 uac_level=never	windows-10	+          <Order>6</Order>
 uac_level=never	windows-10	-          <Order>5</Order>
 uac_level=never	windows-10	+          <Order>7</Order>
-uac_level=never	windows-11	+    </component>
-uac_level=never	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-uac_level=never	windows-11	+      <RunSynchronous>
-uac_level=never	windows-11	+        <RunSynchronousCommand wcm:action="add">
-uac_level=never	windows-11	+          <Order>1</Order>
-uac_level=never	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 0 /f</Path>
 uac_level=never	windows-11	+        </RunSynchronousCommand>
 uac_level=never	windows-11	+        <RunSynchronousCommand wcm:action="add">
 uac_level=never	windows-11	+          <Order>2</Order>
-uac_level=never	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v PromptOnSecureDesktop /t REG_DWORD /d 0 /f</Path>
+uac_level=never	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 0 /f</Path>
 uac_level=never	windows-11	+        </RunSynchronousCommand>
-uac_level=never	windows-11	+      </RunSynchronous>
+uac_level=never	windows-11	+        <RunSynchronousCommand wcm:action="add">
+uac_level=never	windows-11	+          <Order>3</Order>
+uac_level=never	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v PromptOnSecureDesktop /t REG_DWORD /d 0 /f</Path>
 uac_level=never	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 0 /f</Path>
 uac_level=never	windows-server-2008	+        </RunSynchronousCommand>
 uac_level=never	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -1246,14 +1198,10 @@ hibernation=no_fast_startup	windows-10	-          <Order>4</Order>
 hibernation=no_fast_startup	windows-10	+          <Order>5</Order>
 hibernation=no_fast_startup	windows-10	-          <Order>5</Order>
 hibernation=no_fast_startup	windows-10	+          <Order>6</Order>
-hibernation=no_fast_startup	windows-11	+    </component>
-hibernation=no_fast_startup	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-hibernation=no_fast_startup	windows-11	+      <RunSynchronous>
-hibernation=no_fast_startup	windows-11	+        <RunSynchronousCommand wcm:action="add">
-hibernation=no_fast_startup	windows-11	+          <Order>1</Order>
 hibernation=no_fast_startup	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power&quot; /v HiberbootEnabled /t REG_DWORD /d 0 /f</Path>
 hibernation=no_fast_startup	windows-11	+        </RunSynchronousCommand>
-hibernation=no_fast_startup	windows-11	+      </RunSynchronous>
+hibernation=no_fast_startup	windows-11	+        <RunSynchronousCommand wcm:action="add">
+hibernation=no_fast_startup	windows-11	+          <Order>2</Order>
 hibernation=off	windows-8	+          <Path>powercfg.exe -h off</Path>
 hibernation=off	windows-8	+        </RunSynchronousCommand>
 hibernation=off	windows-8	+        <RunSynchronousCommand wcm:action="add">
@@ -1284,14 +1232,10 @@ hibernation=off	windows-10	-          <Order>4</Order>
 hibernation=off	windows-10	+          <Order>5</Order>
 hibernation=off	windows-10	-          <Order>5</Order>
 hibernation=off	windows-10	+          <Order>6</Order>
-hibernation=off	windows-11	+    </component>
-hibernation=off	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-hibernation=off	windows-11	+      <RunSynchronous>
-hibernation=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
-hibernation=off	windows-11	+          <Order>1</Order>
-hibernation=off	windows-11	+          <Path>powercfg.exe -h off</Path>
 hibernation=off	windows-11	+        </RunSynchronousCommand>
-hibernation=off	windows-11	+      </RunSynchronous>
+hibernation=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
+hibernation=off	windows-11	+          <Order>2</Order>
+hibernation=off	windows-11	+          <Path>powercfg.exe -h off</Path>
 hibernation=off	windows-xp	+powercfg.exe /hibernate off >> "%USOS_LOG%" 2>&1
 hibernation=off	windows-server-2003	+powercfg.exe /hibernate off >> "%USOS_LOG%" 2>&1
 system_restore_off=yes	windows-vista	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableSR /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableConfig /t REG_DWORD /d 1 /f</Path>
@@ -1344,14 +1288,10 @@ system_restore_off=yes	windows-10	-          <Order>4</Order>
 system_restore_off=yes	windows-10	+          <Order>5</Order>
 system_restore_off=yes	windows-10	-          <Order>5</Order>
 system_restore_off=yes	windows-10	+          <Order>6</Order>
-system_restore_off=yes	windows-11	+    </component>
-system_restore_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-system_restore_off=yes	windows-11	+      <RunSynchronous>
-system_restore_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-system_restore_off=yes	windows-11	+          <Order>1</Order>
-system_restore_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableSR /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableConfig /t REG_DWORD /d 1 /f</Path>
 system_restore_off=yes	windows-11	+        </RunSynchronousCommand>
-system_restore_off=yes	windows-11	+      </RunSynchronous>
+system_restore_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+system_restore_off=yes	windows-11	+          <Order>2</Order>
+system_restore_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableSR /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore&quot; /v DisableConfig /t REG_DWORD /d 1 /f</Path>
 system_restore_off=yes	windows-xp	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 system_restore_off=yes	windows-xp	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 system_restore_off=yes	windows-xp	+
@@ -1428,26 +1368,22 @@ numlock=on	windows-10	+        <RunSynchronousCommand wcm:action="add">
 numlock=on	windows-10	+          <Order>6</Order>
 numlock=on	windows-10	-          <Order>5</Order>
 numlock=on	windows-10	+          <Order>7</Order>
-numlock=on	windows-11	+    </component>
-numlock=on	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-numlock=on	windows-11	+      <RunSynchronous>
-numlock=on	windows-11	+        <RunSynchronousCommand wcm:action="add">
-numlock=on	windows-11	+          <Order>1</Order>
-numlock=on	windows-11	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2147483650 /f</Path>
 numlock=on	windows-11	+        </RunSynchronousCommand>
 numlock=on	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=on	windows-11	+          <Order>2</Order>
-numlock=on	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+numlock=on	windows-11	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2147483650 /f</Path>
 numlock=on	windows-11	+        </RunSynchronousCommand>
 numlock=on	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=on	windows-11	+          <Order>3</Order>
-numlock=on	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
+numlock=on	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 numlock=on	windows-11	+        </RunSynchronousCommand>
 numlock=on	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=on	windows-11	+          <Order>4</Order>
-numlock=on	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+numlock=on	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
 numlock=on	windows-11	+        </RunSynchronousCommand>
-numlock=on	windows-11	+      </RunSynchronous>
+numlock=on	windows-11	+        <RunSynchronousCommand wcm:action="add">
+numlock=on	windows-11	+          <Order>5</Order>
+numlock=on	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 numlock=on	windows-server-2008	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
 numlock=on	windows-server-2008	+        </RunSynchronousCommand>
 numlock=on	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -1684,26 +1620,22 @@ numlock=off	windows-10	+        <RunSynchronousCommand wcm:action="add">
 numlock=off	windows-10	+          <Order>6</Order>
 numlock=off	windows-10	-          <Order>5</Order>
 numlock=off	windows-10	+          <Order>7</Order>
-numlock=off	windows-11	+    </component>
-numlock=off	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-numlock=off	windows-11	+      <RunSynchronous>
-numlock=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
-numlock=off	windows-11	+          <Order>1</Order>
-numlock=off	windows-11	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2147483648 /f</Path>
 numlock=off	windows-11	+        </RunSynchronousCommand>
 numlock=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=off	windows-11	+          <Order>2</Order>
-numlock=off	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+numlock=off	windows-11	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2147483648 /f</Path>
 numlock=off	windows-11	+        </RunSynchronousCommand>
 numlock=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=off	windows-11	+          <Order>3</Order>
-numlock=off	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 0 /f</Path>
+numlock=off	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 numlock=off	windows-11	+        </RunSynchronousCommand>
 numlock=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
 numlock=off	windows-11	+          <Order>4</Order>
-numlock=off	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+numlock=off	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 0 /f</Path>
 numlock=off	windows-11	+        </RunSynchronousCommand>
-numlock=off	windows-11	+      </RunSynchronous>
+numlock=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
+numlock=off	windows-11	+          <Order>5</Order>
+numlock=off	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 numlock=off	windows-server-2008	+          <Path>reg.exe add &quot;HKU\.DEFAULT\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 0 /f</Path>
 numlock=off	windows-server-2008	+        </RunSynchronousCommand>
 numlock=off	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -1920,14 +1852,10 @@ windows_update=no_restart	windows-10	-          <Order>4</Order>
 windows_update=no_restart	windows-10	+          <Order>5</Order>
 windows_update=no_restart	windows-10	-          <Order>5</Order>
 windows_update=no_restart	windows-10	+          <Order>6</Order>
-windows_update=no_restart	windows-11	+    </component>
-windows_update=no_restart	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-windows_update=no_restart	windows-11	+      <RunSynchronous>
-windows_update=no_restart	windows-11	+        <RunSynchronousCommand wcm:action="add">
-windows_update=no_restart	windows-11	+          <Order>1</Order>
-windows_update=no_restart	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f</Path>
 windows_update=no_restart	windows-11	+        </RunSynchronousCommand>
-windows_update=no_restart	windows-11	+      </RunSynchronous>
+windows_update=no_restart	windows-11	+        <RunSynchronousCommand wcm:action="add">
+windows_update=no_restart	windows-11	+          <Order>2</Order>
+windows_update=no_restart	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f</Path>
 windows_update=no_restart	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f</Path>
 windows_update=no_restart	windows-server-2008	+        </RunSynchronousCommand>
 windows_update=no_restart	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -2079,18 +2007,14 @@ windows_update=notify	windows-10	-          <Order>4</Order>
 windows_update=notify	windows-10	+          <Order>6</Order>
 windows_update=notify	windows-10	-          <Order>5</Order>
 windows_update=notify	windows-10	+          <Order>7</Order>
-windows_update=notify	windows-11	+    </component>
-windows_update=notify	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-windows_update=notify	windows-11	+      <RunSynchronous>
-windows_update=notify	windows-11	+        <RunSynchronousCommand wcm:action="add">
-windows_update=notify	windows-11	+          <Order>1</Order>
-windows_update=notify	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v AUOptions /t REG_DWORD /d 2 /f</Path>
 windows_update=notify	windows-11	+        </RunSynchronousCommand>
 windows_update=notify	windows-11	+        <RunSynchronousCommand wcm:action="add">
 windows_update=notify	windows-11	+          <Order>2</Order>
-windows_update=notify	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f</Path>
+windows_update=notify	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v AUOptions /t REG_DWORD /d 2 /f</Path>
 windows_update=notify	windows-11	+        </RunSynchronousCommand>
-windows_update=notify	windows-11	+      </RunSynchronous>
+windows_update=notify	windows-11	+        <RunSynchronousCommand wcm:action="add">
+windows_update=notify	windows-11	+          <Order>3</Order>
+windows_update=notify	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f</Path>
 windows_update=notify	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v AUOptions /t REG_DWORD /d 2 /f</Path>
 windows_update=notify	windows-server-2008	+        </RunSynchronousCommand>
 windows_update=notify	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -2260,14 +2184,10 @@ windows_update=off	windows-10	-          <Order>4</Order>
 windows_update=off	windows-10	+          <Order>5</Order>
 windows_update=off	windows-10	-          <Order>5</Order>
 windows_update=off	windows-10	+          <Order>6</Order>
-windows_update=off	windows-11	+    </component>
-windows_update=off	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-windows_update=off	windows-11	+      <RunSynchronous>
-windows_update=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
-windows_update=off	windows-11	+          <Order>1</Order>
-windows_update=off	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 1 /f</Path>
 windows_update=off	windows-11	+        </RunSynchronousCommand>
-windows_update=off	windows-11	+      </RunSynchronous>
+windows_update=off	windows-11	+        <RunSynchronousCommand wcm:action="add">
+windows_update=off	windows-11	+          <Order>2</Order>
+windows_update=off	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 1 /f</Path>
 windows_update=off	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU&quot; /v NoAutoUpdate /t REG_DWORD /d 1 /f</Path>
 windows_update=off	windows-server-2008	+        </RunSynchronousCommand>
 windows_update=off	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -2439,66 +2359,62 @@ privacy=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-10	+          <Order>14</Order>
 privacy=yes	windows-10	-          <Order>5</Order>
 privacy=yes	windows-10	+          <Order>15</Order>
-privacy=yes	windows-11	+    </component>
-privacy=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-privacy=yes	windows-11	+      <RunSynchronous>
-privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-privacy=yes	windows-11	+          <Order>1</Order>
-privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent&quot; /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection&quot; /v AllowTelemetry /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>2</Order>
-privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo&quot; /v DisabledByGroupPolicy /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot&quot; /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f</Path>
+privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent&quot; /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection&quot; /v AllowTelemetry /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>3</Order>
-privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI&quot; /v DisableAIDataAnalysis /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows&quot; /v CEIPEnable /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo&quot; /v DisabledByGroupPolicy /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot&quot; /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>4</Order>
-privacy=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+privacy=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI&quot; /v DisableAIDataAnalysis /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows&quot; /v CEIPEnable /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>5</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\CloudContent&quot; /v DisableTailoredExperiencesWithDiagnosticData /t REG_DWORD /d 1 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>6</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\WindowsCopilot&quot; /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\CloudContent&quot; /v DisableTailoredExperiencesWithDiagnosticData /t REG_DWORD /d 1 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>7</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo&quot; /v Enabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\WindowsCopilot&quot; /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>8</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SilentInstalledAppsEnabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo&quot; /v Enabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>9</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SilentInstalledAppsEnabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>10</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SoftLandingEnabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>11</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338388Enabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SoftLandingEnabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>12</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338389Enabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338388Enabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>13</Order>
-privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-353698Enabled /t REG_DWORD /d 0 /f</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338389Enabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
 privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 privacy=yes	windows-11	+          <Order>14</Order>
-privacy=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+privacy=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-353698Enabled /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-11	+        </RunSynchronousCommand>
-privacy=yes	windows-11	+      </RunSynchronous>
+privacy=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+privacy=yes	windows-11	+          <Order>15</Order>
+privacy=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 privacy=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows&quot; /v CEIPEnable /t REG_DWORD /d 0 /f</Path>
 privacy=yes	windows-server-2008	+        </RunSynchronousCommand>
 privacy=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -2953,14 +2869,10 @@ password_never_expires=yes	windows-10	-          <Order>4</Order>
 password_never_expires=yes	windows-10	+          <Order>5</Order>
 password_never_expires=yes	windows-10	-          <Order>5</Order>
 password_never_expires=yes	windows-10	+          <Order>6</Order>
-password_never_expires=yes	windows-11	+    </component>
-password_never_expires=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-password_never_expires=yes	windows-11	+      <RunSynchronous>
-password_never_expires=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-password_never_expires=yes	windows-11	+          <Order>1</Order>
-password_never_expires=yes	windows-11	+          <Path>net.exe accounts /maxpwage:unlimited</Path>
 password_never_expires=yes	windows-11	+        </RunSynchronousCommand>
-password_never_expires=yes	windows-11	+      </RunSynchronous>
+password_never_expires=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+password_never_expires=yes	windows-11	+          <Order>2</Order>
+password_never_expires=yes	windows-11	+          <Path>net.exe accounts /maxpwage:unlimited</Path>
 password_never_expires=yes	windows-server-2008	+          <Path>net.exe accounts /maxpwage:unlimited</Path>
 password_never_expires=yes	windows-server-2008	+        </RunSynchronousCommand>
 password_never_expires=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -3032,22 +2944,18 @@ password_never_expires=yes	windows-server-2025	+      </RunSynchronous>
 password_never_expires=yes	windows-xp	+net.exe accounts /maxpwage:unlimited >> "%USOS_LOG%" 2>&1
 password_never_expires=yes	windows-2000	+net.exe accounts /maxpwage:unlimited >> "%USOS_LOG%" 2>&1
 password_never_expires=yes	windows-server-2003	+net.exe accounts /maxpwage:unlimited >> "%USOS_LOG%" 2>&1
-classic_context_menu=yes	windows-11	+    </component>
-classic_context_menu=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-classic_context_menu=yes	windows-11	+      <RunSynchronous>
-classic_context_menu=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-classic_context_menu=yes	windows-11	+          <Order>1</Order>
-classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v StubPath /t REG_SZ /d &quot;reg.exe add HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32 /ve /f&quot; /f</Path>
 classic_context_menu=yes	windows-11	+        </RunSynchronousCommand>
 classic_context_menu=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 classic_context_menu=yes	windows-11	+          <Order>2</Order>
-classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v Version /t REG_SZ /d 1 /f</Path>
+classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v StubPath /t REG_SZ /d &quot;reg.exe add HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32 /ve /f&quot; /f</Path>
 classic_context_menu=yes	windows-11	+        </RunSynchronousCommand>
 classic_context_menu=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 classic_context_menu=yes	windows-11	+          <Order>3</Order>
-classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v IsInstalled /t REG_DWORD /d 1 /f</Path>
+classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v Version /t REG_SZ /d 1 /f</Path>
 classic_context_menu=yes	windows-11	+        </RunSynchronousCommand>
-classic_context_menu=yes	windows-11	+      </RunSynchronous>
+classic_context_menu=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+classic_context_menu=yes	windows-11	+          <Order>4</Order>
+classic_context_menu=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\USOS-ClassicContextMenu&quot; /v IsInstalled /t REG_DWORD /d 1 /f</Path>
 classic_context_menu=yes	windows-server-2025	+    </component>
 classic_context_menu=yes	windows-server-2025	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 classic_context_menu=yes	windows-server-2025	+      <RunSynchronous>
@@ -3305,34 +3213,30 @@ desktop_icons=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-10	+          <Order>8</Order>
 desktop_icons=yes	windows-10	-          <Order>5</Order>
 desktop_icons=yes	windows-10	+          <Order>9</Order>
-desktop_icons=yes	windows-11	+    </component>
-desktop_icons=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-desktop_icons=yes	windows-11	+      <RunSynchronous>
-desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-desktop_icons=yes	windows-11	+          <Order>1</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-11	+          <Order>2</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {20D04FE0-3AEA-1069-A2D8-08002B30309D} /t REG_DWORD /d 0 /f</Path>
+desktop_icons=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-11	+          <Order>3</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {59031a47-3f72-44a7-89c5-5595fe6b30ee} /t REG_DWORD /d 0 /f</Path>
+desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {20D04FE0-3AEA-1069-A2D8-08002B30309D} /t REG_DWORD /d 0 /f</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-11	+          <Order>4</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {F02C1A0D-BE21-4350-88B0-7367FC96EF3C} /t REG_DWORD /d 0 /f</Path>
+desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {59031a47-3f72-44a7-89c5-5595fe6b30ee} /t REG_DWORD /d 0 /f</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-11	+          <Order>5</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0} /t REG_DWORD /d 0 /f</Path>
+desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {F02C1A0D-BE21-4350-88B0-7367FC96EF3C} /t REG_DWORD /d 0 /f</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 desktop_icons=yes	windows-11	+          <Order>6</Order>
-desktop_icons=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+desktop_icons=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0} /t REG_DWORD /d 0 /f</Path>
 desktop_icons=yes	windows-11	+        </RunSynchronousCommand>
-desktop_icons=yes	windows-11	+      </RunSynchronous>
+desktop_icons=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+desktop_icons=yes	windows-11	+          <Order>7</Order>
+desktop_icons=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 desktop_icons=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel&quot; /v {20D04FE0-3AEA-1069-A2D8-08002B30309D} /t REG_DWORD /d 0 /f</Path>
 desktop_icons=yes	windows-server-2008	+        </RunSynchronousCommand>
 desktop_icons=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -3605,22 +3509,18 @@ classic_taskbar=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 classic_taskbar=yes	windows-10	+          <Order>6</Order>
 classic_taskbar=yes	windows-10	-          <Order>5</Order>
 classic_taskbar=yes	windows-10	+          <Order>7</Order>
-classic_taskbar=yes	windows-11	+    </component>
-classic_taskbar=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-classic_taskbar=yes	windows-11	+      <RunSynchronous>
-classic_taskbar=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-classic_taskbar=yes	windows-11	+          <Order>1</Order>
-classic_taskbar=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 classic_taskbar=yes	windows-11	+        </RunSynchronousCommand>
 classic_taskbar=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 classic_taskbar=yes	windows-11	+          <Order>2</Order>
-classic_taskbar=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarGlomLevel /t REG_DWORD /d 2 /f</Path>
+classic_taskbar=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 classic_taskbar=yes	windows-11	+        </RunSynchronousCommand>
 classic_taskbar=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 classic_taskbar=yes	windows-11	+          <Order>3</Order>
-classic_taskbar=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+classic_taskbar=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarGlomLevel /t REG_DWORD /d 2 /f</Path>
 classic_taskbar=yes	windows-11	+        </RunSynchronousCommand>
-classic_taskbar=yes	windows-11	+      </RunSynchronous>
+classic_taskbar=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+classic_taskbar=yes	windows-11	+          <Order>4</Order>
+classic_taskbar=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 classic_taskbar=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarGlomming /t REG_DWORD /d 0 /f</Path>
 classic_taskbar=yes	windows-server-2008	+        </RunSynchronousCommand>
 classic_taskbar=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -3997,14 +3897,10 @@ lock_screen_off=yes	windows-10	-          <Order>4</Order>
 lock_screen_off=yes	windows-10	+          <Order>5</Order>
 lock_screen_off=yes	windows-10	-          <Order>5</Order>
 lock_screen_off=yes	windows-10	+          <Order>6</Order>
-lock_screen_off=yes	windows-11	+    </component>
-lock_screen_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-lock_screen_off=yes	windows-11	+      <RunSynchronous>
-lock_screen_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-lock_screen_off=yes	windows-11	+          <Order>1</Order>
-lock_screen_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization&quot; /v NoLockScreen /t REG_DWORD /d 1 /f</Path>
 lock_screen_off=yes	windows-11	+        </RunSynchronousCommand>
-lock_screen_off=yes	windows-11	+      </RunSynchronous>
+lock_screen_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+lock_screen_off=yes	windows-11	+          <Order>2</Order>
+lock_screen_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization&quot; /v NoLockScreen /t REG_DWORD /d 1 /f</Path>
 lock_screen_off=yes	windows-server-2012	+    </component>
 lock_screen_off=yes	windows-server-2012	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 lock_screen_off=yes	windows-server-2012	+      <RunSynchronous>
@@ -4183,42 +4079,38 @@ visual_effects=performance	windows-10	+        <RunSynchronousCommand wcm:action
 visual_effects=performance	windows-10	+          <Order>10</Order>
 visual_effects=performance	windows-10	-          <Order>5</Order>
 visual_effects=performance	windows-10	+          <Order>11</Order>
-visual_effects=performance	windows-11	+    </component>
-visual_effects=performance	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-visual_effects=performance	windows-11	+      <RunSynchronous>
-visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
-visual_effects=performance	windows-11	+          <Order>1</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>2</Order>
-visual_effects=performance	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Desktop\WindowMetrics&quot; /v MinAnimate /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v DragFullWindows /t REG_SZ /d 0 /f</Path>
+visual_effects=performance	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>3</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f</Path>
+visual_effects=performance	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Desktop\WindowMetrics&quot; /v MinAnimate /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v DragFullWindows /t REG_SZ /d 0 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>4</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects&quot; /v VisualFXSetting /t REG_DWORD /d 2 /f</Path>
+visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v UserPreferencesMask /t REG_BINARY /d 9012038010000000 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>5</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAnimations /t REG_DWORD /d 0 /f</Path>
+visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects&quot; /v VisualFXSetting /t REG_DWORD /d 2 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>6</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewAlphaSelect /t REG_DWORD /d 0 /f</Path>
+visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v TaskbarAnimations /t REG_DWORD /d 0 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>7</Order>
-visual_effects=performance	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewShadow /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\DWM&quot; /v EnableAeroPeek /t REG_DWORD /d 0 /f</Path>
+visual_effects=performance	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewAlphaSelect /t REG_DWORD /d 0 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
 visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
 visual_effects=performance	windows-11	+          <Order>8</Order>
-visual_effects=performance	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+visual_effects=performance	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ListviewShadow /t REG_DWORD /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\DWM&quot; /v EnableAeroPeek /t REG_DWORD /d 0 /f</Path>
 visual_effects=performance	windows-11	+        </RunSynchronousCommand>
-visual_effects=performance	windows-11	+      </RunSynchronous>
+visual_effects=performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
+visual_effects=performance	windows-11	+          <Order>9</Order>
+visual_effects=performance	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 visual_effects=performance	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Desktop\WindowMetrics&quot; /v MinAnimate /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Desktop&quot; /v DragFullWindows /t REG_SZ /d 0 /f</Path>
 visual_effects=performance	windows-server-2008	+        </RunSynchronousCommand>
 visual_effects=performance	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -4579,26 +4471,22 @@ mouse_accel_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 mouse_accel_off=yes	windows-10	+          <Order>6</Order>
 mouse_accel_off=yes	windows-10	-          <Order>5</Order>
 mouse_accel_off=yes	windows-10	+          <Order>7</Order>
-mouse_accel_off=yes	windows-11	+    </component>
-mouse_accel_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-mouse_accel_off=yes	windows-11	+      <RunSynchronous>
-mouse_accel_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-mouse_accel_off=yes	windows-11	+          <Order>1</Order>
-mouse_accel_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 mouse_accel_off=yes	windows-11	+        </RunSynchronousCommand>
 mouse_accel_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 mouse_accel_off=yes	windows-11	+          <Order>2</Order>
-mouse_accel_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseSpeed /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold1 /t REG_SZ /d 0 /f</Path>
+mouse_accel_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 mouse_accel_off=yes	windows-11	+        </RunSynchronousCommand>
 mouse_accel_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 mouse_accel_off=yes	windows-11	+          <Order>3</Order>
-mouse_accel_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold2 /t REG_SZ /d 0 /f</Path>
+mouse_accel_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseSpeed /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold1 /t REG_SZ /d 0 /f</Path>
 mouse_accel_off=yes	windows-11	+        </RunSynchronousCommand>
 mouse_accel_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 mouse_accel_off=yes	windows-11	+          <Order>4</Order>
-mouse_accel_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+mouse_accel_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold2 /t REG_SZ /d 0 /f</Path>
 mouse_accel_off=yes	windows-11	+        </RunSynchronousCommand>
-mouse_accel_off=yes	windows-11	+      </RunSynchronous>
+mouse_accel_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+mouse_accel_off=yes	windows-11	+          <Order>5</Order>
+mouse_accel_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 mouse_accel_off=yes	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseSpeed /t REG_SZ /d 0 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Mouse&quot; /v MouseThreshold1 /t REG_SZ /d 0 /f</Path>
 mouse_accel_off=yes	windows-server-2008	+        </RunSynchronousCommand>
 mouse_accel_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -4812,22 +4700,18 @@ sticky_keys_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 sticky_keys_off=yes	windows-10	+          <Order>5</Order>
 sticky_keys_off=yes	windows-10	-          <Order>5</Order>
 sticky_keys_off=yes	windows-10	+          <Order>6</Order>
-sticky_keys_off=yes	windows-11	+    </component>
-sticky_keys_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-sticky_keys_off=yes	windows-11	+      <RunSynchronous>
-sticky_keys_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-sticky_keys_off=yes	windows-11	+          <Order>1</Order>
-sticky_keys_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 sticky_keys_off=yes	windows-11	+        </RunSynchronousCommand>
 sticky_keys_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 sticky_keys_off=yes	windows-11	+          <Order>2</Order>
-sticky_keys_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Accessibility\StickyKeys&quot; /v Flags /t REG_SZ /d 506 /f</Path>
+sticky_keys_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 sticky_keys_off=yes	windows-11	+        </RunSynchronousCommand>
 sticky_keys_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 sticky_keys_off=yes	windows-11	+          <Order>3</Order>
-sticky_keys_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+sticky_keys_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Accessibility\StickyKeys&quot; /v Flags /t REG_SZ /d 506 /f</Path>
 sticky_keys_off=yes	windows-11	+        </RunSynchronousCommand>
-sticky_keys_off=yes	windows-11	+      </RunSynchronous>
+sticky_keys_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+sticky_keys_off=yes	windows-11	+          <Order>4</Order>
+sticky_keys_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 sticky_keys_off=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Control Panel\Accessibility\StickyKeys&quot; /v Flags /t REG_SZ /d 506 /f</Path>
 sticky_keys_off=yes	windows-server-2008	+        </RunSynchronousCommand>
 sticky_keys_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -4999,14 +4883,10 @@ power_profile=high_performance	windows-10	-          <Order>4</Order>
 power_profile=high_performance	windows-10	+          <Order>5</Order>
 power_profile=high_performance	windows-10	-          <Order>5</Order>
 power_profile=high_performance	windows-10	+          <Order>6</Order>
-power_profile=high_performance	windows-11	+    </component>
-power_profile=high_performance	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-power_profile=high_performance	windows-11	+      <RunSynchronous>
-power_profile=high_performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
-power_profile=high_performance	windows-11	+          <Order>1</Order>
-power_profile=high_performance	windows-11	+          <Path>powercfg.exe -setactive SCHEME_MIN</Path>
 power_profile=high_performance	windows-11	+        </RunSynchronousCommand>
-power_profile=high_performance	windows-11	+      </RunSynchronous>
+power_profile=high_performance	windows-11	+        <RunSynchronousCommand wcm:action="add">
+power_profile=high_performance	windows-11	+          <Order>2</Order>
+power_profile=high_performance	windows-11	+          <Path>powercfg.exe -setactive SCHEME_MIN</Path>
 power_profile=high_performance	windows-server-2008	+          <Path>powercfg.exe -setactive SCHEME_MIN</Path>
 power_profile=high_performance	windows-server-2008	+        </RunSynchronousCommand>
 power_profile=high_performance	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -5139,14 +5019,10 @@ power_profile=balanced	windows-10	-          <Order>4</Order>
 power_profile=balanced	windows-10	+          <Order>5</Order>
 power_profile=balanced	windows-10	-          <Order>5</Order>
 power_profile=balanced	windows-10	+          <Order>6</Order>
-power_profile=balanced	windows-11	+    </component>
-power_profile=balanced	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-power_profile=balanced	windows-11	+      <RunSynchronous>
-power_profile=balanced	windows-11	+        <RunSynchronousCommand wcm:action="add">
-power_profile=balanced	windows-11	+          <Order>1</Order>
-power_profile=balanced	windows-11	+          <Path>powercfg.exe -setactive SCHEME_BALANCED</Path>
 power_profile=balanced	windows-11	+        </RunSynchronousCommand>
-power_profile=balanced	windows-11	+      </RunSynchronous>
+power_profile=balanced	windows-11	+        <RunSynchronousCommand wcm:action="add">
+power_profile=balanced	windows-11	+          <Order>2</Order>
+power_profile=balanced	windows-11	+          <Path>powercfg.exe -setactive SCHEME_BALANCED</Path>
 power_profile=balanced	windows-server-2008	+          <Path>powercfg.exe -setactive SCHEME_BALANCED</Path>
 power_profile=balanced	windows-server-2008	+        </RunSynchronousCommand>
 power_profile=balanced	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -5279,14 +5155,10 @@ power_profile=power_saver	windows-10	-          <Order>4</Order>
 power_profile=power_saver	windows-10	+          <Order>5</Order>
 power_profile=power_saver	windows-10	-          <Order>5</Order>
 power_profile=power_saver	windows-10	+          <Order>6</Order>
-power_profile=power_saver	windows-11	+    </component>
-power_profile=power_saver	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-power_profile=power_saver	windows-11	+      <RunSynchronous>
-power_profile=power_saver	windows-11	+        <RunSynchronousCommand wcm:action="add">
-power_profile=power_saver	windows-11	+          <Order>1</Order>
-power_profile=power_saver	windows-11	+          <Path>powercfg.exe -setactive SCHEME_MAX</Path>
 power_profile=power_saver	windows-11	+        </RunSynchronousCommand>
-power_profile=power_saver	windows-11	+      </RunSynchronous>
+power_profile=power_saver	windows-11	+        <RunSynchronousCommand wcm:action="add">
+power_profile=power_saver	windows-11	+          <Order>2</Order>
+power_profile=power_saver	windows-11	+          <Path>powercfg.exe -setactive SCHEME_MAX</Path>
 power_profile=power_saver	windows-server-2008	+          <Path>powercfg.exe -setactive SCHEME_MAX</Path>
 power_profile=power_saver	windows-server-2008	+        </RunSynchronousCommand>
 power_profile=power_saver	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -5419,14 +5291,10 @@ no_sleep=yes	windows-10	-          <Order>4</Order>
 no_sleep=yes	windows-10	+          <Order>5</Order>
 no_sleep=yes	windows-10	-          <Order>5</Order>
 no_sleep=yes	windows-10	+          <Order>6</Order>
-no_sleep=yes	windows-11	+    </component>
-no_sleep=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-no_sleep=yes	windows-11	+      <RunSynchronous>
-no_sleep=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-no_sleep=yes	windows-11	+          <Order>1</Order>
-no_sleep=yes	windows-11	+          <Path>cmd.exe /c powercfg.exe -change -standby-timeout-ac 0 &amp; powercfg.exe -change -hibernate-timeout-ac 0</Path>
 no_sleep=yes	windows-11	+        </RunSynchronousCommand>
-no_sleep=yes	windows-11	+      </RunSynchronous>
+no_sleep=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+no_sleep=yes	windows-11	+          <Order>2</Order>
+no_sleep=yes	windows-11	+          <Path>cmd.exe /c powercfg.exe -change -standby-timeout-ac 0 &amp; powercfg.exe -change -hibernate-timeout-ac 0</Path>
 last_access_off=yes	windows-xp	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 last_access_off=yes	windows-xp	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 last_access_off=yes	windows-xp	+
@@ -5451,14 +5319,10 @@ long_paths=yes	windows-10	-          <Order>4</Order>
 long_paths=yes	windows-10	+          <Order>5</Order>
 long_paths=yes	windows-10	-          <Order>5</Order>
 long_paths=yes	windows-10	+          <Order>6</Order>
-long_paths=yes	windows-11	+    </component>
-long_paths=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-long_paths=yes	windows-11	+      <RunSynchronous>
-long_paths=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-long_paths=yes	windows-11	+          <Order>1</Order>
-long_paths=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\FileSystem&quot; /v LongPathsEnabled /t REG_DWORD /d 1 /f</Path>
 long_paths=yes	windows-11	+        </RunSynchronousCommand>
-long_paths=yes	windows-11	+      </RunSynchronous>
+long_paths=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+long_paths=yes	windows-11	+          <Order>2</Order>
+long_paths=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\FileSystem&quot; /v LongPathsEnabled /t REG_DWORD /d 1 /f</Path>
 long_paths=yes	windows-server-2016	+    </component>
 long_paths=yes	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 long_paths=yes	windows-server-2016	+      <RunSynchronous>
@@ -5541,14 +5405,10 @@ search_index_off=yes	windows-10	-          <Order>4</Order>
 search_index_off=yes	windows-10	+          <Order>5</Order>
 search_index_off=yes	windows-10	-          <Order>5</Order>
 search_index_off=yes	windows-10	+          <Order>6</Order>
-search_index_off=yes	windows-11	+    </component>
-search_index_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-search_index_off=yes	windows-11	+      <RunSynchronous>
-search_index_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-search_index_off=yes	windows-11	+          <Order>1</Order>
-search_index_off=yes	windows-11	+          <Path>sc.exe config WSearch start= disabled</Path>
 search_index_off=yes	windows-11	+        </RunSynchronousCommand>
-search_index_off=yes	windows-11	+      </RunSynchronous>
+search_index_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+search_index_off=yes	windows-11	+          <Order>2</Order>
+search_index_off=yes	windows-11	+          <Path>sc.exe config WSearch start= disabled</Path>
 remote_desktop=yes	windows-vista	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 0 /f</Path>
 remote_desktop=yes	windows-vista	+        </RunSynchronousCommand>
 remote_desktop=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
@@ -5619,18 +5479,14 @@ remote_desktop=yes	windows-10	-          <Order>4</Order>
 remote_desktop=yes	windows-10	+          <Order>6</Order>
 remote_desktop=yes	windows-10	-          <Order>5</Order>
 remote_desktop=yes	windows-10	+          <Order>7</Order>
-remote_desktop=yes	windows-11	+    </component>
-remote_desktop=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-remote_desktop=yes	windows-11	+      <RunSynchronous>
-remote_desktop=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-remote_desktop=yes	windows-11	+          <Order>1</Order>
-remote_desktop=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 0 /f</Path>
 remote_desktop=yes	windows-11	+        </RunSynchronousCommand>
 remote_desktop=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 remote_desktop=yes	windows-11	+          <Order>2</Order>
-remote_desktop=yes	windows-11	+          <Path>netsh.exe advfirewall firewall add rule name=USOS-RDP dir=in action=allow protocol=TCP localport=3389</Path>
+remote_desktop=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 0 /f</Path>
 remote_desktop=yes	windows-11	+        </RunSynchronousCommand>
-remote_desktop=yes	windows-11	+      </RunSynchronous>
+remote_desktop=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+remote_desktop=yes	windows-11	+          <Order>3</Order>
+remote_desktop=yes	windows-11	+          <Path>netsh.exe advfirewall firewall add rule name=USOS-RDP dir=in action=allow protocol=TCP localport=3389</Path>
 remote_desktop=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 0 /f</Path>
 remote_desktop=yes	windows-server-2008	+        </RunSynchronousCommand>
 remote_desktop=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -5797,14 +5653,10 @@ firewall_off=yes	windows-10	-          <Order>4</Order>
 firewall_off=yes	windows-10	+          <Order>5</Order>
 firewall_off=yes	windows-10	-          <Order>5</Order>
 firewall_off=yes	windows-10	+          <Order>6</Order>
-firewall_off=yes	windows-11	+    </component>
-firewall_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-firewall_off=yes	windows-11	+      <RunSynchronous>
-firewall_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-firewall_off=yes	windows-11	+          <Order>1</Order>
-firewall_off=yes	windows-11	+          <Path>netsh.exe advfirewall set allprofiles state off</Path>
 firewall_off=yes	windows-11	+        </RunSynchronousCommand>
-firewall_off=yes	windows-11	+      </RunSynchronous>
+firewall_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+firewall_off=yes	windows-11	+          <Order>2</Order>
+firewall_off=yes	windows-11	+          <Path>netsh.exe advfirewall set allprofiles state off</Path>
 firewall_off=yes	windows-server-2008	+          <Path>netsh.exe advfirewall set allprofiles state off</Path>
 firewall_off=yes	windows-server-2008	+        </RunSynchronousCommand>
 firewall_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -6102,22 +5954,18 @@ security_center_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="a
 security_center_off=yes	windows-10	+          <Order>5</Order>
 security_center_off=yes	windows-10	-          <Order>5</Order>
 security_center_off=yes	windows-10	+          <Order>6</Order>
-security_center_off=yes	windows-11	+    </component>
-security_center_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-security_center_off=yes	windows-11	+      <RunSynchronous>
-security_center_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-security_center_off=yes	windows-11	+          <Order>1</Order>
-security_center_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 security_center_off=yes	windows-11	+        </RunSynchronousCommand>
 security_center_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 security_center_off=yes	windows-11	+          <Order>2</Order>
-security_center_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.SecurityAndMaintenance&quot; /v Enabled /t REG_DWORD /d 0 /f</Path>
+security_center_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 security_center_off=yes	windows-11	+        </RunSynchronousCommand>
 security_center_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 security_center_off=yes	windows-11	+          <Order>3</Order>
-security_center_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+security_center_off=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.SecurityAndMaintenance&quot; /v Enabled /t REG_DWORD /d 0 /f</Path>
 security_center_off=yes	windows-11	+        </RunSynchronousCommand>
-security_center_off=yes	windows-11	+      </RunSynchronous>
+security_center_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+security_center_off=yes	windows-11	+          <Order>4</Order>
+security_center_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 security_center_off=yes	windows-xp	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 security_center_off=yes	windows-xp	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 security_center_off=yes	windows-xp	+
@@ -6196,14 +6044,10 @@ smartscreen_off=yes	windows-10	-          <Order>4</Order>
 smartscreen_off=yes	windows-10	+          <Order>5</Order>
 smartscreen_off=yes	windows-10	-          <Order>5</Order>
 smartscreen_off=yes	windows-10	+          <Order>6</Order>
-smartscreen_off=yes	windows-11	+    </component>
-smartscreen_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-smartscreen_off=yes	windows-11	+      <RunSynchronous>
-smartscreen_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-smartscreen_off=yes	windows-11	+          <Order>1</Order>
-smartscreen_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\System&quot; /v EnableSmartScreen /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer&quot; /v SmartScreenEnabled /t REG_SZ /d Off /f</Path>
 smartscreen_off=yes	windows-11	+        </RunSynchronousCommand>
-smartscreen_off=yes	windows-11	+      </RunSynchronous>
+smartscreen_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+smartscreen_off=yes	windows-11	+          <Order>2</Order>
+smartscreen_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\System&quot; /v EnableSmartScreen /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer&quot; /v SmartScreenEnabled /t REG_SZ /d Off /f</Path>
 smartscreen_off=yes	windows-server-2012	+    </component>
 smartscreen_off=yes	windows-server-2012	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 smartscreen_off=yes	windows-server-2012	+      <RunSynchronous>
@@ -6262,14 +6106,10 @@ device_encryption_off=yes	windows-10	-          <Order>4</Order>
 device_encryption_off=yes	windows-10	+          <Order>5</Order>
 device_encryption_off=yes	windows-10	-          <Order>5</Order>
 device_encryption_off=yes	windows-10	+          <Order>6</Order>
-device_encryption_off=yes	windows-11	+    </component>
-device_encryption_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-device_encryption_off=yes	windows-11	+      <RunSynchronous>
-device_encryption_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-device_encryption_off=yes	windows-11	+          <Order>1</Order>
-device_encryption_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\BitLocker&quot; /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
 device_encryption_off=yes	windows-11	+        </RunSynchronousCommand>
-device_encryption_off=yes	windows-11	+      </RunSynchronous>
+device_encryption_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+device_encryption_off=yes	windows-11	+          <Order>2</Order>
+device_encryption_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\BitLocker&quot; /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
 device_encryption_off=yes	windows-server-2016	+    </component>
 device_encryption_off=yes	windows-server-2016	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 device_encryption_off=yes	windows-server-2016	+      <RunSynchronous>
@@ -6332,14 +6172,10 @@ remove_apps=games	windows-10	-          <Order>4</Order>
 remove_apps=games	windows-10	+          <Order>5</Order>
 remove_apps=games	windows-10	-          <Order>5</Order>
 remove_apps=games	windows-10	+          <Order>6</Order>
-remove_apps=games	windows-11	+    </component>
-remove_apps=games	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-remove_apps=games	windows-11	+      <RunSynchronous>
-remove_apps=games	windows-11	+        <RunSynchronousCommand wcm:action="add">
-remove_apps=games	windows-11	+          <Order>1</Order>
-remove_apps=games	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Xbox|GamingApp|Solitaire&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=games	windows-11	+        </RunSynchronousCommand>
-remove_apps=games	windows-11	+      </RunSynchronous>
+remove_apps=games	windows-11	+        <RunSynchronousCommand wcm:action="add">
+remove_apps=games	windows-11	+          <Order>2</Order>
+remove_apps=games	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Xbox|GamingApp|Solitaire&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-8	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Xbox|GamingApp|Solitaire&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-8	+        </RunSynchronousCommand>
 remove_apps=bloat	windows-8	+        <RunSynchronousCommand wcm:action="add">
@@ -6418,30 +6254,26 @@ remove_apps=bloat	windows-10	-          <Order>4</Order>
 remove_apps=bloat	windows-10	+          <Order>9</Order>
 remove_apps=bloat	windows-10	-          <Order>5</Order>
 remove_apps=bloat	windows-10	+          <Order>10</Order>
-remove_apps=bloat	windows-11	+    </component>
-remove_apps=bloat	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-remove_apps=bloat	windows-11	+      <RunSynchronous>
-remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
-remove_apps=bloat	windows-11	+          <Order>1</Order>
-remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Xbox|GamingApp|Solitaire&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-11	+        </RunSynchronousCommand>
 remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
 remove_apps=bloat	windows-11	+          <Order>2</Order>
-remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Bing|Zune|Getstarted|OfficeHub|MixedReality|3DViewer|Print3D|MSPaint$|\.People$|WindowsMaps|SkypeApp&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
+remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Xbox|GamingApp|Solitaire&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-11	+        </RunSynchronousCommand>
 remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
 remove_apps=bloat	windows-11	+          <Order>3</Order>
-remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Messaging|Clipchamp|FeedbackHub|GetHelp|Wallet|YourPhone|PowerAutomate|Todos|Family|549981C3F5F10|Copilot&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
+remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Bing|Zune|Getstarted|OfficeHub|MixedReality|3DViewer|Print3D|MSPaint$|\.People$|WindowsMaps|SkypeApp&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-11	+        </RunSynchronousCommand>
 remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
 remove_apps=bloat	windows-11	+          <Order>4</Order>
-remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;communicationsapps|Teams|OneNote|StickyNotes|SoundRecorder|QuickAssist|HelpAndTips|ReadingList|DevHome&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
+remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;Messaging|Clipchamp|FeedbackHub|GetHelp|Wallet|YourPhone|PowerAutomate|Todos|Family|549981C3F5F10|Copilot&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-11	+        </RunSynchronousCommand>
 remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
 remove_apps=bloat	windows-11	+          <Order>5</Order>
-remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;OutlookForWindows&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
+remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;communicationsapps|Teams|OneNote|StickyNotes|SoundRecorder|QuickAssist|HelpAndTips|ReadingList|DevHome&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 remove_apps=bloat	windows-11	+        </RunSynchronousCommand>
-remove_apps=bloat	windows-11	+      </RunSynchronous>
+remove_apps=bloat	windows-11	+        <RunSynchronousCommand wcm:action="add">
+remove_apps=bloat	windows-11	+          <Order>6</Order>
+remove_apps=bloat	windows-11	+          <Path>powershell.exe -NoP -NonI -C &quot;Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match &apos;OutlookForWindows&apos;}|Remove-AppxProvisionedPackage -Online&quot;</Path>
 first_run_off=yes	windows-vista	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Internet Explorer\Main&quot; /v DisableFirstRunCustomize /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f</Path>
 first_run_off=yes	windows-vista	+        </RunSynchronousCommand>
 first_run_off=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
@@ -6496,18 +6328,14 @@ first_run_off=yes	windows-10	-          <Order>4</Order>
 first_run_off=yes	windows-10	+          <Order>6</Order>
 first_run_off=yes	windows-10	-          <Order>5</Order>
 first_run_off=yes	windows-10	+          <Order>7</Order>
-first_run_off=yes	windows-11	+    </component>
-first_run_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-first_run_off=yes	windows-11	+      <RunSynchronous>
-first_run_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-11	+          <Order>1</Order>
-first_run_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Edge&quot; /v HideFirstRunExperience /t REG_DWORD /d 1 /f</Path>
 first_run_off=yes	windows-11	+        </RunSynchronousCommand>
 first_run_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 first_run_off=yes	windows-11	+          <Order>2</Order>
-first_run_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Edge&quot; /v StartupBoostEnabled /t REG_DWORD /d 0 /f</Path>
+first_run_off=yes	windows-11	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Edge&quot; /v HideFirstRunExperience /t REG_DWORD /d 1 /f</Path>
 first_run_off=yes	windows-11	+        </RunSynchronousCommand>
-first_run_off=yes	windows-11	+      </RunSynchronous>
+first_run_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+first_run_off=yes	windows-11	+          <Order>3</Order>
+first_run_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Edge&quot; /v StartupBoostEnabled /t REG_DWORD /d 0 /f</Path>
 first_run_off=yes	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Internet Explorer\Main&quot; /v DisableFirstRunCustomize /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f</Path>
 first_run_off=yes	windows-server-2008	+        </RunSynchronousCommand>
 first_run_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -6616,26 +6444,22 @@ onedrive_off=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 onedrive_off=yes	windows-10	+          <Order>6</Order>
 onedrive_off=yes	windows-10	-          <Order>5</Order>
 onedrive_off=yes	windows-10	+          <Order>7</Order>
-onedrive_off=yes	windows-11	+    </component>
-onedrive_off=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-onedrive_off=yes	windows-11	+      <RunSynchronous>
-onedrive_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-onedrive_off=yes	windows-11	+          <Order>1</Order>
-onedrive_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive&quot; /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f</Path>
 onedrive_off=yes	windows-11	+        </RunSynchronousCommand>
 onedrive_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 onedrive_off=yes	windows-11	+          <Order>2</Order>
-onedrive_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+onedrive_off=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive&quot; /v DisableFileSyncNGSC /t REG_DWORD /d 1 /f</Path>
 onedrive_off=yes	windows-11	+        </RunSynchronousCommand>
 onedrive_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 onedrive_off=yes	windows-11	+          <Order>3</Order>
-onedrive_off=yes	windows-11	+          <Path>reg.exe delete &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v OneDriveSetup /f</Path>
+onedrive_off=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 onedrive_off=yes	windows-11	+        </RunSynchronousCommand>
 onedrive_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 onedrive_off=yes	windows-11	+          <Order>4</Order>
-onedrive_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+onedrive_off=yes	windows-11	+          <Path>reg.exe delete &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v OneDriveSetup /f</Path>
 onedrive_off=yes	windows-11	+        </RunSynchronousCommand>
-onedrive_off=yes	windows-11	+      </RunSynchronous>
+onedrive_off=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+onedrive_off=yes	windows-11	+          <Order>5</Order>
+onedrive_off=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 user_script=yes	windows-vista	+      <FirstLogonCommands>
 user_script=yes	windows-vista	+        <SynchronousCommand wcm:action="add">
 user_script=yes	windows-vista	+          <Order>1</Order>
