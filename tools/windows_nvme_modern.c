@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 #include <shellapi.h>
+#include "nt/usosnvme/src/usosnvme_diag.h"
 
 static const char *operation="arguments";
 static DWORD failure_code;
@@ -40,11 +41,74 @@ static BOOL trusted_store(HKEY software,const WCHAR *name,DWORD size,int which){
  if(!CertCloseStore(store,0)){code=GetLastError();RegCloseKey(key);return fail_with(code);}
  RegCloseKey(key);return TRUE;
 }
+static void say(const char *text){DWORD written;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),text,lstrlenA(text),&written,0);}
+static void say_code(const char *text,DWORD code){
+ char digits[12];unsigned at=sizeof(digits);DWORD written;digits[--at]='\n';digits[--at]='\r';
+ do{digits[--at]=(char)('0'+code%10);code/=10;}while(code);
+ say(text);WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),digits+at,sizeof(digits)-at,&written,0);
+}
+/* Driver diagnostics (usosnvme_diag.h): IOCTL_SCSI_MINIPORT with signature
+ * "USOSNVME" to \\.\Scsi0: .. \\.\Scsi15:; only usosnvme answers it, other
+ * miniports refuse the unknown signature. Flush count / duration / NVMe
+ * status of the driver serving the target, printed after every RegFlushKey
+ * and flush probe. Off unless entry() runs (the host tests never send it). */
+static BOOL diag_enabled;
+static char line[1024];static unsigned line_len;
+static void put_ch(char c){if(line_len<sizeof(line)-3)line[line_len++]=c;}
+static void put_text(const char *t){while(*t)put_ch(*t++);}
+static void put_dec(DWORD v){char d[11];unsigned n=0;do{d[n++]=(char)('0'+v%10);v/=10;}while(v&&n<10);while(n)put_ch(d[--n]);}
+static void put_hex(DWORD v,int digits){static const char hex[]="0123456789ABCDEF";while(digits--)put_ch(hex[(v>>(digits*4))&15]);}
+static void put_status(DWORD s){if(s==0xFFFFFFFFUL)put_text("timeout");else{put_text("0x");put_hex(s,3);}}
+#define USOS_IOCTL_SCSI_MINIPORT 0x0004D008UL
+static struct{USOSNVME_SRB_IO_CONTROL h;USOSNVME_DIAG d;}diag_io;
+static void nvme_diag(const char *when){
+ DWORD got=0,last=ERROR_FILE_NOT_FOUND,opened=0;
+ if(!diag_enabled)return;
+ line_len=0;put_text("[USOS] Modern NVMe diag ");put_text(when);put_text(": ");
+ for(DWORD n=0;n<16;n++){
+  WCHAR name[16];DWORD at=0;
+  for(const WCHAR *p=L"\\\\.\\Scsi";*p;p++)name[at++]=*p;
+  if(n>=10)name[at++]=L'1';name[at++]=(WCHAR)(L'0'+n%10);name[at++]=L':';name[at]=0;
+  HANDLE h=CreateFileW(name,GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);
+  if(h==INVALID_HANDLE_VALUE){if(!opened)last=GetLastError();continue;}
+  opened++;
+  volatile BYTE *z=(volatile BYTE*)&diag_io;for(DWORD i=0;i<sizeof(diag_io);i++)z[i]=0;
+  diag_io.h.HeaderLength=sizeof(diag_io.h);
+  for(int i=0;i<8;i++)diag_io.h.Signature[i]=(UCHAR)USOSNVME_DIAG_SIGNATURE[i];
+  diag_io.h.Timeout=5;diag_io.h.ControlCode=USOSNVME_DIAG_CODE;diag_io.h.Length=sizeof(diag_io.d);
+  BOOL ok=DeviceIoControl(h,USOS_IOCTL_SCSI_MINIPORT,&diag_io,sizeof(diag_io),&diag_io,sizeof(diag_io),&got,0);
+  if(!ok)last=GetLastError();
+  CloseHandle(h);
+  if(!ok||got<sizeof(diag_io)||diag_io.h.ReturnCode!=0||diag_io.d.Version!=USOSNVME_DIAG_VERSION)continue;
+  const USOSNVME_DIAG *d=&diag_io.d;
+  put_text("scsi");put_dec(n);put_text(" pci ");put_hex(d->PciId&0xFFFF,4);put_text(":");put_hex(d->PciId>>16,4);
+  put_text(" vwc 0x");put_hex(d->Vwc,2);put_text(" state 0x");put_hex(d->State,1);put_text(" starts ");put_dec(d->Starts);
+  put_text(" rd ");put_dec(d->Reads);put_text(" wr ");put_dec(d->Writes);put_text(" err ");put_dec(d->Errors);put_text(" to ");put_dec(d->Timeouts);
+  put_text(" io-st ");put_status(d->LastIoStatus);put_text(" csts 0x");put_hex(d->LastFailCsts,8);put_text(" max-io-us ");put_dec(d->MaxIoUs);
+  put_text(" | flush req ");put_dec(d->FlushRequests);put_text(" sent ");put_dec(d->FlushSent);put_text(" skip ");put_dec(d->FlushSkipped);
+  put_text(" ok ");put_dec(d->FlushOk);put_text(" err ");put_dec(d->FlushErrors);put_text(" to ");put_dec(d->FlushTimeouts);
+  put_text(" last-us ");put_dec(d->LastFlushUs);put_text(" max-us ");put_dec(d->MaxFlushUs);put_text(" total-ms ");put_dec(d->TotalFlushMs);
+  put_text(" last-st ");put_status(d->LastFlushStatus);put_text(" shn ");put_dec(d->Shutdowns);
+  put_text(" | ring");
+  for(DWORD k=0;k<USOSNVME_DIAG_RING&&k<d->FlushSeq;k++){
+   const USOSNVME_FLUSH_REC *r=&d->Ring[(d->FlushSeq-k)%USOSNVME_DIAG_RING];
+   if(!r->Seq)continue;
+   put_text(" #");put_dec(r->Seq);put_text(":");put_hex(r->Source,8);put_text(":");put_dec(r->Us);put_text("us:");put_status(r->Status);
+  }
+  put_text("\r\n");line[line_len]=0;say(line);return;
+ }
+ line[line_len]=0;say(line);say_code(opened?"no usosnvme adapter answered IOCTL_SCSI_MINIPORT; last DeviceIoControl Win32 code=":"no SCSI adapter could be opened; last Win32 code=",last);
+}
 /* A flush may fail once and succeed on a later try; success only with a
- * final ERROR_SUCCESS. */
+ * final ERROR_SUCCESS. Every try is logged with the driver's counters. */
 static LONG flush_retry(HKEY key){
  LONG e=ERROR_SUCCESS;
- for(int i=0;i<3;i++){e=RegFlushKey(key);if(e==ERROR_SUCCESS)break;Sleep(500);}
+ for(int i=0;i<3;i++){
+  e=RegFlushKey(key);
+  if(diag_enabled){say("[USOS] Modern NVMe: RegFlushKey try ");say_code(i==0?"1, Win32 code=":i==1?"2, Win32 code=":"3, Win32 code=",(DWORD)e);}
+  nvme_diag("after RegFlushKey");
+  if(e==ERROR_SUCCESS)break;Sleep(500);
+ }
  return e;
 }
 /* Thumbprint (SHA-1 of the encoded certificate) = the store's key name:
@@ -86,12 +150,6 @@ static BOOL service(HKEY hive,DWORD cs){
  if(e==ERROR_SUCCESS){HKEY pnp;e=RegCreateKeyExW(key,L"Parameters\\PnpInterface",0,0,0,KEY_SET_VALUE,0,&pnp,0);if(e==ERROR_SUCCESS){e=put_dword(pnp,L"5",1);RegCloseKey(pnp);}}
  RegCloseKey(key);if(e)SetLastError(e);return e==ERROR_SUCCESS;
 }
-static void say(const char *text){DWORD written;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),text,lstrlenA(text),&written,0);}
-static void say_code(const char *text,DWORD code){
- char digits[12];unsigned at=sizeof(digits);DWORD written;digits[--at]='\n';digits[--at]='\r';
- do{digits[--at]=(char)('0'+code%10);code/=10;}while(code);
- say(text);WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),digits+at,sizeof(digits)-at,&written,0);
-}
 /* Diagnostic only: a 4 KiB write + FlushFileBuffers on the target volume
  * (the package folder). A failure here points at the disk path (driver
  * cache flush), success at the registry's own hive/log handling. */
@@ -129,13 +187,20 @@ static const char *const commit_steps[2][4]={
 static LONG commit_hive(HKEY *root,const WCHAR *file,const WCHAR *name,BOOL *loaded,int which){
  WCHAR saved[MAX_PATH];LONG e;
  operation=commit_steps[which][0];e=flush_retry(*root);
+ if(e!=ERROR_SUCCESS){
+  say(which?"[USOS] Modern NVMe: SYSTEM":"[USOS] Modern NVMe: SOFTWARE");
+  say_code(" hive RegFlushKey failed; saving the hive to a new file instead. Win32 code=",(DWORD)e);
+ }
+ /* The probe runs after every hive flush, good or bad: the disk path's
+  * own flush result next to the registry's (X470 B261022: 1016 in 2 of 3
+  * runs; the driver's counters follow in the diag line). */
+ say(which?"[USOS] Modern NVMe: SYSTEM":"[USOS] Modern NVMe: SOFTWARE");
+ say_code(" flush probe (4 KiB write + FlushFileBuffers on the target), Win32 code=",flush_probe());
+ nvme_diag("after flush probe");
  if(e==ERROR_SUCCESS){
   RegCloseKey(*root);*root=0;operation=commit_steps[which][2];
   e=RegUnLoadKeyW(HKEY_LOCAL_MACHINE,name);if(e==ERROR_SUCCESS)*loaded=FALSE;return e;
  }
- say(which?"[USOS] Modern NVMe: SYSTEM":"[USOS] Modern NVMe: SOFTWARE");
- say_code(" hive RegFlushKey failed; saving the hive to a new file instead. Win32 code=",(DWORD)e);
- say_code("[USOS] Modern NVMe: flush probe (4 KiB write + FlushFileBuffers on the target), Win32 code=",flush_probe());
  operation=commit_steps[which][1];
  if(!join(saved,file,L".usos-saved"))return ERROR_BUFFER_OVERFLOW;
  SetFileAttributesW(saved,FILE_ATTRIBUTE_NORMAL);DeleteFileW(saved);
@@ -250,7 +315,9 @@ void entry(void){
  /* Require an explicit absolute Windows directory, distinct from this PE. */
  if(lstrlenW(target)<10||target[1]!=':'||target[2]!='\\')ExitProcess(3);
  WCHAR running[MAX_PATH];GetWindowsDirectoryW(running,MAX_PATH);if(!lstrcmpiW(running,target))ExitProcess(3);
+ diag_enabled=TRUE;nvme_diag("at start");
  BOOL ok=configure();
+ nvme_diag("at exit");
  if(!ok){
   DWORD code=failure_code?failure_code:GetLastError();
   say("USOS modern NVMe failed at ");say(operation);say_code("; Win32 code=",code);
