@@ -52,3 +52,9 @@ R25/R26 are installed diagnostic overlays. R22 independently qualifies
 the fresh original USOS installation with the oldf39 driver. This patch
 does not qualify a fresh installer containing f579, NT3.5/NT4, I211 on
 X470 or physical IRQ routing. Those require their own tests.
+
+R27 separately regresses cold-boot USB keyboard/mouse remove/reinsert
+with this installed candidate. Actual menu actions, absent-device
+negative controls, native shutdown and stopped SYS readback pass;
+see `docs/nt351-r27-usb-regression.md`. It does not add a fresh Setup,
+MSC or physical-hardware claim.
