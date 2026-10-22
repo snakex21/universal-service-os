@@ -52,3 +52,13 @@ fresh target, via a temporary whole G disk. Only API/hash metadata are
 saved; scratch is removed. Runtime qualification remains pending until
 fresh normal blank-target USOS, actual desktop/native SCM service list,
 DHCP/ping/DNS, native safe shutdown/QMP0 and stopped service/SYS readback.
+
+## Pinned fresh experiment before runtime
+
+Code1feadbaf, canonical build02 USOSNT3.EXE30208B SHA87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f. All50 static imports resolve against actual original NT35 KERNEL32/ADVAPI in the stopped pinned prior fresh target. No new static API surface; old source baseline remains unchanged.
+
+Private cache G:\USOS-Kolekcja\_assets\B261020-200536-968CCBE8-nt35-client-auto01 uses initrd ae9568457e6af6150fb1d6fc672a7a841e73b4c2002fbef10107c0afd11e0bb5. Only three effective entries differ from qualified d94 fresh: USOSNT3.EXE, nt35_network_setup.sh, nt4_csmwrap_target.sh. All834 other entries (including d94 SYS, frozen USB and ff258504 logger) and all other cache files remain identical. Original compressed prefix preserved.
+
+Plan artifacts/coverage/nt35-client-auto-fresh01/plan.json SHA79d9366fe00dd39a7eab72cde2a8ccff54994f60f91f2e0e9f383d7b32c06f95 changes only the tag from prior fresh NT35. Same original ISO109d2c28, fresh standalone4GiB blank target, normal USOS nested flow, PS/2 baseline explicit, NICigb. The immutable private60-file harness snapshot is copied from the completed prior fresh, with root relocation and four own policy/native-log paths added to its bounded readonly collector. ConsoleMode+isatty rejects both PIPE and Windows NUL before any VM; request policy/native SCM/LAN are not inferred from hashes/status/DONE.
+
+Host checks: five new tests (actual header19cases, emitter4paths, record writer6paths, shell selectors and source boundaries), two metadata-parser tests, eleven existing NT35 network-flow tests, three cache-delta tests, canonical NT31 import-surface compatibility test. Prepared collector rejects unknown/private/ambiguous/wrong-OS evidence, preserves installed_runtime_pass=false even on matching d94; PIPE/NUL refusals verified with zero VMs. Full input/hash details are in docs/nt35-auto-client-inputs.json. Actual runtime remains pending at this commit.
