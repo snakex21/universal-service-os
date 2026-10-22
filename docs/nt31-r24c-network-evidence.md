@@ -29,3 +29,35 @@ does not itself retest HID, MSC, reset/unload, Server, SMP, X470, I210/I211
 or other PCI placement. Native shutdown is not a MAC unload test.
 Full assessment: `nt31-net/artifacts/nt31-fullmac-runtime/r24c-guest-evaluation.json`;
 stopped readback: `nt31-net/artifacts/nt31-fullmac-runtime/r24c-stopped-readback/readback.json`.
+
+The completed R24d regression, commit3820cbfc, qualifies USB coexistence
+with b49: absent-keyboard negative control, keyboard insertion/Run,
+keyboard File/Run with mouse absent, and mouse movement plus File click
+after insertion. Native ping3/3 still passes after replug. Native safe
+shutdown/operator17 and exit0 precede stopped readback b49/f537/Start4;
+the R24c backing is unchanged. Assessment:
+`nt31-net/artifacts/nt31-fullmac-runtime/r24d-usb-evaluation.json`.
+
+R24d also checks native service state. It finds Server RUNNING with
+LanmanServer Start2 alongside Workstation/TCPIP. This is a network-policy
+failure against client-without-sharing, even though functional LAN passes.
+R24d keeps that configuration unchanged for isolation; a separate fix
+and cold-boot policy qualification follow as R24e/R24f.
+Selected RAS service names are absent, which is not a proof of complete
+Dial-Up absence.
+
+The owned helper fix2064ae00 applies only existing SCM Browser/LanmanServer
+stop/Disabled, refusing unexpected active dependents and preserving
+Workstation/TCPIP. Native policy has12 actual-C cases,19 host checks and
+three actual-host OS refusal modes. R24e applies successfully; a separate
+unchanged cold overlay R24f verifies readonly `/clientcheck`, native
+service list and ping3/3. Browser/LanmanServer are STOPPED/Disabled and
+Workstation/TCPIP RUNNING after cold boot. Both native shutdowns and exit0
+precede actual helper/SYS/USB readback. Helper d00c has27 original imports;
+b49/f537 remain unchanged. Final report commit8d269a40, assessment
+`nt31-net/artifacts/nt31-fullmac-runtime/r24f-client-evaluation.json`.
+
+This fixes the measured file-sharing service policy in the installed
+fixture; original R24d failure remains. ClipBook/NetworkDDE are unchanged,
+and fresh automatic NCPA integration, full Dial-Up absence and browser UI
+are still unqualified. The HTTP200 above comes from the owned logger.

@@ -57,8 +57,17 @@ does not qualify fresh automatic network setup. That still needs own
 staging, original NT31 TCP/IP/NCPA binding and reboot, a scoped normal
 collector, then a blank-target normal USOS run. Stock DHCP is not
 applicable. Reset/unload, SMP, Server and physical hardware are outside
-this qualification. A separate HID regression with this full-MAC is
-in progress; R19c is the prior completed USB evidence.
+this qualification. Separate R24d, commit3820cbfc, now confirms keyboard
+and mouse out/in with this full-MAC and native ping3/3 after replug.
+Native safe shutdown and actual SYS/USB/Start4 readback pass. R19c remains
+the prior completed USB evidence; neither run is fresh auto networkflow.
+
+R24d's native service check finds Server RUNNING; that failure remains.
+Separate fix2064ae00 and completed R24e/R24f now qualify Browser/Server
+STOPPED/Disabled with Workstation/TCPIP RUNNING and ping3/3 after cold boot.
+Own helperd00c, b49SYS/f537USB and native safe shutdown/readback are pinned;
+final note8d269a40. Functional LAN and client policy retain separate proofs.
+No fresh automatic integration or hardware readiness is claimed.
 
 ## Pending NT4
 

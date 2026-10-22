@@ -63,7 +63,7 @@ def capability(row):
         elif nt35_r20(row):
             net='QEMU PASS R20: usosnet35 NDIS 3 + igb 8086:10C9, DHCP, ping bramy, ścisłe DNS, HTTP68k.news200; świeży USOS [S6]; około2s, pierwszy ping2/3 i warm3/3, historia zachowana. Osobny installed IRQ candidate d94: ping3/3<10ms, DHCP/DNS/HTTP PASS [S9]; bez nowego cache/fresh Setup'
         elif nt31_r19c(row):
-            net='QEMU PASS R24c: usosnet31 full-MAC, UP + igb 8086:10C9/BDF00:05.0; statyczny TCP/IP, DHCP nie dotyczy; dwa ping3/3, strict DNS30ms, native DNS i HTTP68k200 [S10]. Ręczna integracja NCPA na zachowanej instalacji, bez fresh auto networkflow'
+            net='QEMU PASS R24c: usosnet31 full-MAC, UP + igb 8086:10C9/BDF00:05.0; statyczny TCP/IP, DHCP nie dotyczy; dwa ping3/3, strict DNS30ms, native DNS i HTTP68k200 [S10]. Ręczna integracja NCPA na zachowanej instalacji, bez fresh auto networkflow; R24d Server RUNNING zachowany jako FAIL; osobny helper R24e/R24f po coldboot potwierdza Server/Browser Disabled i Workstation/TCPIP RUNNING [S10]'
         elif 'windows-nt-3-1' in r:
             net='brak portu Intel: wymagany full-MAC, nie miniport NDIS 3; stock NT3.1 ma statyczny TCP/IP, DHCP nie dotyczy; LAN nie zmierzono'
         elif 'windows-nt-3-51' in r:
@@ -121,7 +121,7 @@ def rows(path):
 def hid_test(usb,row=None):
     if 'nie dotyczy' in usb:return 'nie dotyczy'
     if row and nt31_r19c(row):
-        return 'QEMU PASS R19c: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje File; sprzęt i8042 obecny, i8042prt Start4 [S5]; osobny overlay po świeżym USOS, nie konfiguracja domyślna instalatora'
+        return 'QEMU PASS R19c: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje File [S5]. R24d powtarza negative keyboard control, out/in, mouse Fileclick i ping3/3 z full-MAC b49 [S10]; sprzęt i8042 obecny, i8042prt Start4; osobne overlay, nie fresh auto networkflow'
     if row and nt35_r20(row):
         return 'QEMU PASS R20b: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje Run/File [S6]. Osobny nt35-irq-usb01 powtarza negative keyboard control, out/in i Filemenu click z SYS d94 [S9]; i8042 obecny, i8042prt Start4, stopped readback; osobne overlay po świeżym R20'
     if row and nt351_r18f(row):
