@@ -57,8 +57,10 @@ def pci_caps(config):
 async def snapshot(qmp):
     pci = await qmp.command('query-pci')
     devices = [d for b in pci for d in b.get('devices', [])]
-    nic = [d for d in devices if d.get('id') == {'vendor': 0x8086, 'device': 0x10c9}]
-    lpc = [d for d in devices if d.get('id') == {'vendor': 0x8086, 'device': 0x2918}]
+    # QAPI PciDeviceId may also contain subsystem/subsystem-vendor fields.
+    # Those do not change the vendor/device contract; ECAM is checked below.
+    nic = [d for d in devices if (d.get('id', {}).get('vendor'), d.get('id', {}).get('device')) == (0x8086, 0x10c9)]
+    lpc = [d for d in devices if (d.get('id', {}).get('vendor'), d.get('id', {}).get('device')) == (0x8086, 0x2918)]
     if len(nic) != 1 or len(lpc) != 1:
         raise ProbeError('Unique Q35 LPC and 82576 required')
     nic, lpc = nic[0], lpc[0]

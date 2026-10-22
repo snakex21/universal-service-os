@@ -80,6 +80,12 @@ class ProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result['intx_disabled'])
         self.assertTrue(all(x['disabled'] for x in result['lpc_pirq_routes']))
 
+    async def test_qapi_subsystem_fields_do_not_change_identity(self):
+        q = Qmp()
+        q.nic['id'].update(subsystem=0x10c9, **{'subsystem-vendor': 0x8086})
+        q.lpc['id'].update(subsystem=0x1100, **{'subsystem-vendor': 0x1af4})
+        self.assertEqual((await p.probe(q))['status'], 'ok')
+
     async def test_duplicate_target_refused_before_read(self):
         q = Qmp(); q.devices.append(q.nic)
         self.assertEqual((await p.probe(q))['status'], 'unavailable')

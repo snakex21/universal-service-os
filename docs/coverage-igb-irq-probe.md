@@ -28,7 +28,14 @@ Primary contracts:
 - [QEMU ICH9 LPC](https://github.com/qemu/qemu/blob/master/hw/isa/lpc_ich9.c):
   Q35 legacy PIRQ routing registers.
 
-Ten host tests execute the real async helper, enforce the exact allowed
+Eleven host tests execute the real async helper, enforce the exact allowed
 addresses and read budget, and check disabled routing, MSI-X state,
 identity/layout refusals, capability loops and reply sanitization.
 An actual installed-guest snapshot must be assessed separately.
+
+The first installed R23 diagnostic rejected the PCI metadata before any
+register read. The initial identity check compared the entire ID object,
+although [QAPI permits optional subsystem IDs](https://github.com/qemu/qemu/blob/master/qapi/pci.json).
+The corrected check compares the vendor/device fields and still requires
+the exact BDF, class, ECAM identity, BAR and MMIO ranges. The original failed
+diagnostic is preserved; it is not a Windows failure or interrupt result.
