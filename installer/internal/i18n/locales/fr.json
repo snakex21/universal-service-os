@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Le programme d'installation de Windows demande le nom d'utilisateur et le mot de passe pendant l'installation ; USOS ne les définit pas.",
   "boot.lx.logon_answer_file": "Après l'installation, connectez-vous avec le compte de votre fichier de réponses {0}.",
   "boot.profile.field.display_bpp": "Profondeur des couleurs",
-  "boot.profile.help.display_legacy": "Appliqué après installation sur le matériel réel. Automatique choisit un mode disponible jusqu’à 1920x1080 avec repli sans risque. Inchangé conserve les réglages. La profondeur automatique préfère 32 bits si disponibles, sinon 16. Valeur par défaut de Windows : USOS ne modifie pas la résolution après l'installation."
+  "boot.profile.help.display_legacy": "Appliqué après installation sur le matériel réel. Automatique choisit un mode disponible jusqu’à 1920x1080 avec repli sans risque. Automatique (native du moniteur) fonctionne de la même façon. La profondeur automatique préfère 32 bits si disponibles, sinon 16. Valeur par défaut de Windows : USOS ne modifie pas la résolution après l'installation."
 }

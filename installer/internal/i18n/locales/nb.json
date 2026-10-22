@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows installasjonsprogram spør etter brukernavn og passord under installasjonen; USOS angir dem ikke.",
   "boot.lx.logon_answer_file": "Logg på etter installasjonen med kontoen fra svarfilen din {0}.",
   "boot.profile.field.display_bpp": "Fargedybde",
-  "boot.profile.help.display_legacy": "Brukes etter installasjon på den faktiske maskinvaren. Automatisk velger en tilgjengelig modus opptil 1920x1080 med trygg tilbakeføring. Uendret beholder innstillingene. Automatisk fargedybde foretrekker 32 bit, ellers 16. Windows-standard: USOS endrer ikke oppløsningen etter installasjonen."
+  "boot.profile.help.display_legacy": "Brukes etter installasjon på den faktiske maskinvaren. Automatisk velger en tilgjengelig modus opptil 1920x1080 med trygg tilbakeføring. Automatisk (skjermens opprinnelige) virker på samme måte. Automatisk fargedybde foretrekker 32 bit, ellers 16. Windows-standard: USOS endrer ikke oppløsningen etter installasjonen."
 }
