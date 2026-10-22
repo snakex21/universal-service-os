@@ -34,30 +34,34 @@
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
+          <Path>reg.exe add &quot;HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power&quot; /v HiberbootEnabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>2</Order>
-          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; icacls.exe &quot;%SystemDrive%\USOS&quot; /reset /t /c /q</Path>
+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>3</Order>
-          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; icacls.exe &quot;%SystemDrive%\USOS&quot; /reset /t /c /q</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>4</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>5</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>6</Order>
-          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; /f</Path>
+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>7</Order>
+          <Path>cmd.exe /c if exist &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\USOS\NT6\USOSRES.EXE&quot; /f</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>8</Order>
           <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
         </RunSynchronousCommand>
       </RunSynchronous>

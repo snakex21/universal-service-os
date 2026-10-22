@@ -279,30 +279,30 @@ fn fastStartupOn(system_id: []const u8) bool {
         else => return false,
     }
     const system = usos.catalog.systems.findById(system_id) orelse return false;
-    const directory = system.unattended_directory orelse return false;
+    const unattended = system.unattended_directory orelse return false;
     // NTFS path components (openFile looks each one up in its parent).
     var storage: [192]u16 = undefined;
     var slices: [8][]const u16 = undefined;
-    var count: usize = 0;
+    var components: usize = 0;
     var at: usize = 0;
-    var parts = std.mem.tokenizeScalar(u8, directory, '\\');
+    var parts = std.mem.tokenizeScalar(u8, unattended, '\\');
     var done = false;
     while (!done) {
         const part = parts.next() orelse blk: {
             done = true;
             break :blk "fast-startup-on.txt";
         };
-        if (count == slices.len or at + part.len > storage.len) return false;
+        if (components == slices.len or at + part.len > storage.len) return false;
         for (part, 0..) |ch, i| storage[at + i] = ch;
-        slices[count] = storage[at .. at + part.len];
+        slices[components] = storage[at .. at + part.len];
         at += part.len;
-        count += 1;
+        components += 1;
     }
     const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return false;
     defer uefi.pool_allocator.destroy(catalog);
     catalog.* = data_volume.openCatalog() catch return false;
     var file: ntfs.File = undefined;
-    ntfs.openFile(catalog.fs, catalog.reader(), slices[0..count], &file) catch return false;
+    ntfs.openFile(catalog.fs, catalog.reader(), slices[0..components], &file) catch return false;
     serial.writeAscii("[PROFILE] fast-startup-on.txt on DATA: Windows keeps its Fast Startup\n");
     return true;
 }

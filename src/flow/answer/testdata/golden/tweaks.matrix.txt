@@ -265,21 +265,21 @@ show_extensions=yes	windows-7	+          <Order>5</Order>
 show_extensions=yes	windows-8	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-8	+        </RunSynchronousCommand>
 show_extensions=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8	+          <Order>4</Order>
-show_extensions=yes	windows-8	-          <Order>4</Order>
 show_extensions=yes	windows-8	+          <Order>5</Order>
+show_extensions=yes	windows-8	-          <Order>5</Order>
+show_extensions=yes	windows-8	+          <Order>6</Order>
 show_extensions=yes	windows-8-1	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-8-1	+        </RunSynchronousCommand>
 show_extensions=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8-1	+          <Order>4</Order>
-show_extensions=yes	windows-8-1	-          <Order>4</Order>
 show_extensions=yes	windows-8-1	+          <Order>5</Order>
+show_extensions=yes	windows-8-1	-          <Order>5</Order>
+show_extensions=yes	windows-8-1	+          <Order>6</Order>
 show_extensions=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-10	+        </RunSynchronousCommand>
 show_extensions=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-10	+          <Order>4</Order>
-show_extensions=yes	windows-10	-          <Order>4</Order>
 show_extensions=yes	windows-10	+          <Order>5</Order>
+show_extensions=yes	windows-10	-          <Order>5</Order>
+show_extensions=yes	windows-10	+          <Order>6</Order>
 show_extensions=yes	windows-11	+    </component>
 show_extensions=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 show_extensions=yes	windows-11	+      <RunSynchronous>
@@ -440,21 +440,21 @@ show_hidden=yes	windows-7	+          <Order>5</Order>
 show_hidden=yes	windows-8	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-8	+        </RunSynchronousCommand>
 show_hidden=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8	+          <Order>4</Order>
-show_hidden=yes	windows-8	-          <Order>4</Order>
 show_hidden=yes	windows-8	+          <Order>5</Order>
+show_hidden=yes	windows-8	-          <Order>5</Order>
+show_hidden=yes	windows-8	+          <Order>6</Order>
 show_hidden=yes	windows-8-1	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-8-1	+        </RunSynchronousCommand>
 show_hidden=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8-1	+          <Order>4</Order>
-show_hidden=yes	windows-8-1	-          <Order>4</Order>
 show_hidden=yes	windows-8-1	+          <Order>5</Order>
+show_hidden=yes	windows-8-1	-          <Order>5</Order>
+show_hidden=yes	windows-8-1	+          <Order>6</Order>
 show_hidden=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-10	+        </RunSynchronousCommand>
 show_hidden=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-10	+          <Order>4</Order>
-show_hidden=yes	windows-10	-          <Order>4</Order>
 show_hidden=yes	windows-10	+          <Order>5</Order>
+show_hidden=yes	windows-10	-          <Order>5</Order>
+show_hidden=yes	windows-10	+          <Order>6</Order>
 show_hidden=yes	windows-11	+    </component>
 show_hidden=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 show_hidden=yes	windows-11	+      <RunSynchronous>
@@ -623,33 +623,33 @@ no_autorun=yes	windows-7	+          <Order>5</Order>
 no_autorun=yes	windows-8	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-8	+        </RunSynchronousCommand>
 no_autorun=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-8	+          <Order>2</Order>
-no_autorun=yes	windows-8	-          <Order>2</Order>
 no_autorun=yes	windows-8	+          <Order>3</Order>
 no_autorun=yes	windows-8	-          <Order>3</Order>
 no_autorun=yes	windows-8	+          <Order>4</Order>
 no_autorun=yes	windows-8	-          <Order>4</Order>
 no_autorun=yes	windows-8	+          <Order>5</Order>
+no_autorun=yes	windows-8	-          <Order>5</Order>
+no_autorun=yes	windows-8	+          <Order>6</Order>
 no_autorun=yes	windows-8-1	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-8-1	+        </RunSynchronousCommand>
 no_autorun=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-8-1	+          <Order>2</Order>
-no_autorun=yes	windows-8-1	-          <Order>2</Order>
 no_autorun=yes	windows-8-1	+          <Order>3</Order>
 no_autorun=yes	windows-8-1	-          <Order>3</Order>
 no_autorun=yes	windows-8-1	+          <Order>4</Order>
 no_autorun=yes	windows-8-1	-          <Order>4</Order>
 no_autorun=yes	windows-8-1	+          <Order>5</Order>
+no_autorun=yes	windows-8-1	-          <Order>5</Order>
+no_autorun=yes	windows-8-1	+          <Order>6</Order>
 no_autorun=yes	windows-10	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-10	+        </RunSynchronousCommand>
 no_autorun=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-10	+          <Order>2</Order>
-no_autorun=yes	windows-10	-          <Order>2</Order>
 no_autorun=yes	windows-10	+          <Order>3</Order>
 no_autorun=yes	windows-10	-          <Order>3</Order>
 no_autorun=yes	windows-10	+          <Order>4</Order>
 no_autorun=yes	windows-10	-          <Order>4</Order>
 no_autorun=yes	windows-10	+          <Order>5</Order>
+no_autorun=yes	windows-10	-          <Order>5</Order>
+no_autorun=yes	windows-10	+          <Order>6</Order>
 no_autorun=yes	windows-11	+    </component>
 no_autorun=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 no_autorun=yes	windows-11	+      <RunSynchronous>
