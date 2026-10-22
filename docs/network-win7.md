@@ -117,4 +117,38 @@ i dalej do zainstalowanego systemu:
 
 ## Licencja sterownika Intela
 
-Uzupełniane przez koordynatora — w toku weryfikacji źródła
+Źródło: strona pobierania „Intel® Ethernet Adapter Complete Driver Pack”, ID
+15084 —
+<https://www.intel.com/content/www/us/en/download/15084/intel-ethernet-adapter-complete-driver-pack.html>.
+Pełny tekst umowy jest na tej stronie (akceptacja licencji przed pobraniem),
+wersja **Limited Distribution License Agreement [v2025.02.12]**. Sprawdzone
+2026-10-22.
+
+Postanowienia istotne dla USOS:
+
+* **§1.6 „Your Products”** — produkt lub rozwiązanie, które **zawiera komponent
+  Intel**: „includes an Intel Component implementing or executing Material”.
+* **§2.1(c)** — wolno „distribute Redistributables in the format specified in
+  redist.txt, or only as object code (or its equivalent) if no format is
+  specified, **in Your Product**, provided your distribution is subject to
+  terms and conditions consistent with your rights and obligations under this
+  Agreement”.
+* **§2.3** — poza dozwoleniem z §2.1 nie wolno używać ani modyfikować
+  Materiałów w inny sposób.
+
+Wnioski:
+
+1. Redystrybucja jest dozwolona **tylko** dla plików wskazanych jako
+   „Redistributables” w `redist.txt` z pakietu, **tylko** jako object code,
+   **tylko jako część „Your Product”** (def. §1.6) i pod warunkami spójnymi
+   z umową (§2.1(c)).
+2. USOS jako uniwersalny instalator **nie jest** „Your Product” w rozumieniu
+   §1.6 — **nie ma podstaw, by dołączać `PROWin32` / `PROWinx64` do wydania
+   USOS, do assets release ani do „pakietu zgodności”**. Rekomendacja: USOS nie
+   redystrybuuje sterowników Intela.
+3. Wspierany scenariusz — dokładnie ten, który realizuje kod z sekcji 2:
+   użytkownik sam pobiera pakiet od Intela (akceptując umowę) i kładzie
+   rozpakowany folder z INF na swoją partycję DATA. To lokalne użycie własnej
+   kopii na własnym nośniku, nie redystrybucja przez USOS.
+4. Kto chce redystrybuować te pliki, musi sam sprawdzić `redist.txt`
+   i §2.1(c) u Intela; USOS tego nie robi i nie odpowiada za taką dystrybucję.
