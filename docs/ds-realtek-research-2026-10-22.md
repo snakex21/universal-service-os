@@ -1,5 +1,7 @@
 # Raport zadania: sterowniki NIC — Realtek RTL8111/8168 i pozostałe (2026-10-22)
 
+> Status: DeepSeek research, unverified by Claude/Codex; versions and licence notes as of 2026-10-22 — check sources before relying on them.
+
 Gałąź: `ds/realtek-research` (baza `test/x470-98se-qemu`, `be1f36aa`).
 Charakter: **analityczny — zero zmian w kodzie**. Commit zawiera wyłącznie
 pliki `.md`.

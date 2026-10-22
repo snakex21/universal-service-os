@@ -1,5 +1,7 @@
 # Sterowniki kart sieciowych — producent, wersje, licencje (2026-10-22)
 
+> Status: DeepSeek research, unverified by Claude/Codex; versions and licence notes as of 2026-10-22 — check sources before relying on them.
+
 Zakres: karty Realtek RTL8111/8168 (1 Gb, `PCI\VEN_10EC&DEV_8168` i pokrewne)
 oraz krótko RTL8125 (2,5 Gb), Intel I225/I226 i Marvell/Aquantia AQC107/AQC113.
 Pytanie: **dla każdego systemu — czy producent wydał oficjalny sterownik, jaka
