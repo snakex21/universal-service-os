@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Palikti profilį",
   "boot.profile.delete.question": "Ištrinti profilį {0} iš šios USB atmintinės?",
   "boot.profile.delete.title": "Profilio trynimas",
+  "boot.profile.hidden_other_systems": "Paslėpti profiliai (kitai sistemai): {0}",
   "boot.profile.editor.new": "Naujas atsakymų profilis",
   "boot.profile.editor.subtitle": "Vienas profilis kiekvienai Windows: USOS įrašo atsakymų failą, kai prasideda diegimas",
   "boot.profile.editor.subtitle_linux": "Vienas profilis Windows ir Linux: USOS įrašo atsakymų failą, kai prasideda diegimas",

@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Paturēt profilu",
   "boot.profile.delete.question": "Vai dzēst profilu {0} no šīs USB zibatmiņas?",
   "boot.profile.delete.title": "Profila dzēšana",
+  "boot.profile.hidden_other_systems": "Paslēptie profili (citai sistēmai): {0}",
   "boot.profile.editor.new": "Jauns atbilžu profils",
   "boot.profile.editor.subtitle": "Viens profils katrai Windows: USOS ieraksta atbilžu failu, kad sākas instalēšana",
   "boot.profile.editor.subtitle_linux": "Viens profils Windows un Linux: USOS ieraksta atbilžu failu, kad sākas instalēšana",

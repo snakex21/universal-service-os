@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Conserver le profil",
   "boot.profile.delete.question": "Supprimer le profil {0} de cette clé USB ?",
   "boot.profile.delete.title": "Supprimer le profil",
+  "boot.profile.hidden_other_systems": "Profils masqués (pour un autre système) : {0}",
   "boot.profile.editor.new": "Nouveau profil de réponses",
   "boot.profile.editor.subtitle": "Un seul profil pour tous les Windows : USOS écrit le fichier de réponses au démarrage de l'installation",
   "boot.profile.editor.subtitle_linux": "Un seul profil pour Windows et Linux : USOS écrit le fichier de réponses au démarrage de l'installation",

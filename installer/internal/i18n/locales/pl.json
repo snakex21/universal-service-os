@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Zostaw profil",
   "boot.profile.delete.question": "Usunąć profil {0} z tego pendrive'a?",
   "boot.profile.delete.title": "Usuwanie profilu",
+  "boot.profile.hidden_other_systems": "Ukryte profile (przypisane do innego systemu): {0}",
   "boot.profile.editor.new": "Nowy profil odpowiedzi",
   "boot.profile.editor.subtitle": "Jeden profil dla każdego Windows: USOS tworzy plik odpowiedzi przy starcie instalacji",
   "boot.profile.editor.subtitle_linux": "Jeden profil dla Windows i Linuksa: USOS tworzy plik odpowiedzi przy starcie instalacji",

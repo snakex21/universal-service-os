@@ -10,9 +10,12 @@
 //! wimboot RAM disk. clearRendered() removes rendered files left behind
 //! (they may carry a key or a password) before any start.
 //!
-//! Every file is loaded (names stay unique across systems), but the
-//! manager sees only the profiles offered for its system (`systems=`,
-//! answer.applies): len/get/stem/find work on that filtered list.
+//! Every file is loaded, but the manager sees only the profiles offered for
+//! its system (`systems=`, answer.applies): len/get/stem/find work on that
+//! filtered list. A name is unique only among profiles offered for a
+//! common system (applies.overlaps), so the file stem is the name's stem
+//! or, when another file holds that, the stem with "-2", "-3"... (the
+//! stem of a loaded profile is always the one of its file).
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -41,6 +44,9 @@ var loaded_count: usize = 0;
 /// Indices into `loaded` of the profiles offered for `filter_system`.
 var visible: [max]usize = undefined;
 var count: usize = 0;
+/// Loaded profiles not offered for `filter_system` (the answer screen's
+/// "hidden" note).
+var hidden_count: usize = 0;
 var filter_storage: [48]u8 = undefined;
 var filter_system: ?[]const u8 = null;
 /// Keys typed this boot without remember_key, by file stem.
@@ -70,24 +76,58 @@ pub fn filter(system_id: ?[]const u8) void {
     applyFilter();
 }
 
+/// Profiles on the stick made for other systems (not in the list).
+pub fn hidden() usize {
+    return hidden_count;
+}
+
 fn applyFilter() void {
     count = 0;
+    hidden_count = 0;
     for (0..loaded_count) |i| {
-        if (filter_system) |id| if (!answer.applies.appliesTo(&loaded[i], id)) continue;
+        if (filter_system) |id| if (!answer.applies.appliesTo(&loaded[i], id)) {
+            hidden_count += 1;
+            continue;
+        };
         if (count == max) break;
         visible[count] = i;
         count += 1;
     }
 }
 
-/// The stem of any profile file (offered here or not) with the file stem
-/// of `name`: a new name must not overwrite another system's profile.
-pub fn stemInUse(name: []const u8) ?[]const u8 {
+/// Another profile (offered here or not) has the name of `name` (same
+/// file stem: case, space and '.' do not count) and shares a system with
+/// `scope` (its `systems=`): the answer screen of that system would list
+/// both. `own_stem`: the file being edited (not counted).
+pub fn nameTaken(name: []const u8, scope: *const Profile, own_stem: ?[]const u8) bool {
     const wanted = stemOf(name);
-    for (stems[0..loaded_count]) |*s| {
-        if (std.ascii.eqlIgnoreCase(s.slice(), wanted.slice())) return s.slice();
+    for (0..loaded_count) |i| {
+        if (own_stem) |own| if (std.ascii.eqlIgnoreCase(stems[i].slice(), own)) continue;
+        if (!std.ascii.eqlIgnoreCase(stemOf(loaded[i].name.slice()).slice(), wanted.slice())) continue;
+        if (answer.applies.overlaps(&loaded[i], scope)) return true;
     }
-    return null;
+    return false;
+}
+
+const StemOwner = struct {
+    /// The file being replaced (its stem is free for the new one).
+    own: ?[]const u8,
+    fn taken(self: StemOwner, candidate: []const u8) bool {
+        for (stems[0..loaded_count]) |*s| {
+            if (self.own) |own| if (std.ascii.eqlIgnoreCase(s.slice(), own)) continue;
+            if (std.ascii.eqlIgnoreCase(s.slice(), candidate)) return true;
+        }
+        return false;
+    }
+};
+
+/// The file stem for `name`: its own stem, or a numbered one when a profile
+/// of another system (same name, no common system) holds that file.
+fn fileStemFor(name: []const u8, previous_stem: ?[]const u8) Stem {
+    var buffer: [32]u8 = undefined;
+    var result = Stem{};
+    result.set(answer.profile.uniqueFileStem(name, StemOwner{ .own = previous_stem }, StemOwner.taken, &buffer)) catch {};
+    return result;
 }
 
 fn stemOf(name: []const u8) Stem {
@@ -97,11 +137,12 @@ fn stemOf(name: []const u8) Stem {
     return result;
 }
 
-/// Index (in the filtered list) of a profile whose file stem equals that of `name`.
+/// Index (in the filtered list) of the profile named `name` (compared as
+/// file stems; names are unique among the profiles of one system).
 pub fn find(name: []const u8) ?usize {
     const wanted = stemOf(name);
     for (visible[0..count], 0..) |i, index| {
-        if (std.ascii.eqlIgnoreCase(stems[i].slice(), wanted.slice())) return index;
+        if (std.ascii.eqlIgnoreCase(stemOf(loaded[i].name.slice()).slice(), wanted.slice())) return index;
     }
     return null;
 }
@@ -182,14 +223,15 @@ fn deleteFile(root: *uefi.protocol.File, path: []const u8) void {
     } else |_| {}
 }
 
-/// Writes `profile` (replacing the file of `previous_stem` after a rename)
+/// Writes `profile` to the file of fileStemFor (replacing the file of
+/// `previous_stem`, which keeps its stem unless the name changed)
 /// and keeps a session copy of keys that are not remembered.
 pub fn save(root: *uefi.protocol.File, profile: *const Profile, previous_stem: ?[]const u8) !void {
     if (answer.profile.validate(profile)) |_| return error.InvalidProfile;
     try ensureDirectory(root, directory);
     var bytes: [answer.profile.max_file]u8 = undefined;
     const text = try answer.profile.write(profile, &bytes);
-    const new_stem = stemOf(profile.name.slice());
+    const new_stem = fileStemFor(profile.name.slice(), previous_stem);
     var path: [96]u8 = undefined;
     try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}.ini", .{ directory, new_stem.slice() }), text);
     if (previous_stem) |old| {

@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Säilytä profiili",
   "boot.profile.delete.question": "Poistetaanko profiili {0} tältä USB-tikulta?",
   "boot.profile.delete.title": "Poista profiili",
+  "boot.profile.hidden_other_systems": "Piilotetut profiilit (toiselle järjestelmälle): {0}",
   "boot.profile.editor.new": "Uusi vastausprofiili",
   "boot.profile.editor.subtitle": "Yksi profiili jokaiselle Windowsille: USOS kirjoittaa vastaustiedoston asennuksen alkaessa",
   "boot.profile.editor.subtitle_linux": "Yksi profiili Windowsille ja Linuxille: USOS kirjoittaa vastaustiedoston asennuksen alkaessa",

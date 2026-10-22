@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Behold profilen",
   "boot.profile.delete.question": "Slette profilen {0} fra denne USB-pinnen?",
   "boot.profile.delete.title": "Slett profil",
+  "boot.profile.hidden_other_systems": "Skjulte profiler (for et annet system): {0}",
   "boot.profile.editor.new": "Ny svarprofil",
   "boot.profile.editor.subtitle": "En profil for alle Windows: USOS skriver svarfilen når installasjonen starter",
   "boot.profile.editor.subtitle_linux": "En profil for Windows og Linux: USOS skriver svarfilen når installasjonen starter",

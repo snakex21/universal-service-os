@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Profili koru",
   "boot.profile.delete.question": "{0} profili bu USB bellekten silinsin mi?",
   "boot.profile.delete.title": "Profili sil",
+  "boot.profile.hidden_other_systems": "Gizli profiller (başka bir sistem için): {0}",
   "boot.profile.editor.new": "Yeni yanıt profili",
   "boot.profile.editor.subtitle": "Her Windows için tek profil: USOS, kurulum başladığında yanıt dosyasını yazar",
   "boot.profile.editor.subtitle_linux": "Windows ve Linux için tek profil: USOS, kurulum başladığında yanıt dosyasını yazar",

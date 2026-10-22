@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Zadrži profil",
   "boot.profile.delete.question": "Izbrisati profil {0} s ovog USB sticka?",
   "boot.profile.delete.title": "Brisanje profila",
+  "boot.profile.hidden_other_systems": "Skriveni profili (za drugi sustav): {0}",
   "boot.profile.editor.new": "Novi profil odgovora",
   "boot.profile.editor.subtitle": "Jedan profil za svaki Windows: USOS izrađuje datoteku odgovora pri pokretanju instalacije",
   "boot.profile.editor.subtitle_linux": "Jedan profil za Windows i Linux: USOS izrađuje datoteku odgovora pri pokretanju instalacije",

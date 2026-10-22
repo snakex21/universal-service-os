@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Manter o perfil",
   "boot.profile.delete.question": "Excluir o perfil {0} deste pendrive?",
   "boot.profile.delete.title": "Excluir perfil",
+  "boot.profile.hidden_other_systems": "Perfis ocultos (para outro sistema): {0}",
   "boot.profile.editor.new": "Novo perfil de respostas",
   "boot.profile.editor.subtitle": "Um perfil para qualquer Windows: o USOS grava o arquivo de respostas quando a instalação começa",
   "boot.profile.editor.subtitle_linux": "Um perfil para Windows e Linux: o USOS grava o arquivo de respostas quando a instalação começa",

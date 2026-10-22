@@ -234,7 +234,8 @@ pub const max_system_editions = 8;
 pub const max_file = 8192;
 
 pub const Profile = struct {
-    /// Name shown in the menu; also the file name stem.
+    /// Name shown in the menu; the file name stem derives from it
+    /// (uniqueFileStem). Unique among profiles sharing a system.
     name: Text(32) = .{},
     user: Text(20) = .{},
     user2: Text(20) = .{},
@@ -1028,6 +1029,48 @@ pub fn fileStem(name: []const u8, buffer: []u8) []const u8 {
     const n = @min(name.len, buffer.len);
     for (name[0..n], 0..) |c, i| buffer[i] = if (c == ' ' or c == '.') '-' else std.ascii.toLower(c);
     return buffer[0..n];
+}
+
+/// A file stem for `name` that `taken` does not report: fileStem(name), or
+/// with "-2" ... "-99" appended (the base shortened to fit 32 characters)
+/// when another file holds it. Two profiles may share a name when they are
+/// offered for different systems (applies.overlaps), so the name alone no
+/// longer picks the file. Every suffix taken: the plain stem (the caller's
+/// duplicate check refuses the save before that).
+pub fn uniqueFileStem(name: []const u8, context: anytype, comptime taken: fn (@TypeOf(context), []const u8) bool, buffer: *[32]u8) []const u8 {
+    const base = fileStem(name, buffer);
+    if (!taken(context, base)) return base;
+    const base_len = base.len;
+    var number: u8 = 2;
+    while (number < 100) : (number += 1) {
+        var suffix_bytes: [3]u8 = undefined;
+        const suffix = std.fmt.bufPrint(&suffix_bytes, "-{d}", .{number}) catch unreachable;
+        const keep = @min(base_len, buffer.len - suffix.len);
+        // Re-derive the base: an earlier, longer suffix may have overwritten it.
+        _ = fileStem(name[0..@min(name.len, keep)], buffer);
+        @memcpy(buffer[keep .. keep + suffix.len], suffix);
+        const candidate = buffer[0 .. keep + suffix.len];
+        if (!taken(context, candidate)) return candidate;
+    }
+    return fileStem(name, buffer);
+}
+
+test "uniqueFileStem: plain stem when free, numbered when another file holds it" {
+    const Taken = struct {
+        list: []const []const u8,
+        fn has(self: @This(), stem: []const u8) bool {
+            for (self.list) |s| if (std.ascii.eqlIgnoreCase(s, stem)) return true;
+            return false;
+        }
+    };
+    var buffer: [32]u8 = undefined;
+    try std.testing.expectEqualStrings("domowy", uniqueFileStem("Domowy", Taken{ .list = &.{"inny"} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("domowy-2", uniqueFileStem("Domowy", Taken{ .list = &.{"domowy"} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("domowy-3", uniqueFileStem("Domowy", Taken{ .list = &.{ "domowy", "DOMOWY-2" } }, Taken.has, &buffer));
+    // 32-character names: the base is shortened so the suffix fits.
+    const long = "abcdefghijklmnopqrstuvwxyz012345";
+    try std.testing.expectEqualStrings("abcdefghijklmnopqrstuvwxyz0123-2", uniqueFileStem(long, Taken{ .list = &.{long} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("abcdefghijklmnopqrstuvwxyz0123-2", uniqueFileStem("ABCDEFGHIJKLMNOPQRSTUVWXYZ012345", Taken{ .list = &.{long} }, Taken.has, &buffer));
 }
 
 // ------------------------------------------------------------ usos-xp.ini

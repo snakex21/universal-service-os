@@ -215,7 +215,7 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
     const len = layout.len;
     var selected: usize = @min(initial, len - 1);
     var list: view.ListScreen = undefined;
-    list.openWithHints(view.t(.unattended_title), view.t(.unattended_subtitle), rows[0..len], selected, true, help(selected), hints(selected));
+    list.openWithHints(view.t(.unattended_title), subtitle(context), rows[0..len], selected, true, help(selected), hints(selected));
     traceRows(rows[0..len]);
     while (true) {
         const event = input.readBlocking();
@@ -242,6 +242,22 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
             .ignored => {},
         }
     }
+}
+
+var subtitle_text: [256]u8 = undefined;
+
+/// The subtitle, with a note when profiles on the stick are made for other
+/// systems (`systems=`): they are not listed here, and their names may be
+/// used again for this system.
+fn subtitle(context: Context) []const u8 {
+    const base = view.t(.unattended_subtitle);
+    const hidden = if (context.profiles_allowed) answer_profiles.hidden() else 0;
+    if (hidden == 0) return base;
+    var number: [8]u8 = undefined;
+    var note: [160]u8 = undefined;
+    const count_text = std.fmt.bufPrint(&number, "{d}", .{hidden}) catch return base;
+    const hint = view.format(&note, .profile_hidden_other_systems, &.{count_text});
+    return std.fmt.bufPrint(&subtitle_text, "{s} · {s}", .{ base, hint }) catch base;
 }
 
 fn hints(selected: usize) []const Hint {

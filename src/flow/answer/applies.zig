@@ -52,6 +52,77 @@ fn tokenMatches(token: []const u8, system_id: []const u8) bool {
     return false;
 }
 
+/// Some system offers both profiles (their effective `systems=` lists
+/// share a system). Profile names need to be unique only then: the answer
+/// screen of one system never lists two profiles with the same name.
+pub fn overlaps(a: *const Profile, b: *const Profile) bool {
+    return scopesOverlap(effective(a), effective(b));
+}
+
+pub fn scopesOverlap(a: []const u8, b: []const u8) bool {
+    var left = std.mem.splitScalar(u8, a, ',');
+    while (left.next()) |x| {
+        var right = std.mem.splitScalar(u8, b, ',');
+        while (right.next()) |y| {
+            if (tokensOverlap(std.mem.trim(u8, x, " "), std.mem.trim(u8, y, " "))) return true;
+        }
+    }
+    return false;
+}
+
+fn isGroup(token: []const u8) bool {
+    for (profile_mod.system_groups) |group| {
+        if (std.mem.eql(u8, group, token)) return true;
+    }
+    return false;
+}
+
+fn tokensOverlap(x: []const u8, y: []const u8) bool {
+    if (x.len == 0 or y.len == 0) return false;
+    if (std.ascii.eqlIgnoreCase(x, y)) return true;
+    const x_group = isGroup(x);
+    const y_group = isGroup(y);
+    // A group and a system id: the group holds the system.
+    if (x_group and !y_group) return tokenMatches(x, y);
+    if (y_group and !x_group) return tokenMatches(y, x);
+    if (!x_group) return false;
+    // Two different groups: "windows" holds the windows-* groups; the
+    // windows-* groups are disjoint and "linux" shares nothing with them.
+    const windows_x = std.mem.eql(u8, x, "windows");
+    const windows_y = std.mem.eql(u8, y, "windows");
+    return (windows_x and std.mem.startsWith(u8, y, "windows-")) or (windows_y and std.mem.startsWith(u8, x, "windows-"));
+}
+
+test "overlaps: same names allowed only for profiles offered on different systems" {
+    const xp = try profileFrom("name=Dom\nuser=Bob\nsystems=windows-xp\n");
+    const seven = try profileFrom("name=Dom\nuser=Bob\nsystems=windows-7\n");
+    const nt5 = try profileFrom("name=Dom\nuser=Bob\nsystems=windows-nt5\n");
+    const nt6 = try profileFrom("name=Dom\nuser=Bob\nsystems=windows-nt6\n");
+    const nine = try profileFrom("name=Dom\nuser=Bob\nsystems=windows-9x\n");
+    const linux = try profileFrom("name=Dom\nuser=Bob\nsystems=linux\n");
+    const ubuntu = try profileFrom("name=Dom\nuser=Bob\nsystems=ubuntu\n");
+    const windows = try profileFrom("name=Dom\nuser=Bob\nsystems=windows\n");
+    const both = try profileFrom("name=Dom\nuser=Bob\nsystems=windows,linux\n");
+    // A profile saved before systems= existed: every Windows.
+    const legacy = try profileFrom("name=Dom\nuser=Bob\n");
+    // Read-time default: the only per-system edition names Vista.
+    const vista = try profileFrom("name=Dom\nuser=Bob\nedition.windows-vista=Ultimate\n");
+    try std.testing.expect(!overlaps(&xp, &seven));
+    try std.testing.expect(overlaps(&xp, &xp));
+    try std.testing.expect(overlaps(&xp, &nt5) and overlaps(&nt5, &xp));
+    try std.testing.expect(!overlaps(&xp, &nt6) and overlaps(&seven, &nt6));
+    try std.testing.expect(!overlaps(&nt5, &nt6) and !overlaps(&nt5, &nine) and !overlaps(&nt6, &nine));
+    try std.testing.expect(overlaps(&windows, &nine) and overlaps(&nt6, &windows) and overlaps(&windows, &xp));
+    try std.testing.expect(!overlaps(&windows, &linux) and !overlaps(&xp, &ubuntu));
+    try std.testing.expect(overlaps(&linux, &ubuntu) and overlaps(&both, &ubuntu) and overlaps(&both, &seven));
+    try std.testing.expect(overlaps(&legacy, &xp) and !overlaps(&legacy, &ubuntu));
+    try std.testing.expect(overlaps(&vista, &nt6) and !overlaps(&vista, &seven) and !overlaps(&vista, &xp));
+    // Lists: one shared system is enough.
+    try std.testing.expect(scopesOverlap("windows-xp,ubuntu", "debian,ubuntu"));
+    try std.testing.expect(!scopesOverlap("windows-xp,ubuntu", "debian,windows-7"));
+    try std.testing.expect(!scopesOverlap("", "windows"));
+}
+
 /// An answer the target needs for a hands-off Setup that the profile lacks.
 pub const Missing = enum {
     /// 2000 / XP / 2003: without a key Setup stops on the product key page.

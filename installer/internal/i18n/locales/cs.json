@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Ponechat profil",
   "boot.profile.delete.question": "Odstranit profil {0} z tohoto disku USB?",
   "boot.profile.delete.title": "Odstranění profilu",
+  "boot.profile.hidden_other_systems": "Skryté profily (pro jiný systém): {0}",
   "boot.profile.editor.new": "Nový profil odpovědí",
   "boot.profile.editor.subtitle": "Jeden profil pro každý Windows: USOS vytvoří soubor odpovědí při spuštění instalace",
   "boot.profile.editor.subtitle_linux": "Jeden profil pro Windows i Linux: USOS vytvoří soubor odpovědí při spuštění instalace",

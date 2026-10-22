@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Jäta profiil alles",
   "boot.profile.delete.question": "Kas kustutada profiil {0} sellelt mälupulgalt?",
   "boot.profile.delete.title": "Profiili kustutamine",
+  "boot.profile.hidden_other_systems": "Peidetud profiilid (teise süsteemi jaoks): {0}",
   "boot.profile.editor.new": "Uus vastuseprofiil",
   "boot.profile.editor.subtitle": "Üks profiil iga Windowsi jaoks: USOS kirjutab vastusefaili installi alguses",
   "boot.profile.editor.subtitle_linux": "Üks profiil Windowsi ja Linuxi jaoks: USOS kirjutab vastusefaili installi alguses",

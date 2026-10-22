@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Behåll profilen",
   "boot.profile.delete.question": "Ta bort profilen {0} från det här USB-minnet?",
   "boot.profile.delete.title": "Ta bort profil",
+  "boot.profile.hidden_other_systems": "Dolda profiler (för ett annat system): {0}",
   "boot.profile.editor.new": "Ny svarsprofil",
   "boot.profile.editor.subtitle": "En profil för alla Windows: USOS skriver svarsfilen när installationen startar",
   "boot.profile.editor.subtitle_linux": "En profil för Windows och Linux: USOS skriver svarsfilen när installationen startar",

@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Conservar el perfil",
   "boot.profile.delete.question": "¿Eliminar el perfil {0} de esta memoria USB?",
   "boot.profile.delete.title": "Eliminar perfil",
+  "boot.profile.hidden_other_systems": "Perfiles ocultos (para otro sistema): {0}",
   "boot.profile.editor.new": "Nuevo perfil de respuestas",
   "boot.profile.editor.subtitle": "Un perfil para cualquier Windows: USOS escribe el archivo de respuestas al iniciar la instalación",
   "boot.profile.editor.subtitle_linux": "Un perfil para Windows y Linux: USOS escribe el archivo de respuestas al iniciar la instalación",
