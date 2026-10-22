@@ -607,6 +607,7 @@ pub const Key = enum(u16) {
     profile_help_widgets_off,
     profile_help_windows_update,
     profile_help_workgroup,
+    profile_hidden_other_systems,
     profile_key_delete,
     profile_key_edit,
     profile_key_import,
@@ -1422,6 +1423,7 @@ pub const hashes = [_]u32{
     0xe2dec316, // profile.help.widgets_off
     0xa6ae3d48, // profile.help.windows_update
     0xe79573c5, // profile.help.workgroup
+    0xe8f04310, // profile.hidden_other_systems
     0x5f1c9d40, // profile.key.delete
     0x4c0a173f, // profile.key.edit
     0x4ce11c3a, // profile.key.import
@@ -1967,6 +1969,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -3054,6 +3057,7 @@ pub const english = [_][]const u8{
     "No widgets board or news and interests on the taskbar (policy for the whole computer).",
     "Automatic Updates policy: no restart while someone is signed in, notify before downloading, or off.",
     "The workgroup of the computer: up to 15 letters, digits and dashes. Empty: WORKGROUP.",
+    "Hidden profiles (made for another system): {0}",
     "Delete",
     "Edit",
     "Import",

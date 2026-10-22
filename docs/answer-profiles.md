@@ -18,7 +18,7 @@ bad values are refused with the field and the line, never the value.
 
 | key | meaning | rule / default |
 |---|---|---|
-| `name` | name in the menu, file stem | 1-32 characters `A-Z a-z 0-9 space . _ -` |
+| `name` | name in the menu; the file stem derives from it (see "Names and files") | 1-32 characters `A-Z a-z 0-9 space . _ -`; unique among profiles offered for a common system |
 | `user` | first local account (administrator), `FullName` / `RegisteredOwner` | required; 1-20 characters `A-Z a-z 0-9 . _ -` and space, not a built-in account |
 | `user2` | optional second administrator | like `user`, different from it |
 | `computer` | computer name | 1-15 characters `A-Z a-z 0-9 -`, not only digits; empty: `USOS-XP` on NT5, a Setup-chosen name (`*`) on 6.x+ |
@@ -54,7 +54,10 @@ keys).
 
 `src/flow/answer/applies.zig`. The answer screen lists only the profiles
 offered for its system (`answer_profiles.filter`); every file is still
-read, so a new name never overwrites another system's profile.
+read, so a new name never overwrites another system's profile. When the
+stick holds profiles for other systems, the screen's subtitle ends with
+"Hidden profiles (made for another system): N" (`profile.hidden_other_systems`,
+the loaded files minus those offered here).
 
 - `systems=` set: the listed ids and groups (`windows` = every Windows with
   a generated answer, 95/98/Me included, `windows-9x` = 95, 98, 98 SE, Me
@@ -69,8 +72,33 @@ read, so a new name never overwrites another system's profile.
   `edition.windows-vista=Ultimate`) is therefore offered for Vista only.
   Saving a profile in the editor writes `systems=` explicitly.
 - The editor's "Use for" row: "Only <system>" (the default for a new
-  profile), "Every Windows" or "Every Linux installer", "Windows and Linux";
-  a stored list that is none of these is kept and shown as it is.
+  profile, also one imported from `usos-xp.ini`; `profile_editor.edit`
+  picks it when the new profile has no `systems=`), "Every Windows" or
+  "Every Linux installer", "Windows and Linux"; a stored list that is none
+  of these is kept and shown as it is. An existing profile without
+  `systems=` shows its read-time default (usually "Every Windows").
+
+### Names and files
+
+A name must be unique only among profiles offered for a common system
+(`applies.overlaps` on the effective lists: equal ids, a group and one of
+its systems, `windows` and a `windows-*` group; `windows-9x`, `windows-nt5`,
+`windows-nt6` and `linux` share nothing). "Home" with "Only Windows XP" and
+"Home" with "Only Windows 7" may both exist; a second "Home" with "Every
+Windows" is refused ("A profile with this name exists already."). Names are
+compared like file stems: case, space and `.` do not count.
+
+The file is `<stem>.ini` with the stem from `profile.fileStem` (lower case,
+space and `.` -> `-`); when another file holds that stem (a profile of the
+same name for other systems), `profile.uniqueFileStem` appends `-2`, `-3`,
+... (the base shortened to stay within 32 characters): `home.ini`,
+`home-2.ini`. Editing writes back to the file it was read from (its stem is
+free for it; a rename moves the profile to the new name's stem and removes
+the old file); Delete removes the file of the selected row. Existing files
+keep their names; a file whose stem is not the name's (an older or
+hand-made file) is renamed to the name's stem on the next save. Builds
+before 2026-10-22 read numbered files as usual but refuse a second profile
+with the same name in the editor.
 
 ### Missing answers (warnings before the start)
 

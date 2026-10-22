@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Запазване на профила",
   "boot.profile.delete.question": "Да се изтрие ли профилът {0} от тази флашка?",
   "boot.profile.delete.title": "Изтриване на профил",
+  "boot.profile.hidden_other_systems": "Скрити профили (за друга система): {0}",
   "boot.profile.editor.new": "Нов профил с отговори",
   "boot.profile.editor.subtitle": "Един профил за всеки Windows: USOS записва файла с отговори при стартиране на инсталацията",
   "boot.profile.editor.subtitle_linux": "Един профил за Windows и Linux: USOS записва файла с отговори при стартиране на инсталацията",

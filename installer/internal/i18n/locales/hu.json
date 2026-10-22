@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Profil megtartása",
   "boot.profile.delete.question": "Törli a(z) {0} profilt erről a pendrive-ról?",
   "boot.profile.delete.title": "Profil törlése",
+  "boot.profile.hidden_other_systems": "Rejtett profilok (másik rendszerhez): {0}",
   "boot.profile.editor.new": "Új válaszprofil",
   "boot.profile.editor.subtitle": "Egy profil minden Windowshoz: a USOS a telepítés indulásakor elkészíti a válaszfájlt",
   "boot.profile.editor.subtitle_linux": "Egy profil Windowshoz és Linuxhoz: a USOS a telepítés indulásakor elkészíti a válaszfájlt",

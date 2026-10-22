@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Mantieni il profilo",
   "boot.profile.delete.question": "Eliminare il profilo {0} da questa chiavetta?",
   "boot.profile.delete.title": "Elimina profilo",
+  "boot.profile.hidden_other_systems": "Profili nascosti (per un altro sistema): {0}",
   "boot.profile.editor.new": "Nuovo profilo di risposte",
   "boot.profile.editor.subtitle": "Un solo profilo per ogni Windows: USOS scrive il file di risposte all'avvio dell'installazione",
   "boot.profile.editor.subtitle_linux": "Un solo profilo per Windows e Linux: USOS scrive il file di risposte all'avvio dell'installazione",

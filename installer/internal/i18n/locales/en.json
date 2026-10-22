@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Keep the profile",
   "boot.profile.delete.question": "Delete the profile {0} from this stick?",
   "boot.profile.delete.title": "Delete profile",
+  "boot.profile.hidden_other_systems": "Hidden profiles (made for another system): {0}",
   "boot.profile.editor.new": "New answer profile",
   "boot.profile.editor.subtitle": "One profile for every Windows: USOS writes the answer file when the installation starts",
   "boot.profile.editor.subtitle_linux": "One profile for Windows and Linux: USOS writes the answer file when the installation starts",

@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Διατήρηση του προφίλ",
   "boot.profile.delete.question": "Διαγραφή του προφίλ {0} από αυτό το USB;",
   "boot.profile.delete.title": "Διαγραφή προφίλ",
+  "boot.profile.hidden_other_systems": "Κρυφά προφίλ (για άλλο σύστημα): {0}",
   "boot.profile.editor.new": "Νέο προφίλ απαντήσεων",
   "boot.profile.editor.subtitle": "Ένα προφίλ για κάθε Windows: το USOS γράφει το αρχείο απαντήσεων όταν ξεκινά η εγκατάσταση",
   "boot.profile.editor.subtitle_linux": "Ένα προφίλ για Windows και Linux: το USOS γράφει το αρχείο απαντήσεων όταν ξεκινά η εγκατάσταση",

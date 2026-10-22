@@ -457,11 +457,16 @@ fn problemOf(id: F) ?Problem {
     };
 }
 
+/// The scope the form would save (`systems=` of the "Use for" row).
+var scope_probe: Profile = .{};
+
 fn duplicateName() bool {
-    // Every profile file counts, also those made for other systems.
-    const other = answer_profiles.stemInUse(name_text.slice()) orelse return false;
-    const current = previous_stem orelse return true;
-    return !std.ascii.eqlIgnoreCase(other, current);
+    // Every profile file counts, but only one offered for a system this
+    // profile is offered for too: "Only Windows XP" and "Only Windows 7"
+    // may both be called "Home" (they get different files).
+    scope_probe = .{};
+    _ = answer.profile.normalizeSystems(systems_values[systems_index], &scope_probe.systems);
+    return answer_profiles.nameTaken(name_text.slice(), &scope_probe, previous_stem);
 }
 
 fn problemText(problem: Problem) []const u8 {

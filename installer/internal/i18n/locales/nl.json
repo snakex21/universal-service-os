@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Profiel behouden",
   "boot.profile.delete.question": "Profiel {0} van deze USB-stick verwijderen?",
   "boot.profile.delete.title": "Profiel verwijderen",
+  "boot.profile.hidden_other_systems": "Verborgen profielen (voor een ander systeem): {0}",
   "boot.profile.editor.new": "Nieuw antwoordprofiel",
   "boot.profile.editor.subtitle": "Een profiel voor elke Windows: USOS schrijft het antwoordbestand wanneer de installatie start",
   "boot.profile.editor.subtitle_linux": "Een profiel voor Windows en Linux: USOS schrijft het antwoordbestand wanneer de installatie start",

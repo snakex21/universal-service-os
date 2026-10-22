@@ -987,6 +987,7 @@
   "boot.profile.delete.keep": "Obdrži profil",
   "boot.profile.delete.question": "Izbrišem profil {0} s tega ključka USB?",
   "boot.profile.delete.title": "Brisanje profila",
+  "boot.profile.hidden_other_systems": "Skriti profili (za drug sistem): {0}",
   "boot.profile.editor.new": "Nov profil odgovorov",
   "boot.profile.editor.subtitle": "En profil za vsak Windows: USOS ob zagonu namestitve ustvari datoteko odgovorov",
   "boot.profile.editor.subtitle_linux": "En profil za Windows in Linux: USOS ob zagonu namestitve ustvari datoteko odgovorov",

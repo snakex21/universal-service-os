@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Залишити профіль",
   "boot.profile.delete.question": "Видалити профіль {0} з цієї флешки?",
   "boot.profile.delete.title": "Видалення профілю",
+  "boot.profile.hidden_other_systems": "Приховані профілі (для іншої системи): {0}",
   "boot.profile.editor.new": "Новий профіль відповідей",
   "boot.profile.editor.subtitle": "Один профіль для будь-якої версії Windows: USOS записує файл відповідей під час запуску встановлення",
   "boot.profile.editor.subtitle_linux": "Один профіль для Windows і Linux: USOS записує файл відповідей під час запуску встановлення",

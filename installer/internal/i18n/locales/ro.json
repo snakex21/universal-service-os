@@ -984,6 +984,7 @@
   "boot.profile.delete.keep": "Păstrați profilul",
   "boot.profile.delete.question": "Ștergeți profilul {0} de pe acest stick?",
   "boot.profile.delete.title": "Ștergere profil",
+  "boot.profile.hidden_other_systems": "Profiluri ascunse (pentru alt sistem): {0}",
   "boot.profile.editor.new": "Profil de răspuns nou",
   "boot.profile.editor.subtitle": "Un singur profil pentru orice Windows: USOS scrie fișierul de răspuns la pornirea instalării",
   "boot.profile.editor.subtitle_linux": "Un singur profil pentru Windows și Linux: USOS scrie fișierul de răspuns la pornirea instalării",

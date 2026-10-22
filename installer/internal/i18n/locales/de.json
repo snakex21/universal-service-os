@@ -981,6 +981,7 @@
   "boot.profile.delete.keep": "Profil behalten",
   "boot.profile.delete.question": "Profil {0} von diesem USB-Stick löschen?",
   "boot.profile.delete.title": "Profil löschen",
+  "boot.profile.hidden_other_systems": "Ausgeblendete Profile (für ein anderes System): {0}",
   "boot.profile.editor.new": "Neues Antwortprofil",
   "boot.profile.editor.subtitle": "Ein Profil für jedes Windows: USOS schreibt die Antwortdatei beim Start der Installation",
   "boot.profile.editor.subtitle_linux": "Ein Profil für Windows und Linux: USOS schreibt die Antwortdatei beim Start der Installation",
