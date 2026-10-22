@@ -16,10 +16,13 @@ BASE=Path(r'G:\USOS-Kolekcja\_vm\nt35-irq-usb01')
 WORK=Path(r'G:\USOS-Kolekcja\_vm')/TAG
 PROOF=ROOT/'artifacts/nt35-client/apply03/preparation.json'
 SOURCE=PRIOR/'artifacts/coverage/vm/nt35-irq-usb01'
+ARCHIVE_NAME='runtime-core.py'
 
-def configure(phase):
-    global TAG,BASE,WORK,PROOF,SOURCE
+def configure(phase,attempt='01'):
+    global TAG,BASE,WORK,PROOF,SOURCE,ARCHIVE_NAME
     if phase not in ('apply03','cold01'):raise ValueError('Explicit owned client phase required')
+    if attempt not in ('01','02'):raise ValueError('Explicit source archive attempt required')
+    ARCHIVE_NAME='runtime-core'+('' if attempt=='01' else '-'+attempt)+'.py'
     TAG='nt35-client-'+phase
     WORK=Path(r'G:\USOS-Kolekcja\_vm')/TAG
     PROOF=ROOT/'artifacts/nt35-client'/phase/'preparation.json'
@@ -81,7 +84,7 @@ def module():
                         tail=tail[end+1:]"""
     if source.count(old)!=1:raise ValueError('Pinned completion transform mismatch')
     source=source.replace(old,new)
-    archive=PROOF.parent/'runtime-core.py'
+    archive=PROOF.parent/ARCHIVE_NAME
     if archive.exists():raise ValueError('Fresh runtime archive required')
     archive.write_text(source,encoding='utf-8',newline='\n')
     spec=importlib.util.spec_from_loader('nt35_client_core',loader=None)
@@ -99,7 +102,8 @@ def module():
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--phase',choices=('apply03','cold01'),default='apply03')
-    configure(parser.parse_args().phase)
+    parser.add_argument('--attempt',choices=('01','02'),default='01')
+    args=parser.parse_args();configure(args.phase,args.attempt)
     if not live_console():
         raise SystemExit('Live operator PTY required before any VM start')
     raise SystemExit(asyncio.run(module().main()))

@@ -67,8 +67,8 @@ initial cold launcher preflight rejects missing explicit compatibility
 flags before QEMU; a repeated identical-disk comparison supports their
 atomic manifest correction, with a `validation-fix-no-vm-started.json`
 note. No image or guest content changes in that repair. This preparation
-and apply result do not qualify persistent cold policy; the separate
-native cold `/check` requires its own completion evidence.
+and apply result alone do not qualify persistent cold policy; the separate
+native cold `/check` has its own completed evidence below.
 
 The cold reader is prepared without reading the active cold VM. Only after
 the actual completion may the operator write a bounded JSON below
@@ -93,8 +93,23 @@ identical guest contents, and the new successful check log contains no
 `NativeNetExit`. Identical native service/ping text can be valid after
 fresh commands; content hashes alone do not establish execution freshness.
 No optional application staging, guest command or VM start is performed.
-Cold runtime PASS still requires this future review and stopped readback;
-preparing this reader grants none.
+Separate cold01 is now complete. `/check` emits completion0 on operator05,
+and the new346-byte log on operator09 has no `NativeNetExit`: no service
+stop operation is repeated. Browser/Server remain STOPPED/Disabled and
+Workstation/Tcpip RUNNING. Fresh native net and ping commands overwrite
+their own evidence files; operator11 and13 show the client-only service
+list and three replies below10ms each. Native safe shutdown on operator17
+precedes QMP quit/exit0. Stopped readback confirms clean REGF1.2/Select1,
+Start4/4/2/3 for Browser/Server/Workstation/Tcpip and unchanged own binaries.
+Cold target SHA256:
+`c2a142e4ae39f23854b30c549ce966a1e0caca80bad555e3916ff7abd9b61fe4`.
+Original USB parent and completed apply parent stay unchanged. Scratch is
+removed; no Microsoft hive/module or own EXE is exported by the reader.
+Assessments are `artifacts/nt35-client/{apply03,cold01}/evaluation.json`.
+The explicit second source archive records the successful cold launch;
+the first preparation-contract failure is retained and is not a Windows
+failure. Apply and persistent cold policy pass in these installed overlays,
+with no fresh AUTO integration or new HID/MSC claim.
 
 The launcher now requires both `isatty()` and Windows `GetConsoleMode`:
 Windows NUL can satisfy `isatty()` despite having no live operator.
