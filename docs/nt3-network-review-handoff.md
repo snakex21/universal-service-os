@@ -1,0 +1,72 @@
+# NT3 network and HID candidates for review — 2026-10-22
+
+No branch in this handoff was merged, pushed or deployed to physical
+media. Runtime qualifications below are QEMU only. The per-image audit
+is in `docs/windows-usb-network-matrix.md`; unknown variants stay unknown.
+
+## Shared IRQ change: apply the source change once
+
+`fix/nt351-net-irq` b14378d8 and `fix/nt35-net-irq` 2d8d453e each change
+the same four legacy register definitions in
+`tools/nt/usosnet/src/usosnet_igb.c` and add the same actual-C MMIO test
+`tools/tests/test_igb_irq_registers.py`. Select the shared source/test
+change once during review; the separate binaries are both needed.
+
+| Candidate | Repository binary | SHA-256 | Runtime proof |
+|---|---|---|---|
+| NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in |
+| NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | R26 DHCP/ping3/3<10ms/DNS/HTTP200 + passive IRQ trace; R27 keyboard/mouse out/in |
+
+Both USB regressions explicitly disable the PS/2 driver with inherited
+i8042prt Start4 while leaving hardware i8042 present. They include an
+absent-keyboard negative control, keyboard action after insertion,
+keyboard action with mouse absent, and mouse movement/menu click after
+insertion. Native safe shutdown, process exit0 and actual installed SYS
+readback precede each completed assessment. No hub code was changed.
+
+NT35 qualification/USB reports are fa6fab32/cf8f7ca0 in
+`C:\Users\ASRock\usos-work\nt35-irq`. NT351 USB report is f54d1ffc in
+`C:\Users\ASRock\usos-work\nt351-irq`. Build metadata distinguishes raw
+source hashes from normalized CRLF/LF equivalence; use each actual build
+manifest rather than silently assigning one source hash to both builds.
+
+The original fresh R20/R22 installations used earlier drivers and retain
+their measured approximately2s delay. The corrected drivers have only
+installed-overlay qualification so far. A reviewed new cache and fresh
+normal USOS runs remain required before a fresh-install PASS claim.
+QEMU's working NIC IRQ does not qualify the physical I211 IRQ/polling
+behavior on X470. NT4 and other OS binaries were not rebuilt by this fix.
+
+## NT31 is a separate full-MAC port
+
+`C:\Users\ASRock\usos-work\nt31-net`, branch `fix/nt31-net`, has the
+NDIS full-MAC port, its original-contract tests, native integration
+helpers and RAM-only checks against original NT31 modules. Relevant
+later commits:88e16bc8 alignment, d51ff7ce argument order/native C test,
+83ae1ec6 successful R24c qualification. Review the branch dependencies,
+not only its last documentation commit.
+
+R24c's exact own SYS is b49f2445a2e48dbf75b50f426ccc1cef09943a84e779d351747d4cbc8df27a8d,
+16384B. It uses UP, explicit BDF00:05.0, QEMU82576 and20ms polling with
+IRQ disabled. Static IP, two native ping3/3 runs, strict DNS, native
+resolver and HTTP68k200 pass. Native safe shutdown and stopped readback
+confirm the candidate. Earlier loader error193 and ABI STOP remain.
+
+R24c was integrated through native NCPA on a retained installation. It
+does not qualify fresh automatic network setup. That still needs own
+staging, original NT31 TCP/IP/NCPA binding and reboot, a scoped normal
+collector, then a blank-target normal USOS run. Stock DHCP is not
+applicable. Reset/unload, SMP, Server and physical hardware are outside
+this qualification. A separate HID regression with this full-MAC is
+in progress; R19c is the prior completed USB evidence.
+
+## Pending NT4
+
+The corrected temporary address198.51.100.1 replaces192.0.2.1 in the own
+renderer because original TCPCFG rejects a zero octet. `fix/nt4-net`
+a4313b36/3863468b records the original-code validator and host tests.
+Candidate03 is a fresh normal USOS trial; no NT4 desktop/LAN/MSC/HID PASS
+is inferred before its actual results. Its new own EFI is qualified as
+a partial build output: fullbuild03 remains FAIL on an unrelated Win7
+asset, despite589/589 host tests. Frozen HID1.3 and MSC drivers will be
+tested in separate overlays; that is not a combined-HID+MSC claim.
