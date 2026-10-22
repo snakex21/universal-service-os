@@ -14,6 +14,7 @@ full Windows VM installation was performed for this change.
 | Me | Same | Same | Additionally removes exactly the inbox `*PNP8387` Dial-Up Adapter through SetupAPI |
 | NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server and Browser services disabled | usosnet4.sys takes over the loopback adapter (USOSNET.REG, POST.CMD) for a matching card; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
 | 2000 | Microsoft client + TCP/IP; no MS_Server in NetServices | Existing usosnet, matching hardware only; OEM package and merged OemPnPDriversPath | IE settings and Favorites; existing `reg=` setup path seeds defaults too |
+| XP x86, Server 2003 x86 (2026-10-22) | Same WINNT.SIF block as 2000 (a user .sif with its own network sections keeps them) | Same usosnet.sys + usosnet.inf in `C:\USOS\Drivers\USOSNET`, merged OemPnPDriversPath, `OemPreinstall` stays `No`, no `$OEM$` | LAN.REG imported at setup end: XP by `usos-users.cmd` (pae.exe), 2003 by `usos-setup.cmd`. XP x64 / 2003 x64: no amd64 usosnet build, nothing staged |
 
 NT4's loopback uses `192.0.2.1/24`, **not a usable LAN address or DHCP
 lease**. It keeps TCP/IP installed until an NT4-compatible NIC driver is

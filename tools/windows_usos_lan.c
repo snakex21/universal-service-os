@@ -250,7 +250,7 @@ static int read_config(void){static char raw[4097];char *line,*end;HANDLE f;DWOR
   if(!seen)return 0;
   if(lstrcmpA(home,"about:blank")&&memcmp(home,"http://",7)&&memcmp(home,"https://",8))return 0;
 #ifdef USOS_LAN_NT
-  return eq(system_id,"NT4")||eq(system_id,"W2K");
+  return eq(system_id,"NT4")||eq(system_id,"W2K")||eq(system_id,"XP")||eq(system_id,"W2K3");
 #else
   return eq(system_id,"95")||eq(system_id,"98")||eq(system_id,"98SE")||eq(system_id,"ME");
 #endif

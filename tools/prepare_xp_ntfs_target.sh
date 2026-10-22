@@ -174,6 +174,16 @@ usos_nt52_display_only_cmd "$display_line" > "$work/volume/USOS/XP/usos-users.cm
 printf '[XP_PAE] usos-users.cmd staged (display helper only, run hidden by pae.exe)\n'
 fi
 fi
+# LAN helper (network_setup.sh staged USOSLAN.EXE + LAN.REG in USOS\XP): its
+# Run value is imported by usos-users.cmd at setup end (pae.exe), as
+# usos-setup.cmd does on 2000 / 2003. Without a script yet: a minimal one.
+if [ -f "$work/volume/USOS/XP/USOSLAN.EXE" ] && [ -f "$work/volume/USOS/XP/LAN.REG" ]; then
+if [ ! -f "$work/volume/USOS/XP/usos-users.cmd" ]; then
+printf '@echo off\r\nrem USOS: XP setup end (run hidden by pae.exe).\r\nset USOS_LOG=%%SystemRoot%%\\usos-users.log\r\nexit /b 0\r\n' > "$work/volume/USOS/XP/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+fi
+usos_nt52_insert_before_exit "$work/volume/USOS/XP/usos-users.cmd" 'if exist "%SystemDrive%\USOS\XP\LAN.REG" %SystemRoot%\regedit.exe /s "%SystemDrive%\USOS\XP\LAN.REG"' || fail 'cannot register the LAN helper'
+printf '[XP_PAE] LAN helper registered in usos-users.cmd (LAN.REG at setup end)\n'
+fi
 # Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
 if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
 cp /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini"
@@ -204,8 +214,11 @@ mkdir -p "$setup_dir"
     printf 'set USOS_LOG=%%SystemRoot%%\\usos-setup.log\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" call "%%USOS_DIR%%\\usos-users.cmd"\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" del /f /q "%%USOS_DIR%%\\usos-users.cmd"\r\n'
-    if [ "$NT5_SYSTEM" = windows-2000 ]; then
+    # LAN helper Run value (network_setup.sh: 2000 and Server 2003 x86).
+    if [ "$NT5_SYSTEM" = windows-2000 ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then
         printf 'if exist "%%USOS_DIR%%\\USOSLAN.EXE" if exist "%%USOS_DIR%%\\LAN.REG" %%SystemRoot%%\\regedit.exe /s "%%USOS_DIR%%\\LAN.REG"\r\n'
+    fi
+    if [ "$NT5_SYSTEM" = windows-2000 ]; then
         printf 'rem VESA display (usosvbe + framebuf.dll, w2k_stage.sh 11.; DATA vesa-off.txt: none).\r\n'
         printf 'if exist "%%USOS_DIR%%\\vesa.cmd" call "%%USOS_DIR%%\\vesa.cmd"\r\n'
     fi
