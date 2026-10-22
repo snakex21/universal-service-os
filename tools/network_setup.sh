@@ -436,12 +436,14 @@ usos_net_hex7() {
 # with NDISLoop1\Parameters), BusType 5 (PCI; the driver finds the bus and
 # slot itself) and the adapter's TCP/IP becomes DHCP or the profile's
 # static address. The Network applet still names the loopback adapter.
+# Auto-start is required for TCP/IP binding: matched native NT4 cold boots
+# of the same installed image have no adapter at Start=3, DHCP at Start=2.
 usos_net_nt4_reg() {
     _un_ip=$(usos_net_value "$1" ip); _un_gw=$(usos_net_value "$1" gateway); _un_dns=$(usos_net_value "$1" dns)
     printf '%s\r\n' 'REGEDIT4' '' \
         '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop]' \
         '"ImagePath"="\\SystemRoot\\System32\\drivers\\usosnet4.sys"' \
-        '"Start"=dword:00000003' '' \
+        '"Start"=dword:00000002' '' \
         '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1\Parameters]' \
         '"BusType"=dword:00000005' '"BusNumber"=dword:00000000' '"PollMode"=dword:00000000' '' \
         '[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1\Parameters\Tcpip]'

@@ -1,0 +1,13 @@
+{
+  "scope": "Matched native BIOS cold boots of exact completed03 parent; no warm/cold confound between05/06",
+  "normalized_argv_identical": true,
+  "normalized_argv_sha256": "983335e2656694dcf1cbe19474191fe5444c397d16dc5d4ecf36a363827e1c92",
+  "base_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "only_preboot_delta": "Existing ControlSet001 Services NDISLoop Start:05=2,06=3",
+  "start2_native_adapter_dhcp": true,
+  "start2_native_ping_replies": 4,
+  "start3_native_ipconfig_no_adapter": true,
+  "start3_native_ping_unreachable": 4,
+  "native_safe_off_both": true,
+  "configured_dns_still_requires_new_logger": true
+}

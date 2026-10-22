@@ -854,3 +854,99 @@ Candidate03 run_plan TTY43521; retain listener56859 i endpoint/cleanup86629
 uzbrojone przed launch. Jeden zwykły guard, zero obejść i progresspollingu.
 To zapis startu, NIE wynik instalacji. Zakres główny: PS2desktop + LAN.
 USB/HID/MSC i hardware PASS pozostają osobnymi nieukończonymi sprawdzeniami.
+
+2026-10-22 — candidate03: rzeczywisty pulpit i bezpieczne zamknięcie
+
+Świeża pełna instalacja USOS po zmianie placeholdera dotarła do native logon
+(operator endpoint), następnie do Explorer desktop NT4 Workstation PL
+(operator-02). Native IPCONFIG /ALL nie pokazał adaptera; jawny net start
+ndisloop zgłosił powodzenie. Nie jest to jeszcze LAN PASS. Native shutdown
+zakończył się ekranem „Teraz można bezpiecznie wyłączyć komputer”
+(operator-09), potem FINISH/QMP quit, rc0, elapsed8540.29s.
+
+Observer actual-first-logon token nie pojawił się. Ścisła polityka poprawnie
+nie zapisała 21 przedgranicznych ramek DHCP i pominęła kolektor NET. Nie
+zamieniamy widocznego pulpitu w fałszywy token ani nie cofamy granicy PCAP.
+Stopped own STATUS to NOT_READY po ręcznym /testnet, który może nadpisać
+wcześniejszy FIRSTLO_FAILED. ARM i oba hooki usunięte; skrypty i helper
+zachowują dokładne piny. USABILITY.TXT nie powstał. Przyczyna FIRSTLO jest
+jeszcze badana, bez przypisywania jej Windows ani domyślnej usłudze Serial.
+
+Retained target jest kompletny:460390400 bajtów, SHA256
+cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21.
+Pierwszy GetChildItem pokazał stary rozmiar katalogowy NTFS hardlinku196608;
+po otwarciu wyłącznie read-only po zakończeniu VM GetLength i qemu-img info
+potwierdziły pełny obraz. Hipoteza utraty inode odrzucona; danych nie utracono.
+
+Selected stopped hive metadata: poprawny checksum i równe sequence SYSTEM
+oraz SOFTWARE, CurrentControlSet1. NDISLoop Start3/ImagePath usosnet4.sys,
+Bind/Export/Route wskazują NDISLoop1. TCPIP Start2 i jego Bind też NDISLoop1.
+Adapter BusType5/Bus0/PollMode0, EnableDHCP1 oraz zerowe adresy konfiguracyjne.
+Own SYS hash4f2eb16b...0f8d, USB1.3 hash2d455743...cfe1. Workstation Start2,
+Server4 i Browser4 potwierdzają konfigurację client policy, nie ruch LAN.
+POST.OK istnieje. Raw hives i logi pozostają RAM; tylko wybrane booleany,
+numery usług i hashe własnych plików zapisano do metadata.
+
+Installed04: nowy overlay zmienił dokładnie istniejący DWORD NDISLoop/Start
+3→2, pozostałe bytes SYSTEM identyczne, pełny raw→overlay compare PASS.
+Native BIOS cold q35/igb/AHCI doszedł do login i desktop. To inna granica
+firmware niż pierwotny UEFI→CSM warm handoff, nie dowód izolowanej przyczyny.
+Native MODE COM1 115200/8N1 działa przy niezmienionym SerialStart2.
+Następny JSON operatora przekroczył długość linii TTY przez shift-letter
+qcodes i został odrzucony jako JSON control character. Runner QMPquit/rc0
+po348.94s; to harness input FAIL, bez Windows FAIL ani native safe-off.
+Baseline03 pozostaje czysty. Poprawiony hostowy preflight ogranicza JSON
+ASCII do450B i64keys; ARM w lokalnym Coverage używa CapsLock,48keys/284B.
+Installed05 jest kontrolowaną kontynuacją tej samej diagnozy, nie reinstall.
+
+Oddzielny IRQ patch f8a87c46 przenosi cztery stałe z b14378d8. Actual C/MMIO
+host1PASS, własny WDK build rc0, PE4.00 i35 identycznych importów dostępnych
+w actual NT4 NDIS.SYS. Nowy SYS89b7337c...2233 pozostaje osobnym artefaktem,
+nie podmieniono go w03–05. Szczegóły docs/nt4-igb-irq-2026-10-22.md.
+
+Stan potwierdzony: native Desktop i native safe-off03. LAN/HID1.3/MSC oraz
+hardware nadal bez PASS. Wspólne raporty22 i macierz pozostają u roota.
+
+2026-10-22 — matched native cold control oraz granice dowodu sieci
+
+Installed05: native IPCONFIG DHCP10.0.2.15, brama/DHCP10.0.2.2 i DNS10.0.2.3.
+Native ping bramy4/4, RTT31/16/16/16ms. Po publicznym newline do COM1 oraz
+manual FIRSTLO.CMD dokładny token znalazł się na osobnej linii; capture
+rozpoczął zapis wyłącznie późniejszych ramek, bez odzyskiwania poprzednich.
+Wcześniejszy token miał12drukowalnych znaków boot UART przed nim i został
+słusznie odrzucony przez strictline matcher. Nie eksportowano tego prefiksu.
+Helper /firstlogon po rearm nadal daje FIRSTLO_FAILED; manual ten sam skrypt
+wysyła token. Natywny MODE działa. Podejrzenie DETACHED child/console wymaga
+jeszcze osobnej kontroli i poprawki; nie zmieniono historycznego pinu.
+
+Manual TESTNET zrealizował renew i logger. Po native safe-off/operator16,
+QMPquit/rc0, ścisły readonly collector zakończył transport PASS30.737s.
+Zebrano6dozwolonych NET linii; własnySYS matched. DORA zawiera wszystkie4
+pakiety po actualtoken, adres10.0.2.15, DHCP/brama10.0.2.2, DNS10.0.2.3.
+ICMP gateway PASS/echo_match1/rtt15ms; strict DNS PASS/id/peer/question do
+fixed1.1.1.1 i8.8.8.8. Brak configured10.0.2.3, więc nie LAN/DNSfinalPASS.
+Official collection.json ma dhcp/gateway/dns=false, bo statusFIRSTLO_FAILED
+zablokował gateTESTNET_DONE. Nie zmieniono ocen ani mechanizmu gate.
+
+Korekta wcześniejszej hipotezy loggera: frozenff258504 miał nt_tcpip_config
+oraz adapterowy gateway. Brakowało jedynie GLOBAL Tcpip Parameters DHCP DNS
+fallback, nie całej obsługi NT. Stopped05 potwierdza globalDhcpNameServer
+REG_SZ równy rzeczywistemu configuredDNS; adapteroweNameServer/DhcpNameServer
+nie istnieją. Przygotowany oddzielny NT4fork dodaje tylko boundedglobalfallback
+przy pustej liście adapterowej.3actualCtests PASS; dwa niezależne buildy są
+identyczne:fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2.
+To nowy payload jeszcze bez guestqualification, nie nowa ocena05.
+
+UnchangedStart3 control06 używa identycznego completed03/cf04parent oraz
+tego samego native BIOS cold q35/igb/AHCI/CPU/RAM/blankstick co05. Po
+normalizacji wyłącznie własnych nazw/ścieżek/portów całe argv jest identyczne,
+SHA983335e2656694dcf1cbe19474191fe5444c397d16dc5d4ecf36a363827e1c92.
+Jedyny prebootdelta to istniejący DWORD NDISLoop/Start:05=2,06=3.
+06 native IPCONFIG nie ma adaptera; ping4×hostnieosiągalny; native safe-off07,
+QMPquit/rc0. Stopped cleanSYSTEM potwierdza Start3 i SYS4f2eb16...0f8d.
+Ta para usuwa confound dodatkowego coldboot i wcześniejszego manualstart03.
+Na tej podstawie network_setup.sh zmienia takeover Start3→2;27hosttestsPASS.
+Oryginalny03 był warmUEFI→CSM, ale comparison05/06 jest coldBIOS↔coldBIOS.
+
+HID1.3 root deleguje osobno agentowi macos z immutable03. MSC pozostaje
+osobnym przyszłym frozen1.1testem; nie łączymy obu wersji USB/hubów.

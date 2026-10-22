@@ -97,6 +97,7 @@ class Stage(unittest.TestCase):
         self.assertTrue(reg.startswith(b'REGEDIT4\r\n'));self.assertNotIn(b'\n',reg.replace(b'\r\n',b''))
         text=reg.decode('ascii')
         for token in ('[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\NDISLoop]\r\n"ImagePath"="\\\\SystemRoot\\\\System32\\\\drivers\\\\usosnet4.sys"',
+                      '"ImagePath"="\\\\SystemRoot\\\\System32\\\\drivers\\\\usosnet4.sys"\r\n"Start"=dword:00000002',
                       'Services\\NDISLoop1\\Parameters]\r\n"BusType"=dword:00000005','"EnableDHCP"=dword:00000001',
                       '"IPAddress"=hex(7):30,2e,30,2e,30,2e,30,00,00','"DefaultGateway"=hex(7):00,00','Services\\DHCP]\r\n"Start"=dword:00000002'):
             self.assertIn(token,text)
