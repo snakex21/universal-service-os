@@ -14,7 +14,7 @@ change once during review; the separate binaries are both needed.
 
 | Candidate | Repository binary | SHA-256 | Runtime proof |
 |---|---|---|---|
-| NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in |
+| NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in; separate policy apply03/cold01 PASS [S13]; installed overlays, no new fresh PASS |
 | NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | Fresh normal USOS nt351-irq-fresh01: desktop/DHCP/ping3/3<10ms/DNS/HTTP200 PASS, separate fresh Client/noSharing FAIL; R26 passive IRQ trace; R27 keyboard/mouse out/in; separate policy apply02/cold01 PASS [S12] |
 
 Both USB regressions explicitly disable the PS/2 driver with inherited
@@ -56,9 +56,17 @@ lists and clean stopped readback confirm Server/Browser STOPPED/Disabled,
 Workstation/TCPIP RUNNING, with cold ping3/3<10ms and native safe shutdown.
 The fresh parent's original policy FAIL remains; this is diagnostic
 overlay apply/cold PASS, not fresh AUTO policy. No new USB/DHCP/DNS/HTTP
-qualification is inferred. NT35 policy cold qualification is still pending
-in this handoff. The private fresh cache result does not claim integration
-into default release assets.
+qualification is inferred. The private fresh cache result does not claim
+integration into default release assets.
+
+NT35 now separately qualifies the helper-only policy apply03 and unchanged
+cold01, commite8bef69b in `C:\Users\ASRock\usos-work\nt35-client`
+[S13, `docs/nt35-client-policy-evidence.md`]. SCM/native services and stopped
+readback confirm Browser/Server STOPPED/Disabled, Workstation/Tcpip RUNNING,
+and3/3 ping replies below10ms after cold boot. New cold `/check` log has no
+NativeNetExit; d94/USB2d455/helper4a927 and i8042prt Start4 remain pinned.
+Native safe shutdown and rc0 complete both overlays. This adds no fresh
+d94/AUTO policy PASS; R20 history and installed-overlay scope remain.
 
 QEMU's working NIC IRQ does not qualify the physical I211 IRQ/polling
 behavior on X470. NT4 and other OS binaries were not rebuilt by this fix.
