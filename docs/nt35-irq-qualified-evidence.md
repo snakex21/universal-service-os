@@ -26,8 +26,11 @@ Native safeShutdown/operator13 and exit0 precede stopped readback of
 d94, frozen USB and i8042prt Start4. The fixed01 backing stays unchanged.
 Assessment: `nt35-irq/artifacts/nt35-irq-usb/assessment.json`.
 
-41 host checks pass. This is installed-driver qualification, with no
-fresh Setup/new-cache, MSC, Server or X470 claim from either run.
+41 host checks pass. These two runs remain installed-driver and separate
+HID qualification, without fresh Setup/new-cache, MSC, Server or X470
+claims from either run. The newer independent fresh normal USOS d94
+qualification is [S15], `docs/nt35-fresh-irq-evidence.md`; its fresh
+Client/noSharing FAIL stays separate from installed policy coldPASS [S13].
 The source, preparation, exact manifest and assessment are in
 `nt35-irq/docs/nt35-irq-canonical-registers.md` and
 `nt35-irq/artifacts/nt35-irq/qualification-manifest.json`.

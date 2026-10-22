@@ -14,7 +14,7 @@ change once during review; the separate binaries are both needed.
 
 | Candidate | Repository binary | SHA-256 | Runtime proof |
 |---|---|---|---|
-| NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in; separate policy apply03/cold01 PASS [S13]; installed overlays, no new fresh PASS |
+| NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in; fresh normal USOS d94 desktop/DHCP/ping3/3<10ms/strict FIXED DNS/native resolver/HTTP200 PASS [S15], fresh policyFAIL; separate usb01 and policy apply03/cold01 PASS [S13] |
 | NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | Fresh normal USOS nt351-irq-fresh01: desktop/DHCP/ping3/3<10ms/DNS/HTTP200 PASS, separate fresh Client/noSharing FAIL; R26 passive IRQ trace; R27 keyboard/mouse out/in; separate policy apply02/cold01 PASS [S12] |
 
 Both USB regressions explicitly disable the PS/2 driver with inherited
@@ -31,9 +31,19 @@ source hashes from normalized CRLF/LF equivalence; use each actual build
 manifest rather than silently assigning one source hash to both builds.
 
 The original fresh R20/R22 installations used earlier drivers and retain
-their measured approximately2s delay. Corrected NT35 d94 still has only
-installed-overlay qualification; it needs a reviewed cache and a fresh
-normal USOS run before a fresh-install PASS claim.
+their measured approximately2s delay. Corrected NT35 d94 now has completed
+fresh normal USOS qualification nt35-irq-fresh01, commit4cd6a3bf in
+`C:\Users\ASRock\usos-work\nt35-fresh` [S15]. Its private R20 cache
+changes only SYS+SHA, with835 other effective entries and every other
+cache file identical. A new blank4GiB target reaches Program Manager and
+passes native DHCP release/renew, ping3/3<10ms, strict fixed DNS1.1/8.8,
+native resolver and HTTP68k200. Configured10.0.2.3 is confirmed by native
+ipconfig, without a strict matched configuredDNS test in frozen ff258504.
+Two stopped actual SYS reads, native safe shutdown and process/QEMU0
+complete the qualification. PS/2 is allowed; usb01 remains a separate HID
+proof. Fresh Server/Browser RUNNING/Start2 is a separate policyFAIL,
+preserved alongside the installed policy coldPASS [S13], without fresh
+AUTO policy qualification.
 
 Corrected NT351 f579 now has completed fresh normal USOS qualification,
 commit664d721e in `C:\Users\ASRock\usos-work\nt351-fresh` [S11 in the
@@ -65,8 +75,9 @@ cold01, commite8bef69b in `C:\Users\ASRock\usos-work\nt35-client`
 readback confirm Browser/Server STOPPED/Disabled, Workstation/Tcpip RUNNING,
 and3/3 ping replies below10ms after cold boot. New cold `/check` log has no
 NativeNetExit; d94/USB2d455/helper4a927 and i8042prt Start4 remain pinned.
-Native safe shutdown and rc0 complete both overlays. This adds no fresh
-d94/AUTO policy PASS; R20 history and installed-overlay scope remain.
+Native safe shutdown and rc0 complete both policy overlays. This adds no
+fresh AUTO policy PASS; independent d94 fresh LAN [S15] preserves its
+policyFAIL. R20 history and the scope of each installed overlay remain.
 
 QEMU's working NIC IRQ does not qualify the physical I211 IRQ/polling
 behavior on X470. NT4 and other OS binaries were not rebuilt by this fix.

@@ -110,7 +110,18 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('QEMU PASS R20',net)
         self.assertIn('pierwszy ping2/3',net)
         self.assertIn('około2s',net)
+        self.assertIn('QEMU PASS nt35-irq-fresh01',net)
+        self.assertIn('SYS d94',net)
+        self.assertIn('strict FIXED DNS',net)
+        self.assertIn('native resolver',net)
+        self.assertIn('bez strict configuredDNS testu',net)
+        self.assertIn('Fresh Client/noSharing FAIL',net)
+        self.assertIn('[S15]',net)
+        self.assertIn('[S13]',net)
+        self.assertIn('bez fresh AUTO policy PASS',net)
         self.assertIn('QEMU PASS R20b',audit.hid_test(usb,exact))
+        self.assertIn('nt35-irq-usb01',audit.hid_test(usb,exact))
+        self.assertNotIn('fresh01',audit.hid_test(usb,exact))
 
     def test_nt35_pass_never_spreads_to_server_or_nt351(self):
         for index,value in ((0,'Windows NT 3.5\\Server.iso'),(1,'3.50.807 SP3'),(2,'pl-PL / x86'),
