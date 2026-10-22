@@ -38,6 +38,17 @@
  *    (DeviceHotplug), which is unchanged; this is the policy USB hard disks
  *    already get.
  *
+ * GPT sticks on Windows 2000 / XP x86 (no GPT data disks): disk.sys there
+ * hands out the protective MBR's 0xEE entry, and on a removable disk that
+ * single partition gets a drive letter and mounts RAW ("0 bytes", Explorer
+ * offers to format it; a format would overwrite the GPT and the stick's
+ * partitions, the USOS stick's DATA among them). A stick whose MBR holds
+ * nothing but the 0xEE entry is therefore started as a fixed disk too: on a
+ * fixed disk the volume manager keeps a partition of an unknown type hidden
+ * (no drive letter, as for any GPT disk on these systems), and the filter
+ * fails every write command to it with "write protected", so no tool of
+ * the old system can damage the GPT data the system cannot read.
+ *
  * Limits: a card reader that held a multi-partition card at plug-in time
  * becomes a fixed disk until it is unplugged (a card swap is not seen).
  * GPT media count only on NT 5.2 and later (2000 / XP x86 cannot use GPT
@@ -60,7 +71,8 @@
 #define MP_MAX_SECTOR   4096
 #define MP_GPT_ENTRIES  128
 
-typedef enum { MpUnknown = 0, MpFlip, MpKeep } MP_DECISION;
+/* MpHide: GPT stick on a system without GPT data disks (fixed + no writes). */
+typedef enum { MpUnknown = 0, MpFlip, MpKeep, MpHide } MP_DECISION;
 
 typedef struct _MP_EXT {
     PDEVICE_OBJECT  Self;
@@ -79,6 +91,7 @@ static DRIVER_ADD_DEVICE MpAddDevice;
 static DRIVER_UNLOAD MpUnload;
 static DRIVER_DISPATCH MpPass;
 static DRIVER_DISPATCH MpDeviceControl;
+static DRIVER_DISPATCH MpScsiRequest;
 static DRIVER_DISPATCH MpPnp;
 static DRIVER_DISPATCH MpPower;
 
@@ -230,14 +243,17 @@ static BOOLEAN MpRead(PMP_EXT Ext, ULONG Lba, USHORT Blocks, ULONG BlockSize, PU
 
 /* Partitions on the media: 0 = no media / unreadable / no partition
  * table, else the count (an MBR extended entry counts as two: it holds at
- * least one logical drive next to the primary that brought it). */
-static ULONG MpCountPartitions(PMP_EXT Ext)
+ * least one logical drive next to the primary that brought it).
+ * *GptHidden: TRUE when the MBR holds only a protective 0xEE entry and this
+ * system cannot use GPT data disks (NT 5.0 / 5.1). */
+static ULONG MpCountPartitions(PMP_EXT Ext, BOOLEAN *GptHidden)
 {
     UCHAR cdb[10];
     PUCHAR buf;
     ULONG blockSize = 0, lastLba = 0, count = 0, i, attempt;
     BOOLEAN gpt = FALSE;
 
+    *GptHidden = FALSE;
     buf = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, MP_MAX_SECTOR * 4, MP_TAG);
     if (!buf)
         return 0;
@@ -271,9 +287,13 @@ static ULONG MpCountPartitions(PMP_EXT Ext)
     }
     if (gpt) {
         ULONG entriesLba, entries, entrySize, perBlock, blocks, b, j;
-        count = 0;
-        if (!MpGptOk)
+        if (!MpGptOk) {
+            /* Pure protective MBR only; a hybrid MBR keeps today's path. */
+            *GptHidden = (BOOLEAN)(count == 0);
+            count = 0;
             goto out;
+        }
+        count = 0;
         if (!MpRead(Ext, 1, 1, blockSize, buf) || RtlCompareMemory(buf, "EFI PART", 8) != 8)
             goto out;
         entriesLba = MpLe32(buf + 72);   /* high dword must be 0 */
@@ -331,11 +351,12 @@ static NTSTATUS MpDeviceControl(PDEVICE_OBJECT Dev, PIRP Irp)
     if (NT_SUCCESS(st) && d &&
         Irp->IoStatus.Information >= FIELD_OFFSET(STORAGE_DEVICE_DESCRIPTOR, RawPropertiesLength) &&
         d->BusType == BusTypeUsb && d->RemovableMedia) {
-        if (ext->Decision != MpFlip) {
-            ext->Partitions = MpCountPartitions(ext);
-            ext->Decision = ext->Partitions > 1 ? MpFlip : MpKeep;
+        if (ext->Decision != MpFlip && ext->Decision != MpHide) {
+            BOOLEAN gptHidden;
+            ext->Partitions = MpCountPartitions(ext, &gptHidden);
+            ext->Decision = ext->Partitions > 1 ? MpFlip : gptHidden ? MpHide : MpKeep;
         }
-        if (ext->Decision == MpFlip) {
+        if (ext->Decision == MpFlip || ext->Decision == MpHide) {
             PDEVICE_OBJECT o;
             d->RemovableMedia = FALSE;
             /* Windows 7 and later: the port driver's PDO carries
@@ -350,6 +371,59 @@ static NTSTATUS MpDeviceControl(PDEVICE_OBJECT Dev, PIRP Irp)
         }
     }
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    IoReleaseRemoveLock(&ext->RemoveLock, Irp);
+    return st;
+}
+
+/* SCSI write commands: WRITE 6/10/12/16, WRITE AND VERIFY 10/12/16,
+ * WRITE SAME 10/16. */
+static BOOLEAN MpIsWrite(UCHAR Op)
+{
+    return (BOOLEAN)(Op == 0x0A || Op == 0x2A || Op == 0xAA || Op == 0x8A ||
+                     Op == 0x2E || Op == 0xAE || Op == 0x8E || Op == 0x41 || Op == 0x93);
+}
+
+/* IRP_MJ_SCSI from disk.sys. On a hidden GPT stick (MpHide) every write
+ * command fails as CHECK CONDITION, DATA PROTECT / WRITE PROTECTED (sense
+ * 07/27/00), which the class driver reports as STATUS_MEDIA_WRITE_PROTECTED
+ * without retries; everything else passes down unchanged. */
+static NTSTATUS MpScsiRequest(PDEVICE_OBJECT Dev, PIRP Irp)
+{
+    PMP_EXT ext = (PMP_EXT)Dev->DeviceExtension;
+    PIO_STACK_LOCATION sp = IoGetCurrentIrpStackLocation(Irp);
+    PSCSI_REQUEST_BLOCK srb = (PSCSI_REQUEST_BLOCK)sp->Parameters.Scsi.Srb;
+    NTSTATUS st = IoAcquireRemoveLock(&ext->RemoveLock, Irp);
+    if (!NT_SUCCESS(st)) {
+        Irp->IoStatus.Status = st;
+        Irp->IoStatus.Information = 0;
+        IoCompleteRequest(Irp, IO_NO_INCREMENT);
+        return st;
+    }
+    if (ext->Decision == MpHide && srb && srb->Function == SRB_FUNCTION_EXECUTE_SCSI &&
+        srb->CdbLength && MpIsWrite(srb->Cdb[0])) {
+        srb->SrbStatus = SRB_STATUS_ERROR;
+        srb->ScsiStatus = SCSISTAT_CHECK_CONDITION;
+        srb->DataTransferLength = 0;
+        if (srb->SenseInfoBuffer && srb->SenseInfoBufferLength >= 14 &&
+            !(srb->SrbFlags & SRB_FLAGS_DISABLE_AUTOSENSE)) {
+            PUCHAR sense = (PUCHAR)srb->SenseInfoBuffer;
+            UCHAR len = srb->SenseInfoBufferLength > 18 ? 18 : srb->SenseInfoBufferLength;
+            RtlZeroMemory(sense, len);
+            sense[0] = 0x70;            /* current error, fixed format */
+            sense[2] = 0x07;            /* DATA PROTECT */
+            sense[7] = (UCHAR)(len - 8); /* additional sense length */
+            sense[12] = 0x27;           /* WRITE PROTECTED */
+            srb->SenseInfoBufferLength = len;
+            srb->SrbStatus |= SRB_STATUS_AUTOSENSE_VALID;
+        }
+        Irp->IoStatus.Status = STATUS_MEDIA_WRITE_PROTECTED;
+        Irp->IoStatus.Information = 0;
+        IoCompleteRequest(Irp, IO_NO_INCREMENT);
+        IoReleaseRemoveLock(&ext->RemoveLock, Irp);
+        return STATUS_MEDIA_WRITE_PROTECTED;
+    }
+    IoSkipCurrentIrpStackLocation(Irp);
+    st = IoCallDriver(ext->Lower, Irp);
     IoReleaseRemoveLock(&ext->RemoveLock, Irp);
     return st;
 }
@@ -510,6 +584,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT Drv, PUNICODE_STRING RegistryPath)
     for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++)
         Drv->MajorFunction[i] = MpPass;
     Drv->MajorFunction[IRP_MJ_DEVICE_CONTROL] = MpDeviceControl;
+    Drv->MajorFunction[IRP_MJ_SCSI] = MpScsiRequest;
     Drv->MajorFunction[IRP_MJ_PNP] = MpPnp;
     Drv->MajorFunction[IRP_MJ_POWER] = MpPower;
     Drv->DriverExtension->AddDevice = MpAddDevice;

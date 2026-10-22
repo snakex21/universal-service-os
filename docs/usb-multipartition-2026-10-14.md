@@ -113,7 +113,7 @@ at hand), so the Tablet ISO + bundle was used (same XP flow).
 | "Safely Remove Hardware" | PASS: lists "USB Mass Storage Device", Stop lists the 3 volumes + disk, device stops and leaves the list, letters gone |
 | copy shell32.dll (8.4 MB) + notepad.exe to two volumes, yank 3 s later | PASS: no "Delayed Write Failed", both files complete on the host |
 | single-partition stick | unchanged (removable, type removable) |
-| GPT stick | unchanged on XP x86 (as designed: removable, one raw volume) |
+| GPT stick | unchanged on XP x86 (then: removable, one raw volume; since 2026-10-22 hidden, see below) |
 
 One "Windows - Delayed Write Failed" balloon (`\...\DP(1)0-0+15`) appeared
 earlier in the XP series after a run of quick device_del/device_add swaps
@@ -121,6 +121,49 @@ earlier in the XP series after a run of quick device_del/device_add swaps
 to the flipped stick before that were complete on the host, and the
 dedicated copy-and-yank test above did not show it. Not attributed; worth a
 look on hardware.
+
+### GPT stick on 2000 / XP x86: hidden and write-blocked (2026-10-22)
+
+X470, XP SP3 (USOS install): with the Kingston USOS stick plugged in,
+Explorer showed a removable disk with "0 bytes" and offered to format it.
+Cause: not a partition the filter exposed. 2000 / XP x86 cannot use GPT data
+disks: XP's disk.sys (`DiskDisableGpt` on x86) falls back to the MBR view, so
+the protective MBR's single 0xEE entry is the disk's one partition, and on a
+removable disk that partition gets a letter and mounts RAW. usosmpart left
+GPT sticks alone there (the row above). A format would write over LBA 1 on:
+the GPT and the ESP, then DATA.
+
+The Kingston stick (read-only check from the dev PC, raw LBA 0-7): MBR =
+one 0xEE entry (start 1, length 0xFFFFFFFF), the other three empty; GPT
+ESP (C12A7328, FAT32 USOS_ESP), DATA (EBD0A0A2, NTFS USOS_DATA), WORK
+(EBD0A0A2, NTFS USOS_WORK), all GPT attributes 0. The installer creates DATA
+and WORK with "no drive letter" (bit 63) and clears it when the medium is
+exposed (`installer/internal/winhost/gpt_buffer_windows.go`,
+`gpt_postformat_verify_windows.go`), so an attribute rule cannot tell an
+installed USOS stick's partitions apart. NT 5.2+ (2003, XP x64) and NT 6
+read GPT and every partition of the stick is NTFS or FAT32, so they need no
+change.
+
+Fix (`MpHide`): on NT 5.0 / 5.1, a stick whose MBR holds nothing but the
+0xEE entry is started as a fixed disk (like a multi-partition stick). On a
+fixed disk the volume manager keeps a partition of an unrecognised type
+hidden (no letter: the same view XP gives any GPT USB hard disk, "GPT
+Protective Partition" in Disk Management). And the filter fails every SCSI
+write command to that disk (WRITE 6/10/12/16, WRITE AND VERIFY, WRITE SAME)
+with CHECK CONDITION, sense 07/27/00 (write protected), so Disk Management
+or a format tool cannot change the protective MBR or the GPT. A hybrid MBR
+(0xEE next to other entries) keeps the old path. MBR sticks are unchanged.
+
+Other USOS USB paths: NT 3.x / NT 4 / Vista x86 `usosusb` builds one volume
+per GPT partition and skips the 0xEE entry, MSR, ESP and entries with
+attribute bit 63 / 62, so the stick's DATA and WORK appear (NTFS) and
+nothing RAW. Windows 9x `USOSUSB.MPD` is a SCSI miniport; the 9x disk
+layer reads the MBR itself, and what it shows for a GPT stick (an
+unrecognised 0xEE entry on a removable SCSI disk) was not checked (the
+miniport has not run in a 9x VM or on the X470 yet).
+
+Status: built (WDK 7.1, x86 / amd64 / nt6x64, no warnings) and host tests
+only; not run in an XP VM or on the X470, nothing deployed.
 
 ### X470: Windows 7 SP1 x86 (2026-10-14, B261014-195920)
 

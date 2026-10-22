@@ -31,6 +31,13 @@ mass-storage port driver:
    disk starts like a USB hard disk and every partition gets a device and a
    drive letter. One partition, a superfloppy, no media or an unreadable
    table: the answer is passed on unchanged (today's behaviour).
+4. Windows 2000 / XP x86 and a GPT stick (MBR = only the protective 0xEE
+   entry, the USOS stick): these systems cannot use GPT data disks and
+   would show the 0xEE entry as a removable RAW drive that Explorer offers
+   to format (a format destroys the GPT and the partitions). The disk is
+   started as a fixed disk instead, where the 0xEE partition stays hidden
+   (no letter), and every SCSI write command to it fails with "write
+   protected" (sense 07/27/00).
 
 ## What does not change
 
@@ -57,7 +64,8 @@ mass-storage port driver:
   plugged in becomes a fixed disk: a card swap is not seen until the reader is
   unplugged (the filter decides once per device start).
 - GPT media count only on NT 5.2 and later; Windows 2000 / XP x86 cannot
-  use GPT data disks, so a GPT stick (the USOS stick) stays as it is there.
+  use GPT data disks, so a GPT stick (the USOS stick) is hidden and
+  write-blocked there (point 4), not opened.
 - Windows Vista / 7 / 8.x **x64** enforce kernel-mode code signing for a
   boot-start filter: the x64 build loads only on XP x64 / Server 2003 x64 and
   on x64 NT 6 systems running with test signing (USOS Vista x64). Windows 7 /
