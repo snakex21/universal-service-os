@@ -60,6 +60,14 @@ func installComponentAt(espRoot, dataRoot string, id components.ID, zipPath stri
 		}
 		log(fmt.Sprintf("[COMPONENTS] legacy pack: %d Microsoft redistributables in %s", n, components.LegacyMSDataDir))
 		return nil
+	case id == components.Win7NetIntel:
+		n, err := components.ExtractWin7NetDrivers(zipPath, dataRoot)
+		if err != nil {
+			return fmt.Errorf("unpack the Intel Net drivers to DATA: %w", err)
+		}
+		log(fmt.Sprintf("[COMPONENTS] Net drivers (Intel I211): %d files for %s in %s", n,
+			strings.Join(components.Win7NetIntelArches(dataRoot), "/"), components.Win7NetIntelDataDir("<arch>")))
+		return nil
 	}
 	return fmt.Errorf("unknown component %q", id)
 }

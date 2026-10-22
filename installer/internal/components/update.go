@@ -32,8 +32,10 @@ func ParseComponentSelection(text, uiLanguage string) ([]ID, error) {
 			id = WinPE
 		case "winpe-x86":
 			id = WinPEX86
+		case "win7-net-intel", "net-intel":
+			id = Win7NetIntel
 		default:
-			return nil, fmt.Errorf("unknown component %q (known: xp, xp-pl, xp-en, winpe, winpe-x86)", token)
+			return nil, fmt.Errorf("unknown component %q (known: xp, xp-pl, xp-en, winpe, winpe-x86, win7-net-intel)", token)
 		}
 		if !seen[id] {
 			seen[id] = true

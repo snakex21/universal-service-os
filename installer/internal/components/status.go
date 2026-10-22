@@ -44,6 +44,12 @@ type Status struct {
 	// LegacyMS: the legacy pack's Microsoft redistributables are on DATA
 	// (Addons\USOS\MS\legacy-ms.json readable).
 	LegacyMS bool
+	// Win7NetIntel: Intel's I211 Net driver for Windows 7 / Server 2008 R2 is
+	// under DATA\Systems\Windows\Windows 7\Drivers\<arch>\Net\Intel-I211
+	// (at least one .inf). Optional and per-architecture, so it is not part of
+	// Complete: a Windows 10 stick must not be told it is missing a Win7
+	// driver - the Components step offers it separately.
+	Win7NetIntel bool
 }
 
 // Present reports whether id is installed and current.
@@ -57,6 +63,8 @@ func (s Status) Present(id ID) bool {
 		return s.XPCurrent && s.XPLang == id.XPLang()
 	case LegacyMS:
 		return s.LegacyMS
+	case Win7NetIntel:
+		return s.Win7NetIntel
 	}
 	return false
 }
@@ -102,6 +110,7 @@ func Inspect(espRoot, dataRoot string) Status {
 	if _, err := ReadLegacyMSIndex(filepath.Join(dataRoot, LegacyMSDataDir, "legacy-ms.json")); err == nil {
 		s.LegacyMS = true
 	}
+	s.Win7NetIntel = Win7NetIntelPresent(dataRoot)
 	manifest, err := ReadXPManifest(filepath.Join(espRoot, xpESPDir, "manifest.json"))
 	if err == nil {
 		s.XPLang = strings.ToLower(manifest.ReleaseLang)

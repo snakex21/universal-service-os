@@ -115,6 +115,55 @@ i dalej do zainstalowanego systemu:
    `.inf` leży w jednym z drzew z sekcji 2 (USOS nie czyta innych miejsc),
    i czy paczka jest 32/64-bit zgodna z instalowanym systemem.
 
+## Dystrybucja w USOS
+
+Decyzja właściciela projektu (2026-10-22): sterownik Intel I211 dla
+Windows 7 / Server 2008 R2 (`e1r62x86` / `e1r62x64`) **dołączamy mimo
+licencji**, ale **jako osobną paczkę w wydaniu** — GitHub Release i kopia na
+archive.org, tak jak pakiet zgodności z plikami Microsoftu. **Nigdy w
+repozytorium git**; paczka jest zawsze opisana jako **pliki Intela na licencji
+Intela**, a użytkownik akceptuje licencję Intela przy pobieraniu (tak jak przy
+pobieraniu od Intela).
+
+### Układ paczki `USOS-<wersja>-NetDrivers-Intel.zip`
+
+W środku jest dokładnie drzewo DATA, więc rozpakowanie paczki na partycję DATA
+instaluje sterownik bez żadnej konwersji:
+
+```
+SOURCES.txt
+Systems\Windows\Windows 7\Drivers\x86\Net\Intel-I211\   (e1r62x86.inf, .cat, .sys, ...)
+Systems\Windows\Windows 7\Drivers\x64\Net\Intel-I211\   (e1r62x64.inf, .cat, .sys, ...)
+```
+
+`SOURCES.txt` (kopiowany obok INF każdej architektury) zawiera: wersję pakietu
+Intela, URL strony pobrania (ID 15084), SHA-256 plików oraz zdanie „pliki
+Intela na licencji Intela”.
+
+### Instalacja paczki
+
+* **Instalator / aktualizacja:** komponent `win7-net-intel`
+  (`installer/internal/components`, wpisy w `status.go`, `release.go`,
+  `win7net.go`) — pobiera `USOS-<wersja>-NetDrivers-Intel.zip` z wydania
+  i weryfikuje SHA-256 (lista wkompilowana + `SHA256SUMS`), albo przyjmuje plik
+  lokalny („Mam już plik”, ten sam `components.Runner`),
+* **usos-physical-update:** `-components win7-net-intel` (raport bez tej flagi
+  nic nie zapisuje; `COMPONENT win7-net-intel=current|missing`),
+* **ręcznie:** rozpakuj zip na DATA — układ katalogów jest już właściwy.
+
+Rozpakowanie waliduje obecność `.inf` w `Net\Intel-I211` (inny zip jest
+odrzucany przed pierwszym zapisem), każdy plik jest zapisywany przez `.part`
+i sprawdzany SHA-256, a plik identyczny z już obecnym nie jest nadpisywany
+(ponowna instalacja nic nie duplikuje).
+
+### Uwaga o architekturach
+
+Windows 7 x86 dostaje **nasz** sterownik `usosnet` (nasz kod, `usosnet.sys`),
+więc paczka Intel dotyczy głównie **Windows 7 x64 i Server 2008 R2 x64**
+(wersja x86 jest w paczce dla 2008 R2 x86 i na wypadek, gdy `usosnet` nie jest
+chciany) — dlatego komponent jest opcjonalny i nie wpływa na stan „kompletny”
+penden Drive’a.
+
 ## Licencja sterownika Intela
 
 Źródło: strona pobierania „Intel® Ethernet Adapter Complete Driver Pack”, ID

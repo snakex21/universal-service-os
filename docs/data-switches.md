@@ -31,7 +31,10 @@ instalacji. Sterownik sieci (np. Intel I211) nie jest przełącznikiem: kładzie
 się rozpakowany folder z `.inf` w drzewie sterowników i USOS wstrzykuje go
 sam, rekursywnie - 32-bit przez DISM w WinPE (`Systems\Windows\Windows 7\Drivers\x86`
 lub `Drivers\Windows 7`), 64-bit przez `DriverPaths`/`pnputil`. Gdzie dokładnie
-i jak sprawdzić instalację: [network-win7.md](network-win7.md).
+i jak sprawdzić instalację: [network-win7.md](network-win7.md). Paczka Intela
+jest osobnym assetem wydania (`USOS-<wersja>-NetDrivers-Intel.zip`, komponent
+`win7-net-intel` w `usos-physical-update -components`), nigdy plikiem w repo;
+szczegóły i układ paczki: [network-win7.md](network-win7.md).
 
 ## Tabela
 

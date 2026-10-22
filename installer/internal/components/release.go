@@ -40,10 +40,16 @@ const (
 	// LegacyMS: Microsoft redistributables of the legacy compatibility pack
 	// (maintainer decision 2026-09-30), unpacked to DATA\Addons\USOS\MS.
 	LegacyMS ID = "legacy-ms"
+	// Win7NetIntel: Intel's e1r62x86/e1r62x64 Net driver for the Intel I211
+	// under Windows 7 / Server 2008 R2, unpacked to
+	// DATA\Systems\Windows\Windows 7\Drivers\<arch>\Net\Intel-I211
+	// (maintainer decision 2026-10-22: its own release asset, never in the
+	// repository; the user accepts Intel's licence when downloading).
+	Win7NetIntel ID = "win7-net-intel"
 )
 
 // All lists the components in display order.
-var All = []ID{WinPE, WinPEX86, XPPL, XPEN, LegacyMS}
+var All = []ID{WinPE, WinPEX86, XPPL, XPEN, LegacyMS, Win7NetIntel}
 
 // IsWinPE reports whether id is one of the PE10 donors.
 func (id ID) IsWinPE() bool { return id == WinPE || id == WinPEX86 }
@@ -76,6 +82,8 @@ func AssetName(id ID, version string) string {
 		return "USOS-" + version + "-XP-package-EN.zip"
 	case LegacyMS:
 		return "USOS-" + version + "-Legacy-pack-MS.zip"
+	case Win7NetIntel:
+		return "USOS-" + version + "-NetDrivers-Intel.zip"
 	}
 	return ""
 }
