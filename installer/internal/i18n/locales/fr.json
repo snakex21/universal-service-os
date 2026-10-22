@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Vérification du noyau XP, de l'initramfs et de l'identité de la clé USB",
   "boot.xp_prep.loading": "Chargement du noyau micro-Linux depuis la clé USB",
   "boot.xp_prep.starting": "Le noyau charge l'environnement XP ; la sélection du disque suit",
+  "boot.xp_prep.package_missing": "Paquet Windows XP (EFI\\USOS-XP) est absent de cette clé USB. Sans lui, Windows XP ne peut pas être installé depuis le menu UEFI. Vous pourrez l'ajouter plus tard avec Mettre à jour USOS ou Réparer.",
   "winpe.setup_title": "USOS - Installation de Windows",
   "winpe.cancelled": "L'installation de Windows a été annulée.\n\nQue voulez-vous faire ?",
   "winpe.restart": "Redémarrer",

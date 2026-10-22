@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Kontrollerer XP-kernen, initramfs og USB-drevets identitet",
   "boot.xp_prep.loading": "Indlæser mikro-Linux-kernen fra USB-drevet",
   "boot.xp_prep.starting": "Kernen indlæser XP-miljøet; derefter følger diskvalget",
+  "boot.xp_prep.package_missing": "Windows XP-pakke (EFI\\USOS-XP) mangler på dette USB-drev. Uden den kan Windows XP ikke installeres fra UEFI-menuen. Du kan tilføje den senere med Opdater USOS eller Reparer.",
   "winpe.setup_title": "USOS - Windows Installation",
   "winpe.cancelled": "Windows-installationen blev annulleret.\n\nHvad vil du gøre?",
   "winpe.restart": "Genstart",

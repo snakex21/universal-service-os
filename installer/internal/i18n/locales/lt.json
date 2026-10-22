@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Tikrinamas XP branduolys, initramfs ir USB disko tapatybė",
   "boot.xp_prep.loading": "Iš USB disko įkeliamas mikro-Linux branduolys",
   "boot.xp_prep.starting": "Branduolys įkelia XP aplinką; po to bus disko pasirinkimas",
+  "boot.xp_prep.package_missing": "Windows XP paketo (EFI\\USOS-XP) šiame USB diske nėra. Be jo Windows XP negalima įdiegti iš UEFI meniu. Jį galėsite pridėti vėliau per Atnaujinti USOS arba Taisyti.",
   "winpe.setup_title": "USOS - Windows sąranka",
   "winpe.cancelled": "Windows diegimas atšauktas.\n\nKą norite daryti?",
   "winpe.restart": "Paleisti iš naujo",

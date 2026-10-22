@@ -944,6 +944,7 @@
   "boot.xp_prep.checking": "Проверка на ядрото на XP, initramfs и идентичността на USB устройството",
   "boot.xp_prep.loading": "Зареждане на ядрото на микро-Linux от USB устройството",
   "boot.xp_prep.starting": "Ядрото зарежда средата на XP; след това следва изборът на диск",
+  "boot.xp_prep.package_missing": "Пакет за Windows XP (EFI\\USOS-XP) не е на тази USB памет. Без него Windows XP не може да се инсталира от менюто UEFI. Можете да го добавите по-късно с „Обнови USOS“ или „Поправи“.",
   "winpe.setup_title": "USOS - Инсталиране на Windows",
   "winpe.cancelled": "Инсталирането на Windows беше отменено.\n\nКакво искате да направите?",
   "winpe.restart": "Рестартиране",

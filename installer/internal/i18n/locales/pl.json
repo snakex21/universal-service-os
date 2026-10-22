@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Sprawdzanie jądra XP, initramfs i tożsamości pendrive'a",
   "boot.xp_prep.loading": "Ładowanie jądra mikro-Linuksa z pendrive'a",
   "boot.xp_prep.starting": "Jądro ładuje środowisko XP; następnie pojawi się wybór dysku",
+  "boot.xp_prep.package_missing": "Pakietu Windows XP (EFI\\USOS-XP) nie ma na tym pendrivie. Bez niego Windows XP nie zainstaluje się z menu UEFI. Możesz go dodać później przez Aktualizację USOS albo Naprawę.",
   "winpe.setup_title": "USOS - Instalator systemu Windows",
   "winpe.cancelled": "Instalacja Windows została anulowana.\n\nCo chcesz zrobić?",
   "winpe.restart": "Uruchom ponownie",

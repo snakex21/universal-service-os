@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Se verifică nucleul XP, initramfs și identitatea unității USB",
   "boot.xp_prep.loading": "Se încarcă nucleul micro-Linux de pe unitatea USB",
   "boot.xp_prep.starting": "Nucleul încarcă mediul XP; urmează selectarea discului",
+  "boot.xp_prep.package_missing": "Pachet Windows XP (EFI\\USOS-XP) lipsește de pe această unitate USB. Fără el, Windows XP nu poate fi instalat din meniul UEFI. Îl puteți adăuga mai târziu cu Actualizare USOS sau Reparare.",
   "winpe.setup_title": "USOS - Instalare Windows",
   "winpe.cancelled": "Instalarea Windows a fost anulată.\n\nCe doriți să faceți?",
   "winpe.restart": "Repornire",

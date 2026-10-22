@@ -117,6 +117,18 @@ pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
     return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), parts.system.editionOption(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
 }
 
+/// The optional XP package (installer Components, install-xp-package.ps1:
+/// EFI\USOS-XP\initramfs-xp + vmlinuz.efi) is on the ESP. Every NT5 system
+/// (2000, XP, 2003, XP x64 and their editions) boots from it.
+pub fn packagePresent(root: *uefi.protocol.File) bool {
+    const files = [_][*:0]const u16{ wide("\\EFI\\USOS-XP\\initramfs-xp"), wide("\\EFI\\USOS-XP\\vmlinuz.efi") };
+    for (files) |path| {
+        const file = root.open(path, .read, .{}) catch return false;
+        file.close() catch {};
+    }
+    return true;
+}
+
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
@@ -127,9 +139,10 @@ pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8,
     const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);
     const settings_option = answer_screen.xpSettingsOption(answer);
     if (name.len == 0 or name.len > 512 or std.mem.indexOfAny(u8, name, "\\/\r\n") != null) return error.InvalidXpImageName;
-    // Require the isolated payload before creating any diagnostics.
-    const initrd = try root.open(wide("\\EFI\\USOS-XP\\initramfs-xp"), .read, .{});
-    try initrd.close();
+    // Require the isolated payload before creating any diagnostics. Without
+    // the optional XP package (installer Components) this used to surface
+    // as a bare "NotFound"; the menu now names the package.
+    if (!packagePresent(root)) return error.XpPackageMissing;
     try mark(root, "uefi-entry", name);
     const config = try root.open(wide("\\EFI\\USOS\\usos-device.ini"), .read, .{});
     defer config.close() catch {};

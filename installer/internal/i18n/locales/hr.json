@@ -947,6 +947,7 @@
   "boot.xp_prep.checking": "Provjera XP jezgre, initramfsa i identiteta USB pogona",
   "boot.xp_prep.loading": "Učitavanje mikro-Linux jezgre s USB pogona",
   "boot.xp_prep.starting": "Jezgra učitava XP okruženje; zatim slijedi odabir diska",
+  "boot.xp_prep.package_missing": "Paketa za Windows XP (EFI\\USOS-XP) nema na ovom USB pogonu. Bez njega se Windows XP ne može instalirati iz UEFI izbornika. Možete ga dodati kasnije putem Ažuriraj USOS ili Popravi.",
   "winpe.setup_title": "USOS - Instalacija sustava Windows",
   "winpe.cancelled": "Instalacija sustava Windows je otkazana.\n\nŠto želite učiniti?",
   "winpe.restart": "Ponovno pokreni",
