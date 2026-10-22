@@ -52,6 +52,26 @@ VISIBLE_SECTORS=${POSR_VISIBLE_SECTORS:-67108864}
 log() { printf '[POSREADY] %s\n' "$*"; }
 fail() { printf '[POSREADY] STOP: %s\n' "$1" >&2; exit 1; }
 
+# Display (docs/display-policy.md): POSReady 2009 is the NT 5.1 core, so it
+# gets the same USOSRES contract as XP / Server 2003 (usos_nt52_display_stage
+# in prepare_xp_ntfs_target.sh): USOSRES.EXE + DISPLAY.TXT in \USOS\POSR,
+# native EDID mode first, else the highest, only modes from the driver's
+# list, full screen. POSReady's own answer carries no display request
+# (POSR.SIF: [UserData] only; the XML has no display section), so the
+# request is auto. DIR = \USOS\POSR on the PE partition;
+# posready_after_setup copies it to C:\USOS\POSR, where LOGON.CMD registers
+# the helper (USOSDisplay, HKLM Run) at the first logon.
+usos_posr_display_stage() {
+    if [ ! -f "$LIB/USOSRES.EXE" ] || [ ! -f "$LIB/display_profile.sh" ]; then
+        log 'DISPLAY USOSRES.EXE missing in this build; display unchanged'
+        return 0
+    fi
+    . "$LIB/display_profile.sh"
+    usos_display_stage "$1" "$LIB/USOSRES.EXE" autoxauto || fail 'cannot stage the display helper'
+    cmp -s "$LIB/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
+    log "DISPLAY request=autoxauto native=$(usos_display_native || echo unknown) apply=first-logon"
+}
+
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr cp; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
@@ -181,11 +201,15 @@ cp "$PAYLOAD/FIRST.CMD" "$PAYLOAD/LOGON.CMD" "$PAYLOAD/LOGON.EXE" "$PAYLOAD/X470
 od -An -tx4 -j39 -N4 "$pe_loop" | tr -d ' \n' > "$work/pe/USOS/POSR/SOURCE.ID"
 [ "$(wc -c < "$work/pe/USOS/POSR/SOURCE.ID" | tr -d ' ')" = 8 ] || fail 'cannot read the Setup volume identity'
 cp "$PAYLOAD"/DRV/* "$work/pe/USOS/POSR/DRV/" || fail 'cannot copy the X470 drivers'
+# The display helper of the NT 5.1 path, next to FIRST.CMD / LOGON.CMD: with
+# no USOSRES in this build the preparation continues (display unchanged).
+usos_posr_display_stage "$work/pe/USOS/POSR"
 
 sync
 umount "$work/pe" || fail 'cannot unmount the PE partition'
 mdir -a -i "$pe_loop" ::/LDLINUX.SYS >/dev/null 2>&1 || fail 'read-back: LDLINUX.SYS missing'
 mdir -i "$pe_loop" ::/Setup/unattended.xml >/dev/null 2>&1 || fail 'read-back: unattended.xml missing'
+mdir -i "$pe_loop" ::/USOS/POSR/DISPLAY.TXT >/dev/null 2>&1 || fail 'read-back: USOS/POSR/DISPLAY.TXT missing'
 losetup -d "$pe_loop"; pe_loop=''
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true

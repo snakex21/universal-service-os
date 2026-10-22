@@ -73,6 +73,7 @@ reason=native|below-native|highest|exact|smaller|depth16|safe1024`.
 | NT 4.0 WS/Server/EE/TSE | usosvbe + framebuf, USOSRES at first logon | default auto = highest up to 1920x1080 | default auto = **native (prep EDID) / highest** | yes |
 | Windows 2000 Pro/Server | usosvbe + framebuf (vesa.cmd), USOSRES | default auto = highest up to 1920x1080 | default auto = **native (prep EDID, else registry EDID) / highest** | yes |
 | XP x86 (incl. CSMWrap/PAE, MCE, Tablet) / XP x64 / 2003 x86+x64 | no USOS display driver; Windows' or the driver bundle's driver | Full HD on X470 (user, 2026-10-17); profile value -> WINNT.SIF [Display] | **USOSRES at the first logon** (user decision 2026-10-21): native (prep EDID, else registry EDID) / highest; **nothing when the driver already runs that mode** | yes |
+| Windows Embedded POSReady 2009 (NT 5.1 core) | the XP x86 X470 driver set (community ACPI, GenAHCI, USB3 xHCI) | VGA 640x480 after FBA until a mode is chosen | **USOSRES at the first logon** (same NT52 contract, `\USOS\POSR`): native (prep EDID, else registry EDID) / highest; **nothing when the driver already runs that mode** | no (host tests only) |
 | 95 / 98 / 98 SE / Me | vmdisp9x VESA (USOSVESA.INF) + USOSRES 9x | default auto = highest up to 1920x1080 | default auto = **native up to 1920x1080**, else highest up to 1920x1080 | yes |
 | Vista / 7 / 2008 / 2008 R2 CSMWrap | Standard VGA (vgapnp, XDDM) on the CSMWrap VBE | 800x600 | default auto = **native (prep EDID, else registry EDID) / highest**; USOSRES at the first sign-in (below) | yes |
 | 8 / 8.1 / 10 x86 CSMWrap (win-x86-uefi-csmwrap) | Microsoft Basic Display on the card's real VBIOS VBE (CSMWrap) | 1024x768 (X470 2026-10-22, Embedded 8.1 Industry Pro x86, NVMe; 1280x1024 / 1920x1080 listed, manual switch works) | default auto = **native (prep EDID, else registry EDID) / highest of the driver's own list**, fullscreen VBIOS modes only; USOSRES at the first sign-in (below) | yes |
@@ -103,7 +104,42 @@ administrator) and, before any test/apply, **exits with
 already runs the chosen mode (the X470 Full HD case with a 1080p
 monitor). On the VGA driver (4 bpp) the request stays registered until a
 real driver is there. POSReady 2009 (its own VM-install flow,
-`\USOS\POSR`) is **not** covered yet.
+`\USOS\POSR`) is covered below.
+
+### Windows Embedded POSReady 2009 (2026-10-22)
+
+POSReady 2009 is the NT 5.1 core (XP SP3 Embedded), so it uses the XP /
+Server 2003 USOSRES contract unchanged, under `\USOS\POSR` instead of
+`\USOS\XP` (its own VM-install flow: Windows PE + Setup on partition 1,
+`posready_after_setup` copies the folder to `C:\USOS\POSR`):
+
+1. **Staging** (`posready_csmwrap_target.sh`, `usos_posr_display_stage`):
+   `USOSRES.EXE` + `DISPLAY.TXT` go into `\USOS\POSR` on the PE partition
+   through the same shared helper as the NT52 path
+   (`tools/display_profile.sh` `usos_display_stage`), read back from the
+   FAT16 image (`mdir`), and read back again after the copy to the Windows
+   partition (`posready_after_setup`). Request: `autoxauto` plus `native=`
+   from the prep EDID record - POSReady's own answer carries no display
+   request (`POSR.SIF` holds `[UserData]` only and the XML has no display
+   section). A build without `USOSRES.EXE` logs `DISPLAY USOSRES.EXE
+   missing in this build; display unchanged` and continues.
+2. **Registration** (`posready_logon.cmd`, the first logon's RunOnce, the
+   `usos-users.cmd` analogue):
+   `if exist "%S%USOSRES.EXE" reg add HKLM\...\Run /v USOSDisplay ...`
+   with `%SystemDrive%\USOS\POSR\USOSRES.EXE` (REG_SZ, same value name as
+   XP), logged in `FIRST.LOG` next to the other first-logon lines.
+3. **First sign-in**: USOSRES on NT 5.1 uses CDS_GLOBAL, picks only modes
+   from the driver's list, full screen, and exits with `DISPLAY already at
+   the selected mode; unchanged` when the driver already runs it
+   (`display_policy.h` / `display_apply.h`, unchanged by this path). Log
+   `C:\USOS\POSR\USOSRES.LOG`.
+
+Status: host-tested only (`tools/tests/test_display_posready.py`: the
+staging function on a scratch folder incl. the `native=` record, the
+missing-helper path, byte-identical DISPLAY.TXT with the NT52 helper, and
+the wiring of the target script, `posready_after_setup` and
+`posready_logon.cmd`). No QEMU/X470 POSReady install ran with it; the
+actual mode choice is the same code already exercised on XP.
 
 ## Vista / 7 / 2008 / 8.x / 10 x86 CSMWrap chain (commit 1b6fea70; 8.x / 10 x86: feat/x86-modern-display)
 

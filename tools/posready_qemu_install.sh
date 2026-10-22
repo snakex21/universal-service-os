@@ -222,6 +222,12 @@ posready_after_setup() {
                 cmp -s "$w/pe/USOS/POSR/DRV/acpi.sys" "$w/win/USOS/POSR/DRV/acpi.sys" &&
                 cmp -s "$w/pe/USOS/POSR/FIRST.CMD" "$w/win/USOS/POSR/FIRST.CMD" || {
                 echo 'after-setup: cannot copy \USOS\POSR onto the Windows partition' >> "$l/runs.txt"; rc=1; }
+            # The display helper (docs/display-policy.md): the same read-back
+            # for the NT 5.1 USOSRES files, which LOGON.CMD registers.
+            if [ -f "$w/pe/USOS/POSR/DISPLAY.TXT" ] &&
+                ! cmp -s "$w/pe/USOS/POSR/DISPLAY.TXT" "$w/win/USOS/POSR/DISPLAY.TXT"; then
+                echo 'after-setup: \USOS\POSR\DISPLAY.TXT readback mismatch' >> "$l/runs.txt"; rc=1
+            fi
         fi
     else
         echo 'after-setup: cannot mount partition 1 (FAT) or 2 (NTFS)' >> "$l/runs.txt"; rc=1
