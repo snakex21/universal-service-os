@@ -15,6 +15,17 @@ class EvidenceTests(unittest.TestCase):
     def test_nt4_hid_and_separate_lan_keep_storage_and_source_guards(self):
         exact=list(audit.NT4_CANDIDATE03_ROW)
         usb,net=audit.capability(exact)
+        for column in (usb,net,audit.hid_test(usb,exact)):
+            self.assertIn('QEMU PASS tuple09 [S20]',column)
+            self.assertIn('basic coexistence',column)
+            self.assertIn('89b/21248B',column)
+            self.assertIn('fresh AUTO',column)
+        self.assertIn('i8042prt Start4/NDISLoop Start2',usb)
+        self.assertIn('fresh own log, actual token/TESTNET_DONE',net)
+        self.assertIn('id706F',net)
+        self.assertIn('Końcowy ping po USB4/4 (16/<10/<10/<10ms)',net)
+        self.assertIn('Bez pełnej trasy IRQ',net)
+        self.assertIn('treeghostE/auto-refresh nie jest PASS',usb)
         self.assertIn('QEMU PASS combo01 [S19]',usb)
         self.assertIn('HID+MSC na tym samym frozenUSB313952/43648B',usb)
         self.assertIn('i8042prt Start4, NDISLoop Start3',usb)
