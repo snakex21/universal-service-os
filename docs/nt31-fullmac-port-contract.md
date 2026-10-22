@@ -81,11 +81,12 @@ Original default HAL SHA256:
 `301e7d13fb7c120657be7d911996aeefe2ec4e6b944fbc6db163ecffb12d872c`.
 HalGetBusData RVA57B0 branches only for BusDataType0 and1; the default returns
 zero, so the PCIConfiguration4 call is unsupported. HalGetInterruptVector
-3A40 accepts only InterfaceType1/2/3 and returns zero for PCIBus5. Memory
+3A40 accepts only InterfaceType1/2/3 and returns zero for PCIBus 5. Memory
 translation2730 follows an identity mapping without that interface filter.
 These facts prevent treating the presence of HalGetBusData as PCI support
 or renaming the device to an ISA adapter. DMA master registration through
-HalGetAdapter3C60 still requires a separate dataflow assessment.
+HalGetAdapter 3C70 still requires a separate dataflow assessment. (3C60 in
+the earlier note was an incorrect entry address.)
 
 NdisRegisterAdapter2780 consumes the sixth argument as adapter information.
 It reads type at information+0C, master at+4, physical-map count+10,
@@ -113,3 +114,72 @@ filter/binding serialization and resource ownership before implementation.
 There is no Intel build or network runtime result from this audit.
 All four protected NT4/NDIS5/NT35/NT351 binaries stayed identical; the
 temporary ISO was removed and expanded Microsoft modules stayed in RAM.
+
+## Checkpoint, 22 October 2026
+
+The later measurements `lifecycle-02.json`, `lifecycle-03.json` and
+`lifecycle-04.json` are completed static original-media audits. The final
+measurement contains 1199834 bytes of instruction/name/RVA metadata, no raw
+module bytes. Every selected direct CFG completed within its bound; the
+report now separately lists unresolved indirect jumps. This is still not
+an assertion that indirect calls or their callees were all proved.
+Temporary ISO scratch was removed and the four protected driver binaries
+retained their hashes. No Intel NT31 driver has been built or run.
+
+The actual HAL path does not reject PCIBus 5 bus-master registration.
+HalGetAdapter 3C70, for type 5 with Master set, selects UseChannel 0 at
+3C7B–3C8E, calls allocator 48F0 at 3DC1 and returns the master adapter through
+3E86–3E9D without programming 8237. The 177-instruction allocator CFG has no
+InterfaceType rejection. HalAllocateCommonBuffer 4BB0 constructs the physical
+limit 00FFFFFF at 4BB7–4BD6; master adapters bypass its 64KiB crossing check at
+4C10–4C14. This is a 24-bit allocation limit, which an Intel 32-bit DMA ring
+can use, not a general 32-bit allocation guarantee. The HAL import table
+does contain MmAllocateContiguousMemory, MmFreeContiguousMemory and
+MmGetPhysicalAddress. However, the section-wide thunk scan produced no HAL
+matches. Exact decoding of targets 5E20/5E30/5E40 is still needed before
+labelling those individual call targets as the corresponding imports.
+
+NDIS DriverUnload 1950 calls the registered RemoveAdapter at 197C before
+its own KeWaitForSingleObject at 1991, without raising IRQL in that path.
+It then calls UnloadMac at 19A0. The measured cleanup helpers 3F90,3F20,
+3FD0 and4130 close bindings/unlink wrapper objects and release allocations;
+this is evidence for a removable full-MAC design, not permission to write
+private wrapper fields. An owned worker must stop, terminate and be joined
+through the actual thread object before adapter memory or driver code is
+released. NtWaitForSingleObject 144D6 is an original export with a complete
+81-instruction direct CFG and three-argument cleanup; the modern-looking
+ZwWaitForSingleObject name is absent. The normal path should use the
+already measured object-reference and KeWaitForSingleObject interfaces;
+failure unwinding must also retain a provable join.
+
+Original NE2000 FilterChange 21C0 removes 28 stack bytes, AddressChange 2240
+removes 20 and DeferredClose 22C0 removes 4. These differ from miniport
+callbacks and must be declared independently. Query helper 1610 confirms
+request OID/buffer/length at+14/+18/+1C, with bytes-written/needed at+20/+24.
+The measured filter indication routines release the supplied filter lock
+around protocol callbacks. An owned worker must enter receive indication
+at DISPATCH_LEVEL and must not hold the hardware lock across that call,
+because a protocol can synchronously send from its receive callback.
+
+Original RegisterAdapter calls IoReportResourceUsage at 2ABB and 2E82 and
+tests both the returned status and conflict flag. MapIoSpace calls it at
+F3E before translation/mapping. The next implementation must trace the
+actual memory descriptor, bus/type and conditional reporting path through
+these routines and honor failure/conflict; the presence of the calls
+alone does not prove a particular future MMIO claim.
+
+The agreed diagnostic PCI candidate is explicitly UP/QEMU only:
+KeNumberProcessors must equal 1, BDF comes only from owned staging, and
+vendor/device/class/BAR are revalidated. Each short IRQ-disabled CF8/CFC
+transaction saves and restores CF8. No scan, BAR-sizing write, fake ISA
+type or claim that CF8 is the NIC BAR is allowed. Save the original PCI
+Command before enabling Memory/BusMaster; stop DMA and restore it on failed
+initialization or removal. PCI interrupts/MSI are excluded because this
+original HAL does not implement the PCIBus 5 interrupt-vector contract.
+
+Next work is the exact HAL thunk decode, complete MMIO resource dataflow,
+packet/buffer ABI and filter/binding ownership, followed by a separate
+full-MAC source/build with import and unwind checks. Only then should an
+owned overlay from stopped R19 be prepared for static IP, ping and DNS.
+No new NT31 installation is needed. Stock DHCP remains not applicable.
+No VM, build or additional original-media audit is queued at this checkpoint.
