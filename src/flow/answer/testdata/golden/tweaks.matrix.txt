@@ -280,22 +280,18 @@ show_extensions=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 show_extensions=yes	windows-10	+          <Order>5</Order>
 show_extensions=yes	windows-10	-          <Order>5</Order>
 show_extensions=yes	windows-10	+          <Order>6</Order>
-show_extensions=yes	windows-11	+    </component>
-show_extensions=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_extensions=yes	windows-11	+      <RunSynchronous>
-show_extensions=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-11	+          <Order>1</Order>
-show_extensions=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_extensions=yes	windows-11	+        </RunSynchronousCommand>
 show_extensions=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_extensions=yes	windows-11	+          <Order>2</Order>
-show_extensions=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
+show_extensions=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_extensions=yes	windows-11	+        </RunSynchronousCommand>
 show_extensions=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_extensions=yes	windows-11	+          <Order>3</Order>
-show_extensions=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+show_extensions=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-11	+        </RunSynchronousCommand>
-show_extensions=yes	windows-11	+      </RunSynchronous>
+show_extensions=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+show_extensions=yes	windows-11	+          <Order>4</Order>
+show_extensions=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 show_extensions=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-server-2008	+        </RunSynchronousCommand>
 show_extensions=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -455,22 +451,18 @@ show_hidden=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
 show_hidden=yes	windows-10	+          <Order>5</Order>
 show_hidden=yes	windows-10	-          <Order>5</Order>
 show_hidden=yes	windows-10	+          <Order>6</Order>
-show_hidden=yes	windows-11	+    </component>
-show_hidden=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_hidden=yes	windows-11	+      <RunSynchronous>
-show_hidden=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-11	+          <Order>1</Order>
-show_hidden=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_hidden=yes	windows-11	+        </RunSynchronousCommand>
 show_hidden=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_hidden=yes	windows-11	+          <Order>2</Order>
-show_hidden=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
+show_hidden=yes	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 show_hidden=yes	windows-11	+        </RunSynchronousCommand>
 show_hidden=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
 show_hidden=yes	windows-11	+          <Order>3</Order>
-show_hidden=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
+show_hidden=yes	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-11	+        </RunSynchronousCommand>
-show_hidden=yes	windows-11	+      </RunSynchronous>
+show_hidden=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+show_hidden=yes	windows-11	+          <Order>4</Order>
+show_hidden=yes	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 show_hidden=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-server-2008	+        </RunSynchronousCommand>
 show_hidden=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
@@ -650,14 +642,10 @@ no_autorun=yes	windows-10	-          <Order>4</Order>
 no_autorun=yes	windows-10	+          <Order>5</Order>
 no_autorun=yes	windows-10	-          <Order>5</Order>
 no_autorun=yes	windows-10	+          <Order>6</Order>
-no_autorun=yes	windows-11	+    </component>
-no_autorun=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-no_autorun=yes	windows-11	+      <RunSynchronous>
-no_autorun=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-11	+          <Order>1</Order>
-no_autorun=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-11	+        </RunSynchronousCommand>
-no_autorun=yes	windows-11	+      </RunSynchronous>
+no_autorun=yes	windows-11	+        <RunSynchronousCommand wcm:action="add">
+no_autorun=yes	windows-11	+          <Order>2</Order>
+no_autorun=yes	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-server-2008	+        </RunSynchronousCommand>
 no_autorun=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">

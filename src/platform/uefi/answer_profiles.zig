@@ -313,11 +313,12 @@ pub fn render(profile: *const Profile, system_id: []const u8, arch: answer.Arch)
 /// Fast Startup for this version (docs/ds-fast-startup-2026-10-22.md). The
 /// folder is the catalog entry's own, so Embedded 8.1 Industry and routed
 /// variants use theirs. Unreadable DATA or a version without Fast Startup:
-/// false, so the answer disables it where it applies.
+/// false, so the answer disables it where it applies (clients 8 / 8.1 / 10 /
+/// 11; the Server SKUs hide Fast Startup, see answer.hiberboot).
 fn fastStartupOn(system_id: []const u8) bool {
     const family = answer.target.familyFor(system_id) orelse return false;
     switch (family) {
-        .windows_8, .windows_8_1, .windows_10 => {},
+        .windows_8, .windows_8_1, .windows_10, .windows_11 => {},
         else => return false,
     }
     const system = usos.catalog.systems.findById(system_id) orelse return false;

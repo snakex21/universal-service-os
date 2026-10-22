@@ -313,10 +313,11 @@ fn hasUserOptions(p: *const Profile, family: Family) bool {
     return false;
 }
 
-/// Windows 8 / 8.1 / 10 (client) boot with Fast Startup; Server SKUs hide it.
+/// Windows 8 / 8.1 / 10 / 11 (client) boot with Fast Startup; Server SKUs
+/// hide it.
 fn hiberboot(family: Family) bool {
     return switch (family) {
-        .windows_8, .windows_8_1, .windows_10 => true,
+        .windows_8, .windows_8_1, .windows_10, .windows_11 => true,
         else => false,
     };
 }
@@ -326,9 +327,9 @@ pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, fast_st
     // display=keep: no USOSRES registration (the staging stages nothing).
     const helper = displayHelper(family, arch) and p.display != .keep;
     if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
-    // Windows 8 / 8.1 / 10: no Fast Startup (hiberboot). A shutdown then leaves
-    // the NTFS volume clean instead of hibernated, which matters because USOS
-    // installs move between computers; fast-startup-on.txt on DATA keeps
+    // Windows 8 / 8.1 / 10 / 11: no Fast Startup (hiberboot). A shutdown then
+    // leaves the NTFS volume clean instead of hibernated, which matters because
+    // USOS installs move between computers; fast-startup-on.txt on DATA keeps
     // Windows' setting (docs/ds-fast-startup-2026-10-22.md).
     if (!fast_startup_on and hiberboot(family))
         try out.add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power\" /v HiberbootEnabled /t REG_DWORD /d 0 /f", .{});
@@ -781,14 +782,21 @@ test "autounattend: every option on stays within the limits on every version" {
     }
 }
 
-test "autounattend: Fast Startup off on 8 / 8.1 / 10 clients only, opt-out keeps it" {
+test "autounattend: Fast Startup off on 8 / 8.1 / 10 / 11 clients only, opt-out keeps it" {
     const p: Profile = .{};
     const hiber = "/v HiberbootEnabled /t REG_DWORD /d 0 /f";
     var buffer: [max_size]u8 = undefined;
     inline for (@typeInfo(Family).@"enum".fields) |f| {
         const family: Family = @enumFromInt(f.value);
         if (comptime family.nt5()) continue;
-        const expected = family == .windows_8 or family == .windows_8_1 or family == .windows_10;
+        // Clients 8 and newer (Windows 11 included: it hibernates just the same
+        // and the disk still moves between computers); Server 2008-2025 hide
+        // Fast Startup, so the command must not appear there.
+        const expected = switch (family) {
+            .windows_8, .windows_8_1, .windows_10, .windows_11 => true,
+            else => false,
+        };
+        if (comptime family.server()) try std.testing.expect(!expected);
         for ([_]Arch{ .x86, .amd64 }) |arch| {
             const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
             errdefer std.debug.print("{s} {s}\n", .{ f.name, @tagName(arch) });
