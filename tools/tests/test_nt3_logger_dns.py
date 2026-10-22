@@ -12,7 +12,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[2]
 HEADER=ROOT/'tools/nt3/usoslog/src/usoslog_dns_packet.h'
-ZIG=Path(os.environ.get('USOS_ZIG',str(ROOT.parent/'dokumentacja-9x/tools/zig/zig.exe')))
+ZIG=Path(os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')))
 
 
 def name(value):return b''.join(bytes((len(v),))+v.encode() for v in value.split('.'))+b'\0'

@@ -11,7 +11,7 @@ import unittest
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
 HEADER=HERE/'nt4_observer/observer_core.h'
-ZIG=Path(os.environ.get('USOS_ZIG',r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe'))
+ZIG=Path(os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')))
 TMP=ROOT/'artifacts/coverage/nt4-observer-host';TMP.mkdir(parents=True,exist_ok=True)
 spec=importlib.util.spec_from_file_location('fixture_hook',HERE/'prepare_stick.py');fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 TOKEN='USOS_COVERAGE_FIRST_LOGON_'+'a'*32

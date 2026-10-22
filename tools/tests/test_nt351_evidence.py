@@ -211,6 +211,7 @@ class PassiveReceiver(unittest.IsolatedAsyncioTestCase):
 class IntegrationPatch(unittest.TestCase):
     def test_patch_applies_to_pinned_runner_and_collects_before_cleanup(self):
         matrix=ROOT.parent/'macierz-windows'
+        if not (matrix/'.git').exists():self.skipTest('Codex macierz-windows checkout not on this host')
         with tempfile.TemporaryDirectory(dir=TMP) as temporary:
             directory=Path(temporary)
             for name in ('boot_menu.py','run_plan.py'):

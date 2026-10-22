@@ -5,7 +5,9 @@ import unittest
 s=importlib.util.spec_from_file_location('nt31_boot',Path(__file__).with_name('boot_nt31_fullmac.py'))
 b=importlib.util.module_from_spec(s);s.loader.exec_module(b)
 class ColdCommand(unittest.TestCase):
-    def setUp(self):self.prior=json.loads((b.SOURCE/'command.json').read_text(encoding='utf-8'))
+    def setUp(self):
+        if not (b.SOURCE/'command.json').is_file():self.skipTest('Codex macierz-windows R19c evidence not on this host')
+        self.prior=json.loads((b.SOURCE/'command.json').read_text(encoding='utf-8'))
     def test_exact_scoped_nic_and_retained_paths(self):
         cmd=b.command(self.prior,12345,['-object','owned-capture'])
         self.assertIn('igb,addr=0x05,netdev=usabilitynet,mac=52:54:00:55:53:01',cmd)

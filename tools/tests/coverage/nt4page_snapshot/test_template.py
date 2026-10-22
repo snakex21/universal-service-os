@@ -1,11 +1,11 @@
 from pathlib import Path
 import ctypes,hashlib,json,os,subprocess,unittest
 HERE=Path(__file__).resolve().parent
-ZIG=Path(r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe');OUT=HERE/'template-tests03'
+ZIG=Path(__import__('os').environ.get('USOS_ZIG') or next((str(p/'tools/zig/zig.exe') for p in Path(__file__).resolve().parents if (p/'tools/zig/zig.exe').is_file()),'zig.exe'));OUT=HERE/'template-tests03'
 class RealBoundedTemplate(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  if OUT.exists():raise ValueError('Fresh test output required')
+  if OUT.exists():__import__('shutil').rmtree(OUT)
   OUT.mkdir();tmp=OUT/'tmp';tmp.mkdir();dll=OUT/'actual.dll';env=dict(os.environ,TEMP=str(tmp),TMP=str(tmp),ZIG_GLOBAL_CACHE_DIR=str(OUT/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-local'))
   subprocess.run([str(ZIG),'cc','-target','x86_64-windows-gnu','-Os','-shared','-nostdlib','-fno-builtin','-fno-stack-protector','-Wall','-Wextra','-Werror','-Wno-unused-function','-isystem',str(ZIG.parent/'lib/libc/include/any-windows-any'),str(HERE/'template_test.c'),'-Wl,--entry,DllMain','-o',str(dll)],check=True,env=env)
   cls.lib=ctypes.WinDLL(str(dll));cls.lib.actual_template.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p];cls.lib.actual_template.restype=ctypes.c_int;cls.lib.actual_fragment.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p];cls.lib.actual_fragment.restype=ctypes.c_int

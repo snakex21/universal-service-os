@@ -4,7 +4,7 @@ import ctypes,hashlib,json,os,subprocess,sys,threading,time,unittest
 from ctypes import wintypes as w
 HERE=Path(__file__).resolve().parent
 OUT=HERE/'cross-process05'
-ZIG=Path(r'C:\Users\ASRock\usos-work\dokumentacja-9x\tools\zig\zig.exe')
+ZIG=Path(__import__('os').environ.get('USOS_ZIG') or next((str(p/'tools/zig/zig.exe') for p in Path(__file__).resolve().parents if (p/'tools/zig/zig.exe').is_file()),'zig.exe'))
 def child():
  u=ctypes.WinDLL('user32',use_last_error=True);k=ctypes.WinDLL('kernel32',use_last_error=True)
  proc_type=ctypes.WINFUNCTYPE(ctypes.c_ssize_t,w.HWND,w.UINT,w.WPARAM,w.LPARAM)
@@ -37,7 +37,7 @@ def child():
 class RealCrossProcess(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  if OUT.exists():raise ValueError('Fresh test output required')
+  if OUT.exists():__import__('shutil').rmtree(OUT)
   OUT.mkdir();tmp=OUT/'tmp';tmp.mkdir();dll=OUT/'cross.dll'
   env=dict(os.environ,TEMP=str(tmp),TMP=str(tmp),ZIG_GLOBAL_CACHE_DIR=str(OUT/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-local'))
   subprocess.run([str(ZIG),'cc','-target','x86_64-windows-gnu','-Os','-shared','-nostdlib','-fno-builtin','-fno-stack-protector','-isystem',str(ZIG.parent/'lib/libc/include/any-windows-any'),str(HERE/'cross_process.c'),'-Wl,--entry,DllMain','-lkernel32','-luser32','-o',str(dll)],check=True,env=env)
