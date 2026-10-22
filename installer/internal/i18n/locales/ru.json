@@ -3,6 +3,7 @@
 
   "installer.window.title": "Установщик Universal Service OS",
   "installer.startup.log_failed": "Установщик не может запуститься, так как не удалось открыть файл журнала рядом с программой:\n%s",
+  "installer.startup.portable_not_writable": "USOS — портативная программа: переместите папку USOS в место с правом записи (например, на рабочий стол или флешку) и запустите снова.\n\n%s",
   "installer.startup.install_engine_failed": "Не удаётся запустить модуль установки:\n%s",
   "installer.startup.update_engine_failed": "Не удаётся запустить модуль локального обновления:\n%s",
   "installer.startup.repair_engine_failed": "Не удаётся запустить модуль восстановления:\n%s",

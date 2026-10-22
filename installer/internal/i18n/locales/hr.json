@@ -3,6 +3,7 @@
 
   "installer.window.title": "Instalacijski program za Universal Service OS",
   "installer.startup.log_failed": "Instalacijski program ne može se pokrenuti jer nije bilo moguće otvoriti datoteku zapisnika pokraj programa:\n%s",
+  "installer.startup.portable_not_writable": "USOS je prijenosni program — premjestite mapu USOS na mjesto s pravom pisanja (npr. radnu površinu ili USB stick) i ponovno ga pokrenite.\n\n%s",
   "installer.startup.install_engine_failed": "Mehanizam instalacije ne može se pokrenuti:\n%s",
   "installer.startup.update_engine_failed": "Mehanizam lokalnog ažuriranja ne može se pokrenuti:\n%s",
   "installer.startup.repair_engine_failed": "Mehanizam popravka ne može se pokrenuti:\n%s",

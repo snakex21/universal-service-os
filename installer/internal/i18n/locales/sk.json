@@ -3,6 +3,7 @@
 
   "installer.window.title": "Inštalátor Universal Service OS",
   "installer.startup.log_failed": "Inštalátor sa nedá spustiť, pretože sa nepodarilo otvoriť súbor denníka vedľa programu:\n%s",
+  "installer.startup.portable_not_writable": "USOS je prenosný program — presuňte priečinok USOS na miesto s právom zápisu (napr. pracovnú plochu alebo USB kľúč) a spustite ho znova.\n\n%s",
   "installer.startup.install_engine_failed": "Inštalačný modul sa nedá spustiť:\n%s",
   "installer.startup.update_engine_failed": "Modul lokálnej aktualizácie sa nedá spustiť:\n%s",
   "installer.startup.repair_engine_failed": "Modul opravy sa nedá spustiť:\n%s",

@@ -3,6 +3,7 @@
 
   "installer.window.title": "Instalador de Universal Service OS",
   "installer.startup.log_failed": "El instalador no puede iniciarse porque no se pudo abrir el archivo de registro situado junto al programa:\n%s",
+  "installer.startup.portable_not_writable": "USOS es un programa portátil: mueva la carpeta USOS a un lugar con permiso de escritura (p. ej., el escritorio o una memoria USB) y vuelva a iniciarlo.\n\n%s",
   "installer.startup.install_engine_failed": "El motor de instalación no puede iniciarse:\n%s",
   "installer.startup.update_engine_failed": "El motor de actualización local no puede iniciarse:\n%s",
   "installer.startup.repair_engine_failed": "El motor de reparación no puede iniciarse:\n%s",

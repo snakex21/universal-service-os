@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS telepítő",
   "installer.startup.log_failed": "A telepítő nem indítható, mert a program melletti naplófájl nem nyitható meg:\n%s",
+  "installer.startup.portable_not_writable": "Az USOS hordozható program — helyezze át az USOS mappát írható helyre (pl. az asztalra vagy pendrive-ra), és indítsa újra.\n\n%s",
   "installer.startup.install_engine_failed": "A telepítőmotor nem indítható:\n%s",
   "installer.startup.update_engine_failed": "A helyi frissítés motorja nem indítható:\n%s",
   "installer.startup.repair_engine_failed": "A javítómotor nem indítható:\n%s",

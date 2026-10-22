@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 )
 
 // Progress of one download. Total is 0 while unknown.
@@ -35,13 +37,18 @@ type Downloader struct {
 	Log        func(string)
 }
 
-// DefaultDir is the download folder: %TEMP%\USOS-components\<tag>.
+// DefaultDir is the download folder: data\components\<tag> beside
+// the EXE (portable mode; never the user profile or %TEMP%).
 func DefaultDir(r Release) string {
 	tag := r.Tag
 	if tag == "" {
 		tag = "dev"
 	}
-	return filepath.Join(os.TempDir(), "USOS-components", tag)
+	dir, err := portable.Path("components")
+	if err != nil {
+		dir = filepath.Join("data", "components")
+	}
+	return filepath.Join(dir, tag)
 }
 
 func (d *Downloader) client() *http.Client {

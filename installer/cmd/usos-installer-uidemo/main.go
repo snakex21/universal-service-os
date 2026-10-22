@@ -30,6 +30,8 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/ui"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
 	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
+
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 )
 
 func main() {
@@ -60,7 +62,7 @@ func main() {
 		MokFirmware: &fakeMokFirmware{vars: map[string][]byte{}},
 		// Never touch this PC: markers go to a temporary directory, the
 		// machine UUID is fixed and restarts only show a toast.
-		MokMarkerDir:      filepath.Join(os.TempDir(), "usos-uidemo-mok"),
+		MokMarkerDir:      uidemoMokDir(),
 		MachineUUID:       func() string { return "00112233-4455-6677-8899-AABBCCDDEEFF" },
 		Restart:           func() error { return errors.New("demo: restart skipped") },
 		RestartToFirmware: func() error { return errors.New("demo: restart into firmware settings skipped") },
@@ -756,4 +758,14 @@ func componentsTour(d *ui.Driver, shot func(string) error) error {
 		return err
 	}
 	return d.Activate("components.primary")
+}
+
+// uidemoMokDir keeps the demo's fake "key enrolled" markers in data\tmp
+// beside the demo EXE (removed with data\tmp), never in the profile.
+func uidemoMokDir() string {
+	dir, err := portable.TempDir()
+	if err != nil {
+		return filepath.Join("data", "tmp", "usos-uidemo-mok")
+	}
+	return filepath.Join(dir, "usos-uidemo-mok")
 }

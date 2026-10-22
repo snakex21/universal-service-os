@@ -63,6 +63,16 @@ Po instalacji pendrive ma trzy partycje:
 
 ## 2. Instalator: instalacja, aktualizacja, naprawa, deinstalacja
 
+Instalator jest przenośny. Ustawienia, dziennik przywracania AutoPlay,
+znaczniki „klucz zapisany” i pobrane komponenty znajdują się w `data` obok
+EXE; pliki tymczasowe trafiają do `data\tmp` i są usuwane po zamknięciu
+instalatora. Nic nie powstaje w `%APPDATA%`, `%LOCALAPPDATA%` ani `%TEMP%`.
+Przenoś cały folder programu razem z `data`. Folder musi umożliwiać zapis: w
+miejscu tylko do odczytu (np. Program Files) instalator prosi o przeniesienie
+folderu USOS (pulpit, pendrive) i kończy pracę. Ustawienia starszej wersji z
+`%APPDATA%\USOS` są jednorazowo kopiowane do `data`; stare pliki zostają bez
+zmian.
+
 Uruchom `USOS-Installer-1.0.0.exe` (dwukrotne kliknięcie, zgoda UAC).
 Na pierwszym ekranie „**Co chcesz zrobić?**” są cztery karty:
 

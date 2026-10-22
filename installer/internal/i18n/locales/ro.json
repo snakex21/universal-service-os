@@ -3,6 +3,7 @@
 
   "installer.window.title": "Programul de instalare Universal Service OS",
   "installer.startup.log_failed": "Programul de instalare nu poate porni deoarece fișierul jurnal de lângă program nu a putut fi deschis:\n%s",
+  "installer.startup.portable_not_writable": "USOS este un program portabil — mutați dosarul USOS într-un loc cu drept de scriere (de ex. desktopul sau un stick USB) și porniți-l din nou.\n\n%s",
   "installer.startup.install_engine_failed": "Motorul de instalare nu poate porni:\n%s",
   "installer.startup.update_engine_failed": "Motorul de actualizare locală nu poate porni:\n%s",
   "installer.startup.repair_engine_failed": "Motorul de reparare nu poate porni:\n%s",

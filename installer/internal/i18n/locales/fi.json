@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS -asennusohjelma",
   "installer.startup.log_failed": "Asennusohjelma ei voi käynnistyä, koska ohjelman vieressä olevaa lokitiedostoa ei voitu avata:\n%s",
+  "installer.startup.portable_not_writable": "USOS on siirrettävä ohjelma — siirrä USOS-kansio paikkaan, johon voi kirjoittaa (esim. työpöydälle tai USB-tikulle), ja käynnistä se uudelleen.\n\n%s",
   "installer.startup.install_engine_failed": "Asennusmoottori ei voi käynnistyä:\n%s",
   "installer.startup.update_engine_failed": "Paikallisen päivityksen moottori ei voi käynnistyä:\n%s",
   "installer.startup.repair_engine_failed": "Korjausmoottori ei voi käynnistyä:\n%s",

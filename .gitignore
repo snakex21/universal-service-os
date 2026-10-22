@@ -80,3 +80,8 @@ installer/internal/payload/assets/*.zip
 # WDK 7.1 (7600.16385.1), unpacked from the user-downloaded GRMWDK_EN_7600_1.ISO
 # with msiexec /a; see docs/BUILDING.md (never redistributed)
 tools/WinDDK71/
+
+# Portable installer state (data\ beside the EXE: prefs, journal, tmp and the
+# Secure Boot signing key in data\signing) never enters the repository.
+/data/
+installer/data/

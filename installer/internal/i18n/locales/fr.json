@@ -3,6 +3,7 @@
 
   "installer.window.title": "Programme d'installation d'Universal Service OS",
   "installer.startup.log_failed": "Le programme d'installation ne peut pas démarrer, car le fichier journal situé à côté du programme n'a pas pu être ouvert :\n%s",
+  "installer.startup.portable_not_writable": "USOS est un programme portable — déplacez le dossier USOS vers un emplacement accessible en écriture (p. ex. le bureau ou une clé USB) et relancez-le.\n\n%s",
   "installer.startup.install_engine_failed": "Le moteur d'installation ne peut pas démarrer :\n%s",
   "installer.startup.update_engine_failed": "Le moteur de mise à jour locale ne peut pas démarrer :\n%s",
   "installer.startup.repair_engine_failed": "Le moteur de réparation ne peut pas démarrer :\n%s",

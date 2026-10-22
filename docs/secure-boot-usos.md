@@ -108,12 +108,19 @@ Such a stick boots only with Secure Boot off.
   usage, not a CA, valid 30 years. Subject `CN=USOS Secure Boot Signing 2026,
   O=Universal Service OS`, certificate SHA-256
   `1039d6f0c8cddf1769f13766edaaac4a30daf55986654655f9d41d6ea517d230`.
-- Created once with `go run ./cmd/usos-efisign keygen`; stored in
-  `%APPDATA%\USOS\signing\usos-secure-boot.key` (PKCS#8 PEM) and
-  `usos-secure-boot.cer`. `USOS_SIGNING_DIR` overrides the directory. keygen
-  refuses to overwrite an existing key.
-- The private key never enters the repository: `.gitignore` ignores `*.key`,
-  `*.pfx`, `*.p12` and `/signing/`. Only the public certificate is tracked
+- Created once with `go run ./cmd/usos-efisign keygen`; stored (portable,
+  no password) in `data\signing\usos-secure-boot.key` (PKCS#8 PEM) and
+  `usos-secure-boot.cer` beside the program, which for `go run` from
+  `installer\` is `installer\data\signing`. `USOS_SIGNING_DIR` overrides the
+  directory. keygen refuses to overwrite an existing key. A key from older
+  versions in `%APPDATA%\USOS\signing` is copied there once, verified byte
+  for byte; the original is never changed or deleted. The copy is reported
+  on stderr (`[KEY] copied ...`, paths only, never key bytes).
+- The private key never enters the repository, a payload or a USOS drive:
+  `.gitignore` ignores `/data/`, `installer/data/`, `*.key`, `*.pfx`, `*.p12`
+  and `/signing/`; the payload packer refuses `signing/` folders, the USOS key
+  file and PKCS#12 bundles, and only `internal/efisign` and
+  `cmd/usos-efisign` may reference the key (tests enforce both). Only the public certificate is tracked
   (`assets/secure-boot/usos-secure-boot.cer`); the build warns when the local
   key does not match it.
 - Back it up offline (e.g. an encrypted copy on separate media). If it is
@@ -464,7 +471,7 @@ UEFI or legacy BIOS, `SecureBoot`, `MokListRT` (visible only when Windows was
 itself started through shim), `MokTimeout`, and whether the key is known to
 be on this computer from
 
-- `%APPDATA%\USOS\mok-enrolled-<SMBIOS UUID>`, written when a source below
+- `data\mok-enrolled-<SMBIOS UUID>` beside the installer EXE, written when a source below
   confirmed the key or the user clicked **Already done**;
 - the per-machine report on any detected USOS drive
   (`EFI\USOS\Logs\secure-boot-<UUID>.ini`, `usos_key=saved`), matched by the

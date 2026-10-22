@@ -3,6 +3,7 @@
 
   "installer.window.title": "Namestitveni program za Universal Service OS",
   "installer.startup.log_failed": "Namestitvenega programa ni mogoče zagnati, ker dnevniške datoteke poleg programa ni bilo mogoče odpreti:\n%s",
+  "installer.startup.portable_not_writable": "USOS je prenosni program — premaknite mapo USOS na mesto s pravico pisanja (npr. namizje ali USB ključ) in ga znova zaženite.\n\n%s",
   "installer.startup.install_engine_failed": "Mehanizma za namestitev ni mogoče zagnati:\n%s",
   "installer.startup.update_engine_failed": "Mehanizma za lokalno posodobitev ni mogoče zagnati:\n%s",
   "installer.startup.repair_engine_failed": "Mehanizma za popravilo ni mogoče zagnati:\n%s",

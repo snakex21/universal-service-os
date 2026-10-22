@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS installer",
   "installer.startup.log_failed": "Installerit ei saa käivitada, sest programmi kõrval olevat logifaili ei õnnestunud avada:\n%s",
+  "installer.startup.portable_not_writable": "USOS on kaasaskantav programm — teisaldage kaust USOS kohta, kuhu saab kirjutada (nt töölauale või USB-mälupulgale), ja käivitage see uuesti.\n\n%s",
   "installer.startup.install_engine_failed": "Installimootorit ei saa käivitada:\n%s",
   "installer.startup.update_engine_failed": "Kohaliku värskenduse mootorit ei saa käivitada:\n%s",
   "installer.startup.repair_engine_failed": "Parandusmootorit ei saa käivitada:\n%s",

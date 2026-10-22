@@ -3,6 +3,7 @@
 
   "installer.window.title": "Installationsprogram för Universal Service OS",
   "installer.startup.log_failed": "Installationsprogrammet kan inte starta eftersom loggfilen bredvid programmet inte kunde öppnas:\n%s",
+  "installer.startup.portable_not_writable": "USOS är ett portabelt program — flytta mappen USOS till en plats med skrivbehörighet (t.ex. skrivbordet eller ett USB-minne) och starta det igen.\n\n%s",
   "installer.startup.install_engine_failed": "Installationsmotorn kan inte starta:\n%s",
   "installer.startup.update_engine_failed": "Motorn för lokal uppdatering kan inte starta:\n%s",
   "installer.startup.repair_engine_failed": "Reparationsmotorn kan inte starta:\n%s",

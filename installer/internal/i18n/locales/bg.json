@@ -3,6 +3,7 @@
 
   "installer.window.title": "Инсталатор на Universal Service OS",
   "installer.startup.log_failed": "Инсталаторът не може да стартира, защото файлът на дневника до програмата не можа да бъде отворен:\n%s",
+  "installer.startup.portable_not_writable": "USOS е преносима програма — преместете папката USOS на място с право на запис (напр. работния плот или USB флашка) и я стартирайте отново.\n\n%s",
   "installer.startup.install_engine_failed": "Механизмът за инсталиране не може да стартира:\n%s",
   "installer.startup.update_engine_failed": "Механизмът за локално обновяване не може да стартира:\n%s",
   "installer.startup.repair_engine_failed": "Механизмът за поправка не може да стартира:\n%s",

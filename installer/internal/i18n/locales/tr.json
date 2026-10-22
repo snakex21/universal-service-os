@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS Yükleyicisi",
   "installer.startup.log_failed": "Programın yanındaki günlük dosyası açılamadığı için yükleyici başlatılamıyor:\n%s",
+  "installer.startup.portable_not_writable": "USOS taşınabilir bir programdır — USOS klasörünü yazma izni olan bir yere (ör. masaüstü veya USB bellek) taşıyın ve yeniden başlatın.\n\n%s",
   "installer.startup.install_engine_failed": "Kurulum motoru başlatılamıyor:\n%s",
   "installer.startup.update_engine_failed": "Yerel güncelleme motoru başlatılamıyor:\n%s",
   "installer.startup.repair_engine_failed": "Onarım motoru başlatılamıyor:\n%s",

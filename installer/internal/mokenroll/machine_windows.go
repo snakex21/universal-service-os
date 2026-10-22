@@ -4,6 +4,7 @@ package mokenroll
 
 import (
 	"errors"
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,13 +34,10 @@ func MachineUUID() (string, error) {
 	return id, nil
 }
 
-// AppDataDir is %APPDATA%\USOS.
+// AppDataDir is the portable data folder beside the EXE.
 func AppDataDir() string {
-	base := os.Getenv("APPDATA")
-	if base == "" {
-		return ""
-	}
-	return filepath.Join(base, "USOS")
+	dir, _ := portable.DataDir()
+	return dir
 }
 
 // RestartToFirmware restarts Windows into the UEFI firmware settings

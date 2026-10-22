@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS – Installationsprogramm",
   "installer.startup.log_failed": "Das Installationsprogramm kann nicht starten, weil die Protokolldatei neben dem Programm nicht geöffnet werden konnte:\n%s",
+  "installer.startup.portable_not_writable": "USOS ist ein portables Programm — verschieben Sie den USOS-Ordner an einen beschreibbaren Ort (z. B. Desktop oder USB-Stick) und starten Sie es erneut.\n\n%s",
   "installer.startup.install_engine_failed": "Die Installations-Engine kann nicht starten:\n%s",
   "installer.startup.update_engine_failed": "Die Engine für die lokale Aktualisierung kann nicht starten:\n%s",
   "installer.startup.repair_engine_failed": "Die Reparatur-Engine kann nicht starten:\n%s",

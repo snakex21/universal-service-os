@@ -5,7 +5,7 @@
 // ("Use AutoPlay for all media and devices"):
 // HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers
 // DisableAutoplay. Before changing it, the previous state is written to a
-// journal (HKCU\Software\USOS\Installer), so a crash or a killed process is
+// journal (data/autoplay-journal.json beside the EXE), so a crash or a killed process is
 // repaired by RestorePending at the next installer start.
 package autoplay
 
@@ -27,7 +27,7 @@ const (
 	journalValue   = "AutoplayPreviousValue"
 )
 
-// Store is the registry (HKCU) seen by this package; tests use a map.
+// Store holds the OS setting and the portable restore journal; tests use a map.
 type Store interface {
 	GetDWORD(key, name string) (value uint32, exists bool, err error)
 	SetDWORD(key, name string, value uint32) error
