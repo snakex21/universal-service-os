@@ -1,5 +1,11 @@
 # Eksperymentalny LAN NT3.5 — dowody i historia portu
 
+Późniejsza kwalifikacja czterech offsetów IRQ na zachowanym R20b dała standardowy
+ping3/3 time<10ms, logger ICMP1s/strict DNS/HTTP200 oraz native shutdown/rc0
+z dokładnym stopped SYS readback. Szczegóły, manifest i ograniczenie do tej
+zainstalowanej fixture: [nt35-irq-canonical-registers.md](nt35-irq-canonical-registers.md).
+Poniższe około2s i FAIL11010 są zachowaną historią poprzedniego sterownika.
+
 Aktualny wynik R20: świeży normalny USOS osiągnął Program Manager Version3.5,
 DHCP, dopasowany ICMP oraz UDP/TCP DNS. `r20-guest-evaluation.json` wiąże wynik
 z faktycznym installed SYS e1aa...21c5, gościem i zakończonym capture. Stock ping
