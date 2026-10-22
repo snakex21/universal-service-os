@@ -89,7 +89,24 @@ func ReportComponents(espRoot, dataRoot string) ComponentReport {
 	report.Items = append(report.Items, inspectXPComponent(espRoot, status))
 	report.Items = append(report.Items, inspectWinpeComponent(dataRoot, espRoot, archX64, status.WinPE))
 	report.Items = append(report.Items, inspectWinpeComponent(dataRoot, espRoot, archX86, status.WinPEX86))
+	report.Items = append(report.Items, inspectWin7NetComponent(dataRoot))
 	return report
+}
+
+// inspectWin7NetComponent checks the Intel I211 Net driver package of
+// Windows 7 / Server 2008 R2: DATA\Systems\Windows\Windows 7\Drivers\<arch>\
+// Net\Intel-I211 with at least one .inf. Optional and per-architecture, so its
+// -components token (win7-net-intel) never makes a stick incomplete.
+func inspectWin7NetComponent(dataRoot string) ComponentReportItem {
+	item := ComponentReportItem{Name: "win7-net-intel", ID: components.Win7NetIntel, State: ComponentMissing,
+		Detail: "no .inf in " + filepath.FromSlash("Systems/Windows/Windows 7/Drivers/<arch>/Net/Intel-I211")}
+	arches := components.Win7NetIntelArches(dataRoot)
+	if len(arches) == 0 {
+		return item
+	}
+	item.State = ComponentCurrent
+	item.Detail = "arch " + strings.Join(arches, "/")
+	return item
 }
 
 // inspectXPComponent checks ESP\EFI\USOS-XP\manifest.json, the two payload
@@ -283,6 +300,8 @@ func componentToken(id components.ID) string {
 		return "winpe-x86"
 	case id.IsXP():
 		return "xp"
+	case id == components.Win7NetIntel:
+		return "win7-net-intel"
 	}
 	return ""
 }

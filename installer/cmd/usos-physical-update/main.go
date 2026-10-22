@@ -36,7 +36,7 @@ func main() {
 	restoreImageMarkers := flag.Bool("restore-image-markers", false, "rollback only: recreate pre-direct-NTFS zero-byte image markers on ESP after update")
 	debugBootmgrProbe := flag.String("debug-bootmgr-probe", "", "optional physical diagnostic bootmgr.exe probe copied to the identified ESP after a successful update")
 	language := flag.String("language", "", "language written to the ESP (usos-settings.ini, lang.bin); empty keeps the target's current usos-settings.ini language")
-	componentList := flag.String("components", "", "optional components to install after a successful update (xp, xp-pl, xp-en, winpe, winpe-x86); empty = report only, nothing written to the stick")
+	componentList := flag.String("components", "", "optional components to install after a successful update (xp, xp-pl, xp-en, winpe, winpe-x86, win7-net-intel); empty = report only, nothing written to the stick")
 	flag.Parse()
 
 	fatalf := func(format string, args ...any) {
