@@ -73,7 +73,12 @@ class RfbEvents(unittest.TestCase):
         self.peer.sendall(b'\0\0\0\x01'+struct.pack('>HHHHi',x,y,width,height,encoding)+data)
 
     def finish(self, code=0):
-        self.peer.shutdown(socket.SHUT_RDWR)
+        try:
+            self.peer.shutdown(socket.SHUT_RDWR)
+        except (ConnectionResetError, ConnectionAbortedError):
+            # A rejected frame can close the native peer before shutdown.
+            # Still verify its actual exit code and all output below.
+            pass
         self.peer.close()
         output,errors=self.process.communicate(timeout=5)
         self.assertEqual(self.process.returncode,code,errors)

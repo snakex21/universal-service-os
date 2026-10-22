@@ -6,6 +6,8 @@ static const Page pages[] = {
     {"busy", UINT64_C(0x1f36e2daa8666765), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"busy", UINT64_C(0x04017a8b5487ec68), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"setup-type", UINT64_C(0x65cb873cd593e64e), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
+    /* Exact RTM PL OEM heading: Opcje programu Instalator. */
+    {"setup-type", UINT64_C(0xa07c4a33fc5c5f22), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"coa", UINT64_C(0x57899c67caef5944), UINT64_C(0x46071c2c8bdb3bc3), 110, 138, 405, 16},
     {"owner", UINT64_C(0x202c4cd89699d426), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"hardware-list", UINT64_C(0xf9ce3d026135a826), UINT64_C(0xe677e0878975fb18), 214, 129, 365, 43},
