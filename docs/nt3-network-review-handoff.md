@@ -15,7 +15,7 @@ change once during review; the separate binaries are both needed.
 | Candidate | Repository binary | SHA-256 | Runtime proof |
 |---|---|---|---|
 | NT35 | tools/nt/usosnet/bin/i386/usosnet35.sys,16384B | d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85 | fixed01 DHCP/ping3/3<10ms/DNS/HTTP200; usb01 keyboard/mouse out/in |
-| NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | Fresh normal USOS nt351-irq-fresh01: desktop/DHCP/ping3/3<10ms/DNS/HTTP200 PASS, separate Client/noSharing FAIL; R26 passive IRQ trace; R27 keyboard/mouse out/in |
+| NT351 | tools/nt/usosnet/bin/i386/usosnet351.sys,17024B | f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf | Fresh normal USOS nt351-irq-fresh01: desktop/DHCP/ping3/3<10ms/DNS/HTTP200 PASS, separate fresh Client/noSharing FAIL; R26 passive IRQ trace; R27 keyboard/mouse out/in; separate policy apply02/cold01 PASS [S12] |
 
 Both USB regressions explicitly disable the PS/2 driver with inherited
 i8042prt Start4 while leaving hardware i8042 present. They include an
@@ -49,9 +49,16 @@ Strict same-XID DORA stays false despite native lease/renew evidence.
 The same fresh NT351 case separately fails Client/noSharing: native
 Server/Computer Browser are RUNNING and both have Start2/Type32 in the
 selected stopped SYSTEM control set. No service policy changed in that
-case. Separate NT35/NT351 policy apply/cold trials have no completed
-qualification in this handoff. The private fresh cache result does not
-claim integration into default release assets.
+case. Separate NT351 helper-only apply02 and unchanged cold01 now qualify
+the policy correction, commitd268e499 in `C:\Users\ASRock\usos-work\nt351-client`
+[S12, `docs/nt351-client-policy-evidence.md`]. Actual SCM/native service
+lists and clean stopped readback confirm Server/Browser STOPPED/Disabled,
+Workstation/TCPIP RUNNING, with cold ping3/3<10ms and native safe shutdown.
+The fresh parent's original policy FAIL remains; this is diagnostic
+overlay apply/cold PASS, not fresh AUTO policy. No new USB/DHCP/DNS/HTTP
+qualification is inferred. NT35 policy cold qualification is still pending
+in this handoff. The private fresh cache result does not claim integration
+into default release assets.
 
 QEMU's working NIC IRQ does not qualify the physical I211 IRQ/polling
 behavior on X470. NT4 and other OS binaries were not rebuilt by this fix.

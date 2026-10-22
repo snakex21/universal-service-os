@@ -25,9 +25,12 @@ physical-X470 claim is inferred from this fresh run; PS/2 is allowed.
 Client/noSharing is explicitly FAIL: native service list has Server and
 Computer Browser RUNNING, and selected REGF1.2/CurrentDefault1 readback
 finds both Start2/Type32. Workstation is2/32 and Tcpip3/1. Nothing was
-changed in this trial. A separate helper-only policy overlay is under
-test; no completed apply/cold policy PASS is added here. Successful LAN
-does not override the policy failure. This private-cache qualification
+changed in this trial. Separate helper-only apply02 and unchanged cold01
+overlays now pass client policy [S12], as recorded in
+`docs/nt351-client-policy-evidence.md`: Server/Browser STOPPED/Disabled,
+Workstation/TCPIP RUNNING and cold ping3/3<10ms. That diagnostic correction
+after installation leaves this fresh Client/noSharing FAIL intact and
+does not qualify fresh AUTO policy. This private-cache qualification
 also does not claim incorporation into the default release assets.
 
 Local full report/assessment:
