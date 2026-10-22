@@ -33,4 +33,6 @@ same03 parent and normalized cold argv. Start2 gives native DHCP and
 ping4/4; Start3 gives no adapter and4 unreachable replies. Sourcefix is
 f00b1597 in `fix/nt4-net`. Official LAN05 remains false because the hidden
 FIRSTLO helper failed and the old logger did not read global DHCP DNS.
-New collector qualification and frozen MSC tests are separate pending work.
+New collector qualification LAN07 has now completed separately [S16],
+`docs/nt4-installed07-lan-evidence.md`; it is not inferred from HID01.
+Frozen MSC and new IRQ89/08 remain separate pending work.

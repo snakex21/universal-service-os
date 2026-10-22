@@ -12,12 +12,17 @@ def row(path,route,arch='x86'):
 
 
 class EvidenceTests(unittest.TestCase):
-    def test_nt4_hid_does_not_qualify_storage_or_official_lan(self):
+    def test_nt4_hid_and_separate_lan_keep_storage_and_source_guards(self):
         exact=list(audit.NT4_CANDIDATE03_ROW)
         usb,net=audit.capability(exact)
         self.assertIn('brak MSC PASS',usb)
-        self.assertNotIn('QEMU PASS',net)
+        self.assertIn('QEMU PASS LAN07 [S16]',net)
+        self.assertIn('strict configuredUDP DNS10.0.2.3',net)
+        self.assertIn('oldSYS4f2',net)
+        self.assertIn('bez fresh AUTO/nowego IRQ89/MSC/X470 PASS',net)
         self.assertIn('LAN05 false',net)
+        self.assertIn('control06',net)
+        self.assertNotIn('[S16]',audit.hid_test(usb,exact))
         self.assertIn('QEMU PASS NT4 HID01',audit.hid_test(usb,exact))
         self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
 

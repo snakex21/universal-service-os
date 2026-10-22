@@ -114,7 +114,7 @@ Own helperd00c, b49SYS/f537USB and native safe shutdown/readback are pinned;
 final note8d269a40. Functional LAN and client policy retain separate proofs.
 No fresh automatic integration or hardware readiness is claimed.
 
-## NT4: completed Setup/HID, network and MSC follow separately
+## NT4: completed Setup/HID and separate LAN07, MSC follows separately
 
 The corrected temporary address198.51.100.1 replaces192.0.2.1 in the own
 renderer because original TCPCFG rejects a zero octet. `fix/nt4-net`
@@ -129,5 +129,12 @@ asset, despite589/589 host tests. Frozen MSC is being tested separately;
 there is no combined-HID+MSC or physical claim. Network05 versus unchanged
 Start3 control06 establishes the Start2 requirement under matched cold
 argv, but the official05 LAN result remains false for observer/DNS
-collector failures. New07 qualification is pending; do not convert the
-native DHCP/ping evidence into an official full LAN PASS prematurely.
+collector failures. Separate LAN07 now has completed strict qualification
+[S16], sourcec06435bf: actual first-logon/TESTNET_DONE, lease-matched DHCP
+DORA, matching gateway ICMP and configuredUDP10.0.2.3 DNS peer/port/id/
+question. Collector07 dhcp/gateway/dns/lease gates all pass. Helper82279
+and loggerfe4ffa are explicitly pinned; old4f2 SYS is unchanged. Native
+Winver09 confirms SP6a; safeShutdown12/QMP0 and stopped payload/hive
+readback complete the run. This BIOS installed overlay is not fresh AUTO,
+new IRQ89/08, MSC, Server or X470 qualification. LAN05 false and unchanged
+control06 remain preserved; HID01 has its separate S14 proof.
