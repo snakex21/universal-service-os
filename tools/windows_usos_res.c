@@ -383,17 +383,31 @@ static void run(void) {
        or centred-window mode (docs/display-policy.md). */
     for(i=0;i<USOS_DISPLAY_MAX;i++) {
         if(!usos_display_enum(enumerate,GetVersion(),i,&settings[count])) break;
-        modes[count].width=settings[count].dmPelsWidth; modes[count].height=settings[count].dmPelsHeight;
-        modes[count].bpp=settings[count].dmBitsPerPel;
-        /* Progressive 60 Hz or firmware default only; no guessed refresh. */
-        modes[count].valid=!(settings[count].dmDisplayFlags&DM_INTERLACED) &&
-            (settings[count].dmDisplayFrequency<=1 || settings[count].dmDisplayFrequency==60);
-#ifdef USOSRES_9X
-        validate_vbe(&modes[count]);
-        lstrcpyA(line,"DISPLAY mode ");describe(&modes[count]);lstrcatA(line,modes[count].valid?" ok":" rejected");
-        lstrcatA(line," pitch=");number(modes[count].pitch);lstrcatA(line," memory=");number(modes[count].vram);lstrcatA(line,"\r\n");say(line);
-#endif
         count++;
+    }
+    {   /* Progressive 60 Hz / driver default, or the single refresh a
+           uniform driver reports for its whole list; no guessed refresh. */
+        DWORD uniform_hz=0; int uniform=usos_display_uniform_refresh(settings,count,&uniform_hz);
+        lstrcpyA(line,"DISPLAY active=");number(current.dmPelsWidth);lstrcatA(line,"x");number(current.dmPelsHeight);
+        lstrcatA(line,"x");number(current.dmBitsPerPel);lstrcatA(line,"@");number(current.dmDisplayFrequency);
+        lstrcatA(line," refresh=");
+        if(uniform){lstrcatA(line,"uniform@");number(uniform_hz);} else lstrcatA(line,"mixed");
+        lstrcatA(line,"\r\n");say(line);
+        for(i=0;i<count;i++) {
+            modes[i].width=settings[i].dmPelsWidth; modes[i].height=settings[i].dmPelsHeight;
+            modes[i].bpp=settings[i].dmBitsPerPel; modes[i].pitch=modes[i].vram=0;
+            modes[i].valid=usos_display_refresh_ok(&settings[i],uniform,uniform_hz);
+#ifdef USOSRES_9X
+            validate_vbe(&modes[i]);
+#endif
+            lstrcpyA(line,"DISPLAY mode ");describe(&modes[i]);lstrcatA(line,"@");number(settings[i].dmDisplayFrequency);
+            if(settings[i].dmDisplayFlags&DM_INTERLACED)lstrcatA(line,"i");
+            lstrcatA(line,modes[i].valid?" ok":" rejected");
+#ifdef USOSRES_9X
+            lstrcatA(line," pitch=");number(modes[i].pitch);lstrcatA(line," memory=");number(modes[i].vram);
+#endif
+            lstrcatA(line,"\r\n");say(line);
+        }
     }
     request_log(&request,count);
     change_mode=change;
