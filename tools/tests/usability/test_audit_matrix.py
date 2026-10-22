@@ -44,12 +44,14 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('po 1.0',usb)
         self.assertIn('NDIS 3',net)
 
-    def test_completed_nt351_diagnostic_does_not_qualify_storage_or_installer(self):
+    def test_fresh_nt351_lan_keeps_diagnostic_usb_and_storage_separate(self):
         exact=[*audit.NT351_R18F_ROW,'unused','unused','unused','unused']
         usb,net=audit.capability(exact)
         self.assertNotIn('PASS',usb)
-        self.assertIn('QEMU PASS R18f',net)
-        self.assertIn('bez kwalifikacji świeżego instalatora',net)
+        self.assertIn('QEMU PASS R22',net)
+        self.assertIn('świeży normalny USOS',net)
+        self.assertIn('około2s',net)
+        self.assertIn('QEMU PASS R18f',audit.hid_test(usb,exact))
         self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
 
     def test_nt351_result_does_not_spread_to_other_media_editions_or_architecture(self):
