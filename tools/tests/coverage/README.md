@@ -21,14 +21,7 @@ installation and exact-image hardware binding has been assessed.
 - `discover_downloads.py` / `download_media.py`: one-time Windows download plan,
   published whole-file hash validation, collection index; refuse replacement
   of existing media. The plan/report is written before transfer.
-- `download_apple.py` / `apple_integrity.py`: Apple full packages. Catalogue
-  `Digest` checks the compressed XAR TOC, **not** the complete PKG. Check all
-  SHA-256 blocks using Apple's HTTPS `integrityDataV1` as well; method 2 is
-  a self-checking manifest, not a digital signature. Record a full-file SHA-256
-  locally. These downloads are not bootable ISO files.
-- `download_apple_recovery.py`: invoke the pinned existing OpenCore recovery
-  utility with a documented public board ID and placeholder MLB; verify the
-  signed recovery chunklist. Recovery is an online-install environment.
+- macOS download / recovery helpers are not part of this branch (macOS DLC, separate).
 - `prepare_stick.py` / `boot_menu.py`: disposable qcow2 fixture and OVMF menu
   adapter. The former boots Linux directly only to construct the test stick;
   the OS flow starts from OVMF, the unmodified UEFI menu and the product
