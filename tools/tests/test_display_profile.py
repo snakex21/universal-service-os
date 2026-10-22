@@ -385,6 +385,17 @@ class TargetBuilds(unittest.TestCase):
         for text in ('DISPLAY VBI start failed error=', 'DISPLAY VBI wait=', 'copy_vbi_log();', 'DISPLAY VBE.DAT absent', '" rejected"'):
             self.assertIn(text, source)
 
+    def test_nt_helper_logs_every_mode_and_uniform_refresh(self):
+        # X470 Win10 x86 2026-10-22: "modes=15 ... no tested mode" without a
+        # per-mode line on NT. Every family now logs each mode with its
+        # refresh and uses the shared refresh rule.
+        source = (ROOT/'tools/windows_usos_res.c').read_text()
+        self.assertIn('usos_display_uniform_refresh(settings,count,&uniform_hz)', source)
+        self.assertIn('usos_display_refresh_ok(&settings[i],uniform,uniform_hz)', source)
+        loop = source[source.index('"DISPLAY active="'):source.index('request_log(&request,count);\n    change_mode')]
+        self.assertIn('"DISPLAY mode "', loop)
+        self.assertNotIn('dmDisplayFrequency==60', source)
+
     def test_original_media_proves_nt35_fallback_is_required(self):
         for fixture, expected in [('nt35_display_exports.txt', False), ('nt351_display_exports.txt', True), ('nt4rtm_display_exports.txt', True)]:
             table = exports(fixture)['user32.dll']

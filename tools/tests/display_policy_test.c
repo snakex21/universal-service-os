@@ -105,6 +105,25 @@ void entry(void) {
         CHECK(usos_display_already(basic,4,&r,0,1024,768,16,&c)<0);
         CHECK(usos_display_already(NULL,0,&r,0,1024,768,32,&c)<0 && c.index==-1);
     }
+    {   /* Refresh: X470 Win10 x86 2026-10-22 (Basic Display, no answer):
+           15 modes, none at 60 / default -> "no tested mode". A driver with
+           one refresh for its whole list counts; mixed lists stay strict. */
+        static DEVMODEA s[4]; DWORD hz=0; int i;
+        static const DWORD sizes[4][2]={{800,600},{1024,768},{1280,1024},{1920,1080}};
+        for(i=0;i<4;i++){s[i].dmPelsWidth=sizes[i][0];s[i].dmPelsHeight=sizes[i][1];s[i].dmBitsPerPel=32;s[i].dmDisplayFrequency=64;s[i].dmDisplayFlags=0;}
+        CHECK(usos_display_uniform_refresh(s,4,&hz) && hz==64);
+        for(i=0;i<4;i++) CHECK(usos_display_refresh_ok(&s[i],1,hz));
+        CHECK(!usos_display_refresh_ok(&s[0],0,0));
+        s[2].dmDisplayFrequency=75; CHECK(!usos_display_uniform_refresh(s,4,&hz));
+        CHECK(!usos_display_refresh_ok(&s[2],0,0) && !usos_display_refresh_ok(&s[0],0,0));
+        s[2].dmDisplayFrequency=60; CHECK(usos_display_refresh_ok(&s[2],0,0));
+        s[2].dmDisplayFrequency=1; CHECK(usos_display_refresh_ok(&s[2],0,0));
+        /* An interlaced entry neither breaks uniformity nor is accepted. */
+        s[2].dmDisplayFrequency=87; s[2].dmDisplayFlags=DM_INTERLACED;
+        CHECK(usos_display_uniform_refresh(s,4,&hz) && hz==64 && !usos_display_refresh_ok(&s[2],1,87));
+        s[2].dmDisplayFrequency=64; CHECK(!usos_display_refresh_ok(&s[2],1,64));
+        CHECK(!usos_display_uniform_refresh(s,0,&hz));
+    }
     CHECK(usos_display_parse("1920x1080xauto",&r));
     /* double buffering rejects 15.82 MiB for an 8 MiB adapter */
     CHECK(usos_display_choose(m,5,&r,1).index==2);

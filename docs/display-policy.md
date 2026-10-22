@@ -186,9 +186,18 @@ never an invented one.
 
 X470 expectation (BenQ GL2250H, 1080p): `native=1920x1080` in DISPLAY.TXT,
 `DISPLAY selected=1920x1080x32 reason=native test=0`, `DISPLAY applied`.
-Host tests only; not yet run on the X470. Risk: the 60 Hz /
-default-refresh filter; a Basic Display mode reported with another
-refresh is skipped (`DISPLAY no tested mode; current retained`).
+X470 2026-10-22 (fresh Win10 22H2 x86, Micron NVMe, answer=none): the
+registration worked (Default hive Run, first sign-in of the OOBE user,
+its HKCU value removed) but USOSRES logged `native=1920x1080 modes=15`
+and `DISPLAY no tested mode; current retained` with no `selected=` line:
+every listed mode failed the 60 Hz / default-refresh filter before
+CDS_TEST (CCD stored VSyncFreq NOTSPECIFIED for 1024x768). Fix: a driver
+that reports one refresh value for its whole progressive list sets no
+timing of its own, so that value counts (`display_compat.h`
+`usos_display_uniform_refresh` / `usos_display_refresh_ok`); lists with
+several refresh values keep the strict rule. Every family now logs
+`DISPLAY active=WxHxB@Hz refresh=uniform@N|mixed` and one `DISPLAY mode
+WxHxB@Hz ok|rejected` line per mode. Host tests only; X470 recheck open.
 Existing installs (done before this change) have no `\USOS\NT6`: only a
 fresh preparation gets it.
 
