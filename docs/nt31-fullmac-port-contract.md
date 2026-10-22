@@ -440,3 +440,68 @@ R24c manifest pins new overlay
 with clean R24 backing. Original SYSTEM/TCPIP/USB and BDF settings remain
 byte-identical; only own files change. R24c started after one normal guard
 and awaits its passive endpoint. Its LAN result is still unqualified.
+
+
+### R24c completed: original NT31 full-MAC static LAN qualified
+
+R24c reached Program Manager (operator-02.png) without the previous SCM
+alert. The actual E9 trace records CPUcount1/IRQL0, successful RegisterAdapter,
+MapIoSpace and RegisterMac, MMIO81000000 and RX/TX rings00733080/00733B80,
+both below16MiB. The SYS read back from the stopped guest is exactly build16
+b49f2445a2e48dbf75b50f426ccc1cef09943a84e779d351747d4cbc8df27a8d,
+16384B, PE3.10; all43 imports match the installed UP modules.
+
+Original native ping completed3/3 twice, in PING31.LOG and POST.LOG.
+Original NT31 ping does not print RTT, so none is claimed. The own logger
+matched the configured DNS10.0.2.3 reply for frogfind.com, transaction4AC0,
+answer64.227.13.248 after30ms. Native gethostbyname independently returned
+that address after120ms. HTTP68k.news returned HTTP/1.1 200 OK; this was the
+logger, not a page in Internet Explorer. Original NT31 has no bundled IE.
+The separate frogfind.com HTTP timeout4005ms remains in the log. Logger ICMP
+remains SKIP because its newer adapter-discovery path did not recognize the
+old global NT31 gateway schema; native ping is the primary echo proof.
+
+Native shutdown reached the safe screen (operator-12.png), then QMP quit
+returned0; elapsed1013.96s. Retained target SHA256 is
+05638a08cfd41460d5d1b96b3735859ac7b1ac33ed97b2bfa0951a5124a4de1d.
+The bounded collector exported only selected own text plus hash/service
+metadata. Frozen USBf5373eb3...ef05, i8042prtStart4, actual REGF1.1 current/
+default1 and original TCPIP/STREAMS were confirmed. Raw scratch was removed;
+base unchanged. Manual assessment is
+artifacts/nt31-fullmac-runtime/r24c-guest-evaluation.json; primary stopped
+readback is r24c-stopped-readback/readback.json. The8MiB-capped sole-VM PCAP
+has48097B/251frames and is supplemental; automatic installed-pass/DORA flags
+were not rewritten. Original NT31 uses static TCP/IP here, DHCP is N/A.
+
+This qualifies the installed UP/QEMU82576 at explicit BDF00:05.0, staticIP
+10.0.2.15/24, gateway10.0.2.2 and DNS10.0.2.3. The nominal20ms worker is not
+an exact latency guarantee. Reset is unsupported; dynamic unload/worker join
+is not runtime-qualified. Native shutdown is not evidence of MAC unload.
+No X470, physical NIC, I210/I211, SMP or NT31Server claim follows. The R24
+error193 and R24b ABI STOP remain failures. R24c did not repeat USB hotplug;
+a following unchanged-binary overlay will assess that coexistence separately.
+
+### Remaining work for fresh normal USOS network automation
+
+1. Add an NT31-only selector/staging path in tools/nt4_csmwrap_target.sh for
+   the proven82576/UP/explicitBDF candidate. Stage the pinned SYS as the
+   actual8.3 USNET31.SYS, private OEM INF and NET31CFG helper; preserve other
+   OS branches and frozen USB. The proven original NCPA identity is
+   USOSNET31 plus USOSNET3101, not a guessed later miniport service scheme.
+2. Implement and test original NT31 Setup/NCPA automation for the adapter,
+   stock STREAMS/TCPIP and static address/gateway/DNS. Verify original INF
+   fields instead of assuming NT35 NetworkAdapterData/TransportData. Preserve
+   the required protocol/binding reboot. The current success used original
+   NCPA manually on a retained R19c-derived installation.
+3. Overlay only the owned NT31 payload into the latest cache, preserving
+   later NT4/NT35/NT351 changes. Pin cache/initrd/SYS/helper/sourceISO hashes.
+   The separate legacy IRQ source correction must be applied once by the
+   integrator; this polling NT31 binary was not rebuilt with that change.
+4. Integrate a scoped NT31 success collector and bounded VM-only capture in
+   the normal coverage run_plan/boot_menu flow. A status or hash match alone
+   must never grant LAN PASS; the current stopped collector is case-scoped.
+5. Run a fresh blank-target normal USOS plan through Program Manager,
+   native ping, matched DNS, USB isolation, native shutdown and stopped
+   readback with the same pins. R24c is installed-overlay qualification,
+   not fresh automatic network-installation PASS. Workstation/server and
+   Dial-Up policy still need narrowly scoped presence/runtime evidence.
