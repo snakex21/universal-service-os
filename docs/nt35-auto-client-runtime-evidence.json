@@ -1,0 +1,441 @@
+{
+  "case": "nt35-client-auto-fresh01",
+  "assessment": {
+    "case": "nt35-client-auto-fresh01",
+    "fresh_normal_usos_blank_target": true,
+    "fresh_desktop": "PASS",
+    "fresh_auto_client_no_sharing": "PASS",
+    "fresh_d94_guest_lan": "PASS",
+    "auto_policy_source_commit": "1feadbaf534d4546c42a051b6d34d430371d8f89",
+    "policy_configured_before_first_target_boot": true,
+    "manual_policy_helper_invoked": false,
+    "native_services": {
+      "running_services": [
+        "DHCP Client",
+        "EventLog",
+        "Messenger",
+        "OLE",
+        "Spooler",
+        "TCP/IP NetBIOS Helper",
+        "Workstation"
+      ],
+      "workstation_running": true,
+      "server_running": false,
+      "browser_running": false,
+      "no_sharing_running_state": true
+    },
+    "stopped_policy": {
+      "selected": {
+        "current": 1,
+        "default": 1
+      },
+      "services": {
+        "1": {
+          "Browser": {
+            "present": true,
+            "start": 4,
+            "type": 32
+          },
+          "LanmanServer": {
+            "present": true,
+            "start": 4,
+            "type": 32
+          },
+          "LanmanWorkstation": {
+            "present": true,
+            "start": 2,
+            "type": 32
+          },
+          "Tcpip": {
+            "present": true,
+            "start": 3,
+            "type": 1
+          },
+          "RasMan": {
+            "present": false
+          },
+          "RasAcd": {
+            "present": false
+          },
+          "RemoteAccess": {
+            "present": false
+          }
+        }
+      }
+    },
+    "network": {
+      "native_dhcp_release_renew": true,
+      "address": "10.0.2.15",
+      "gateway": "10.0.2.2",
+      "configured_dns_in_native_ipconfig": "10.0.2.3",
+      "native_gateway_replies": [
+        "<10ms TTL=255",
+        "<10ms TTL=255",
+        "<10ms TTL=255"
+      ],
+      "strict_gateway_echo_match": true,
+      "strict_gateway_rtt_ms": 0,
+      "strict_fixed_dns_results": [
+        "UDP DNS 1.1.1.1 (fixed): reply after 90 ms from 1.1.1.1:53: 46 bytes DNS PASS dns_match=1 id=01B2 question=frogfind.com A=64.227.13.248",
+        "UDP DNS 8.8.8.8 (fixed): reply after 50 ms from 8.8.8.8:53: 46 bytes DNS PASS dns_match=1 id=0905 question=frogfind.com A=64.227.13.248",
+        "TCP DNS 1.1.1.1:53: connected in 20 ms, reply: 46 bytes DNS PASS dns_match=1 id=5755 question=frogfind.com A=64.227.13.248"
+      ],
+      "strict_configured_dns_10_0_2_3": "NOT_TESTED",
+      "native_gethostbyname_lines": [
+        "[NET] gethostbyname(frogfind.com): 64.227.13.248 after 101 ms",
+        "[NET] gethostbyname(example.com): ok error 0 after 20 ms",
+        "[NET] gethostbyname(68k.news): ok error 0 after 60 ms"
+      ],
+      "http_200_observed": true,
+      "http_is_own_logger_not_ie": true,
+      "retained_negative_logger_lines": [
+        "[NET] UDP DNS 10.0.2.2 (gateway): query 30 bytes sent, NO REPLY in 3000 ms",
+        "[NET] TCP connect 10.0.2.2:80: connect TIMEOUT after 4006 ms",
+        "[NET]   HTTP 64.227.13.248:80: connect TIMEOUT after 4006 ms"
+      ]
+    },
+    "driver_sha256": "d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85",
+    "driver_bytes": 16384,
+    "actual_post_sha256": "87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f",
+    "actual_post_bytes": 30208,
+    "independent_actual_driver_readbacks": 2,
+    "initrd_sha256": "ae9568457e6af6150fb1d6fc672a7a841e73b4c2002fbef10107c0afd11e0bb5",
+    "changed_effective_entries": 3,
+    "other_834_effective_entries_unchanged": true,
+    "old_and_private_cache_unchanged_after_runtime": true,
+    "visual_review": {
+      "case": "nt35-client-auto-fresh01",
+      "native_safe_shutdown_observed": true,
+      "images": {
+        "desktop": {
+          "file": "operator-01.png",
+          "sha256": "c9b514ef75d65cc7c0e089ea7aa112019b406edc12a60f3243b8e95e05caa223",
+          "observed": "Program Manager and native Run dialog over Windows NT Workstation Version 3.5 wallpaper."
+        },
+        "native_services": {
+          "file": "operator-10.png",
+          "sha256": "00e8cc9ce86525cffc0cf4d2b78803cff25d2895dbea3b532b48849ec1ac5c64",
+          "observed": "Completed native net start lists DHCP Client and Workstation; Server and Computer Browser are absent. No service change command was issued."
+        },
+        "native_dhcp": {
+          "file": "operator-11.png",
+          "sha256": "ab63bd8de0934c3f893195f09f9ee5e92bcc1b710c825b82de3ecf7ca2c199e4",
+          "observed": "Native ipconfig /all shows sole USOS Ethernet MAC 52-54-00-55-53-01, DHCP Yes, 10.0.2.15/24, gateway and DHCP server10.0.2.2, DNS10.0.2.3."
+        },
+        "native_ping": {
+          "file": "operator-09.png",
+          "sha256": "61115c4900305b5832e030ad342d4aae3eb209f1caafda0cd49a89c7e9b998ed",
+          "observed": "Native ping -n3 to gateway10.0.2.2 gives three bytes32 replies time<10ms TTL255 after DHCP renewal."
+        },
+        "logger_complete": {
+          "file": "operator-13.png",
+          "sha256": "ec92b3f3707dc5cfea5e25c56fa45dd23b067666bbcd9fbfbfbe4b898288c381",
+          "observed": "Own unchanged logger snapshot #1 ended and returned to prompt; HTTP68k.news returned HTTP/1.1 200 OK. Frogfind/gateway TCP timeouts and gateway DNS no reply remain in full log."
+        },
+        "safe_shutdown": {
+          "file": "operator-17.png",
+          "sha256": "e1956af370356c8bfb5a10be555c4eaf74ea78ab030a8ebd3dbd992094e925b3",
+          "observed": "Native Shutdown Computer screen explicitly says It is now safe to turn off your computer."
+        }
+      }
+    },
+    "native_safe_shutdown": true,
+    "qemu_returncode": 0,
+    "process_returncode": 0,
+    "target_sha256": "b316b2faeec744cfb90cddd1a84cac3b50f9c7b63b47c3f3ad7d4290f5021f8a",
+    "retained_images": {
+      "target-retained.qcow2": {
+        "bytes": 242417664,
+        "sha256": "b316b2faeec744cfb90cddd1a84cac3b50f9c7b63b47c3f3ad7d4290f5021f8a"
+      },
+      "vars-retained.fd": {
+        "bytes": 540672,
+        "sha256": "c47156ab8bba0fd8f0ce8de10ce2170ed0613c97cee0f41e3e5024b7e4b13740"
+      },
+      "stick-retained.qcow2": {
+        "bytes": 498204672,
+        "sha256": "83b928d93a28015cb9fa832519bd680c6477da8ce9f47e20fb5a3c9c6878c89f"
+      }
+    },
+    "bounded_vm_capture_sha256": "d58c9db2c3488b3786d4fa136fe005d22e0f124ed487e20f7057262677390ce1",
+    "strict_dora_observed": false,
+    "packet_capture_alone_never_guest_pass": true,
+    "ps2_baseline": true,
+    "new_usb_or_msc_qualification": false,
+    "failure_stop_scope": "Requested CLIENT/NET35 and checked DONE/restart only; legacy drivers[] CopyFile logging and void set_dword are not generally hardened or USB-failure qualified",
+    "previous_fresh_sharing_fail_and_overlay_policy_pass_unchanged": true,
+    "no_ms_binary_hive_export": true,
+    "no_physical_writes": true,
+    "no_progress_polling": true,
+    "scope": "Exact NT3.5 Workstation EN/QEMU/AHCI/igb; no NT31/NT351/Server/physical/SMP or SMB-client transfer qualification"
+  },
+  "artifact_hashes": {
+    "artifacts/coverage/nt35-client-auto-fresh01/guest-evaluation.json": {
+      "bytes": 6643,
+      "sha256": "c5b86a2c81cc0bf1a897f2371406b4f94c680766eff64fc78903eeefb158173b"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/stopped-readback.json": {
+      "bytes": 2093,
+      "sha256": "d1489852283baff5ab9c6d17441dbabb2145633a70f77be4d180fefa8e436c66"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/visual-review.json": {
+      "bytes": 1831,
+      "sha256": "3b1403c0c86a021b6fa25c25fde125b61816330e8d4a936b8eb6b194d09443d0"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/operator-requests.json": {
+      "bytes": 6520,
+      "sha256": "b9f7030fba556724bc47ed67e46b1f070d70bdfe285aeb3fa14d69b42ff6526d"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/process-exit.json": {
+      "bytes": 18,
+      "sha256": "df4d721d233a2334088d2d2e0110346ae9e509ff46bf0b379fbcfa85c715af4d"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/plan.json": {
+      "bytes": 1015,
+      "sha256": "79d9366fe00dd39a7eab72cde2a8ccff54994f60f91f2e0e9f383d7b32c06f95"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/cache-manifest.json": {
+      "bytes": 52475,
+      "sha256": "754d72e270f608fc02ec573188ba196f3d0a3f303b4a9412c401df449ca23844"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/harness-manifest.json": {
+      "bytes": 15062,
+      "sha256": "9496091570af36f544ea383b62469a4eea89b02f97d6e35a109b8aaccc2746c9"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/start-manifest.json": {
+      "bytes": 1878,
+      "sha256": "a8405bc8f66946175772ef1daf777d91e69c88c3ab3c3e13cbc768b2455f2807"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/target-info.json": {
+      "bytes": 746,
+      "sha256": "f1620cfa0260a30f92e462f5e03ee95e3d7762dc9c5c32670cf5cc93cc63b654"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/pcap-completed-analysis.json": {
+      "bytes": 305,
+      "sha256": "8dbfcb72faa6743efca9e92ad30eda4763b90b4b944a98d347ba4d9b2e4ff9a9"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/CLNT35.REQ": {
+      "bytes": 29,
+      "sha256": "b253d0591f05e7eb339033576838d7f7cc5b11e7322428b94f5bda9baf74ac61"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/CLNT35.LOG": {
+      "bytes": 223,
+      "sha256": "86679faa05d789e84b9e01602f3bf636b3af7d4100e8a3e99c5f20e3ccd7f183"
+    },
+    "artifacts/coverage/nt35-client-auto-fresh01/C35NET.LOG": {
+      "bytes": 1484,
+      "sha256": "79586c934e3f4f21a1693e32ed0b8bb5cee820c207cfe2fc9883e561eb0bc59e"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/result.json": {
+      "bytes": 2962,
+      "sha256": "df3d5a514cbea246fa70a718451bbbff0146542d9c932d527d32dc620a888340"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/cleanup.json": {
+      "bytes": 84,
+      "sha256": "7e04b11ad64578d668cd808fae89981231bcd9b82abe937b1de384dc77738c73"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/fixture.json": {
+      "bytes": 1592,
+      "sha256": "3394c82f8f03da6efefa7b86ad7c5f4b65f834a89754af66320d2fe01f222b72"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/command.json": {
+      "bytes": 1448,
+      "sha256": "c0c0dcc3f0a5143cadb163ff4405fd18e46fa41974840d936401583beed4717d"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-actions.jsonl": {
+      "bytes": 1541,
+      "sha256": "6454cbf0389a7932b50b6764b67bd5f586c7a167f0c28d693770520332c68792"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/network.pcap": {
+      "bytes": 28487,
+      "sha256": "d58c9db2c3488b3786d4fa136fe005d22e0f124ed487e20f7057262677390ce1"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/collection.json": {
+      "bytes": 902,
+      "sha256": "a604563692df31cce6b8bc5dc3d783e28350e597332002d249209baf87f7daa6"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/NET35.STATUS": {
+      "bytes": 268,
+      "sha256": "938b9cd817b413a5f49340fb105fc922a3fd1d84e4f85f43b6182af380247808"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/NET35.ON": {
+      "bytes": 180,
+      "sha256": "0cd4dbe2c164f4f2a35e452224fa644ce6bbfe9e57a95882152153d20b9036ed"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/POST.LOG": {
+      "bytes": 2566,
+      "sha256": "d2df2c7fd376932091820baafb2ab0c8539ac96415bafdde540ad8e0202f15eb"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/USABILITY.TXT": {
+      "bytes": 4744,
+      "sha256": "2dfaa6fdb84adc6ef3da857c4cf4199a71096a47de25cf8485e551f0aa9f9361"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/nt35-own-evidence/USOSNET35.SHA256": {
+      "bytes": 80,
+      "sha256": "3e1193e647347503b0bc31d5bd0e94d6dc3bd05c47ba9036ba06b677d8767f21"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-01.png": {
+      "bytes": 17971,
+      "sha256": "c9b514ef75d65cc7c0e089ea7aa112019b406edc12a60f3243b8e95e05caa223"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-10.png": {
+      "bytes": 20012,
+      "sha256": "00e8cc9ce86525cffc0cf4d2b78803cff25d2895dbea3b532b48849ec1ac5c64"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-11.png": {
+      "bytes": 20874,
+      "sha256": "ab63bd8de0934c3f893195f09f9ee5e92bcc1b710c825b82de3ecf7ca2c199e4"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-09.png": {
+      "bytes": 21964,
+      "sha256": "61115c4900305b5832e030ad342d4aae3eb209f1caafda0cd49a89c7e9b998ed"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-13.png": {
+      "bytes": 28554,
+      "sha256": "ec92b3f3707dc5cfea5e25c56fa45dd23b067666bbcd9fbfbfbe4b898288c381"
+    },
+    "artifacts/coverage/vm/nt35-client-auto-fresh01/operator-17.png": {
+      "bytes": 19141,
+      "sha256": "e1956af370356c8bfb5a10be555c4eaf74ea78ab030a8ebd3dbd992094e925b3"
+    }
+  },
+  "stopped_readback": {
+    "stopped": true,
+    "qemu_returncode": 0,
+    "process_returncode": 0,
+    "target": "G:\\USOS-Kolekcja\\_vm\\nt35-client-auto-fresh01\\target-retained.qcow2",
+    "target_sha256": "b316b2faeec744cfb90cddd1a84cac3b50f9c7b63b47c3f3ad7d4290f5021f8a",
+    "driver_sha256": "d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85",
+    "driver_bytes": 16384,
+    "post_sha256": "87cb43259878583758269b979c8e59411d69366ce5d58ec949a51638786d449f",
+    "post_bytes": 30208,
+    "hive_version": [
+      1,
+      2
+    ],
+    "system_sha256": "d6a69cbdc6de3bd4793f7ddcc2cd67ad989843607fd0955dea1b40ba0baaf585",
+    "policy": {
+      "selected": {
+        "current": 1,
+        "default": 1
+      },
+      "services": {
+        "1": {
+          "Browser": {
+            "present": true,
+            "start": 4,
+            "type": 32
+          },
+          "LanmanServer": {
+            "present": true,
+            "start": 4,
+            "type": 32
+          },
+          "LanmanWorkstation": {
+            "present": true,
+            "start": 2,
+            "type": 32
+          },
+          "Tcpip": {
+            "present": true,
+            "start": 3,
+            "type": 1
+          },
+          "RasMan": {
+            "present": false
+          },
+          "RasAcd": {
+            "present": false
+          },
+          "RemoteAccess": {
+            "present": false
+          }
+        }
+      }
+    },
+    "client_configuration_disabled_readback": true,
+    "own_files": {
+      "CLNT35.REQ": {
+        "present": true,
+        "bytes": 29,
+        "sha256": "b253d0591f05e7eb339033576838d7f7cc5b11e7322428b94f5bda9baf74ac61"
+      },
+      "CLNT35.LOG": {
+        "present": true,
+        "bytes": 223,
+        "sha256": "86679faa05d789e84b9e01602f3bf636b3af7d4100e8a3e99c5f20e3ccd7f183"
+      },
+      "CLNT35.ERR": {
+        "present": false
+      },
+      "C35NET.LOG": {
+        "present": true,
+        "bytes": 1484,
+        "sha256": "79586c934e3f4f21a1693e32ed0b8bb5cee820c207cfe2fc9883e561eb0bc59e"
+      }
+    },
+    "registry_modified": false,
+    "no_ms_binary_or_hive_export": true,
+    "scope": "Selected service Start/Type only; native running-state proof is separate",
+    "scratch_whole_disk_removed": true
+  },
+  "runtime": {
+    "result": "ASSESS_ENDPOINT",
+    "first_logon_observed": false,
+    "elapsed_seconds": 3820.31,
+    "prepared_target_seconds": 2868.41,
+    "qemu_returncode": 0,
+    "input": "PS/2",
+    "network_capture": {
+      "path": "network.pcap",
+      "mac": "52:54:00:55:53:01",
+      "netdev": "usabilitynet",
+      "hard_byte_cap": 8388608,
+      "boundary_disconnect": {
+        "type": "ConnectionResetError",
+        "errno": 22,
+        "winerror": 64,
+        "during_controlled_shutdown": true
+      },
+      "controlled_boundary_reset_accepted": true,
+      "stored_bytes": 28487,
+      "stored_frames": 101,
+      "received_frames": 101,
+      "discarded_frames": 0,
+      "capped": false,
+      "connected": true,
+      "error": null,
+      "sha256": "d58c9db2c3488b3786d4fa136fe005d22e0f124ed487e20f7057262677390ce1",
+      "analysis": {
+        "dora_observed": false,
+        "exchanges": [],
+        "records": 101,
+        "prepared_target_start_record": 8,
+        "installed_runtime_pass": false,
+        "icmp_pass": false,
+        "dns_pass": false,
+        "scope": "Pinned VM netdev exchange after requested prepared-target start; guest/OS attribution requires guest evidence"
+      }
+    }
+  },
+  "pins": {
+    "source_commit": "1feadbaf534d4546c42a051b6d34d430371d8f89",
+    "fixture_commit": "8c7dba7e",
+    "plan_sha256": "79d9366fe00dd39a7eab72cde2a8ccff54994f60f91f2e0e9f383d7b32c06f95",
+    "harness_manifest_sha256": "9496091570af36f544ea383b62469a4eea89b02f97d6e35a109b8aaccc2746c9",
+    "original_archive_sha256": "e63ce7b63906cfad0b705200ca8f1318d8620d88370ab26ce5ba6fbe8bdd5236",
+    "original_iso_sha256": "109d2c28e3d774e01987434b11c622fbf336e01f28eec2eafe40544f166852d1",
+    "cache": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt35-client-auto01",
+    "initrd_sha256": "ae9568457e6af6150fb1d6fc672a7a841e73b4c2002fbef10107c0afd11e0bb5",
+    "logger_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7"
+  },
+  "readback_and_native_parser_tests": {
+    "count": 6,
+    "result": "PASS",
+    "missing_selected_controlset_refused": true
+  },
+  "ras_scope": "Only RasMan/RasAcd/RemoteAccess service names absent; no complete Dial-Up package claim",
+  "evidence_directory": "C:\\Users\\ASRock\\usos-work\\nt35-auto-client\\artifacts\\coverage\\nt35-client-auto-fresh01",
+  "runtime_directory": "C:\\Users\\ASRock\\usos-work\\nt35-auto-client\\artifacts\\coverage\\vm\\nt35-client-auto-fresh01",
+  "no_shared_report_or_matrix_change": true
+}

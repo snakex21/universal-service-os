@@ -21,6 +21,16 @@ class EvidenceGuards(unittest.TestCase):
         policy['services']['1']['LanmanServer']=dict(present=False)
         self.assertFalse(policy_pass(policy))
 
+    def test_missing_selected_control_set_cannot_be_vacuous_pass(self):
+        self.assertFalse(policy_pass({}))
+        policy=self.policy();policy['services'].clear()
+        self.assertFalse(policy_pass(policy))
+        policy=self.policy();del policy['services']['2']
+        self.assertFalse(policy_pass(policy))
+        for bad in (0,1000,True,'1'):
+            policy=self.policy();policy['selected']['current']=bad
+            self.assertFalse(policy_pass(policy))
+
     def test_workstation_and_tcpip_config_never_inferred(self):
         for name,field,value in (('LanmanWorkstation','start',4),('Tcpip','type',32),('Tcpip','start',0)):
             policy=self.policy();policy['services']['1'][name][field]=value

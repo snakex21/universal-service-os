@@ -32,6 +32,9 @@ def digest(path):
 
 
 def policy_pass(policy):
+    selected=policy.get('selected',{})
+    if set(selected)!={'current','default'} or any(type(v) is not int or not 1<=v<=999 for v in selected.values()):return False
+    if set(policy.get('services',{}))!={str(v) for v in selected.values()}:return False
     for rows in policy['services'].values():
         for name in ('Browser','LanmanServer'):
             value=rows[name]
