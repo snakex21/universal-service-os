@@ -33,4 +33,15 @@ static UsosDisplayResult usos_display_execute(UsosDisplayMode *m,unsigned count,
     }
     return result;
 }
+/* The driver already runs the mode the policy picks from its own list
+   (e.g. an XP driver at the monitor's native mode, or 8.1 / 10 x86 on
+   Microsoft Basic Display when the monitor's native mode is the current
+   one): nothing is tested or changed. Returns the chosen index or -1. */
+static int usos_display_already(const UsosDisplayMode *m,unsigned count,const UsosDisplayRequest *request,
+    int buffers,unsigned long width,unsigned long height,unsigned long bpp,UsosDisplayChoice *out) {
+    UsosDisplayChoice chosen=usos_display_choose(m,count,request,buffers);
+    *out=chosen;
+    if(chosen.index<0)return -1;
+    return m[chosen.index].width==width && m[chosen.index].height==height && m[chosen.index].bpp==bpp ? chosen.index : -1;
+}
 #endif

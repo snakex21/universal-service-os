@@ -246,6 +246,26 @@ class DisplayTransport(unittest.TestCase):
         folder, out = self.nt6_display_block(registered, helper=False)
         self.assertFalse(folder.exists()); self.assertIn(b'USOSRES.EXE missing', out)
 
+    def test_x86_modern_csmwrap_stages_from_rendered_answers(self):
+        # win-x86-uefi-csmwrap (32-bit 8 / 8.1 / 10) runs the same target
+        # script (X86_SELF=1); step 2b is not tied to the Vista profile.
+        text = (ROOT/'tools/vista_csmwrap_target.sh').read_text()
+        block = text[text.index('# 2b. Display'):text.index('# 3. The PE10 donor')]
+        self.assertNotIn('$X86_SELF', block)
+        golden = ROOT/'src/flow/answer/testdata/golden'
+        for name in ('full.windows-10.x86.xml', 'full.windows-8-1.x86.xml', 'options.windows-10.x86.xml',
+                     'full.windows-8.amd64.xml'):
+            folder, out = self.nt6_display_block((golden/name).read_bytes())
+            self.assertEqual((folder/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n', name)
+            self.assertIn(b'DISPLAY request=autoxauto apply=first-sign-in', out, name)
+        folder, _ = self.nt6_display_block((golden/'tweaks.windows-8-1.x86.xml').read_bytes())
+        self.assertTrue((folder/'DISPLAY.TXT').read_bytes().startswith(b'1024x768x'))
+        # Windows 11 / Server 2012+ / arm64 never register it: nothing staged.
+        for name in ('full.windows-11.amd64.xml', 'full.windows-10.arm64.xml', 'full.windows-server-2012-r2.amd64.xml'):
+            if (golden/name).exists():
+                folder, _ = self.nt6_display_block((golden/name).read_bytes())
+                self.assertFalse(folder.exists(), name)
+
     def test_display_section_stays_before_usos_csm(self):
         # INSTALL.BAT appends Me's usoskey.drv line to the last section, which
         # must stay [USOS.Csm] (else the Me USB keyboard driver is lost).

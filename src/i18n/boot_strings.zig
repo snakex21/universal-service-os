@@ -2987,7 +2987,7 @@ pub const english = [_][]const u8{
     "Windows does not encrypt the system disk with BitLocker on its own, so other systems and USOS can still read it.",
     "Vista and 7: User Account Control off. Less safe: every program of an administrator runs with full rights.",
     "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
-    "Vista, 7, Server 2008 and 2008 R2 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it.",
+    "Vista, 7, Server 2008, 2008 R2 and 32-bit 8, 8.1 and 10 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it.",
     "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit.",
     "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
     "Right-clicking a taskbar button offers End task (for every new user).",

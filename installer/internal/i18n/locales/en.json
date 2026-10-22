@@ -1152,7 +1152,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Screen resolution",
-  "boot.profile.help.display": "Vista, 7, Server 2008 and 2008 R2 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it.",
+  "boot.profile.help.display": "Vista, 7, Server 2008, 2008 R2 and 32-bit 8, 8.1 and 10 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it.",
   "boot.profile.xp_ini.detail": "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
   "boot.profile.section.apps": "Apps and scripts",
   "boot.profile.field.shortcut_suffix_off": "No \"Shortcut\" in shortcut names",

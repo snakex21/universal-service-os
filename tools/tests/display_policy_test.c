@@ -44,6 +44,16 @@ void entry(void) {
     enum_calls=0;CHECK(usos_display_enum(old_enum,5,0,&mode)&&enum_calls==3);
     CHECK(usos_display_current(old_enum,3,old_caps,&mode)&&mode.dmPelsWidth==1024&&mode.dmPelsHeight==768);
     CHECK(usos_display_change(old_change,&mode,CDS_UPDATEREGISTRY|CDS_GLOBAL)==0&&change_calls==2&&last_flags==CDS_UPDATEREGISTRY);
+    /* NT 6.2 / 6.3 / 10 (as 6.2 unmanifested, 10.0 manifested): like 6.0 /
+       6.1, no CDS_GLOBAL and the per-user Run value is removed; NT5 global;
+       NT4 and 9x (high bit) neither. */
+    CHECK(usos_display_flags(0x0005)==(CDS_UPDATEREGISTRY|CDS_GLOBAL)&&usos_display_flags(0x0105)==(CDS_UPDATEREGISTRY|CDS_GLOBAL));
+    {   static const DWORD nt6[]={0x0006,0x0106,0x0206,0x0306,0x000A}; int i;
+        for(i=0;i<5;i++) CHECK(usos_display_flags(nt6[i])==CDS_UPDATEREGISTRY&&usos_display_user_run(nt6[i]));
+    }
+    CHECK(usos_display_flags(0x0004)==CDS_UPDATEREGISTRY&&!usos_display_user_run(0x0004)&&!usos_display_user_run(0x0005));
+    CHECK(!usos_display_user_run(0xC0000A04UL));
+    CHECK(usos_display_dm_size(0x0206)==156&&usos_display_dm_size(0x000A)==156);
     CHECK(usos_display_retry(4,0,0,0)&&usos_display_retry(16,3,DISP_CHANGE_NOTUPDATED,0));
     CHECK(usos_display_retry(32,0,0,1)&&!usos_display_retry(32,1,0,0));
     CHECK(usos_display_parse("1920x1080x32\r\n",&r));
@@ -75,6 +85,25 @@ void entry(void) {
         e[127]^=1; CHECK(!usos_edid_native(e,128,&w,&h)); e[127]^=1;
         CHECK(!usos_edid_native(e,127,&w,&h));
         e[0]=1; CHECK(!usos_edid_native(e,128,&w,&h));
+    }
+    {   /* 8.1 / 10 x86 on CSMWrap (X470 2026-10-22, BenQ GL2250H): Microsoft
+           Basic Display at 1024x768 lists the VBIOS modes 1280x1024 and
+           1920x1080; native from EDID picks 1920x1080, not already there. */
+        static UsosDisplayMode basic[] = {
+            {800,600,32,0,0,1}, {1024,768,32,0,0,1}, {1280,1024,32,0,0,1}, {1920,1080,32,0,0,1}};
+        CHECK(usos_display_parse("autoxauto\r\nnative=1920x1080\r\n",&r));
+        CHECK(usos_display_already(basic,4,&r,0,1024,768,32,&c)<0 && c.index==3 && c.reason[0]=='n');
+        /* Already at native: no-op (no test, no apply). */
+        CHECK(usos_display_already(basic,4,&r,0,1920,1080,32,&c)==3);
+        /* No EDID: the highest of the driver's list. */
+        CHECK(usos_display_parse("autoxauto\r\n",&r));
+        CHECK(usos_display_already(basic,4,&r,0,1024,768,32,&c)<0 && c.index==3 && c.reason[0]=='h');
+        /* Native size missing from the list: largest mode that fits, never a
+           synthetic native mode. */
+        CHECK(usos_display_parse("autoxauto\r\nnative=1680x1050\r\n",&r));
+        CHECK(usos_display_already(basic,4,&r,0,1024,768,32,&c)<0 && c.index==2 && c.reason[0]=='b');
+        CHECK(usos_display_already(basic,4,&r,0,1024,768,16,&c)<0);
+        CHECK(usos_display_already(NULL,0,&r,0,1024,768,32,&c)<0 && c.index==-1);
     }
     CHECK(usos_display_parse("1920x1080xauto",&r));
     /* double buffering rejects 15.82 MiB for an 8 MiB adapter */

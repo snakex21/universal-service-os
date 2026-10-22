@@ -92,16 +92,19 @@ display=1280x1024	windows-7	+        <ColorDepth>32</ColorDepth>
 display=1280x1024	windows-7	+        <HorizontalResolution>1280</HorizontalResolution>
 display=1280x1024	windows-7	+        <VerticalResolution>1024</VerticalResolution>
 display=1280x1024	windows-7	+      </Display>
+display=1280x1024	windows-8	+<!-- USOS-DISPLAY=1280x1024xauto -->
 display=1280x1024	windows-8	+      <Display>
 display=1280x1024	windows-8	+        <ColorDepth>32</ColorDepth>
 display=1280x1024	windows-8	+        <HorizontalResolution>1280</HorizontalResolution>
 display=1280x1024	windows-8	+        <VerticalResolution>1024</VerticalResolution>
 display=1280x1024	windows-8	+      </Display>
+display=1280x1024	windows-8-1	+<!-- USOS-DISPLAY=1280x1024xauto -->
 display=1280x1024	windows-8-1	+      <Display>
 display=1280x1024	windows-8-1	+        <ColorDepth>32</ColorDepth>
 display=1280x1024	windows-8-1	+        <HorizontalResolution>1280</HorizontalResolution>
 display=1280x1024	windows-8-1	+        <VerticalResolution>1024</VerticalResolution>
 display=1280x1024	windows-8-1	+      </Display>
+display=1280x1024	windows-10	+<!-- USOS-DISPLAY=1280x1024xauto -->
 display=1280x1024	windows-10	+      <Display>
 display=1280x1024	windows-10	+        <ColorDepth>32</ColorDepth>
 display=1280x1024	windows-10	+        <HorizontalResolution>1280</HorizontalResolution>
@@ -167,6 +170,9 @@ display=1280x1024	windows-server-2003	+Xresolution=1280
 display=1280x1024	windows-server-2003	+Yresolution=1024
 display_bpp=16	windows-vista	+<!-- USOS-DISPLAY=autox16 -->
 display_bpp=16	windows-7	+<!-- USOS-DISPLAY=autox16 -->
+display_bpp=16	windows-8	+<!-- USOS-DISPLAY=autox16 -->
+display_bpp=16	windows-8-1	+<!-- USOS-DISPLAY=autox16 -->
+display_bpp=16	windows-10	+<!-- USOS-DISPLAY=autox16 -->
 display_bpp=16	windows-server-2008	+<!-- USOS-DISPLAY=autox16 -->
 display_bpp=16	windows-server-2008-r2	+<!-- USOS-DISPLAY=autox16 -->
 display_bpp=16	windows-2000	+
@@ -256,54 +262,24 @@ show_extensions=yes	windows-7	+        <RunSynchronousCommand wcm:action="add">
 show_extensions=yes	windows-7	+          <Order>4</Order>
 show_extensions=yes	windows-7	-          <Order>4</Order>
 show_extensions=yes	windows-7	+          <Order>5</Order>
-show_extensions=yes	windows-8	+    </component>
-show_extensions=yes	windows-8	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_extensions=yes	windows-8	+      <RunSynchronous>
-show_extensions=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8	+          <Order>1</Order>
-show_extensions=yes	windows-8	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_extensions=yes	windows-8	+        </RunSynchronousCommand>
-show_extensions=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8	+          <Order>2</Order>
 show_extensions=yes	windows-8	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-8	+        </RunSynchronousCommand>
 show_extensions=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8	+          <Order>3</Order>
-show_extensions=yes	windows-8	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_extensions=yes	windows-8	+        </RunSynchronousCommand>
-show_extensions=yes	windows-8	+      </RunSynchronous>
-show_extensions=yes	windows-8-1	+    </component>
-show_extensions=yes	windows-8-1	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_extensions=yes	windows-8-1	+      <RunSynchronous>
-show_extensions=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8-1	+          <Order>1</Order>
-show_extensions=yes	windows-8-1	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_extensions=yes	windows-8-1	+        </RunSynchronousCommand>
-show_extensions=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8-1	+          <Order>2</Order>
+show_extensions=yes	windows-8	+          <Order>4</Order>
+show_extensions=yes	windows-8	-          <Order>4</Order>
+show_extensions=yes	windows-8	+          <Order>5</Order>
 show_extensions=yes	windows-8-1	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-8-1	+        </RunSynchronousCommand>
 show_extensions=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-8-1	+          <Order>3</Order>
-show_extensions=yes	windows-8-1	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_extensions=yes	windows-8-1	+        </RunSynchronousCommand>
-show_extensions=yes	windows-8-1	+      </RunSynchronous>
-show_extensions=yes	windows-10	+    </component>
-show_extensions=yes	windows-10	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_extensions=yes	windows-10	+      <RunSynchronous>
-show_extensions=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-10	+          <Order>1</Order>
-show_extensions=yes	windows-10	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_extensions=yes	windows-10	+        </RunSynchronousCommand>
-show_extensions=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-10	+          <Order>2</Order>
+show_extensions=yes	windows-8-1	+          <Order>4</Order>
+show_extensions=yes	windows-8-1	-          <Order>4</Order>
+show_extensions=yes	windows-8-1	+          <Order>5</Order>
 show_extensions=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v HideFileExt /t REG_DWORD /d 0 /f</Path>
 show_extensions=yes	windows-10	+        </RunSynchronousCommand>
 show_extensions=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_extensions=yes	windows-10	+          <Order>3</Order>
-show_extensions=yes	windows-10	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_extensions=yes	windows-10	+        </RunSynchronousCommand>
-show_extensions=yes	windows-10	+      </RunSynchronous>
+show_extensions=yes	windows-10	+          <Order>4</Order>
+show_extensions=yes	windows-10	-          <Order>4</Order>
+show_extensions=yes	windows-10	+          <Order>5</Order>
 show_extensions=yes	windows-11	+    </component>
 show_extensions=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 show_extensions=yes	windows-11	+      <RunSynchronous>
@@ -461,54 +437,24 @@ show_hidden=yes	windows-7	+        <RunSynchronousCommand wcm:action="add">
 show_hidden=yes	windows-7	+          <Order>4</Order>
 show_hidden=yes	windows-7	-          <Order>4</Order>
 show_hidden=yes	windows-7	+          <Order>5</Order>
-show_hidden=yes	windows-8	+    </component>
-show_hidden=yes	windows-8	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_hidden=yes	windows-8	+      <RunSynchronous>
-show_hidden=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8	+          <Order>1</Order>
-show_hidden=yes	windows-8	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_hidden=yes	windows-8	+        </RunSynchronousCommand>
-show_hidden=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8	+          <Order>2</Order>
 show_hidden=yes	windows-8	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-8	+        </RunSynchronousCommand>
 show_hidden=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8	+          <Order>3</Order>
-show_hidden=yes	windows-8	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_hidden=yes	windows-8	+        </RunSynchronousCommand>
-show_hidden=yes	windows-8	+      </RunSynchronous>
-show_hidden=yes	windows-8-1	+    </component>
-show_hidden=yes	windows-8-1	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_hidden=yes	windows-8-1	+      <RunSynchronous>
-show_hidden=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8-1	+          <Order>1</Order>
-show_hidden=yes	windows-8-1	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_hidden=yes	windows-8-1	+        </RunSynchronousCommand>
-show_hidden=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8-1	+          <Order>2</Order>
+show_hidden=yes	windows-8	+          <Order>4</Order>
+show_hidden=yes	windows-8	-          <Order>4</Order>
+show_hidden=yes	windows-8	+          <Order>5</Order>
 show_hidden=yes	windows-8-1	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-8-1	+        </RunSynchronousCommand>
 show_hidden=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-8-1	+          <Order>3</Order>
-show_hidden=yes	windows-8-1	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_hidden=yes	windows-8-1	+        </RunSynchronousCommand>
-show_hidden=yes	windows-8-1	+      </RunSynchronous>
-show_hidden=yes	windows-10	+    </component>
-show_hidden=yes	windows-10	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-show_hidden=yes	windows-10	+      <RunSynchronous>
-show_hidden=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-10	+          <Order>1</Order>
-show_hidden=yes	windows-10	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-show_hidden=yes	windows-10	+        </RunSynchronousCommand>
-show_hidden=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-10	+          <Order>2</Order>
+show_hidden=yes	windows-8-1	+          <Order>4</Order>
+show_hidden=yes	windows-8-1	-          <Order>4</Order>
+show_hidden=yes	windows-8-1	+          <Order>5</Order>
 show_hidden=yes	windows-10	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
 show_hidden=yes	windows-10	+        </RunSynchronousCommand>
 show_hidden=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-show_hidden=yes	windows-10	+          <Order>3</Order>
-show_hidden=yes	windows-10	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-show_hidden=yes	windows-10	+        </RunSynchronousCommand>
-show_hidden=yes	windows-10	+      </RunSynchronous>
+show_hidden=yes	windows-10	+          <Order>4</Order>
+show_hidden=yes	windows-10	-          <Order>4</Order>
+show_hidden=yes	windows-10	+          <Order>5</Order>
 show_hidden=yes	windows-11	+    </component>
 show_hidden=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 show_hidden=yes	windows-11	+      <RunSynchronous>
@@ -674,30 +620,36 @@ no_autorun=yes	windows-7	-          <Order>3</Order>
 no_autorun=yes	windows-7	+          <Order>4</Order>
 no_autorun=yes	windows-7	-          <Order>4</Order>
 no_autorun=yes	windows-7	+          <Order>5</Order>
-no_autorun=yes	windows-8	+    </component>
-no_autorun=yes	windows-8	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-no_autorun=yes	windows-8	+      <RunSynchronous>
-no_autorun=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-8	+          <Order>1</Order>
 no_autorun=yes	windows-8	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-8	+        </RunSynchronousCommand>
-no_autorun=yes	windows-8	+      </RunSynchronous>
-no_autorun=yes	windows-8-1	+    </component>
-no_autorun=yes	windows-8-1	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-no_autorun=yes	windows-8-1	+      <RunSynchronous>
-no_autorun=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-8-1	+          <Order>1</Order>
+no_autorun=yes	windows-8	+        <RunSynchronousCommand wcm:action="add">
+no_autorun=yes	windows-8	+          <Order>2</Order>
+no_autorun=yes	windows-8	-          <Order>2</Order>
+no_autorun=yes	windows-8	+          <Order>3</Order>
+no_autorun=yes	windows-8	-          <Order>3</Order>
+no_autorun=yes	windows-8	+          <Order>4</Order>
+no_autorun=yes	windows-8	-          <Order>4</Order>
+no_autorun=yes	windows-8	+          <Order>5</Order>
 no_autorun=yes	windows-8-1	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-8-1	+        </RunSynchronousCommand>
-no_autorun=yes	windows-8-1	+      </RunSynchronous>
-no_autorun=yes	windows-10	+    </component>
-no_autorun=yes	windows-10	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-no_autorun=yes	windows-10	+      <RunSynchronous>
-no_autorun=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
-no_autorun=yes	windows-10	+          <Order>1</Order>
+no_autorun=yes	windows-8-1	+        <RunSynchronousCommand wcm:action="add">
+no_autorun=yes	windows-8-1	+          <Order>2</Order>
+no_autorun=yes	windows-8-1	-          <Order>2</Order>
+no_autorun=yes	windows-8-1	+          <Order>3</Order>
+no_autorun=yes	windows-8-1	-          <Order>3</Order>
+no_autorun=yes	windows-8-1	+          <Order>4</Order>
+no_autorun=yes	windows-8-1	-          <Order>4</Order>
+no_autorun=yes	windows-8-1	+          <Order>5</Order>
 no_autorun=yes	windows-10	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer&quot; /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f</Path>
 no_autorun=yes	windows-10	+        </RunSynchronousCommand>
-no_autorun=yes	windows-10	+      </RunSynchronous>
+no_autorun=yes	windows-10	+        <RunSynchronousCommand wcm:action="add">
+no_autorun=yes	windows-10	+          <Order>2</Order>
+no_autorun=yes	windows-10	-          <Order>2</Order>
+no_autorun=yes	windows-10	+          <Order>3</Order>
+no_autorun=yes	windows-10	-          <Order>3</Order>
+no_autorun=yes	windows-10	+          <Order>4</Order>
+no_autorun=yes	windows-10	-          <Order>4</Order>
+no_autorun=yes	windows-10	+          <Order>5</Order>
 no_autorun=yes	windows-11	+    </component>
 no_autorun=yes	windows-11	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 no_autorun=yes	windows-11	+      <RunSynchronous>
