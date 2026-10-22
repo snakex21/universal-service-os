@@ -186,6 +186,80 @@ int main(void){
         subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-O2',str(ROOT/'tools/tests/nvme_modern_service_harness.c'),'-ladvapi32','-lcrypt32','-lshell32','-o',str(exe)],check=True,capture_output=True)
         subprocess.run([str(exe)],check=True,capture_output=True)
 
+    def test_cmd_retries_the_helper_once(self):
+        # X470 B261022-130215: one helper failure stopped the install; the
+        # .cmd now tries once more (the helper starts again from its hive
+        # copies) and still refuses the restart after a second failure.
+        out=ROOT/'zig-out/modern-tests';out.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=out) as tmp:
+            folder=Path(tmp)
+            source=(ROOT/'tools/windows_nvme_modern.cmd').read_text()
+            source=source.replace('dism.exe ', 'call "%~dp0dism-mock.cmd" ').replace('ping -n 3 127.0.0.1 >nul','rem no wait in the test')
+            source=source.replace('"%~dp0usos-nvme-modern.exe"', 'call "%~dp0helper-mock.cmd"')
+            (folder/'route.cmd').write_text(source)
+            for name in ('inf','sys','cat','cer'):
+                (folder/('modern-usosnvme.'+name)).write_bytes(b'private test placeholder')
+            (folder/'dism-mock.cmd').write_text('@echo off\necho dism>>"%USOS_TRACE%\\trace"\nexit /b 0\n')
+            (folder/'helper-mock.cmd').write_text('''@echo off
+echo helper>>"%USOS_TRACE%\\trace"
+if "%USOS_FAIL%"=="always" exit /b 4
+if "%USOS_FAIL%"=="once" if not exist "%USOS_TRACE%\\failed" (echo x>"%USOS_TRACE%\\failed" & exit /b 4)
+exit /b 0
+''')
+            for fail,code,helpers in (('once',0,3),('always',1,2)):
+                trace=folder/fail;trace.mkdir()
+                target=trace/'target'
+                (target/'Windows/System32/config').mkdir(parents=True)
+                (target/'Windows/System32/config/SYSTEM').write_bytes(b'not a real hive')
+                (target/'Windows/System32/Recovery').mkdir()
+                (target/'Windows/System32/Recovery/winre.wim').write_bytes(b'not a real WIM')
+                env=dict(os.environ,USOS_TRACE=str(trace),USOS_FAIL=fail)
+                r=subprocess.run(['cmd.exe','/d','/c',str(folder/'route.cmd'),str(target),'6.2','19041'],env=env,capture_output=True,text=True)
+                with self.subTest(fail=fail):
+                    self.assertEqual(r.returncode,code,r.stdout)
+                    events=(trace/'trace').read_text().split()
+                    self.assertEqual(events.count('helper'),helpers)
+                    self.assertIn('second attempt',r.stdout)
+                    if code:self.assertIn('restart refused',r.stdout);self.assertEqual(events.count('dism'),1)
+
+    def test_trust_store_reports_no_stale_code_and_reads_back(self):
+        # CertAddEncodedCertificateToStore leaves CRYPT_E_NOT_FOUND in
+        # GetLastError on success; the X470 log reported exactly that code.
+        certs=sorted(ROOT.glob('zig-out/**/usosnvme.cer'))
+        if not certs:self.skipTest('build the signed usosnvme package first')
+        source=(ROOT/'tools/windows_nvme_modern.c').read_text()
+        self.assertNotIn('operation="trust-certificate-stores"',source)
+        out=ROOT/'zig-out/modern-tests';out.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=out) as tmp:
+            folder=Path(tmp)
+            code=r'''#include <windows.h>
+#include <assert.h>
+#include <stdio.h>
+static int flush_fail;
+static LONG WINAPI flush_fake(HKEY h){(void)h;if(flush_fail){flush_fail--;return ERROR_REGISTRY_IO_FAILED;}return ERROR_SUCCESS;}
+#define RegFlushKey flush_fake
+#define entry unused_entry
+#include "SOURCE"
+int main(int argc,char**argv){
+ FILE*f=fopen(argv[1],"rb");DWORD size=(DWORD)fread(cert,1,sizeof cert,f);fclose(f);assert(size>100);
+ assert(make_thumbprint(size)&&lstrlenW(thumb)==40);
+ HKEY base;assert(!RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-modern",0,0,0,KEY_ALL_ACCESS,0,&base,0));
+ failure_code=0;assert(trusted_store(base,ROOT_STORE,size,0));assert(trusted_store(base,PUBLISHER_STORE,size,1));
+ assert(failure_code==0);
+ assert(has_certificate(base,ROOT_STORE,size)&&has_certificate(base,PUBLISHER_STORE,size));
+ assert(!has_certificate(base,L"Microsoft\\SystemCertificates\\CA",size)&&failure_code==ERROR_FILE_NOT_FOUND);
+ flush_fail=2;assert(flush_retry(base)==ERROR_SUCCESS&&!flush_fail);
+ flush_fail=5;assert(flush_retry(base)==ERROR_REGISTRY_IO_FAILED);
+ RegCloseKey(base);RegDeleteTreeW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-modern");RegDeleteKeyW(HKEY_CURRENT_USER,L"Software\\USOS-test-nvme-modern");
+ return 0;
+}
+'''
+            (folder/'trust.c').write_text(code.replace('SOURCE',str(ROOT/'tools/windows_nvme_modern.c').replace('\\','/')))
+            exe=folder/'trust.exe'
+            subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-O2',str(folder/'trust.c'),'-ladvapi32','-lcrypt32','-lshell32','-o',str(exe)],check=True,capture_output=True)
+            r=subprocess.run([str(exe),str(certs[-1])],capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stderr)
+
     def test_host_is_refused_before_writes(self):
         exe=ROOT/'zig-out/windows-modern/usos-nvme-modern.exe'
         self.assertTrue(exe.is_file(),'build the helper before running this test')

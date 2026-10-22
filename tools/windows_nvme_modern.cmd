@@ -18,6 +18,15 @@ dism.exe /English /Image:%T%\ /ScratchDir:"%P%\scratch" /LogPath:"%P%\dism-insta
 if errorlevel 1 (echo [USOS] Modern NVMe: driver-store staging failed; restart refused. & exit /b 1)
 "%~dp0usos-nvme-modern.exe" "%P%" "%T%\Windows"
 echo [USOS] Modern NVMe: helper exit=%errorlevel%
+rem X470 B261022-130215: one failed attempt (the hives are restored from the
+rem .before-usos-nvme copies) stopped the install for good. One more try from
+rem those copies; the helper verifies its own writes by reading the hive back.
+if errorlevel 1 (
+    echo [USOS] Modern NVMe: second attempt.
+    ping -n 3 127.0.0.1 >nul
+    "%~dp0usos-nvme-modern.exe" "%P%" "%T%\Windows"
+)
+echo [USOS] Modern NVMe: helper final exit=%errorlevel%
 if errorlevel 1 (echo [USOS] Modern NVMe: offline configuration failed; restart refused. & exit /b 1)
 rem Recovery is a separate OS and must receive the same boot driver.
 set "RE=%T%\Windows\System32\Recovery\winre.wim"
