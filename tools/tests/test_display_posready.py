@@ -51,7 +51,7 @@ def quote(p) -> str:
 class Staging(unittest.TestCase):
     """usos_posr_display_stage from posready_csmwrap_target.sh."""
 
-    def stage(self, native: bytes | None, helper: bool = True):
+    def stage(self, native: bytes | None, helper: bool = True, keep: str = ""):
         tmp = Path(tempfile.mkdtemp(prefix="posr-display-"))
         self.addCleanup(shutil.rmtree, tmp)
         lib = tmp / "lib"
@@ -66,7 +66,8 @@ class Staging(unittest.TestCase):
         setup.mkdir(parents=True)
         funcs = function_text(TARGET, "usos_posr_display_stage")
         pre = ('fail() { echo "$*" >&2; exit 1; }; log() { echo "LOG $*" >&2; }; '
-               "LIB=" + quote(lib) + " USOS_DISPLAY_NATIVE_FILE=" + quote(record) + "; ")
+               "LIB=" + quote(lib) + " USOS_DISPLAY_NATIVE_FILE=" + quote(record) + "; "
+               + ("USOS_DISPLAY_KEEP=" + keep + "; " if keep else ""))
         r = shell(pre + funcs + "\nusos_posr_display_stage " + quote(setup))
         self.assertEqual(r.returncode, 0, r.stderr)
         return setup, r, record
@@ -91,6 +92,15 @@ class Staging(unittest.TestCase):
         self.assertFalse((setup / "DISPLAY.TXT").exists())
         self.assertIn(b"USOSRES.EXE missing in this build; display unchanged", r.stderr)
 
+    def test_display_keep_flag_stages_nothing(self) -> None:
+        # DATA's display-keep.txt (USOS_DISPLAY_KEEP=1 from w9x_csmwrap_prepare.sh).
+        setup, r, _ = self.stage(b"1920x1080\r\n", keep="1")
+        self.assertFalse((setup / "USOSRES.EXE").exists())
+        self.assertFalse((setup / "DISPLAY.TXT").exists())
+        self.assertIn(b"DISPLAY keep (display-keep.txt): USOSRES not staged", r.stderr)
+        setup, _, _ = self.stage(b"1920x1080\r\n", keep="0")
+        self.assertTrue((setup / "DISPLAY.TXT").exists())
+
     def test_same_contract_as_the_nt52_path(self) -> None:
         # The same shared helper as usos_nt52_display_stage: identical bytes.
         setup, _, record = self.stage(b"1280x1024")
@@ -114,6 +124,8 @@ class Wiring(unittest.TestCase):
         self.assertIn('usos_display_stage "$1" "$LIB/USOSRES.EXE" autoxauto', text)
         self.assertIn(". \"$LIB/display_profile.sh\"", text)
         self.assertIn("::/USOS/POSR/DISPLAY.TXT", text)
+        # The read-back only when something was staged (keep, missing helper).
+        self.assertIn('[ "$posr_display_staged" = 0 ] || mdir -i "$pe_loop" ::/USOS/POSR/DISPLAY.TXT', text)
         # \\USOS\\POSR is what posready_after_setup copies to C:.
         self.assertLess(text.index('mkdir -p "$work/pe/USOS/POSR/DRV"'),
                         text.index('usos_posr_display_stage "$work/pe/USOS/POSR"'))

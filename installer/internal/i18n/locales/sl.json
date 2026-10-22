@@ -1080,6 +1080,7 @@
   "boot.profile.section.updates": "Posodobitve in zasebnost",
   "boot.profile.section.accounts": "Računi in omrežje",
   "boot.profile.value.unchanged": "Nespremenjeno",
+  "boot.profile.value.display_keep": "Privzeto v sistemu Windows",
   "boot.profile.field.show_protected": "Pokaži zaščitene sistemske datoteke",
   "boot.profile.help.show_protected": "Raziskovalec prikaže tudi skrite datoteke in zaščitene datoteke operacijskega sistema (za vsakega novega uporabnika).",
   "boot.profile.field.launch_to_pc": "Raziskovalec odpre Ta računalnik",
@@ -1158,7 +1159,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Ločljivost zaslona",
-  "boot.profile.help.display": "XP in Server 2003: barve 32-bit pri tej ločljivosti, če jo gonilnik zaslona ponuja. Samodejno: brez sprememb; brez gonilnika zaslona (gonilnik VGA, npr. prek CSMWrap) Windows ostane v osnovnem načinu.",
+  "boot.profile.help.display": "XP in Server 2003: barve 32-bit pri tej ločljivosti, če jo gonilnik zaslona ponuja. Samodejno: brez sprememb; brez gonilnika zaslona (gonilnik VGA, npr. prek CSMWrap) Windows ostane v osnovnem načinu. Privzeto v sistemu Windows: USOS po namestitvi ne spremeni ločljivosti.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (samo za branje); Uvozi iz nje ustvari profil USOS",
   "boot.profile.section.apps": "Aplikacije in skripti",
   "boot.profile.field.shortcut_suffix_off": "Brez »Bližnjica« v imenih bližnjic",
@@ -1368,5 +1369,5 @@
   "boot.lx.logon_setup_asks": "Namestitveni program Windows med namestitvijo vpraša za uporabniško ime in geslo; USOS ju ne nastavi.",
   "boot.lx.logon_answer_file": "Po namestitvi se prijavite z računom iz svoje datoteke odgovorov {0}.",
   "boot.profile.field.display_bpp": "Barvna globina",
-  "boot.profile.help.display_legacy": "Uporabi se po namestitvi na pravi strojni opremi. Samodejno izbere razpoložljivi način do 1920x1080 z varnim prehodom na nižjega. Nespremenjeno ohrani nastavitve. Samodejna globina: 32 bitov, če je na voljo, sicer 16."
+  "boot.profile.help.display_legacy": "Uporabi se po namestitvi na pravi strojni opremi. Samodejno izbere razpoložljivi način do 1920x1080 z varnim prehodom na nižjega. Nespremenjeno ohrani nastavitve. Samodejna globina: 32 bitov, če je na voljo, sicer 16. Privzeto v sistemu Windows: USOS po namestitvi ne spremeni ločljivosti."
 }

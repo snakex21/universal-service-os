@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Päivitykset ja tietosuoja",
   "boot.profile.section.accounts": "Tilit ja verkko",
   "boot.profile.value.unchanged": "Ei muutosta",
+  "boot.profile.value.display_keep": "Windowsin oletus",
   "boot.profile.field.show_protected": "Näytä suojatut järjestelmätiedostot",
   "boot.profile.help.show_protected": "Resurssienhallinta näyttää myös piilotiedostot ja suojatut käyttöjärjestelmän tiedostot (jokaiselle uudelle käyttäjälle).",
   "boot.profile.field.launch_to_pc": "Avaa Tämä tietokone",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Näytön tarkkuus",
-  "boot.profile.help.display": "XP ja Server 2003: 32-bit-värit tällä tarkkuudella, jos näytönohjain tarjoaa sen. Automaattinen: ei muutosta; ilman näytönohjainta (VGA-ohjain, esim. CSMWrapin kautta) Windows pysyy perustilassa.",
+  "boot.profile.help.display": "XP ja Server 2003: 32-bit-värit tällä tarkkuudella, jos näytönohjain tarjoaa sen. Automaattinen: ei muutosta; ilman näytönohjainta (VGA-ohjain, esim. CSMWrapin kautta) Windows pysyy perustilassa. Windowsin oletus: USOS ei muuta näytön tarkkuutta asennuksen jälkeen.",
   "boot.profile.xp_ini.detail": "usos-xp.ini DATA-osiossa (vain luku); Tuo tekee siitä USOS-profiilin",
   "boot.profile.section.apps": "Sovellukset ja komentosarjat",
   "boot.profile.field.shortcut_suffix_off": "Ei ”Pikakuvake”-sanaa nimissä",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "Windowsin asennus kysyy käyttäjänimen ja salasanan asennuksen aikana; USOS ei aseta niitä.",
   "boot.lx.logon_answer_file": "Kirjaudu asennuksen jälkeen vastaustiedostosi {0} tilillä.",
   "boot.profile.field.display_bpp": "Värisyvyys",
-  "boot.profile.help.display_legacy": "Otetaan käyttöön asennuksen jälkeen oikealla laitteistolla. Automaattinen valitsee saatavilla olevan tilan enintään 1920x1080 ja turvallisen varatilan. Ei muutoksia säilyttää asetukset. Automaattinen värisyvyys suosii 32 bittiä, muuten 16."
+  "boot.profile.help.display_legacy": "Otetaan käyttöön asennuksen jälkeen oikealla laitteistolla. Automaattinen valitsee saatavilla olevan tilan enintään 1920x1080 ja turvallisen varatilan. Ei muutoksia säilyttää asetukset. Automaattinen värisyvyys suosii 32 bittiä, muuten 16. Windowsin oletus: USOS ei muuta näytön tarkkuutta asennuksen jälkeen."
 }

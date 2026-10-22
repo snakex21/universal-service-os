@@ -281,6 +281,12 @@ elif [ "$ANSWER_KIND" != USER ] && [ -f "$LIB/w9x-display/USOSRES.EXE" ] && [ -f
     display_request=autoxauto
     log 'display: no request in the answer, default auto (native EDID mode up to 1920x1080)'
 fi
+# Keep (profile display=keep or DATA's display-keep.txt): no USOSRES /
+# USOSVBI; the vmdisp9x VESA driver stays at its INF / VESA95 first mode.
+if [ -n "$display_request" ] && usos_display_keep "$display_request"; then
+    log 'display: keep (profile display=keep or display-keep.txt): USOSRES not staged, the first mode stays'
+    display_request=
+fi
 if [ -n "$display_request" ]; then
     usos_display_stage "$work/c/USOS9X" "$LIB/w9x-display/USOSRES.EXE" "$display_request" || fail 'cannot stage 9x display request'
     cp "$LIB/w9x-display/USOSVBI.EXE" "$work/c/USOS9X/USOSVBI.EXE" || fail 'cannot stage VBE reader'

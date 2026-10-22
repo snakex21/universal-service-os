@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Frissítések és adatvédelem",
   "boot.profile.section.accounts": "Fiókok és hálózat",
   "boot.profile.value.unchanged": "Változatlan",
+  "boot.profile.value.display_keep": "Windows alapértelmezés",
   "boot.profile.field.show_protected": "Védett rendszerfájlok megjelenítése",
   "boot.profile.help.show_protected": "Az Intéző a rejtett fájlokat és a védett operációsrendszer-fájlokat is megjeleníti (minden új felhasználónál).",
   "boot.profile.field.launch_to_pc": "Az Intéző az Ez a gép nézetben nyílik",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Klasszikus Windows",
   "boot.profile.value.theme_basic": "Windows 7 alapszintű",
   "boot.profile.field.display": "Képernyőfelbontás",
-  "boot.profile.help.display": "XP és Server 2003: 32-bit színmélység ezen a felbontáson, ha a kijelzőillesztő felkínálja. Automatikus: változatlan; kijelzőillesztő nélkül (VGA-illesztő, pl. CSMWrap esetén) a Windows alap módban marad.",
+  "boot.profile.help.display": "XP és Server 2003: 32-bit színmélység ezen a felbontáson, ha a kijelzőillesztő felkínálja. Automatikus: változatlan; kijelzőillesztő nélkül (VGA-illesztő, pl. CSMWrap esetén) a Windows alap módban marad. Windows alapértelmezés: az USOS a telepítés után nem módosítja a felbontást.",
   "boot.profile.xp_ini.detail": "usos-xp.ini a DATA-n (csak olvasható); az Importálás USOS-profilt készít belőle",
   "boot.profile.section.apps": "Alkalmazások és parancsfájlok",
   "boot.profile.field.shortcut_suffix_off": "Nincs „Parancsikon” a nevekben",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "A Windows telepítője a telepítés közben kéri a felhasználónevet és a jelszót; a USOS nem állítja be őket.",
   "boot.lx.logon_answer_file": "A telepítés után jelentkezzen be a(z) {0} válaszfájlban megadott fiókkal.",
   "boot.profile.field.display_bpp": "Színmélység",
-  "boot.profile.help.display_legacy": "A telepítés után, valódi hardveren lép érvénybe. Az automatikus mód legfeljebb 1920x1080-as elérhető módot választ biztonságos visszalépéssel. A változatlan megőrzi a beállításokat. Automatikus színmélység: 32 bit, ha elérhető, különben 16."
+  "boot.profile.help.display_legacy": "A telepítés után, valódi hardveren lép érvénybe. Az automatikus mód legfeljebb 1920x1080-as elérhető módot választ biztonságos visszalépéssel. A változatlan megőrzi a beállításokat. Automatikus színmélység: 32 bit, ha elérhető, különben 16. Windows alapértelmezés: az USOS a telepítés után nem módosítja a felbontást."
 }

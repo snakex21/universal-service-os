@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Aktualizace a soukromí",
   "boot.profile.section.accounts": "Účty a síť",
   "boot.profile.value.unchanged": "Beze změny",
+  "boot.profile.value.display_keep": "Výchozí Windows",
   "boot.profile.field.show_protected": "Zobrazit chráněné systémové soubory",
   "boot.profile.help.show_protected": "Průzkumník zobrazuje i skryté soubory a chráněné soubory operačního systému (pro každého nového uživatele).",
   "boot.profile.field.launch_to_pc": "Průzkumník otevře Tento počítač",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Klasický systém Windows",
   "boot.profile.value.theme_basic": "Windows 7 – základní",
   "boot.profile.field.display": "Rozlišení obrazovky",
-  "boot.profile.help.display": "XP a Server 2003: barvy 32-bit v tomto rozlišení, pokud to ovladač displeje nabízí. Automaticky: beze změny; bez ovladače displeje (ovladač VGA, např. přes CSMWrap) zůstane Windows v základním režimu.",
+  "boot.profile.help.display": "XP a Server 2003: barvy 32-bit v tomto rozlišení, pokud to ovladač displeje nabízí. Automaticky: beze změny; bez ovladače displeje (ovladač VGA, např. přes CSMWrap) zůstane Windows v základním režimu. Výchozí Windows: USOS po instalaci nemění rozlišení.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (jen pro čtení); Importovat z něj vytvoří profil USOS",
   "boot.profile.section.apps": "Aplikace a skripty",
   "boot.profile.field.shortcut_suffix_off": "Bez „Zástupce“ v názvech zástupců",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Instalační program Windows se během instalace zeptá na uživatelské jméno a heslo; USOS je nenastavuje.",
   "boot.lx.logon_answer_file": "Po instalaci se přihlaste účtem ze svého souboru odpovědí {0}.",
   "boot.profile.field.display_bpp": "Barevná hloubka",
-  "boot.profile.help.display_legacy": "Použije se po instalaci na skutečném hardwaru. Automaticky vybere dostupný režim do 1920x1080 a bezpečně přejde na nižší. Beze změny zachová nastavení. Automatická hloubka: 32 bitů, jsou-li dostupné, jinak 16."
+  "boot.profile.help.display_legacy": "Použije se po instalaci na skutečném hardwaru. Automaticky vybere dostupný režim do 1920x1080 a bezpečně přejde na nižší. Beze změny zachová nastavení. Automatická hloubka: 32 bitů, jsou-li dostupné, jinak 16. Výchozí Windows: USOS po instalaci nemění rozlišení."
 }

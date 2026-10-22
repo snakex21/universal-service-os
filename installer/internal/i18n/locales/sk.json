@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Aktualizácie a súkromie",
   "boot.profile.section.accounts": "Kontá a sieť",
   "boot.profile.value.unchanged": "Bez zmeny",
+  "boot.profile.value.display_keep": "Predvolené Windows",
   "boot.profile.field.show_protected": "Zobraziť chránené systémové súbory",
   "boot.profile.help.show_protected": "Prieskumník zobrazuje aj skryté súbory a chránené súbory operačného systému (pre každého nového používateľa).",
   "boot.profile.field.launch_to_pc": "Prieskumník otvorí Tento počítač",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Rozlíšenie obrazovky",
-  "boot.profile.help.display": "XP a Server 2003: farby 32-bit v tomto rozlíšení, ak to ovládač displeja ponúka. Automaticky: bez zmeny; bez ovládača displeja (ovládač VGA, napr. cez CSMWrap) zostane Windows v základnom režime.",
+  "boot.profile.help.display": "XP a Server 2003: farby 32-bit v tomto rozlíšení, ak to ovládač displeja ponúka. Automaticky: bez zmeny; bez ovládača displeja (ovládač VGA, napr. cez CSMWrap) zostane Windows v základnom režime. Predvolené Windows: USOS po inštalácii nemení rozlíšenie.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (iba na čítanie); Importovať z neho vytvorí profil USOS",
   "boot.profile.section.apps": "Aplikácie a skripty",
   "boot.profile.field.shortcut_suffix_off": "Bez „Odkaz“ v názvoch odkazov",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Inštalátor Windows sa počas inštalácie opýta na meno používateľa a heslo; USOS ich nenastavuje.",
   "boot.lx.logon_answer_file": "Po inštalácii sa prihláste účtom zo svojho súboru odpovedí {0}.",
   "boot.profile.field.display_bpp": "Počet bitov farby",
-  "boot.profile.help.display_legacy": "Použije sa po inštalácii na skutočnom hardvéri. Automaticky vyberie dostupný režim do 1920x1080 s bezpečným prechodom na nižší. Bez zmeny zachová nastavenia. Automatický počet bitov: 32, ak sú dostupné, inak 16."
+  "boot.profile.help.display_legacy": "Použije sa po inštalácii na skutočnom hardvéri. Automaticky vyberie dostupný režim do 1920x1080 s bezpečným prechodom na nižší. Bez zmeny zachová nastavenia. Automatický počet bitov: 32, ak sú dostupné, inak 16. Predvolené Windows: USOS po inštalácii nemení rozlíšenie."
 }

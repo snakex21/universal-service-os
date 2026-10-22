@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Актуализации и поверителност",
   "boot.profile.section.accounts": "Акаунти и мрежа",
   "boot.profile.value.unchanged": "Без промяна",
+  "boot.profile.value.display_keep": "По подразбиране на Windows",
   "boot.profile.field.show_protected": "Показване на защитените системни файлове",
   "boot.profile.help.show_protected": "Explorer показва и скритите файлове, и защитените файлове на операционната система (за всеки нов потребител).",
   "boot.profile.field.launch_to_pc": "Explorer се отваря в Този компютър",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Windows Classic",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Разделителна способност",
-  "boot.profile.help.display": "XP и Server 2003: 32-bit цвят при тази разделителна способност, ако видеодрайверът я предлага. Автоматично: без промяна; без видеодрайвер (драйверът VGA, напр. чрез CSMWrap) Windows остава в основния режим.",
+  "boot.profile.help.display": "XP и Server 2003: 32-bit цвят при тази разделителна способност, ако видеодрайверът я предлага. Автоматично: без промяна; без видеодрайвер (драйверът VGA, напр. чрез CSMWrap) Windows остава в основния режим. По подразбиране на Windows: USOS не променя разделителната способност след инсталацията.",
   "boot.profile.xp_ini.detail": "usos-xp.ini в DATA (само за четене); Импортиране създава от него USOS профил",
   "boot.profile.section.apps": "Приложения и скриптове",
   "boot.profile.field.shortcut_suffix_off": "Без „Пряк път“ в имената",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "Инсталацията на Windows пита за потребителско име и парола по време на инсталирането; USOS не ги задава.",
   "boot.lx.logon_answer_file": "След инсталирането влезте с акаунта от вашия файл с отговори {0}.",
   "boot.profile.field.display_bpp": "Дълбочина на цвета",
-  "boot.profile.help.display_legacy": "Прилага се след инсталацията на реалния хардуер. Автоматично: наличен режим до 1920x1080 с безопасно понижаване. Без промяна запазва настройките. Автоматичен цвят: 32 бита, ако са налични, иначе 16."
+  "boot.profile.help.display_legacy": "Прилага се след инсталацията на реалния хардуер. Автоматично: наличен режим до 1920x1080 с безопасно понижаване. Без промяна запазва настройките. Автоматичен цвят: 32 бита, ако са налични, иначе 16. По подразбиране на Windows: USOS не променя разделителната способност след инсталацията."
 }

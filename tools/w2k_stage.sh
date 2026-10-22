@@ -962,6 +962,12 @@ usos_w2k_vesa_stage() {
             w2k_display_request=$(usos_display_from_nt5 "$XP_USER_SETTINGS") || return 1
         fi
         [ -n "$w2k_display_request" ] || w2k_display_request=autoxauto
+        # Keep (profile display=keep or DATA's display-keep.txt): VESA.REG's
+        # 1024x768x16 stays, no USOSRES and no DISPLAY.REG.
+        if usos_display_keep "$w2k_display_request"; then
+            echo '[W2K_STAGE] DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged'
+            w2k_display_request=
+        fi
         if [ -n "$w2k_display_request" ]; then
             usos_display_stage "$1" "${USOS_LIB_DIR:-/usr/lib/usos}/USOSRES.EXE" "$w2k_display_request" || return 1
             usos_display_run_reg W2K > "$1/DISPLAY.REG" || return 1

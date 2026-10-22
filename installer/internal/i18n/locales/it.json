@@ -1074,6 +1074,7 @@
   "boot.profile.section.updates": "Aggiornamenti e privacy",
   "boot.profile.section.accounts": "Account e rete",
   "boot.profile.value.unchanged": "Invariato",
+  "boot.profile.value.display_keep": "Predefinita di Windows",
   "boot.profile.field.show_protected": "Mostra file di sistema protetti",
   "boot.profile.help.show_protected": "Esplora risorse mostra anche i file nascosti e i file protetti del sistema operativo (per ogni nuovo utente).",
   "boot.profile.field.launch_to_pc": "Apri Esplora risorse su Questo PC",
@@ -1152,7 +1153,7 @@
   "boot.profile.value.theme_classic": "Windows classico",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Risoluzione dello schermo",
-  "boot.profile.help.display": "XP e Server 2003: colori a 32-bit a questa risoluzione se il driver video la offre. Automatico: invariato; senza driver video (il driver VGA, ad es. tramite CSMWrap) Windows resta in modalità base.",
+  "boot.profile.help.display": "XP e Server 2003: colori a 32-bit a questa risoluzione se il driver video la offre. Automatico: invariato; senza driver video (il driver VGA, ad es. tramite CSMWrap) Windows resta in modalità base. Predefinita di Windows: USOS non modifica la risoluzione dopo l'installazione.",
   "boot.profile.xp_ini.detail": "usos-xp.ini su DATA (sola lettura); Importa ne crea un profilo USOS",
   "boot.profile.section.apps": "App e script",
   "boot.profile.field.shortcut_suffix_off": "Niente \"Collegamento\" nei nomi",
@@ -1362,5 +1363,5 @@
   "boot.lx.logon_setup_asks": "Il programma di installazione di Windows chiede nome utente e password durante l'installazione; USOS non li imposta.",
   "boot.lx.logon_answer_file": "Dopo l'installazione accedi con l'account del tuo file di risposte {0}.",
   "boot.profile.field.display_bpp": "Profondità colore",
-  "boot.profile.help.display_legacy": "Applicata dopo l’installazione sull’hardware reale. Automatico sceglie una modalità disponibile fino a 1920x1080 con ripiego sicuro. Invariato conserva le impostazioni. Profondità automatica: 32 bit se disponibili, altrimenti 16."
+  "boot.profile.help.display_legacy": "Applicata dopo l’installazione sull’hardware reale. Automatico sceglie una modalità disponibile fino a 1920x1080 con ripiego sicuro. Invariato conserva le impostazioni. Profondità automatica: 32 bit se disponibili, altrimenti 16. Predefinita di Windows: USOS non modifica la risoluzione dopo l'installazione."
 }

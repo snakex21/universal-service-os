@@ -88,7 +88,10 @@ fn tweakLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
     if (!first) try w.writeAll("\n");
     if (family == .windows_2000) {
         if (@import("display_profile.zig").requested(p)) try w.print("display={s}\ndisplay_bpp={s}\n", .{ @tagName(p.display), @tagName(p.display_bpp) });
-    } else if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
+    } else if (schema.tweakOn(p, .display, family) or (p.display == .keep and schema.tweakAvailable(.display, family))) {
+        // keep: no [Display] and no USOSRES (xp_user_settings.sh, prepare_xp_ntfs_target.sh).
+        try w.print("display={s}\n", .{@tagName(p.display)});
+    }
     try optionLines(p, family, w);
     if (family == .windows_2000) {
         const network = @import("network_defaults.zig");
@@ -167,6 +170,15 @@ test "NT5 render: tweaks per family, none for 2000" {
     p.theme = .basic;
     const basic = try render(&p, .windows_xp, "", &buffer_for_test);
     try std.testing.expect(std.mem.indexOf(u8, basic, "classic_theme") == null);
+    // keep: the settings carry display=keep (no [Display], no USOSRES).
+    p.display = .keep;
+    p.display_explicit = true;
+    for ([_]Family{ .windows_xp, .windows_2003 }) |family| {
+        const keep = try render(&p, family, "", &buffer_for_test);
+        try std.testing.expect(std.mem.endsWith(u8, keep, "display=keep\n"));
+    }
+    const w2k_keep = try render(&p, .windows_2000, "", &buffer_for_test);
+    try std.testing.expect(std.mem.indexOf(u8, w2k_keep, "display=keep\ndisplay_bpp=auto\n") != null);
 }
 
 test "NT5 render: regional settings from the language" {

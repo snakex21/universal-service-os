@@ -181,13 +181,19 @@ log 'NT60 NTFS boot code PASS'
 # (usos-x86-csmwrap.exe display / usos-vista-install.exe,
 # windows_display_register.h: the Default user's Run value). A user's own
 # answer that sets <Display><HorizontalResolution> keeps its mode: nothing
-# staged. Optional: any failure keeps Windows' own mode and the preparation
-# goes on.
+# staged. Keep (a USOS answer's <!-- USOS-DISPLAY=keepx... --> from the
+# profile's display=keep, or DATA's display-keep.txt as USOS_DISPLAY_KEEP=1
+# for every answer): nothing staged, so nothing is registered either.
+# Optional: any failure keeps Windows' own mode and the preparation goes on.
 modprobe ntfs3 2>/dev/null || true
 display_request=
 if [ -r "$LIB/display_profile.sh" ]; then
     . "$LIB/display_profile.sh"
-    if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && usos_display_nt6_answer "$ANSWER_XML"; then
+    display_keep_request=
+    if [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ]; then display_keep_request=$(usos_display_from_xml "$ANSWER_XML") || display_keep_request=; fi
+    if usos_display_keep "$display_keep_request"; then
+        log 'DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged'
+    elif [ -n "$ANSWER_XML" ] && [ -r "$ANSWER_XML" ] && usos_display_nt6_answer "$ANSWER_XML"; then
         display_request=$(usos_display_from_xml "$ANSWER_XML") || { display_request=; log 'DISPLAY duplicate request in the answer; display unchanged'; }
         [ -n "$display_request" ] || display_request=autoxauto
         usos_display_valid "$display_request" || { log "DISPLAY invalid request $display_request; display unchanged"; display_request=; }

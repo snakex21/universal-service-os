@@ -41,7 +41,7 @@ bad values are refused with the field and the line, never the value.
 | `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
 | `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-9x`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
-| tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`) | default off / `default` / `auto`; see "Tweaks" |
+| tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`, `keep`: Windows' own mode, no USOSRES, docs/display-policy.md) | default off / `default` / `auto`; see "Tweaks" |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.

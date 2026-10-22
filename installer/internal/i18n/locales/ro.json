@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Actualizări și confidențialitate",
   "boot.profile.section.accounts": "Conturi și rețea",
   "boot.profile.value.unchanged": "Neschimbat",
+  "boot.profile.value.display_keep": "Implicit Windows",
   "boot.profile.field.show_protected": "Afișare fișiere de sistem protejate",
   "boot.profile.help.show_protected": "Explorer afișează și fișierele ascunse și fișierele protejate ale sistemului de operare (pentru fiecare utilizator nou).",
   "boot.profile.field.launch_to_pc": "Explorer deschis la Acest PC",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Windows clasic",
   "boot.profile.value.theme_basic": "Windows 7 de bază",
   "boot.profile.field.display": "Rezoluție ecran",
-  "boot.profile.help.display": "XP și Server 2003: culori 32-bit la această rezoluție dacă driverul de afișare o oferă. Automat: neschimbat; fără driver de afișare (driverul VGA, de ex. prin CSMWrap) Windows rămâne în modul de bază.",
+  "boot.profile.help.display": "XP și Server 2003: culori 32-bit la această rezoluție dacă driverul de afișare o oferă. Automat: neschimbat; fără driver de afișare (driverul VGA, de ex. prin CSMWrap) Windows rămâne în modul de bază. Implicit Windows: USOS nu modifică rezoluția după instalare.",
   "boot.profile.xp_ini.detail": "usos-xp.ini pe DATA (doar citire); Import creează din el un profil USOS",
   "boot.profile.section.apps": "Aplicații și scripturi",
   "boot.profile.field.shortcut_suffix_off": "Fără „Comandă rapidă” în nume",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Programul de instalare Windows cere numele de utilizator și parola în timpul instalării; USOS nu le setează.",
   "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}.",
   "boot.profile.field.display_bpp": "Adâncime de culoare",
-  "boot.profile.help.display_legacy": "Se aplică după instalare pe hardware-ul real. Automat alege un mod disponibil până la 1920x1080, cu revenire sigură la unul inferior. Neschimbat păstrează setările. Adâncime automată: 32 de biți dacă sunt disponibili, altfel 16."
+  "boot.profile.help.display_legacy": "Se aplică după instalare pe hardware-ul real. Automat alege un mod disponibil până la 1920x1080, cu revenire sigură la unul inferior. Neschimbat păstrează setările. Adâncime automată: 32 de biți dacă sunt disponibili, altfel 16. Implicit Windows: USOS nu modifică rezoluția după instalare."
 }

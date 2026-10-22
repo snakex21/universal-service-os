@@ -344,6 +344,10 @@ nt3_stage_profile() {
     if [ -n "${nt3:-}" ] && [ -z "${nt31:-}" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
         . "$LIB/display_profile.sh"
         nt3_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
+        if usos_display_keep "$nt3_display_request"; then
+            log 'DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged'
+            return 0
+        fi
         usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt3_display_request" || fail 'cannot stage NT3 hardware display request'
         log "DISPLAY request=$nt3_display_request apply=hardware-service vm=deferred"
     fi
@@ -1097,11 +1101,17 @@ nt4_display_request=
 if [ -z "$nt3" ] && [ -z "$nt31" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
     . "$LIB/display_profile.sh"
     nt4_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
-    [ -f "$usos/VESA.REG" ] || fail 'display request needs the VESA miniport'
+    [ -f "$usos/VESA.REG" ] || usos_display_keep "$nt4_display_request" || fail 'display request needs the VESA miniport'
 elif [ -z "$nt3" ] && [ -z "$nt31" ] && [ "$ANSWER_KIND" != USER ] && [ -f "$usos/VESA.REG" ] && [ -f "$LIB/USOSRES.EXE" ]; then
     . "$LIB/display_profile.sh"
     nt4_display_request=autoxauto
     log 'DISPLAY no request in the answer, default auto (native EDID mode, else highest)'
+fi
+# Keep (profile display=keep or DATA's display-keep.txt): VESA.REG's first
+# mode (1024x768x16) stays, no USOSRES and no Run value.
+if [ -n "$nt4_display_request" ] && usos_display_keep "$nt4_display_request"; then
+    log 'DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged'
+    nt4_display_request=
 fi
 if [ -n "$nt4_display_request" ]; then
     usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt4_display_request" || fail 'cannot stage hardware display request'

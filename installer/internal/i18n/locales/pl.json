@@ -1077,6 +1077,7 @@
   "boot.profile.section.updates": "Aktualizacje i prywatność",
   "boot.profile.section.accounts": "Konta i sieć",
   "boot.profile.value.unchanged": "Bez zmian",
+  "boot.profile.value.display_keep": "Domyślna Windows",
   "boot.profile.field.show_protected": "Pokaż chronione pliki systemowe",
   "boot.profile.help.show_protected": "Eksplorator pokazuje też ukryte pliki i chronione pliki systemu operacyjnego (dla każdego nowego użytkownika).",
   "boot.profile.field.launch_to_pc": "Eksplorator otwiera Ten komputer",
@@ -1155,7 +1156,7 @@
   "boot.profile.value.theme_classic": "Klasyczny Windows",
   "boot.profile.value.theme_basic": "Windows 7 Basic",
   "boot.profile.field.display": "Rozdzielczość ekranu",
-  "boot.profile.help.display": "Vista, 7, Server 2008, 2008 R2 oraz 32-bitowe 8, 8.1 i 10 bez CSM (CSMWrap): Automatycznie wybiera natywny tryb monitora (EDID), a bez niego najwyższy dostępny, przy pierwszym logowaniu na prawdziwym sprzęcie. Stała wartość trafia też do Instalatora Windows (wszystkie wersje 6.x+; tryb nieobsługiwany przez sterownik jest pomijany). XP i Server 2003: kolor 32-bitowy w tej rozdzielczości, jeśli sterownik karty ją oferuje.",
+  "boot.profile.help.display": "Vista, 7, Server 2008, 2008 R2 oraz 32-bitowe 8, 8.1 i 10 bez CSM (CSMWrap): Automatycznie wybiera natywny tryb monitora (EDID), a bez niego najwyższy dostępny, przy pierwszym logowaniu na prawdziwym sprzęcie. Stała wartość trafia też do Instalatora Windows (wszystkie wersje 6.x+; tryb nieobsługiwany przez sterownik jest pomijany). XP i Server 2003: kolor 32-bitowy w tej rozdzielczości, jeśli sterownik karty ją oferuje. Domyślna Windows: USOS nie zmienia rozdzielczości po instalacji.",
   "boot.profile.xp_ini.detail": "usos-xp.ini na DATA (tylko do odczytu); Importuj tworzy z niego profil USOS",
   "boot.profile.section.apps": "Aplikacje i skrypty",
   "boot.profile.field.shortcut_suffix_off": "Bez „Skrót” w nazwach skrótów",
@@ -1365,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Instalator Windows zapyta w trakcie instalacji o nazwę użytkownika i hasło; USOS ich nie ustawia.",
   "boot.lx.logon_answer_file": "Po instalacji zaloguj się kontem z Twojego pliku odpowiedzi {0}.",
   "boot.profile.field.display_bpp": "Głębia kolorów",
-  "boot.profile.help.display_legacy": "Ustawiane po instalacji na prawdziwym sprzęcie. Automatycznie: natywny tryb monitora (EDID), a bez niego najwyższy dostępny (Windows 9x: najwyżej 1920x1080), z bezpiecznym wyborem niższego trybu. Bez zmian zachowuje ustawienia instalacji. Automatyczna głębia: 32 bity, gdy dostępne, inaczej 16."
+  "boot.profile.help.display_legacy": "Ustawiane po instalacji na prawdziwym sprzęcie. Automatycznie: natywny tryb monitora (EDID), a bez niego najwyższy dostępny (Windows 9x: najwyżej 1920x1080), z bezpiecznym wyborem niższego trybu. Bez zmian zachowuje ustawienia instalacji. Automatyczna głębia: 32 bity, gdy dostępne, inaczej 16. Domyślna Windows: USOS nie zmienia rozdzielczości po instalacji."
 }

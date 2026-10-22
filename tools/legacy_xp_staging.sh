@@ -477,6 +477,11 @@ usos_legacy_xp_staging() {
     fi
     SOURCE_ROOT=/mnt/source
     export SOURCE_ROOT TARGET_DEVICE USOS_DISK_DEVICE
+    # display-keep.txt (2000, XP, 2003, every answer, also none): no USOSRES,
+    # Windows keeps its own display mode (docs/display-policy.md;
+    # prepare_xp_ntfs_target.sh and w2k_stage.sh read USOS_DISPLAY_KEEP).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/display-keep.txt" ]; then USOS_DISPLAY_KEEP=1; else USOS_DISPLAY_KEEP=0; fi
+    export USOS_DISPLAY_KEEP
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
     if usos_nt5_uefi_profile; then
     if [ "$NT5_SYSTEM" = windows-xp ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then

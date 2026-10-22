@@ -90,6 +90,11 @@ usos_nt52_display_stage() {
     else
         _nd_request=$(usos_display_request_nt52 "${XP_USER_SETTINGS:-}") || fail 'duplicate display request'
     fi
+    # Keep (profile display=keep or DATA's display-keep.txt): Windows' own
+    # mode, nothing staged or registered.
+    if usos_display_keep "$_nd_request"; then
+        printf '[NT5] DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged\n' >&2; return 0
+    fi
     usos_display_stage "$1" "$SCRIPT_DIR/USOSRES.EXE" "$_nd_request" || fail 'cannot stage the display helper'
     cmp -s "$SCRIPT_DIR/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
     printf '[NT5] DISPLAY request=%s native=%s apply=first-logon\n' "$_nd_request" "$(usos_display_native || echo unknown)" >&2
