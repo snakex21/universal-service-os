@@ -97,7 +97,7 @@ def main():
     policy_pass=all(services[name].get('start')==4 for name in ('Browser','LanmanServer'))
     native_server_running='\n   Server\n' in native
     sharing_result='PASS' if policy_pass and not native_server_running and '\n   Computer Browser\n' not in native else 'FAIL'
-    native_services=re.findall(r'^   (.+)$',native.split('The following services are running:',1)[1].split('The command completed',1)[0],re.M)
+    native_services=re.findall(r'^   (.+)$',native.split('These Windows NT services are started:',1)[1].split('The command completed',1)[0],re.M)
     retained={p.name:dict(bytes=p.stat().st_size,sha256=file_sha(p)) for p in sorted(WORK.glob('*-retained.*'))}
     assessment=dict(case=WORK.name,scope='Exact QEMU NT35 Workstation EN only; no Server SKU/physical/SMP/full release claim',
         fresh_normal_usos_install=True,new_blank_target_at_start=True,standalone_target_no_backing=True,
