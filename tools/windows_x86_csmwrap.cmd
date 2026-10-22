@@ -184,16 +184,25 @@ rem ---- USB 3 for the installed 32-bit Windows 7 (section 12.3) ------------
 rem Windows 7 has no xHCI driver; the X470 has only xHCI ports. From DATA:
 rem   Systems\Windows\Windows 7\Updates\windows6.1-kb2864202-x86*.msu (or
 rem   kb2685811-x86): KMDF 1.11, which the generic USB 3 package needs;
-rem   Systems\Windows\Windows 7\Drivers\x86\: the 32-bit USB 3 package(s).
-rem Both go into the installed image with this WinPE's DISM before its first
-rem boot. Vista / Server 2008 (NT 6.0): this DISM cannot service them and no
-rem 32-bit NT 6.0 xHCI package is known; skipped with a note.
+rem   Systems\Windows\Windows 7\Drivers\x86\: the 32-bit driver library;
+rem   Drivers\Windows 7\: the user's own packages (docs/drivers.md, the same
+rem   folder the x64 UEFI path reads), e.g. an unpacked Intel NIC package
+rem   (e1r62x86 for the I211).
+rem Both trees go into the installed image with this WinPE's DISM, recursively
+rem (Add-Driver /Recurse), before the first boot: an unpacked folder with an
+rem .inf anywhere below them is enough, no file list to edit. The driver step
+rem does not depend on the KMDF update: a NET/other package is installed even
+rem when the xHCI package would not start without KMDF 1.11. Vista / Server
+rem 2008 (NT 6.0): this DISM cannot service them and no 32-bit NT 6.0 xHCI
+rem package is known; skipped with a note.
 :usb3
 echo [USOS] phase=usb3-offline
 set "USOS_USB3_INSTALLED="
 set "USOS_T="
 set "USOS_NT="
 set "USOS_WORKDIR="
+set "USOS_DRV="
+set "USOS_USER_DRV="
 "%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt"
 if errorlevel 1 (echo [USOS] USB3: installed Windows not found; skipped. & exit /b 0)
 for /f "usebackq tokens=1,2" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B")
@@ -205,31 +214,49 @@ set "USOS_DATA="
 for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z) do if not defined USOS_DATA if /i not "%%D:"=="%USOS_T%" if exist "%%D:\Systems\Windows\Windows 7\" set "USOS_DATA=%%D:\Systems\Windows\Windows 7"
 if not defined USOS_DATA (echo [USOS] USB3: DATA\Systems\Windows\Windows 7 not visible; skipped. & exit /b 0)
 set "USOS_DRV=%USOS_DATA%\Drivers\x86"
+rem The user folder of the x64 UEFI path on the same DATA volume: an unpacked
+rem package dropped into DATA\Drivers\Windows 7 is installed here too.
+for %%D in ("%USOS_DATA%") do set "USOS_USER_DRV=%%~dD\Drivers\Windows 7"
 set "USOS_KMDF_MSU="
 for %%M in ("%USOS_DATA%\Updates\*kb2685811-x86*.msu" "%USOS_DATA%\Updates\*kb2864202-x86*.msu") do if exist "%%~fM" set "USOS_KMDF_MSU=%%~fM"
 set "USOS_HAVE_INF="
 if exist "%USOS_DRV%\" for /r "%USOS_DRV%" %%I in (*.inf) do set "USOS_HAVE_INF=1"
-if not defined USOS_HAVE_INF (echo [USOS] USB3: no 32-bit package in %USOS_DRV%; skipped. & exit /b 0)
-if not defined USOS_KMDF_MSU (echo [USOS] USB3: KMDF 1.11 x86 missing - put windows6.1-kb2864202-x86*.msu into %USOS_DATA%\Updates; skipped. & exit /b 0)
+if exist "%USOS_USER_DRV%\" for /r "%USOS_USER_DRV%" %%I in (*.inf) do set "USOS_HAVE_INF=1"
+if not defined USOS_HAVE_INF (echo [USOS] USB3: no 32-bit package (.inf) in %USOS_DRV% or %USOS_USER_DRV%; skipped. & exit /b 0)
 set "USOS_WORKDIR=%USOS_T%\USOS-usb3"
 if exist "%USOS_WORKDIR%" rd /s /q "%USOS_WORKDIR%"
 md "%USOS_WORKDIR%\cab"
 md "%USOS_WORKDIR%\scratch"
+if not defined USOS_KMDF_MSU (echo [USOS] USB3: KMDF 1.11 x86 missing - put windows6.1-kb2864202-x86*.msu into %USOS_DATA%\Updates; the xHCI package would not start, the driver packages are still added. & goto usb3_drivers)
 expand.exe -F:Windows6.1-KB*-x86.cab "%USOS_KMDF_MSU%" "%USOS_WORKDIR%\cab" >nul
 set "USOS_KMDF_CAB="
 for %%C in ("%USOS_WORKDIR%\cab\Windows6.1-KB*-x86.cab") do if exist "%%~fC" set "USOS_KMDF_CAB=%%~fC"
-if not defined USOS_KMDF_CAB (echo [USOS] USB3: no KMDF package inside %USOS_KMDF_MSU%; skipped. & goto usb3_done)
+if not defined USOS_KMDF_CAB (echo [USOS] USB3: no KMDF package inside %USOS_KMDF_MSU%; the driver packages are still added. & goto usb3_drivers)
 echo [USOS] USB3: KMDF %USOS_KMDF_CAB% into %USOS_T%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-kmdf.log" /Add-Package /PackagePath:"%USOS_KMDF_CAB%"
 set "USOS_DISM=%errorlevel%"
 echo [USOS] USB3: KMDF DISM exit=%USOS_DISM%
-if not "%USOS_DISM%"=="0" if not "%USOS_DISM%"=="3010" (echo [USOS] USB3: KMDF not installed, so the USB 3 package would not start; skipped. & goto usb3_done)
+if not "%USOS_DISM%"=="0" if not "%USOS_DISM%"=="3010" echo [USOS] USB3: KMDF not installed, so the USB 3 package would not start; the driver packages are still added.
+:usb3_drivers
+rem Recursive over the whole tree: every folder that holds an .inf is one package
+rem (Drivers\x86\e1r62x86\ for an Intel I211 NIC, a Storage\USB_AMD copy, ...).
+rem The bundled library goes first, the user folder second and only its own
+rem exit code is logged: a package DISM refuses (another architecture) never
+rem hides the other tree. USOS_USB3_INSTALLED follows the bundled tree only, so
+rem a NET package here does not silence the usosusb fallback.
+if not exist "%USOS_DRV%\" goto usb3_user_drivers
 echo [USOS] USB3: drivers %USOS_DRV%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-drivers.log" /Add-Driver /Driver:"%USOS_DRV%" /Recurse /ForceUnsigned
 set "USOS_DISM=%errorlevel%"
 echo [USOS] USB3: driver DISM exit=%USOS_DISM%
 if "%USOS_DISM%"=="0" set "USOS_USB3_INSTALLED=1"
 if "%USOS_DISM%"=="3010" set "USOS_USB3_INSTALLED=1"
+:usb3_user_drivers
+if not exist "%USOS_USER_DRV%\" goto usb3_done
+echo [USOS] USB3: user drivers %USOS_USER_DRV%
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-user-drivers.log" /Add-Driver /Driver:"%USOS_USER_DRV%" /Recurse /ForceUnsigned
+set "USOS_DISM=%errorlevel%"
+echo [USOS] USB3: user driver DISM exit=%USOS_DISM%
 :usb3_done
 "%~dp0usos-log-x86.exe"
 if exist "%USOS_WORKDIR%\scratch" rd /s /q "%USOS_WORKDIR%\scratch"

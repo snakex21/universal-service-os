@@ -24,6 +24,15 @@ DATA\Systems\Windows\Windows 10\Unattended\fast-startup-on.txt
   systemie), nie Windows Setup. Działają tylko dla instalacji robionych przez
   USOS.
 
+## Sterowniki sieci Windows 7
+
+Pliki na DATA (`Systems\Windows\<wersja>\Unattended`) opisują zachowanie
+instalacji. Sterownik sieci (np. Intel I211) nie jest przełącznikiem: kładzie
+się rozpakowany folder z `.inf` w drzewie sterowników i USOS wstrzykuje go
+sam, rekursywnie - 32-bit przez DISM w WinPE (`Systems\Windows\Windows 7\Drivers\x86`
+lub `Drivers\Windows 7`), 64-bit przez `DriverPaths`/`pnputil`. Gdzie dokładnie
+i jak sprawdzić instalację: [network-win7.md](network-win7.md).
+
 ## Tabela
 
 | Plik | Co robi | Systemy / ścieżki | Bez pliku (domyślnie) | Kod |

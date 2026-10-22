@@ -1,0 +1,120 @@
+# Sieć Intel I211 (PCI\VEN_8086&DEV_1539) w Windows 7 / Server 2008 R2
+
+Windows 7 i Windows Server 2008 R2 nie mają sterownika dla I211. Intel wydał
+go jako **e1r62x86 / e1r62x64** (NDIS 6.2) w „Intel Ethernet Adapter Complete
+Driver Pack” (katalogi `PROWin32` / `PROWinx64`). Ten dokument mówi, gdzie
+położyć rozpakowaną paczkę, żeby USOS sam ją wstrzyknął, i jak sprawdzić, że
+karta działa.
+
+USOS nie zawiera plików Intela i nie instaluje ich z repo — paczkę kładzie
+użytkownik na partycji `USOS_DATA` (montowanej w USOS jako DATA). Nie kopiuj
+jej do repozytorium ani do `tools\cache`.
+
+## 1. Co rozpakować
+
+Z paczki Intela potrzebny jest **cały folder sterownika**, nie pojedyncze
+pliki:
+
+```
+e1r62x86\        (32-bit: Windows 7 x86, Server 2008 R2 x86)
+  e1r62x86.inf
+  e1r62x86.cat
+  e1r62x86.sys
+  ...            (pliki .dll/.bin z paczki zostaw w folderze)
+e1r62x64\        (64-bit: Windows 7 x64, Server 2008 R2 x64)
+  e1r62x64.inf
+  e1r62x64.cat
+  e1r62x64.sys
+  ...
+```
+
+Wystarczy sam folder z `.inf` (i plikami, które ten `.inf` wymienia) — USOS
+skanuje drzewo rekursywnie i nie ma żadnej listy plików do edycji.
+
+## 2. Gdzie położyć
+
+### Windows 7 x86 / Server 2008 R2 x86 (ścieżka CSMWrap, `win-x86-uefi-csmwrap`)
+
+Jedno z dwóch miejsc na DATA (oba są czytane):
+
+```
+DATA\Systems\Windows\Windows 7\Drivers\x86\e1r62x86\
+DATA\Drivers\Windows 7\e1r62x86\            (dowolny podfolder; klasy Storage/USB/Other też)
+```
+
+Pierwsze to biblioteka x86 USOS (tym samym drzewem jadą paczki USB 3), drugie
+to zwykły folder użytkownika z `docs/drivers.md`. Katalog `Drivers\x86` jest
+bezpieczniejszy, gdy na tej samej DATA leżą też paczki 64-bitowe: DISM w tym
+kroku instaluje najpierw całe `Drivers\x86`, a dopiero potem
+`Drivers\Windows 7`, więc obca architektura w drugim drzewie nie zasłoni
+poprawnej paczki (jej błąd jest tylko logowany).
+
+Po instalacji systemu (Setup `/noreboot`, przed pierwszym rozruchem) USOS
+robi offline:
+
+```
+dism /Image:<dysk docelowy>\ /Add-Driver /Driver:D:\Systems\Windows\Windows 7\Drivers\x86 /Recurse /ForceUnsigned
+dism /Image:<dysk docelowy>\ /Add-Driver /Driver:D:\Drivers\Windows 7              /Recurse /ForceUnsigned
+```
+
+### Windows 7 x64 / Server 2008 R2 x64 (natywne UEFI)
+
+```
+DATA\Drivers\Windows 7\e1r62x64\            (dowolny podfolder)
+DATA\Drivers\Windows 7\Other\e1r62x64\      (klasa "Other" - sieć, grafika, ...)
+```
+
+`Drivers\Windows 7\Storage\`, `USB\` i `Other\` to klasy z `docs/drivers.md`;
+folder poza nimi (albo pliki wprost w `Drivers\Windows 7`) liczy się jako
+`Other`. Karta sieciowa to `Other`, ale dowolne z tych miejsc działa tak samo:
+każdy folder z `.inf` jest jedną paczką.
+
+Paczka trafia do archiwum `usos-drivers.bin` (`usos-win7-drivers\user\<klasa>\NN\`)
+i dalej do zainstalowanego systemu:
+
+* przez `DriverPaths` (`offlineServicing`, `Microsoft-Windows-PnpCustomizationsNonWinPE`)
+  wskazujący `usos-win7-drivers` — Setup skanuje to drzewo rekursywnie:
+  `tools/windows7_modern_startup.cmd:56`, `tools/windows7_native_startup.cmd:78`,
+  `tools/windows_unattend_drivers.c:36-39`;
+* albo, gdy instalacja idzie bez pliku odpowiedzi (ręczny Setup z PE7),
+  przez `pnputil -i -a` w `SetupComplete.cmd` zainstalowanego systemu
+  (`tools/windows7_setupcomplete.cmd:12-14`), po skopiowaniu paczek do
+  `<dysk>:\USOS\Drivers` (`tools/windows7_native_startup.cmd:128`).
+
+## 3. Jak sprawdzić, że działa
+
+1. **Menedżer urządzeń** (`devmgmt.msc`): „Karty sieciowe” →
+   `Intel(R) I211 Gigabit Network Connection`, bez żółtego wykrzyknika;
+   Właściwości → Sterownik → Dostawca `Intel`, Wersja zgodna z paczką.
+2. **Sterownik w magazynie** (konsola administratora):
+
+   ```
+   pnputil /enum-drivers
+   ```
+
+   Szukaj wpisu z `Nazwa pliku INF: e1r62x86.inf` (x86) lub `e1r62x64.inf`
+   (x64) i `Nazwa klasy: Net`.
+3. **Interfejs sieciowy**:
+
+   ```
+   ipconfig /all
+   ```
+
+   Karta „Intel(R) I211…” ma adres sprzętowy i (przy podłączonym kablu)
+   adres IP; `ping` bramy działa.
+4. **Logi USOS**:
+   * x86 CSMWrap, na dysku docelowym: `\USOS-usb3\dism-drivers.log` (biblioteka
+     `Drivers\x86`) i `\USOS-usb3\dism-user-drivers.log` (`Drivers\Windows 7`),
+     a także `[USOS] USB3: … exit=…` na konsoli i w logu USOS
+     (`tools/windows_x86_csmwrap.cmd:249` i `:257`).
+   * x64 UEFI: `usos-win7-drivers\user\usos-user-drivers.log` (w archiwum
+     i w WinPE), `\USOS\Drivers\usos-pnputil.log` (ścieżka bez pliku
+     odpowiedzi), `Windows\Panther\setupact.log` oraz `Windows\INF\setupapi.dev.log`
+     zainstalowanego systemu (`oem*.inf` z `e1r62*`).
+5. Brak karty w Menedżerze urządzeń mimo poprawnej paczki: sprawdź, czy plik
+   `.inf` leży w jednym z drzew z sekcji 2 (USOS nie czyta innych miejsc),
+   i czy paczka jest 32/64-bit zgodna z instalowanym systemem.
+
+## Licencja sterownika Intela
+
+Uzupełniane przez koordynatora — w toku weryfikacji źródła

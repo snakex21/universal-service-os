@@ -176,6 +176,25 @@ def main() -> int:
     assert script.index("setup-returned") < usb3 < script.index('usos-x86-csmwrap.exe" after')
     assert script.index("/Add-Package") < script.index("/Add-Driver")
     assert 'if not "%USOS_NT%"=="6.1" exit /b 0' in script and "/ForceUnsigned" in script
+    # A user package dropped as an unpacked folder (docs/network-win7.md, an
+    # Intel I211 e1r62x86 INF) is installed without editing any file list:
+    # DISM /Add-Driver runs recursively over the whole Win7 driver trees, and
+    # the driver step no longer depends on the optional KMDF update.
+    assert script.index('if not "%USOS_NT%"=="6.1" exit /b 0') < script.index("/Add-Driver")
+    assert 'for %%D in ("%USOS_DATA%") do set "USOS_USER_DRV=%%~dD\\Drivers\\Windows 7"' in script
+    section = script[script.index("\n:usb3\n"):script.index("\n:usb3_done\n")]
+    add_driver = [line for line in section.splitlines() if line.startswith("dism.exe") and "/Add-Driver" in line]
+    assert len(add_driver) == 2, add_driver
+    assert '/Driver:"%USOS_DRV%" /Recurse /ForceUnsigned' in add_driver[0]
+    assert '/Driver:"%USOS_USER_DRV%" /Recurse /ForceUnsigned' in add_driver[1]
+    # Missing / broken KMDF: a note, not a jump past the driver packages.
+    before_drivers = section.split(":usb3_drivers")[0]
+    assert "goto usb3_done" not in before_drivers
+    assert before_drivers.count("goto usb3_drivers") == 2 and "still added" in before_drivers
+    # The bundled tree decides USOS_USB3_INSTALLED (the usosusb fallback); the
+    # user tree only logs its own exit code.
+    bundled, user = section.split(":usb3_user_drivers")
+    assert "USOS_USB3_INSTALLED=1" in bundled and "USOS_USB3_INSTALLED" not in user
     # The Win10 x86 WinPE has neither fc.exe nor findstr.exe (find only): any
     # call of them fails, so a check built on them silently skips its step
     # (usosmpart readback 2026-10-14). The readback uses the helper instead.
