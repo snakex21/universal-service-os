@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/components"
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
@@ -34,6 +36,7 @@ func main() {
 	restoreImageMarkers := flag.Bool("restore-image-markers", false, "rollback only: recreate pre-direct-NTFS zero-byte image markers on ESP after update")
 	debugBootmgrProbe := flag.String("debug-bootmgr-probe", "", "optional physical diagnostic bootmgr.exe probe copied to the identified ESP after a successful update")
 	language := flag.String("language", "", "language written to the ESP (usos-settings.ini, lang.bin); empty keeps the target's current usos-settings.ini language")
+	componentList := flag.String("components", "", "optional components to install after a successful update (xp, xp-pl, xp-en, winpe, winpe-x86); empty = report only, nothing written to the stick")
 	flag.Parse()
 
 	fatalf := func(format string, args ...any) {
@@ -126,6 +129,12 @@ func main() {
 		fatalf("no catalog for language %q", chosen)
 	}
 	fmt.Printf("LANGUAGE=%s\n", i18n.SetLanguage(chosen))
+	// The component selection is parsed before the first write, so a typo in
+	// -components stops the run before the ESP is touched.
+	installComponents, err := components.ParseComponentSelection(*componentList, chosen)
+	if err != nil {
+		fatalf("-components: %v", err)
+	}
 
 	if err := winhost.ValidateBackupDirectory(filepath.Dir(logAbs), target.Disk.Number); err != nil {
 		fatalf("validate local evidence directory: %v", err)
@@ -164,6 +173,16 @@ func main() {
 	fmt.Printf("CONFIRMED PhysicalDrive%d model=%q serial=%q size=%d\n", target.Disk.Number, target.Disk.DisplayName(), target.Disk.Serial, target.Disk.SizeBytes)
 	fmt.Printf("GPT disk=%s ESP=%s@%d+%d DATA=%s@%d+%d WORK=%s@%d+%d\n", target.Media.DiskPTUUID, target.Media.ESP.PartUUID, target.Media.ESP.StartBytes, target.Media.ESP.SizeBytes, target.Media.DATA.PartUUID, target.Media.DATA.StartBytes, target.Media.DATA.SizeBytes, target.Media.WORK.PartUUID, target.Media.WORK.StartBytes, target.Media.WORK.SizeBytes)
 	fmt.Printf("INSTALLER=%s\n", installerAbs)
+	// Component report: always read-only. Without -components this is the
+	// whole component part of the run (report only, no writes).
+	componentReport := winhost.ReportComponents(target.Media.ESP.VolumePath, target.Media.DATA.VolumePath)
+	for _, line := range componentReport.Lines() {
+		fmt.Println(line)
+		logger.WriteLine(line)
+	}
+	if len(installComponents) == 0 {
+		fmt.Println("COMPONENTS mode=report-only (pass -components xp,winpe,winpe-x86 to install)")
+	}
 	var final *install.VerificationReport
 	var finalErr error
 	for event := range engine.RunAsync(target) {
@@ -243,6 +262,37 @@ func main() {
 			fatalf("bootmgr probe readback mismatch: got=%x want=%x", got, want)
 		}
 		fmt.Printf("DEBUG_BOOTMGR_PROBE=%s bytes=%d sha256=%x\n", destination, len(probe), got)
+	}
+	if len(installComponents) > 0 {
+		// Install the selected components with the installer's Components step
+		// (components.Runner + installComponentAt, no second implementation).
+		// The zips come out of the -installer overlay; an online installer
+		// without one downloads them into %TEMP%.
+		opts := winhost.ComponentInstallOptions{
+			Release: components.CurrentRelease(),
+			Log:     func(line string) { fmt.Println(line); logger.WriteLine(line) },
+		}
+		bundle, err := components.OpenBundle(installerAbs)
+		if err == nil {
+			opts.Bundle = bundle
+			fmt.Printf("COMPONENTS bundle=%s\n", installerAbs)
+		} else if err != components.ErrNoBundle {
+			fatalf("read the component overlay of %s: %v", installerAbs, err)
+		} else {
+			fmt.Printf("COMPONENTS bundle=none installer=%s\n", installerAbs)
+		}
+		results := winhost.InstallComponents(context.Background(), target.Media.ESP.VolumePath, target.Media.DATA.VolumePath, installComponents, opts)
+		for _, id := range installComponents {
+			if err := results[id]; err != nil {
+				fatalf("install component %s: %v", id, err)
+			}
+		}
+		after := winhost.ReportComponents(target.Media.ESP.VolumePath, target.Media.DATA.VolumePath)
+		for _, line := range after.Lines() {
+			fmt.Println(line)
+			logger.WriteLine(line)
+		}
+		fmt.Println("COMPONENTS RESULT=PASS")
 	}
 	fmt.Printf("LOG=%s\n", logAbs)
 	fmt.Println("RESULT=PASS")
