@@ -18,7 +18,7 @@ import (
 //   - the report USOS writes on the drive at every UEFI start,
 //     EFI\USOS\Logs\secure-boot-<SMBIOS UUID>.ini (usos_key=saved|missing),
 //     matched by this computer's SMBIOS system UUID;
-//   - a local marker %APPDATA%\USOS\mok-enrolled-<UUID>, written when one of
+//   - a local marker data/mok-enrolled-<UUID> beside the EXE, written when one of
 //     the above confirmed the key or when the user clicked "Already done".
 
 // ParseSMBIOSUUID returns the SMBIOS type 1 system UUID from the raw table
@@ -128,7 +128,7 @@ func ReadReport(espRoot, machineUUID string) (Report, bool) {
 	return rep, true
 }
 
-// MarkerPath is %APPDATA%\USOS\mok-enrolled-<UUID> under dir (the USOS
+// MarkerPath is mok-enrolled-<UUID> under dir (the portable USOS
 // application data directory).
 func MarkerPath(dir, machineUUID string) string {
 	return filepath.Join(dir, "mok-enrolled-"+strings.ToUpper(machineUUID))

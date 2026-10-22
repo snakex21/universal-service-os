@@ -69,7 +69,7 @@ type Config struct {
 	// screen uses; nil means this computer's (mokenroll.System).
 	MokFirmware mokenroll.Firmware
 	// MokMarkerDir holds the per-computer "key enrolled" markers; "" means
-	// %APPDATA%\USOS.
+	// data beside the executable.
 	MokMarkerDir string
 	// MachineUUID returns this computer's SMBIOS UUID; nil = the real one.
 	MachineUUID func() string

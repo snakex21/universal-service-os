@@ -1,6 +1,7 @@
 package efisign
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -14,27 +15,99 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 )
 
-// Key custody: the private key lives outside the repository, by default in
-// %APPDATA%\USOS\signing (USOS_SIGNING_DIR overrides it). Only the public
+// Key custody: the private key lives in data\signing beside the program
+// (portable mode; for `go run` from installer\ that is installer\data\signing
+// beside "USOS Installer.exe"); USOS_SIGNING_DIR overrides it. installer/data/
+// is git-ignored and never packed into a payload, release or USOS drive. A
+// key left by older versions in %APPDATA%\USOS\signing is copied once
+// (verified byte for byte; the original is only read). Only the public
 // certificate is copied onto the USB stick for MokManager enrollment.
 const (
-	KeyFileName  = "usos-secure-boot.key"
-	CertFileName = "usos-secure-boot.cer"
+	KeyFileName   = "usos-secure-boot.key"
+	CertFileName  = "usos-secure-boot.cer"
 	signingDirEnv = "USOS_SIGNING_DIR"
 )
 
-// DefaultKeyDir returns the signing key directory.
+// KeyNotice receives one line per key-folder event (copy from the legacy
+// folder, mismatch). Lines name files and folders only, never key bytes.
+var KeyNotice func(string)
+
+func notice(line string) {
+	if KeyNotice != nil {
+		KeyNotice(line)
+	}
+}
+
+// DefaultKeyDir returns the signing key directory (data\signing), copying a
+// legacy key into it once.
 func DefaultKeyDir() (string, error) {
 	if dir := os.Getenv(signingDirEnv); dir != "" {
 		return dir, nil
 	}
-	config, err := os.UserConfigDir()
+	data, err := portable.DataDir()
 	if err != nil {
-		return "", fmt.Errorf("locate the user configuration directory: %w", err)
+		return "", fmt.Errorf("signing key folder: %w", err)
 	}
-	return filepath.Join(config, "USOS", "signing"), nil
+	dir := filepath.Join(data, portable.SigningDirName)
+	if legacy := portable.LegacyPath(portable.SigningDirName); legacy != "" {
+		if err := MigrateLegacyKey(legacy, dir); err != nil {
+			return "", err
+		}
+	}
+	return dir, nil
+}
+
+// MigrateLegacyKey copies the key pair from legacy into dir when dir does
+// not have it yet. legacy is only read; each copy is verified byte for byte;
+// a differing file already in dir is kept and reported.
+func MigrateLegacyKey(legacy, dir string) error {
+	if _, err := os.Stat(filepath.Join(legacy, KeyFileName)); err != nil {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	for _, f := range []struct {
+		name string
+		mode os.FileMode
+	}{{KeyFileName, 0o600}, {CertFileName, 0o644}} {
+		src := filepath.Join(legacy, f.name)
+		dst := filepath.Join(dir, f.name)
+		if _, err := os.Stat(src); err != nil {
+			continue
+		}
+		if _, err := os.Stat(dst); err == nil {
+			same, err := sameFile(src, dst)
+			if err != nil {
+				return err
+			}
+			if !same {
+				notice(fmt.Sprintf("WARN %s in %s differs from %s; keeping the data copy", f.name, dir, legacy))
+			}
+			continue
+		}
+		if err := portable.CopyNew(src, dst, f.mode); err != nil {
+			return fmt.Errorf("copy %s from %s to %s: %w", f.name, legacy, dir, err)
+		}
+		notice(fmt.Sprintf("copied %s from %s to %s (verified byte for byte; original kept)", f.name, legacy, dir))
+	}
+	return nil
+}
+
+func sameFile(a, b string) (bool, error) {
+	da, err := os.ReadFile(a)
+	if err != nil {
+		return false, err
+	}
+	db, err := os.ReadFile(b)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(da, db), nil
 }
 
 // KeyPair is the USOS Secure Boot signing identity.

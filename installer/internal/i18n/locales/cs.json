@@ -3,6 +3,7 @@
 
   "installer.window.title": "Instalátor Universal Service OS",
   "installer.startup.log_failed": "Instalátor nelze spustit, protože nebylo možné otevřít soubor protokolu vedle programu:\n%s",
+  "installer.startup.portable_not_writable": "USOS je přenosný program — přesuňte složku USOS na místo s právem zápisu (např. plochu nebo flash disk) a spusťte jej znovu.\n\n%s",
   "installer.startup.install_engine_failed": "Instalační modul nelze spustit:\n%s",
   "installer.startup.update_engine_failed": "Modul místní aktualizace nelze spustit:\n%s",
   "installer.startup.repair_engine_failed": "Modul opravy nelze spustit:\n%s",

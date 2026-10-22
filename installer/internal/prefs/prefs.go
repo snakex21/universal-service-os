@@ -1,5 +1,5 @@
-// Package prefs stores per-user installer preferences in
-// %APPDATA%\USOS\installer.ini (the same [ui] language= format the drive's
+// Package prefs stores installer preferences in data/installer.ini beside
+// the EXE (the same [ui] language= format the drive's
 // usos-settings.ini uses). Nothing here is written to a USOS drive.
 package prefs
 
@@ -9,18 +9,15 @@ import (
 	"path/filepath"
 
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 )
 
-// FileName is the preferences file inside the per-user USOS directory.
+// FileName is the preferences file inside the portable data directory.
 const FileName = "installer.ini"
 
-// DefaultPath returns %APPDATA%\USOS\installer.ini.
+// DefaultPath returns data/installer.ini beside the EXE.
 func DefaultPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "USOS", FileName), nil
+	return portable.Path(FileName)
 }
 
 // LoadLanguage returns the saved language code if the file exists and names a

@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS diegimo programa",
   "installer.startup.log_failed": "Diegimo programa negali pasileisti, nes nepavyko atidaryti žurnalo failo šalia programos:\n%s",
+  "installer.startup.portable_not_writable": "USOS yra nešiojama programa — perkelkite aplanką USOS į vietą, kurioje galima rašyti (pvz., darbalaukį ar USB atmintinę), ir paleiskite iš naujo.\n\n%s",
   "installer.startup.install_engine_failed": "Nepavyksta paleisti diegimo variklio:\n%s",
   "installer.startup.update_engine_failed": "Nepavyksta paleisti vietinio atnaujinimo variklio:\n%s",
   "installer.startup.repair_engine_failed": "Nepavyksta paleisti taisymo variklio:\n%s",

@@ -3,6 +3,7 @@
 
   "installer.window.title": "Πρόγραμμα εγκατάστασης Universal Service OS",
   "installer.startup.log_failed": "Το πρόγραμμα εγκατάστασης δεν μπορεί να ξεκινήσει, επειδή δεν ήταν δυνατό να ανοίξει το αρχείο καταγραφής δίπλα στο πρόγραμμα:\n%s",
+  "installer.startup.portable_not_writable": "Το USOS είναι φορητό πρόγραμμα — μετακινήστε τον φάκελο USOS σε θέση με δικαίωμα εγγραφής (π.χ. την επιφάνεια εργασίας ή ένα USB stick) και εκκινήστε το ξανά.\n\n%s",
   "installer.startup.install_engine_failed": "Ο μηχανισμός εγκατάστασης δεν μπορεί να ξεκινήσει:\n%s",
   "installer.startup.update_engine_failed": "Ο μηχανισμός τοπικής ενημέρωσης δεν μπορεί να ξεκινήσει:\n%s",
   "installer.startup.repair_engine_failed": "Ο μηχανισμός επισκευής δεν μπορεί να ξεκινήσει:\n%s",

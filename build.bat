@@ -47,7 +47,8 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 rem Secure Boot: the vendored Microsoft-signed shim becomes EFI\BOOT\BOOTX64.EFI,
 rem USOS becomes the MOK-signed EFI\BOOT\grubx64.efi, and the micro-Linux kernel,
 rem systemd-boot and the NTFS driver are signed in place. The private key lives
-rem outside the repository (%%APPDATA%%\USOS\signing); without it the same layout
+rem in installer\data\signing (git-ignored, copied once from the older
+rem %%APPDATA%%\USOS\signing); without it the same layout
 rem is emitted UNSIGNED (boots only with Secure Boot off). docs\secure-boot-usos.md
 pushd "%ROOT%installer"
 go run ./cmd/usos-efisign release -root ..

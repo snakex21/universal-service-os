@@ -9,8 +9,10 @@
 //	go run ./cmd/usos-efisign derive-check -unsigned A -signed B -sbat F
 //	go run ./cmd/usos-efisign mok-request -cert C -password P -out DIR   dump MokNew.bin/MokAuth.bin
 //
-// The private key is read from %APPDATA%\USOS\signing (or USOS_SIGNING_DIR)
-// and never enters the repository.
+// The private key is read from data\signing beside the program, i.e.
+// installer\data\signing for `go run` (or USOS_SIGNING_DIR); installer/data/ is
+// git-ignored and never enters the repository, a payload or a USOS drive.
+// An older key in %APPDATA%\USOS\signing is copied there once (original kept).
 package main
 
 import (
@@ -30,6 +32,8 @@ func main() {
 	if len(os.Args) < 2 {
 		usage()
 	}
+	// Key-folder events name paths only, never key bytes.
+	efisign.KeyNotice = func(line string) { fmt.Fprintln(os.Stderr, "[KEY]", line) }
 	var err error
 	switch os.Args[1] {
 	case "keygen":
@@ -61,7 +65,7 @@ func usage() {
 }
 
 func keyDirFlag(set *flag.FlagSet) *string {
-	return set.String("key-dir", "", "signing key directory (default %APPDATA%\\USOS\\signing or USOS_SIGNING_DIR)")
+	return set.String("key-dir", "", "signing key directory (default data\\signing beside the program or USOS_SIGNING_DIR)")
 }
 
 func resolveKeyDir(value string) (string, error) {

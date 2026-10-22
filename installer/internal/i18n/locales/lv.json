@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS instalētājs",
   "installer.startup.log_failed": "Instalētāju nevar palaist, jo neizdevās atvērt žurnāla failu blakus programmai:\n%s",
+  "installer.startup.portable_not_writable": "USOS ir pārnēsājama programma — pārvietojiet mapi USOS uz vietu ar rakstīšanas tiesībām (piem., darbvirsmu vai USB zibatmiņu) un palaidiet to vēlreiz.\n\n%s",
   "installer.startup.install_engine_failed": "Nevar palaist instalēšanas dzinēju:\n%s",
   "installer.startup.update_engine_failed": "Nevar palaist lokālās atjaunināšanas dzinēju:\n%s",
   "installer.startup.repair_engine_failed": "Nevar palaist labošanas dzinēju:\n%s",

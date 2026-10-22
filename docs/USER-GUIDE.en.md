@@ -63,6 +63,16 @@ After installation the stick has three partitions:
 
 ## 2. The installer: install, update, repair, uninstall
 
+The installer is portable. Settings, the AutoPlay restore journal, the
+"key enrolled" markers and downloaded components live in `data` beside the
+EXE; temporary work goes to `data\tmp` and is removed when the installer
+closes. Nothing is created in `%APPDATA%`, `%LOCALAPPDATA%` or `%TEMP%`. Move
+the entire program folder with `data`. The folder must be writable: in a
+read-only place (e.g. Program Files) the installer asks you to move the USOS
+folder (desktop, USB stick) and closes. Settings left by an older version in
+`%APPDATA%\USOS` are copied once into `data`; the old files are left as they
+are.
+
 Start `USOS-Installer-1.0.0.exe` (double-click, accept UAC). The first
 screen, "**What do you want to do?**", has four cards:
 

@@ -3,6 +3,7 @@
 
   "installer.window.title": "Universal Service OS Installer",
   "installer.startup.log_failed": "Nie można uruchomić instalatora, ponieważ nie udało się otworzyć pliku logu obok programu:\n%s",
+  "installer.startup.portable_not_writable": "USOS jest programem przenośnym — przenieś folder USOS w miejsce z prawem zapisu (np. pulpit lub pendrive) i uruchom ponownie.\n\n%s",
   "installer.startup.install_engine_failed": "Nie można uruchomić silnika instalacji:\n%s",
   "installer.startup.update_engine_failed": "Nie można uruchomić silnika aktualizacji lokalnej:\n%s",
   "installer.startup.repair_engine_failed": "Nie można uruchomić silnika naprawy:\n%s",

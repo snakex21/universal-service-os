@@ -3,6 +3,7 @@
 
   "installer.window.title": "Installatieprogramma Universal Service OS",
   "installer.startup.log_failed": "Het installatieprogramma kan niet starten omdat het logbestand naast het programma niet kon worden geopend:\n%s",
+  "installer.startup.portable_not_writable": "USOS is een draagbaar programma — verplaats de USOS-map naar een beschrijfbare locatie (bijv. het bureaublad of een USB-stick) en start het opnieuw.\n\n%s",
   "installer.startup.install_engine_failed": "De installatie-engine kan niet starten:\n%s",
   "installer.startup.update_engine_failed": "De engine voor lokaal bijwerken kan niet starten:\n%s",
   "installer.startup.repair_engine_failed": "De herstel-engine kan niet starten:\n%s",

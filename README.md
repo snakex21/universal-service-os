@@ -307,9 +307,9 @@ The build runs on Windows. Full instructions: [docs/BUILDING.md](docs/BUILDING.m
 - **Offline build:** extract `USOS-1.0.0-buildkit.zip`, set `USOS_BUILDKIT`
   to the extracted `USOS-1.0.0-buildkit` folder and run `build.bat`; the kit
   is checked against its manifest and downloads are disabled.
-- **Signing key:** the Secure Boot (MOK) key lives **outside the
-  repository**, in `%APPDATA%\USOS\signing\` (`USOS_SIGNING_DIR` overrides
-  it). Without it the build is **unsigned** and boots only with Secure Boot
+- **Signing key:** the Secure Boot (MOK) key lives in the git-ignored
+  portable folder `installer\data\signing\` (`USOS_SIGNING_DIR` overrides
+  it; a key in the older `%APPDATA%\USOS\signing\` is copied there once). Without it the build is **unsigned** and boots only with Secure Boot
   off. Never commit or share the key.
 
 Windows ISOs, drivers and other third-party media are never part of the
