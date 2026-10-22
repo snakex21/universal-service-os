@@ -103,13 +103,20 @@ Own helperd00c, b49SYS/f537USB and native safe shutdown/readback are pinned;
 final note8d269a40. Functional LAN and client policy retain separate proofs.
 No fresh automatic integration or hardware readiness is claimed.
 
-## Pending NT4
+## NT4: completed Setup/HID, network and MSC follow separately
 
 The corrected temporary address198.51.100.1 replaces192.0.2.1 in the own
 renderer because original TCPCFG rejects a zero octet. `fix/nt4-net`
 a4313b36/3863468b records the original-code validator and host tests.
-Candidate03 is a fresh normal USOS trial; no NT4 desktop/LAN/MSC/HID PASS
-is inferred before its actual results. Its new own EFI is qualified as
+Candidate03 has completed fresh normal Setup and the native desktop,
+safe shutdown and stopped retained-target readback. Separate HID01
+qualifies keyboard/mouse out/in with i8042prtStart4, USB2d455 and original
+parent unchanged (fix/nt4-usb0c53a3ed, S14). Its BIOS cold firmware differs
+from the original OVMF/CSMWrap warm handoff. Its new own EFI is qualified as
 a partial build output: fullbuild03 remains FAIL on an unrelated Win7
-asset, despite589/589 host tests. Frozen HID1.3 and MSC drivers will be
-tested in separate overlays; that is not a combined-HID+MSC claim.
+asset, despite589/589 host tests. Frozen MSC is being tested separately;
+there is no combined-HID+MSC or physical claim. Network05 versus unchanged
+Start3 control06 establishes the Start2 requirement under matched cold
+argv, but the official05 LAN result remains false for observer/DNS
+collector failures. New07 qualification is pending; do not convert the
+native DHCP/ping evidence into an official full LAN PASS prematurely.

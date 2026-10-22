@@ -25,6 +25,18 @@ NT35_R20_ROW = (
     'windows-nt-3-5 / nt3-x86-qemu-csmwrap',
 )
 
+NT4_CANDIDATE03_ROW = (
+    r'Windows NT 4.0\Windows NT 4.0 Workstation PL.iso',
+    '4.0.1381.1',
+    'pl-PL / x86',
+    'windows-nt-4 / nt4-x86-qemu-csmwrap',
+)
+
+def nt4_candidate03(row):
+    """Bind the completed NT4 HID overlay to its exact base ISO row [S14]."""
+    return len(row) >= 4 and tuple(value.casefold() for value in row[:4]) == tuple(
+        value.casefold() for value in NT4_CANDIDATE03_ROW)
+
 
 def nt35_r20(row):
     """Bind fresh R20 LAN and separate R20b USB to their exact source [S6]."""
@@ -72,6 +84,9 @@ def capability(row):
             net='brak runtime: port NDIS 3 dla NT3.5 wymaga osobnej obsługi PCI i zasobów; brakujące API wykluczają niezmieniony usosnet351; loopback nie jest LAN'
         return usb,net
     if 'windows-nt-4' in r or 'windows nt 4.0' in p:
+        if nt4_candidate03(row):
+            return ('brak MSC PASS; frozen313952 start/hot-swap w osobnej próbie [S2,S14]',
+                    'częściowy pomiar: Start2 daje native DHCP/ping4/4, matched cold Start3 bez adaptera; sourcefix f00b1597. Oficjalny LAN05 false: hiddenFIRSTLO_FAILED i brak configuredDNS w starym loggerze; nowy07 oczekuje [S14]')
         return 'brak MSC w bazie; gotowa osobna feat/nt4-usb-sticks ed1e1459, start / hot-swap oczekują świeżego QEMU [S2]', 'brak pomiaru: usosnet4 NDIS 4, takeover NDISLoop1 + DHCP; świeży QEMU oczekuje'
     if 'windows-95' in r or 'windows 95' in p:
         if 'rtm' in p or 'osr1' in p:
@@ -120,6 +135,8 @@ def rows(path):
 
 def hid_test(usb,row=None):
     if 'nie dotyczy' in usb:return 'nie dotyczy'
+    if row and nt4_candidate03(row):
+        return 'QEMU PASS NT4 HID01: keyboard out negative/in typing, mouse out z żywą klawiaturą/in ruch+Start click; i8042 obecny, i8042prt Start4, USB1.3/2d455 actualreadback. Osobny BIOS cold overlay completed03, nie fresh OVMF domyślny; bez MSC/LAN/X470 [S14]'
     if row and nt31_r19c(row):
         return 'QEMU PASS R19c: klawiatura USB out/in, mysz ruch+klik po in; bez myszy klawiatura obsługuje File [S5]. R24d powtarza negative keyboard control, out/in, mouse Fileclick i ping3/3 z full-MAC b49 [S10]; sprzęt i8042 obecny, i8042prt Start4; osobne overlay, nie fresh auto networkflow'
     if row and nt35_r20(row):
@@ -150,7 +167,8 @@ def main(args):
         '[S11] `docs/nt351-fresh-network-evidence.md`: świeży normalny USOS/blank target z SYS f579, desktop/DHCP/ping3/3<10ms/DNS/HTTP i actual SYS readback PASS. Oddzielnie fresh Client/noSharing FAIL: Server/Browser RUNNING/Start2, zachowany pomimo osobnej poprawki [S12]. Bez nowego USB/MSC/X470 ani fresh AUTO policy PASS.','',
         '[S12] `docs/nt351-client-policy-evidence.md`: osobny diagnostic overlay po świeżej instalacji: helper-only apply02 i niezmieniony cold01 PASS, Server/Browser STOPPED/Disabled, Workstation/TCPIP RUNNING, cold ping3/3<10ms. Native safeShutdown/rc0, SCM/native list i stopped readback. Nie jest fresh AUTO policy PASS; bez nowego USB/DHCP/DNS/HTTP/MSC/X470.','',
         '[S13] `docs/nt35-client-policy-evidence.md`: osobny installed NT35 policy apply03 i niezmieniony cold01 PASS: Server/Browser STOPPED/Disabled, Workstation/TCPIP RUNNING, cold ping3/3<10ms. Nowy log /check bez NativeNetExit, native safeShutdown/rc0 i stopped readback; d94/USB2d455/helper4a927 oraz i8042prt Start4 przypięte. Bez fresh d94/AUTO policy ani nowego HID/MSC/DHCP/DNS/HTTP/X470 PASS.','',
-        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. NT4 candidate02 nie doszedł do logowania; po poprawieniu placeholdera IP trwa świeży candidate03. Bez desktop/MSC/LAN PASS do faktycznego wyniku.','',
+        '[S14] `docs/nt4-candidate03-hid-evidence.md`: NT4 candidate03 kończy świeży Setup/pulpit, a osobny HID01 przechodzi keyboard/mouse out/in z nativeShutdown/rc0/readback. Start2/Start3 ma matched native DHCP/ping control, ale oficjalny LAN05 pozostaje false i MSC nadal wymaga odrębnego testu.','',
+        'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. Dawne błędy NT4 candidate02 pozostają; nowszy wynik pulpitu nie nadaje MSC/LAN PASS.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
     for row in entries:
@@ -161,14 +179,14 @@ def main(args):
         if nt35_r20(row):tests='T3 / T4 / T5 po przeglądzie zgodnej konfiguracji; MSC po 1.0; poprawka IRQ [S9] wymaga integracji/przeglądu'
         out.append('| '+' | '.join([*row[:4],usb,net,hid_test(usb,row),tests])+' |')
     out+=['','## Ograniczenia i kolejność','',
-        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9). Candidate02 nie ukończył Setup; USB MSC i HID wymagają osobnych dowodów, bez przenoszenia wyników NT351.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: [S7] potwierdza świeży Workstation R22 i LAN; [S4] osobny diagnostyczny USB/HID. Bez MSC. Dawne około2s opóźnienie zachowano jako historię; installed candidate [S8] je usuwa i przechodzi osobną regresję HID R27. Inne nośniki i Server wymagają osobnych testów.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
+        '- NT4 Workstation PL + SP6a: świeży normalny przepływ OVMF → USOS → micro-Linux → CSMWrap; zewnętrzny QEMU `igb` (8086:10C9). Candidate03 ukończył Setup/pulpit, osobny HID01 PASS [S14]; MSC i oficjalny LAN07 wymagają odrębnych zakończonych dowodów, bez przenoszenia wyników NT351.','- W2K/XP/NT5.2: osobno weryfikować faktycznie zainstalowany kontroler, USBSTOR i NIC; stare SP mają blokady pakietu. R11/R12 używają prawidłowego celu 32 GiB thin qcow2.','- Vista SP2 / 2008 SP2 x86: wymagany własny świeży test, wspólny skrypt i importy nie wystarczają. R13 ma osobny prywatny cache fix/nt6x86-usb i donor x86.','- NT3.51: [S7] potwierdza świeży Workstation R22 i LAN; [S4] osobny diagnostyczny USB/HID. Bez MSC. Dawne około2s opóźnienie zachowano jako historię; installed candidate [S8] je usuwa i przechodzi osobną regresję HID R27. Inne nośniki i Server wymagają osobnych testów.','- QEMU IRQ nie odtwarza braku IRQ karty I211 na X470; działanie pollingu 20 ms pozostaje bramką sprzętową.','- Poprawka `fix/nt6x86-usb` (`4f54df6b`, `655af5ef`): błąd instalacji notyfikatora zatrzymuje restart; log przy EXE, bez PUBLIC fallback. Host PASS, runtime oczekuje. Nie scalono ani nie wdrożono.','']
     out+=['## Pytania sprzętowe — odpowiedzi tylko tak/nie','',
         '- T1: Czy po uruchomieniu systemu widać pendrive i można otworzyć jego START.TXT bez propozycji formatowania?',
         '- T2: Czy po dopięciu drugiego pendrive na pulpicie widać go i można otworzyć HOTPLUG.TXT bez restartu, konsoli i AutoPlay?',
         '- T4: Czy po odpięciu i ponownym podłączeniu klawiatury można normalnie pisać, bez zablokowanego klawisza i restartu?',
         '- T5: Czy po odpięciu i ponownym podłączeniu myszy działają ruch oraz przyciski, bez restartu?',
         '- T3: Czy przeglądarka startuje bez modemu/ICW i otwiera 68k.news z ulubionych? W systemach bez IE użyć dostępnej przeglądarki; jeśli nie ma żadnej, HTTP pozostaje nieprzetestowane.','',
-        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. Logger i podłączenie NT4 przygotowano na fix/nt4-net 9859f850, z testami hosta; runtime nadal oczekuje. Pozostałe nowe ścieżki wymagają własnego podłączenia. Nie jest to jeszcze gotowy pakiet do testu X470.','']
+        'T3 nie dowodzi DHCP ani ping do bramy. Te wyniki muszą pochodzić z cichego logu. NT4 ma zakończony HID01 [S14] i matched Start2/Start3 network control; nowy logger/helper07 oraz MSC pozostają osobnymi kwalifikacjami. Pozostałe nowe ścieżki wymagają własnego podłączenia. Nie jest to jeszcze gotowy pakiet do testu X470.','']
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text('\n'.join(out),encoding='utf-8',newline='\n')
     print('USB_LAN_MATRIX',len(entries),'coverage rows; no new runtime PASS inferred')

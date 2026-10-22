@@ -12,6 +12,23 @@ def row(path,route,arch='x86'):
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_nt4_hid_does_not_qualify_storage_or_official_lan(self):
+        exact=list(audit.NT4_CANDIDATE03_ROW)
+        usb,net=audit.capability(exact)
+        self.assertIn('brak MSC PASS',usb)
+        self.assertNotIn('QEMU PASS',net)
+        self.assertIn('LAN05 false',net)
+        self.assertIn('QEMU PASS NT4 HID01',audit.hid_test(usb,exact))
+        self.assertIn('i8042prt Start4',audit.hid_test(usb,exact))
+
+    def test_nt4_hid_never_spreads_to_other_media_or_server(self):
+        for index,value in ((0,r'Windows NT 4.0\Other.iso'),(1,'4.0 SP3'),
+                            (2,'en-US / x86'),(2,'pl-PL / x64'),
+                            (3,'windows-nt-4-server / nt4-x86-qemu-csmwrap')):
+            changed=list(audit.NT4_CANDIDATE03_ROW);changed[index]=value
+            usb,net=audit.capability(changed)
+            self.assertNotIn('QEMU PASS',usb+net+audit.hid_test(usb,changed))
+
     def test_desktop_does_not_imply_usb_or_network(self):
         usb,net=audit.capability(row('Windows XP\\XP SP3.iso','windows-xp'))
         self.assertIn('brak potwierdzenia MSC',usb)
