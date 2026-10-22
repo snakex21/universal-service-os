@@ -32,6 +32,7 @@
 
 #include <miniport.h>
 #include <scsi.h>
+#include "usosnvme_diag.h"
 
 #define USOSNVME_VERSION "1.0"
 
@@ -111,9 +112,20 @@
 #define NVME_MAX_BREAKS    ((NVME_MAX_TRANSFER / NVME_PAGE) + 1)
 #define NVME_PRP9X_MAX     (NVME_MAX_BREAKS + 1)
 
-/* Polling limits (microseconds) */
+/* Polling limits (microseconds of real time, see NvmeWait). Every command
+   is polled inside HwStartIo at raised IRQL (the ScsiPort lock, often from
+   its completion DPC); Windows 8+ stop a DPC that runs for ~20 s
+   (DPC_WATCHDOG_VIOLATION) and a polled wait that long blocks the whole
+   adapter, so no wait comes near that. A command that does not complete in
+   time fails as ABORTED COMMAND (the class driver retries) and the
+   controller is re-initialised before the next command. */
 #define NVME_ADMIN_TIMEOUT_US  (5UL * 1000UL * 1000UL)
-#define NVME_IO_TIMEOUT_US     (30UL * 1000UL * 1000UL)
+#define NVME_IO_TIMEOUT_US     (10UL * 1000UL * 1000UL)
+#define NVME_FLUSH_TIMEOUT_US  (10UL * 1000UL * 1000UL)
+/* CC.SHN normal shutdown: wait for CSTS.SHST = complete, RTD3E clamped */
+#define NVME_SHN_MIN_MS        1000UL
+#define NVME_SHN_DEFAULT_MS    5000UL
+#define NVME_SHN_MAX_MS        10000UL
 
 /* Error-log unique ids (ScsiPortLogError, System event log "usosnvme") */
 #define NVME_LOG_NO_READY    0x4E560001UL  /* CSTS.RDY never became 1 / CFS */
@@ -126,6 +138,8 @@
 #define NVME_LOG_BAR_HIGH    0x4E560008UL  /* 9x: BAR above 4 GiB, not mapped */
 #define NVME_LOG_DMA_HIGH    0x4E560009UL  /* amd64: first data PRP above 4 GiB (once per boot; informational) */
 #define NVME_LOG_BAD_PA      0x4E56000AUL  /* amd64: unusable data address from ScsiPort, command not sent */
+/* a FLUSH failed: low 12 bits = (SCT << 8) | SC, FFFh = no completion in time */
+#define NVME_LOG_FLUSH_BASE  0x4E561000UL
 
 #pragma pack(push, 1)
 typedef struct _NVME_SQE {
@@ -179,6 +193,7 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG ReadyTimeoutMs;
     ULONG MaxChunkBytes;         /* min(MDTS, NVME_MAX_TRANSFER) */
     BOOLEAN VolatileCache;
+    BOOLEAN Dirty;               /* a WRITE since the last successful FLUSH */
     BOOLEAN ControllerUp;
     BOOLEAN NeedRestart;
     BOOLEAN NamespaceReady;
@@ -200,6 +215,9 @@ typedef struct _HW_DEVICE_EXTENSION {
     UCHAR SenseKey, Asc, Ascq;   /* last sense for REQUEST SENSE */
     ULONG Reads, Writes, Flushes, Errors, Timeouts;
     ULONG LastStatus;            /* last failing NVMe status (SCT << 8 | SC) */
+    ULONG LastWaitUs;            /* NvmeWait: duration of the last command */
+    ULONG ShutdownMs;            /* CC.SHN limit (RTD3E clamped) */
+    USOSNVME_DIAG Diag;          /* IOCTL_SCSI_MINIPORT "USOSNVME" */
     PUSHORT Vga;
     ULONG InitStage;
     ULONG IoQid;                 /* NVME_IO_QID, or 1 if fewer queues */

@@ -331,4 +331,69 @@ int main(int argc,char**argv){
             self.assertIn('flush probe (4 KiB write + FlushFileBuffers on the target), Win32 code=0',r.stdout)
             self.assertIn('SYSTEM hive replaced by its saved copy.',r.stdout)
 
+    def test_driver_diag_line_and_probe_after_every_flush(self):
+        # X470 B261022: RegFlushKey 1016 in 2 of 3 WinPE runs. Every flush try
+        # and the flush probe (now also after a good flush) are followed by
+        # the usosnvme counters (IOCTL_SCSI_MINIPORT "USOSNVME", only from
+        # entry(); the host tests never send it to a real adapter).
+        source=(ROOT/'tools/windows_nvme_modern.c').read_text()
+        commit=source[source.index('static LONG commit_hive('):source.index('static BOOL service_points_to_usosnvme(')]
+        self.assertLess(commit.index('flush_probe()'),commit.index('if(e==ERROR_SUCCESS){'))
+        self.assertIn('nvme_diag("after flush probe");',commit)
+        self.assertIn('nvme_diag("after RegFlushKey");',source[source.index('static LONG flush_retry('):])
+        entry=source[source.index('void entry(void)'):]
+        self.assertLess(entry.index('MiniNT'),entry.index('diag_enabled=TRUE'))
+        out=ROOT/'zig-out/modern-tests';out.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=out) as tmp:
+            folder=Path(tmp)
+            code=r'''#include <windows.h>
+#include <assert.h>
+#include <string.h>
+static int opened_ours,ioctls;
+static HANDLE WINAPI create_fake(LPCWSTR n,DWORD a,DWORD s,LPSECURITY_ATTRIBUTES sa,DWORD d,DWORD f,HANDLE t){
+ (void)a;(void)s;(void)sa;(void)d;(void)f;(void)t;
+ if(!lstrcmpW(n,L"\\\\.\\Scsi1:")||!lstrcmpW(n,L"\\\\.\\Scsi12:")){opened_ours++;return (HANDLE)(n[9]==L'2'?(HANDLE)12:(HANDLE)1);}
+ SetLastError(ERROR_FILE_NOT_FOUND);return INVALID_HANDLE_VALUE;}
+static BOOL WINAPI close_fake(HANDLE h){(void)h;return TRUE;}
+#include "DIAGH"
+static int answer=1;
+static BOOL WINAPI ioctl_fake(HANDLE h,DWORD code,LPVOID in,DWORD inl,LPVOID out,DWORD outl,LPDWORD got,LPOVERLAPPED o){
+ (void)o;assert(code==0x0004D008UL&&in==out&&inl==outl);ioctls++;
+ PUSOSNVME_SRB_IO_CONTROL hd=(PUSOSNVME_SRB_IO_CONTROL)in;
+ assert(hd->HeaderLength==28&&!memcmp(hd->Signature,"USOSNVME",8)&&hd->ControlCode==USOSNVME_DIAG_CODE&&hd->Length==sizeof(USOSNVME_DIAG));
+ if(h==(HANDLE)1){SetLastError(ERROR_INVALID_FUNCTION);return FALSE;}   /* another miniport */
+ if(!answer){SetLastError(ERROR_INVALID_FUNCTION);return FALSE;}
+ PUSOSNVME_DIAG d=(PUSOSNVME_DIAG)((BYTE*)in+28);
+ d->Version=1;d->Size=sizeof(*d);d->PciId=0x54071344;d->Vwc=7;d->State=11;d->Writes=99;d->FlushRequests=5;d->FlushSent=3;d->FlushSkipped=2;
+ d->FlushOk=2;d->FlushErrors=1;d->FlushTimeouts=1;d->LastFlushUs=10200000;d->LastFlushStatus=0xFFFFFFFF;d->FlushSeq=9;
+ d->Ring[1].Seq=9;d->Ring[1].Source=1;d->Ring[1].Us=10200000;d->Ring[1].Status=0xFFFFFFFF;
+ d->Ring[0].Seq=8;d->Ring[0].Source=0x10002;d->Ring[0].Us=0;d->Ring[0].Status=0;
+ hd->ReturnCode=0;*got=outl;return TRUE;}
+#define CreateFileW create_fake
+#define CloseHandle close_fake
+#define DeviceIoControl ioctl_fake
+#define entry unused_entry
+#include "SOURCE"
+int main(void){
+ nvme_diag("off");assert(!opened_ours&&!ioctls);
+ diag_enabled=TRUE;nvme_diag("test");assert(opened_ours==2&&ioctls==2);
+ answer=0;nvme_diag("none");
+ return 0;
+}
+'''
+            code=code.replace('DIAGH',str(ROOT/'tools/nt/usosnvme/src/usosnvme_diag.h').replace('\\','/'))
+            (folder/'diag.c').write_text(code.replace('SOURCE',str(ROOT/'tools/windows_nvme_modern.c').replace('\\','/')))
+            exe=folder/'diag.exe'
+            r=subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-O2',str(folder/'diag.c'),'-ladvapi32','-lcrypt32','-lshell32','-o',str(exe)],capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stderr)
+            r=subprocess.run([str(exe)],capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+            lines=r.stdout.splitlines()
+            self.assertEqual(len(lines),2,r.stdout)
+            self.assertTrue(lines[0].startswith('[USOS] Modern NVMe diag test: scsi12 pci 1344:5407 vwc 0x07 state 0xB'),lines[0])
+            for want in (' wr 99 ',' | flush req 5 sent 3 skip 2 ok 2 err 1 to 1 last-us 10200000 ',' last-st timeout ',
+                         ' | ring #9:00000001:10200000us:timeout #8:00010002:0us:0x000'):
+                self.assertIn(want,lines[0])
+            self.assertEqual(lines[1],'[USOS] Modern NVMe diag none: no usosnvme adapter answered IOCTL_SCSI_MINIPORT; last DeviceIoControl Win32 code=1')
+
 if __name__=='__main__':unittest.main()

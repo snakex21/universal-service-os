@@ -18,7 +18,12 @@
  *    created with IEN = 0), so the driver runs with no interrupt at all
  *    (NT 3.x / 4.0 under CSMWrap have no usable PCI interrupt routing);
  *  - READ / WRITE through PRP1 / PRP2 / one PRP list page, split at
- *    min(MDTS, 128 KiB); FLUSH for SYNCHRONIZE CACHE, SRB flush/shutdown;
+ *    min(MDTS, 128 KiB); FLUSH for SYNCHRONIZE CACHE and SRB flush, sent
+ *    only when a WRITE happened since the last good flush and the
+ *    controller has a volatile write cache; SRB shutdown (NT6) / the 9x exit:
+ *    flush + CC.SHN normal shutdown notification;
+ *  - diagnostics (flush durations and NVMe status, error counters) through
+ *    IOCTL_SCSI_MINIPORT signature "USOSNVME" (usosnvme_diag.h);
  *  - only namespaces with 512-byte LBAs and no metadata are exposed; any
  *    other format is refused (no disk) with an event-log entry and a line
  *    in the VGA text buffer.
@@ -48,8 +53,8 @@ __declspec(dllimport) PVOID __stdcall MmMapIoSpace(IN PHYSICAL_ADDRESS PhysicalA
 #endif
 #else
 static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN BOOLEAN SaveState);
-static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext);
 #endif
+static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext, ULONG Source);
 
 ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2);
 static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID BusInformation,
@@ -480,6 +485,8 @@ static ULONG NvmeSubmit(PHW_DEVICE_EXTENSION Ext, PNVME_QUEUE Q, PNVME_SQE Cmd)
     PULONG src = (PULONG)Cmd;
     ULONG i;
 
+    /* CID FFFFh is reserved (the error log's "not specific to a command") */
+    if (cid == 0xFFFF) cid = (++Ext->CommandId) & 0xFFFF;
     Cmd->Cdw0 = (Cmd->Cdw0 & 0x0000FFFF) | (cid << 16);
     for (i = 0; i < sizeof(NVME_SQE) / 4; i++) dst[i] = src[i];
     Q->SqTail++;
@@ -491,9 +498,17 @@ static ULONG NvmeSubmit(PHW_DEVICE_EXTENSION Ext, PNVME_QUEUE Q, PNVME_SQE Cmd)
 /* Status: 0 = success, 0xFFFFFFFF = timeout, else (SCT << 8) | SC */
 #define NVME_TIMEOUT_STATUS 0xFFFFFFFFUL
 
+/* The time is the sum of the ScsiPortStallExecution steps: 2 us for the
+   first 200 us (most commands complete there), 10 us up to 2 ms, then
+   50 us. usosnvme <= B261022 stalled 2 us per step throughout and counted
+   only the stall: the call and CQ-read overhead of each step was missing,
+   so its "30 s" limit could run far longer in real time (X470 Micron,
+   Win10 x86: a ~55-60 s black screen at shutdown). With 50 us steps that
+   overhead is a few per cent of a long wait. The duration of the last
+   command is left in Ext->LastWaitUs. */
 static ULONG NvmeWait(PHW_DEVICE_EXTENSION Ext, PNVME_QUEUE Q, ULONG Cid, PULONG Dw0, ULONG TimeoutUs)
 {
-    ULONG waited = 0, spins = 0;
+    ULONG waited = 0, spins = 0, step;
 
     for (;;) {
         volatile ULONG *e = (volatile ULONG *)&Q->Cq[Q->CqHead];
@@ -508,14 +523,20 @@ static ULONG NvmeWait(PHW_DEVICE_EXTENSION Ext, PNVME_QUEUE Q, ULONG Cid, PULONG
             NvmeWr(Ext, Q->CqDoorbell, Q->CqHead);
             if ((dw3 & 0xFFFF) == Cid) {
                 if (Dw0) *Dw0 = d0;
+                Ext->LastWaitUs = waited;
+                Ext->Diag.LastCqeDw3 = dw3;
                 return (dw3 >> 17) & 0x7FF;   /* SC 7:0, SCT 10:8 */
             }
             continue;   /* a stale completion; keep looking for ours */
         }
-        if (waited >= TimeoutUs) return NVME_TIMEOUT_STATUS;
-        if ((++spins & 0x3FF) == 0 && NvmeControllerDead(Ext)) return NVME_TIMEOUT_STATUS;
-        ScsiPortStallExecution(2);
-        waited += 2;
+        if (waited >= TimeoutUs ||
+            ((++spins & 0xFF) == 0 && NvmeControllerDead(Ext))) {
+            Ext->LastWaitUs = waited;
+            return NVME_TIMEOUT_STATUS;
+        }
+        step = waited < 200 ? 2 : (waited < 2000 ? 10 : 50);
+        ScsiPortStallExecution(step);
+        waited += step;
     }
 }
 
@@ -586,7 +607,9 @@ static BOOLEAN NvmeStartController(PHW_DEVICE_EXTENSION Ext)
     Ext->ControllerUp = FALSE;
     Ext->NamespaceReady = FALSE;
     Ext->NeedRestart = FALSE;
+    Ext->Dirty = TRUE;               /* unknown: the first flush is always sent */
     Ext->InitStage = 1;
+    Ext->Diag.Starts++;
 
     Ext->CapLo = NvmeRd(Ext, NVME_REG_CAP_LO);
     Ext->CapHi = NvmeRd(Ext, NVME_REG_CAP_HI);
@@ -652,6 +675,12 @@ static BOOLEAN NvmeStartController(PHW_DEVICE_EXTENSION Ext)
     NvmeTrimCopy(Ext->Firmware, Ext->Ident + 64, 8);
     mdts = Ext->Ident[77];
     Ext->VolatileCache = (BOOLEAN)((Ext->Ident[525] & 1) != 0);
+    Ext->Diag.Vwc = Ext->Ident[525];
+    Ext->Diag.Rtd3eUs = NvmeGetUlong(Ext->Ident + 88);
+    Ext->ShutdownMs = Ext->Diag.Rtd3eUs / 1000;
+    if (Ext->ShutdownMs == 0) Ext->ShutdownMs = NVME_SHN_DEFAULT_MS;
+    if (Ext->ShutdownMs < NVME_SHN_MIN_MS) Ext->ShutdownMs = NVME_SHN_MIN_MS;
+    if (Ext->ShutdownMs > NVME_SHN_MAX_MS) Ext->ShutdownMs = NVME_SHN_MAX_MS;
     Ext->MaxChunkBytes = NVME_MAX_TRANSFER;
     if (mdts != 0 && mdts < 16 && (NVME_PAGE << mdts) < Ext->MaxChunkBytes) Ext->MaxChunkBytes = NVME_PAGE << mdts;
 
@@ -1052,33 +1081,55 @@ static VOID NvmeDbgCounters(PHW_DEVICE_EXTENSION Ext, const CHAR *Why)
     NvmeDbgStr(l.Text);
     NvmeDbgStr("\n");
 }
+#endif
 
-/* Windows exits to real mode (shut down, restart, MS-DOS mode): flush,
-   normal shutdown notification (CC.SHN), then the controller is left
-   disabled. Its admin queue was replaced at our init, so SeaBIOS NVMe in
-   CSMWrap 3.1.2-usos9+ re-arms its own queues on its next INT 13h call
-   (98's WIN.COM /z power-off; older CSMWrap timed out there); it refuses a
-   controller that still runs our queues. The next I/O from Windows
-   re-initialises it. */
+#if defined(USOSNVME_W9X) || defined(USOSNVME_NT6)
+/* Flush (if anything is unflushed) and the CC.SHN normal shutdown
+   notification: the controller commits its volatile cache and metadata
+   (stornvme does the same at shutdown). The notification is sent even when
+   the controller needs a restart (a timed-out command), as long as it is
+   enabled and ready, and waited for at most RTD3E clamped to 1-10 s.
+   NT6: SRB_FUNCTION_SHUTDOWN. The controller stays enabled; ControllerUp
+   is cleared, so an I/O after the shutdown request re-initialises it.
+   Windows 9x: Windows exits to real mode (shut down, restart, MS-DOS mode).
+   The controller is then left disabled. Its admin queue was replaced at our
+   init, so SeaBIOS NVMe in CSMWrap 3.1.2-usos9+ re-arms its own queues on
+   its next INT 13h call (98's WIN.COM /z power-off; older CSMWrap timed out
+   there); it refuses a controller that still runs our queues. The next I/O
+   from Windows re-initialises it. */
 static VOID NvmeShutdown(PHW_DEVICE_EXTENSION Ext)
 {
-    ULONG cc, ms;
+    ULONG cc, csts, ms, limit;
 
     if (Ext->Regs == NULL || NvmeControllerDead(Ext)) return;
-    if (Ext->ControllerUp && Ext->NamespaceReady && !Ext->NeedRestart) (VOID)NvmeFlush(Ext);
+    if (Ext->ControllerUp && Ext->NamespaceReady && !Ext->NeedRestart)
+        (VOID)NvmeFlush(Ext, USOSNVME_FLUSH_SHUTDOWN);
     cc = NvmeRd(Ext, NVME_REG_CC);
-    if (cc & NVME_CC_EN) {
+    csts = NvmeRd(Ext, NVME_REG_CSTS);
+    if ((cc & NVME_CC_EN) && (csts & NVME_CSTS_RDY)) {
+        limit = Ext->ShutdownMs ? Ext->ShutdownMs : NVME_SHN_DEFAULT_MS;
         NvmeWr(Ext, NVME_REG_CC, (cc & ~(3UL << 14)) | NVME_CC_SHN_NORMAL);
-        for (ms = 0; ms < 10000; ms++) {
-            if ((NvmeRd(Ext, NVME_REG_CSTS) & NVME_CSTS_SHST_MASK) == NVME_CSTS_SHST_DONE) break;
+        for (ms = 0; ms < limit; ms++) {
+            csts = NvmeRd(Ext, NVME_REG_CSTS);
+            if (csts == 0xFFFFFFFF || (csts & NVME_CSTS_SHST_MASK) == NVME_CSTS_SHST_DONE) break;
             ScsiPortStallExecution(1000);
         }
-        NvmeWr(Ext, NVME_REG_CC, NvmeRd(Ext, NVME_REG_CC) & ~NVME_CC_EN);
+        Ext->Diag.Shutdowns++;
+        Ext->Diag.LastShutdownUs = ms * 1000;
+        Ext->Diag.LastShutdownCsts = csts;
+    }
+#ifdef USOSNVME_W9X
+    cc = NvmeRd(Ext, NVME_REG_CC);
+    if (cc & NVME_CC_EN) {
+        NvmeWr(Ext, NVME_REG_CC, cc & ~NVME_CC_EN);
         (VOID)NvmeWaitReady(Ext, FALSE);
     }
+#endif
     Ext->ControllerUp = FALSE;
 }
+#endif
 
+#ifdef USOSNVME_W9X
 static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN BOOLEAN SaveState)
 {
     PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
@@ -1345,6 +1396,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
                     ULONG LbaLo, ULONG LbaHi, ULONG Blocks, BOOLEAN Fua)
 {
     NVME_SQE c;
+    ULONG status;
 #if defined(_WIN64) && !defined(USOSNVME_W9X)
     ULONG bytes = Blocks << 9, refused;
     BOOLEAN above4g = FALSE;
@@ -1414,21 +1466,87 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
     c.Cdw10 = LbaLo;
     c.Cdw11 = LbaHi;
     c.Cdw12 = (Blocks - 1) | (Fua ? (1UL << 30) : 0);
-    return NvmeExec(Ext, &Ext->Io, &c, NVME_IO_TIMEOUT_US, NULL);
+    if (Write) Ext->Dirty = TRUE;    /* FUA too: conservative */
+    status = NvmeExec(Ext, &Ext->Io, &c, NVME_IO_TIMEOUT_US, NULL);
+    if (Ext->LastWaitUs > Ext->Diag.MaxIoUs) Ext->Diag.MaxIoUs = Ext->LastWaitUs;
+    return status;
 }
 
-static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext)
+/* FLUSH of our namespace (NSID FFFFFFFFh is valid only when Identify VWC
+   bits 2:1 = 11b). Windows asks often and twice in a row (the disk class:
+   SYNCHRONIZE CACHE, then SRB_FUNCTION_FLUSH because the adapter reports
+   CachesData; at shutdown SYNCHRONIZE CACHE + SRB_FUNCTION_SHUTDOWN). No
+   command when nothing was written since the last good flush, none when the
+   controller has no volatile write cache (the FLUSH has no effect there).
+   Every request is counted and the last eight kept (diagnostics ring); a
+   failure goes to the event log with its NVMe status. A timeout marks the
+   controller for re-initialisation before the next command. */
+static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext, ULONG Source)
 {
     NVME_SQE c;
-    NvmeZero(&c, sizeof(c));
-    c.Cdw0 = NVME_NVM_FLUSH;
-    c.Nsid = Ext->Nsid;
-    Ext->Flushes++;
-    return NvmeExec(Ext, &Ext->Io, &c, NVME_IO_TIMEOUT_US, NULL);
+    PUSOSNVME_DIAG d = &Ext->Diag;
+    USOSNVME_FLUSH_REC *r;
+    ULONG status = 0, us = 0, how = USOSNVME_FLUSH_SENT;
+
+    d->FlushRequests++;
+    if (!Ext->VolatileCache) {
+        how = USOSNVME_FLUSH_NO_VWC;
+        d->FlushSkipped++;
+    } else if (!Ext->Dirty) {
+        how = USOSNVME_FLUSH_CLEAN;
+        d->FlushSkipped++;
+    } else {
+        NvmeZero(&c, sizeof(c));
+        c.Cdw0 = NVME_NVM_FLUSH;
+        c.Nsid = Ext->Nsid;
+        Ext->Flushes++;
+        d->FlushSent++;
+        status = NvmeExec(Ext, &Ext->Io, &c, NVME_FLUSH_TIMEOUT_US, NULL);
+        us = Ext->LastWaitUs;
+        /* Invalid Field / Invalid Namespace for our NSID: once more for all
+           namespaces when the controller supports that */
+        if ((status == 0x002 || status == 0x00B) && (d->Vwc & 6) == 6) {
+            NvmeZero(&c, sizeof(c));
+            c.Cdw0 = NVME_NVM_FLUSH;
+            c.Nsid = 0xFFFFFFFFUL;
+            d->FlushSent++;
+            how = USOSNVME_FLUSH_ALL_NS;
+            status = NvmeExec(Ext, &Ext->Io, &c, NVME_FLUSH_TIMEOUT_US, NULL);
+            us += Ext->LastWaitUs;
+        }
+        d->LastFlushUs = us;
+        if (us > d->MaxFlushUs) d->MaxFlushUs = us;
+        d->TotalFlushMs += us / 1000;
+        d->LastFlushStatus = status;
+        if (status == 0) {
+            d->FlushOk++;
+            Ext->Dirty = FALSE;
+        } else {
+            d->FlushErrors++;
+            d->LastIoStatus = status;
+            d->LastFailCsts = NvmeRd(Ext, NVME_REG_CSTS);
+            if (status == NVME_TIMEOUT_STATUS) {
+                d->FlushTimeouts++;
+                Ext->NeedRestart = TRUE;
+            }
+            NvmeLog(Ext, NVME_LOG_FLUSH_BASE | (status == NVME_TIMEOUT_STATUS ? 0xFFFUL : (status & 0x7FFUL)));
+            if (status == NVME_TIMEOUT_STATUS) NvmeReport(Ext, "FLUSH timeout; CSTS", d->LastFailCsts, TRUE);
+            else NvmeReport(Ext, "FLUSH failed; status", status, TRUE);
+        }
+    }
+    d->FlushSeq++;
+    r = &d->Ring[d->FlushSeq % USOSNVME_DIAG_RING];
+    r->Seq = d->FlushSeq;
+    r->Source = Source | how;
+    r->Us = us;
+    r->Status = status;
+    return status;
 }
 
 static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULONG Status, BOOLEAN Write)
 {
+    ULONG sct, sc;
+
     Ext->Errors++;
 #if defined(_WIN64) && !defined(USOSNVME_W9X)
     if (Status == NVME_BADPA_STATUS) {
@@ -1441,6 +1559,8 @@ static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULON
     }
 #endif
     Ext->LastStatus = Status;
+    Ext->Diag.LastIoStatus = Status;
+    Ext->Diag.LastFailCsts = NvmeRd(Ext, NVME_REG_CSTS);
     if (Status == NVME_TIMEOUT_STATUS) {
         Ext->Timeouts++;
         Ext->NeedRestart = TRUE;          /* re-create the queues before the next command */
@@ -1450,9 +1570,23 @@ static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULON
         return;
     }
     NvmeLog(Ext, NVME_LOG_IO_ERROR);
-    if (((Status >> 8) & 7) == 0 && (Status & 0xFF) == 0x80)       /* LBA out of range */
+    /* Generic status codes: a refused command is an ILLEGAL REQUEST (the
+       disk class then stops sending an unsupported SYNCHRONIZE CACHE instead
+       of failing the flush as a device error), a busy or interrupted one is
+       retried; anything else stays a hardware error. */
+    sct = (Status >> 8) & 7;
+    sc = Status & 0xFF;
+    if (sct == 0 && sc == 0x80)                                    /* LBA out of range */
         NvmeSetSense(Ext, Srb, SCSI_SENSE_ILLEGAL_REQUEST, 0x21, 0);
-    else if (((Status >> 8) & 7) == 2)                               /* media errors */
+    else if (sct == 0 && sc == 0x01)                               /* invalid opcode */
+        NvmeSetSense(Ext, Srb, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0);
+    else if (sct == 0 && (sc == 0x02 || sc == 0x0B))               /* invalid field / namespace */
+        NvmeSetSense(Ext, Srb, SCSI_SENSE_ILLEGAL_REQUEST, 0x24, 0);
+    else if (sct == 0 && sc == 0x82)                               /* namespace not ready */
+        NvmeSetSense(Ext, Srb, SCSI_SENSE_NOT_READY, 0x04, 0x01);
+    else if (sct == 0 && (sc == 0x07 || sc == 0x08 || sc == 0x21)) /* aborted / interrupted */
+        NvmeSetSense(Ext, Srb, SCSI_SENSE_ABORTED_COMMAND, 0, 0);
+    else if (sct == 2)                                             /* media errors */
         NvmeSetSense(Ext, Srb, SCSI_SENSE_MEDIUM_ERROR, Write ? 0x0C : 0x11, 0);
     else
         NvmeSetSense(Ext, Srb, SCSI_SENSE_HARDWARE_ERROR, 0x44, 0);
@@ -1599,7 +1733,7 @@ static VOID NvmeExecuteScsi(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb)
         break;
     case SCSIOP_SYNCHRONIZE_CACHE:
     case 0x91:  /* SYNCHRONIZE CACHE(16) */
-        status = NvmeFlush(Ext);
+        status = NvmeFlush(Ext, USOSNVME_FLUSH_SYNC_CACHE);
         if (status != 0) NvmeIoFailed(Ext, Srb, status, TRUE);
         else {
             Srb->DataTransferLength = 0;
@@ -1611,6 +1745,41 @@ static VOID NvmeExecuteScsi(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb)
         NvmeSetSense(Ext, Srb, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0);
         break;
     }
+}
+
+/* IOCTL_SCSI_MINIPORT, signature "USOSNVME", code USOSNVME_DIAG_CODE: a copy
+   of the diagnostics block after the SRB_IO_CONTROL header. Any other
+   signature or code is refused. Nothing is sent to the controller. */
+static VOID NvmeIoControl(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb)
+{
+    PUSOSNVME_SRB_IO_CONTROL h = (PUSOSNVME_SRB_IO_CONTROL)Srb->DataBuffer;
+    static const CHAR sig[8] = { 'U', 'S', 'O', 'S', 'N', 'V', 'M', 'E' };
+    PUSOSNVME_DIAG d = &Ext->Diag;
+    ULONG i;
+
+    Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
+    if (h == NULL || Srb->DataTransferLength < sizeof(*h) || h->HeaderLength != sizeof(*h)) return;
+    for (i = 0; i < 8; i++) if (h->Signature[i] != (UCHAR)sig[i]) return;
+    if (h->ControlCode != USOSNVME_DIAG_CODE || h->Length < sizeof(USOSNVME_DIAG) ||
+        Srb->DataTransferLength - sizeof(*h) < sizeof(USOSNVME_DIAG)) {
+        h->ReturnCode = 1;
+        return;
+    }
+    d->Version = USOSNVME_DIAG_VERSION;
+    d->Size = sizeof(USOSNVME_DIAG);
+    d->PciId = Ext->PciId;
+    d->NvmeVersion = Ext->Version;
+    d->Nsid = Ext->Nsid;
+    d->State = (Ext->ControllerUp ? 1UL : 0) | (Ext->NamespaceReady ? 2UL : 0) |
+               (Ext->NeedRestart ? 4UL : 0) | (Ext->Dirty ? 8UL : 0);
+    d->Reads = Ext->Reads;
+    d->Writes = Ext->Writes;
+    d->Errors = Ext->Errors;
+    d->Timeouts = Ext->Timeouts;
+    NvmeCopy((PUCHAR)h + sizeof(*h), d, sizeof(USOSNVME_DIAG));
+    h->ReturnCode = 0;
+    h->Length = sizeof(USOSNVME_DIAG);
+    Srb->SrbStatus = SRB_STATUS_SUCCESS;
 }
 
 static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
@@ -1631,9 +1800,23 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
         NvmeExecuteScsi(ext, Srb);
         break;
     case SRB_FUNCTION_FLUSH:
-    case SRB_FUNCTION_SHUTDOWN:
-        if (ext->ControllerUp && ext->NamespaceReady && !ext->NeedRestart) (VOID)NvmeFlush(ext);
+        /* the SYNCHRONIZE CACHE just before carries any error; after a good
+           one this is answered without a command (NvmeFlush) */
+        if (ext->ControllerUp && ext->NamespaceReady && !ext->NeedRestart)
+            (VOID)NvmeFlush(ext, USOSNVME_FLUSH_SRB_FLUSH);
         Srb->SrbStatus = SRB_STATUS_SUCCESS;
+        break;
+    case SRB_FUNCTION_SHUTDOWN:
+#ifdef USOSNVME_NT6
+        NvmeShutdown(ext);
+#else
+        if (ext->ControllerUp && ext->NamespaceReady && !ext->NeedRestart)
+            (VOID)NvmeFlush(ext, USOSNVME_FLUSH_SHUTDOWN);
+#endif
+        Srb->SrbStatus = SRB_STATUS_SUCCESS;
+        break;
+    case SRB_FUNCTION_IO_CONTROL:
+        NvmeIoControl(ext, Srb);
         break;
     case SRB_FUNCTION_ABORT_COMMAND:
     case SRB_FUNCTION_RESET_BUS:
