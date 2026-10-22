@@ -30,7 +30,7 @@ static struct Service services[5];
 static DWORD last_error, version;
 static unsigned test_minor = 50;
 static int req, fail_record, status_write, done_write, write_fail, readback_bad;
-static int product_server, access_bad, change_fail, writes, readonly_bad, closes;
+static int product_server, access_bad, change_fail, writes, readonly_bad, closes, value_kind_bad, value_size_bad;
 static const char *request_text;
 static int len(const char *s) { return (int)strlen(s); }
 static void say(const char *s) { (void)s; }
@@ -80,7 +80,7 @@ static LONG RegQueryValueExA(HKEY key,const char *name,void *zero,DWORD *type,BY
     if(strcmp(name,"Start") && strcmp(name,"Type")) return 2;
     value=!strcmp(name,"Start")?s->start:s->type;
     if (readback_bad && writes && s==&services[1] && !strcmp(name,"Start")) value=2;
-    *type=REG_DWORD;*size=4;memcpy(out,&value,4);return 0;
+    *type=value_kind_bad?REG_SZ:REG_DWORD;*size=value_size_bad?3:4;memcpy(out,&value,4);return 0;
 }
 static int RegCloseKey(HKEY key) { (void)key;closes++;return 0; }
 static int net351_dword(HKEY key,const char *name,DWORD value) {
@@ -107,7 +107,7 @@ static void reset(void) {
     memcpy(services,initial,sizeof services);
     last_error=0;version=(test_minor<<8)|3;req=test_minor==50?1:2;fail_record=0;status_write=0;done_write=0;
     write_fail=0;readback_bad=0;product_server=0;access_bad=0;change_fail=0;
-    writes=0;readonly_bad=0;closes=0;g_client_requested=0;request_text=test_minor==50?CLIENT35_REQUEST:CLIENT351_REQUEST;
+    writes=0;readonly_bad=0;closes=0;value_kind_bad=value_size_bad=0;g_client_requested=0;request_text=test_minor==50?CLIENT35_REQUEST:CLIENT351_REQUEST;
 }
 #define REQUIRE(x) do { if(!(x)){fprintf(stderr,"line%d: %s\n",__LINE__,#x);return 1;} }while(0)
 static int cases(void) {
@@ -137,10 +137,12 @@ static int cases(void) {
     reset();version=0x1f03;REQUIRE(!client_request() && !writes); /* NT31 excluded */
     reset();version=0x0004;REQUIRE(!client_request() && !writes); /* NT4 excluded */
     reset();REQUIRE(client_request() && g_client_config->minor==test_minor);
+    reset();value_kind_bad=1;REQUIRE(client_request() && !client_prepare(2) && !writes && fail_record);
+    reset();value_size_bad=1;REQUIRE(client_request() && !client_prepare(2) && !writes && fail_record);
     return 0;
 }
 
 int main(void) {
  for(test_minor=50;test_minor<=51;test_minor++) if(cases())return 1;
- puts("SHARED actual production header: both minors,44 cases PASS");return 0;
+ puts("SHARED actual production header: both minors,50 cases PASS");return 0;
 }
