@@ -1,0 +1,44 @@
+{
+  "scope": "Own source snapshot, diagnostic_only; guest validation pending",
+  "helper_sha256": "37e151bf7879431653eae31462d9390acca9ee82262efb529b8b96771518db3e",
+  "helper_bytes": 33792,
+  "reproducible_builds": [
+    "build10",
+    "build11"
+  ],
+  "all_original_imports_present_PL_EN": true,
+  "import_count": 37,
+  "host_tests_pass": {
+    "actual_c": 7,
+    "separate_process": 4,
+    "uart_policy": 6,
+    "closed_operator": 4,
+    "post_quit_file": 5
+  },
+  "total_host_pass": 26,
+  "self_contained_tests_in_snapshot": 11,
+  "source_sha256": {
+    "page.c": "395e97da9f8a80b80db436f224cf8878b7137035a5043004501a5b005bfbd6bc",
+    "core.h": "de352ba9abe2e7a03db8ae6296c580658082be2e8884a4c129a4184c8ac12705",
+    "public_ids.h": "68bd6d8c3970104e7bb223a28d171d996e9fe385785fe922ee3b0b33e7b305dc",
+    "semantic.c": "3c36c63e34c17f843fe6f95efcdc6d63d997f1e94059d2a14ab35e4cddbbc242",
+    "test_semantics.py": "5a9b1413bae5e16090e6d63cf3c96efcbe0802f7b09891be62ac01383c1ecac1",
+    "cross_process.c": "a9ee727ece817eb0e72bdc2376294be363ad0c5e3f269d0bf576423ba5efa2bf",
+    "test_cross_process.py": "c6efdff29a9be98f30f10ac0cdedc1c88aaedf3b4deb51212b21d35c0a0e8b9b",
+    "protocol.py": "d692903ed8f50074beedc4da9ef5912d48b52f624581893a5df24f1365d98644"
+  },
+  "runtime_attempt07": "PREPARED_NOT_BOOTED",
+  "vm_running": false,
+  "installation_runner_changed": false,
+  "compiled_original_source_sha256": {
+    "page.c": "395e97da9f8a80b80db436f224cf8878b7137035a5043004501a5b005bfbd6bc",
+    "core.h": "de352ba9abe2e7a03db8ae6296c580658082be2e8884a4c129a4184c8ac12705",
+    "public_ids.h": "9c715c598b6818c787815ebeade4ee807030cf2030099a5ee9330a8b6d013d5c",
+    "semantic.c": "3c36c63e34c17f843fe6f95efcdc6d63d997f1e94059d2a14ab35e4cddbbc242",
+    "test_semantics.py": "5a9b1413bae5e16090e6d63cf3c96efcbe0802f7b09891be62ac01383c1ecac1",
+    "cross_process.c": "a9ee727ece817eb0e72bdc2376294be363ad0c5e3f269d0bf576423ba5efa2bf",
+    "test_cross_process.py": "c6efdff29a9be98f30f10ac0cdedc1c88aaedf3b4deb51212b21d35c0a0e8b9b",
+    "protocol.py": "d692903ed8f50074beedc4da9ef5912d48b52f624581893a5df24f1365d98644"
+  },
+  "snapshot_line_endings": "LF; original build source byte hashes preserved separately"
+}

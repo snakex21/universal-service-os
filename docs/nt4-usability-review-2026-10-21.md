@@ -666,3 +666,38 @@ następnie tylko odczyt własnego pliku. Źródło do review:
 `artifacts/nt4-success-review/nt4page/page.c`; metadane
 `host-validation-file.json` i `nativepage07-preparation.json`. Nie ma
 nowego desktop/LAN/HID/MSC ani hardware PASS.
+
+
+## Handoff na koniec dnia: bez dalszych VM
+
+Użytkownik kończy pracę; próba 07 NIE została uruchomiona. Żadna własna VM ani
+listener 07 nie działa. Sesje 05 i 06 są zakończone. Guard RAM dla 07 jeszcze
+nie był wykonywany; zwykły pojedynczy guard jest wymagany dopiero po wznowieniu.
+
+Końcowa poprawka chroni całą ramkę mutexem. Po childexit ustawiany jest stop,
+końcowy status czeka na END, sink jest flushowany i zamykany, a oczekiwanie na
+observer wynosi najwyżej 1000 ms. Mutex nie obejmuje blokującego ReadFileCOM.
+Actual-C test na rzeczywistych wątkach/zdarzeniach wymusza childexit w środku
+BEGIN i potwierdza finalny native flag dopiero po END, z zachowaniem exit19.
+Doszedł negatywny test odrzucania ramki bez potwierdzonej synchronizacji.
+Łącznie 26 host PASS (7 C, 4 cross-process, 6 UART, 4 operator, 5 own-file).
+
+Finalny build10/build11: SHA256
+`37e151bf7879431653eae31462d9390acca9ee82262efb529b8b96771518db3e`,
+33792 B, wszystkie 37 importów dostępne w oryginalnych NT4 PL i EN.
+Finalny niebootowany overlay 07:
+`G:\USOS-Kolekcja\_vm\nt4-setup02-nativepage07\final\target.qcow2`.
+Pełny readback i porównanie innych wirtualnych bajtów PASS; native Setup,
+SOFTWARE i logger niezmienione, tymczasowy własny RAW usunięty. Starszy
+niebootowany overlay 07 sprzed synchronizacji pozostaje osobną historią;
+przyszły runner wskazuje wyłącznie final/target.qcow2.
+
+Własny snapshot C/headerów i 11 samodzielnych testów hostowych zapisano w
+`tools/tests/coverage/nt4page_snapshot/`, z README i verification.json.
+To WIP integracji diagnostycznej, nie zmiana aktywnego produktu/driverów.
+Pełny zamknięty handoff:
+`artifacts/nt4-success-review/nt4page/handoff-2026-10-22.json`.
+Po wznowieniu jedyną przygotowaną akcją jest run_nativepage07.py: 150 s,
+QMP quit, a dopiero potem odczyt własnego allowlist logu. Aktualnie zakaz startu.
+06 transport-timeout nadal nie jest Windows FAIL. Pulpit i LAN NT4 oraz osobne
+HID/MSC i sprzęt fizyczny pozostają niepotwierdzone.
