@@ -655,6 +655,23 @@ usos_legacy_xp_staging() {
         [ -r /usr/lib/usos/xp_csmwrap_esp.sh ] || stop 'xp_csmwrap_esp.sh is missing'
         xp_run_logged legacy-xp-csmwrap.log sh /usr/lib/usos/xp_csmwrap_esp.sh || stop 'The CSMWrap ESP could not be created on the target'
         printf '[LEGACY_XP] CSMWRAP ESP PASS\n'
+        # Firmware entry for the target's CSMWrap ESP, first in BootOrder,
+        # plus BootNext (tools/uefi_boot_entry.sh, as Custom OS). Without it
+        # the X470 started the still-plugged USOS stick again after the
+        # preparation (2026-10-22, B261022-211645) and every Setup restart
+        # (text mode -> GUI -> desktop) would too. First in BootOrder, not
+        # only BootNext: BootNext covers one restart. Not fatal: removing the
+        # stick still boots the disk through the removable-media path.
+        if [ -r /usr/lib/usos/uefi_boot_entry.sh ]; then
+            if xp_run_logged legacy-xp-boot-entry.log env TARGET_DEVICE="$TARGET_DEVICE" \
+                ENTRY_NAME="${NT5_NAME:-Windows XP}" sh /usr/lib/usos/uefi_boot_entry.sh add; then
+                printf '[LEGACY_XP] BOOT ENTRY PASS (BootOrder first + BootNext: the restart starts the target)\n'
+            else
+                printf '[LEGACY_XP] BOOT ENTRY not written; remove the USOS stick before the restart\n'
+            fi
+        else
+            printf '[LEGACY_XP] BOOT ENTRY helper missing; remove the USOS stick before the restart\n'
+        fi
     fi
     xp_stage_set prepare-xpsetup-pass
     usos_ui_stage 5 5 'Verification and finalization' 'Verifying the staged source, unmounting media and flushing writes.' || true

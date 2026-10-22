@@ -474,9 +474,11 @@ usos_net_nt4_reg() {
 usos_net_w2k_sif() {
     # After usos_net_stage: stdin answer, stdout revised answer. Windows 2000,
     # XP and Server 2003 x86 (system= of the config). W2K: OemPreinstall=Yes
-    # (its $OEM$ copy, usos_net_stage); XP / 2003 keep OemPreinstall as it is
-    # (No: OemPnPDriversPath works without it since XP, docs/drivers.md) and
-    # need no $OEM$ tree. USOS_NET_KEEP=yes (the user's own .sif has its own
+    # (its $OEM$ copy, usos_net_stage); XP / 2003 need no $OEM$ tree. Their
+    # OemPreinstall is set to Yes afterwards by usos_nt5_oem_pnp_preinstall
+    # (nt5_user_drivers.sh, end of prepare_xp_windows_partition.sh): without
+    # it text mode never adds OemPnPDriversPath to DevicePath (X470 XP SP3
+    # 2026-10-22, I211 without a driver). USOS_NET_KEEP=yes (the user's own .sif has its own
     # network sections): only the driver path is merged, the user's
     # [Networking] / [NetAdapters] / ... stay and no USOS block is added.
     USOS_NET_PATH=$_un_driver_path USOS_NET_ID=$_un_hwid USOS_NET_COUNT=$_un_matches USOS_NET_CFG=$_un_cfg awk '
