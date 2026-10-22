@@ -133,13 +133,14 @@ class ResourceQueryExecution(unittest.TestCase):
         cc=shutil.which('gcc') or 'C:/msys64/mingw64/bin/gcc.exe'
         self.assertTrue(Path(cc).is_file())
         source=(DRV/'src/usosnet.c').read_text()
-        start=source.index('#if USOSNET_NDIS4\n    /* 95 OSR2 (PnP)')
+        start=source.index('#if USOSNET_NT35\n    A->Legacy = TRUE;')
         end=source.index('\n\n    /* PCI identity;',start)
         branch=source[start:end]
         harness=r"""
 #include <stdint.h>
 #include <stdio.h>
 #define USOSNET_NDIS4 1
+#define USOSNET_NDIS3 USOSNET_NT351
 #define NDIS_STATUS_SUCCESS 0U
 #define NDIS_STATUS_NOT_SUPPORTED 0xC00000BBU
 #define NDIS_STATUS_ADAPTER_NOT_FOUND 0xC0010006U
@@ -208,6 +209,7 @@ class CallbackExecution(unittest.TestCase):
 #include <stdio.h>
 #include <string.h>
 #define USOSNET_NT351 1
+#define USOSNET_NDIS3 1
 #define TICKS_PER_SEC 50
 #define FALSE 0
 typedef unsigned long ULONG;

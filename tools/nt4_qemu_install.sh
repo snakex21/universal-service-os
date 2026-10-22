@@ -363,6 +363,14 @@ nt4_vm_install() {
                 return 2
             fi
         fi
+        if [ -n "$nt3" ] && [ -z "$nt31" ]; then
+            . "${USOS_LIB_DIR:-/usr/lib/usos}/nt35_network_setup.sh"
+            if ! usos_nt35_vm_patch "$target"; then
+                printf 'run %s: NT35 original LAN INF contract/readback failed\n' "$boot" >> "$logs/runs.txt"
+                W9X_VM_TICK_FN=''
+                return 2
+            fi
+        fi
         # NT 3.1 Advanced Server: GUI Setup stops first at Domain Settings
         # (3.1 has no unattended form of it, QEMU 2026-10-10): controller of
         # the new domain USOSDOMAIN (NT31_DOMAIN_KEYS), then the Date/Time

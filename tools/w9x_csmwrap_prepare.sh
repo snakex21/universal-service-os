@@ -89,6 +89,8 @@ w9x_nt3_default_sif() {
     printf '\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n'
     case "${2:-}" in NT351|NT351S)
         printf ';USOS-NT351-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
+      NT35|NT35S)
+        printf ';USOS-NT35-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
     esac
 }
 

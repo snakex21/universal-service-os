@@ -121,12 +121,16 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
 /// again by micro-Linux before it enables its own NDIS3 build and TCP/IP.
 pub fn renderForSystem(p: *const Profile, system_id: []const u8, buffer: []u8) ![]const u8 {
     const base = try render(p, buffer);
-    if (!std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51") and
-        !std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51-server")) return base;
+    const is351 = std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51") or
+        std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-51-server");
+    const is35 = std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-5") or
+        std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-5-server");
+    if (!is351 and !is35) return base;
+    const target: []const u8 = if (is351) "NT351" else "NT35";
     var tail: std.Io.Writer = .fixed(buffer[base.len..]);
-    try tail.print(";USOS-NT351-NETWORK={s}\r\n", .{@tagName(p.network)});
+    try tail.print(";USOS-{s}-NETWORK={s}\r\n", .{ target, @tagName(p.network) });
     var group: [15]u8 = undefined;
-    try tail.print(";USOS-NT351-WORKGROUP={s}\r\n", .{netbiosName(if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &group)});
+    try tail.print(";USOS-{s}-WORKGROUP={s}\r\n", .{ target, netbiosName(if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &group) });
     try @import("network_defaults.zig").metadata(p, false, &tail);
     return buffer[0 .. base.len + tail.buffered().len];
 }
@@ -145,6 +149,17 @@ test "NT351 LAN is system-bound and respects network off" {
         const other = try renderForSystem(&p, id, &buffer);
         try std.testing.expect(std.mem.indexOf(u8, other, "USOS-NT351-NETWORK") == null);
     }
+}
+
+test "NT35 LAN has its own version marker" {
+    var p = Profile{};
+    var buffer: [4096]u8 = undefined;
+    const on = try renderForSystem(&p, "windows-nt-3-5", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, on, ";USOS-NT35-NETWORK=on\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, on, "USOS-NT351-NETWORK") == null);
+    p.network = .off;
+    const off = try renderForSystem(&p, "windows-nt-3-5-server", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, off, ";USOS-NT35-NETWORK=off\r\n") != null);
 }
 
 test "NT 3.51 / 3.5 ids" {
