@@ -82,6 +82,8 @@ def capability(row):
             net='brak pomiaru tego źródła/edycji: własny usosnet351 NDIS 3 istnieje; R18f Workstation [S4] nie kwalifikuje Servera ani innych nośników'
         else:
             net='brak runtime: port NDIS 3 dla NT3.5 wymaga osobnej obsługi PCI i zasobów; brakujące API wykluczają niezmieniony usosnet351; loopback nie jest LAN'
+        if nt35_r20(row):
+            net=('QEMU PASS AUTO35 [S21]: świeży normalny USOS/blank target, POST87cb/SYSd94; Server/Browser STOPPED/Disabled od pierwszego targetboot bez ręcznego helpera, Workstation/DHCP aktywne; DHCP renew, ping3/3<10ms, strict FIXED DNS/native resolver/HTTP200, nativeShutdown/rc0/actualreadback. Strict configuredDNS10.0.2.3 NOT_TESTED, PS/2 baseline; bez nowego USB/MSC/USER/Server/X470 PASS. Historia wcześniejszych oddzielnych pakietów: '+net)
         return usb,net
     if 'windows-nt-4' in r or 'windows nt 4.0' in p:
         if nt4_candidate03(row):
@@ -175,6 +177,7 @@ def main(args):
         '[S19] `docs/nt4-combined-usb-evidence.md`: zakończony combo01/6457ab4b kwalifikuje HID+MSC na tym samym frozenUSB313952/43648B: negative keyboard/mouse controls, rzeczywisty wpis/ruch/klik po in, FAT16 start/hot-plug, Write/Flush/Close/read i persisted reinsert; klik myszy po MSC replug także PASS. i8042 obecny/Start4, NDISLoop Start3, nativeShutdown/rc0/stoppedreadback; źródło exact NT4 PL. MSC04 [S17] i HID1.3 [S14] zachowują historię, LAN [S18] jest osobny. Nowe okno Explorer potrzebne; auto-refresh, LAN współistnienia, fresh AUTO i X470 nie uzyskują PASS z combo01.','',
         '[S20] `docs/nt4-tuple09-coexistence-evidence.md`: jedna zakończona installed VM tuple09 potwierdza podstawowe współistnienie frozenUSB313952/43648B (HID+MSC), i8042prt Start4 oraz NET89b/21248B/Start2. Świeży własny log/actual token/TESTNET_DONE, strict DHCP/brama/configuredDNS706F, negative HID out/in, startup/hot/flush/close/persisted reinsert i końcowy ping po USB4/4 (16/<10/<10/<10ms) PASS. NativeSafe36/QMP0 i stoppedreadbacks; parent08 unchanged. Dawne [S14,S16,S17,S18,S19] są odrębne. TreeghostE/auto-refresh, pełna trasa IRQ, fresh AUTO/HTTP/Server/X470 bez PASS.','',
         'Stan starszych kolejek i oddzielnych poprawek: `docs/usability-staging-audit-2026-10-21.md`. Bieżący raport NT3/NT4/macOS: `C:\\Users\\ASRock\\Documents\\Codex\\zadania\\2026-10-22-nt3-nt4-macos-RAPORT.md`. Dawne błędy NT4 candidate02 pozostają; nowszy wynik pulpitu nie nadaje MSC/LAN PASS.','',
+        '[S21] `docs/nt35-fresh-auto-client-evidence.md`: zakończony AUTO35/e129273f kwalifikuje świeży normalny USOS i noSharing przed pierwszym targetboot, POST87cb/SYSd94, DHCP/ping/fixedDNS/native resolver/HTTP200 oraz nativeShutdown/rc0/readback. Bez ręcznego policy helpera; strict configuredDNS.3 NOT_TESTED, brak nowego USB/MSC/Server/X470. Stary fresh policyFAIL [S15] i osobny overlay [S13] pozostają historycznie odrębne.','',
         '| Obraz | Build / SP | Język / arch | Przepływ | Pendrive (start / hot-swap) | Sieć (sterownik, DHCP, ping bramy, DNS) | Klawiatura / mysz po odpięciu | Test użytkownika |',
         '|---|---|---|---|---|---|---|---|']
     for row in entries:

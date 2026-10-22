@@ -143,6 +143,11 @@ class EvidenceTests(unittest.TestCase):
     def test_nt35_fresh_lan_and_overlay_hid_keep_storage_and_latency_limits(self):
         exact=list(audit.NT35_R20_ROW)
         usb,net=audit.capability(exact)
+        self.assertTrue(net.startswith('QEMU PASS AUTO35 [S21]'))
+        self.assertIn('od pierwszego targetboot bez ręcznego helpera',net)
+        self.assertIn('Strict configuredDNS10.0.2.3 NOT_TESTED',net)
+        self.assertIn('Historia wcześniejszych oddzielnych pakietów',net)
+        self.assertNotIn('[S21]',usb+audit.hid_test(usb,exact))
         self.assertNotIn('PASS',usb)
         self.assertIn('QEMU PASS R20',net)
         self.assertIn('pierwszy ping2/3',net)
