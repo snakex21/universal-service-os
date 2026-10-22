@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Comptes et réseau",
   "boot.profile.value.unchanged": "Inchangé",
   "boot.profile.value.display_keep": "Valeur par défaut de Windows",
+  "boot.profile.value.display_native": "Automatique (native du moniteur)",
   "boot.profile.field.show_protected": "Afficher les fichiers système protégés",
   "boot.profile.help.show_protected": "L'Explorateur affiche aussi les fichiers cachés et les fichiers protégés du système d'exploitation (pour chaque nouvel utilisateur).",
   "boot.profile.field.launch_to_pc": "Ouvrir l'Explorateur sur Ce PC",

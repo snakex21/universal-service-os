@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Hesaplar ve ağ",
   "boot.profile.value.unchanged": "Değişmez",
   "boot.profile.value.display_keep": "Windows varsayılanı",
+  "boot.profile.value.display_native": "Otomatik (monitörün yerel)",
   "boot.profile.field.show_protected": "Korunan sistem dosyalarını göster",
   "boot.profile.help.show_protected": "Gezgin gizli dosyaları ve korunan işletim sistemi dosyalarını da gösterir (her yeni kullanıcı için).",
   "boot.profile.field.launch_to_pc": "Gezgin Bu bilgisayar ile açılsın",

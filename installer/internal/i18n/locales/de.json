@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Konten und Netzwerk",
   "boot.profile.value.unchanged": "Unverändert",
   "boot.profile.value.display_keep": "Windows-Standard",
+  "boot.profile.value.display_native": "Automatisch (native Monitorauflösung)",
   "boot.profile.field.show_protected": "Geschützte Systemdateien anzeigen",
   "boot.profile.help.show_protected": "Der Explorer zeigt auch versteckte Dateien und die geschützten Betriebssystemdateien an (für jeden neuen Benutzer).",
   "boot.profile.field.launch_to_pc": "Explorer mit Dieser PC öffnen",

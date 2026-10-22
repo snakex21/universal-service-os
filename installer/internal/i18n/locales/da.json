@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Konti og netværk",
   "boot.profile.value.unchanged": "Uændret",
   "boot.profile.value.display_keep": "Windows-standard",
+  "boot.profile.value.display_native": "Automatisk (skærmens oprindelige)",
   "boot.profile.field.show_protected": "Vis beskyttede systemfiler",
   "boot.profile.help.show_protected": "Stifinder viser også skjulte filer og de beskyttede operativsystemfiler (for hver ny bruger).",
   "boot.profile.field.launch_to_pc": "Åbn Stifinder i Denne pc",

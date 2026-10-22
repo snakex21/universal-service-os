@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Account e rete",
   "boot.profile.value.unchanged": "Invariato",
   "boot.profile.value.display_keep": "Predefinita di Windows",
+  "boot.profile.value.display_native": "Automatica (nativa del monitor)",
   "boot.profile.field.show_protected": "Mostra file di sistema protetti",
   "boot.profile.help.show_protected": "Esplora risorse mostra anche i file nascosti e i file protetti del sistema operativo (per ogni nuovo utente).",
   "boot.profile.field.launch_to_pc": "Apri Esplora risorse su Questo PC",

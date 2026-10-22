@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Accounts en netwerk",
   "boot.profile.value.unchanged": "Ongewijzigd",
   "boot.profile.value.display_keep": "Windows-standaard",
+  "boot.profile.value.display_native": "Automatisch (eigen van de monitor)",
   "boot.profile.field.show_protected": "Beveiligde systeembestanden tonen",
   "boot.profile.help.show_protected": "Verkenner toont ook verborgen bestanden en de beveiligde besturingssysteembestanden (voor elke nieuwe gebruiker).",
   "boot.profile.field.launch_to_pc": "Verkenner openen in Deze pc",

@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Tilit ja verkko",
   "boot.profile.value.unchanged": "Ei muutosta",
   "boot.profile.value.display_keep": "Windowsin oletus",
+  "boot.profile.value.display_native": "Automaattinen (näytön oma)",
   "boot.profile.field.show_protected": "Näytä suojatut järjestelmätiedostot",
   "boot.profile.help.show_protected": "Resurssienhallinta näyttää myös piilotiedostot ja suojatut käyttöjärjestelmän tiedostot (jokaiselle uudelle käyttäjälle).",
   "boot.profile.field.launch_to_pc": "Avaa Tämä tietokone",

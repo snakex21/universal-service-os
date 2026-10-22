@@ -1078,6 +1078,7 @@
   "boot.profile.section.accounts": "Kontá a sieť",
   "boot.profile.value.unchanged": "Bez zmeny",
   "boot.profile.value.display_keep": "Predvolené Windows",
+  "boot.profile.value.display_native": "Automatické (natívne pre monitor)",
   "boot.profile.field.show_protected": "Zobraziť chránené systémové súbory",
   "boot.profile.help.show_protected": "Prieskumník zobrazuje aj skryté súbory a chránené súbory operačného systému (pre každého nového používateľa).",
   "boot.profile.field.launch_to_pc": "Prieskumník otvorí Tento počítač",

@@ -1081,6 +1081,7 @@
   "boot.profile.section.accounts": "Računi in omrežje",
   "boot.profile.value.unchanged": "Nespremenjeno",
   "boot.profile.value.display_keep": "Privzeto v sistemu Windows",
+  "boot.profile.value.display_native": "Samodejno (izvorna za monitor)",
   "boot.profile.field.show_protected": "Pokaži zaščitene sistemske datoteke",
   "boot.profile.help.show_protected": "Raziskovalec prikaže tudi skrite datoteke in zaščitene datoteke operacijskega sistema (za vsakega novega uporabnika).",
   "boot.profile.field.launch_to_pc": "Raziskovalec odpre Ta računalnik",

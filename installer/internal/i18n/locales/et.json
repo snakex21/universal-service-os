@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Kontod ja võrk",
   "boot.profile.value.unchanged": "Muutmata",
   "boot.profile.value.display_keep": "Windowsi vaikeväärtus",
+  "boot.profile.value.display_native": "Automaatne (monitori loomulik)",
   "boot.profile.field.show_protected": "Näita kaitstud süsteemifaile",
   "boot.profile.help.show_protected": "Explorer näitab ka peidetud faile ja kaitstud operatsioonisüsteemi faile (igale uuele kasutajale).",
   "boot.profile.field.launch_to_pc": "Explorer avaneb vaates See arvuti",

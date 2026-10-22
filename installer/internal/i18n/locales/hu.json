@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Fiókok és hálózat",
   "boot.profile.value.unchanged": "Változatlan",
   "boot.profile.value.display_keep": "Windows alapértelmezés",
+  "boot.profile.value.display_native": "Automatikus (a monitor natív)",
   "boot.profile.field.show_protected": "Védett rendszerfájlok megjelenítése",
   "boot.profile.help.show_protected": "Az Intéző a rejtett fájlokat és a védett operációsrendszer-fájlokat is megjeleníti (minden új felhasználónál).",
   "boot.profile.field.launch_to_pc": "Az Intéző az Ez a gép nézetben nyílik",

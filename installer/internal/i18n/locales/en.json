@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Accounts and network",
   "boot.profile.value.unchanged": "Unchanged",
   "boot.profile.value.display_keep": "Windows default",
+  "boot.profile.value.display_native": "Automatic (monitor native)",
   "boot.profile.field.show_protected": "Show protected system files",
   "boot.profile.help.show_protected": "Explorer also shows hidden files and the protected operating system files (for every new user).",
   "boot.profile.field.launch_to_pc": "Open Explorer to This PC",

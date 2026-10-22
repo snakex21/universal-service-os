@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Contas e rede",
   "boot.profile.value.unchanged": "Sem alteração",
   "boot.profile.value.display_keep": "Padrão do Windows",
+  "boot.profile.value.display_native": "Automática (nativa do monitor)",
   "boot.profile.field.show_protected": "Mostrar arquivos protegidos do sistema",
   "boot.profile.help.show_protected": "O Explorer mostra também os arquivos ocultos e os arquivos protegidos do sistema operacional (para cada novo usuário).",
   "boot.profile.field.launch_to_pc": "Abrir o Explorer em Este Computador",

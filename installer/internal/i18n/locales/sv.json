@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Konton och nätverk",
   "boot.profile.value.unchanged": "Oförändrat",
   "boot.profile.value.display_keep": "Windows-standard",
+  "boot.profile.value.display_native": "Automatisk (skärmens egen)",
   "boot.profile.field.show_protected": "Visa skyddade systemfiler",
   "boot.profile.help.show_protected": "Utforskaren visar även dolda filer och de skyddade operativsystemfilerna (för varje ny användare).",
   "boot.profile.field.launch_to_pc": "Öppna Utforskaren i Den här datorn",

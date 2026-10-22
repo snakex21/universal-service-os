@@ -1078,6 +1078,7 @@
   "boot.profile.section.accounts": "Conturi și rețea",
   "boot.profile.value.unchanged": "Neschimbat",
   "boot.profile.value.display_keep": "Implicit Windows",
+  "boot.profile.value.display_native": "Automată (nativă a monitorului)",
   "boot.profile.field.show_protected": "Afișare fișiere de sistem protejate",
   "boot.profile.help.show_protected": "Explorer afișează și fișierele ascunse și fișierele protejate ale sistemului de operare (pentru fiecare utilizator nou).",
   "boot.profile.field.launch_to_pc": "Explorer deschis la Acest PC",

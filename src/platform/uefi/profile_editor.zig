@@ -220,7 +220,9 @@ fn setOptions() void {
     protect_options = .{ t(.profile_value_protect_recommended), t(.profile_value_protect_updates), t(.profile_value_protect_off) };
     const legacy_display = answer.display_profile.supportsSystem(system_id);
     const offset: usize = if (legacy_display) 1 else 0;
-    display_options[0] = t(if (legacy_display) .profile_value_unchanged else .profile_value_auto);
+    // 9x / NT: the first item (no explicit display) is the automatic native
+    // resolution since 2026-10-20, so it is named that way.
+    display_options[0] = t(if (legacy_display) .profile_value_display_native else .profile_value_auto);
     if (legacy_display) display_options[1] = t(.profile_value_auto);
     inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i|
         display_options[i + offset] = if (comptime std.mem.eql(u8, f.name, "keep")) t(.profile_value_display_keep) else f.name;

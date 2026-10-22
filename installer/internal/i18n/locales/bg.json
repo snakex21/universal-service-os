@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Акаунти и мрежа",
   "boot.profile.value.unchanged": "Без промяна",
   "boot.profile.value.display_keep": "По подразбиране на Windows",
+  "boot.profile.value.display_native": "Автоматична (естествена за монитора)",
   "boot.profile.field.show_protected": "Показване на защитените системни файлове",
   "boot.profile.help.show_protected": "Explorer показва и скритите файлове, и защитените файлове на операционната система (за всеки нов потребител).",
   "boot.profile.field.launch_to_pc": "Explorer се отваря в Този компютър",

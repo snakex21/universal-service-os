@@ -1078,6 +1078,7 @@
   "boot.profile.section.accounts": "Paskyros ir tinklas",
   "boot.profile.value.unchanged": "Nekeičiama",
   "boot.profile.value.display_keep": "Numatytoji Windows",
+  "boot.profile.value.display_native": "Automatinė (monitoriaus savoji)",
   "boot.profile.field.show_protected": "Rodyti apsaugotus sistemos failus",
   "boot.profile.help.show_protected": "Naršyklė rodo ir paslėptus failus, ir apsaugotus operacinės sistemos failus (kiekvienam naujam vartotojui).",
   "boot.profile.field.launch_to_pc": "Naršyklė atidaro Šis kompiuteris",

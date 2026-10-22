@@ -1078,6 +1078,7 @@
   "boot.profile.section.accounts": "Konti un tīkls",
   "boot.profile.value.unchanged": "Bez izmaiņām",
   "boot.profile.value.display_keep": "Windows noklusējums",
+  "boot.profile.value.display_native": "Automātiski (monitora dabiskā)",
   "boot.profile.field.show_protected": "Rādīt aizsargātos sistēmas failus",
   "boot.profile.help.show_protected": "Pārlūks rāda arī slēptos failus un aizsargātos operētājsistēmas failus (katram jaunam lietotājam).",
   "boot.profile.field.launch_to_pc": "Pārlūks atveras mapē Šis dators",

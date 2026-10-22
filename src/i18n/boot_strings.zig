@@ -636,6 +636,7 @@ pub const Key = enum(u16) {
     profile_summary,
     profile_value_auto,
     profile_value_display_keep,
+    profile_value_display_native,
     profile_value_edition_manual,
     profile_value_edition_server_default,
     profile_value_hibernation_no_fast_startup,
@@ -1452,6 +1453,7 @@ pub const hashes = [_]u32{
     0xea748758, // profile.summary
     0x803f740e, // profile.value.auto
     0x832851bb, // profile.value.display_keep
+    0x039b88e1, // profile.value.display_native
     0x74eb2ac4, // profile.value.edition_manual
     0xf324f363, // profile.value.edition_server_default
     0x2429db7f, // profile.value.hibernation_no_fast_startup
@@ -1969,6 +1971,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -3086,6 +3089,7 @@ pub const english = [_][]const u8{
     "Profile {0}: {1} ({2})",
     "Automatic",
     "Windows default",
+    "Automatic (monitor native)",
     "Type manually\xe2\x80\xa6",
     "(Standard - default)",
     "Fast startup off",

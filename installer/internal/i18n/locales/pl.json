@@ -1078,6 +1078,7 @@
   "boot.profile.section.accounts": "Konta i sieć",
   "boot.profile.value.unchanged": "Bez zmian",
   "boot.profile.value.display_keep": "Domyślna Windows",
+  "boot.profile.value.display_native": "Automatyczna (natywna monitora)",
   "boot.profile.field.show_protected": "Pokaż chronione pliki systemowe",
   "boot.profile.help.show_protected": "Eksplorator pokazuje też ukryte pliki i chronione pliki systemu operacyjnego (dla każdego nowego użytkownika).",
   "boot.profile.field.launch_to_pc": "Eksplorator otwiera Ten komputer",

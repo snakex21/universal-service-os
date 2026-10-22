@@ -1075,6 +1075,7 @@
   "boot.profile.section.accounts": "Kontoer og nettverk",
   "boot.profile.value.unchanged": "Uendret",
   "boot.profile.value.display_keep": "Windows-standard",
+  "boot.profile.value.display_native": "Automatisk (skjermens opprinnelige)",
   "boot.profile.field.show_protected": "Vis beskyttede systemfiler",
   "boot.profile.help.show_protected": "Utforsker viser også skjulte filer og de beskyttede operativsystemfilene (for hver ny bruker).",
   "boot.profile.field.launch_to_pc": "Åpne Utforsker i Denne PCen",
