@@ -12,6 +12,8 @@ static const Page pages[] = {
     {"owner", UINT64_C(0x202c4cd89699d426), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"hardware-list", UINT64_C(0xf9ce3d026135a826), UINT64_C(0xe677e0878975fb18), 214, 129, 365, 43},
     {"busy", UINT64_C(0xf9ce3d026135a826), UINT64_C(0xa5eaef2d71e6f47f), 214, 129, 365, 43},
+    /* RTM PL adds Communication before the common Windows components page. */
+    {"communication", UINT64_C(0x5ddbfc6d53f04a7c), UINT64_C(0x71b411b0d5813505), 54, 90, 160, 24},
     {"components", UINT64_C(0xb8c2ba9fa19c2f01), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"computer-options", UINT64_C(0xb0f529c4eee43ea6), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"startup-disk", UINT64_C(0x6abd2d2621e3dec0), UINT64_C(0x0000000000000000), 0, 0, 0, 0},

@@ -93,10 +93,10 @@ class Win95Input(unittest.TestCase):
             self.assertFalse((self.temp / 'input').exists())
 
     def test_navigation_is_not_limited_to_five_key_attempts(self):
-        r = self.run_policy('for W9X_VM_PAGE in welcome directory setup-type hardware-list components computer-options startup-disk copy-ready restart reboot-confirm; do w9x_vm_95_page_ready && w9x_vm_95_input || exit 2; done; echo "keytries=$key_tries"')
+        r = self.run_policy('for W9X_VM_PAGE in welcome directory setup-type hardware-list communication components computer-options startup-disk copy-ready restart reboot-confirm; do w9x_vm_95_page_ready && w9x_vm_95_input || exit 2; done; echo "keytries=$key_tries"')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('keytries=0', r.stdout)
-        self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').splitlines().count('ret'), 10)
+        self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').splitlines().count('ret'), 11)
 
     def test_owner_parser_reads_only_the_name_section(self):
         inf = self.temp / 'answer.inf'
