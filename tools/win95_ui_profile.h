@@ -20,6 +20,8 @@ static const Page pages[] = {
     {"copy-ready", UINT64_C(0x01e2d224e94e7454), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"busy", UINT64_C(0x71ada2dbbfd4fc8d), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
     {"restart", UINT64_C(0xb8966280dd8b189a), UINT64_C(0x7ea17a0dc876890d), 130, 168, 376, 23},
+    /* RTM PL first Finish text; the following reboot confirmation is shared. */
+    {"restart", UINT64_C(0xb8966280dd8b189a), UINT64_C(0x2ea8d56e74180678), 130, 168, 376, 23},
     {"reboot-confirm", UINT64_C(0xb8966280dd8b189a), UINT64_C(0xf91a3f1cbb37d3a1), 130, 168, 376, 23},
     {"directory", UINT64_C(0xc1f50b8b63695fb6), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
 };
