@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows Kurulumu kurulum sırasında kullanıcı adını ve parolayı sorar; USOS bunları ayarlamaz.",
   "boot.lx.logon_answer_file": "Kurulumdan sonra {0} yanıt dosyanızdaki hesapla oturum açın.",
   "boot.profile.field.display_bpp": "Renk derinliği",
-  "boot.profile.help.display_legacy": "Kurulumdan sonra gerçek donanımda uygulanır. Otomatik, güvenli geri dönüşle 1920x1080 değerine kadar kullanılabilir bir kip seçer. Otomatik (monitörün yerel) aynı şekilde çalışır. Otomatik renk derinliği varsa 32 bit, yoksa 16 bit seçer. Windows varsayılanı: USOS kurulumdan sonra çözünürlüğü değiştirmez."
+  "boot.profile.help.display_legacy": "Kurulumdan sonra gerçek donanımda uygulanır. Otomatik, monitörün yerel kipini (EDID), yoksa kullanılabilir en yüksek kipi (Windows 9x: en fazla 1920x1080) güvenli geri dönüşle seçer. Otomatik (monitörün yerel) aynı şekilde çalışır. Otomatik renk derinliği varsa 32 bit, yoksa 16 bit seçer. Windows varsayılanı: USOS kurulumdan sonra çözünürlüğü değiştirmez."
 }

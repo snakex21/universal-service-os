@@ -1366,5 +1366,5 @@
   "boot.lx.logon_setup_asks": "Windows Installation spørger om brugernavn og adgangskode under installationen; USOS angiver dem ikke.",
   "boot.lx.logon_answer_file": "Log på efter installationen med kontoen fra din svarfil {0}.",
   "boot.profile.field.display_bpp": "Farvedybde",
-  "boot.profile.help.display_legacy": "Anvendes efter installation på den rigtige hardware. Automatisk vælger en tilgængelig tilstand op til 1920x1080 med sikkert tilbagefald. Automatisk (skærmens oprindelige) virker på samme måde. Automatisk farvedybde foretrækker 32 bit, ellers 16. Windows-standard: USOS ændrer ikke opløsningen efter installationen."
+  "boot.profile.help.display_legacy": "Anvendes efter installation på den rigtige hardware. Automatisk vælger skærmens oprindelige tilstand (EDID), ellers den højeste tilgængelige (Windows 9x: højst 1920x1080), med sikkert tilbagefald. Automatisk (skærmens oprindelige) virker på samme måde. Automatisk farvedybde foretrækker 32 bit, ellers 16. Windows-standard: USOS ændrer ikke opløsningen efter installationen."
 }
