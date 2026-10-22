@@ -134,6 +134,16 @@ if [ -n "$net_system" ]; then
     fi
     rm -f "$work/network.ini"
 fi
+# Driver paths only reach the PnP search path with OemPreinstall=Yes
+# (text-mode Setup appends OemPnPDriversPath to DevicePath only then; X470
+# XP SP3 2026-10-22: usosnet staged, I211 left without a driver).
+. "$SCRIPT_DIR/nt5_user_drivers.sh"
+mv "$work/winnt.sif" "$work/winnt.base"
+usos_nt5_oem_pnp_preinstall < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot set OemPreinstall for OemPnPDriversPath'
+rm -f "$work/winnt.base"
+if grep -qi '^OemPnPDriversPath' "$work/winnt.sif"; then
+    printf '[XP_WINDOWS] OemPnPDriversPath present: OemPreinstall=Yes (DevicePath append in text mode)\n'
+fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

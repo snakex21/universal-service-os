@@ -360,8 +360,12 @@ changed. Design for the refactor:
   `[Unattended] OemPnPDriversPath="USOS\Drivers\User\Storage-01;..."` (paths
   relative to `%SystemDrive%`, `;`-separated, at most ~4 KiB). With an empty
   folder the key is left out, so the answer file stays byte-identical to
-  today's. `OemPreinstall` stays `No` (OemPnPDriversPath works without it
-  since XP; the `$OEM$` tree is not needed).
+  today's. `OemPreinstall` is set to `Yes` whenever the answer has
+  OemPnPDriversPath: text-mode Setup appends the key to `DevicePath` only in
+  preinstall mode (X470 XP SP3 2026-10-22: with `No`, `DevicePath` stayed
+  `%SystemRoot%\inf` and the staged usosnet INF was never found). The
+  `$OEM$` tree is still not needed; missing `OEMSkipRegional` /
+  `OemSkipWelcome` are added as `1` (`usos_nt5_oem_pnp_preinstall`).
 * Validation: the existing `check_xp_*` scripts plus a QEMU text-mode run
   with a user AHCI/RAID package, and `compare_xp_packages.py` showing only
   the expected overlay changes.
