@@ -51,8 +51,24 @@ with Workstation and TCPIP RUNNING. Native `net start` (operator11) lists
 Workstation/DHCP Client and no Server/Computer Browser. The separately
 logged native ping (operator13) receives three replies below10ms each.
 Native Shutdown reaches safe-off on operator17, followed by QMP quit/exit0.
-Stopped disk readback and a separate unchanged cold-boot `/check` remain
-pending; this apply result alone does not qualify persistent cold policy.
+Bounded stopped readback confirms the own helper, SYSd94/USB2d455, clean
+SYSTEM Select Current/Default1, i8042prt Start4, Browser/Server Start4,
+Workstation Start2 and TCPIP Start3. Only the four own text files are
+exported; SYSTEM and binary reads remain in RAM. The actual stopped target
+SHA256 is `f798b3021c12fec3c56dd652530dc2cd3b1c1dc54a107b1e653eabe7b9e05836`;
+the original USB parent92c2 is unchanged and whole-disk scratch is removed.
+
+`readback_nt35_client.py` qualifies only completed apply03. A separate
+`prepare_nt35_client_cold.py` creates an empty cold01 COW; actual
+`qemu-img compare` confirms identical effective disk contents, including
+SYSTEM and USB. It retains the helper/import proof and actual apply03
+command hash without claiming newly added files or starting QEMU. The
+initial cold launcher preflight rejects missing explicit compatibility
+flags before QEMU; a repeated identical-disk comparison supports their
+atomic manifest correction, with a `validation-fix-no-vm-started.json`
+note. No image or guest content changes in that repair. This preparation
+and apply result do not qualify persistent cold policy; the separate
+native cold `/check` requires its own completion evidence.
 
 The launcher now requires both `isatty()` and Windows `GetConsoleMode`:
 Windows NUL can satisfy `isatty()` despite having no live operator.
