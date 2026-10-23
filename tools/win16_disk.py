@@ -6,7 +6,9 @@ Only the pieces the Win16 test needs are implemented:
 * ``Iso`` - read an ISO9660 image (the MS-DOS 6.22 and Windows 3.1 media),
 * ``Fat16Builder`` - create a 64/128 MiB hard-disk image with an MBR, one
   active FAT16 partition and a caller-supplied list of files,
-* ``Fat16Reader`` - read files back from such an image.
+* ``Fat16Reader`` - read files back from such an image,
+* ``Fat16Volume`` - read and write files in the FAT16 partition of an
+  existing image (staging into an installed Windows without reinstalling it).
 
 The MS-DOS boot sector code is not written from scratch: it is taken from the
 MS-DOS 6.22 ``SYS.COM`` (the utility embeds the boot sector template) and only
@@ -449,5 +451,278 @@ class Fat16Reader:
         try:
             self.read(path)
         except (FileNotFoundError, IsADirectoryError):
+            return False
+        return True
+
+
+class Fat16Volume:
+    """Read and write files in the FAT16 partition of an existing image.
+
+    ``Fat16Builder`` writes a whole image; this class edits one in place, the
+    way the QEMU harness stages ``WINSOCK.DLL``/``TESTLOAD.EXE`` into an
+    already installed Windows, rewrites ``AUTOEXEC.BAT`` for one run and
+    removes the DLL again for the negative run.  Both FAT copies are kept in
+    sync and a replaced file returns its clusters to the table.
+
+    Only 8.3 names are created; existing long-file-name entries are left as
+    they are (Windows itself writes them), so replacing a file never touches
+    the preceding 0x0F records.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._fh = self.path.open('r+b')
+        head = self._read(0, SECTOR)
+        start = 0
+        if head[510:512] == b'\x55\xaa' and head[446 + 4] in (0x04, 0x06, 0x0E):
+            start = struct.unpack_from('<I', head, 446 + 8)[0]
+        self.start = start
+        vbr = self._read(start * SECTOR, SECTOR)
+        if struct.unpack_from('<H', vbr, 11)[0] != SECTOR:
+            raise ValueError('%s: unsupported sector size' % self.path)
+        self.spc = vbr[13]
+        self.reserved = struct.unpack_from('<H', vbr, 14)[0]
+        self.nfats = vbr[16]
+        self.root_entries = struct.unpack_from('<H', vbr, 17)[0]
+        self.spf = struct.unpack_from('<H', vbr, 22)[0]
+        total = struct.unpack_from('<H', vbr, 19)[0] or struct.unpack_from('<I', vbr, 32)[0]
+        base = start * SECTOR
+        self.fat = base + self.reserved * SECTOR
+        self.root = self.fat + self.nfats * self.spf * SECTOR
+        self.data = self.root + self.root_entries * 32
+        self.cluster_bytes = SECTOR * self.spc
+        data_sectors = total - self.reserved - self.nfats * self.spf \
+            - (self.root_entries * 32) // SECTOR
+        self.max_cluster = data_sectors // self.spc + 2
+
+    # -- raw access -------------------------------------------------------
+    def _read(self, offset: int, size: int) -> bytes:
+        self._fh.seek(offset)
+        data = self._fh.read(size)
+        if len(data) < size:
+            raise ValueError('%s: short read at %d' % (self.path, offset))
+        return data
+
+    def _write(self, offset: int, data: bytes) -> None:
+        self._fh.seek(offset)
+        self._fh.write(data)
+
+    def close(self) -> None:
+        self._fh.close()
+
+    def __enter__(self) -> 'Fat16Volume':
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    # -- FAT --------------------------------------------------------------
+    def _fat_get(self, cluster: int) -> int:
+        return struct.unpack_from('<H', self._read(self.fat + cluster * 2, 2))[0]
+
+    def _fat_set(self, cluster: int, value: int) -> None:
+        record = struct.pack('<H', value)
+        for copy in range(self.nfats):
+            self._write(self.fat + copy * self.spf * SECTOR + cluster * 2, record)
+
+    def _cluster_offset(self, cluster: int) -> int:
+        return self.data + (cluster - 2) * self.cluster_bytes
+
+    def _read_chain(self, first: int, size: int | None = None) -> bytes:
+        out = bytearray()
+        cluster = first
+        while 2 <= cluster < self.max_cluster and (size is None or len(out) < size):
+            out += self._read(self._cluster_offset(cluster), self.cluster_bytes)
+            value = self._fat_get(cluster)
+            cluster = 0xFFFF if value >= 0xFFF8 else value
+        if size is not None:
+            if len(out) < size:
+                raise ValueError('%s: cluster chain shorter than %d bytes'
+                                 % (self.path, size))
+            return bytes(out[:size])
+        return bytes(out)
+
+    def _free_chain(self, first: int) -> None:
+        cluster = first
+        while 2 <= cluster < self.max_cluster:
+            value = self._fat_get(cluster)
+            self._fat_set(cluster, 0)
+            if value >= 0xFFF8 or value < 2:
+                break
+            cluster = value
+
+    def _alloc(self, size: int) -> int:
+        """First free cluster of a chain for ``size`` bytes (zeroed)."""
+        count = max(1, (size + self.cluster_bytes - 1) // self.cluster_bytes)
+        free: list[int] = []
+        cluster = 2
+        while cluster < self.max_cluster and len(free) < count:
+            if self._fat_get(cluster) == 0:
+                free.append(cluster)
+            cluster += 1
+        if len(free) < count:
+            raise ValueError('%s: FAT16 partition full (%d clusters needed)'
+                             % (self.path, count))
+        for index, cluster in enumerate(free):
+            self._fat_set(cluster, free[index + 1] if index + 1 < count else 0xFFFF)
+            self._write(self._cluster_offset(cluster), bytes(self.cluster_bytes))
+        return free[0]
+
+    def _write_chain(self, first: int, data: bytes) -> None:
+        cluster, pos = first, 0
+        while pos < len(data):
+            chunk = data[pos:pos + self.cluster_bytes]
+            self._write(self._cluster_offset(cluster), chunk)
+            pos += len(chunk)
+            if pos < len(data):
+                cluster = self._fat_get(cluster)
+                if not 2 <= cluster < self.max_cluster:
+                    raise ValueError('%s: broken chain while writing' % self.path)
+
+    # -- directories ------------------------------------------------------
+    def _dir_bytes(self, first: int) -> bytes:
+        if first == 0:  # root: fixed area, no chain
+            return self._read(self.root, self.root_entries * 32)
+        return self._read_chain(first)
+
+    def _write_dir(self, first: int, raw: bytes) -> None:
+        if first == 0:
+            if len(raw) > self.root_entries * 32:
+                raise ValueError('%s: root directory full' % self.path)
+            self._write(self.root, raw)
+            return
+        cluster, pos = first, 0
+        while pos < len(raw):
+            self._write(self._cluster_offset(cluster), raw[pos:pos + self.cluster_bytes])
+            pos += self.cluster_bytes
+            if pos < len(raw):
+                cluster = self._fat_get(cluster)
+                if not 2 <= cluster < self.max_cluster:
+                    raise ValueError('%s: directory chain too short' % self.path)
+
+    @staticmethod
+    def _short_name(record: bytes) -> str:
+        name = record[0:11].decode('ascii', 'replace')
+        base, ext = name[:8].rstrip(), name[8:].rstrip()
+        return (base + '.' + ext if ext else base).upper()
+
+    def _find_entry(self, raw: bytes, name: str) -> int | None:
+        for offset in range(0, len(raw), 32):
+            record = raw[offset:offset + 32]
+            if record[0] == 0:
+                return None
+            if record[0] == 0xE5 or record[11] == 0x0F:
+                continue
+            if self._short_name(record) == name.upper():
+                return offset
+        return None
+
+    def _slot(self, raw: bytes, first: int) -> int:
+        """Free 32-byte slot offset, growing the directory by one cluster."""
+        for offset in range(0, len(raw), 32):
+            if raw[offset] in (0x00, 0xE5):
+                return offset
+        if first == 0:
+            raise ValueError('%s: root directory full' % self.path)
+        last = first
+        while True:
+            value = self._fat_get(last)
+            if value >= 0xFFF8:
+                break
+            last = value
+        self._fat_set(last, self._alloc(self.cluster_bytes))
+        return len(raw)
+
+    def _walk_to(self, parts: list[str], create: bool) -> tuple[int, bytes]:
+        """(first cluster, raw directory) of ``parts``; creates directories."""
+        first, raw = 0, self._dir_bytes(0)
+        for depth, part in enumerate(parts):
+            offset = self._find_entry(raw, part)
+            if offset is not None:
+                if not raw[offset + 11] & 0x10:
+                    raise ValueError('%s: %s is not a directory'
+                                     % (self.path, '\\'.join(parts[:depth + 1])))
+                first = struct.unpack_from('<H', raw, offset + 26)[0]
+                raw = self._dir_bytes(first)
+                continue
+            if not create:
+                raise FileNotFoundError('\\'.join(parts[:depth + 1]))
+            new = self._alloc(self.cluster_bytes)
+            offset = self._slot(raw, first)
+            block = bytearray(raw + bytes(self.cluster_bytes) if offset == len(raw) else raw)
+            block[offset:offset + 32] = _entry(short_name(part), 0x10, new)
+            self._write_dir(first, bytes(block))
+            parent = first
+            first, raw = new, bytes(self.cluster_bytes)
+            block = bytearray(raw)
+            block[0:32] = _entry(b'.          ', 0x10, new)
+            block[32:64] = _entry(b'..         ', 0x10, parent)
+            self._write(self._cluster_offset(new), bytes(block))
+        return first, raw
+
+    # -- public API -------------------------------------------------------
+    @staticmethod
+    def _parts(path: str) -> list[str]:
+        return [part for part in path.strip('\\/').replace('/', '\\').split('\\') if part]
+
+    def put(self, path: str, data: bytes, attr: int = 0x20) -> None:
+        """Create or replace one file (missing parent directories are made)."""
+        parts = self._parts(path)
+        if not parts:
+            raise ValueError('empty path')
+        first, raw = (self._walk_to(parts[:-1], create=True) if len(parts) > 1
+                      else (0, self._dir_bytes(0)))
+        offset = self._find_entry(raw, parts[-1])
+        block = bytearray(raw)
+        if offset is not None:
+            if raw[offset + 11] & 0x10:
+                raise ValueError('%s: is a directory' % path)
+            old = struct.unpack_from('<H', raw, offset + 26)[0]
+            if old >= 2:
+                self._free_chain(old)
+        else:
+            offset = self._slot(raw, first)
+            if offset == len(raw):
+                block += bytes(self.cluster_bytes)
+        cluster = self._alloc(len(data)) if data else 0
+        if data:
+            self._write_chain(cluster, data)
+        block[offset:offset + 32] = _entry(short_name(parts[-1]), attr, cluster, len(data))
+        self._write_dir(first, bytes(block))
+
+    def remove(self, path: str) -> bool:
+        """Delete a file; returns False when it did not exist."""
+        parts = self._parts(path)
+        try:
+            first, raw = (self._walk_to(parts[:-1], create=False) if len(parts) > 1
+                          else (0, self._dir_bytes(0)))
+        except FileNotFoundError:
+            return False
+        offset = self._find_entry(raw, parts[-1])
+        if offset is None or raw[offset + 11] & 0x10:
+            return False
+        old = struct.unpack_from('<H', raw, offset + 26)[0]
+        if old >= 2:
+            self._free_chain(old)
+        block = bytearray(raw)
+        block[offset] = 0xE5
+        self._write_dir(first, bytes(block))
+        return True
+
+    def read(self, path: str) -> bytes:
+        parts = self._parts(path)
+        first, raw = (self._walk_to(parts[:-1], create=False) if len(parts) > 1
+                      else (0, self._dir_bytes(0)))
+        offset = self._find_entry(raw, parts[-1])
+        if offset is None or raw[offset + 11] & 0x10:
+            raise FileNotFoundError(path)
+        cluster = struct.unpack_from('<H', raw, offset + 26)[0]
+        size = struct.unpack_from('<I', raw, offset + 28)[0]
+        return self._read_chain(cluster, size) if size else b''
+
+    def exists(self, path: str) -> bool:
+        try:
+            self.read(path)
+        except FileNotFoundError:
             return False
         return True
