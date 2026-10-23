@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build the USOS Win16 Winsock provider (src/platform/bios/win16/winsock16).
 
-Produces zig-out/win16/WINSOCK.DLL (NE, 16-bit Windows 3.x) with the Open
-Watcom 16-bit toolchain.  A missing toolchain is reported and treated as a
+Produces zig-out/win16/WINSOCK.DLL (NE, 16-bit Windows 3.x) and
+zig-out/win16/TESTLOAD.EXE (the WSAStartup smoke-test application) with the
+Open Watcom 16-bit toolchain.  A missing toolchain is reported and treated as a
 skip (exit 0) so that a plain ``zig build``/CI run without the Watcom cache
 still succeeds; pass ``--strict`` to make a missing toolchain fatal.
 
@@ -24,6 +25,7 @@ SRC_DIR = ROOT / 'src' / 'platform' / 'bios' / 'win16' / 'winsock16'
 OUT_DIR = ROOT / 'zig-out' / 'win16'
 OBJ_DIR = ROOT / 'zig-out' / 'win16' / 'obj'
 ARTIFACT = OUT_DIR / 'WINSOCK.DLL'
+TESTLOAD_ARTIFACT = OUT_DIR / 'TESTLOAD.EXE'
 
 
 def find_watcom() -> Path | None:
@@ -93,6 +95,7 @@ def run(cmd: list[str], verbose: bool, cwd: Path | None = None) -> None:
             print(result.stderr.strip(), file=sys.stderr)
         raise SystemExit('FAILED (%d): %s' % (result.returncode, cmd[0]))
 def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
+    """WINSOCK.DLL: NE DLL, libentry.obj + 48 export directives."""
     wcc = watcom / 'binnt64' / 'wcc.exe'
     wlink = watcom / 'binnt64' / 'wlink.exe'
     headers = watcom / 'h' / 'win'
@@ -145,6 +148,48 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
     return ARTIFACT
 
 
+def build_testload(watcom: Path, verbose: bool) -> Path:
+    """TESTLOAD.EXE: a small Win16 EXE, no libentry.obj, no export table."""
+    wcc = watcom / 'binnt64' / 'wcc.exe'
+    wlink = watcom / 'binnt64' / 'wlink.exe'
+    headers = watcom / 'h' / 'win'
+    includes = watcom / 'h'
+    libs = watcom / 'lib286' / 'win'
+
+    OBJ_DIR.mkdir(parents=True, exist_ok=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    source = SRC_DIR / 'testload.c'
+    obj = OBJ_DIR / 'testload.obj'
+    for needed in (source, headers / 'windows.h', headers / 'winsock.h',
+                   includes / 'io.h', includes / 'fcntl.h'):
+        if not needed.exists():
+            raise SystemExit('missing input: %s' % needed)
+
+    print('compile: %s' % source.relative_to(ROOT))
+    run([wcc, '-bt=windows', '-ml', '-zW', '-zq', '-w3',
+         '-I%s' % headers, '-I%s' % includes, '-fo=%s' % obj, source], verbose)
+
+    print('link: %s' % TESTLOAD_ARTIFACT.relative_to(ROOT))
+    # A Win16 EXE needs no libentry.obj (no __DLLstart_) and no export list;
+    # windows.lib supplies the WinMain startup and clibl.lib the large-model C
+    # runtime used by _lcreat/_lwrite/_lclose.
+    directives = [
+        'format windows',
+        'option quiet',
+        'option nodefaultlibs',
+        'name %s' % TESTLOAD_ARTIFACT,
+        'file %s' % obj,
+        'library %s' % (libs / 'windows.lib'),
+        'library %s' % (libs / 'clibl.lib'),
+    ]
+    response = OBJ_DIR / 'testload.lnk'
+    response.write_text('\r\n'.join(directives) + '\r\n', encoding='ascii')
+    run([wlink, '@%s' % response], verbose)
+    if not TESTLOAD_ARTIFACT.exists():
+        raise SystemExit('linker reported success but %s is missing' % TESTLOAD_ARTIFACT)
+    return TESTLOAD_ARTIFACT
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--strict', action='store_true',
@@ -165,6 +210,10 @@ def main(argv: list[str] | None = None) -> int:
 
     artifact = build(watcom, args.verbose, args.keep_objects)
     print('OK: %s (%d bytes)' % (artifact.relative_to(ROOT), artifact.stat().st_size))
+    exe = build_testload(watcom, args.verbose)
+    print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
+    if not args.keep_objects:
+        shutil.rmtree(OBJ_DIR, ignore_errors=True)
     return 0
 
 
