@@ -49,16 +49,16 @@ w9x_vm_type_owner_text() {
 w9x_vm_95_page_ready() {
     [ "$W9X_VM_PAGE" != "$w95_last_page" ] || return 1
     case "$W9X_VM_PAGE" in
-        coa|coa-single) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
+        coa|coa-single|coa-single-en) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
         owner) w9x_vm_owner_valid ;;
-        recovery|welcome|directory|setup-type|hardware-list|communication|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm) return 0 ;;
+        recovery|welcome|directory|setup-type|hardware-list|communication|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm|network-device-en) return 0 ;;
         *) return 1 ;;
     esac
 }
 
 w9x_vm_95_input() {
     case "$W9X_VM_PAGE" in
-        coa-single)
+        coa-single|coa-single-en)
             key_on_screen=1
             w9x_vm_clear_edit || return 1
             w95_remaining=$key
@@ -109,6 +109,12 @@ w9x_vm_95_input() {
             ;;
         startup-disk)
             w9x_vm_private_key down && w9x_vm_private_key ret || return 1
+            key_on_screen=0
+            ;;
+        network-device-en)
+            # OSR1 EN's selector does not accept Escape/Alt+C here.
+            # Models -> Have Disk -> OK -> Cancel; no component installed.
+            for w95_scan in tab tab tab spc; do w9x_vm_private_key "$w95_scan" || return 1; done
             key_on_screen=0
             ;;
         recovery|welcome|directory|setup-type|hardware-list|communication|components|computer-options|copy-ready|restart|reboot-confirm)

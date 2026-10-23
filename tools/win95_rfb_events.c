@@ -59,6 +59,8 @@ static uint64_t monotonic_ms(void)
 static int next_button_role(const char *role)
 {
     size_t length=strlen(role);
+    if (length==sizeof("coa-single-en")-1 && !memcmp(role,"coa-single-en",sizeof("coa-single-en")-1)) return 0;
+    if (length==sizeof("network-device-en")-1 && !memcmp(role,"network-device-en",sizeof("network-device-en")-1)) return 0;
     if (length==sizeof("restart")-1 && !memcmp(role,"restart",sizeof("restart")-1)) return 0;
     if (length==sizeof("reboot-confirm")-1 && !memcmp(role,"reboot-confirm",sizeof("reboot-confirm")-1)) return 0;
     return 1;
@@ -72,7 +74,8 @@ static void gate_update(Gate *gate, const char *role, const char *previous)
     button=fingerprint(pixels,width,425,395,32,10);
     unsupported=!strcmp(role,"unknown");
     if ((!unsupported && !strcmp(role,previous)) ||
-        ((unsupported || next_button_role(role)) && button!=WIN95_UI_READY_BUTTON_HASH)) {
+        ((unsupported || next_button_role(role)) && button!=WIN95_UI_READY_BUTTON_HASH &&
+            button!=UINT64_C(0xb304b7dade1a13b1))) {
         gate->role=NULL; return;
     }
     if (gate->role && !strcmp(role,gate->role) && gate->heading==heading &&

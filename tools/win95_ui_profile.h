@@ -1,4 +1,12 @@
 static const Page pages[] = {
+    /* Original OSR1 EN OEM 950. Static heading and labels only: the
+     * Product Identification edit at x214..463,y211..234 is excluded.
+     * Its Next button is disabled while the field is empty. */
+    {"coa-single-en", UINT64_C(0xf85c29bdaa0feab3), UINT64_C(0x8599957f814638b0), 214, 194, 250, 13},
+    {"busy", UINT64_C(0x53da302148d1cd16), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
+    /* Exact Network adapters selector; cancel through the visible button
+     * instead of installing the old detected NDIS2/ODI placeholder. */
+    {"network-device-en", UINT64_C(0x546e6568cf8848ff), UINT64_C(0xdf22bf26597d0dce), 74, 45, 453, 38},
     /* RTM PL OEM: single Product ID edit; labels only, edit at y=235 excluded. */
     {"coa-single", UINT64_C(0xa31becc465840cd2), UINT64_C(0x2983c7270b2212f1), 214, 212, 260, 16},
     {"recovery", UINT64_C(0x5f7deb30089843a5), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
