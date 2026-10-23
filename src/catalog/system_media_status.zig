@@ -6,7 +6,8 @@ pub const SystemMediaStatus = struct {
     vhdx_count: usize = 0,
     efi_count: usize = 0,
     /// Folders of diskette images (src/catalog/floppy_set.zig).
-    floppy_set_count: usize = 0,
+    /// u0 in the BIOS Core, which never lists floppy sets.
+    floppy_set_count: if (@import("floppy_set.zig").enabled) usize else u0 = 0,
     unattended_files: usize = 0,
 
     pub fn imageCount(self: SystemMediaStatus) usize {
