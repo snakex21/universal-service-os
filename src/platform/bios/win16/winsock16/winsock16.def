@@ -1,4 +1,6 @@
 ; winsock16.def - export list for the USOS Win16 Winsock 1.1 provider.
+; Copyright (C) 2026 Maksymilian and the USOS Authors
+; SPDX-License-Identifier: GPL-3.0-or-later
 ;
 ; Ordinals follow the public Winsock 1.1 specification appendix ("Name and
 ; ordinal"): accept..socket = 1..23, gethostbyaddr..gethostname = 51..57,

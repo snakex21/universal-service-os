@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Host tests for the portable engine of the USOS Win16 Winsock provider.
 
 The sources under src/platform/bios/win16/winsock16/net/ are plain C89 with no
@@ -47,9 +49,8 @@ HARNESS = Path(__file__).resolve().parent / 'net_harness.c'
 # intentionally not compiled here.
 CORE = ['checksum.c', 'ip.c', 'arp.c', 'udp.c', 'icmp.c', 'tcp.c', 'dns.c']
 
-ZIG_CANDIDATES = [
-    Path(r'C:\Users\ASRock\Desktop\Universal_Service_OS\tools\zig\zig.exe'),
-]
+ZIG_CANDIDATES = [Path(os.environ.get('USOS_ZIG', ROOT / 'tools/zig/zig.exe'))]
+
 
 
 def _compiler() -> list[str] | None:
@@ -61,6 +62,13 @@ def _compiler() -> list[str] | None:
         if zig.is_file():
             return [str(zig), 'cc']
     return None
+
+
+def _compiler_env() -> dict[str, str]:
+    env = dict(os.environ)
+    env['ZIG_GLOBAL_CACHE_DIR'] = os.environ.get('USOS_ZIG_CACHE', str(ROOT/'tools/cache/zig-global'))
+    env['ZIG_LOCAL_CACHE_DIR'] = str(ROOT/'zig-out/win16/host-cache')
+    return env
 
 
 @pytest.fixture(scope='session')
@@ -75,7 +83,7 @@ def harness(tmp_path_factory) -> Path:
         '-o', str(exe),
         str(HARNESS),
     ] + [str(NET_DIR / name) for name in CORE]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=_compiler_env())
     assert result.returncode == 0, 'compile failed:\n%s\n%s' % (result.stdout, result.stderr)
     return exe
 
@@ -245,7 +253,7 @@ def test_dll_still_stubs_select_and_async() -> None:
     """select and WSAAsyncSelect stay stubs in the ABI file."""
     source = (NET_DIR.parent / 'winsock16.c').read_text(encoding='ascii', errors='replace')
     for name in ('select', 'WSAAsyncSelect'):
-        start = source.index('__pascal %s(' % name)
+        start = source.index('__export %s(' % name)
         body = source[start:start + 400]
         assert 'usos_not_implemented' in body, name
         assert 'usos_sock_' not in body, name
@@ -269,3 +277,17 @@ def test_net_header_has_no_system_includes() -> None:
     header = (NET_DIR / 'net.h').read_text(encoding='ascii', errors='replace')
     includes = [line for line in header.splitlines() if line.strip().startswith('#include')]
     assert includes == ['#include <limits.h>']
+
+
+def test_blocking_socket_keeps_all_segments_and_fin_data(tmp_path) -> None:
+    compiler = _compiler()
+    assert compiler is not None, 'host compiler needed for socket regression'
+    exe = tmp_path / ('socket-peer.exe' if os.name == 'nt' else 'socket-peer')
+    sources = [HARNESS.with_name('socket_harness.c'), NET_DIR / 'win16_sock.c']
+    sources += [NET_DIR / name for name in CORE]
+    result = subprocess.run(compiler + ['-std=c89', '-I', str(NET_DIR), '-o', str(exe)] +
+                            [str(p) for p in sources], capture_output=True, text=True, env=_compiler_env())
+    assert result.returncode == 0, result.stdout + result.stderr
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'bytes=5157 eof=0 routed=1 failures=0' in result.stdout

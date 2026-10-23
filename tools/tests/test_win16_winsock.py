@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Checks for the USOS Win16 Winsock 1.1 DLL (milestone 1 skeleton).
 
 Two contracts are pinned here:
@@ -68,7 +70,7 @@ def parse_def(path: Path) -> dict[str, int]:
             exports[match.group(1).lower()] = int(match.group(2))
     return exports
 def parse_ne_exports(path: Path) -> dict[str, int]:
-    """Return {UPPERCASE name: ordinal} from an NE (Win16) export table."""
+    """Return exact on-disk names; normalizing them would hide loader bugs."""
     data = path.read_bytes()
     ne = struct.unpack_from('<I', data, 0x3C)[0]
     if data[ne:ne + 2] != b'NE':
@@ -81,12 +83,16 @@ def parse_ne_exports(path: Path) -> dict[str, int]:
         while pos < len(data) and data[pos] != 0:
             length = data[pos]
             pos += 1
+            assert pos + length + 2 <= len(data), 'truncated NE name entry'
             name = data[pos:pos + length].decode('latin1')
+            assert '\x00' not in name, 'NE names have no NUL suffix'
             pos += length
             ordinal = struct.unpack_from('<H', data, pos)[0]
             pos += 2
             if ordinal:
-                exports.setdefault(name.upper(), ordinal)
+                assert name not in exports or exports[name] == ordinal
+                exports[name] = ordinal
+        assert pos < len(data) and data[pos] == 0, 'unterminated NE names'
 
     read_names(ne + struct.unpack_from('<H', data, ne + 0x26)[0])
     read_names(struct.unpack_from('<I', data, ne + 0x2C)[0])
@@ -120,6 +126,7 @@ def test_dll_exports_match_def() -> None:
     if not ARTIFACT.is_file():
         pytest.skip(SKIP_ARTIFACT)
     exports = parse_ne_exports(ARTIFACT)
+    assert all(name == name.upper() for name in exports), 'NE exports must be uppercase'
     wrong = []
     for ordinal, name in WINSOCK11.items():
         key = name.upper()
@@ -140,3 +147,18 @@ def test_no_trumpet_winsock_files() -> None:
         if name in TRUMPET_NAMES:
             offenders.append(str(path.relative_to(ROOT)))
     assert not offenders, 'Trumpet Winsock material in the tree: %s' % ', '.join(offenders)
+
+
+def test_ne_names_use_absolute_nonresident_offset_and_preserve_case(tmp_path):
+    # Deliberately different NE-relative and file-relative locations. Names
+    # carry an exact byte count, no C NUL; the ordinal follows immediately.
+    data = bytearray(0x280)
+    struct.pack_into('<I', data, 0x3c, 0x80)
+    data[0x80:0x82] = b'NE'
+    struct.pack_into('<H', data, 0x80+0x26, 0x40)
+    struct.pack_into('<I', data, 0x80+0x2c, 0x210)
+    data[0xc0:0xc7] = b'\x03WEP\x00\x04\x00'
+    data[0x210:0x21e] = b'\x0aWSAStartup\x73\x00\x00'
+    path = tmp_path/'exports.dll'
+    path.write_bytes(data)
+    assert parse_ne_exports(path) == {'WEP': 1024, 'WSAStartup': 115}

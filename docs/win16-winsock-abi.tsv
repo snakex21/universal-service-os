@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 ordinal	name	group	source
 1	accept	socket	trumpet_ne+winsock11_spec
 2	bind	socket	trumpet_ne+winsock11_spec

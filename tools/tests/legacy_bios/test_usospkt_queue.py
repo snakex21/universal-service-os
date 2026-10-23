@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """USOSPKT.COM queue mode: the second interface for a protected-mode client
 (Windows 3.1 DLL) that cannot take a far-call upcall - INT 2Fh AX=5553h
 ("US"), the shared block (header, 16 x 2048 RX, 4 x 1536 TX, text log) and
@@ -29,7 +31,7 @@ try:
 except ImportError:                                   # pragma: no cover
     Uc = None
 
-SOURCE = ROOT / 'src/platform/bios/msdos/usospkt.S'
+SOURCE = ROOT / 'src/platform/bios/msdos/usospktq.S'
 TSR = 0x1000          # resident segment (PSP)
 APP = 0x3000          # caller: buffer at 0400h, receiver at 0100h
 STUB = 0xF000         # previous handler = IRET
@@ -50,7 +52,9 @@ Q_RXBASE, Q_TXBASE = 20, 32
 AREASIZE = 2048 + 16 * 2048                            # DMA block (unchanged)
 # resident memory the install asks for, from the history: the packet driver
 # alone (no /Q) and with the queue block (/Q). Both are paragraph aligned.
-NOQ_BYTES, Q_BYTES = 44544, 84256
+# USOSPKTQ only: explicit RX kick + correct post-reset MAC publication add
+# one 128-byte DMA alignment unit. The default binary is pinned separately.
+NOQ_BYTES, Q_BYTES = 44672, 84384
 
 REGS = dict(ax=UC_X86_REG_AX, bx=UC_X86_REG_BX, cx=UC_X86_REG_CX, dx=UC_X86_REG_DX,
             si=UC_X86_REG_SI, di=UC_X86_REG_DI, sp=UC_X86_REG_SP, ds=UC_X86_REG_DS,
@@ -70,11 +74,11 @@ class Built:
 def build():
     if Built.com is None:
         depguard.require_zig()
-        from build_dos_network import build_usospkt
+        from build_dos_network import build_usospkt_queue
         from build_win3_usb_keyboard import elf_symbols
         tmp = Path(tempfile.mkdtemp(prefix='usospktq-'))
-        com = build_usospkt(ROOT, tmp, tmp)
-        Built.com, Built.sym = com.read_bytes(), elf_symbols(tmp / 'usospkt.elf')
+        com = build_usospkt_queue(ROOT, tmp, tmp)
+        Built.com, Built.sym = com.read_bytes(), elf_symbols(tmp / 'usospktq.elf')
     return Built.com, Built.sym
 
 
@@ -227,6 +231,13 @@ class SourceContract(unittest.TestCase):
     def setUpClass(cls):
         cls.src = SOURCE.read_text(encoding='ascii')
 
+    def test_queue_identity_is_published_after_hardware_mac_is_read(self):
+        # The NIC drops a unicast ARP response addressed to 00:00:00:00:00:00.
+        # Driver state is initially zero, so the publish must follow nic_mac.
+        publish = self.src.index('mov di, Q_MAC')
+        self.assertGreater(publish, self.src.index('call nic_mac'))
+        self.assertLess(publish, self.src.index('call nic_start'))
+
     def test_multiplex_and_subfunctions(self):
         self.assertIn('cmp ax, 0x5553', self.src)
         for bx, label in ((0xFFFF, 'q_query'), (1, 'q_attach'), (2, 'q_state'),
@@ -310,15 +321,15 @@ class ResidentSize(unittest.TestCase):
         return (((area + AREASIZE + 15) >> 4) * 16,
                 ((qoff + Q_SIZE + 15) >> 4) * 16, area, qoff)
 
-    def test_without_q_is_the_old_size(self):
+    def test_experimental_binary_without_q_size(self):
         noq, q, area, qoff = self.sizes()
-        self.assertEqual(noq, NOQ_BYTES)                     # 2784 paragraphs
-        self.assertEqual(noq // 16, 2784)
+        self.assertEqual(noq, NOQ_BYTES)                     # 2792 paragraphs
+        self.assertEqual(noq // 16, 2792)
         self.assertLess(qoff, 0xF000)                        # block stays in one segment
 
     def test_with_q_adds_exactly_the_block(self):
         noq, q, area, qoff = self.sizes()
-        self.assertEqual(q, Q_BYTES)                         # 5266 paragraphs
+        self.assertEqual(q, Q_BYTES)                         # 5274 paragraphs
         self.assertEqual(q - noq, Q_SIZE)                    # nothing else grows
         self.assertEqual(qoff, area + AREASIZE)              # 16-aligned already
 
@@ -437,6 +448,26 @@ class QueueModeTest(unittest.TestCase):
         self.assertEqual((m.qdword(Q_TXERR), m.qdword(Q_TXBUSY)), (1, 1))
         self.assertEqual(m.qword(Q_TXTAIL), 1)                  # slot retired
         self.assertIn(b'TX ERR', m.log_text())
+
+    def test_kick_polls_receive_without_a_hardware_interrupt(self):
+        self.m.qcall(1)
+        frame = MAC + bytes(6) + b'\x08\x00' + bytes(range(90))
+        self.m.rx_frame(0, frame)
+        self.assertEqual(self.m.qword(Q_RXHEAD), 0)
+        self.assertEqual(self.m.qcall(3)['al'], 1)  # no TX work; RX still polled
+        self.assertEqual(self.m.qword(Q_RXHEAD), 1)
+        self.assertEqual(self.m.rx_slot(0)[1][:len(frame)], frame)
+
+    def test_kick_respects_receive_busy_exclusion(self):
+        self.m.qcall(1)
+        frame = MAC + bytes(6) + b'\x08\x00' + bytes(60)
+        self.m.rx_frame(0, frame)
+        self.m.poke('busy', b'\x01')
+        self.assertEqual(self.m.qcall(3)['al'], 1)
+        self.assertEqual(self.m.qword(Q_RXHEAD), 0)
+        self.m.poke('busy', b'\x00')
+        self.assertEqual(self.m.qcall(3)['al'], 1)
+        self.assertEqual(self.m.qword(Q_RXHEAD), 1)
 
     def test_release_returns_to_upcalls(self):
         self.assertEqual(self.m.access(b'\x08\x00')['ax'], 1)

@@ -137,17 +137,21 @@ static int usos_frame_send(usos_u32 dst_ip, usos_u16 ip_len)
     usos_u8 request[USOS_NET_ETH_HDR + USOS_NET_ARP_LEN];
     usos_u32 deadline;
     usos_u16 n;
+    /* Stage 1 uses the documented QEMU user-network configuration. Route
+     * remote destinations via its gateway; ARP resolves a local next hop. */
+    usos_u32 next_hop = ((dst_ip & 0xFFFFFF00UL) == (usos_pkt_ip() & 0xFFFFFF00UL))
+                       ? dst_ip : 0x0A000202UL;
 
     if (ip_len == 0 || (usos_u16)(ip_len + USOS_NET_ETH_HDR) > USOS_NET_FRAME_MAX)
         return 0;
-    if ((net_arp_lookup(&usos_arp, dst_ip, mac)) == 0) {
-        n = net_arp_build_request(request, &usos_arp, dst_ip);
+    if ((net_arp_lookup(&usos_arp, next_hop, mac)) == 0) {
+        n = net_arp_build_request(request, &usos_arp, next_hop);
         if (n != 0)
             usos_pkt_send(request, n);
         deadline = usos_abi_now() + USOS_ARP_TIMEOUT_MS;
         for (;;) {
             usos_pump();
-            if (net_arp_lookup(&usos_arp, dst_ip, mac))
+            if (net_arp_lookup(&usos_arp, next_hop, mac))
                 break;
             if ((long)(usos_abi_now() - deadline) >= 0)
                 return 0;               /* nobody answered: unreachable */
@@ -232,14 +236,13 @@ static void usos_tcp_input(usos_u8 *pkt, usos_u16 len)
             usos_tcp_send_ack(sk);
             break;
         case USOS_TCP_EV_DATA:
+        case USOS_TCP_EV_FIN:
             if ((usos_u16)(sk->rx_len + dlen) <= (usos_u16)USOS_NET_TCP_MSS) {
                 usos_copy(sk->rx + sk->rx_len, data, dlen);
                 sk->rx_len = (usos_u16)(sk->rx_len + dlen);
             }
-            usos_tcp_send_ack(sk);
-            break;
-        case USOS_TCP_EV_FIN:
-            sk->peer_fin = 1;
+            if (ev == USOS_TCP_EV_FIN)
+                sk->peer_fin = 1;
             usos_tcp_send_ack(sk);
             break;
         case USOS_TCP_EV_DUP:
@@ -358,16 +361,24 @@ static void usos_pump(void)
 {
     usos_u16 len;
     int guard = 0;
+    int i;
 
     if (!usos_ready || usos_pumping)
         return;
     usos_pumping = 1;
+    /* Keep at most one received segment in the socket buffer. Draining the
+     * whole queue and ACKing discarded bytes would silently truncate HTTP. */
+    for (i = 0; i < USOS_MAX_SOCKETS; ++i)
+        if (usos_socks[i].rx_len) goto done;
     while (usos_pkt_recv(usos_rx_frame, (usos_u16)sizeof(usos_rx_frame),
                          &len) == USOS_PKT_OK) {
         usos_eth_input(len);
+        for (i = 0; i < USOS_MAX_SOCKETS; ++i)
+            if (usos_socks[i].rx_len) goto done;
         if (++guard >= USOS_DRAIN_LIMIT)
             break;
     }
+done:
     usos_pumping = 0;
 }
 

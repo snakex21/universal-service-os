@@ -121,7 +121,7 @@ int net_ip_parse(const usos_u8 *pkt, usos_u16 caplen, net_ip_view *view,
     usos_u16 total;
     usos_u16 frag;
 
-    if (pkt == 0 || view == 0 || payload == 0)
+    if (pkt == 0 || view == 0)
         return USOS_NET_ERR_ARG;
     if (caplen < USOS_NET_IP_HDR)
         return USOS_NET_ERR_SHORT;
@@ -149,7 +149,8 @@ int net_ip_parse(const usos_u8 *pkt, usos_u16 caplen, net_ip_view *view,
     view->len = (usos_u16)(total - hdr_len);
     view->proto = pkt[9];
     view->ttl = pkt[8];
-    *payload = pkt + hdr_len;
+    if (payload != 0)
+        *payload = pkt + hdr_len;
     return USOS_NET_OK;
 }
 

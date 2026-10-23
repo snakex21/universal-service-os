@@ -196,6 +196,7 @@ static int case_ip(void)
     check("dst", (long)(view.dst == 0xC0A80002UL), 1);
     check("payload pointer", (long)(payload == pkt + 20), 1);
     check("payload offset", (long)(payload[0] == 0x04 && payload[1] == 0x00), 1);
+    check("optional payload output", net_ip_parse(pkt, len, &view, 0), USOS_NET_OK);
 
     /* Rejections. */
     {

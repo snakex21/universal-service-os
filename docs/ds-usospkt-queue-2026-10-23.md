@@ -1,6 +1,9 @@
+<!-- Copyright (C) 2026 Maksymilian and the USOS Authors
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
 # USOSPKT.COM — tryb kolejkowy dla klienta w trybie chronionym (etap 2a)
 
-Data: 2026-10-23. Gałąź: `ds/usospkt-queue` (worktree `C:\Users\ASRock\usos-work\ds-usospkt-queue`,
+Data: 2026-10-23. Gałąź: `ds/usospkt-queue` (worktree `<local-worktree-or-evidence>`,
 baza `ds/winsock16`). Zmiana dotyczy wyłącznie strony sterownika:
 `src/platform/bios/msdos/usospkt.S`. Strona DLL (`winsock16.c`) należy do innego workera i nie
 została tknięta.
@@ -157,7 +160,7 @@ logu. Gdy klienta nie ma — dotychczasowa ścieżka `deliver` (upcall) bez zmia
   (przed trybem kolejkowym 8 157 B — kod obu ścieżek; limit `check_usospkt` 4–16 KiB zachowany).
 * Zbudowane `zig cc`/`ld.lld`/`objcopy` z `tools/build_dos_network.py` (`build_usospkt`) — w tym
   worktree nie ma `tools/zig` (toolchain nie jest śledzony w gicie), więc użyto
-  `C:\Users\ASRock\Desktop\Universal_Service_OS\tools\zig\zig.exe` przez `USOS_ZIG`
+  `<local-worktree-or-evidence>` przez `USOS_ZIG`
   oraz cache `...\tools\cache\zig-global` przez `USOS_ZIG_CACHE`.
 * Pamięć rezydentna (z `/Q`): **5 266 akapitów = 84 256 B (~82,3 KiB)**; bez `/Q`:
   **2 784 akapity = 44 544 B (~43,5 KiB)** — dokładnie jak dotąd (obraz + blok DMA).

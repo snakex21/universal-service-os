@@ -6,9 +6,9 @@
  * Two jobs:
  *
  *   1. DPMI plumbing.  Locate the driver block (INT 2Fh AX=5553h BX=FFFFh),
- *      map it into our address space (INT 31h AX=0002h on a descriptor from
- *      AX=0000h), keep a real-mode call structure in a DOS block
- *      (AX=0100h/0101h) and issue every multiplex call through
+ *      map it through an owned descriptor (INT 31h AX=0007h/0008h/0009h),
+ *      keep a real-mode call structure in a GlobalDosAlloc block and issue
+ *      every multiplex call through
  *      INT 31h AX=0300h instead of a protected-mode INT 2Fh, so the call runs
  *      exactly as the driver expects it on a real CPU.
  *
@@ -28,6 +28,20 @@
 
 #include "net.h"
 #include "usos_pkt.h"
+
+#ifdef USOS_WS_DIAG
+static void diag(const char *text)
+{
+    HFILE f = _lopen("C:\\WSDIAG.LOG", OF_WRITE);
+    unsigned int n = 0;
+    if (f == HFILE_ERROR) f = _lcreat("C:\\WSDIAG.LOG", 0);
+    if (f == HFILE_ERROR) return;
+    while (text[n]) ++n;
+    _llseek(f, 0, 2); _lwrite(f, text, n); _lwrite(f, "\r\n", 2); _lclose(f);
+}
+#else
+#define diag(text) ((void)0)
+#endif
 
 /* ------------------------------------------------------------------ */
 /* 'USQ1' block header: offsets are block relative (see usospkt.S)      */
@@ -133,7 +147,7 @@ static void usos_mem_copy(usos_u8 FAR *dst, const usos_u8 FAR *src,
 /* DPMI primitives                                                     */
 /* ------------------------------------------------------------------ */
 
-/* 1687h is the documented probe; in a Win16 box we are already in protected
+/* 1687h is the documented probe; in a Win16 session we are already protected
  * mode, where some hosts answer "not supported", so a failed probe falls back
  * to the DPMI version call (INT 31h AX=0400h). */
 static int usos_dpmi_present(void)
@@ -180,31 +194,27 @@ static void usos_dpmi_free_desc(usos_u16 selector)
 
 static int usos_dpmi_alloc_dos(usos_u16 paras, usos_u16 *seg, usos_u16 *sel)
 {
-    union REGS in, out;
-
-    in.x.ax = 0x0100;
-    in.x.bx = paras;
-    int86(0x31, &in, &out);
-    if (out.x.cflag)
+    DWORD allocation;
+    /* Win16's allocator works in STANDARD as well as enhanced mode and
+     * supplies both the protected selector and the real-mode paragraph. */
+    diag("GlobalDosAlloc enter");
+    allocation = GlobalDosAlloc((DWORD)paras * 16UL);
+    diag("GlobalDosAlloc returned");
+    if (allocation == 0)
         return USOS_PKT_ERR_DPMI;
-    *seg = out.x.ax;
-    *sel = out.x.dx;                   /* 0 on hosts that only give the segment */
+    *seg = HIWORD(allocation);
+    *sel = LOWORD(allocation);
     return USOS_PKT_OK;
 }
 
-static void usos_dpmi_free_dos(usos_u16 seg)
+static void usos_dpmi_free_dos(usos_u16 selector)
 {
-    union REGS in, out;
-
-    if (seg == 0)
+    if (selector == 0)
         return;
-    in.x.ax = 0x0101;
-    in.x.bx = seg;
-    int86(0x31, &in, &out);
+    GlobalDosFree(selector);
 }
 
-/* AX=0007h/0008h/0009h: base, limit, access rights.  Used when a host rejects
- * AX=0002h (some DPMI 0.9 implementations do). */
+/* AX=0007h/0008h/0009h: base, limit, access rights of our owned descriptor. */
 static int usos_dpmi_set_seg(usos_u16 selector, usos_u32 base, usos_u32 limit,
                              usos_u8 rights)
 {
@@ -231,32 +241,26 @@ static int usos_dpmi_set_seg(usos_u16 selector, usos_u32 base, usos_u32 limit,
     return out.x.cflag ? USOS_PKT_ERR_DPMI : USOS_PKT_OK;
 }
 
-/* AX=0002h: real-mode segment -> descriptor.  A 64 KiB, byte-granular,
- * present, writable data segment at segment*16. */
+/* Map an owned descriptor; AX=0002h would instead RETURN a different
+ * selector in AX and must not be confused with setting a descriptor. */
 static int usos_dpmi_map(usos_u16 seg, usos_u16 selector)
 {
-    usos_u8 image[8];
-    usos_u32 base = (usos_u32)seg * 16UL;
-    union REGS in, out;
-    struct SREGS sr;
+    return usos_dpmi_set_seg(selector, (usos_u32)seg * 16UL, 0xFFFFUL, 0xF2);
+}
 
-    image[0] = (usos_u8)(base & 0xFFUL);
-    image[1] = (usos_u8)((base >> 8) & 0xFFUL);
-    image[2] = (usos_u8)((base >> 16) & 0xFFUL);
-    image[3] = (usos_u8)((base >> 24) & 0xFFUL);
-    image[4] = 0xFF;                   /* limit 0xFFFF, byte granular */
-    image[5] = 0xFF;
-    image[6] = 0x92;                   /* present, DPL 0, data, writable */
-    image[7] = 0x00;
-    segread(&sr);
-    in.x.ax = 0x0002;
-    in.x.bx = seg;
-    in.x.di = (usos_u16)FP_OFF(image);
-    sr.es = (usos_u16)FP_SEG(image);
-    int86x(0x31, &in, &out, &sr);
-    if (!out.x.cflag)
-        return USOS_PKT_OK;
-    return usos_dpmi_set_seg(selector, base, 0xFFFFUL, 0x92);
+/* The shared x86 queue uses little endian, independently of wire headers. */
+static usos_u16 q_get16(const usos_u8 FAR *p)
+{
+    return (usos_u16)((usos_u16)p[0] | ((usos_u16)p[1] << 8));
+}
+static usos_u32 q_get32(const usos_u8 FAR *p)
+{
+    return (usos_u32)q_get16(p) | ((usos_u32)q_get16(p + 2) << 16);
+}
+static void q_put16(usos_u8 FAR *p, usos_u16 v)
+{
+    p[0] = (usos_u8)v;
+    p[1] = (usos_u8)(v >> 8);
 }
 
 /* ------------------------------------------------------------------ */
@@ -308,7 +312,7 @@ static int usos_rm_int(usos_u8 intno, usos_u16 ax, usos_u16 bx, usos_u16 cx,
     usos_rm_put32(RMCS_EDX, (usos_u32)dx);
     usos_rm_put32(RMCS_ECX, (usos_u32)cx);
     usos_rm_put32(RMCS_EAX, (usos_u32)ax);
-    usos_rm_put16(RMCS_FLAGS, 0x0002);            /* IF=1, CF=0 on entry */
+    usos_rm_put16(RMCS_FLAGS, 0x0202);            /* IF=1, CF=0 on entry */
     usos_rm_put16(RMCS_ES, 0);
     usos_rm_put16(RMCS_DS, 0);
     usos_rm_put16(RMCS_SS, usos_rm_seg);
@@ -319,8 +323,10 @@ static int usos_rm_int(usos_u8 intno, usos_u16 ax, usos_u16 bx, usos_u16 cx,
     in.x.bx = (usos_u16)intno;                    /* BL = interrupt number */
     in.x.cx = 0;                                  /* no stack parameter copy */
     in.x.di = 0;                                  /* RMCS at offset 0 */
-    sr.es = usos_rm_seg;                          /* real-mode address */
+    sr.es = usos_rm_sel;                          /* protected-mode selector */
+    if (bx != MPX_KICK) diag("DPMI simulate interrupt enter");
     int86x(0x31, &in, &out, &sr);
+    if (bx != MPX_KICK) diag("DPMI simulate interrupt returned");
     if (out.x.cflag)
         return USOS_PKT_ERR_DPMI;
 
@@ -343,7 +349,7 @@ static int usos_pkt_give_back(void)
         usos_dpmi_free_desc(usos_q_desc);
     if (usos_rm_desc != 0)
         usos_dpmi_free_desc(usos_rm_desc);
-    usos_dpmi_free_dos(usos_rm_seg);
+    usos_dpmi_free_dos(usos_rm_sel);
     usos_q = 0;
     usos_q_desc = 0;
     usos_q_seg = 0;
@@ -368,8 +374,10 @@ int usos_pkt_init(void)
 
     if (usos_state != USOS_PKT_STATE_DOWN)
         return USOS_PKT_OK;
+    diag("transport init");
     if (!usos_dpmi_present())
         return USOS_PKT_ERR_DPMI;
+    diag("DPMI present");
 
     rc = usos_dpmi_alloc_dos((usos_u16)USOS_RMCS_PARAS, &usos_rm_seg,
                              &usos_rm_sel);
@@ -378,14 +386,14 @@ int usos_pkt_init(void)
     if (usos_rm_sel == 0) {
         rc = usos_dpmi_alloc_desc(&usos_rm_desc);
         if (rc != USOS_PKT_OK) {
-            usos_dpmi_free_dos(usos_rm_seg);
+            usos_dpmi_free_dos(usos_rm_sel);
             usos_rm_seg = 0;
             return rc;
         }
         rc = usos_dpmi_map(usos_rm_seg, usos_rm_desc);
         if (rc != USOS_PKT_OK) {
             usos_dpmi_free_desc(usos_rm_desc);
-            usos_dpmi_free_dos(usos_rm_seg);
+            usos_dpmi_free_dos(usos_rm_sel);
             usos_rm_desc = 0;
             usos_rm_seg = 0;
             return rc;
@@ -393,6 +401,7 @@ int usos_pkt_init(void)
         usos_rm_sel = usos_rm_desc;
     }
     usos_rm = (usos_u8 FAR *)MK_FP(usos_rm_sel, 0);
+    diag("DOS pointer mapped");
 
     /* Query: a driver without /Q answers 0 in AL, which is precisely the
      * "no transport" case WSAStartup turns into WSASYSNOTREADY. */
@@ -401,6 +410,7 @@ int usos_pkt_init(void)
         return usos_pkt_give_back();
     if ((usos_u8)ax != 0xFFU)
         return usos_pkt_give_back();
+    diag("queue query present");
     seg = es;
     ver = cx;
     flags = dx;
@@ -412,6 +422,7 @@ int usos_pkt_init(void)
     if (rc != USOS_PKT_OK)
         return usos_pkt_give_back();
     usos_q = (usos_u8 FAR *)MK_FP(usos_q_desc, 0);
+    diag("queue pointer mapped");
     usos_q_seg = seg;
     usos_q_ver = ver;
     usos_q_flags = flags;
@@ -419,15 +430,15 @@ int usos_pkt_init(void)
     if (usos_q[Q_MAGIC + 0] != 'U' || usos_q[Q_MAGIC + 1] != 'S' ||
         usos_q[Q_MAGIC + 2] != 'Q' || usos_q[Q_MAGIC + 3] != '1')
         return usos_pkt_give_back();
-    if ((usos_u16)(net_get16(usos_q + Q_VERSION) >> 8) != 1)
+    if ((usos_u16)(q_get16(usos_q + Q_VERSION) >> 8) != 1)
         return usos_pkt_give_back();   /* only major version 1 */
 
-    usos_rx_cnt = net_get16(usos_q + Q_RXCNT);
-    usos_rx_stride = net_get16(usos_q + Q_RXSTRIDE);
-    usos_rx_base = (usos_u16)(net_get32(usos_q + Q_RXBASE) & 0xFFFFUL);
-    usos_tx_cnt = net_get16(usos_q + Q_TXCNT);
-    usos_tx_stride = net_get16(usos_q + Q_TXSTRIDE);
-    usos_tx_base = (usos_u16)(net_get32(usos_q + Q_TXBASE) & 0xFFFFUL);
+    usos_rx_cnt = q_get16(usos_q + Q_RXCNT);
+    usos_rx_stride = q_get16(usos_q + Q_RXSTRIDE);
+    usos_rx_base = (usos_u16)(q_get32(usos_q + Q_RXBASE) & 0xFFFFUL);
+    usos_tx_cnt = q_get16(usos_q + Q_TXCNT);
+    usos_tx_stride = q_get16(usos_q + Q_TXSTRIDE);
+    usos_tx_base = (usos_u16)(q_get32(usos_q + Q_TXBASE) & 0xFFFFUL);
     if (!usos_pkt_is_pow2(usos_rx_cnt) || !usos_pkt_is_pow2(usos_tx_cnt) ||
         usos_rx_stride < (usos_u16)(Q_SLOT_DATA + 64) ||
         usos_tx_stride < (usos_u16)(Q_SLOT_DATA + 64))
@@ -482,11 +493,24 @@ void usos_pkt_release(void)
 
 void usos_pkt_term(void)
 {
+#ifdef USOS_WS_DIAG
+    if (usos_q != 0) {
+        char image[161];
+        static const char hex[] = "0123456789ABCDEF";
+        unsigned int i;
+        for (i = 0; i < 80; ++i) {
+            image[2*i] = hex[usos_q[i] >> 4];
+            image[2*i+1] = hex[usos_q[i] & 15];
+        }
+        image[160] = 0;
+        diag(image);
+    }
+#endif
     usos_pkt_release();
     if (usos_state == USOS_PKT_STATE_INIT) {
         usos_dpmi_free_desc(usos_q_desc);
         usos_dpmi_free_desc(usos_rm_desc);
-        usos_dpmi_free_dos(usos_rm_seg);
+        usos_dpmi_free_dos(usos_rm_sel);
         usos_q = 0;
         usos_q_desc = 0;
         usos_rm = 0;
@@ -530,18 +554,18 @@ int usos_pkt_send(const usos_u8 *frame, usos_u16 len)
     if (frame == 0 || len < (usos_u16)USOS_PKT_FRAME_MIN ||
         len > (usos_u16)USOS_PKT_FRAME_MAX)
         return USOS_PKT_ERR_PARAM;
-    head = net_get16(usos_q + Q_TXHEAD);
-    tail = net_get16(usos_q + Q_TXTAIL);
+    head = q_get16(usos_q + Q_TXHEAD);
+    tail = q_get16(usos_q + Q_TXTAIL);
     next = (usos_u16)((head + 1) & (usos_u16)(usos_tx_cnt - 1));
     if (next == tail)
         return USOS_PKT_ERR_FULL;
     slot = (usos_u16)(usos_tx_base + head * usos_tx_stride);
     usos_mem_copy(usos_q + slot + Q_SLOT_DATA, frame, len);
-    net_put16(usos_q + slot + Q_SLOT_LEN, len);
-    net_put16(usos_q + slot + Q_SLOT_FLAGS, 1);        /* bit 0: complete */
-    net_put16(usos_q + slot + Q_SLOT_SEQ, usos_tx_seq);
+    q_put16(usos_q + slot + Q_SLOT_LEN, len);
+    q_put16(usos_q + slot + Q_SLOT_FLAGS, 1);        /* bit 0: complete */
+    q_put16(usos_q + slot + Q_SLOT_SEQ, usos_tx_seq);
     usos_tx_seq = (usos_u16)(usos_tx_seq + 1);
-    net_put16(usos_q + Q_TXHEAD, next);
+    q_put16(usos_q + Q_TXHEAD, next);
     rc = usos_pkt_kick();
     return rc;
 }
@@ -556,22 +580,25 @@ int usos_pkt_recv(usos_u8 *frame, usos_u16 room, usos_u16 *len)
         return USOS_PKT_ERR_STATE;
     if (frame == 0 || len == 0)
         return USOS_PKT_ERR_PARAM;
-    head = net_get16(usos_q + Q_RXHEAD);
-    tail = net_get16(usos_q + Q_RXTAIL);
+    /* Poll hardware on each receive attempt, including ARP/DNS waits. A
+     * count of idle-loop iterations is not a clock in STANDARD Windows. */
+    usos_pkt_kick();
+    head = q_get16(usos_q + Q_RXHEAD);
+    tail = q_get16(usos_q + Q_RXTAIL);
     if (tail == head)
         return USOS_PKT_ERR_EMPTY;
     slot = (usos_u16)(usos_rx_base + tail * usos_rx_stride);
-    slot_len = net_get16(usos_q + slot + Q_SLOT_LEN);
+    slot_len = q_get16(usos_q + slot + Q_SLOT_LEN);
     next = (usos_u16)((tail + 1) & (usos_u16)(usos_rx_cnt - 1));
     if (slot_len > (usos_u16)USOS_PKT_FRAME_MAX || slot_len > room ||
         slot_len < (usos_u16)USOS_PKT_FRAME_MIN) {
         /* Over-long or runt slot: drop it and advance, or the ring wedges. */
-        net_put16(usos_q + Q_RXTAIL, next);
+        q_put16(usos_q + Q_RXTAIL, next);
         return USOS_PKT_ERR_PARAM;
     }
     for (i = 0; i < slot_len; i++)
         frame[i] = usos_q[slot + Q_SLOT_DATA + i];
-    net_put16(usos_q + Q_RXTAIL, next);
+    q_put16(usos_q + Q_RXTAIL, next);
     *len = slot_len;
     return USOS_PKT_OK;
 }
@@ -597,28 +624,28 @@ usos_u32 usos_pkt_rx_dropped(void)
 {
     if (usos_q == 0)
         return 0;
-    return net_get32(usos_q + Q_RXDROP);
+    return q_get32(usos_q + Q_RXDROP);
 }
 
 usos_u32 usos_pkt_tx_dropped(void)
 {
     if (usos_q == 0)
         return 0;
-    return net_get32(usos_q + Q_TXERR);
+    return q_get32(usos_q + Q_TXERR);
 }
 
 usos_u32 usos_pkt_rx_frames(void)
 {
     if (usos_q == 0)
         return 0;
-    return net_get32(usos_q + Q_RXERR) + net_get32(usos_q + Q_RXDROP);
+    return q_get32(usos_q + Q_RXERR) + q_get32(usos_q + Q_RXDROP);
 }
 
 usos_u32 usos_pkt_tx_frames(void)
 {
     if (usos_q == 0)
         return 0;
-    return net_get32(usos_q + Q_TXDONE);
+    return q_get32(usos_q + Q_TXDONE);
 }
 
 int usos_pkt_mac(usos_u8 mac[USOS_NET_ETH_ALEN])

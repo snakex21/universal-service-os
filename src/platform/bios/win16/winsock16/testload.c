@@ -84,6 +84,7 @@ static void usos_quit(void)
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+    ExitWindows(0, 0);
 }
 
 typedef int (FAR PASCAL *LPFN_WSASTARTUP)(WORD, LPWSADATA);
@@ -94,9 +95,12 @@ int PASCAL WinMain(HANDLE hInstance, HANDLE hPrevInstance, LPSTR lpCmdLine, int 
     WSADATA data;
     WORD requested = 0x0101;
     LPFN_WSASTARTUP startup;
+    LPFN_WSASTARTUP ordinal_startup;
     LPFN_WSACLEANUP cleanup;
+    LPFN_WSACLEANUP ordinal_cleanup;
     HINSTANCE dll;
     int rc;
+    UINT old_error_mode;
 
     (void)hInstance;
     (void)hPrevInstance;
@@ -106,7 +110,9 @@ int PASCAL WinMain(HANDLE hInstance, HANDLE hPrevInstance, LPSTR lpCmdLine, int 
     if (lpCmdLine != NULL && (lpCmdLine[0] == 'f' || lpCmdLine[0] == 'F'))
         requested = 0x0202;
 
+    old_error_mode = SetErrorMode(SEM_NOOPENFILEERRORBOX | SEM_FAILCRITICALERRORS);
     dll = LoadLibrary("WINSOCK.DLL");
+    SetErrorMode(old_error_mode);
     if ((UINT)dll < 32) {
         usos_append("USOS WINSOCK FAIL err=load:");
         usos_append_dec((int)(UINT)dll);
@@ -116,14 +122,24 @@ int PASCAL WinMain(HANDLE hInstance, HANDLE hPrevInstance, LPSTR lpCmdLine, int 
     }
     startup = (LPFN_WSASTARTUP)GetProcAddress(dll, "WSAStartup");
     cleanup = (LPFN_WSACLEANUP)GetProcAddress(dll, "WSACleanup");
-    if (startup == NULL || cleanup == NULL) {
+    ordinal_startup = (LPFN_WSASTARTUP)GetProcAddress(dll, MAKEINTRESOURCE(115));
+    ordinal_cleanup = (LPFN_WSACLEANUP)GetProcAddress(dll, MAKEINTRESOURCE(116));
+    if (startup == NULL || cleanup == NULL || ordinal_startup == NULL || ordinal_cleanup == NULL) {
         usos_append("USOS WINSOCK FAIL err=missing-export");
         usos_write_log();
         usos_quit();
         return 1;
     }
 
+    usos_append("name=");
     rc = startup(requested, &data);
+    usos_append_dec(rc);
+    if (rc == 0)
+        cleanup();
+    usos_append(" ordinal=");
+    rc = ordinal_startup(requested, &data);
+    usos_append_dec(rc);
+    usos_append(" ");
     if (rc != 0) {
         usos_append("USOS WINSOCK FAIL err=");
         usos_append_dec(rc);
@@ -134,9 +150,10 @@ int PASCAL WinMain(HANDLE hInstance, HANDLE hPrevInstance, LPSTR lpCmdLine, int 
         usos_append_version(data.wHighVersion);
         usos_append(" desc=");
         usos_append((const char *)data.szDescription);
-        cleanup();
+        ordinal_cleanup();
     }
     usos_write_log();
+    FreeLibrary(dll);
     usos_quit();
     return 0;
 }

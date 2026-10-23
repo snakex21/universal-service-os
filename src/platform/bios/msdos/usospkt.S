@@ -4,15 +4,12 @@
  * the X470 Master board), I210 and 82576 (QEMU -device igb).
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- *   USOSPKT [vector] [/P] [/M] [/Q] [/?]
+ *   USOSPKT [vector] [/P] [/M] [/?]
  *
  *   vector  software interrupt, 0x60..0x80 (default 0x60), "60" or "0x60"
  *   /P      polled only (timer, INT 08h), never the PCI interrupt
  *   /M      registers through BAR0 MMIO even when an I/O BAR exists (test)
  *   /S      find the NIC with a config-space scan, not the PCI BIOS (test)
- *   /Q      queue mode (INT 2Fh AX=5553h) for a protected-mode client: the
- *           extra block costs 39712 paragraphs-worth of bytes; without /Q
- *           nothing is allocated and INT 2Fh is not touched
  *
  * Errorlevel: 0 installed, 1 no supported NIC (nothing stays resident),
  * 2 vector already in use, 3 no usable register access, 4 NIC did not
@@ -48,16 +45,6 @@
  * edge for causes that arrived meanwhile. The timer (INT 08h, after the
  * BIOS handler) polls the RX ring in every mode: the polled fallback and a
  * safety net for a lost edge. Receiver upcalls run on a private stack.
- *
- * Queue mode. A Windows 3.1 DLL in protected mode cannot take a far-call
- * upcall, so there is a second interface: INT 2Fh AX=5553h ("US"). BX=FFFF
- * reports the block, BX=1 (ATTACH) hands it out and turns the upcalls off,
- * BX=2 returns the ring positions, BX=3 sends what the client queued in the
- * TX ring and BX=4 returns to upcall-only. The block sits in its own
- * segment behind the DMA area: header, 16 x 2048 RX, 4 x 1536 TX and a text
- * log the client drains (the driver never calls DOS from an ISR). Without
- * ATTACH the packet-driver interface above works exactly as before.
- * docs/ds-usospkt-queue-2026-10-23.md has the layout and the tests.
  */
 .intel_syntax noprefix
 .code16
@@ -73,52 +60,6 @@
 .set A_TXBUF, 512
 .set A_RXBUF, 2048
 .set AREA_SIZE, A_RXBUF + RX_COUNT * BUF_SIZE
-
-/* Queue mode (INT 2Fh AX=5553h): one block in its own segment directly
- * behind the DMA area - header, RX ring 16 x 2048, TX ring 4 x 1536 and a
- * text log. Offsets are block-relative, so nothing can cross a 64 KiB
- * segment; the DMA area above keeps its layout for the upcall path. */
-.set QF_READY, 1                     /* driver resident and set up */
-.set QF_ATTACH, 2                    /* queue client attached */
-.set QF_SUPPRESS, 4                  /* no RX upcalls, the client polls */
-.set Q_TXCOUNT, 4
-.set Q_HDR, 128                      /* header size */
-.set Q_MAGIC, 0                      /* 'USQ1' */
-.set Q_VERSION, 4                    /* word 0x0100 */
-.set Q_HDRSZ, 6
-.set Q_FLAGS, 8
-.set Q_RXHEAD, 12
-.set Q_RXTAIL, 14
-.set Q_RXCNT, 16
-.set Q_RXSTRIDE, 18
-.set Q_RXBASE, 20                    /* dword, offset in the block */
-.set Q_TXHEAD, 24
-.set Q_TXTAIL, 26
-.set Q_TXCNT, 28
-.set Q_TXSTRIDE, 30
-.set Q_TXBASE, 32                    /* dword */
-.set Q_RXDROP, 36                    /* dword counters */
-.set Q_TXBUSY, 40
-.set Q_TXDONE, 44
-.set Q_RXERR, 48
-.set Q_TXERR, 52
-.set Q_LOGHEAD, 56
-.set Q_LOGTAIL, 58
-.set Q_LOGSZ, 60
-.set Q_LOGBASE, 62                   /* dword */
-.set Q_LOGDROP, 66                   /* dword */
-.set Q_INT, 70                       /* the packet vector we answer on */
-.set Q_MAC, 72
-.set Q_SEQ, 78
-.set Q_RXBUF, Q_HDR
-.set Q_RXBUFSZ, 2048
-.set Q_RXSTR, 8 + Q_RXBUFSZ          /* len/flags/seq, then the frame */
-.set Q_TXBUF, Q_RXBUF + RX_COUNT * Q_RXSTR
-.set Q_TXBUFSZ, 1536
-.set Q_TXSTR, 8 + Q_TXBUFSZ
-.set Q_LOGOFF, Q_TXBUF + Q_TXCOUNT * Q_TXSTR
-.set Q_LOGBUFSZ, 512
-.set Q_SIZE, Q_LOGOFF + Q_LOGBUFSZ   /* 39712 bytes */
 .set MAX_HANDLES, 4
 .set H_USE, 0
 .set H_LEN, 1
@@ -212,7 +153,6 @@ mmio:    .long 0
 phys:    .long 0                      /* physical address of the DMA block */
 old08:   .long 0
 oldirq:  .long 0
-old2f:   .long 0
 upcall:  .long 0
 stats:                                /* get_statistics layout */
 st_pin:  .long 0
@@ -223,8 +163,6 @@ st_ein:  .long 0
 st_eout: .long 0
 st_lost: .long 0
 area:    .word 0                      /* offset of the DMA block */
-qoff:    .word 0                      /* offset of the queue block from CS */
-qseg:    .word 0                      /* its segment (0 = not set up) */
 iobase:  .word 0
 rx_next: .word 0
 tx_next: .word 0
@@ -237,16 +175,6 @@ busy:    .byte 0
 pvec:    .byte 0x60
 mac:     .space 6
 drvname: .asciz "USOSPKT igb"
-qlog_attach: .ascii "ATTACH\r\n"
-.set qlog_attach_l, 8
-qlog_release: .ascii "RELEASE\r\n"
-.set qlog_release_l, 9
-qlog_full:   .ascii "RXQ FULL\r\n"
-.set qlog_full_l, 10
-qlog_txerr:  .ascii "TX ERR\r\n"
-.set qlog_txerr_l, 8
-qlog_ready:  .ascii "QUEUE ON\r\n"
-.set qlog_ready_l, 10
     .p2align 1
 handles: .space MAX_HANDLES * H_SIZE
 
@@ -500,85 +428,54 @@ f_send:
     ja pk_err
     cmp cx, 14
     jb pk_err
+    mov di, [area]
+    add di, A_TXBUF
+    push cs
+    pop es
     push ds
     mov si, [bp + F_ESI]
     mov ds, [bp + F_DS]
-    call tx_frame
-    pop ds
-    jnc pk_ok
-    mov al, 12
-    jmp pk_err
-
-/* tx_frame: DS:SI frame of CX bytes (14..1514) in any segment - copied into
- * the TX buffer, one descriptor armed, waited for (DD), so the caller may
- * reuse its buffer. CF = 1 on timeout (st_eout), otherwise st_pout / st_bout
- * grow. Shared by send_pkt and by the queue-mode TX_KICK; no DOS calls, so
- * it also works from the INT 2Fh handler. */
-tx_frame:
-    push ds
-    push es
-    push ax
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    mov dx, cx
-    push cs
-    pop es
-    mov di, cs:[area]
-    add di, A_TXBUF
     shr cx, 1
     rep movsw
     adc cx, cx
     rep movsb
-    mov cx, dx
-    movzx ecx, cx
-    mov bx, cs:[tx_next]
+    pop ds
+    movzx ecx, word ptr [bp + F_ECX]
+    mov bx, [tx_next]
     shl bx, 4
-    add bx, cs:[area]
+    add bx, [area]
     add bx, A_TXRING
-    mov eax, cs:[phys]
+    mov eax, [phys]
     add eax, A_TXBUF
-    mov es:[bx], eax
-    mov dword ptr es:[bx + 4], 0
+    mov [bx], eax
+    mov dword ptr [bx + 4], 0
     mov eax, ecx
     shl eax, 14
-    mov es:[bx + 12], eax             /* PAYLEN */
+    mov [bx + 12], eax                /* PAYLEN */
     mov eax, ecx
     or eax, 0x2B300000                /* DEXT RS IFCS EOP, DTYP data */
-    mov es:[bx + 8], eax
-    mov ax, cs:[tx_next]
+    mov [bx + 8], eax
+    mov ax, [tx_next]
     inc ax
     and ax, TX_COUNT - 1
-    mov cs:[tx_next], ax
+    mov [tx_next], ax
     push ebx
     movzx eax, ax
     mov ebx, TDT0
     call reg_wr
     pop ebx
     mov dx, 20000                     /* about 20 ms */
-1:  test byte ptr es:[bx + 12], 1     /* DD */
-    jnz 2f
+7:  test byte ptr [bx + 12], 1        /* DD */
+    jnz 8f
     out 0x80, al
     dec dx
-    jnz 1b
-    add dword ptr cs:[st_eout], 1
-    stc
-    jmp 3f
-2:  add dword ptr cs:[st_pout], 1
-    movzx ecx, cx
-    add dword ptr cs:[st_bout], ecx
-    clc
-3:  pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    pop es
-    pop ds
-    ret
+    jnz 7b
+    add dword ptr [st_eout], 1
+    mov al, 12
+    jmp pk_err
+8:  add dword ptr [st_pout], 1
+    add dword ptr [st_bout], ecx
+    jmp pk_ok
 
 /* ------------------------------------------------------------------ */
 /* register window: EBX = register, EAX = value; everything else kept   */
@@ -717,20 +614,13 @@ rx_poll:
     push dx
     push di
     push bp
-    call rx_dispatch
+    call deliver
     pop bp
     pop di
     pop dx
     pop bx
     jmp 3f
 2:  add dword ptr [st_ein], 1
-    cmp word ptr [qseg], 0            /* the queue client sees the bad frames */
-    je 6f
-    push es
-    mov es, [qseg]
-    add dword ptr es:[Q_RXERR], 1
-    pop es
-6:
 3:  movzx eax, bx
     shl eax, 11
     add eax, [phys]
@@ -826,317 +716,6 @@ deliver:
     mov sp, cs:[sv_sp]
     ret
 
-/* ------------------------------------------------------------------ */
-/* Queue mode: a frame ring a protected-mode client polls (INT 2Fh     */
-/* AX=5553h). The driver writes the heads, the client the tails; no    */
-/* upcall, no DOS call from the ISR (the log is a memory ring).         */
-
-/* SI = frame in our segment, CX = length: queue when a client is
- * attached, else the packet-driver upcall. */
-rx_dispatch:
-    cmp word ptr [qseg], 0
-    je 2f
-    push es
-    mov es, [qseg]
-    test byte ptr es:[Q_FLAGS], QF_ATTACH
-    pop es
-    jz 2f
-    jmp q_rx_frame
-2:  jmp deliver
-
-/* RX ring: SI = frame, CX = length, all registers and flags kept. */
-q_rx_frame:
-    pushf
-    push ds
-    push es
-    pushad
-    cld
-    mov ax, cs:[qseg]
-    or ax, ax
-    jz 9f
-    mov es, ax
-    mov dx, es:[Q_RXHEAD]
-    mov bx, dx
-    inc bx
-    and bx, RX_COUNT - 1
-    cmp bx, es:[Q_RXTAIL]
-    je 8f                             /* ring full: drop, count it */
-    movzx eax, dx
-    imul eax, Q_RXSTR
-    add eax, Q_RXBUF
-    mov di, ax
-    add di, 8
-    push cx
-    rep movsb                         /* DS:SI -> ES:DI (DS is ours) */
-    pop cx
-    mov di, ax                        /* rep does not touch AX */
-    mov word ptr es:[di], cx          /* len */
-    mov word ptr es:[di + 2], 1       /* flags: complete frame */
-    mov ax, es:[Q_SEQ]
-    mov word ptr es:[di + 4], ax      /* seq */
-    inc ax
-    mov es:[Q_SEQ], ax
-    mov es:[Q_RXHEAD], bx
-    add dword ptr cs:[st_pin], 1
-    movzx ecx, cx
-    add dword ptr cs:[st_bin], ecx
-    jmp 9f
-8:  add dword ptr es:[Q_RXDROP], 1
-    push ds
-    push si
-    mov si, offset qlog_full
-    mov cx, qlog_full_l
-    call q_log
-    pop si
-    pop ds
-9:  popad
-    pop es
-    pop ds
-    popf
-    ret
-
-/* TX_KICK: send the slots the client queued, one by one, and give the
- * descriptor back before the next. Runs in the caller's context (INT 2Fh),
- * never in an ISR. AL: 0 sent, 1 nothing queued, 2 no client, 3 send error. */
-q_tx_kick:
-    push ds
-    push es
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    mov ax, cs:[qseg]
-    or ax, ax
-    jz 7f
-    mov es, ax
-    test byte ptr es:[Q_FLAGS], QF_ATTACH
-    jz 7f
-    mov al, 1
-1:  mov bx, es:[Q_TXTAIL]
-    cmp bx, es:[Q_TXHEAD]
-    je 6f
-    movzx eax, bx
-    imul eax, Q_TXSTR
-    add eax, Q_TXBUF
-    mov di, ax
-    mov cx, es:[di]                   /* length in the slot header */
-    cmp cx, 1514
-    ja 4f
-    cmp cx, 14
-    jb 4f
-    push es
-    pop ds                            /* DS:SI = the frame in the block */
-    mov si, di
-    add si, 8
-    call tx_frame
-    push cs
-    pop ds
-    jc 4f
-    add dword ptr es:[Q_TXDONE], 1
-    xor al, al
-    jmp 5f
-4:  add dword ptr es:[Q_TXERR], 1
-    add dword ptr es:[Q_TXBUSY], 1
-    mov al, 3
-    push si
-    mov si, offset qlog_txerr
-    mov cx, qlog_txerr_l
-    call q_log
-    pop si
-5:  mov bx, es:[Q_TXTAIL]
-    inc bx
-    and bx, Q_TXCOUNT - 1
-    mov es:[Q_TXTAIL], bx
-    cmp al, 3
-    je 6f                             /* stop at the first failure */
-    jmp 1b
-6:  jmp 8f
-7:  mov al, 2
-8:  pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop es
-    pop ds
-    ret
-
-/* Text log: CX bytes from DS:SI (our segment) appended to the ring; a full
- * ring counts a drop and writes nothing. Never calls DOS. */
-q_log:
-    pushf
-    push es
-    pushad
-    cld
-    mov ax, cs:[qseg]
-    or ax, ax
-    jz 9f
-    mov es, ax
-    mov bx, es:[Q_LOGHEAD]
-    mov dx, es:[Q_LOGTAIL]
-    mov ax, bx
-    sub ax, dx
-    and ax, Q_LOGBUFSZ - 1            /* bytes in use */
-    mov di, Q_LOGBUFSZ - 1
-    sub di, ax                        /* free */
-    cmp di, cx
-    jb 8f
-    mov ax, bx
-    add ax, cx
-    and ax, Q_LOGBUFSZ - 1
-    push ax                           /* new head */
-    mov di, bx
-    add di, Q_LOGOFF
-    mov dx, Q_LOGBUFSZ
-    sub dx, bx                        /* room to the end of the ring */
-    cmp dx, cx
-    jae 1f
-    push cx
-    mov cx, dx
-    rep movsb
-    mov di, Q_LOGOFF
-    pop cx
-    sub cx, dx
-1:  rep movsb
-    pop ax
-    mov es:[Q_LOGHEAD], ax
-    jmp 9f
-8:  add dword ptr es:[Q_LOGDROP], 1
-9:  popad
-    pop es
-    popf
-    ret
-
-/* INT 2Fh: AX=5553h is ours, everything else goes to the previous handler
- * with the caller's registers untouched. */
-int2f:
-    cmp ax, 0x5553
-    jne q_chain
-    push ds
-    push es
-    pushad
-    mov bp, sp
-    push cs
-    pop ds
-    cmp bx, 0xFFFF
-    je q_query
-    cmp bx, 1
-    je q_attach
-    cmp bx, 2
-    je q_state
-    cmp bx, 3
-    je q_kick
-    cmp bx, 4
-    je q_free
-    popad                             /* unknown subfunction: pass it on */
-    pop es
-    pop ds
-q_chain:
-    JMPFAR old2f
-q_out:
-    popad
-    pop es
-    pop ds
-    iret
-
-/* query: AL=0xFF present, ES:DI = block, CX version, DX flags */
-q_query:
-    mov ax, [qseg]
-    or ax, ax
-    jz 1f
-    mov [bp + F_ES], ax
-    mov word ptr [bp + F_EDI], 0
-    mov byte ptr [bp + F_EAX], 0xFF
-    mov word ptr [bp + F_ECX], 0x0100
-    mov es, ax
-    mov dx, es:[Q_FLAGS]
-    mov [bp + F_EDX], dx
-    jmp q_out
-1:  mov byte ptr [bp + F_EAX], 0
-    jmp q_out
-
-/* ATTACH: AL=0 ok (block in ES:DI, CX version, DX flags), 1 no driver,
- * 2 already owned by somebody. Kills the upcalls, empties the rings. */
-q_attach:
-    mov ax, [qseg]
-    or ax, ax
-    jz q_nodrv
-    mov es, ax
-    test byte ptr es:[Q_FLAGS], QF_ATTACH
-    jnz q_busy
-    or byte ptr es:[Q_FLAGS], QF_ATTACH + QF_SUPPRESS
-    mov word ptr es:[Q_RXHEAD], 0
-    mov word ptr es:[Q_RXTAIL], 0
-    mov word ptr es:[Q_TXHEAD], 0
-    mov word ptr es:[Q_TXTAIL], 0
-    mov [bp + F_ES], ax
-    mov word ptr [bp + F_EDI], 0
-    mov byte ptr [bp + F_EAX], 0
-    mov word ptr [bp + F_ECX], 0x0100
-    mov dx, es:[Q_FLAGS]
-    mov [bp + F_EDX], dx
-    mov si, offset qlog_attach
-    mov cx, qlog_attach_l
-    call q_log
-    jmp q_out
-q_nodrv:
-    mov byte ptr [bp + F_EAX], 1
-    jmp q_out
-q_busy:
-    mov byte ptr [bp + F_EAX], 2
-    jmp q_out
-
-/* GET_STATE: AL=0, ES:DI = block, CX = frames waiting in the RX ring,
- * DX = frames waiting in the TX ring; the counters live in the header. */
-q_state:
-    mov ax, [qseg]
-    or ax, ax
-    jz 1f
-    mov byte ptr [bp + F_EAX], 0
-    mov [bp + F_ES], ax
-    mov word ptr [bp + F_EDI], 0
-    mov es, ax
-    mov cx, es:[Q_RXHEAD]
-    sub cx, es:[Q_RXTAIL]
-    and cx, RX_COUNT - 1
-    mov [bp + F_ECX], cx
-    mov dx, es:[Q_TXHEAD]
-    sub dx, es:[Q_TXTAIL]
-    and dx, Q_TXCOUNT - 1
-    mov [bp + F_EDX], dx
-    jmp q_out
-1:  mov byte ptr [bp + F_EAX], 1
-    jmp q_out
-
-/* TX_KICK: the return code of q_tx_kick lands in AL */
-q_kick:
-    call q_tx_kick
-    mov [bp + F_EAX], al
-    jmp q_out
-
-/* RELEASE: AL=0 back to upcall-only (or 1 nothing attached); pending frames
- * are abandoned, the packet driver handles the next frames itself again. */
-q_free:
-    mov ax, [qseg]
-    or ax, ax
-    jz 1f
-    mov es, ax
-    test byte ptr es:[Q_FLAGS], QF_ATTACH
-    jz 1f
-    and byte ptr es:[Q_FLAGS], 0xFF - (QF_ATTACH + QF_SUPPRESS)
-    mov ax, es:[Q_RXHEAD]
-    mov es:[Q_RXTAIL], ax
-    mov ax, es:[Q_TXHEAD]
-    mov es:[Q_TXTAIL], ax
-    mov si, offset qlog_release
-    mov cx, qlog_release_l
-    call q_log
-    mov byte ptr [bp + F_EAX], 0
-    jmp q_out
-1:  mov byte ptr [bp + F_EAX], 1
-    jmp q_out
-
 /* timer: BIOS first, then poll */
 int08:
     pushf
@@ -1209,7 +788,6 @@ pcibios:  .byte 0
 opt_p:    .byte 0
 opt_m:    .byte 0
 opt_s:    .byte 0
-opt_q:    .byte 0
 v86:      .byte 0
 vds:      .byte 0
 plltries: .byte 0
@@ -1272,8 +850,6 @@ msg_irq2:   .ascii " (PCI INTx) + timer poll$"
 msg_poll:   .ascii "\r\nInterrupt: none, polled from the timer (INT 08h)$"
 msg_dma:    .ascii "\r\nDMA block: phys $"
 msg_vds:    .ascii " (VDS)$"
-msg_queue:  .ascii "\r\nQueue block: $"
-msg_queue2: .ascii "h:0000, size $"
 msg_mac:    .ascii "\r\nMAC $"
 msg_msrc:   .ascii " source $"
 msg_pll:    .ascii " PLL $"
@@ -1459,12 +1035,8 @@ arg_opt:
     mov byte ptr [opt_m], 1
     jmp arg_next
 2:  cmp al, 's'
-    jne 3f
-    mov byte ptr [opt_s], 1
-    jmp arg_next
-3:  cmp al, 'q'                         /* /Q or -Q, case-insensitive */
     jne arg_bad
-    mov byte ptr [opt_q], 1
+    mov byte ptr [opt_s], 1
     jmp arg_next
 arg_bad:
     mov dx, offset msg_help
@@ -1774,68 +1346,7 @@ acc_ok:
 3:  mov eax, [dds + 12]
     mov [phys], eax
     mov byte ptr [vds], 1
-2:  /* Queue-mode block (INT 2Fh AX=5553h) only with /Q: its own segment
-     * directly behind the DMA area, so the client gets one contiguous,
-     * 16-byte aligned segment and the DMA block keeps the layout mTCP
-     * already uses. Without /Q nothing is reserved and INT 2Fh is left
-     * alone (the driver is then exactly the packet driver above). */
-    cmp byte ptr [opt_q], 0
-    je no_q_block
-    mov ax, [area]
-    add ax, AREA_SIZE
-    add ax, 15
-    and ax, 0xFFF0
-    mov [qoff], ax
-    mov bx, ax
-    shr bx, 4
-    mov dx, cs
-    add dx, bx
-    mov [qseg], dx
-    /* it must fit in the memory DOS gave us (PSP:0002 = first free para) */
-    xor eax, eax
-    mov ax, cs
-    shl eax, 4
-    movzx ebx, word ptr [qoff]
-    add eax, ebx
-    add eax, Q_SIZE
-    xor ebx, ebx
-    mov bx, [0x0002]
-    shl ebx, 4
-    cmp eax, ebx
-    jb 1f
-    mov dx, offset msg_mem
-    call print
-    mov ax, 0x4C06
-    int 0x21
-1:  mov es, [qseg]
-    xor di, di
-    mov cx, Q_SIZE / 2
-    xor ax, ax
-    rep stosw
-    mov dword ptr es:[Q_MAGIC], 0x31515355   /* "USQ1" */
-    mov word ptr es:[Q_VERSION], 0x0100
-    mov word ptr es:[Q_HDRSZ], Q_HDR
-    mov word ptr es:[Q_FLAGS], QF_READY
-    mov word ptr es:[Q_RXCNT], RX_COUNT
-    mov word ptr es:[Q_RXSTRIDE], Q_RXSTR
-    mov dword ptr es:[Q_RXBASE], Q_RXBUF
-    mov word ptr es:[Q_TXCNT], Q_TXCOUNT
-    mov word ptr es:[Q_TXSTRIDE], Q_TXSTR
-    mov dword ptr es:[Q_TXBASE], Q_TXBUF
-    mov word ptr es:[Q_LOGSZ], Q_LOGBUFSZ
-    mov dword ptr es:[Q_LOGBASE], Q_LOGOFF
-    mov al, [pvec]
-    mov es:[Q_INT], al
-    mov si, offset mac
-    mov di, Q_MAC
-    mov cx, 3
-    rep movsw
-    push cs
-    pop es
-    mov si, offset qlog_ready          /* the log says the mode is on */
-    mov cx, qlog_ready_l
-    call q_log
-no_q_block:
+2:
     call nic_reset
     jnc 1f
     mov dx, offset msg_reset
@@ -1868,13 +1379,6 @@ no_q_block:
     mov [old08], eax
     mov word ptr es:[0x08 * 4], offset int08
     mov es:[0x08 * 4 + 2], cs
-    cmp byte ptr [opt_q], 0            /* /Q: the queue multiplex handler */
-    je hook_done
-    mov eax, es:[0x2F * 4]
-    mov [old2f], eax
-    mov word ptr es:[0x2F * 4], offset int2f
-    mov es:[0x2F * 4 + 2], cs
-hook_done:
     movzx bx, byte ptr [irq]
     cmp bl, 0xFF
     je 4f
@@ -1936,20 +1440,7 @@ hook_done:
     je 3f
     mov dx, offset msg_vds
     call print
-3:  cmp byte ptr [opt_q], 0
-    je no_q_report
-    mov dx, offset msg_queue
-    call print
-    mov eax, [qseg]
-    mov cl, 4
-    call print_hex
-    mov dx, offset msg_queue2
-    call print
-    mov eax, Q_SIZE
-    mov cl, 4
-    call print_hex
-no_q_report:
-    mov dx, offset msg_mac
+3:  mov dx, offset msg_mac
     call print
     mov si, offset mac
     mov bx, 6
@@ -2024,16 +1515,8 @@ no_q_report:
     call print_hex
     mov dx, offset msg_res
     call print
-    cmp byte ptr [opt_q], 0            /* the block is the only extra memory */
-    je res_area
-    movzx eax, word ptr [qoff]
-    add eax, Q_SIZE
-    jmp res_size
-res_area:
     movzx eax, word ptr [area]
-    add eax, AREA_SIZE
-res_size:
-    add eax, 15
+    add eax, AREA_SIZE + 15
     shr eax, 4
     push ax
     mov cl, 4

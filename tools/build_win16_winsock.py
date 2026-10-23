@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build the USOS Win16 Winsock provider (src/platform/bios/win16/winsock16).
 
 Produces zig-out/win16/WINSOCK.DLL (NE, 16-bit Windows 3.x) and
@@ -73,20 +75,20 @@ def parse_def_exports(def_file: Path) -> list[tuple[str, int]]:
 
 
 def export_directive(exports: list[tuple[str, int]]) -> list[str]:
-    """One wlink ``export`` directive per entry (C names get a '_').
+    """Export uppercase public names and FAR PASCAL linker symbols.
 
     A single comma-separated ``export`` argument is long enough that the
     linker's own command-line parser chokes on it (E3033 near '"export'), so
     the whole link is driven from a response file with one line per export.
     """
-    items = ['export %s.%d=%s' % (name, ordinal, name.upper()) for name, ordinal in exports]
+    items = ['export %s.%d=%s' % (name.upper(), ordinal, name.upper()) for name, ordinal in exports]
     return items
 
 
 def run(cmd: list[str], verbose: bool, cwd: Path | None = None) -> None:
     if verbose:
         print('  ' + ' '.join(str(part) for part in cmd))
-    result = subprocess.run([str(part) for part in cmd], cwd=str(cwd or ROOT),
+    result = subprocess.run([str(part) for part in cmd], cwd=str(cwd or OBJ_DIR),
                             capture_output=True, text=True)
     if result.stdout.strip():
         print(result.stdout.strip())
@@ -125,7 +127,10 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
         # -bt=windows: 16-bit Windows target, -ml: large model, -zW: Windows
         # prolog/epilog, -bd: build a DLL (no DOS extender stub).  h/ carries
         # i86.h (int86x, MK_FP, segread), h/win the Windows and Winsock API.
-        run([wcc, '-bt=windows', '-bd', '-ml', '-zW', '-zq', '-w3',
+        # A DLL runs on its caller's stack: SS is not its own DGROUP. Without
+        # -zu, far addresses of automatic REGS/RMCS buffers use the wrong DS.
+        run([wcc, '-bt=windows', '-bd', '-ml', '-zu', '-zW', '-zq', '-w3',
+             *(['-dUSOS_WS_DIAG'] if os.environ.get('USOS_WS_DIAG') == '1' else []),
              '-I%s' % headers, '-I%s' % includes, '-I%s' % net_dir,
              '-fo=%s' % obj, one], verbose)
         objs.append(obj)
@@ -160,7 +165,7 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
     return ARTIFACT
 
 
-def build_testload(watcom: Path, verbose: bool) -> Path:
+def build_testload(watcom: Path, verbose: bool, stem: str = 'testload') -> Path:
     """TESTLOAD.EXE: a small Win16 EXE, no libentry.obj, no export table."""
     wcc = watcom / 'binnt64' / 'wcc.exe'
     wlink = watcom / 'binnt64' / 'wlink.exe'
@@ -170,8 +175,9 @@ def build_testload(watcom: Path, verbose: bool) -> Path:
 
     OBJ_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    source = SRC_DIR / 'testload.c'
-    obj = OBJ_DIR / 'testload.obj'
+    source = SRC_DIR / (stem + '.c')
+    obj = OBJ_DIR / (stem + '.obj')
+    artifact = OUT_DIR / (stem.upper() + '.EXE')
     for needed in (source, headers / 'windows.h', headers / 'winsock.h',
                    includes / 'io.h', includes / 'fcntl.h'):
         if not needed.exists():
@@ -181,7 +187,7 @@ def build_testload(watcom: Path, verbose: bool) -> Path:
     run([wcc, '-bt=windows', '-ml', '-zW', '-zq', '-w3',
          '-I%s' % headers, '-I%s' % includes, '-fo=%s' % obj, source], verbose)
 
-    print('link: %s' % TESTLOAD_ARTIFACT.relative_to(ROOT))
+    print('link: %s' % artifact.relative_to(ROOT))
     # A Win16 EXE needs no libentry.obj (no __DLLstart_) and no export list;
     # windows.lib supplies the WinMain startup and clibl.lib the large-model C
     # runtime used by _lcreat/_lwrite/_lclose.
@@ -189,17 +195,17 @@ def build_testload(watcom: Path, verbose: bool) -> Path:
         'format windows',
         'option quiet',
         'option nodefaultlibs',
-        'name %s' % TESTLOAD_ARTIFACT,
+        'name %s' % artifact,
         'file %s' % obj,
         'library %s' % (libs / 'windows.lib'),
         'library %s' % (libs / 'clibl.lib'),
     ]
-    response = OBJ_DIR / 'testload.lnk'
+    response = OBJ_DIR / (stem + '.lnk')
     response.write_text('\r\n'.join(directives) + '\r\n', encoding='ascii')
     run([wlink, '@%s' % response], verbose)
-    if not TESTLOAD_ARTIFACT.exists():
-        raise SystemExit('linker reported success but %s is missing' % TESTLOAD_ARTIFACT)
-    return TESTLOAD_ARTIFACT
+    if not artifact.exists():
+        raise SystemExit('linker reported success but %s is missing' % artifact)
+    return artifact
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build(watcom, args.verbose, args.keep_objects)
     print('OK: %s (%d bytes)' % (artifact.relative_to(ROOT), artifact.stat().st_size))
     exe = build_testload(watcom, args.verbose)
+    print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
+    exe = build_testload(watcom, args.verbose, 'gethttp')
     print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     if not args.keep_objects:
         shutil.rmtree(OBJ_DIR, ignore_errors=True)
