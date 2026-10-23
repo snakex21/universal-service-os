@@ -43,6 +43,12 @@ yet** on QEMU or hardware.
   `build.cmd` copies the `src` files next to them.
 * `bin/i386/usosnet.sys`, `bin/i386/usosnet4.sys` - committed builds (our own
   code only).
+* `inf/usosnet95rtm.inf`, `src95rtm/`, `build95rtm.py`,
+  `bin/i386/win95-rtm/usosnet4.sys` (+ `BUILD.json`) - Windows 95 RTM / OSR1
+  (SETUP 4.0.0.950): NDIS 3.0 registration shared with NT 3.5x
+  (`USOSNET_W95RTM=1`), a driver timer re-armed with the one-shot
+  `NdisSetTimer`; WDK 7.1 like `build351.py`. QEMU only, see
+  [docs/win95-rtm-osr1-2026-10-23.md](../../../docs/win95-rtm-osr1-2026-10-23.md).
 
 ## Build
 

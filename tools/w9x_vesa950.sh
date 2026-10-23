@@ -3,7 +3,7 @@
 # R137 isolated that call; R141 skipped it and completed a VESA warm restart.
 # Keep the published NE ABI. Never patch the shared vendor/payload original.
 # Exact input/output digests make this fail closed for another driver version.
-# See docs/win95-vesa950-unregister-2026-10-23.md for proof and limitations.
+# See docs/win95-rtm-osr1-2026-10-23.md (VESA950) for proof and limitations.
 
 w9x_vesa950_prepare() (
     [ "${2:-}" = '4 0 0 950' ] || return 0

@@ -79,6 +79,12 @@ class Generator(unittest.TestCase):
     def test_scope_boundary_journal_and_dos_limits(self):
         tmp=self.create();parent=(tmp/'VESA95.BAT').read_bytes();child=(tmp/'VESALATE.BAT').read_bytes()
         self.assertLess(parent.index(b'CALL C:\\USOS9X\\VESALATE.BAT'),parent.index(b'VESA95.OK GOTO END'))
+        # Fail-soft: a failed late binding is logged on the target disk and the
+        # old VESA95 path continues (no PAUSE loop withholding Windows).
+        self.assertNotIn(b'PAUSE',parent)
+        failed=parent.split(b':VLFAIL\r\n')[1].split(b':VLNEXT\r\n')[0]
+        self.assertIn(b'>> C:\\USOS9X\\USOSLOG.TXT\r\n',failed)
+        self.assertNotIn(b'GOTO',failed)
         text=child.decode('ascii')
         boundary=text.index('IF NOT ERRORLEVEL 1 GOTO PENDING')
         for op in ['ECHO run>','ATTRIB.EXE -S -R -H','VESBIND.EXE PLAN','COPY /Y SYSTEM.DAT']:

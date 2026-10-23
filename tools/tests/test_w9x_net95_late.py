@@ -37,7 +37,9 @@ class LateNetwork(unittest.TestCase):
   self.assertLess(s.index('NLATE.ERR GOTO FAIL'),s.index('NLATE.OK GOTO END'))
   self.assertLess(s.index('NLATE.RUN GOTO FAIL'),s.index('NLATE.OK GOTO END'))
   self.assertIn(b'NLATE.ERR GOTO PREPERR',parent);self.assertIn(b'NLATE.RUN GOTO PREPERR',parent)
-  self.assertIn(b':PREPWAIT\r\nPAUSE > NUL\r\nGOTO PREPWAIT',parent)
+  # Fail-soft: logged on the target disk, then Windows starts (no PAUSE loop).
+  self.assertNotIn(b'PAUSE',parent)
+  self.assertIn(b'>> C:\\USOS9X\\USOSLOG.TXT\r\n:END',parent.split(b':PREPERR\r\n')[1])
 
  def test_only_network_files_imported_once_then_verified_and_restored(self):
   _,child=self.create();s=child.decode('ascii')

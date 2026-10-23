@@ -76,7 +76,11 @@ class NetworkFiles(unittest.TestCase):
         self.assertIn('ATTRIB.EXE +S +R +H SYSTEM.DAT',failed)
         self.assertIn('ATTRIB.EXE +S +R +H USER.DAT',failed)
         self.assertNotIn('REG95.OK',failed)
-        self.assertIn(':PREPWAIT\r\nPAUSE > NUL\r\nGOTO PREPWAIT',failed)
+        # Fail-soft: logged on the target disk, then Windows starts (no PAUSE loop).
+        self.assertNotIn('PAUSE',s)
+        tail=failed.split(':PREPERR\r\n')[1]
+        self.assertIn('>> C:\\USOS9X\\USOSLOG.TXT\r\n:END',tail)
+        self.assertNotIn('GOTO',tail)
         self.assertIn(b'NFILES.OK DEL',files)
         self.assertNotIn(b'NFILES.OK',files.split(b':FAIL\r\n')[1])
 

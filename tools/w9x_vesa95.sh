@@ -133,8 +133,10 @@ EOF
             printf '%s\r\n' 'CALL C:\USOS9X\VESALATE.BAT' \
                 'IF EXIST C:\USOS9X\VLATE.ERR GOTO VLFAIL' \
                 'IF EXIST C:\USOS9X\VLATE.RUN GOTO VLFAIL' 'GOTO VLNEXT' \
-                ':VLFAIL' 'ECHO Display preparation failed. See C:\USOS9X. Windows start withheld.' \
-                ':VLWAIT' 'PAUSE > NUL' 'GOTO VLWAIT' ':VLNEXT'
+                ':VLFAIL' 'REM Fail-soft: log to the target disk, Windows starts with the display it has.' \
+                'ECHO USOS: display preparation failed, see C:\USOS9X. Windows starts with its current display.' \
+                'ECHO VESA95: 950 late display binding failed, see C:\USOS9X\VLATE.*; Windows started>> C:\USOS9X\USOSLOG.TXT' \
+                ':VLNEXT'
             tail -n +2 "$dir/VESA95.BAT"
         } > "$dir/VESA95.NEW" && mv "$dir/VESA95.NEW" "$dir/VESA95.BAT" || return 1
     fi

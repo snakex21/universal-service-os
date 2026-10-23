@@ -474,10 +474,9 @@ IF EXIST ${U}NET\\NFILES.RUN GOTO PREPERR"
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 :PREPERR
-ECHO Network preparation failed. See C:\\USOS9X\\NET. Windows start withheld.
-:PREPWAIT
-PAUSE > NUL
-GOTO PREPWAIT"
+REM Fail-soft: log to the target disk, Windows starts without the USOS network.
+ECHO USOS: network preparation failed, see C:\\USOS9X\\NET. Windows starts without it.
+ECHO REG95: 950 network preparation failed, see C:\\USOS9X\\NET; Windows started>> ${U}USOSLOG.TXT"
     fi
     if [ -n "$net" ]; then
         devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
