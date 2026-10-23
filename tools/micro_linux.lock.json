@@ -224,6 +224,14 @@
     ],
     "packages": [
       {
+        "file": "qemu-11.0.3-r0.apk",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/qemu-11.0.3-r0.apk",
+        "sha256": "89f12874767f11fc9d6cc82d203809817ada2295213ae7964e82c9ccf6b0fb1d",
+        "files": [
+          "usr/share/qemu/keymaps/en-us"
+        ]
+      },
+      {
         "file": "qemu-system-i386-11.0.3-r0.apk",
         "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/qemu-system-i386-11.0.3-r0.apk",
         "sha256": "a4186c5cdbbfbb360790be35716a83e64eeac7e6966a949dbeda0d1f0950c42c",

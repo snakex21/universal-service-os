@@ -17,6 +17,12 @@ def build(root: Path, out: Path, zig: Path | None = None) -> Path:
                    env=env, check=True)
     if binary.read_bytes()[:4] != b'\x7fELF':
         raise RuntimeError('Expected a static Linux ELF classifier')
+    events = out / 'win95-rfb-events'
+    subprocess.run([str(compiler), 'cc', '-target', 'x86_64-linux-musl', '-static', '-Os', '-s',
+                    '-Wall', '-Wextra', '-Werror', str(root / 'tools/win95_rfb_events.c'), '-o', str(events)],
+                   env=env, check=True)
+    if events.read_bytes()[:4] != b'\x7fELF':
+        raise RuntimeError('Expected a static Linux ELF event receiver')
     return binary
 
 

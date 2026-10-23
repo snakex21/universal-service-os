@@ -189,6 +189,14 @@ w9x_vm_answer() {
 # caller defines it. 0 = the guest restarted (Setup phase 1 ended), 2 = QEMU
 # failed, 3 = timeout. Logs in $W9X_VM_RUN.
 w9x_phase1_run() {
+    if [ -n "${W9X_VM_KEY:-}" ]; then
+        # Windows 95 has its own event-driven input controller. Never enter
+        # the shared timed monitor when its required event helper is absent.
+        [ -r "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" ] || return 2
+        . "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" || return 2
+        w9x_95_event_run "$@"
+        return $?
+    fi
     target=$1
     accel=${2:-tcg}
     rm -rf "$W9X_VM_RUN"
@@ -454,7 +462,7 @@ w9x_phase1_verify() {
 # The VM's logs (and the last screen) next to prepare.log on the USOS ESP.
 w9x_phase1_keep_logs() {
     mkdir -p "$1"
-    for file in command.txt qemu.log serial.log seabios.log monitor.log screen.ppm answer-1.ppm answer-2.ppm answer-3.ppm; do
+    for file in command.txt qemu.log serial.log seabios.log monitor.log event-errors.log screen.ppm answer-1.ppm answer-2.ppm answer-3.ppm; do
         [ -f "$W9X_VM_RUN/$file" ] && cp "$W9X_VM_RUN/$file" "$1/$file" 2>/dev/null
     done
     sync

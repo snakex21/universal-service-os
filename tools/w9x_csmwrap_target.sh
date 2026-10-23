@@ -6,7 +6,8 @@
 #
 # Writes ONLY $TARGET_DEVICE:
 #   MBR     USOS MBR code (boots the active partition), new disk signature
-#   slot 1  FAT32 (type 0Ch, LBA), active, from LBA 2048, at most 32 GiB
+#   slot 1  FAT32 (type 0Ch, LBA), active, from LBA 2048, at most 32 GiB;
+#           95 RTM/OSR1: FAT16 type 06h, at most 2047 MiB, real CHS fields
 #           (Microsoft cluster sizes: 4/8/16 KiB, FAT below 16 MiB for the
 #           16-bit ScanDisk), 255 heads / 63 sectors like the BIOS Core path
 #   slot 2  CSMWrap ESP, 64 MiB at the end (tools/xp_csmwrap_esp.sh, unchanged)
@@ -189,6 +190,19 @@ for name in "$SETUP_FOLDER" "$(printf '%s' "$SETUP_FOLDER" | tr '[:upper:]' '[:l
 done
 [ -n "$setup_dir" ] || fail "the ISO has no $SETUP_FOLDER\\SETUP.EXE"
 
+. "$LIB/w9x_filesystem.sh"
+setup_version=''
+if [ "$SYSTEM_TAG" = 95 ]; then
+    setup_launcher=''
+    for name in SETUP.EXE setup.exe; do
+        [ ! -f "$work/iso/$name" ] || setup_launcher="$work/iso/$name"
+    done
+    [ -n "$setup_launcher" ] || fail 'Windows 95 needs its original root SETUP.EXE to identify FAT16/FAT32 support; no disk was changed'
+    setup_version=$("$LIB/pe-file-version" "$setup_launcher") || fail 'cannot read the Windows 95 launcher version; no disk was changed'
+fi
+usos_w9x_fs_select "$SYSTEM_TAG" "$setup_version" || fail 'unknown Windows 95 source version; refusing to guess filesystem support; no disk was changed'
+log "source_setup_version=${setup_version:-not-required} filesystem=FAT$W9X_FAT_BITS partition_type=$W9X_MBR_TYPE"
+
 floppy="$work/BOOT.IMG"
 if [ -n "$BOOT_FLOPPY" ]; then
     # Windows 95 CDs do not boot: the user's startup disk image (bridge).
@@ -221,7 +235,8 @@ part_start=2048
 part_sectors=$((SIZE_GIB * 2097152))
 [ $((part_start + part_sectors)) -le "$esp_start" ] || part_sectors=$(( (esp_start - part_start) / 2048 * 2048 ))
 [ "$part_sectors" -ge 1048576 ] || fail 'no room for a Windows partition of 512 MiB or more'
-if [ "$part_sectors" -le 16777216 ]; then cluster=8; elif [ "$part_sectors" -le 33554432 ]; then cluster=16; else cluster=32; fi
+usos_w9x_fs_layout "$part_sectors" || fail 'cannot choose filesystem geometry'
+part_sectors=$W9X_FS_SECTORS cluster=$W9X_FS_CLUSTER
 log "disk_sectors=$total part_start=$part_start part_sectors=$part_sectors cluster_sectors=$cluster esp_start=$esp_start"
 
 # Whole-disk mode: both GPT copies and the old MBR go.
@@ -231,12 +246,8 @@ mbr="$work/mbr.bin"
 dd if=/dev/zero of="$mbr" bs=512 count=1 2>/dev/null
 dd if="$LIB/xp-geometry-fix-mbr-440.bin" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if=/dev/urandom of="$mbr" bs=1 seek=440 count=4 conv=notrunc 2>/dev/null
-le32() {
-    v=$1
-    printf "\\$(printf %03o $((v & 255)))\\$(printf %03o $(((v >> 8) & 255)))\\$(printf %03o $(((v >> 16) & 255)))\\$(printf %03o $(((v >> 24) & 255)))"
-}
-# CHS fields: 1023/254/63 (beyond CHS), Windows 9x uses the LBA type 0Ch.
-{ printf '\200\376\377\377\014\376\377\377'; le32 "$part_start"; le32 "$part_sectors"; } | dd of="$mbr" bs=1 seek=446 count=16 conv=notrunc 2>/dev/null
+# FAT32 retains sentinel CHS; RTM FAT16 gets real 255/63 CHS and type 06h.
+usos_w9x_partition_entry "$W9X_FAT_BITS" "$part_start" "$part_sectors" | dd of="$mbr" bs=1 seek=446 count=16 conv=notrunc 2>/dev/null
 printf '\125\252' | dd of="$mbr" bs=1 seek=510 count=2 conv=notrunc 2>/dev/null
 dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR'
 
@@ -247,9 +258,9 @@ losetup -o $((part_start * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot a
 label=WINDOWS98
 [ "$SYSTEM_TAG" != ME ] || label=WINDOWSME
 [ "$SYSTEM_TAG" != 95 ] || label=WINDOWS95
-mkfs.fat -F 32 -s "$cluster" -R 32 -f 2 -h "$part_start" -g 255/63 -D 0x80 -M 0xF8 -n "$label" "$part_loop" $((part_sectors / 2)) >/dev/null || fail 'cannot format the FAT32 partition'
+mkfs.fat -F "$W9X_FAT_BITS" -s "$cluster" -R "$W9X_FAT_RESERVED" -f 2 -h "$part_start" -g 255/63 -D 0x80 -M 0xF8 -n "$label" "$part_loop" $((part_sectors / 2)) >/dev/null || fail "cannot format the FAT$W9X_FAT_BITS partition"
 
-mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail 'cannot mount the new FAT32 partition'
+mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail "cannot mount the new FAT$W9X_FAT_BITS partition"
 mkdir -p "$work/c/$SETUP_FOLDER" "$work/c/USOS9X"
 copied=0
 for file in "$setup_dir"/*; do
@@ -625,6 +636,6 @@ blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 # pci_irq_routing = true, CSMWrap 3.1.2-usos12 patch 0015).
 TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on USOS_INT13_BOOT_DISK_ONLY=$int13_only sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
-[ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 12 ] || fail 'read-back: the Windows partition type differs'
+[ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = "$W9X_MBR_TYPE" ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'
 log "PASS target=$TARGET_DEVICE release=$SYSTEM_TAG answer=$ANSWER_KIND; next boot: this disk's UEFI entry -> CSMWrap -> Windows $SYSTEM_TAG Setup"
