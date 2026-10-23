@@ -388,6 +388,9 @@ const uefi_profiles = [_]Profile{
     // disk with a one-time DOS start and a CSMWrap ESP; Setup then runs from
     // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
     .{ .id = "win3x-floppy-set-uefi-csmwrap", .systems = .{ .ids = floppy_set_ids }, .images = &.{.floppy_set}, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    // Every other floppy-set selection is refused (UEFI only: the BIOS Core
+    // never lists floppy sets, and no Core rule accepts the kind).
+    .{ .id = "floppy-set-unsupported", .images = &.{.floppy_set}, .backend = null, .progress = .none },
     .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = dos_family_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "w9x-uefi-other", .systems = .{ .ids = dos_family_ids }, .firmware = .uefi, .backend = null, .progress = .none },
     // Windows NT 4.0 Workstation / Server from UEFI: the same step 620; the
@@ -432,8 +435,6 @@ pub const profiles = (if (native_windows7_enabled) uefi_profiles else [_]Profile
     .{ .id = "win81-bios-other-iso", .systems = .{ .ids = &.{"windows-8-1"} }, .images = iso, .methods = &.{.direct_iso}, .firmware = .bios, .backend = null, .progress = .none },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
-    // Floppy disk sets: only the rule above (Windows 1.0x-3.x on UEFI).
-    .{ .id = "floppy-set-unsupported", .images = &.{.floppy_set}, .backend = null, .progress = .none },
     .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },
     .{ .id = "nt5-staging", .systems = .nt5_staging, .images = iso, .methods = &.{.automatic}, .backend = .xp_staging, .progress = .core },
     .{ .id = "win10-11-uefi-native", .systems = .{ .native = .modern }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .progress = .direct_iso },
