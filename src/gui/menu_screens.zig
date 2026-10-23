@@ -43,11 +43,10 @@ pub fn home(ui: *const Ui, header: HeaderInfo, items: []const HomeItem, selected
 pub fn homeItem(ui: *const Ui, items: []const HomeItem, index: usize, state: RowState) void {
     if (index >= items.len) return;
     const item = items[index];
-    const rect = ui.homeCardRect(index, items.len);
     if (card_extras) {
-        ui.homeCardWith(rect, .{ .icon = item.icon, .image = item.image, .enabled = item.enabled }, item.title, item.description, state);
+        ui.homeCardWith(ui.homeCardRect(index, items.len), .{ .icon = item.icon, .image = item.image, .enabled = item.enabled }, item.title, item.description, state);
     } else {
-        ui.homeCard(rect, item.icon, item.title, item.description, state);
+        ui.homeCard(ui.homeCardRect(index, items.len), item.icon, item.title, item.description, state);
     }
 }
 

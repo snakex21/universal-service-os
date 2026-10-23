@@ -580,24 +580,10 @@ pub const Ui = struct {
         return .{ .x = body.x + column * (card_w + gap), .y = body.y + row_index * (card_h + gap), .w = card_w, .h = card_h };
     }
 
+    /// The plain category card (vector icon, always enabled). The Legacy
+    /// BIOS Core draws only this one; the UEFI menu uses homeCardWith.
     pub fn homeCard(self: *const Ui, rect: Rect, icon: Icon, title: []const u8, description: []const u8, state: RowState) void {
-        self.homeCardWith(rect, .{ .icon = icon }, title, description, state);
-    }
-
-    pub const HomeCardLook = struct {
-        icon: Icon,
-        /// 32x32 RGBA colour icon drawn on a neutral tile instead of `icon`.
-        image: ?[]const u8 = null,
-        enabled: bool = true,
-    };
-
-    pub fn homeCardWith(self: *const Ui, rect: Rect, look: HomeCardLook, title: []const u8, description: []const u8, state: RowState) void {
         const theme = self.theme;
-        // Disabled and colour-icon cards are a UEFI-menu feature (macOS
-        // tile); the size-limited Legacy BIOS Core compiles them out.
-        const card_extras = @import("builtin").os.tag != .freestanding;
-        const enabled = !card_extras or look.enabled;
-        const card_image: ?[]const u8 = if (card_extras) look.image else null;
         const fill = switch (state) {
             .selected => theme.accent_soft,
             .hover => theme.panel_alt,
@@ -617,7 +603,59 @@ pub const Ui = struct {
         const tile = @min(self.px(52), rect.h -| (2 * self.px(16)));
         const tile_x = rect.x + pad;
         const tile_y = rect.y + (rect.h -| tile) / 2;
-        if (card_image) |pixels| {
+        const tile_fill = if (state == .selected) theme.accent else theme.accent_soft;
+        paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), tile_fill, fill);
+        const glyph = tile * 3 / 5;
+        icons.drawKind(self.surface, icon, tile_x + (tile - glyph) / 2, tile_y + (tile - glyph) / 2, glyph, if (state == .selected) theme.on_accent else theme.accent, null);
+
+        const chevron = self.px(18);
+        const text_x = tile_x + tile + self.px(18);
+        const text_right = rect.right() -| pad -| chevron -| self.px(12);
+        const text_w = text_right -| text_x;
+        const title_h = self.fonts.lineHeight(.strong);
+        var lines: [2][]const u8 = undefined;
+        const line_count = self.fonts.wrap(.body, description, text_w, &lines, null);
+        const block_h = title_h + self.px(4) + @as(u32, @intCast(line_count)) * self.fonts.lineHeight(.body);
+        var y = rect.y + (rect.h -| block_h) / 2;
+        _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .strong, title, theme.text, fill);
+        y += title_h + self.px(4);
+        for (lines[0..line_count]) |value| {
+            _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .body, value, theme.muted, fill);
+            y += self.fonts.lineHeight(.body);
+        }
+        icons.draw(self.surface, .chevron_right, rect.right() -| pad -| chevron, rect.y + (rect.h -| chevron) / 2, chevron, if (state == .selected) theme.accent else theme.faint, null);
+    }
+
+    pub const HomeCardLook = struct {
+        icon: Icon,
+        /// 32x32 RGBA colour icon drawn on a neutral tile instead of `icon`.
+        image: ?[]const u8 = null,
+        enabled: bool = true,
+    };
+
+    pub fn homeCardWith(self: *const Ui, rect: Rect, look: HomeCardLook, title: []const u8, description: []const u8, state: RowState) void {
+        const theme = self.theme;
+        const enabled = look.enabled;
+        const fill = switch (state) {
+            .selected => theme.accent_soft,
+            .hover => theme.panel_alt,
+            .normal => theme.panel,
+        };
+        const border = switch (state) {
+            .selected => theme.accent,
+            .hover => theme.border_strong,
+            .normal => theme.border,
+        };
+        const thickness = if (state == .selected) self.line(2) else self.line(1);
+        // Clear the previous state's outer ring first (selection is thicker).
+        self.surface.fillRect(rect.x, rect.y, rect.w, rect.h, theme.background);
+        paint.card(self.surface, rect.x, rect.y, rect.w, rect.h, self.px(10), thickness, border, fill, theme.background);
+
+        const pad = self.px(20);
+        const tile = @min(self.px(52), rect.h -| (2 * self.px(16)));
+        const tile_x = rect.x + pad;
+        const tile_y = rect.y + (rect.h -| tile) / 2;
+        if (look.image) |pixels| {
             // Colour icons keep their own colours: a neutral tile, the
             // image a little larger than a vector glyph.
             const image_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent_soft else theme.panel_alt;
