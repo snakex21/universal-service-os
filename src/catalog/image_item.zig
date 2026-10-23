@@ -9,4 +9,6 @@ pub const ImageItem = struct {
     /// the UEFI image list (platform/uefi/windows_media_probe.zig), null when
     /// the image was not probed.
     media: ?windows_media.Info = null,
+    /// A floppy set: the number of diskette images in the folder.
+    disks: u8 = 0,
 };

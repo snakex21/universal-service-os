@@ -15,7 +15,8 @@
 #   \USOSDOS           INSTALL.BAT and the other EFI\USOS\dos-native\msdos
 #                      helpers, CSMWRAP.TAG, DOSFILES = the MS-DOS ISO root,
 #                      WINSETUP = the Windows 3.x ISO root (one directory
-#                      level kept), EARLY.TAG for Windows 1.0x-3.0,
+#                      level kept) or the merged floppy disk set
+#                      (DOS_WIN3_ISO names a folder), EARLY.TAG for Windows 1.0x-3.0,
 #                      PROGRAMS (DATA),
 #                      MEMDISK and BOOT.IMG = the MS-DOS 6.22 El Torito
 #                      floppy with our AUTOEXEC.BAT / CONFIG.SYS
@@ -50,6 +51,7 @@ for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/xp_csmwrap_esp.sh" "$ESP_DI
     [ -r "$file" ] || fail "missing: $file"
 done
 [ -z "$WIN3_ISO" ] || [ -r "$WIN3_ISO" ] || fail "missing: $WIN3_ISO"
+[ ! -d "$WIN3_ISO" ] || [ -r "$LIB/floppy_set.sh" ] || fail "missing: $LIB/floppy_set.sh"
 case "$SIZE_MIB" in 128|256|512) ;; *) fail "unexpected partition size: $SIZE_MIB" ;; esac
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
     fail 'a partition of the selected disk is mounted; no disk was changed'
@@ -71,7 +73,14 @@ dos_loop=$(losetup -f) || fail 'no free loop device for the MS-DOS ISO'
 losetup -r "$dos_loop" "$DOS_ISO" || fail 'cannot attach the MS-DOS ISO'
 mount -t iso9660 -o ro "$dos_loop" "$work/dos" || fail 'cannot mount the MS-DOS ISO'
 [ -f "$work/dos/SYS.COM" ] || [ -f "$work/dos/sys.com" ] || fail 'the MS-DOS ISO has no SYS.COM in its root'
-if [ -n "$WIN3_ISO" ]; then
+if [ -d "$WIN3_ISO" ]; then
+    # A floppy disk set (a folder of diskette images in Images, the menu's
+    # "floppy set" entry): every diskette merged into one folder, the same
+    # files the ISO made from these diskettes has (tools/floppy_set.sh).
+    . "$LIB/floppy_set.sh"
+    floppy_set_merge "$WIN3_ISO" "$work/win" || fail 'the floppy disk set could not be read'
+    [ -f "$work/win/SETUP.EXE" ] || fail 'the floppy disk set has no SETUP.EXE (Windows Setup diskette 1 missing?)'
+elif [ -n "$WIN3_ISO" ]; then
     win_loop=$(losetup -f) || fail 'no free loop device for the Windows 3.x ISO'
     losetup -r "$win_loop" "$WIN3_ISO" || fail 'cannot attach the Windows 3.x ISO'
     mount -t iso9660 -o ro "$win_loop" "$work/win" || fail 'cannot mount the Windows 3.x ISO'

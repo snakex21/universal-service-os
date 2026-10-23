@@ -346,6 +346,18 @@ const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-m
 /// Core does not carry them; src/catalog/windows_legacy.zig).
 pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0", "windows-2-11-386", "windows-2-11-286", "windows-2-03", "windows-1-04", "windows-1-01" };
 
+/// Floppy disk sets (src/catalog/floppy_set.zig): Windows 1.0x-3.x and WfW,
+/// whose step 620 copies Setup into one folder (dos_csmwrap_target.sh merges
+/// the diskettes into USOSDOS/WINSETUP like an ISO made from them).
+pub const floppy_set_ids = &[_][]const u8{ "windows-3-1", "windows-3-11" } ++ windows_early_ids;
+
+pub fn floppySetSupported(system_id: []const u8) bool {
+    for (floppy_set_ids) |id| {
+        if (std.mem.eql(u8, id, system_id)) return true;
+    }
+    return false;
+}
+
 const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-nt-4-tse" };
 const posready_ids = &[_][]const u8{"windows-embedded-posready-2009"};
 /// Custom OS (src/catalog/other_systems.zig) and FreeDOS from UEFI: the image
@@ -375,6 +387,7 @@ const uefi_profiles = [_]Profile{
     // Windows 95/98/Me from UEFI: micro-Linux step 620 writes a FAT32 Setup
     // disk with a one-time DOS start and a CSMWrap ESP; Setup then runs from
     // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
+    .{ .id = "win3x-floppy-set-uefi-csmwrap", .systems = .{ .ids = floppy_set_ids }, .images = &.{.floppy_set}, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = dos_family_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "w9x-uefi-other", .systems = .{ .ids = dos_family_ids }, .firmware = .uefi, .backend = null, .progress = .none },
     // Windows NT 4.0 Workstation / Server from UEFI: the same step 620; the
@@ -419,6 +432,8 @@ pub const profiles = (if (native_windows7_enabled) uefi_profiles else [_]Profile
     .{ .id = "win81-bios-other-iso", .systems = .{ .ids = &.{"windows-8-1"} }, .images = iso, .methods = &.{.direct_iso}, .firmware = .bios, .backend = null, .progress = .none },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
+    // Floppy disk sets: only the rule above (Windows 1.0x-3.x on UEFI).
+    .{ .id = "floppy-set-unsupported", .images = &.{.floppy_set}, .backend = null, .progress = .none },
     .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },
     .{ .id = "nt5-staging", .systems = .nt5_staging, .images = iso, .methods = &.{.automatic}, .backend = .xp_staging, .progress = .core },
     .{ .id = "win10-11-uefi-native", .systems = .{ .native = .modern }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .progress = .direct_iso },
@@ -570,6 +585,25 @@ test "Windows NT 3.51 / 3.5 / 3.1 Workstation and Server on UEFI: the VM install
         try std.testing.expectEqual(Backend.win9x_uefi, backend(nt3, .iso, .automatic, .uefi).?);
         try std.testing.expect(backend(nt3, .iso, .chainload, .uefi) == null);
         try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
+    }
+}
+
+test "floppy disk sets: Windows 1.0x-3.x on UEFI only, refused everywhere else" {
+    const systems = @import("systems.zig");
+    for (floppy_set_ids) |id| {
+        const entry = systems.findById(id).?;
+        try std.testing.expectEqualStrings("win3x-floppy-set-uefi-csmwrap", select(entry, .floppy_set, .automatic, .uefi).?.id);
+        try std.testing.expectEqual(Backend.win9x_uefi, backend(entry, .floppy_set, .automatic, .uefi).?);
+        try std.testing.expect(backend(entry, .floppy_set, .automatic, .bios) == null);
+        try std.testing.expect(backend(entry, .floppy_set, .chainload, .uefi) == null);
+        try std.testing.expect(floppySetSupported(id));
+    }
+    for ([_][]const u8{ "ms-dos", "windows-98-se", "windows-95", "windows-nt-4", "windows-xp", "windows-11", "freedos", "ubuntu" }) |id| {
+        const entry = systems.findById(id).?;
+        try std.testing.expect(!floppySetSupported(id));
+        for ([_]?Firmware{ .uefi, .bios, null }) |firmware| {
+            try std.testing.expect(backend(entry, .floppy_set, .automatic, firmware) == null);
+        }
     }
 }
 

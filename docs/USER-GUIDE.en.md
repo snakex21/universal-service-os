@@ -344,6 +344,30 @@ USOS_DATA\
   other way round), the menu tells you the right folder. The image can still
   be started.
 
+#### Floppy disk media
+
+Instead of an ISO you can use a set of floppy disk images. The whole set is
+one folder in `Images`, e.g.:
+
+```
+Systems\Windows\Windows for Workgroups 3.11\Images\WfW 3.11 PL\
+    disk01.img  disk02.img  ...  disk10.img
+```
+
+- The UEFI menu lists the folder as one entry (folder name, `FDD` label,
+  number of disks). It installs exactly like the ISO.
+- Images: `.img`, `.ima`, `.vfd` or `.flp` of a diskette size
+  (160/180/320/360 KB, 720 KB, 1.2 MB, 1.44 MB, 2.88 MB, FAT12). Other files
+  in the folder (e.g. `.txt`) are ignored.
+- Any names; the order is natural (`disk2` before `disk10`; `DISK_1`,
+  `disk01`, `Disk 1 of 10` all work).
+- The files of all diskettes go into one Setup folder. A file found on
+  several diskettes: the first copy is kept; a different content is noted in
+  the preparation log (`EFI\USOS\win9x\prepare.log`).
+- Supported: Windows 1.0x-3.x and Windows for Workgroups 3.11 (UEFI menu, also without CSM;
+  the BIOS menu does not list sets). For other systems the menu shows the set as an
+  unsupported format; use an ISO there.
+
 ### 4.2 Answer files (unattended installation)
 
 - Windows 6.x and newer: `.xml` files in `Systems\Windows\<system>\Unattended\`.
