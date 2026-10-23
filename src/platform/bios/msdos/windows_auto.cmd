@@ -53,5 +53,13 @@ goto end
 :missing
 echo Brakuje plikow Windows w C:\WINDOWS.
 :end
+rem WIN typed at the DOS prompt from now on: the mode of the default menu item
+rem (C:\USOSW3\WINRUN.BAT; WIN /3 and other arguments unchanged). DOSKEY
+rem (about 4 KiB conventional memory) only after Windows or the menu item, so
+rem Windows started from the menu runs without it.
+if not exist C:\USOSW3\WINRUN.BAT goto macro_ok
+if not exist C:\DOS\DOSKEY.COM goto macro_ok
+C:\DOS\DOSKEY.COM win=C:\USOSW3\WINRUN.BAT $* >nul
+:macro_ok
 echo.
 echo Aby ponownie wybrac tryb uruchomienia, zrestartuj komputer.

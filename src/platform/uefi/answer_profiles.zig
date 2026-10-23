@@ -377,6 +377,9 @@ pub fn clearWin9x(root: *uefi.protocol.File) void {
     for (answer.posready.staged) |entry| {
         deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
     }
+    for (answer.dos.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
 }
 
 /// Windows 95/98/Me through the BIOS mode (docs/win9x-modern-2026-09-30.md):
@@ -406,6 +409,11 @@ pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
     for (answer.posready.staged) |entry| {
         const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // MS-DOS / Windows 1.x-3.x (same step 620): DOS.INI, the regional settings.
+    for (answer.dos.staged) |entry| {
+        const bytes = try answer.dos.render(profile, &rendered);
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), bytes);
     }
     var line: [96]u8 = undefined;
     serial.writeAscii(std.fmt.bufPrint(&line, "[PROFILE] staged {s} for Windows 95/98/Me\n", .{profile.name.slice()}) catch "[PROFILE] staged 9x\n");

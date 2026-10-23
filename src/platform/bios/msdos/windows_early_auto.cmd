@@ -106,5 +106,16 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 :v10_log2
 echo USOS %UDIAG%: dziennik w C:\USOS\DIAG\%UDIAG%.TXT
 :end_msg
+rem Windows 3.0 (SYSTEM\DOSX.EXE): WIN typed at the DOS prompt from now on
+rem starts standard mode (C:\USOSW3\WINRUN.BAT; WIN /3, /R and other
+rem arguments unchanged). DOSKEY (about 4 KiB) only after Windows or the menu
+rem item. Windows 1.0x/2.x and Windows/386 keep their own WIN / WIN386.
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto macro_ok
+if exist C:\WIN386\WIN386.EXE goto macro_ok
+if exist C:\WINDOWS\WIN386.EXE goto macro_ok
+if not exist C:\USOSW3\WINRUN.BAT goto macro_ok
+if not exist C:\DOS\DOSKEY.COM goto macro_ok
+C:\DOS\DOSKEY.COM win=C:\USOSW3\WINRUN.BAT $* >nul
+:macro_ok
 echo.
 echo Aby ponownie wybrac tryb uruchomienia, zrestartuj komputer.

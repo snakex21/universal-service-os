@@ -187,8 +187,10 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
     // Windows NT 4.0 / 3.51: WINNT.SIF (answer/nt4.zig, answer/nt3.zig).
     if (answer_target.familyFor(system.id) == null and @import("answer/msbatch.zig").releaseFor(system.id) == null and
         !@import("answer/nt4.zig").isNt4(system.id) and !@import("answer/nt3.zig").isNt3(system.id) and
-        !@import("answer/posready.zig").isPosReady(system.id)) return false;
-    if (image != .iso and image != .wim) return false;
+        !@import("answer/posready.zig").isPosReady(system.id) and !@import("answer/dos.zig").isDos(system.id)) return false;
+    // MS-DOS / Windows 1.x-3.x: DOS.INI (answer/dos.zig), also from a floppy disk set.
+    const dos_set = image == .floppy_set and @import("answer/dos.zig").isDos(system.id);
+    if (image != .iso and image != .wim and !dos_set) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
         .xp_uefi_staging => true,
@@ -213,7 +215,11 @@ test "Windows 95/98/Me offer answer profiles on the UEFI path (MSBATCH.INF)" {
     for ([_][]const u8{ "windows-95", "windows-98", "windows-98-se", "windows-me" }) |id| {
         try std.testing.expect(profileCapable(systems.findById(id).?, .iso, .automatic, .uefi));
     }
-    try std.testing.expect(!profileCapable(systems.findById("windows-3-11").?, .iso, .automatic, .uefi));
+    // MS-DOS and Windows 1.x-3.x on UEFI (w9x-uefi-csmwrap): DOS.INI; the BIOS Core path takes none.
+    for ([_][]const u8{ "ms-dos", "windows-3-11", "windows-3-1", "windows-wfw-3-11", "windows-3-0", "windows-1-01" }) |id| {
+        try std.testing.expect(profileCapable(systems.findById(id).?, .iso, .automatic, .uefi));
+    }
+    try std.testing.expect(!profileCapable(systems.findById("ms-dos").?, .iso, .automatic, .bios));
     try std.testing.expect(profileCapable(systems.findById("windows-nt-4").?, .iso, .automatic, .uefi));
     try std.testing.expect(profileCapable(systems.findById("windows-nt-4-server").?, .iso, .automatic, .uefi));
     try std.testing.expect(profileCapable(systems.findById("windows-nt-3-51").?, .iso, .automatic, .uefi));

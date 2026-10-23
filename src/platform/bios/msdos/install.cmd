@@ -144,6 +144,11 @@ copy %USRC%\W3CONFIG.SYS C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W3AUTO.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+rem WIN typed at the DOS prompt = the menu's mode (DOSKEY macro, W3AUTO.BAT).
+if not exist %USRC%\WINRUN.BAT goto winrun_done
+copy %USRC%\WINRUN.BAT C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+:winrun_done
 rem CSMWrap: HIMEM /M:2 and VBMOUSE in the start menu, SYSTEM.INI changes.
 if not exist %USRC%\CSMWRAP.TAG goto csm_w3_done
 copy %USRC%\W3CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
@@ -226,6 +231,16 @@ echo After Setup, USOS prepares a Windows and DOS start menu.
 echo A final restart will load that menu and its new settings.
 goto reboot_prompt
 :dos_done
+rem Regional settings of the answer profile (dos_csmwrap_target.sh, DOS.INI):
+rem COUNTRY and DISPLAY.SYS / MODE CON CODEPAGE (and KEYB when chosen), as a
+rem localized MS-DOS Setup writes them. The Windows start menus carry the
+rem same lines; no file = US defaults as before.
+if not exist %USRC%\REGCFG.SYS goto regcfg_done
+type %USRC%\REGCFG.SYS>>C:\CONFIG.SYS
+:regcfg_done
+if not exist %USRC%\REGAUTO.BAT goto regauto_done
+type %USRC%\REGAUTO.BAT>>C:\AUTOEXEC.BAT
+:regauto_done
 cls
 echo USOS - installation completed.
 echo.

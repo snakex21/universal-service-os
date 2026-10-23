@@ -41,6 +41,8 @@ bad values are refused with the field and the line, never the value.
 | `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
 | `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-9x`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
+| `dos_regional` | MS-DOS 6.22 and Windows 1.x-3.x (`dos.zig`, DOS.INI): `auto` = COUNTRY, code page (DISPLAY.SYS + MODE CON CODEPAGE) from `locale`, as a localized MS-DOS Setup writes them, and the regional text pages of Windows 3.1 Setup (W3PL.KEY) answered; `manual` = nothing written, those pages left to the user | default `auto`; written only as `manual` |
+| `dos_keyb` | MS-DOS: also `KEYB <layout>` from `keyboard` (only a layout of the same code page) | default `no`: KEYB translates in INT 09h, which USB keys under CSMWrap never pass (QEMU usb-kbd without i8042, 2026-10-24); for a PS/2 keyboard |
 | tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`, `keep`: Windows' own mode, no USOSRES, docs/display-policy.md) | default off / `default` / `auto`; see "Tweaks" |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
@@ -461,6 +463,23 @@ give byte-identical `WINNT.SIF` and accounts script.
 
 ## Renderers
 
+- **MS-DOS / Windows 1.x-3.x** (`dos.zig`, 2026-10-24): `DOS.INI`
+  (`[dos]` `mode`, `country`, `codepage`, `cpi`, `keyb`, `keybfile`),
+  staged by `stageWin9x` as `\EFI\USOS\answer\DOS.INI` for every DOS-based
+  system (the profile is offered for `ms-dos` and `windows-1-01` ...
+  `windows-wfw-3-11`; the group `windows` includes them, `windows-9x` does
+  not). Table: the MS-DOS 6.22 COUNTRY.TXT country list (Estonian,
+  Latvian, Lithuanian, Ukrainian: no country, nothing written; far east:
+  COUNTRY with 437 only). micro-Linux (`tools/dos_win3_menu.sh`
+  `dos_regional_apply`) writes `COUNTRY=` + `DISPLAY.SYS CON=(EGA,,1)` and
+  `MODE CON CODEPAGE PREPARE/SELECT` (+ `KEYB`) into the MS-DOS start files
+  (INSTALL.BAT appends REGCFG.SYS / REGAUTO.BAT) and into the Windows start
+  menus (a `[common]` block at the end of W3CONFIG / W1CONFIG, the AUTOEXEC
+  lines after `set TEMP=`). The Windows Setup stage itself runs without
+  them. No profile = US defaults, as before. MS-DOS itself has no Setup
+  pages in the USOS flow (SYS + PREPDOS), so `manual` means: nothing
+  written, and the W3PL.KEY answers of the Central European Windows 3.1 /
+  WfW 3.11 Setup pages are not used.
 - **NT5** (`nt5.zig`): the profile as the normalized settings of
   `tools/xp_user_settings.sh` plus `family` (`xp`, `2000`, `2003`),
   `locale`, `input_locale`, `language_group`. The staging loads it in
