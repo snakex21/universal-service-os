@@ -16,16 +16,20 @@ pub const Badge = ui_mod.Badge;
 pub const HeaderInfo = ui_mod.HeaderInfo;
 pub const Icon = icons.Kind;
 
+/// Disabled and colour-icon home cards (the macOS tile) exist only in the
+/// UEFI menu; the size-limited Legacy BIOS Core (freestanding) leaves them out.
+const card_extras = @import("builtin").os.tag != .freestanding;
+
 pub const HomeItem = struct {
     icon: Icon,
     title: []const u8,
     description: []const u8,
     /// Colour system icon (32x32 RGBA, e.g. the macOS tile from bios-ui.bin)
     /// drawn instead of the vector `icon` when present.
-    image: ?[]const u8 = null,
+    image: if (card_extras) ?[]const u8 else void = if (card_extras) null else {},
     /// A disabled card stays visible and selectable (it explains itself) but
     /// is drawn greyed out.
-    enabled: bool = true,
+    enabled: if (card_extras) bool else void = if (card_extras) true else {},
 };
 
 pub fn home(ui: *const Ui, header: HeaderInfo, items: []const HomeItem, selected: usize, hover: ?usize, hints: []const Hint) void {
@@ -39,7 +43,12 @@ pub fn home(ui: *const Ui, header: HeaderInfo, items: []const HomeItem, selected
 pub fn homeItem(ui: *const Ui, items: []const HomeItem, index: usize, state: RowState) void {
     if (index >= items.len) return;
     const item = items[index];
-    ui.homeCardWith(ui.homeCardRect(index, items.len), .{ .icon = item.icon, .image = item.image, .enabled = item.enabled }, item.title, item.description, state);
+    const rect = ui.homeCardRect(index, items.len);
+    if (card_extras) {
+        ui.homeCardWith(rect, .{ .icon = item.icon, .image = item.image, .enabled = item.enabled }, item.title, item.description, state);
+    } else {
+        ui.homeCard(rect, item.icon, item.title, item.description, state);
+    }
 }
 
 /// The optional offer banner under the home cards (e.g. "save the Secure
