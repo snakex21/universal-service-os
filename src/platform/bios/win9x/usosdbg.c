@@ -1174,20 +1174,21 @@ static const char *uds_why_name(DWORD w)
 
 static const char *uds_ev_name(BYTE e)
 {
-    static const char *const n[18] = { "?", "present", "GONE", "reset", "eject", "badreq", "HWFAIL", "TIMEOUT",
+    static const char *const n[20] = { "?", "present", "GONE", "reset", "eject", "badreq", "HWFAIL", "TIMEOUT",
                                        "PHASE", "REGFAIL", "stall", "plugged in", "PLUG FAILED", "connect",
-                                       "unplugged", "connected, not set up at POST", "media", "watch armed" };
-    return e <= UDS_EV_ARM ? n[e] : "?";
+                                       "unplugged", "connected, not set up at POST", "media", "watch armed",
+                                       "keyboard/mouse unplugged", "keyboard/mouse back" };
+    return e <= UDS_EV_HIDBACK ? n[e] : "?";
 }
 
 /* UDS_AF_*: why a stick plugged in at runtime was not brought up */
 static const char *uds_af_name(BYTE r)
 {
-    static const char *const n[12] = { "?", "port reset", "Enable Slot", "Address Device", "device descriptor",
+    static const char *const n[13] = { "?", "port reset", "Enable Slot", "Address Device", "device descriptor",
                                        "config descriptor", "not a USB stick (no bulk-only mass storage)",
                                        "SET_CONFIGURATION", "Configure Endpoint", "both hot-plug slots in use",
-                                       "device table full", "EP0 packet size" };
-    return r <= UDS_AF_MPS ? n[r] : "?";
+                                       "device table full", "EP0 packet size", "keyboard/mouse bring-up" };
+    return r <= UDS_AF_HID ? n[r] : "?";
 }
 
 /* UDS_FS_*: what the media check found, and whether Windows 9x reads it */
@@ -1242,6 +1243,8 @@ static void uds_ev_result(LPSTR t, BYTE e, BYTE r)
     case UDS_EV_DETACH: wsprintf(t, "%s", (LPSTR)(r ? "replugged at once" : "port empty")); break;
     case UDS_EV_MEDIA: wsprintf(t, "%s", (LPSTR)uds_fs_name(r)); break;
     case UDS_EV_ARM: wsprintf(t, "%u xHCI", (WORD)r); break;
+    case UDS_EV_HIDGONE: wsprintf(t, "%s", (LPSTR)(r ? "replugged at once" : "port empty")); break;
+    case UDS_EV_HIDBACK: wsprintf(t, "after %u retries", (WORD)r); break;
     default: wsprintf(t, "result %u", (WORD)r); break;
     }
 }

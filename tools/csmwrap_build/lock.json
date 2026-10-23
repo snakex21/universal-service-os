@@ -1,5 +1,5 @@
 {
-  "comment": "Pinned inputs of tools/build_csmwrap.ps1 (CSMWrap 3.1.2-usos17 source build in an Alpine VM; the 1.0 build 3.1.2-usos1 with run_build_vm.py --patches tools/vendor/csmwrap/3.1.2-usos1/patches --usos-version 3.1.2-usos1).",
+  "comment": "Pinned inputs of tools/build_csmwrap.ps1 (CSMWrap 3.1.2-usos18 source build in an Alpine VM; the 1.0 build 3.1.2-usos1 with run_build_vm.py --patches tools/vendor/csmwrap/3.1.2-usos1/patches --usos-version 3.1.2-usos1).",
   "alpine_iso": {
     "file": "tools/cache/alpine/alpine-virt-3.24.1-x86_64.iso",
     "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
@@ -26,5 +26,5 @@
   "source_dir": "csmwrap-3.1.2",
   "source_epoch": 1778284800,
   "upstream_version": "3.1.2",
-  "usos_version": "3.1.2-usos17"
+  "usos_version": "3.1.2-usos18"
 }

@@ -215,13 +215,13 @@ def pins() -> None:
     assert manifest["patches"] == {n: sha(V15 / "patches" / n) for n in names}
     for name, digest in manifest["files"].items():
         assert sha(V15 / name) == digest, name
-    # the release pins moved to 3.1.2-usos16, then 3.1.2-usos17 (same 0001-0020 files, test_csmwrap_uds17.py)
+    # the release pins moved to 3.1.2-usos16, then 3.1.2-usos17 and 3.1.2-usos18 (same 0001-0020 files, test_csmwrap_hid18.py)
     efi = (V15 / "csmwrapx64.efi").read_bytes()
     assert efi[:2] == b"MZ" and b"3.1.2-usos15" in efi and b"pci_irq_routing" in efi
     tp = json.loads((ROOT / "tools/release/third-party.json").read_text(encoding="utf-8"))
     cw = [c for c in tp["components"] if c.get("id") == "csmwrap"] if isinstance(tp, dict) and "components" in tp else []
     if cw:
-        assert cw[0]["version"] in ("3.1.2-usos15", "3.1.2-usos16", "3.1.2-usos17")
+        assert cw[0]["version"] in ("3.1.2-usos15", "3.1.2-usos16", "3.1.2-usos17", "3.1.2-usos18")
 
 
 def main() -> int:

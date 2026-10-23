@@ -17,6 +17,13 @@ wheel count (BH) after mouse_move 0 0 dz: dz > 0 (QEMU wheel up) must give
 a negative sum (CuteMouse convention: up negative), dz < 0 positive. Without
 --wheel the probe also checks that no wheel shows up (an older CSMWrap).
 
+--replug (CSMWrap 3.1.2-usos18, patches 0023/0024): after the first mouse
+checks, QMP-free monitor device_del of the USB keyboard and mouse, then
+device_add again: cycle 1 on the same root ports (1, 2), cycle 2 on other
+ports (3, 4). After each cycle the mouse checks run again, and in the last
+one a key ends M33TEST and the USB keyboard types ECHO USOS-REPLUG-OK at the
+DOS prompt (PASS when the echo output line is on screen). Session mode only.
+
 --mode session (default): AUTOEXEC loads VBMOUSE and runs M33TEST (the
 FreeDOS / MS-DOS RAM session wiring: FDAUTO.BAT, LIVE.BAT).
 --mode dosmouse: the Windows 9x MS-DOS mode wrapper. C:\\USOS9X holds
@@ -71,7 +78,7 @@ AUTOEXEC = {
 }
 LINE = re.compile(r'M33 I=([0-9A-F]{4}) N=([0-9A-F]{4}) X=([0-9A-F]{4}) Y=([0-9A-F]{4}) B=([0-9A-F]{4}) P=([0-9A-F]{4})'
                   r' A=([0-9A-F]{4}) C=([0-9A-F]{4}) W=([0-9A-F]{4})')
-KEYS = {' ': 'spc', '\n': 'ret', '\\': 'backslash', ':': 'shift-semicolon', '.': 'dot'}
+KEYS = {' ': 'spc', '-': 'minus', '\n': 'ret', '\\': 'backslash', ':': 'shift-semicolon', '.': 'dot'}
 
 
 def build_com(source: Path, work: Path) -> bytes:
@@ -213,6 +220,33 @@ def wheel_checks(mon: Monitor, scr: Screen, want: bool, log) -> bool:
     return before[6] == 0x574D and bool(before[7] & 1) and w1 < w0 and w2 > w1
 
 
+def replug(mon: Monitor, kbd_port: int, mouse_port: int, log):
+    mon.cmd('device_del mouse')
+    mon.cmd('device_del kbd')
+    time.sleep(2.0)
+    mon.cmd(f'device_add usb-kbd,bus=xhci.0,port={kbd_port},id=kbd')
+    mon.cmd(f'device_add usb-mouse,bus=xhci.0,port={mouse_port},id=mouse')
+    time.sleep(3.0)
+    log.append(f'replugged: keyboard port {kbd_port}, mouse port {mouse_port}')
+
+
+def replug_checks(mon: Monitor, scr: Screen, log) -> bool:
+    ok = True
+    for n, (kp, mp) in enumerate(((1, 2), (3, 4)), 1):
+        replug(mon, kp, mp, log)
+        first = scr.state()
+        log.append(f'cycle {n} start {first}')
+        good = bool(first) and mouse_checks(mon, scr, first, log)
+        log.append(f'cycle {n} mouse ' + ('PASS' if good else 'FAIL'))
+        ok = ok and good
+    mon.cmd('sendkey spc')   # a key ends M33TEST (USB keyboard after replug)
+    time.sleep(2.0)
+    type_text(mon, 'echo USOS-REPLUG-OK\n')
+    text = scr.wait(lambda t: any(l.strip() == 'USOS-REPLUG-OK' for l in t.splitlines()), 30)
+    log.append('replug keyboard ' + ('PASS' if text else 'FAIL'))
+    return ok and bool(text)
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--output', type=Path, required=True)
@@ -221,6 +255,7 @@ def main() -> int:
     p.add_argument('--keep', action='store_true')
     p.add_argument('--csmwrap', type=Path, default=CSMWRAP, help='csmwrapx64.efi (default: 3.1.2-usos11)')
     p.add_argument('--wheel', action='store_true', help='expect the USB wheel (CSMWrap patch 0016)')
+    p.add_argument('--replug', action='store_true', help='unplug / replug keyboard and mouse (patches 0023/0024)')
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -236,7 +271,8 @@ def main() -> int:
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
            '-drive', f'if=none,id=dos,format=raw,cache=writeback,file={disk.as_posix()}',
            '-device', 'nvme,drive=dos,serial=USOS-DOS-MOUSE',
-           '-device', 'qemu-xhci,id=xhci', '-device', 'usb-kbd,bus=xhci.0', '-device', 'usb-mouse,bus=xhci.0']
+           '-device', 'qemu-xhci,id=xhci', '-device', 'usb-kbd,bus=xhci.0,port=1,id=kbd',
+           '-device', 'usb-mouse,bus=xhci.0,port=2,id=mouse']
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print('QEMU PID', proc.pid, flush=True)
     log, ok, text = [], False, ''
@@ -257,6 +293,8 @@ def main() -> int:
         if first and first[0] == 0xFFFF:
             ok = mouse_checks(mon, scr, first, log)
             ok = wheel_checks(mon, scr, a.wheel, log) and ok
+            if a.replug and a.mode == 'session':
+                ok = replug_checks(mon, scr, log) and ok
             if a.mode == 'dosmouse':
                 mon.cmd('sendkey spc')
                 time.sleep(1.5)

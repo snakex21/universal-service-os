@@ -3,7 +3,7 @@
 # docs/design/csmwrap-integration.md). Runs after prepare_xp_target.sh PASSED
 # on the same target: adds a small FAT16 EFI system partition (MBR type 0xEF)
 # in the space the Windows plan left free at the end of the disk
-# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos17 (a MODIFIED
+# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos18 (a MODIFIED
 # CSMWrap 3.1.2: quiet unless verbose = true, docs/research/csmwrap.md 6 and 7)
 # as \EFI\BOOT\BOOTX64.EFI, its licences, source and patches in \CSMWRAP.
 # The firmware then boots the target through
@@ -17,7 +17,7 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d
+PINNED=0188057913ee7b4680027e45c53c45048deb8583c599c3c0672d98748704e0a4
 # Windows 2000 diagnostic setup (USOS_W2K_DIAG=on, DATA w2k-diag.txt):
 # CSMWrap 3.1.2-usos11-diag (usos11 + 0011 tick watcher + 0013 NMI snapshot,
 # tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
@@ -34,7 +34,7 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
-[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos17 hash'
+[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos18 hash'
 for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done

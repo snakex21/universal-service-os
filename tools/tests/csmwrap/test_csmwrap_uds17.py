@@ -149,6 +149,9 @@ def source(zig: str) -> None:
 def pins() -> None:
     h = json.loads((V17 / 'manifest.json').read_text(encoding='utf-8'))['files']['csmwrapx64.efi']
     assert h == '3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d'
+    # 2026-10-23: the release pin moved on to 3.1.2-usos18 (test_csmwrap_hid18.py checks it)
+    print('[pins] usos17 manifest hash; the release pins are checked by test_csmwrap_hid18.py')
+    return
     lock = json.loads((ROOT / 'tools/csmwrap_build/lock.json').read_text(encoding='utf-8'))
     assert lock['usos_version'] == '3.1.2-usos17', lock['usos_version']
     esp = (ROOT / 'tools/xp_csmwrap_esp.sh').read_text(encoding='utf-8')

@@ -179,6 +179,8 @@ struct uds_diag_disk {          /* 12 bytes: the BIOS hard disks / CD-ROMs SeaBI
 #define UDS_EV_UNCLAIMED 15  /* connected when the watch armed, no device slot (result: PLS) */
 #define UDS_EV_MEDIA     16  /* media check (result: UDS_FS_*) */
 #define UDS_EV_ARM       17  /* the port watch armed (result: watched controllers) */
+#define UDS_EV_HIDGONE   18  /* usos18: root USB keyboard/mouse unplugged (result: 1 = replugged at once) */
+#define UDS_EV_HIDBACK   19  /* usos18: root USB keyboard/mouse re-attached (result: retries) */
 
 /* bring-up failure reasons (UDS_EV_ATTFAIL, last_fail) */
 #define UDS_AF_RESET    1    /* port reset failed / disconnected */
@@ -192,6 +194,7 @@ struct uds_diag_disk {          /* 12 bytes: the BIOS hard disks / CD-ROMs SeaBI
 #define UDS_AF_POOL     9    /* both runtime pool chunks in use */
 #define UDS_AF_TABLE   10    /* device table full */
 #define UDS_AF_MPS     11    /* EP0 packet size */
+#define UDS_AF_HID     12    /* usos18: keyboard/mouse re-attach bring-up failed */
 
 /* media check (struct uds_diag_media.fs) */
 #define UDS_FS_UNREAD   0
