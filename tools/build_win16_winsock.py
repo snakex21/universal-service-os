@@ -103,20 +103,32 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
 
     OBJ_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    obj = OBJ_DIR / 'winsock16.obj'
 
+    includes = watcom / 'h'
     source = SRC_DIR / 'winsock16.c'
     def_file = SRC_DIR / 'winsock16.def'
-    for needed in (source, def_file, headers / 'windows.h', headers / 'winsock.h'):
+    net_dir = SRC_DIR / 'net'
+    # winsock16.c first, then the engine: the portable core (net/*.c minus
+    # win16_pkt.c) plus win16_pkt.c, which is the only Windows/DPMI consumer.
+    sources = [source] + sorted(net_dir.glob('*.c'))
+    for needed in (source, def_file, net_dir / 'net.h', net_dir / 'usos_pkt.h',
+                   net_dir / 'win16_pkt.c', headers / 'windows.h',
+                   headers / 'winsock.h', includes / 'i86.h'):
         if not needed.exists():
             raise SystemExit('missing input: %s' % needed)
 
     print('Open Watcom: %s' % watcom)
-    print('compile: %s' % source.relative_to(ROOT))
-    # -bt=windows: 16-bit Windows target, -ml: large model, -zW: Windows
-    # prolog/epilog, -bd: build a DLL (no DOS extender stub).
-    run([wcc, '-bt=windows', '-bd', '-ml', '-zW', '-zq', '-w3',
-         '-I%s' % headers, '-fo=%s' % obj, source], verbose)
+    objs = []
+    for one in sources:
+        obj = OBJ_DIR / (one.stem + '.obj')
+        print('compile: %s' % one.relative_to(ROOT))
+        # -bt=windows: 16-bit Windows target, -ml: large model, -zW: Windows
+        # prolog/epilog, -bd: build a DLL (no DOS extender stub).  h/ carries
+        # i86.h (int86x, MK_FP, segread), h/win the Windows and Winsock API.
+        run([wcc, '-bt=windows', '-bd', '-ml', '-zW', '-zq', '-w3',
+             '-I%s' % headers, '-I%s' % includes, '-I%s' % net_dir,
+             '-fo=%s' % obj, one], verbose)
+        objs.append(obj)
 
     exports = parse_def_exports(def_file)
     print('link: %s (%d exports)' % (ARTIFACT.relative_to(ROOT), len(exports)))
@@ -131,11 +143,11 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
         'option nodefaultlibs',
         'option modname=WINSOCK',
         'name %s' % ARTIFACT,
-        'file %s' % obj,
         'file %s' % (libs / 'libentry.obj'),
         'library %s' % (libs / 'windows.lib'),
         'library %s' % (libs / 'clibl.lib'),
     ]
+    directives += ['file %s' % one for one in objs]
     directives += export_directive(exports)
     response = OBJ_DIR / 'winsock16.lnk'
     response.write_text('\r\n'.join(directives) + '\r\n', encoding='ascii')
