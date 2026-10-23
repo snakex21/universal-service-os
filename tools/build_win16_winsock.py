@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,44 @@ def find_watcom() -> Path | None:
                 if (candidate / 'binnt64' / 'wcc.exe').is_file():
                     return candidate
     return None
+
+
+def parse_def_exports(def_file: Path) -> list[tuple[str, int]]:
+    """Return [(name, ordinal)] from the EXPORTS section of the module def.
+
+    The linker shipped in the toolchain cache (wlink 2.0 beta, 64-bit host)
+    refuses module definition files (``file x.def`` -> E3146, ``option
+    definition=`` -> E3033), so the build re-states the same list with wlink
+    ``export`` directives instead of parsing the .def itself.
+    """
+    exports: list[tuple[str, int]] = []
+    in_exports = False
+    for raw in def_file.read_text(encoding='ascii', errors='replace').splitlines():
+        line = raw.split(';', 1)[0].strip()
+        if not line:
+            continue
+        if line.upper().startswith('EXPORTS'):
+            in_exports = True
+            continue
+        if not in_exports:
+            continue
+        match = re.match(r'^([A-Za-z_][\w@$?]*)\s+@(\d+)\b', line)
+        if match:
+            exports.append((match.group(1), int(match.group(2))))
+    if not exports:
+        raise SystemExit('no exports found in %s' % def_file)
+    return exports
+
+
+def export_directive(exports: list[tuple[str, int]]) -> list[str]:
+    """One wlink ``export`` directive per entry (C names get a '_').
+
+    A single comma-separated ``export`` argument is long enough that the
+    linker's own command-line parser chokes on it (E3033 near '"export'), so
+    the whole link is driven from a response file with one line per export.
+    """
+    items = ['export %s.%d=%s' % (name, ordinal, name.upper()) for name, ordinal in exports]
+    return items
 
 
 def run(cmd: list[str], verbose: bool, cwd: Path | None = None) -> None:
@@ -76,10 +115,28 @@ def build(watcom: Path, verbose: bool, keep_objects: bool) -> Path:
     run([wcc, '-bt=windows', '-bd', '-ml', '-zW', '-zq', '-w3',
          '-I%s' % headers, '-fo=%s' % obj, source], verbose)
 
-    print('link: %s' % ARTIFACT.relative_to(ROOT))
-    run([wlink, 'system', 'windows_dll', 'option', 'quiet', 'option', 'nodefaultlibs',
-         'name', ARTIFACT, 'file', obj, def_file,
-         'library', libs / 'windows.lib', libs / 'winsock.lib'], verbose)
+    exports = parse_def_exports(def_file)
+    print('link: %s (%d exports)' % (ARTIFACT.relative_to(ROOT), len(exports)))
+    # format windows dll: NE DLL (the cached 64-bit wlink knows no
+    # 'system windows_dll').  libentry.obj supplies __DLLstart_, clibl.lib the
+    # large-model C runtime (__STK, _big_code_).  The linker in the cache does
+    # not read module definition files at all, so the export table is restated
+    # as wlink directives in a response file.
+    directives = [
+        'format windows dll',
+        'option quiet',
+        'option nodefaultlibs',
+        'option modname=WINSOCK',
+        'name %s' % ARTIFACT,
+        'file %s' % obj,
+        'file %s' % (libs / 'libentry.obj'),
+        'library %s' % (libs / 'windows.lib'),
+        'library %s' % (libs / 'clibl.lib'),
+    ]
+    directives += export_directive(exports)
+    response = OBJ_DIR / 'winsock16.lnk'
+    response.write_text('\r\n'.join(directives) + '\r\n', encoding='ascii')
+    run([wlink, '@%s' % response], verbose)
 
     if not keep_objects:
         shutil.rmtree(OBJ_DIR, ignore_errors=True)

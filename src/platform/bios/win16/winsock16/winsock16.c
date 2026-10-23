@@ -171,6 +171,12 @@ char FAR * __far __pascal inet_ntoa(struct in_addr in)
     return (char FAR *)0;
 }
 
+int __far __pascal ioctlsocket(SOCKET s, long cmd, u_long FAR *argp)
+{
+    (void)s; (void)cmd; (void)argp;
+    return usos_not_implemented();
+}
+
 int __far __pascal listen(SOCKET s, int backlog)
 {
     (void)s; (void)backlog;
