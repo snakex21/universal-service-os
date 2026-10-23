@@ -40,8 +40,13 @@ No proprietary Microsoft binary is patched or added to the repository.
   All six Disable markers completed; new Enable markers appeared after
   restart. QEMU exit0/458.79s; source images unchanged, PS/2 counters zero.
   No Setup, USB or network test was repeated.
-- The exact trace-free output above still requires its one installed-overlay
-  runtime check. No final fresh normal install is claimed by this branch.
+- R143/R144: original 950 DOS installed the exact trace-free recipe artifact;
+  entire hives/INI/other core unchanged, exit85/1.84s, readonly strict fsck PASS.
+- R145: that exact output cold-booted VESA1024×768, completed the selected warm
+  restart, returned to login and the second desktop1024×768, then powered off
+  normally. QEMU exit0/644.03s; source images unchanged and PS/2 counters zero.
+  No USB/network test or Setup was repeated. No final fresh normal install
+  is claimed by this branch.
 
 This is a compatibility workaround, not proof of the VDD implementation's
 internal defect. RTM was tested in QEMU; OSR1 and X470 need independent
