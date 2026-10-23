@@ -421,8 +421,26 @@ def _movable(ins, seg, targets, first):
 
 SITE_SEGMENTS = ('es', 'ds-reg')
 
+# Extra walk starts (segment -> routine offsets) for drivers whose code the
+# walk cannot reach by itself, keyed by the sha256 of the input. Every entry
+# was reviewed by disassembly (docs/win3x-vga-redraw-2026-10-23.md, "3.0a"):
+# code that runs in place (direct near calls, RET, loop bodies entered
+# through computed jumps `mov bl,cs:[bx+T] / add bx,B / jmp [bp-x]` or near
+# pointers in tables the walk does not recognise), never a template that is
+# copied before it runs. Each start is still checked by the walk (clean
+# decode, agrees with the code already reached).
+_W30_TEXT = {2: (0x1B4A, 0x1BD6, 0x20D8, 0x2A69, 0x2A96, 0x2ADC, 0x2B43, 0x2B98,
+                 0x2BB9, 0x2BE9, 0x2C2A, 0x2C7C),
+             3: (0x17A6, 0x1826)}
+REVIEWED_STARTS = {
+    # Windows 3.0a VGA.DRV (386 text output in segment 2, 286 in segment 3)
+    'b7d9400c50228fda4e3701cf8a0155118cd92ef7788446c8cb71f0f919ad150c': _W30_TEXT,
+    # Windows 3.0a EGA.DRV (the same text output code at the same offsets)
+    '03d772c6fa0ef49e38a9f09640d50ad8a1a3538dee46fb8bb19d17db99c88182': _W30_TEXT,
+}
 
-def analyse(ne: NeFile, unlocked_rmw=False, segments=SITE_SEGMENTS):
+
+def analyse(ne: NeFile, unlocked_rmw=False, segments=SITE_SEGMENTS, extra=None):
     """Returns (sites, per-segment reached instruction maps). The window of
     a site is the run of whole instructions (the site plus movable
     neighbours, at least 3 bytes) replaced by CALL+NOPs."""
@@ -433,7 +451,8 @@ def analyse(ne: NeFile, unlocked_rmw=False, segments=SITE_SEGMENTS):
     for seg in ne.segments:
         if not seg.is_code or not seg.data:
             continue
-        insns, targets = walk(seg, starts.get(seg.index, set()) | seg.targets)
+        more = set((extra or {}).get(seg.index, ()))
+        insns, targets = walk(seg, starts.get(seg.index, set()) | seg.targets | more)
         reach[seg.index] = (insns, targets)
         prev = {o + i.size: o for o, i in insns.items()}
         covered = set()
@@ -520,9 +539,11 @@ def sp_users(reach):
     return out
 
 
-def patch(raw: bytes, unlocked_rmw=False, segments=SITE_SEGMENTS):
+def patch(raw: bytes, unlocked_rmw=False, segments=SITE_SEGMENTS, extra=None):
     ne = parse_ne(raw)
-    sites, reach = analyse(ne, unlocked_rmw, segments)
+    if extra is None:
+        extra = REVIEWED_STARTS.get(hashlib.sha256(raw).hexdigest(), {})
+    sites, reach = analyse(ne, unlocked_rmw, segments, extra)
     out = bytearray(raw)
     for seg in ne.segments:
         todo = [s for s in sites if s.seg == seg.index and s.action == 'patched']

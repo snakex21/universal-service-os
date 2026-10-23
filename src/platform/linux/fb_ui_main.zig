@@ -23,6 +23,11 @@ pub fn main(init: std.process.Init) !u8 {
             const log_path = args.next() orelse return 2;
             return @import("driver_stage.zig").run(source, destination, image, log_path);
         }
+        // tools/dos_csmwrap_target.sh: patch the staged Windows 3.x display
+        // driver(s) and VGA logo (X470 latch fault, src/compat/win3x; no UI).
+        if (std.mem.eql(u8, arg, "--win3x-display")) {
+            return usos.win3x.display_run.run(init.io, init.gpa, args.next() orelse return 2);
+        }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
             const bcd = @import("bcd_lowmem.zig");

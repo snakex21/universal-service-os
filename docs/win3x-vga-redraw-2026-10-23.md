@@ -164,3 +164,87 @@ Limits: the patch keeps the instruction effect but not its interrupt
 atomicity (not needed for video memory; the busy flags are not touched);
 code only reachable through pointers the walk does not find stays
 unpatched (none known in 3.1 VGA.DRV); not yet tried on hardware.
+
+## X470 result and the fix in every Windows 3.x install
+
+X470 (2026-10-23): Windows 3.1 PL with the patched VGA.DRV (94 sites) has
+no redraw damage, the logo is clean with the patched VGALOGO.LGO / WIN.COM;
+USOSVGAR 3 says `RMW RESULT LOCKED-ONLY`. USOSVGAR stays an on-demand
+diagnostic (INSTALL.BAT copies it to C:\DOS; no start batch runs it):
+`C:\DOS\USOSVGAR.COM>C:\USOS\DIAG\VGAREG.TXT`.
+
+### Where the files are patched
+
+`tools/dos_csmwrap_target.sh` (micro-Linux, the CSMWrap DOS path the X470
+uses) copies the Windows 3.x ISO root to `C:\USOSDOS\WINSETUP`; right after
+that, for Windows 3.0a / 3.1 / 3.11 / WfW 3.11 only (`DOS_WIN_EARLY` empty
+or `windows-3-0`; 1.x/2.x unchanged), it runs
+`usos-fb-ui --win3x-display "$U/WINSETUP"`. The tool patches, in place:
+
+| file | 3.0a | 3.1 PL | 3.11 OEM EN | WfW 3.11 PL |
+| --- | --- | --- | --- | --- |
+| VGA.DRV | SZDD under the plain name, 87 sites | VGA.DR_ SZDD, 94 | VGA.DR_ KWAJ, 94 (same driver as 3.1) | VGA.DR_ KWAJ, 94 (own build) |
+| EGA.DRV | SZDD, 89 | EGA.DR_ SZDD, 75 | EGA.DR_ KWAJ, 75 (= 3.1) | not on the media |
+| VGALOGO.LGO | SZDD, logo patch | VGALOGO.LG_ SZDD | VGALOGO.LG_ KWAJ (= 3.1) | VGALOGO.LG_ KWAJ (= 3.1) |
+
+Each patched file is stored again in the container the media uses (the
+original header kept, the length updated), so Setup reads it through the
+decompressor it uses for every other file: SZDD with literal-only flag bytes,
+KWAJ method 3 with fixed-length tables (type 0; Microsoft's own compressor
+uses all four table types on the WfW media, type 0 included) and literal
+runs of 32 bytes. Setup then installs the patched driver and builds WIN.COM
+from WIN.CNF + the patched VGALOGO.LGO + VGALOGO.RLE. Before a file is
+replaced the stored result is expanded again and compared. The decisions are
+logged to the prepare log and `WINSETUP\USOSDISP.TXT` (copied with WINSETUP
+to `C:\WINSETUP`). Known drivers only (input sha256); an unknown driver or an
+already patched file is left as it is, so the step is idempotent and an
+unknown edition installs unpatched, as before.
+
+Setup picks VGA.DRV on the X470 and in QEMU for every 3.x version (3.0a by
+detection, 3.1/3.11/WfW by the batch answers); EGA.DRV is patched as the
+640x350 fallback where the media has it.
+
+### Implementation
+
+* `src/compat/win3x/` (Zig, own code, GPL-3.0-or-later): `lz.zig` (SZDD and
+  KWAJ method 3 decoder, literal-only encoders), `display_patch.zig` (the
+  stub/NE layout of tools/win3x_vga_patch.py and the logo pattern patch of
+  tools/win3x_logo_patch.py), `display_table.zig` (generated plans),
+  `display_run.zig` (the folder step). In the micro-Linux it is a mode of
+  usos-fb-ui; on the host `zig build win3x-display-tool` builds
+  `usos-win3x-display patch-dir DIR | expand IN OUT` for the tests.
+* The capstone walk stays on the host: `tools/win3x_patch_table.py` writes
+  `display_table.zig` from the drivers (input sha256, the windows = segment,
+  start, instruction lengths and which one is the XCHG, output sha256). The
+  table holds offsets, lengths and hashes only; the stubs are rebuilt from the
+  user's own file and used only when the result has the recorded sha256.
+  Another edition of a driver is added by running the generator on it.
+
+### Windows 3.0a: the byte-scan sites
+
+The 46 ES sites per 3.0a driver that the walk did not reach are in place
+code, not templates (disassembly review): segment 2 holds the 386 text
+output, segment 3 the 286 one. They are unrolled loop bodies entered by
+computed jumps (`mov bl,cs:[bx+T] / add bx,B / mov [bp-5Ch],bx / jmp
+[bp-5Ch]`, seg2 1B4A/1BD6, seg3 17A6/1826) and helper routines reached
+through near pointer tables the walk does not recognise (seg2 1E1C.., 1DDC,
+1E94..: 20D8, 2A69, 2A96, 2ADC, 2B43, 2B98, 2BB9, 2BE9, 2C2A, 2C7C); they end
+in RET and use direct near calls, so they run where they are. Each does
+`out dx,al` (GC8 bit mask) + `xchg es:[di],al`, the faulting pattern.
+`REVIEWED_STARTS` in tools/win3x_vga_patch.py adds these routine starts for
+the two 3.0a drivers (by sha256); the walk still checks every start. Result:
+VGA.DRV 87 and EGA.DRV 89 sites replaced, no ES site left; the remaining 35
+are SS/DS variables and BP stack slots (busy flags, never video memory).
+Unicorn: every replaced 3.0a VGA.DRV window x 4 write modes is identical to
+the original on a faithful VGA and correct on the fault model (original
+wrong in 238 of 348 runs). Not yet tried on the X470.
+
+### Tests
+
+* `tools/tests/legacy_bios/test_win3x_display_tool.py`: with the media,
+  the Zig tool output equals the Python patchers byte for byte for every
+  version (expanded with own reference decoders), the container is kept, a
+  second run changes nothing, an unknown driver stays untouched, and the
+  committed table equals the generator output; script/subcommand wiring.
+* Zig unit tests (`src/compat/win3x`): containers round trip, stub bytes,
+  logo patch.
