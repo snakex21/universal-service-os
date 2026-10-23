@@ -514,3 +514,11 @@ attached): fresh unattended installs of 1.04 and 1.01 bound the driver
 select files, double-click starts CALC.EXE (1.04) and PAINT.EXE (1.01), a
 pencil drag draws in Paint, a dialog closes with a click. QEMU is not
 hardware evidence; the X470 test is pending (fresh 1.0x install).
+
+## DOS network in the start menu (2026-10-23)
+
+W1AUTO.BAT (all default items, not D1-D6) and W3AUTO.BAT call
+`C:\NET\NETSTART.BAT` (own packet driver USOSPKT + mTCP DHCP) before WIN;
+INSTALL.BAT stages `C:\NET` for every Windows 1.x-3.x install. QEMU only:
+1.01, 2.03, 3.0a, 3.1 start with the driver resident, HTGET works after
+leaving Windows. Details: `docs/win3-net-2026-10-23.md`.

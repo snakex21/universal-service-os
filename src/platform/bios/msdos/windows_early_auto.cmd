@@ -36,6 +36,14 @@ if "%UDIAG%"=="D2" goto tsr_done
 :kbc_load
 if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M
 :tsr_done
+rem Network (C:\NET, staged by INSTALL.BAT): USOSPKT + DHCP before WIN, as
+rem in the MS-DOS install, so mTCP works at the DOS prompt and after leaving
+rem Windows. About 42 KiB conventional memory; no supported NIC = one line,
+rem nothing resident; no DHCP answer = at most about 12 s (Esc skips).
+rem The diagnostic items stay without it.
+if not "%UDIAG%"=="" goto net_skip
+if exist C:\NET\NETSTART.BAT call C:\NET\NETSTART.BAT
+:net_skip
 if "%CONFIG%"=="DOSONLY" goto dos
 if "%UDIAG%"=="" goto win_go
 rem USOSWHER last, so its INT 15h/21h hooks see the calls of the other

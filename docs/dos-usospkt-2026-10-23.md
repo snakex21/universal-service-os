@@ -112,9 +112,12 @@ skips) and one status line. The link wait inside USOSPKT is at most 5 s.
 
 Only the CSMWrap DOS path stages the files (dos_csmwrap_target.sh copies the
 whole helper folder); the BIOS-Core RAM-disk path (dos6_native_iso.zig) has
-an explicit helper list without them - not changed in this round. Windows
-1.x-3.x start menus replace AUTOEXEC.BAT and are not wired (the resident
-DMA driver under Windows 3.x is untested).
+an explicit helper list without them - not changed in this round.
+
+Update 2026-10-23 (feat/win3-net, `docs/win3-net-2026-10-23.md`): INSTALL.BAT
+stages `C:\NET` for the Windows 1.x-3.x installs too (the AUTOEXEC.BAT line
+stays MS-DOS only, Setup runs without the driver), and both Windows start
+menus (W1AUTO.BAT, W3AUTO.BAT) call NETSTART.BAT before WIN.
 
 ## QEMU results (QEMU only, 82576 `-device igb`, not I211)
 

@@ -2,6 +2,9 @@
 prompt $p$g
 path C:\DOS;C:\WINDOWS;C:\PROGRAMS
 set TEMP=C:\TEMP
+rem Network (C:\NET, staged by INSTALL.BAT): USOSPKT + DHCP before WIN, as
+rem in the MS-DOS install (mTCP at the DOS prompt and after leaving Windows).
+if exist C:\NET\NETSTART.BAT call C:\NET\NETSTART.BAT
 if "%CONFIG%"=="DOSONLY" goto dos
 if "%CONFIG%"=="WINSET" goto settings
 if not exist C:\WINDOWS\WIN.COM goto missing

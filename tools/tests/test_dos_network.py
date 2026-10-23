@@ -31,10 +31,30 @@ class DosNetworkTest(unittest.TestCase):
         self.assertEqual(names, set(net.NET_FILES))
         self.assertIn('echo call C:\\NET\\NETSTART.BAT>>C:\\AUTOEXEC.BAT', block)
         self.assertIn('copy C:\\NET\\MTCP.DEF C:\\NET\\MTCP.CFG', block)
-        # only the plain MS-DOS install (no Windows 1.x-3.x start menu yet)
-        self.assertIn('if exist %USRC%\\WINSETUP\\SETUP.EXE goto net_done', block)
+        # staged for every install; the AUTOEXEC.BAT line only for plain
+        # MS-DOS (the Setup stage of Windows 1.x-3.x runs without it)
+        skip = block.index('if exist %USRC%\\WINSETUP\\SETUP.EXE goto net_done')
+        self.assertLess(block.index('for %%f in'), skip)
+        self.assertLess(skip, block.index('echo call C:\\NET\\NETSTART.BAT'))
+        self.assertIn('if not exist C:\\NET\\NUL md C:\\NET', block)
         # before the branch that ends the MS-DOS-only install
         self.assertLess(text.index(':net_done'), text.index(':dos_done'))
+
+    def test_windows_start_menus_call_netstart(self):
+        call = 'if exist C:\\NET\\NETSTART.BAT call C:\\NET\\NETSTART.BAT'
+        # Windows 3.1 / WfW 3.11 (W3AUTO.BAT): every item, before WIN
+        auto = (MSDOS / 'windows_auto.cmd').read_text(encoding='ascii').splitlines()
+        self.assertEqual(auto.count(call), 1)
+        self.assertLess(auto.index(call), auto.index('if "%CONFIG%"=="DOSONLY" goto dos'))
+        # Windows 1.0x-3.0 (W1AUTO.BAT): after the TSRs, not in the D items
+        early = (MSDOS / 'windows_early_auto.cmd').read_text(encoding='ascii').splitlines()
+        self.assertEqual(early.count(call), 1)
+        at = early.index(call)
+        self.assertEqual(early[at - 1], 'if not "%UDIAG%"=="" goto net_skip')
+        self.assertEqual(early[at + 1], ':net_skip')
+        self.assertLess(early.index(':tsr_done'), at)
+        self.assertLess(at, early.index('if "%CONFIG%"=="DOSONLY" goto dos'))
+        self.assertLess(at, early.index(':win_go'))
 
     def test_netstart_never_blocks(self):
         lines = [l.strip() for l in (MSDOS / 'network_start.cmd').read_text(encoding='ascii').splitlines()]
