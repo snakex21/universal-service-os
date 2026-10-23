@@ -73,17 +73,19 @@ if errorlevel 2 goto failed
 rem Network (C:\NET): own packet driver USOSPKT for Intel I211/I210/82576
 rem and mTCP (GPL-3.0, source MTCPSRC.ZIP); NETSTART.BAT loads it and runs
 rem DHCP at every start, and returns at once when no such NIC is present.
-rem MS-DOS only for now: the Windows 1.x-3.x start menus replace this
-rem AUTOEXEC.BAT and were not tested with the resident driver.
+rem Windows 1.x-3.x: staged too, but not called in the Setup stage (this
+rem AUTOEXEC.BAT); their start menus (W1AUTO.BAT / W3AUTO.BAT) call
+rem NETSTART.BAT before WIN, so the driver is resident under Windows and
+rem mTCP works at the DOS prompt and after leaving Windows.
 if not exist %USRC%\USOSPKT.COM goto net_done
-if exist %USRC%\WINSETUP\SETUP.EXE goto net_done
-md C:\NET
+if not exist C:\NET\NUL md C:\NET
 for %%f in (USOSPKT.COM NETSTART.BAT MTCP.DEF MTCP.TXT MTCPSRC.ZIP) do copy %USRC%\%%f C:\NET /y >nul
 for %%f in (DHCP PING HTGET FTP TELNET SNTP NC DNSTEST PKTTOOL) do copy %USRC%\%%f.EXE C:\NET /y >nul
 if not exist C:\NET\NETSTART.BAT goto failed
 if not exist C:\NET\DHCP.EXE goto failed
 if not exist C:\NET\PKTTOOL.EXE goto failed
 copy C:\NET\MTCP.DEF C:\NET\MTCP.CFG /y >nul
+if exist %USRC%\WINSETUP\SETUP.EXE goto net_done
 echo call C:\NET\NETSTART.BAT>>C:\AUTOEXEC.BAT
 :net_done
 if not exist %USRC%\WINSETUP\SETUP.EXE goto dos_done
