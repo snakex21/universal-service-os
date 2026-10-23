@@ -219,6 +219,24 @@ def build_diag(out: Path, work: Path) -> None:
     if not 0 < len(data) <= 4096 or data[0] != 0xE9 or b'USOSWHR1' not in data:
         raise ValueError('unexpected USOSWHERE.COM layout')
     build_usosv10(out, work)
+    build_usosvgar(out, work)
+
+
+def build_usosvgar(out: Path, work: Path) -> Path:
+    """USOSVGAR.COM: VGA register readback / latch probe (Windows 3.x redraw)."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, com = work / 'USOSVGAR.o', work / 'USOSVGAR.elf', out / 'USOSVGAR.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(SOURCE / 'usosvgar.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    # Output buffer at 1000h: the image must end below it.
+    if not 0 < len(data) <= 0x1000 - 0x100 or data[0] != 0xE9 or b'USOSVGR1' not in data:
+        raise ValueError('unexpected USOSVGAR.COM layout')
+    return com
 
 
 def build_usosv10(out: Path, work: Path) -> Path:

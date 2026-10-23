@@ -123,6 +123,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/USOSWHER.COM`, `EFI/USOS/dos-native/msdos/USOSWHER.COM`},
 	{`zig-out/dos-native/msdos/USOSMS1.DRV`, `EFI/USOS/dos-native/msdos/USOSMS1.DRV`},
 	{`zig-out/dos-native/msdos/USOSV10.COM`, `EFI/USOS/dos-native/msdos/USOSV10.COM`},
+	{`zig-out/dos-native/msdos/USOSVGAR.COM`, `EFI/USOS/dos-native/msdos/USOSVGAR.COM`},
 	{`zig-out/dos-native/msdos/USOSPKT.COM`, `EFI/USOS/dos-native/msdos/USOSPKT.COM`},
 	{`zig-out/dos-native/msdos/NETSTART.BAT`, `EFI/USOS/dos-native/msdos/NETSTART.BAT`},
 	{`zig-out/dos-native/msdos/MTCP.DEF`, `EFI/USOS/dos-native/msdos/MTCP.DEF`},

@@ -45,6 +45,12 @@ if not exist %USRC%\USOSV10.COM goto v10_done
 copy %USRC%\USOSV10.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :v10_done
+rem One-shot VGA register readback probe before WIN of Windows 3.x and
+rem 1.x-3.0 (X470 redraw problem); missing file = skipped.
+if not exist %USRC%\USOSVGAR.COM goto vgar_done
+copy %USRC%\USOSVGAR.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:vgar_done
 rem Prepared under CSMWrap (UEFI PC without CSM): USB mouse through VBADOS.
 if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done
 copy %USRC%\VBMOUSE.EXE C:\DOS /y >nul
