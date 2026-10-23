@@ -31,8 +31,6 @@ pub const Key = enum(u16) {
     category_beta_desc,
     category_dos_desc,
     category_linux_desc,
-    category_macos_addon,
-    category_macos_desc,
     category_others,
     category_others_desc,
     category_power,
@@ -174,11 +172,6 @@ pub const Key = enum(u16) {
     key_usos_menu,
     language_name,
     linux_unverified,
-    macos_addon_heading,
-    macos_addon_line1,
-    macos_addon_line2,
-    macos_addon_line3,
-    macos_addon_title,
     media_blocked_32bit,
     media_blocked_arm64,
     media_blocked_line2,
@@ -363,6 +356,8 @@ pub const Key = enum(u16) {
     bios_mode_secure_boot_line2,
     bios_mode_start,
     bios_mode_starting,
+    category_macos_addon,
+    category_macos_desc,
     chainload_line1,
     chainload_line2,
     chainload_title,
@@ -422,6 +417,11 @@ pub const Key = enum(u16) {
     iso_stage_3,
     iso_title,
     iso_validating,
+    macos_addon_heading,
+    macos_addon_line1,
+    macos_addon_line2,
+    macos_addon_line3,
+    macos_addon_title,
     notice_backend_line1,
     notice_backend_line2,
     power_firmware,
@@ -857,8 +857,6 @@ pub const hashes = [_]u32{
     0x50adb2ee, // category.beta.desc
     0xc4dcd124, // category.dos.desc
     0xf91b310c, // category.linux.desc
-    0x2e3ef382, // category.macos.addon
-    0x09fbd55d, // category.macos.desc
     0xfffaabfa, // category.others
     0x387e901d, // category.others.desc
     0x47a1786e, // category.power
@@ -1000,11 +998,6 @@ pub const hashes = [_]u32{
     0xaf281282, // key.usos_menu
     0x5aa9bbcc, // language.name
     0x30be067e, // linux.unverified
-    0xc387b6f2, // macos.addon.heading
-    0x55ec5d5d, // macos.addon.line1
-    0x52ec58a4, // macos.addon.line2
-    0x53ec5a37, // macos.addon.line3
-    0x477ce35a, // macos.addon.title
     0x72a0bdee, // media.blocked_32bit
     0x30d9d376, // media.blocked_arm64
     0x655e4fe6, // media.blocked_line2
@@ -1189,6 +1182,8 @@ pub const hashes = [_]u32{
     0xc2a2d662, // bios_mode.secure_boot.line2
     0x2fc0f46e, // bios_mode.start
     0xa26e99a2, // bios_mode.starting
+    0x2e3ef382, // category.macos.addon
+    0x09fbd55d, // category.macos.desc
     0xfc4d4ef9, // chainload.line1
     0xf94d4a40, // chainload.line2
     0xb38e898e, // chainload.title
@@ -1248,6 +1243,11 @@ pub const hashes = [_]u32{
     0xd564eb19, // iso.stage.3
     0x1fdc1e96, // iso.title
     0xd22ab261, // iso.validating
+    0xc387b6f2, // macos.addon.heading
+    0x55ec5d5d, // macos.addon.line1
+    0x52ec58a4, // macos.addon.line2
+    0x53ec5a37, // macos.addon.line3
+    0x477ce35a, // macos.addon.title
     0x48a2a970, // notice.backend.line1
     0x4ba2ae29, // notice.backend.line2
     0x69b9a301, // power.firmware
@@ -1989,13 +1989,13 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -2479,7 +2479,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 342;
+pub const bios_count = 335;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2511,8 +2511,6 @@ pub const english = [_][]const u8{
     "Whistler, Longhorn and other builds",
     "DOS systems and legacy boot images",
     "Linux installers and live systems",
-    "Requires the macOS add-on",
-    "macOS on a PC via OpenCore (optional add-on)",
     "Other systems",
     "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS and your own images",
     "Power",
@@ -2654,11 +2652,6 @@ pub const english = [_][]const u8{
     "USOS menu",
     "English",
     "Unknown distribution: USOS uses the ISO's own boot entry (unverified).",
-    "The macOS add-on is not installed",
-    "macOS support is an optional add-on, separate from the main USOS release.",
-    "It starts macOS from your own OpenCore files on the DATA partition (Systems\\macOS).",
-    "Once the add-on is installed, this tile lists its macOS entries.",
-    "macOS add-on",
     "32-bit image - needs 32-bit UEFI or BIOS mode (CSM)",
     "ARM64 image - it does not start on this PC",
     "Choose another image or start the PC in the matching firmware mode.",
@@ -2843,6 +2836,8 @@ pub const english = [_][]const u8{
     "Turn Secure Boot off in the firmware settings to use the BIOS mode.",
     "Start BIOS mode",
     "Starting the BIOS mode (CSMWrap)...",
+    "Requires the macOS add-on",
+    "macOS on a PC via OpenCore (optional add-on)",
     "Boot media preparation is complete.",
     "Starting EFI/BOOT from the prepared WORK partition...",
     "Starting chained bootloader",
@@ -2902,6 +2897,11 @@ pub const english = [_][]const u8{
     "Starting Windows Setup",
     "Starting Windows from ISO",
     "Validating the installation ISO and resolving the boot source",
+    "The macOS add-on is not installed",
+    "macOS support is an optional add-on, separate from the main USOS release.",
+    "It starts macOS from your own OpenCore files on the DATA partition (Systems\\macOS).",
+    "Once the add-on is installed, this tile lists its macOS entries.",
+    "macOS add-on",
     "No implemented boot backend supports this selection.",
     "This system stays visible because its backend is planned.",
     "Firmware setup (BIOS/UEFI)",

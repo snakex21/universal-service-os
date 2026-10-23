@@ -593,7 +593,11 @@ pub const Ui = struct {
 
     pub fn homeCardWith(self: *const Ui, rect: Rect, look: HomeCardLook, title: []const u8, description: []const u8, state: RowState) void {
         const theme = self.theme;
-        const enabled = look.enabled;
+        // Disabled and colour-icon cards are a UEFI-menu feature (macOS
+        // tile); the size-limited Legacy BIOS Core compiles them out.
+        const card_extras = @import("builtin").os.tag != .freestanding;
+        const enabled = !card_extras or look.enabled;
+        const card_image: ?[]const u8 = if (card_extras) look.image else null;
         const fill = switch (state) {
             .selected => theme.accent_soft,
             .hover => theme.panel_alt,
@@ -613,7 +617,7 @@ pub const Ui = struct {
         const tile = @min(self.px(52), rect.h -| (2 * self.px(16)));
         const tile_x = rect.x + pad;
         const tile_y = rect.y + (rect.h -| tile) / 2;
-        if (look.image) |pixels| {
+        if (card_image) |pixels| {
             // Colour icons keep their own colours: a neutral tile, the
             // image a little larger than a vector glyph.
             const image_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent_soft else theme.panel_alt;
