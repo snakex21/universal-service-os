@@ -93,7 +93,7 @@ class Vesa95(unittest.TestCase):
 class Wiring(unittest.TestCase):
     def test_target_writes_vesa95_for_95_only(self):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
-        block = text[text.index('if [ "$SYSTEM_TAG" = 95 ]; then\n    if [ -r "$LIB/w9x_vesa95.sh" ]'):
+        block = text[text.index('if [ "$SYSTEM_TAG" = 95 ]; then\n    vesa95_source='):
                      text.index('# The boot floppy runs INSTALL.BAT')]
         for tag, expected in (('95', True), ('98SE', False), ('98', False), ('ME', False)):
             tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-vesablock-'))

@@ -13,6 +13,8 @@
                 tools/vendor/vmdisp9x, checked against manifest.json)
   VMDISP9X.TXT  their SOURCES.txt + MIT licence
   VMDISP9X.TGZ  the vmdisp9x source archive
+  VESBIND.EXE   own DOS parser of original REGEDIT exports, used by source950
+                post-Setup VESALATE.BAT; no compiler runtime linked
   USOSKEY.COM, USOSKEY.DRV, USOSMOUS.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
                 the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
                 and 98 mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
@@ -109,7 +111,7 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT',
           'USOSVMD.VXD')
 # Everything on the stick (the payload list and the release check use it).
-STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
+STAGED = FILES + ('VESBIND.EXE', 'MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
                    'CREGFIX.TXT') + (
     # Hardware diagnostics: on the stick, so the UEFI path's target writer
     # (tools/w9x_csmwrap_target.sh) puts them into C:\USOS9X; nothing runs
@@ -470,6 +472,30 @@ def stage_usosusb(out: Path, source: Path = USOSUSB) -> None:
     (out / 'USOSUSB.REG').write_bytes(dos_text(reg))
 
 
+def build_vesbind(out: Path, work: Path, ow: Path | None = None) -> Path:
+    """16-bit DOS parser of REGEDIT exports; no hive parsing or modification."""
+    if ow is None:
+        from build_win3_usb_keyboard import openwatcom
+        ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=str(ow / 'h'),
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj, entry, exe = work / 'vesbind.obj', work / 'vesbind_entry.obj', out / 'VESBIND.EXE'
+    subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=dos', '-ms', '-0', '-os', '-s', '-zl',
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'vesbind.c')],
+                   env=env, check=True, cwd=work)
+    subprocess.run([str(ow / 'binnt64/wasm.exe'), '-q', '-fo=' + str(entry), str(SOURCE / 'vesbind_entry.asm')],
+                   env=env, check=True, cwd=work)
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), 'system', 'dos', 'option', 'quiet',
+                    'option', 'stack=8192', 'file', str(entry), 'file', str(obj), 'name', str(exe),
+                    'option', 'map=' + str(work / 'vesbind.map')], env=env, check=True, cwd=work)
+    data = exe.read_bytes()
+    if data[:2] != b'MZ' or b'REGEDIT4' not in data or len(data) >= 65536:
+        raise ValueError('unexpected VESBIND DOS executable')
+    if 'clib' in (work / 'vesbind.map').read_text(errors='replace').lower():
+        raise ValueError('VESBIND must not link compiler runtime libraries')
+    return exe
+
+
 def build(root: Path = ROOT, out: Path | None = None) -> None:
     out = out or root / 'zig-out/dos-native/win9x'
     out.mkdir(parents=True, exist_ok=True)
@@ -481,6 +507,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     build_diag(out, work)
     build_usosdbg(out, work)
     build_usoslog(out, work)
+    build_vesbind(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:
@@ -509,8 +536,15 @@ if __name__ == '__main__':
     p.add_argument('--out', type=Path)
     p.add_argument('--usoslog', action='store_true',
                    help='only USOSDBG.EXE and USOSLOG.EXE (for in-place kits)')
+    p.add_argument('--vesbind', action='store_true', help='only the 950 DOS late-display binding helper')
     a = p.parse_args()
-    if a.usoslog:
+    if a.vesbind:
+        o = a.out or ROOT / 'zig-out/dos-native/win9x'
+        w = ROOT / 'zig-out/win9x-support'
+        o.mkdir(parents=True, exist_ok=True)
+        w.mkdir(parents=True, exist_ok=True)
+        print(build_vesbind(o, w))
+    elif a.usoslog:
         o = a.out or ROOT / 'zig-out/win9x-usoslog'
         w = ROOT / 'zig-out/win9x-support'
         o.mkdir(parents=True, exist_ok=True)

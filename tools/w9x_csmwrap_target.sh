@@ -543,14 +543,17 @@ case "$SYSTEM_TAG:$TIME_ZONE" in
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
         fi ;;
 esac
-# Windows 95 never enumerates PCI under SeaBIOS (VM phase 1 or CSMWrap), so
-# Setup leaves the display on Standard VGA: C:\USOS9X\VESA95.BAT
+# The early legacy path leaves the display on Standard VGA: VESA95.BAT
 # (tools/w9x_vesa95.sh) moves it to the vmdisp9x VESA driver at the first
-# start, the end state 98 gets from Setup.
+# start, the end state 98 gets from Setup. Source950 can also enumerate a
+# later PCI display; its post-Setup hook binds that actual existing device.
 if [ "$SYSTEM_TAG" = 95 ]; then
-    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X"; then
+    vesa95_source=''
+    [ "$ANSWER_KIND" = USER ] || vesa95_source=${setup_version:-}
+    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X" 16 1024,768 "$vesa95_source"; then
         log 'display: VESA95.BAT (vmdisp9x VESA at the first start, 16-bit 1024x768)'
     else
+        [ "$vesa95_source" != '4 0 0 950' ] || fail 'cannot prepare the 950 post-Setup display binding'
         rm -f "$work/c/USOS9X/VESA95.BAT" "$work/c/USOS9X/VESA95.REG"
         log 'display: no VESA95.BAT (Standard VGA stays)'
     fi
