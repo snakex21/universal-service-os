@@ -70,6 +70,9 @@ def build(root: Path):
     # helper in Autostart (src/platform/bios/msdos/windows_inf.bas).
     (dos_out / 'W3INF.BAS').write_bytes(dos_text((root / 'src/platform/bios/msdos/windows_inf.bas').read_text(encoding='ascii')))
     print('[PASS] MS-DOS support: verified HimemX 3.40, sources, license and DOS helpers')
+    # Network for MS-DOS (INSTALL.BAT -> C:\NET): own packet driver + mTCP.
+    from build_dos_network import build as build_dos_network
+    build_dos_network(root, dos_out)
     build_csmwrap_variants(root, dos_out)
     build_reboot(root)
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')

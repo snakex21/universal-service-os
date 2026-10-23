@@ -1,0 +1,23 @@
+{
+  "name": "mTCP (TCP/IP applications for DOS by Michael Brutman)",
+  "version": "2026-10-10",
+  "license": "GPL-3.0 (COPYING.TXT; README.TXT section Licensing)",
+  "upstream": "http://www.brutman.com/mTCP/mTCP.html ; https://github.com/mbbrutman/mTCP",
+  "binaries": "http://www.brutman.com/mTCP/download/mTCP_2026-10-10.zip (sha256 bc201d7c0afe6de9ce54576345b79b7e692b7bd40de8e5362c5823b73117dd16); the EXE files below extracted unmodified, names upper-cased; 00_mtcp.txt saved as README.TXT",
+  "source": "http://www.brutman.com/mTCP/download/mTCP-src_2026-10-10.zip (sha256 4ba7030c9e4cafc40888e8ffad5cc6f72d11134fc81d8444d0e3d4ed784f7d52), kept here unmodified and staged next to the binaries as C:\\NET\\MTCPSRC.ZIP",
+  "used_by": "the MS-DOS installer (INSTALL.BAT -> C:\\NET, NETSTART.BAT): DHCP and tools over the own packet driver USOSPKT.COM (src/platform/bios/msdos/usospkt.S); docs/dos-usospkt-2026-10-23.md",
+  "files": {
+    "COPYING.TXT": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b",
+    "DHCP.EXE": "affe563e4a594238b4e85dba55af174c4211facdb45f4f33c9ab17a3f4ff00ff",
+    "DNSTEST.EXE": "51aaa259964b18d920aacaeb9dacac1eac6b88113e3e2d98f53d087a0d7c52b9",
+    "FTP.EXE": "ad65c74c23bf927ec8e49dee0cf0df73b069352f5b6a0dac41e6c69d5d6f3b8b",
+    "HTGET.EXE": "4c711fda47a8407ab2da04e03cd17973289d3af49f6e85456d410fe23ed4771c",
+    "NC.EXE": "06ce1d108d04f2789d916272678fb78a60d6c01daadd4c87525216116a4ba9a7",
+    "PING.EXE": "3fa8da9af3687dc2d12e2a16cab363ad89c197cabd8c57e1d159fb674c4328e0",
+    "PKTTOOL.EXE": "357e2c539ff7b60271a11e8f7eedeb8ec33613700df79b891d424ecc463b1033",
+    "README.TXT": "59c9dc4fc3b00194548a22037d604ca387e0e2db7fee4da42bc27caa381b2f6b",
+    "SNTP.EXE": "5341620ed72e0ecacd3485abf5858719e6b6fe0c113f873fa6501174e13e302d",
+    "TELNET.EXE": "e30043adb80d2b8f54e1edd0bd06dc8082df75c3ae05c25c657dd7edc5011b63",
+    "mTCP-src_2026-10-10.zip": "4ba7030c9e4cafc40888e8ffad5cc6f72d11134fc81d8444d0e3d4ed784f7d52"
+  }
+}
