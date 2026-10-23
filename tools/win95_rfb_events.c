@@ -59,6 +59,7 @@ static uint64_t monotonic_ms(void)
 static int next_button_role(const char *role)
 {
     size_t length=strlen(role);
+    if (length==sizeof("welcome-en")-1 && !memcmp(role,"welcome-en",sizeof("welcome-en")-1)) return 0;
     if (length==sizeof("coa-single-en")-1 && !memcmp(role,"coa-single-en",sizeof("coa-single-en")-1)) return 0;
     if (length==sizeof("network-device-en")-1 && !memcmp(role,"network-device-en",sizeof("network-device-en")-1)) return 0;
     if (length==sizeof("restart")-1 && !memcmp(role,"restart",sizeof("restart")-1)) return 0;

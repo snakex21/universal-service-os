@@ -1,4 +1,8 @@
 static const Page pages[] = {
+    /* Original OSR1 EN initial welcome: this short wizard puts its active
+     * Next at y339..360, outside the later page's y395 button probe.
+     * Match both the title and the static To begin, click Next paragraph. */
+    {"welcome-en", UINT64_C(0x7a49b78a53a896db), UINT64_C(0xcad563218326ccda), 214, 140, 360, 25},
     /* Original OSR1 EN OEM 950. Static heading and labels only: the
      * Product Identification edit at x214..463,y211..234 is excluded.
      * Its Next button is disabled while the field is empty. */

@@ -51,7 +51,7 @@ w9x_vm_95_page_ready() {
     case "$W9X_VM_PAGE" in
         coa|coa-single|coa-single-en) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
         owner) w9x_vm_owner_valid ;;
-        recovery|welcome|directory|setup-type|hardware-list|communication|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm|network-device-en) return 0 ;;
+        recovery|welcome|welcome-en|directory|setup-type|hardware-list|communication|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm|network-device-en) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -117,7 +117,7 @@ w9x_vm_95_input() {
             for w95_scan in tab tab tab spc; do w9x_vm_private_key "$w95_scan" || return 1; done
             key_on_screen=0
             ;;
-        recovery|welcome|directory|setup-type|hardware-list|communication|components|computer-options|copy-ready|restart|reboot-confirm)
+        recovery|welcome|welcome-en|directory|setup-type|hardware-list|communication|components|computer-options|copy-ready|restart|reboot-confirm)
             w9x_vm_private_key ret || return 1
             key_on_screen=0
             ;;
