@@ -1,0 +1,411 @@
+/* winsock16.c - USOS Winsock 1.1 provider for 16-bit Windows (Win16).
+ *
+ * Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Milestone 1 (this file): ABI skeleton.  WSAStartup()/WSACleanup() and the
+ * last-error accessors are functional; every socket/database entry point is a
+ * stub that reports WSAENETDOWN (WSAVERNOTSUPPORTED for the asynchronous
+ * database lookups), because no transport engine is linked in yet.
+ *
+ * milestone 2: silnik TCP/UDP na mTCP + USOSPKT w trybie kolejkowym
+ *
+ * Export list and ordinals follow the public Winsock 1.1 specification
+ * (accept=1 ... socket=23, gethostbyaddr=51 ... gethostname=57,
+ * WSAAsyncSelect=101 ... WSACleanup=116, __WSAFDIsSet=151).  No code from any
+ * third-party Winsock implementation is used here; this file is written from
+ * scratch against winsock.h (Open Watcom) and the published specification.
+ *
+ * Build: tools/build_win16_winsock.py
+ */
+
+#include <windows.h>
+#include <winsock.h>
+
+#define USOS_WS_DESCRIPTION   "USOS Winsock 1.1 (Win16)"
+#define USOS_WS_SYSTEM_STATUS "USOSPKT queue mode - milestone 1 ABI skeleton"
+
+/* A Win16 DLL is a single instance per machine, so static storage is the
+ * documented Winsock 1.1 model. */
+static int usos_startup_count = 0;
+static int usos_last_error = 0;
+
+static void FAR *usos_far_zero(void FAR *dst, unsigned int count)
+{
+    unsigned char FAR *p = (unsigned char FAR *)dst;
+    while (count-- != 0)
+        *p++ = 0;
+    return dst;
+}
+
+static void usos_far_copyz(char FAR *dst, const char *src, unsigned int room)
+{
+    unsigned int i = 0;
+    while (i + 1 < room && src[i] != '\0') {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+/* Common failure path for entry points with no transport engine yet. */
+static int usos_not_implemented(void)
+{
+    usos_last_error = WSAENETDOWN;
+    return SOCKET_ERROR;
+}
+
+static HANDLE usos_async_not_implemented(void)
+{
+    usos_last_error = WSAVERNOTSUPPORTED;
+    return (HANDLE)0;
+}
+
+int __far __pascal WSAStartup(WORD wVersionRequired, LPWSADATA lpWSAData)
+{
+    if (lpWSAData == NULL) {
+        usos_last_error = WSAEFAULT;
+        return SOCKET_ERROR;
+    }
+    if (LOBYTE(wVersionRequired) != 1) {
+        usos_far_zero(lpWSAData, (unsigned int)sizeof(WSADATA));
+        usos_last_error = WSAVERNOTSUPPORTED;
+        return SOCKET_ERROR;
+    }
+
+    usos_far_zero(lpWSAData, (unsigned int)sizeof(WSADATA));
+    /* 1.0 is honoured as 1.0; anything newer in the 1.x line as 1.1. */
+    lpWSAData->wVersion = (HIBYTE(wVersionRequired) == 0) ? (WORD)0x0100 : (WORD)0x0101;
+    lpWSAData->wHighVersion = (WORD)0x0101;
+    usos_far_copyz(lpWSAData->szDescription, USOS_WS_DESCRIPTION,
+                   (unsigned int)sizeof(lpWSAData->szDescription));
+    usos_far_copyz(lpWSAData->szSystemStatus, USOS_WS_SYSTEM_STATUS,
+                   (unsigned int)sizeof(lpWSAData->szSystemStatus));
+    lpWSAData->iMaxSockets = 8;
+    lpWSAData->iMaxUdpDg = 512;
+    lpWSAData->lpVendorInfo = NULL;
+
+    usos_startup_count++;
+    usos_last_error = 0;
+    return 0;
+}
+
+int __far __pascal WSACleanup(void)
+{
+    if (usos_startup_count == 0) {
+        usos_last_error = WSANOTINITIALISED;
+        return SOCKET_ERROR;
+    }
+    usos_startup_count--;
+    usos_last_error = 0;
+    return 0;
+}/* ------------------------------------------------------------------ */
+/* Ordinals 1..23: socket API                                          */
+/* ------------------------------------------------------------------ */
+
+SOCKET __far __pascal accept(SOCKET s, struct sockaddr FAR *addr, int FAR *addrlen)
+{
+    (void)s; (void)addr; (void)addrlen;
+    return (SOCKET)usos_not_implemented();
+}
+
+int __far __pascal bind(SOCKET s, const struct sockaddr FAR *name, int namelen)
+{
+    (void)s; (void)name; (void)namelen;
+    return usos_not_implemented();
+}
+
+int __far __pascal closesocket(SOCKET s)
+{
+    (void)s;
+    return usos_not_implemented();
+}
+
+int __far __pascal connect(SOCKET s, const struct sockaddr FAR *name, int namelen)
+{
+    (void)s; (void)name; (void)namelen;
+    return usos_not_implemented();
+}
+
+int __far __pascal getpeername(SOCKET s, struct sockaddr FAR *name, int FAR *namelen)
+{
+    (void)s; (void)name; (void)namelen;
+    return usos_not_implemented();
+}
+
+int __far __pascal getsockname(SOCKET s, struct sockaddr FAR *name, int FAR *namelen)
+{
+    (void)s; (void)name; (void)namelen;
+    return usos_not_implemented();
+}
+
+int __far __pascal getsockopt(SOCKET s, int level, int optname,
+                              char FAR *optval, int FAR *optlen)
+{
+    (void)s; (void)level; (void)optname; (void)optval; (void)optlen;
+    return usos_not_implemented();
+}
+
+u_long __far __pascal htonl(u_long hostlong)
+{
+    (void)hostlong;
+    return (u_long)usos_not_implemented();
+}
+
+u_short __far __pascal htons(u_short hostshort)
+{
+    (void)hostshort;
+    return (u_short)usos_not_implemented();
+}
+
+unsigned long __far __pascal inet_addr(const char FAR *cp)
+{
+    (void)cp;
+    return (unsigned long)usos_not_implemented();
+}
+
+char FAR * __far __pascal inet_ntoa(struct in_addr in)
+{
+    (void)in;
+    usos_not_implemented();
+    return (char FAR *)0;
+}
+
+int __far __pascal listen(SOCKET s, int backlog)
+{
+    (void)s; (void)backlog;
+    return usos_not_implemented();
+}u_long __far __pascal ntohl(u_long netlong)
+{
+    (void)netlong;
+    return (u_long)usos_not_implemented();
+}
+
+u_short __far __pascal ntohs(u_short netshort)
+{
+    (void)netshort;
+    return (u_short)usos_not_implemented();
+}
+
+int __far __pascal recv(SOCKET s, char FAR *buf, int len, int flags)
+{
+    (void)s; (void)buf; (void)len; (void)flags;
+    return usos_not_implemented();
+}
+
+int __far __pascal recvfrom(SOCKET s, char FAR *buf, int len, int flags,
+                            struct sockaddr FAR *from, int FAR *fromlen)
+{
+    (void)s; (void)buf; (void)len; (void)flags; (void)from; (void)fromlen;
+    return usos_not_implemented();
+}
+
+int __far __pascal select(int nfds, fd_set FAR *readfds, fd_set FAR *writefds,
+                          fd_set FAR *exceptfds, const struct timeval FAR *timeout)
+{
+    (void)nfds; (void)readfds; (void)writefds; (void)exceptfds; (void)timeout;
+    return usos_not_implemented();
+}
+
+int __far __pascal send(SOCKET s, const char FAR *buf, int len, int flags)
+{
+    (void)s; (void)buf; (void)len; (void)flags;
+    return usos_not_implemented();
+}
+
+int __far __pascal sendto(SOCKET s, const char FAR *buf, int len, int flags,
+                          const struct sockaddr FAR *to, int tolen)
+{
+    (void)s; (void)buf; (void)len; (void)flags; (void)to; (void)tolen;
+    return usos_not_implemented();
+}
+
+int __far __pascal setsockopt(SOCKET s, int level, int optname,
+                              const char FAR *optval, int optlen)
+{
+    (void)s; (void)level; (void)optname; (void)optval; (void)optlen;
+    return usos_not_implemented();
+}
+
+int __far __pascal shutdown(SOCKET s, int how)
+{
+    (void)s; (void)how;
+    return usos_not_implemented();
+}
+
+SOCKET __far __pascal socket(int af, int type, int protocol)
+{
+    (void)af; (void)type; (void)protocol;
+    return (SOCKET)usos_not_implemented();
+}
+
+/* ------------------------------------------------------------------ */
+/* Ordinals 51..57: database lookups                                   */
+/* ------------------------------------------------------------------ */
+
+struct hostent FAR * __far __pascal gethostbyaddr(const char FAR *addr, int len, int type)
+{
+    (void)addr; (void)len; (void)type;
+    usos_not_implemented();
+    return (struct hostent FAR *)0;
+}
+
+struct hostent FAR * __far __pascal gethostbyname(const char FAR *name)
+{
+    (void)name;
+    usos_not_implemented();
+    return (struct hostent FAR *)0;
+}
+
+struct protoent FAR * __far __pascal getprotobyname(const char FAR *name)
+{
+    (void)name;
+    usos_not_implemented();
+    return (struct protoent FAR *)0;
+}
+
+struct protoent FAR * __far __pascal getprotobynumber(int proto)
+{
+    (void)proto;
+    usos_not_implemented();
+    return (struct protoent FAR *)0;
+}
+
+struct servent FAR * __far __pascal getservbyname(const char FAR *name, const char FAR *proto)
+{
+    (void)name; (void)proto;
+    usos_not_implemented();
+    return (struct servent FAR *)0;
+}
+
+struct servent FAR * __far __pascal getservbyport(int port, const char FAR *proto)
+{
+    (void)port; (void)proto;
+    usos_not_implemented();
+    return (struct servent FAR *)0;
+}
+
+int __far __pascal gethostname(char FAR *name, int namelen)
+{
+    (void)name; (void)namelen;
+    return usos_not_implemented();
+}/* ------------------------------------------------------------------ */
+/* Ordinals 101..116: Windows Sockets extensions                       */
+/* ------------------------------------------------------------------ */
+
+int __far __pascal WSAAsyncSelect(SOCKET s, HWND hWnd, unsigned int wMsg, long lEvent)
+{
+    (void)s; (void)hWnd; (void)wMsg; (void)lEvent;
+    return usos_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetHostByAddr(HWND hWnd, unsigned int wMsg,
+                                            const char FAR *addr, int len, int type,
+                                            char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)addr; (void)len; (void)type; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetHostByName(HWND hWnd, unsigned int wMsg,
+                                            const char FAR *name,
+                                            char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)name; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetProtoByNumber(HWND hWnd, unsigned int wMsg,
+                                               int number, char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)number; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetProtoByName(HWND hWnd, unsigned int wMsg,
+                                             const char FAR *name,
+                                             char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)name; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetServByPort(HWND hWnd, unsigned int wMsg, int port,
+                                            const char FAR *proto,
+                                            char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)port; (void)proto; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+HANDLE __far __pascal WSAAsyncGetServByName(HWND hWnd, unsigned int wMsg,
+                                            const char FAR *name, const char FAR *proto,
+                                            char FAR *buf, int buflen)
+{
+    (void)hWnd; (void)wMsg; (void)name; (void)proto; (void)buf; (void)buflen;
+    return usos_async_not_implemented();
+}
+
+int __far __pascal WSACancelAsyncRequest(HANDLE hAsyncTaskHandle)
+{
+    (void)hAsyncTaskHandle;
+    return usos_not_implemented();
+}
+
+FARPROC __far __pascal WSASetBlockingHook(FARPROC lpBlockFunc)
+{
+    (void)lpBlockFunc;
+    usos_not_implemented();
+    return (FARPROC)NULL;
+}
+
+int __far __pascal WSAUnhookBlockingHook(void)
+{
+    return usos_not_implemented();
+}
+
+int __far __pascal WSAGetLastError(void)
+{
+    return usos_last_error;
+}
+
+void __far __pascal WSASetLastError(int iError)
+{
+    usos_last_error = iError;
+}
+
+int __far __pascal WSACancelBlockingCall(void)
+{
+    return usos_not_implemented();
+}
+
+BOOL __far __pascal WSAIsBlocking(void)
+{
+    return FALSE;
+}
+
+/* Ordinal 151. */
+int __far __pascal __WSAFDIsSet(SOCKET fd, fd_set FAR *set)
+{
+    (void)fd; (void)set;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Win16 DLL plumbing (not part of the Winsock ABI)                    */
+/* ------------------------------------------------------------------ */
+
+int __far __pascal LibMain(HANDLE hInstance, WORD wDataSeg, WORD wHeapSize, LPSTR lpCmdLine)
+{
+    (void)hInstance; (void)wDataSeg; (void)wHeapSize; (void)lpCmdLine;
+    usos_startup_count = 0;
+    usos_last_error = 0;
+    return 1;
+}
+
+int __far __pascal WEP(int nExitType)
+{
+    (void)nExitType;
+    usos_startup_count = 0;
+    return 1;
+}
