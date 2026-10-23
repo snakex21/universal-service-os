@@ -31,6 +31,8 @@ pub const Key = enum(u16) {
     category_beta_desc,
     category_dos_desc,
     category_linux_desc,
+    category_macos_addon,
+    category_macos_desc,
     category_others,
     category_others_desc,
     category_power,
@@ -172,6 +174,11 @@ pub const Key = enum(u16) {
     key_usos_menu,
     language_name,
     linux_unverified,
+    macos_addon_heading,
+    macos_addon_line1,
+    macos_addon_line2,
+    macos_addon_line3,
+    macos_addon_title,
     media_blocked_32bit,
     media_blocked_arm64,
     media_blocked_line2,
@@ -850,6 +857,8 @@ pub const hashes = [_]u32{
     0x50adb2ee, // category.beta.desc
     0xc4dcd124, // category.dos.desc
     0xf91b310c, // category.linux.desc
+    0x2e3ef382, // category.macos.addon
+    0x09fbd55d, // category.macos.desc
     0xfffaabfa, // category.others
     0x387e901d, // category.others.desc
     0x47a1786e, // category.power
@@ -991,6 +1000,11 @@ pub const hashes = [_]u32{
     0xaf281282, // key.usos_menu
     0x5aa9bbcc, // language.name
     0x30be067e, // linux.unverified
+    0xc387b6f2, // macos.addon.heading
+    0x55ec5d5d, // macos.addon.line1
+    0x52ec58a4, // macos.addon.line2
+    0x53ec5a37, // macos.addon.line3
+    0x477ce35a, // macos.addon.title
     0x72a0bdee, // media.blocked_32bit
     0x30d9d376, // media.blocked_arm64
     0x655e4fe6, // media.blocked_line2
@@ -1975,6 +1989,13 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -2458,7 +2479,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 335;
+pub const bios_count = 342;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2490,6 +2511,8 @@ pub const english = [_][]const u8{
     "Whistler, Longhorn and other builds",
     "DOS systems and legacy boot images",
     "Linux installers and live systems",
+    "Requires the macOS add-on",
+    "macOS on a PC via OpenCore (optional add-on)",
     "Other systems",
     "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS and your own images",
     "Power",
@@ -2631,6 +2654,11 @@ pub const english = [_][]const u8{
     "USOS menu",
     "English",
     "Unknown distribution: USOS uses the ISO's own boot entry (unverified).",
+    "The macOS add-on is not installed",
+    "macOS support is an optional add-on, separate from the main USOS release.",
+    "It starts macOS from your own OpenCore files on the DATA partition (Systems\\macOS).",
+    "Once the add-on is installed, this tile lists its macOS entries.",
+    "macOS add-on",
     "32-bit image - needs 32-bit UEFI or BIOS mode (CSM)",
     "ARM64 image - it does not start on this PC",
     "Choose another image or start the PC in the matching firmware mode.",
