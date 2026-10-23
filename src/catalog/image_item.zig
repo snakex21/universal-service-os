@@ -10,5 +10,6 @@ pub const ImageItem = struct {
     /// the image was not probed.
     media: ?windows_media.Info = null,
     /// A floppy set: the number of diskette images in the folder.
-    disks: u8 = 0,
+    /// u0 in the BIOS Core, which never lists floppy sets.
+    disks: if (@import("floppy_set.zig").enabled) u8 else u0 = 0,
 };

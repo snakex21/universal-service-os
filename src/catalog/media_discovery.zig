@@ -46,9 +46,12 @@ pub const Discovery = struct {
             const page = self.source.listPage(directory_path, skip, &entries) catch return result;
             for (entries[0..page.count]) |entry| {
                 if (entry.directory) {
-                    // A folder of diskette images: one floppy-set entry.
-                    const disks = self.floppySetDisks(directory_path, entry.name.slice());
-                    if (disks != 0 and !result.append(.{ .name = entry.name, .kind = .floppy_set, .disks = disks })) return result;
+                    // A folder of diskette images: one floppy-set entry
+                    // (not compiled into the BIOS Core).
+                    if (comptime floppy_set.enabled) {
+                        const disks = self.floppySetDisks(directory_path, entry.name.slice());
+                        if (disks != 0 and !result.append(.{ .name = entry.name, .kind = .floppy_set, .disks = disks })) return result;
+                    }
                     continue;
                 }
                 const kind = ImageKind.fromFilename(entry.name.slice()) orelse continue;
@@ -111,7 +114,9 @@ pub const Discovery = struct {
             const page = self.source.listPage(directory_path, skip, &entries) catch return status;
             for (entries[0..page.count]) |entry| {
                 if (entry.directory) {
-                    if (self.floppySetDisks(directory_path, entry.name.slice()) != 0) status.floppy_set_count += 1;
+                    if (comptime floppy_set.enabled) {
+                        if (self.floppySetDisks(directory_path, entry.name.slice()) != 0) status.floppy_set_count += 1;
+                    }
                     continue;
                 }
                 const kind = ImageKind.fromFilename(entry.name.slice()) orelse continue;
@@ -122,7 +127,7 @@ pub const Discovery = struct {
                     .vhd => status.vhd_count += 1,
                     .vhdx => status.vhdx_count += 1,
                     .efi => status.efi_count += 1,
-                    .floppy_set => status.floppy_set_count += 1,
+                    .floppy_set => unreachable, // never a file extension
                 }
             }
             if (!page.has_more or page.count == 0) return status;
@@ -134,7 +139,6 @@ pub const Discovery = struct {
     /// floppy set).
     /// Only the folder's first page is read (64 entries; a set has fewer).
     fn floppySetDisks(self: *Discovery, directory_path: []const u8, name: []const u8) u8 {
-        if (!floppy_set.enabled) return 0;
         var path_buffer: [max_path_bytes]u8 = undefined;
         const child = floppy_set.childPath(&path_buffer, directory_path, name) orelse return 0;
         var entries: [directory_source.max_directory_entries]directory_source.Entry = undefined;
