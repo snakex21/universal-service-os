@@ -1,7 +1,8 @@
-"""FreeDOS network staging (tools/image_disk_target.sh freedos_net): the
-MS-DOS flow's C:\\NET (USOSPKT.COM + mTCP, tools/build_dos_network.py) into
-C:\\NET of the written FreeDOS FullUSB disk and one guarded call in
-FDAUTO.BAT (once; before the installer check; CRLF kept).
+"""FreeDOS network and mouse staging (tools/image_disk_target.sh freedos_net,
+freedos_mouse, freedos_auto_add): the MS-DOS flow's C:\\NET (USOSPKT.COM +
+mTCP, tools/build_dos_network.py) into C:\\NET and its VBMOUSE.EXE into
+C:\\USOS of the written FreeDOS FullUSB disk, one guarded FDAUTO.BAT line
+each (once; before the installer check; CRLF kept).
 
 Host only: Git sh, the function from the script, mtools replaced by a shim
 that maps "::/x" of "disk@@offset" to a folder; no VM, no disk. The real
@@ -24,6 +25,10 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import build_dos_network as net  # noqa: E402
 
 CALL = 'if exist C:\\NET\\USOSPKT.COM call C:\\NET\\NETSTART.BAT'
+MOUSE = 'if exist C:\\USOS\\VBMOUSE.EXE C:\\USOS\\VBMOUSE.EXE'
+MOUSE_REM = 'rem USOS mouse: VBMOUSE (INT 33h on the BIOS mouse, USB under CSMWrap)'
+NET_REM = 'rem USOS network: C:\\NET\\NETSTART.BAT (USOSPKT + mTCP DHCP)'
+MOUSE_FILES = ('VBMOUSE.EXE', 'VBADOS.TXT')
 
 # The lines of the FreeDOS 1.4 FullUSB FDAUTO.BAT around the insertion point.
 FDAUTO = ('@echo off\r\nSET DOSDIR=\\FREEDOS\r\nSET PATH=%dosdir%\\BIN\r\n'
@@ -72,7 +77,7 @@ class FreeDosNet(unittest.TestCase):
         (self.fat / 'FDAUTO.BAT').write_bytes(FDAUTO.encode('ascii'))
         self.src = self.tmp / 'msdos'
         self.src.mkdir()
-        for name in net.NET_FILES:
+        for name in (*net.NET_FILES, *MOUSE_FILES):
             (self.src / name).write_bytes(b'USOS ' + name.encode() + b'\r\n')
         self.bin = self.tmp / 'bin'
         self.bin.mkdir()
@@ -81,15 +86,18 @@ class FreeDosNet(unittest.TestCase):
             (self.bin / name).chmod(0o755)
         (self.tmp / 'work').mkdir()
 
-    def run_net(self, extra=''):
+    def run_net(self, extra='', call='freedos_net'):
         lines = TARGET.read_text(encoding='utf-8').splitlines()
-        assigns = '\n'.join(l for l in lines if l.startswith(('DOS_NET_DIR=', 'DOS_NET_FILES=', 'DOS_NET_CALL=')))
+        assigns = '\n'.join(l for l in lines if l.startswith(('DOS_NET_DIR=', 'DOS_NET_FILES=', 'DOS_NET_CALL=',
+                                                               'DOS_MOUSE_FILES=', 'DOS_MOUSE_LINE=')))
+        funcs = '\n'.join(function_text(TARGET, f) for f in ('freedos_auto_add', 'freedos_mouse', 'freedos_net'))
+        calls = '\n'.join(f'{c} /dev/sdz@@32256' for c in call.split())
         script = (f'log() {{ printf "[IMAGE_DISK] %s\\n" "$*"; }}\n'
                   f'fail() {{ printf "STOP: %s\\n" "$1"; exit 1; }}\n'
                   f'PATH="{msys(self.bin)}:$PATH"; FAKEFAT="{self.fat.as_posix()}"; '
                   f'FAKELOG="{(self.tmp / "log").as_posix()}"; export FAKEFAT FAKELOG\n'
                   f'USOS_DOS_NET_DIR="{self.src.as_posix()}"; work="{(self.tmp / "work").as_posix()}"\n{extra}\n'
-                  f'{assigns}\n{function_text(TARGET, "freedos_net")}\nfreedos_net /dev/sdz@@32256')
+                  f'{assigns}\n{funcs}\n{calls}')
         return sh(script)
 
     def auto(self):
@@ -108,7 +116,7 @@ class FreeDosNet(unittest.TestCase):
         self.assertLess(text.index(CALL), text.index('if not exist SETUP.BAT goto Done'))
         self.assertIn(CALL + '\r\nif not exist SETUP.BAT', text)
         self.assertNotIn('\n', text.replace('\r\n', ''))      # CRLF only
-        self.assertEqual(text.replace('rem USOS network: C:\\NET\\NETSTART.BAT (USOSPKT + mTCP DHCP)\r\n' + CALL + '\r\n', ''), FDAUTO)
+        self.assertEqual(text.replace(NET_REM + '\r\n' + CALL + '\r\n', ''), FDAUTO)
 
     def test_second_run_adds_nothing(self):
         self.assertEqual(self.run_net()[0], 0)
@@ -148,6 +156,51 @@ class FreeDosNet(unittest.TestCase):
         # staged after the installer switch, inside freedos_fix
         fix = function_text(TARGET, 'freedos_fix')
         self.assertLess(fix.index('SETUP.OFF'), fix.index('freedos_net "$part"'))
+
+    def test_mouse_files_and_line(self):
+        rc, out, err = self.run_net(call='freedos_mouse freedos_net')
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn('FreeDOS mouse: C:\\USOS\\VBMOUSE.EXE staged, FDAUTO.BAT loads it, read-back PASS', out)
+        self.assertIn('FDAUTO.BAT calls NETSTART.BAT, read-back PASS', out)
+        for name in MOUSE_FILES:
+            self.assertEqual((self.fat / 'USOS' / name).read_bytes(), (self.src / name).read_bytes(), name)
+        text = self.auto()
+        self.assertEqual(text.count(MOUSE), 1)
+        self.assertEqual(text.count(CALL), 1)
+        # mouse first, then the network, both before the installer check
+        self.assertLess(text.index('fdnet.bat start'), text.index(MOUSE))
+        self.assertLess(text.index(MOUSE), text.index(CALL))
+        self.assertIn(CALL + '\r\nif not exist SETUP.BAT', text)
+        self.assertNotIn('\n', text.replace('\r\n', ''))
+        rest = text.replace(MOUSE_REM + '\r\n' + MOUSE + '\r\n', '').replace(NET_REM + '\r\n' + CALL + '\r\n', '')
+        self.assertEqual(rest, FDAUTO)
+        # a second prepare run adds nothing
+        rc, out, err = self.run_net(call='freedos_mouse freedos_net')
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn('FDAUTO.BAT already loads it', out)
+        self.assertIn('already calls NETSTART.BAT', out)
+        self.assertEqual(self.auto(), text)
+
+    def test_mouse_missing_file_skips_without_change(self):
+        (self.src / 'VBMOUSE.EXE').unlink()
+        rc, out, err = self.run_net(call='freedos_mouse')
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn('VBMOUSE.EXE missing, no VBMOUSE', out)
+        self.assertFalse((self.fat / 'USOS').exists())
+        self.assertEqual(self.auto(), FDAUTO)
+
+    def test_mouse_wired_like_the_ms_dos_flow(self):
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn("DOS_MOUSE_LINE='%s'" % MOUSE, text)
+        self.assertIn("DOS_MOUSE_FILES='%s'" % ' '.join(MOUSE_FILES), text)
+        self.assertLessEqual(len(MOUSE), 127)
+        fix = function_text(TARGET, 'freedos_fix')
+        self.assertLess(fix.index('SETUP.OFF'), fix.index('freedos_mouse "$part"'))
+        self.assertLess(fix.index('freedos_mouse "$part"'), fix.index('freedos_net "$part"'))
+        # the same driver the MS-DOS flow loads under CSMWrap (INSTALL.BAT)
+        install = (ROOT / 'src/platform/bios/msdos/install.cmd').read_text(encoding='ascii')
+        self.assertIn('copy %USRC%\\VBMOUSE.EXE C:\\DOS', install)
+        self.assertIn('echo C:\\DOS\\VBMOUSE.EXE>>C:\\AUTOEXEC.BAT', install)
 
     def test_netstart_uses_c_net(self):
         start = (ROOT / 'src/platform/bios/msdos/network_start.cmd').read_text(encoding='ascii')

@@ -134,11 +134,12 @@ def overlay(csmwrap: Path, root: Path, efivarfs_ko: Path | None = None) -> bytes
     for f in sorted(csmwrap.rglob("*")):
         if f.is_file():
             add("usos-e2e/csmwrap/" + f.relative_to(csmwrap).as_posix(), f.read_bytes())
-    # FreeDOS network (image_disk_target.sh freedos_net): the C:/NET files of
-    # the stick's EFI/USOS/dos-native/msdos, from the --root build.
+    # FreeDOS network and mouse (image_disk_target.sh freedos_net,
+    # freedos_mouse): the C:/NET and C:/USOS files of the stick's
+    # EFI/USOS/dos-native/msdos, from the --root build.
     sys.path.insert(0, str(ROOT / "tools"))
     from build_dos_network import NET_FILES
-    for name in NET_FILES:
+    for name in (*NET_FILES, "VBMOUSE.EXE", "VBADOS.TXT"):
         f = root / "zig-out" / "dos-native" / "msdos" / name
         if f.is_file():
             add("usos-e2e/dosnet/" + name, f.read_bytes())

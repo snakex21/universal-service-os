@@ -23,7 +23,9 @@
 #     FreeDOS prompt instead of the installer (which aborts on its own disk);
 #     the package repository stays on the disk (FDIMPLES); C:\NET gets the
 #     MS-DOS flow's network (USOSPKT.COM + mTCP) and FDAUTO.BAT one guarded
-#     call of C:\NET\NETSTART.BAT (freedos_net).
+#     call of C:\NET\NETSTART.BAT (freedos_net); C:\USOS gets the MS-DOS
+#     flow's INT 33h mouse driver VBMOUSE.EXE and FDAUTO.BAT one guarded
+#     line that loads it (freedos_mouse).
 # An image that cannot start from a hard disk (CD-only ISO such as TempleOS:
 # no partition table and no boot code in sector 0) is refused before any
 # write. Writes ONLY $TARGET_DEVICE; the rest of the disk stays unallocated.
@@ -218,7 +220,67 @@ freedos_fix() {
         mren -i "$part" ::/SETUP.BAT ::/SETUP.OFF || fail 'cannot switch FreeDOS from its installer to the prompt'
         log 'FreeDOS: SETUP.BAT renamed to SETUP.OFF (starts into the prompt)'
     fi
+    freedos_mouse "$part"
     freedos_net "$part"
+}
+
+# One guarded FDAUTO.BAT line and its rem, once, right before the installer
+# check (after the FDNET line, before FreeDOS's welcome text); that check
+# missing: at the end. Text through ENVIRON, not awk -v or awk strings
+# (backslashes). Every line ends CRLF (a trailing CR removed first: some awks
+# drop it on read). Written back and read back.
+# freedos_auto_add PART TAG REM LINE; returns 1 if LINE is already there.
+freedos_auto_add() {
+    fa_dir="$work/fdauto-$2"
+    rm -rf "$fa_dir"; mkdir -p "$fa_dir" || fail 'internal error: FDAUTO.BAT work folder'
+    mcopy -n -i "$1" ::/FDAUTO.BAT "$fa_dir/old" || fail 'FreeDOS: cannot read FDAUTO.BAT'
+    if tr -d '\r' < "$fa_dir/old" | grep -qxF "$4"; then
+        return 1
+    fi
+    FA_REM=$3 FA_LINE=$4 awk '
+        BEGIN { cr = sprintf("%c", 13); rem = ENVIRON["FA_REM"]; line = ENVIRON["FA_LINE"] }
+        { sub(cr "$", "") }
+        !done && tolower($0) ~ /^if not exist setup\.bat goto done/ { print rem cr; print line cr; done = 1 }
+        { print $0 cr }
+        END { if (!done) { print rem cr; print line cr } }
+    ' "$fa_dir/old" > "$fa_dir/new" || fail 'internal error: FDAUTO.BAT'
+    mcopy -o -i "$1" "$fa_dir/new" ::/FDAUTO.BAT || fail 'FreeDOS: cannot write FDAUTO.BAT'
+    mcopy -n -i "$1" ::/FDAUTO.BAT "$fa_dir/chk" || fail 'FreeDOS: cannot read back FDAUTO.BAT'
+    [ "$(sha256sum < "$fa_dir/chk")" = "$(sha256sum < "$fa_dir/new")" ] || fail 'read-back: FDAUTO.BAT differs'
+    return 0
+}
+
+# FreeDOS mouse (docs/freedos-input-2026-10-23.md): the FullUSB FDAUTO.BAT
+# loads no INT 33h driver (CTMOUSE is only a package in PACKAGES\BASE), so
+# no DOS program sees the mouse (X470 B261023-130119: no pointer in FreeDOS
+# EDIT, whose only mouse access is INT 33h). The MS-DOS flow (X470 PASS)
+# loads VBADOS VBMOUSE.EXE (GPL-2.0+, docs/dos-mouse-2026-10-18.md), which
+# reads the mouse only through INT 15h C2xxh, i.e. CSMWrap's SeaBIOS USB
+# mouse. The same files from the stick's EFI\USOS\dos-native\msdos into
+# C:\USOS, one guarded line in FDAUTO.BAT. No mouse: VBMOUSE says so and
+# stays out; FreeDOS boots on.
+DOS_MOUSE_FILES='VBMOUSE.EXE VBADOS.TXT'
+DOS_MOUSE_LINE='if exist C:\USOS\VBMOUSE.EXE C:\USOS\VBMOUSE.EXE'
+freedos_mouse() {
+    part=$1
+    for tool in mcopy mmd; do
+        command -v "$tool" >/dev/null 2>&1 || { log "FreeDOS mouse: $tool missing, no VBMOUSE"; return 0; }
+    done
+    for name in $DOS_MOUSE_FILES; do
+        [ -r "$DOS_NET_DIR/$name" ] || { log "FreeDOS mouse: $DOS_NET_DIR/$name missing, no VBMOUSE"; return 0; }
+    done
+    mdir -i "$part" ::/USOS >/dev/null 2>&1 || mmd -i "$part" ::/USOS || fail 'FreeDOS: cannot create C:\USOS'
+    rm -rf "$work/fdmouse"; mkdir -p "$work/fdmouse" || fail 'internal error: FreeDOS mouse work folder'
+    for name in $DOS_MOUSE_FILES; do
+        mcopy -o -i "$part" "$DOS_NET_DIR/$name" "::/USOS/$name" || fail "FreeDOS: cannot copy $name to C:\\USOS"
+        mcopy -n -i "$part" "::/USOS/$name" "$work/fdmouse/$name" || fail "FreeDOS: cannot read back C:\\USOS\\$name"
+        [ "$(sha256sum < "$work/fdmouse/$name")" = "$(sha256sum < "$DOS_NET_DIR/$name")" ] || fail "read-back: C:\\USOS\\$name differs"
+    done
+    if freedos_auto_add "$part" mouse 'rem USOS mouse: VBMOUSE (INT 33h on the BIOS mouse, USB under CSMWrap)' "$DOS_MOUSE_LINE"; then
+        log 'FreeDOS mouse: C:\USOS\VBMOUSE.EXE staged, FDAUTO.BAT loads it, read-back PASS'
+    else
+        log 'FreeDOS mouse: C:\USOS\VBMOUSE.EXE staged; FDAUTO.BAT already loads it'
+    fi
 }
 
 # FreeDOS network (docs/freedos-net-2026-10-23.md): the MS-DOS flow's C:\NET
@@ -247,27 +309,10 @@ freedos_net() {
         mcopy -n -i "$part" "::/NET/$name" "$work/fdnet/$name" || fail "FreeDOS: cannot read back C:\\NET\\$name"
         [ "$(sha256sum < "$work/fdnet/$name")" = "$(sha256sum < "$DOS_NET_DIR/$name")" ] || fail "read-back: C:\\NET\\$name differs"
     done
-    auto="$work/fdnet/fdauto.old"
-    mcopy -n -i "$part" ::/FDAUTO.BAT "$auto" || fail 'FreeDOS: cannot read FDAUTO.BAT'
-    if tr -d '\r' < "$auto" | grep -qxF "$DOS_NET_CALL"; then
+    if ! freedos_auto_add "$part" net 'rem USOS network: C:\NET\NETSTART.BAT (USOSPKT + mTCP DHCP)' "$DOS_NET_CALL"; then
         log 'FreeDOS network: C:\NET staged; FDAUTO.BAT already calls NETSTART.BAT'
         return 0
     fi
-    # Before the installer check (after the FDNET line): the network messages
-    # come before FreeDOS's welcome text. Not found: at the end.
-    # Text through ENVIRON, not awk -v or awk strings (backslashes). Every
-    # line ends CRLF (a trailing CR removed first: some awks drop it on read).
-    DOS_NET_REM='rem USOS network: C:\NET\NETSTART.BAT (USOSPKT + mTCP DHCP)'
-    DOS_NET_REM=$DOS_NET_REM DOS_NET_CALL=$DOS_NET_CALL awk '
-        BEGIN { cr = sprintf("%c", 13); rem = ENVIRON["DOS_NET_REM"]; call = ENVIRON["DOS_NET_CALL"] }
-        { sub(cr "$", "") }
-        !done && tolower($0) ~ /^if not exist setup\.bat goto done/ { print rem cr; print call cr; done = 1 }
-        { print $0 cr }
-        END { if (!done) { print rem cr; print call cr } }
-    ' "$auto" > "$work/fdnet/fdauto.new" || fail 'internal error: FDAUTO.BAT'
-    mcopy -o -i "$part" "$work/fdnet/fdauto.new" ::/FDAUTO.BAT || fail 'FreeDOS: cannot write FDAUTO.BAT'
-    mcopy -n -i "$part" ::/FDAUTO.BAT "$work/fdnet/fdauto.chk" || fail 'FreeDOS: cannot read back FDAUTO.BAT'
-    [ "$(sha256sum < "$work/fdnet/fdauto.chk")" = "$(sha256sum < "$work/fdnet/fdauto.new")" ] || fail 'read-back: FDAUTO.BAT differs'
     log 'FreeDOS network: C:\NET staged (USOSPKT + mTCP), FDAUTO.BAT calls NETSTART.BAT, read-back PASS'
 }
 case "$SYSTEM" in freedos) freedos_fix ;; esac
