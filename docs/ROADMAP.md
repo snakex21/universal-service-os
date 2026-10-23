@@ -55,6 +55,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L12 | Własny stos USB dla DOS (usosusb jako rezydentny sterownik DOS): xHCI, huby, klawiatura/mysz HID, pamięć masowa, hot-swap | **Later** (po 1.0) | usosusb, L11 | do oszacowania |
 | L13 | Własne środowisko przygotowania zamiast mikro-Linuksa Alpine | **Later** (po 1.0); przed 1.0 tylko pakiety Alpine offline | aplikacja UEFI (Zig) | do oszacowania, etapami |
 | L14 | Back-end Realtek RTL8111/8168 w usosnet4 (tylko NT4 / Windows 95) | **Later** (po 1.0) | usosnet4 | do oszacowania |
+| L15 | Winsock dla Windows 3.1 / WfW 3.11: własny GPL WINSOCK.DLL na kodzie mTCP nad USOSPKT | **Later** (po 1.0) | USOSPKT, mTCP | ~20–30 dni |
 
 ## 2. Pozycje
 
@@ -489,6 +490,13 @@ przypiętymi wersjami; `blkid 2.42.1-r0` zniknął z CDN Alpine 2026-10-22.
 Decyzja użytkownika 2026-10-23: back-end RTL8111/8168 w usosnet4 tylko dla
 NT4 i Windows 95 (docs/ds-realtek-research-2026-10-22.md). Pozostałe
 systemy używają sterownika producenta z DATA.
+
+### L15. Winsock dla Windows 3.1 / WfW 3.11: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: własny GPL WINSOCK.DLL na kodzie mTCP nad
+USOSPKT (kolejka pakietów w USOSPKT, tryb standard i 386 enhanced),
+~20–30 dni. Opcjonalny krok pośredni: własny zamiennik WINPKT + Trumpet
+dostarczony przez użytkownika (docs/win3-winsock-options-2026-10-23.md).
 
 ## 2b. Wydanie 1.1 (scalone do `master` 2026-09-29, bez tagu)
 
