@@ -215,7 +215,7 @@ class Wiring(unittest.TestCase):
         (tmp / 'c/USOS9X/MSBATCH.INF').write_bytes((answer or DEFAULT_INF.read_text(encoding='ascii').replace('\n', '\r\n')).encode('ascii'))
         text = TARGET.read_text(encoding='utf-8')
         helper = text[text.index('w9x_98fe_channelbar_answer() {'):text.index('\nfor tool in ')]
-        block = target_block('if [ "$SYSTEM_TAG" = 95 ]; then\n    if [ -r "$LIB/w9x_vesa95.sh" ]', '# The boot floppy runs INSTALL.BAT')
+        block = target_block('if [ "$SYSTEM_TAG" = 95 ]; then\n    vesa95_source=', '# The boot floppy runs INSTALL.BAT')
         script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { echo "FAIL $*"; exit 9; }\n' + helper + '\n'
                   f'SYSTEM_TAG={tag}\nANSWER_KIND={kind}\nlog_ok={log_ok}\nvmd_ok={vmd_ok}\n'
                   f'LIB="{(lib or ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block)
