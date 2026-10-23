@@ -202,6 +202,9 @@ if [ "$SYSTEM_TAG" = 95 ]; then
 fi
 usos_w9x_fs_select "$SYSTEM_TAG" "$setup_version" || fail 'unknown Windows 95 source version; refusing to guess filesystem support; no disk was changed'
 log "source_setup_version=${setup_version:-not-required} filesystem=FAT$W9X_FAT_BITS partition_type=$W9X_MBR_TYPE"
+# For the caller (w9x_csmwrap_prepare.sh): the Windows 95 Setup phase-1 input
+# controller is chosen by this version (950 = event controller, OSR2 = timed).
+printf 'setup_version=%s\n' "$setup_version" > "${W9X_TARGET_RESULT:-/run/w9x-target.result}" 2>/dev/null || true
 
 floppy="$work/BOOT.IMG"
 if [ -n "$BOOT_FLOPPY" ]; then

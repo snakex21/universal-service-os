@@ -189,9 +189,12 @@ w9x_vm_answer() {
 # caller defines it. 0 = the guest restarted (Setup phase 1 ended), 2 = QEMU
 # failed, 3 = timeout. Logs in $W9X_VM_RUN.
 w9x_phase1_run() {
-    if [ -n "${W9X_VM_KEY:-}" ]; then
-        # Windows 95 has its own event-driven input controller. Never enter
-        # the shared timed monitor when its required event helper is absent.
+    if [ -n "${W9X_VM_KEY:-}" ] && [ "${W9X_VM_95_SETUP950:-0}" = 1 ]; then
+        # Windows 95 RTM / OSR1 (root SETUP.EXE 4.0.0.950, set by the caller
+        # from w9x_csmwrap_target.sh's result): its own event-driven input
+        # controller. OSR2 / OSR2.1 keep the timed controller below unchanged
+        # (X470 PASS). Never enter the timed monitor for 950 when the event
+        # helper is absent.
         [ -r "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" ] || return 2
         . "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" || return 2
         w9x_95_event_run "$@"

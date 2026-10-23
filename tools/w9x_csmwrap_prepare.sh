@@ -599,6 +599,7 @@ usos_w9x_csmwrap_prepare() {
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
             W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x" W9X_USB_STORAGE="$usb9x" W9X_VMD="$vmd9x" W9X_LOGGING="$log9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
+    rm -f /run/w9x-target.result
     "$@" >> "$W9X_LOG/prepare.log" 2>&1 < /dev/null
     target_rc=$?
     usos_stick_flush || true
@@ -681,8 +682,15 @@ usos_w9x_csmwrap_prepare() {
         w9x_phase1_progress() {
             usos_ui_stage 5 5 "$folder installation - stage 1 in the background"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($1 / 60)) $(($1 % 60))), written to disk: $2 MB." || true
         }
+        # Windows 95: the event-driven input controller only for SETUP
+        # 4.0.0.950 (RTM / OSR1, from the target script's result); OSR2 and
+        # OSR2.1 keep the timed controller (X470 PASS).
+        W9X_VM_95_SETUP950=0
+        if [ "$tag" = 95 ] && grep -qx 'setup_version=4 0 0 950' /run/w9x-target.result 2>/dev/null; then
+            W9X_VM_95_SETUP950=1
+        fi
         accel=$(w9x_vm_accel)
-        w9x_csmwrap_log "PHASE1 start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT"
+        w9x_csmwrap_log "PHASE1 start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT setup950=$W9X_VM_95_SETUP950"
         w9x_phase1_run "$TARGET_DEVICE" "$accel"
         vm_rc=$?
         W9X_VM_KEY=''
