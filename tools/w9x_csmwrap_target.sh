@@ -278,6 +278,14 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# The pinned MIT VESA driver's unregister call stalls RTM shutdown. Patch
+# only this newly staged target copy for the exact 950 source, never OSR2.
+if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    [ -r "$LIB/w9x_vesa950.sh" ] || fail 'missing 950 VESA compatibility helper'
+    . "$LIB/w9x_vesa950.sh"
+    w9x_vesa950_prepare "$work/c/USOS9X" "$setup_version" || fail 'cannot prepare the pinned 950 VESA compatibility driver'
+    log 'display: pinned MIT VESA 950 unregister workaround, target copy only'
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the highest validated mode up to 1920x1080 for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
