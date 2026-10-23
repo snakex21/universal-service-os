@@ -522,3 +522,44 @@ W1AUTO.BAT (all default items, not D1-D6) and W3AUTO.BAT call
 INSTALL.BAT stages `C:\NET` for every Windows 1.x-3.x install. QEMU only:
 1.01, 2.03, 3.0a, 3.1 start with the driver resident, HTGET works after
 leaving Windows. Details: `docs/win3-net-2026-10-23.md`.
+
+## WIN at the prompt, product names, regional settings (2026-10-24)
+
+- **WIN typed at the DOS prompt** = the menu's mode. W3AUTO.BAT and
+  W1AUTO.BAT (Windows 3.0 only: `SYSTEM\DOSX.EXE`, no WIN386) load
+  `DOSKEY win=C:\USOSW3\WINRUN.BAT $*` at `:end`, i.e. after Windows
+  returned or after the DOS item, so Windows started from the menu runs
+  without DOSKEY. A macro is expanded before COMMAND.COM looks into the
+  current directory; a `WIN.BAT` in the PATH would lose to `WIN.COM` in
+  `C:\WINDOWS`, where the prompt is after leaving Windows. `WINRUN.BAT`
+  without arguments: 3.1 / 3.11 `/S /B`, WfW 3.11 `/3 /B` (enhanced only),
+  3.0 `/S` (386 enhanced mode under CSMWrap: keyboard late, no mouse);
+  with arguments unchanged (`win /3` = 386 enhanced, `win progman`).
+  Windows 1.0x / 2.x / Windows/386 keep their own WIN / WIN386 and get no
+  DOSKEY. Note: the 3.0 menu default is still `WIN /R` (item 2 `WIN /S`).
+- **Product names** (`tools/dos_win3_menu.sh` `dos_menu_names`, called by
+  `dos_csmwrap_target.sh` with `DOS_WIN_SYSTEM`): "Windows 3.1 - tryb
+  standardowy (domyslny)", "Windows 3.0a (domyslny)", "Windows/386 2.11
+  (domyslny)", "Windows for Workgroups 3.11 - tryb rozszerzony 386
+  (domyslny)"; the revision letter comes from the image or folder name
+  (`Windows 3.0a EN.iso`). Item "WIN /S" only for 3.0. The BIOS Core path
+  keeps the generic labels.
+- **Regional settings** from the answer profile: `docs/answer-profiles.md`
+  (`dos_regional`, `dos_keyb`, renderer `dos.zig`).
+
+QEMU only (2026-10-24, SeaBIOS without CSMWrap, fresh MS-DOS 6.22 +
+Windows install from a disk staged like dos_csmwrap_target.sh; X470 not
+tested):
+- 3.1 PL with a Polish DOS.INI (USB keyboard, i8042 off): menu shows
+  "Windows 3.1 - tryb standardowy (domyslny)"; after leaving Windows at
+  `C:\WINDOWS>` `doskey /macros` = `WIN=C:\USOSW3\WINRUN.BAT $*`, `mode con`
+  = active code page 852, `date` = `2026.10.24` / `(yy-mm-dd)`; typed `win`
+  = "Tryb standardowy". Typing works with KEYB PL loaded; AltGr letters do
+  not (USB keys never reach KEYB's INT 09h). Same disk with a PS/2
+  keyboard: AltGr+A gives "ą" (KEYB works there). Conventional memory:
+  DOSKEY 4 144 B, DISPLAY.SYS 8 304 B, KEYB 6 944 B; 587 KiB free.
+- 3.0a (menu "Windows 3.0a (domyslny)", item 2 "Windows 3.0a - tryb
+  standardowy"): typed `win` = Standard Mode (16 MiB VM; with 64 MiB 3.0
+  falls back to Real Mode for `WIN /S` as well, QEMU only), `win /3` = 386
+  Enhanced Mode (PS/2 keyboard; with the USB keyboard enhanced mode hangs in
+  QEMU, the known BIOS-USB-in-V86 problem).
