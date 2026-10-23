@@ -8,15 +8,6 @@ if exist C:\NET\NETSTART.BAT call C:\NET\NETSTART.BAT
 if "%CONFIG%"=="DOSONLY" goto dos
 if "%CONFIG%"=="WINSET" goto settings
 if not exist C:\WINDOWS\WIN.COM goto missing
-rem VGA probe, once per install (C:\USOS\DIAG\VGAREG.TXT): Windows 3.x
-rem VGA.DRV reads the VGA registers back when it draws the pointer; the
-rem probe logs whether this card returns what was written (X470 redraw).
-if exist C:\USOS\DIAG\VGAREG.TXT goto vgar_done
-if not exist C:\DOS\USOSVGAR.COM goto vgar_done
-if not exist C:\USOS\NUL md C:\USOS
-if not exist C:\USOS\DIAG\NUL md C:\USOS\DIAG
-C:\DOS\USOSVGAR.COM>C:\USOS\DIAG\VGAREG.TXT
-:vgar_done
 C:
 cd \WINDOWS
 if "%CONFIG%"=="WIN386" goto enhanced

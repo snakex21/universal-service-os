@@ -66,15 +66,6 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 :v10_log1
 echo ==== WIN started (no "WIN returned" below = hang)>>C:\USOS\DIAG\%UDIAG%.TXT
 :win_go
-rem VGA probe, once per install (C:\USOS\DIAG\VGAREG.TXT): Windows 3.x
-rem VGA.DRV reads the VGA registers back when it draws the pointer; the
-rem probe logs whether this card returns what was written (X470 redraw).
-if exist C:\USOS\DIAG\VGAREG.TXT goto vgar_done
-if not exist C:\DOS\USOSVGAR.COM goto vgar_done
-if not exist C:\USOS\NUL md C:\USOS
-if not exist C:\USOS\DIAG\NUL md C:\USOS\DIAG
-C:\DOS\USOSVGAR.COM>C:\USOS\DIAG\VGAREG.TXT
-:vgar_done
 C:
 if exist C:\WIN386\WIN386.EXE goto w386dir
 if exist C:\WINDOWS\WIN386.EXE goto w386win
