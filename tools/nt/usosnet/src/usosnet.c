@@ -62,11 +62,14 @@ C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);
 #define USOSNET_ETHDB(H) (((PNDIS_MINIPORT_BLOCK)(H))->EthDB)
 /* MajorNdisVersion 4: the NDIS 3.0 part + ReturnPacket / SendPackets /
  * AllocateComplete; 95 OSR2 NDIS.VXD wants at least 0x48 bytes. */
-#if USOSNET_NDIS3
+#if USOSNET_NDIS30
 /* Original NT351 SHA948d...ab1b RVA179D and NT35 SHAfa392...5543 RVA1BD0
  * accept3.0 and copy0x3C; NT35 internal RX188B/1896 also uses EthDBD8.
  * The NT351 routine copies
- * exactly 0x3C bytes. Inbox NE2000, ELNK3 and DC21X4 confirm EthDB+0xD8. */
+ * exactly 0x3C bytes. Inbox NE2000, ELNK3 and DC21X4 confirm EthDB+0xD8.
+ * 95 RTM / OSR1: NDIS.VXD has neither NdisMSetAttributesEx nor
+ * NdisMSetPeriodicTimer; the inbox NE2000.SYS of both registers 0x3C bytes
+ * and uses EthDB+0xD8 (Codex, docs/win95-rtm-osr1-2026-10-23.md). */
 #define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, ReturnPacketHandler)
 C_ASSERT(USOSNET_CHARS_SIZE == 0x3C);
 C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CheckForHangHandler) == 0x08);
@@ -76,6 +79,11 @@ C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, TransferDataHandler) == 0x3
 EXPORT VOID NdisMSetAttributes(IN NDIS_HANDLE MiniportAdapterHandle,
     IN NDIS_HANDLE MiniportAdapterContext, IN BOOLEAN BusMaster,
     IN NDIS_INTERFACE_TYPE AdapterType);
+#if USOSNET_W95RTM
+/* The one-shot NdisSetTimer takes the NDIS_TIMER prefix of the miniport timer. */
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Timer) == 0);
+C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Dpc) == FIELD_OFFSET(NDIS_TIMER, Dpc));
+#endif
 #else
 #define USOSNET_CHARS_SIZE FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, CoCreateVcHandler)
 C_ASSERT(USOSNET_CHARS_SIZE == 0x48);
@@ -555,6 +563,11 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
     if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
     A->Chip->Ops->TxReclaim(A);
     if (A->TimerCount % TICKS_PER_SEC == 0) TimerSecond(A);
+#if USOSNET_W95RTM
+    /* Miniport timers are serialized with Halt. Only the one-shot export
+     * exists in 95 RTM; rearm after this callback's work has completed. */
+    if (A->TimerInit) NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
+#endif
 }
 #endif
 
@@ -739,7 +752,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
 
-#if USOSNET_NDIS3
+#if USOSNET_NDIS30
     NdisMSetAttributes(MiniportAdapterHandle, (NDIS_HANDLE)A, TRUE, NdisInterfacePci);
 #else
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
@@ -916,7 +929,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #if !USOSNET_NDIS3
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
+#if USOSNET_W95RTM
+    NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
+#else
     NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
+#endif
 #endif
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;

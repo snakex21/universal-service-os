@@ -1,0 +1,17 @@
+# Windows 95 RTM / OSR1 (SETUP 4.0.0.950, NDIS.VXD without the NDIS 4.0
+# Ex/periodic-timer exports): the same source as ..\src as an NDIS 3.0
+# miniport (USOSNET_W95RTM=1, see usosnet.h). Built by ..\build95rtm.py;
+# output bin\i386\win95-rtm\usosnet4.sys (installed as USOSNET.SYS).
+TARGETNAME=usosnet95r
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+C_DEFINES=$(C_DEFINES) -DNDIS_MINIPORT_DRIVER=1 -DNDIS50_MINIPORT=1 -DUSOSNET_NDIS4=1 -DUSOSNET_W95RTM=1
+TARGETLIBS=$(DDK_LIB_PATH)\ndis.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=usosnet.c \
+        usosnet_igb.c

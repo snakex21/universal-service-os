@@ -46,11 +46,26 @@ static const char *run="Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 /* Internet Explorer 3 (Windows 95 OSR2) cannot open about:blank ("cannot
    find"); its own Local Page is a plain file and it writes local pages as
    file://C:\path (SHDOCVW.DLL 4.70 "file://%c:%s"). On 95 the default page
-   is the small START.HTM the install writes beside this helper. */
+   is the small START.HTM the install writes beside this helper. After an
+   original IE5/6 upgrade, preserve the requested about:blank instead.
+   Use the installed product Version, not SHDOCVW's 4.70 file version. */
+#ifndef USOS_LAN_NT
+static int installed_ie5plus(void){char version[80];unsigned i=0,part=0,major=0;
+  if(!query(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Internet Explorer","Version",version,sizeof version))return 0;
+  if(version[0]!='5'&&version[0]!='6')return 0;
+  major=(unsigned)(version[i++]-'0');
+  if(version[i++]!='.')return 0;
+  for(;version[i];i++){
+    if(version[i]>='0'&&version[i]<='9'){part++;continue;}
+    if(version[i]!='.'||!part)return 0;part=0;
+  }
+  return major>=5&&part!=0;
+}
+#endif
 static const char *start_page(void){
 #ifndef USOS_LAN_NT
   static char page[MAX_PATH+8];
-  if(eq(system_id,"95")&&!lstrcmpA(home,"about:blank")){local(path,"START.HTM");
+  if(eq(system_id,"95")&&!lstrcmpA(home,"about:blank")&&!installed_ie5plus()){local(path,"START.HTM");
     if(GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES&&len(path)<MAX_PATH){lstrcpyA(page,"file://");lstrcatA(page,path);return page;}}
 #endif
   return home;}
@@ -207,6 +222,28 @@ static void transports(void){HKEY k;DWORD index,n;char name[32],key[MAX_PATH],va
 
 static int vm(void){unsigned a,b,c,d;__cpuid(1,a,b,c,d);if(c&0x80000000u)return 1;
   __cpuid(0x40000000u,a,b,c,d);return a>=0x40000000u&&a<=0x4000ffffu;}
+#ifndef USOS_LAN_NT
+/* Native QEMU is also a VM. Only source950 may pass this boundary, after
+ * the phase1 postprocessor wrote its own marker and original GUI Setup
+ * removed RunOnce\Setup. A marker alone does not certify final Setup or
+ * filesystem verification. The caller must also wait for the desktop.
+ * The nested first-stage Setup has no postprocessor marker and defers.
+ */
+static int native95_handoff(void){char raw[96];DWORD n,i;HANDLE f;HKEY setup;LONG status;OSVERSIONINFOA version={0};
+  version.dwOSVersionInfoSize=sizeof version;
+  if(!eq(system_id,"95")||!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||
+     version.dwMajorVersion!=4||version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950)return 0;
+  local(path,"PHASE1.OK");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+  if(f==INVALID_HANDLE_VALUE)return 0;
+  n=0;status=GetFileSize(f,0)<sizeof(raw)&&ReadFile(f,raw,sizeof(raw),&n,0);CloseHandle(f);
+  if(!status||n<23||memcmp(raw,"phase1=qemu elapsed=",20))return 0;
+  i=20;while(i<n&&raw[i]>='0'&&raw[i]<='9')i++;
+  if(i==20||i+2!=n||raw[i]!='\r'||raw[i+1]!='\n')return 0;
+  status=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&setup);
+  if(status==ERROR_SUCCESS){RegCloseKey(setup);return 0;}
+  return status==ERROR_FILE_NOT_FOUND;
+}
+#endif
 static int desktop(void){HMODULE u=LoadLibraryA("user32.dll");HWND(WINAPI *find)(LPCSTR,LPCSTR);int ok=0;
   if(!u)return 0;find=(void*)GetProcAddress(u,"FindWindowA");if(find)ok=find("Shell_TrayWnd",0)!=0;FreeLibrary(u);return ok;}
 int memcmp(const void *a,const void *b,size_t n){const BYTE *x=a,*y=b;while(n--){if(*x!=*y)return *x-*y;x++;y++;}return 0;}
@@ -333,16 +370,33 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
   log_handle=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,0,0);if(log_handle==INVALID_HANDLE_VALUE)ExitProcess(1);
   SetFilePointer(log_handle,0,0,FILE_END);
   if(!read_config()){log_line("LAN gave up: invalid/missing NETCFG and no valid DOS-native metadata");unregister();CloseHandle(log_handle);ExitProcess(1);}
-  if(vm()){log_line("LAN deferred: VM; Run retained");CloseHandle(log_handle);ExitProcess(0);}
+  if(vm()){
+#ifndef USOS_LAN_NT
+    if(!native95_handoff()){
+#endif
+      log_line("LAN deferred: VM; Run retained");CloseHandle(log_handle);ExitProcess(0);
+#ifndef USOS_LAN_NT
+    }
+    log_line("LAN permitted: completed source950 handoff in VM; desktop still required");
+#endif
+  }
   mutex=CreateMutexA(0,FALSE,"USOSLAN-first-desktop");if(!mutex||GetLastError()==ERROR_ALREADY_EXISTS)ExitProcess(0);
   if(!desktop())log_line("LAN waiting for desktop readiness notifications (bounded, no polling)");
   if(!usos_wait_desktop(desktop,300000)){log_line("LAN desktop deadline reached; Run retained");CloseHandle(log_handle);ExitProcess(0);}
+#ifndef USOS_LAN_NT
+  /* Recheck the completion boundary after the readiness notification. */
+  if(vm()&&!native95_handoff()){log_line("LAN deferred: source950 handoff changed; Run retained");CloseHandle(log_handle);ExitProcess(0);}
+#endif
   refresh=refresh_requested();
   if(!load_state(refresh)){log_line("LAN gave up: invalid private retry state");unregister();CloseHandle(log_handle);ExitProcess(2);}
   if(refresh){usos_lan_refresh(&state);log_line("LAN explicit post-package refresh");}
   if(state.done==USOS_LAN_ALL){log_line("LAN already completed; user settings preserved");unregister();CloseHandle(log_handle);ExitProcess(0);}
   if(!usos_lan_attempt(&state)){log_line("LAN gave up after three attempts; completed steps/user settings preserved");unregister();CloseHandle(log_handle);ExitProcess(2);}
   if(!save_state()){log_line("LAN gave up: cannot persist private retry state");unregister();CloseHandle(log_handle);ExitProcess(2);}
+#ifndef USOS_LAN_NT
+  if(vm())log_line("LAN installed source950 VM desktop; no connectivity assertion or automatic restart");
+  else
+#endif
   log_line("LAN first hardware desktop; no DHCP wait, ping or automatic restart");
   for(bit=1;bit<=USOS_LAN_DEFAULT_FAVORITE;bit<<=1){
     usos_lan_step(&state,bit,action,&bit);

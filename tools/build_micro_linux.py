@@ -585,6 +585,7 @@ def main() -> int:
             ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
+            ("tools/w9x_vesa950.sh", "usr/lib/usos/w9x_vesa950.sh"),
             ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
@@ -825,6 +826,12 @@ def main() -> int:
         lan_files.append(build_usoslog(lan_out, logger_work))
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        for relative, source in (
+            ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
+            ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
+        ):
+            put(entries, Entry('usr/lib/usos/network/' + relative, stat.S_IFREG | 0o644,
+                               (root / source).read_bytes()))
         from build_usosadd import build as build_addons_runner
         from build_legacy_stage import build as build_addons_planner
         addons_out = root / "zig-out/legacy-pack"

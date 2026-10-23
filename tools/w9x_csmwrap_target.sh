@@ -281,6 +281,14 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# The pinned MIT VESA driver's unregister call stalls RTM shutdown. Patch
+# only this newly staged target copy for the exact 950 source, never OSR2.
+if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    [ -r "$LIB/w9x_vesa950.sh" ] || fail 'missing 950 VESA compatibility helper'
+    . "$LIB/w9x_vesa950.sh"
+    w9x_vesa950_prepare "$work/c/USOS9X" "$setup_version" || fail 'cannot prepare the pinned 950 VESA compatibility driver'
+    log 'display: pinned MIT VESA 950 unregister workaround, target copy only'
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -323,7 +331,7 @@ if [ -f "$LIB/w9x_logon.sh" ] && [ -f "$LIB/w9x/USOSME.PWL" ]; then
 fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
-usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+USOS_NET_W95_VERSION=$setup_version usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
@@ -544,14 +552,17 @@ case "$SYSTEM_TAG:$TIME_ZONE" in
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
         fi ;;
 esac
-# Windows 95 never enumerates PCI under SeaBIOS (VM phase 1 or CSMWrap), so
-# Setup leaves the display on Standard VGA: C:\USOS9X\VESA95.BAT
+# The early legacy path leaves the display on Standard VGA: VESA95.BAT
 # (tools/w9x_vesa95.sh) moves it to the vmdisp9x VESA driver at the first
-# start, the end state 98 gets from Setup.
+# start, the end state 98 gets from Setup. Source950 can also enumerate a
+# later PCI display; its post-Setup hook binds that actual existing device.
 if [ "$SYSTEM_TAG" = 95 ]; then
-    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X"; then
+    vesa95_source=''
+    [ "$ANSWER_KIND" = USER ] || vesa95_source=${setup_version:-}
+    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X" 16 1024,768 "$vesa95_source"; then
         log 'display: VESA95.BAT (vmdisp9x VESA at the first start, 16-bit 1024x768)'
     else
+        [ "$vesa95_source" != '4 0 0 950' ] || fail 'cannot prepare the 950 post-Setup display binding'
         rm -f "$work/c/USOS9X/VESA95.BAT" "$work/c/USOS9X/VESA95.REG"
         log 'display: no VESA95.BAT (Standard VGA stays)'
     fi
@@ -572,10 +583,13 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         # usos_net_w95_stage): imported with REG95.REG, checked into NET.
         reg95_net=
         [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || reg95_net="$work/c/USOS9X/NET/NET95.REG"
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net"; then
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}"; then
             log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
             [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
         else
+            if [ -n "$reg95_net" ] && [ "${setup_version:-}" = '4 0 0 950' ]; then
+                fail 'RTM/OSR1 network files and registry helpers could not be prepared; target start withheld'
+            fi
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
             if [ "$vmd_ok" = 1 ]; then
