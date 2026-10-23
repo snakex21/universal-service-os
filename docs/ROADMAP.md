@@ -56,6 +56,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L13 | Własne środowisko przygotowania zamiast mikro-Linuksa Alpine | **Later** (po 1.0); przed 1.0 tylko pakiety Alpine offline | aplikacja UEFI (Zig) | do oszacowania, etapami |
 | L14 | Back-end Realtek RTL8111/8168 w usosnet4 (tylko NT4 / Windows 95) | **Later** (po 1.0) | usosnet4 | do oszacowania |
 | L15 | Winsock dla Windows 3.1 / WfW 3.11: własny GPL WINSOCK.DLL na kodzie mTCP nad USOSPKT | **Later** (po 1.0) | USOSPKT, mTCP | ~20–30 dni |
+| L16 | Multiboot na jednym dysku: instalacja obok istniejących systemów, własny menedżer startu UEFI, ukrywanie partycji dla DOS/9x/NT4 | **Later** (po 1.0) | CSMWrap (L11), przepływ instalacji | do oszacowania |
 
 ## 2. Pozycje
 
@@ -497,6 +498,16 @@ Decyzja użytkownika 2026-10-23: własny GPL WINSOCK.DLL na kodzie mTCP nad
 USOSPKT (kolejka pakietów w USOSPKT, tryb standard i 386 enhanced),
 ~20–30 dni. Opcjonalny krok pośredni: własny zamiennik WINPKT + Trumpet
 dostarczony przez użytkownika (docs/win3-winsock-options-2026-10-23.md).
+
+### L16. Multiboot na jednym dysku: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: instalacja na wolne miejsce lub wskazaną
+partycję bez ruszania istniejących systemów. Własny menedżer startu w UEFI
+na dysku (systemy nowoczesne bezpośrednio, stare przez CSMWrap). Ukrywanie
+partycji dla DOS/9x/NT4 (jak OS/2 Boot Manager / System Commander). Reguły
+zgodności: partycje podstawowe, limit 8 GB/LBA dla DOS/9x, MBR vs GPT.
+Na start najczęstsze zestawy (np. DOS+98+XP+7, XP+10); testy kombinacji
+na X470.
 
 ## 2b. Wydanie 1.1 (scalone do `master` 2026-09-29, bez tagu)
 
