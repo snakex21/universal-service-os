@@ -248,3 +248,21 @@ wrong in 238 of 348 runs). Not yet tried on the X470.
   committed table equals the generator output; script/subcommand wiring.
 * Zig unit tests (`src/compat/win3x`): containers round trip, stub bytes,
   logo patch.
+* QEMU only (build B261023-194647-7926C19A, tools/tests/run_w9x_micro_linux_qemu.py
+  w3 --boot: the real micro-Linux runs dos_csmwrap_target.sh, then CSMWrap
+  path boot, Setup by itself; QEMU's VGA does not show the fault, so the
+  check is by hash on the installed disk):
+  * Windows 3.1 PL (SZDD): `[WIN3X_DISPLAY]` lines in the prepare log;
+    installed `C:\WINDOWS\SYSTEM\VGA.DRV` = 9685c4f8... (patched),
+    `VGALOGO.LGO` = 8da538eb... (patched), `WIN.COM` = ba873ece... (= WIN.CNF
+    + patched VGALOGO.LGO + VGALOGO.RLE), `display.drv=vga.drv`; Program
+    Manager on screen.
+  * Windows for Workgroups 3.11 PL (KWAJ): VGA.DRV = 59d1faf8...,
+    VGALOGO.LGO = 8da538eb..., WIN.COM = 72754064... (patched), desktop up.
+  So Setup takes the literal-only SZDD and KWAJ files. 3.0a (same SZDD path
+  as 3.1, own Setup) and 3.11 OEM (same KWAJ path as WfW) were not
+  installed in QEMU; hardware: only the 3.1 driver/logo were tried on the
+  X470 so far.
+* Not covered: the BIOS-native DOS path (`src/platform/bios/dos6_native_iso.zig`,
+  firmware CSM PCs, RAM disk built by the UEFI Core) has no micro-Linux step
+  and still installs the original files.
