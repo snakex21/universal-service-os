@@ -37,6 +37,7 @@ GetModuleFileNameA
 GetProcAddress
 GetTickCount
 GetVersion
+GetVersionExA
 LoadLibraryA
 MultiByteToWideChar
 OpenProcess

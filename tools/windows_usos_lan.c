@@ -228,9 +228,10 @@ static int vm(void){unsigned a,b,c,d;__cpuid(1,a,b,c,d);if(c&0x80000000u)return 
  * filesystem verification. The caller must also wait for the desktop.
  * The nested first-stage Setup has no postprocessor marker and defers.
  */
-static int native95_handoff(void){char raw[96];DWORD version,n,i;HANDLE f;HKEY setup;LONG status;
-  version=GetVersion();
-  if(!eq(system_id,"95")||(version&0xffff)!=4||!(version&0x80000000UL)||((version>>16)&0x7fff)!=950)return 0;
+static int native95_handoff(void){char raw[96];DWORD n,i;HANDLE f;HKEY setup;LONG status;OSVERSIONINFOA version={0};
+  version.dwOSVersionInfoSize=sizeof version;
+  if(!eq(system_id,"95")||!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||
+     version.dwMajorVersion!=4||version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950)return 0;
   local(path,"PHASE1.OK");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
   if(f==INVALID_HANDLE_VALUE)return 0;
   n=0;status=GetFileSize(f,0)<sizeof(raw)&&ReadFile(f,raw,sizeof(raw),&n,0);CloseHandle(f);

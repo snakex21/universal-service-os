@@ -4,6 +4,11 @@
 #include <windows.h>
 static DWORD test_os_version=0x08ae5a04UL;
 static DWORD WINAPI test_version(void){return test_os_version;}
+static DWORD test_build_number=0x040003b6UL,test_platform=VER_PLATFORM_WIN32_WINDOWS;
+static BOOL test_version_available=TRUE;
+static BOOL WINAPI test_version_ex(LPOSVERSIONINFOA version){
+  if(!test_version_available)return FALSE;
+  version->dwPlatformId=test_platform;version->dwMajorVersion=4;version->dwMinorVersion=0;version->dwBuildNumber=test_build_number;return TRUE;}
 static LONG test_setup_status=ERROR_FILE_NOT_FOUND;
 static unsigned test_setup_opens,test_setup_closes;
 static const char *test_ie_version;
@@ -23,6 +28,7 @@ static LONG WINAPI test_reg_query(HKEY key,LPCSTR name,LPDWORD reserved,LPDWORD 
 static char *test_command="unit.exe";
 static LPSTR WINAPI test_command_line(void){return test_command;}
 #define GetVersion test_version
+#define GetVersionExA test_version_ex
 #define GetCommandLineA test_command_line
 #define RegOpenKeyExA test_reg_open
 #define RegCloseKey test_reg_close
@@ -57,8 +63,9 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   fixture("PHASE1.OK","phase1=qemu elapsed=123\r\nextra");CHECK(!native95_handoff());
   fixture("PHASE1.OK","phase1=qemu elapsed=0\r\n");CHECK(native95_handoff());
   copy(system_id,"98");CHECK(!native95_handoff());copy(system_id,"95");
-  test_os_version=0x84570004UL;CHECK(!native95_handoff());
-  test_os_version=0x03b60004UL;CHECK(!native95_handoff());
+  test_build_number=1111;CHECK(!native95_handoff());test_build_number=0x040003b6UL;
+  test_platform=VER_PLATFORM_WIN32_NT;CHECK(!native95_handoff());test_platform=VER_PLATFORM_WIN32_WINDOWS;
+  test_version_available=FALSE;CHECK(!native95_handoff());test_version_available=TRUE;
   test_os_version=0x08ae5a04UL;local(path,"PHASE1.OK");DeleteFileA(path);
   copy(system_id,"95");lstrcpyA(home,"about:blank");fixture("START.HTM","own local legacy page");
   CHECK(!memcmp(start_page(),"file://",7));

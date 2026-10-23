@@ -14,6 +14,10 @@ succeed:
   returns `ERROR_FILE_NOT_FOUND`. An existing key or an access/query error
   defers the helper and preserves its Run value.
 
+The version gate uses `GetVersionExA`, Win32Windows4.0 and the low16 bits of
+`dwBuildNumber`, matching the successful guest NETPROBE's real950 result.
+It does not infer a9x build from the older packed `GetVersion` result.
+
 The existing event driven desktop wait still runs before policy changes.
 The completion boundary is checked again after that wait. Nested phase1
 Setup has no postprocessor marker and continues to defer. Other source
