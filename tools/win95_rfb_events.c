@@ -61,6 +61,13 @@ static int next_button_role(const char *role)
     size_t length=strlen(role);
     if (length==sizeof("welcome-en")-1 && !memcmp(role,"welcome-en",sizeof("welcome-en")-1)) return 0;
     if (length==sizeof("coa-single-en")-1 && !memcmp(role,"coa-single-en",sizeof("coa-single-en")-1)) return 0;
+    if (length==sizeof("directory-en")-1 && !memcmp(role,"directory-en",sizeof("directory-en")-1)) return 0;
+    if (length==sizeof("setup-type-en")-1 && !memcmp(role,"setup-type-en",sizeof("setup-type-en")-1)) return 0;
+    if (length==sizeof("owner-en")-1 && !memcmp(role,"owner-en",sizeof("owner-en")-1)) return 0;
+    if (length==sizeof("hardware-list-en")-1 && !memcmp(role,"hardware-list-en",sizeof("hardware-list-en")-1)) return 0;
+    if (length==sizeof("communication-en")-1 && !memcmp(role,"communication-en",sizeof("communication-en")-1)) return 0;
+    if (length==sizeof("components-en")-1 && !memcmp(role,"components-en",sizeof("components-en")-1)) return 0;
+    if (length==sizeof("copy-ready-en")-1 && !memcmp(role,"copy-ready-en",sizeof("copy-ready-en")-1)) return 0;
     if (length==sizeof("network-device-en")-1 && !memcmp(role,"network-device-en",sizeof("network-device-en")-1)) return 0;
     if (length==sizeof("restart")-1 && !memcmp(role,"restart",sizeof("restart")-1)) return 0;
     if (length==sizeof("reboot-confirm")-1 && !memcmp(role,"reboot-confirm",sizeof("reboot-confirm")-1)) return 0;

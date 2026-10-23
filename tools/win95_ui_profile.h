@@ -7,7 +7,17 @@ static const Page pages[] = {
      * Product Identification edit at x214..463,y211..234 is excluded.
      * Its Next button is disabled while the field is empty. */
     {"coa-single-en", UINT64_C(0xf85c29bdaa0feab3), UINT64_C(0x8599957f814638b0), 214, 194, 250, 13},
+    /* Original English 950 pages use the short wizard at y339..360.
+     * Public instructions distinguish its waiting hardware page from the
+     * identically titled active detection page immediately below it. */
+    {"directory-en", UINT64_C(0x6f912fd406d2f9bc), UINT64_C(0x1efd71610cab5ab7), 214, 129, 365, 43},
+    {"setup-type-en", UINT64_C(0x2947e7a7c49e592b), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
+    {"owner-en", UINT64_C(0x527862c5a3c2b2fd), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
+    {"hardware-list-en", UINT64_C(0x53da302148d1cd16), UINT64_C(0x1bb3e37e9b89f815), 214, 129, 365, 43},
     {"busy", UINT64_C(0x53da302148d1cd16), UINT64_C(0x0000000000000000), 0, 0, 0, 0},
+    {"communication-en", UINT64_C(0xff6d4a3e8fb49f38), UINT64_C(0x6e929060547d2e3a), 214, 129, 365, 43},
+    {"components-en", UINT64_C(0xba085e9f60e1ec03), UINT64_C(0xd89f1aceaf9f1a8d), 214, 129, 365, 43},
+    {"copy-ready-en", UINT64_C(0x5cc7b92f00ccacb7), UINT64_C(0x47ead39e433c9b6d), 214, 129, 365, 43},
     /* Exact Network adapters selector; cancel through the visible button
      * instead of installing the old detected NDIS2/ODI placeholder. */
     {"network-device-en", UINT64_C(0x546e6568cf8848ff), UINT64_C(0xdf22bf26597d0dce), 74, 45, 453, 38},
