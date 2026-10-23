@@ -208,7 +208,14 @@ usos_w9x_csmwrap_prepare() {
     modprobe vfat 2>/dev/null || true
     mkdir -p /mnt/data
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only'
-    [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
+    # A floppy disk set (a folder of diskette images in Images; the menu's
+    # floppy-set entry) only for Windows 1.0x-3.x: dos_csmwrap_target.sh
+    # merges its diskettes (tools/floppy_set.sh). Other systems take files.
+    if [ -d "/mnt/data/$iso" ]; then
+        [ "$tag" = W3 ] || stop "floppy disk sets are supported only for Windows 1.0x-3.x and Windows for Workgroups: $iso"
+    else
+        [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
+    fi
     floppy=''
     dos_iso=''
     nt4=''

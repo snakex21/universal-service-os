@@ -23,6 +23,7 @@ pub const DiscoveredImage = @import("discovered_image.zig").DiscoveredImage;
 pub const image_catalog = @import("image_catalog.zig");
 pub const directory_source = @import("directory_source.zig");
 pub const media_discovery = @import("media_discovery.zig");
+pub const floppy_set = @import("floppy_set.zig");
 pub const utility_catalog = @import("utility_catalog.zig");
 
 test {
@@ -49,5 +50,6 @@ test {
     _ = image_catalog;
     _ = directory_source;
     _ = media_discovery;
+    _ = floppy_set;
     _ = utility_catalog;
 }

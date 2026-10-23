@@ -177,6 +177,9 @@ pub const Key = enum(u16) {
     media_blocked_line2,
     media_blocked_no_uefi,
     media_blocked_title,
+    media_floppy_set,
+    media_floppy_set_hint,
+    media_floppy_set_unsupported,
     media_not_windows,
     media_setup,
     media_unreadable,
@@ -1003,6 +1006,9 @@ pub const hashes = [_]u32{
     0x655e4fe6, // media.blocked_line2
     0x51f33129, // media.blocked_no_uefi
     0x98318504, // media.blocked_title
+    0x65b5132e, // media.floppy_set
+    0x1a966db2, // media.floppy_set_hint
+    0xfc63ebaa, // media.floppy_set_unsupported
     0x3c08652a, // media.not_windows
     0xece75d88, // media.setup
     0xca296b94, // media.unreadable
@@ -1989,6 +1995,9 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -2479,7 +2488,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 335;
+pub const bios_count = 338;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2657,6 +2666,9 @@ pub const english = [_][]const u8{
     "Choose another image or start the PC in the matching firmware mode.",
     "No UEFI loader on this image - use BIOS mode (CSM)",
     "This image cannot start here",
+    "Floppy disk set: {0} disks",
+    "Floppy disk sets work for Windows 1.0x-3.x and Windows for Workgroups. Use an ISO for this system.",
+    "Floppy disk set - not supported for this system",
     "Not Windows boot media",
     "Windows Setup",
     "Contents could not be read",

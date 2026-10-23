@@ -5,10 +5,12 @@ pub const SystemMediaStatus = struct {
     vhd_count: usize = 0,
     vhdx_count: usize = 0,
     efi_count: usize = 0,
+    /// Folders of diskette images (src/catalog/floppy_set.zig).
+    floppy_set_count: usize = 0,
     unattended_files: usize = 0,
 
     pub fn imageCount(self: SystemMediaStatus) usize {
-        return self.iso_count + self.wim_count + self.img_count + self.vhd_count + self.vhdx_count + self.efi_count;
+        return self.iso_count + self.wim_count + self.img_count + self.vhd_count + self.vhdx_count + self.efi_count + self.floppy_set_count;
     }
 
     pub fn hasImages(self: SystemMediaStatus) bool {

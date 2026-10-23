@@ -347,6 +347,30 @@ USOS_DATA\
 - Jeśli wrzucisz obraz Windows Server do folderu zwykłego Windows (albo
   odwrotnie), menu podpowie właściwy folder. Obraz i tak da się uruchomić.
 
+#### Media z dyskietek
+
+Zamiast ISO można dać zestaw obrazów dyskietek. Cały zestaw to jeden
+folder w `Images`, np.:
+
+```
+Systems\Windows\Windows for Workgroups 3.11\Images\WfW 3.11 PL\
+    disk01.img  disk02.img  ...  disk10.img
+```
+
+- Menu UEFI pokazuje folder jako jedną pozycję (nazwa folderu, oznaczenie
+  `FDD`, liczba dyskietek). Instalacja przebiega tak samo jak z ISO.
+- Obrazy: `.img`, `.ima`, `.vfd` lub `.flp` o rozmiarze dyskietki
+  (160/180/320/360 KB, 720 KB, 1,2 MB, 1,44 MB, 2,88 MB, FAT12). Inne pliki
+  w folderze (np. `.txt`) są pomijane.
+- Nazwy są dowolne; kolejność jest naturalna (`disk2` przed `disk10`,
+  `DISK_1`, `disk01`, `Disk 1 of 10` działają tak samo).
+- Pliki ze wszystkich dyskietek trafiają do jednego folderu instalacyjnego.
+  Gdy ten sam plik jest na kilku dyskietkach, zostaje pierwsza kopia; różna
+  treść jest zapisana w logu przygotowania (`EFI\USOS\win9x\prepare.log`).
+- Obsługiwane: Windows 1.0x–3.x i Windows for Workgroups 3.11 (menu UEFI, także bez CSM;
+  menu BIOS nie pokazuje zestawów). Dla innych systemów menu pokazuje zestaw jako
+  „nieobsługiwany format”; dla nich użyj ISO.
+
 ### 4.2 Pliki odpowiedzi (instalacja nienadzorowana)
 
 - Windows 6.x i nowsze: pliki `.xml` w `Systems\Windows\<system>\Unattended\`.

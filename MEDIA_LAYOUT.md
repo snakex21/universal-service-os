@@ -36,6 +36,13 @@ Każdy profil ma własny katalog `Images`. Obsługiwane w katalogu są obecnie f
 
 Nazwa pliku jest dowolna. Format i metoda startu są rozdzielone: po wybraniu obrazu GUI pokazuje tylko metody zgodne z profilem i typem pliku.
 
+Zestaw dyskietek: podfolder `Images\<nazwa>\` z obrazami dyskietek
+(`.img/.ima/.vfd/.flp`, rozmiar 160 KB–2,88 MB) to jedna pozycja menu UEFI
+(rodzaj `floppy_set`, etykieta `FDD`). Tylko Windows 1.0x–3.x / WfW
+(profil `win3x-floppy-set-uefi-csmwrap`); mikro-Linux łączy dyskietki w
+`C:\USOSDOS\WINSETUP` (`tools/floppy_set.sh`). Szczegóły:
+`docs/floppy-sets-2026-10-23.md`.
+
 ## Ikony profili
 
 Profil systemu albo narzędzia może mieć opcjonalne `icon.png` obok katalogu `Images`, np. `Systems/Windows/Windows 11/icon.png` albo `Utilities/MemTest86/icon.png`. PNG jest jedynym formatem ikon profili; bootmanager ma własny lekki dekoder PNG i nie ładuje kodeków JPEG. Maksymalny rozmiar ikony to 1 MiB.

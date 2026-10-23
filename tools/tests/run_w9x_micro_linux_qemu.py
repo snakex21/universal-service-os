@@ -29,6 +29,7 @@ runs INSTALL.BAT, restarts and Windows Setup by itself.
 
     python tools/tests/run_w9x_micro_linux_qemu.py dos  --dos-iso DOS622.iso --out DIR --root BUILD --nvme [--boot]
     python tools/tests/run_w9x_micro_linux_qemu.py w3   --dos-iso DOS622.iso --win3 WFW.iso --out DIR --root BUILD --nvme [--boot]
+    python tools/tests/run_w9x_micro_linux_qemu.py w3   --dos-iso DOS622.iso --win3-floppies "DIR/WfW 3.11 PL" --out DIR --root BUILD --scripts [--boot]
     python tools/tests/run_w9x_micro_linux_qemu.py 98se --iso 98SE.iso --out DIR --root BUILD --nvme [--boot]
 
 --qemu: a renamed copy of qemu-system-x86_64.exe inside ROOT/tools/qemu (so
@@ -53,7 +54,7 @@ import run_nt3_micro_linux_qemu as nt3  # noqa: E402
 from run_stage_drivers_qemu import Console  # noqa: E402
 
 SCRIPTS = ("w9x_csmwrap_prepare.sh", "w9x_phase1_qemu.sh", "w9x_csmwrap_target.sh", "dos_csmwrap_target.sh",
-           "xp_csmwrap_esp.sh", "w9x_nvme.sh")
+           "xp_csmwrap_esp.sh", "w9x_nvme.sh", "floppy_set.sh")
 
 GUEST = r'''#!/bin/sh
 # run_w9x_micro_linux_qemu.py guest part: step 620's DOS / 9x calls, no screens.
@@ -103,7 +104,11 @@ if [ "$FAMILY" = 98se ]; then
     fi
 else
     WIN3=''
-    if [ "$FAMILY" = w3 ]; then
+    if [ "$FAMILY" = w3 ] && [ -d /usos-e2e/floppies ]; then
+        # --win3-floppies: the floppy disk set folder itself (no ISO)
+        for d in /usos-e2e/floppies/*; do WIN3=$d; done
+        log "floppy set: $WIN3 ($(ls "$WIN3" | wc -l) files)"
+    elif [ "$FAMILY" = w3 ]; then
         dd if=/dev/vdb of=/mnt/data/win3.iso bs=1M 2>/dev/null || { echo E2E-RESULT=FAIL; exit 1; }
         WIN3=/mnt/data/win3.iso
     fi
@@ -141,6 +146,11 @@ def overlay(args) -> bytes:
     for f in sorted(csmwrap.rglob("*")):
         if f.is_file():
             add("usos-e2e/csmwrap/" + f.relative_to(csmwrap).as_posix(), f.read_bytes())
+    if args.win3_floppies:
+        folder = Path(args.win3_floppies)
+        for f in sorted(folder.iterdir()):
+            if f.is_file():
+                add(f"usos-e2e/floppies/{folder.name}/{f.name}", f.read_bytes())
     if args.scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -157,7 +167,7 @@ def install(args, out: Path, target: Path) -> bool:
     port = nt3.free_port()
     first = args.iso if args.family == "98se" else args.dos_iso
     disks = ["-drive", f"file={Path(first).as_posix()},format=raw,if=none,id=cd,readonly=on", "-device", "virtio-blk-pci,drive=cd"]
-    if args.family == "w3":
+    if args.family == "w3" and not args.win3_floppies:
         disks += ["-drive", f"file={Path(args.win3).as_posix()},format=raw,if=none,id=w3,readonly=on", "-device", "virtio-blk-pci,drive=w3"]
     tgt = (["-device", "pcie-root-port,id=rpn,chassis=20,slot=20", "-device", "nvme,drive=t,serial=W9X-NVME-TARGET,bus=rpn"]
            if args.nvme else ["-device", "ide-hd,drive=t,bus=ide.0"])
@@ -309,6 +319,7 @@ def main() -> int:
     p.add_argument("--iso", help="98se: the Windows 98 SE ISO")
     p.add_argument("--dos-iso", help="dos / w3: the MS-DOS 6.22 ISO")
     p.add_argument("--win3", help="w3: the Windows 3.x ISO")
+    p.add_argument("--win3-floppies", help="w3: a floppy disk set folder (diskette images) instead of --win3")
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--root", type=Path, default=ROOT, help="checkout with zig-out and tools/qemu")
     p.add_argument("--qemu", type=Path, help="renamed qemu-system-x86_64.exe copy (in ROOT/tools/qemu)")
@@ -330,7 +341,7 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / "target.qcow2"
     if not args.boot_only:
-        need = [args.iso] if args.family == "98se" else [args.dos_iso] + ([args.win3] if args.family == "w3" else [])
+        need = [args.iso] if args.family == "98se" else [args.dos_iso] + ([args.win3 or args.win3_floppies] if args.family == "w3" else [])
         if not all(need):
             raise SystemExit("missing ISO argument(s)")
         target.unlink(missing_ok=True)
