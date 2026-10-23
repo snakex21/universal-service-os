@@ -17,6 +17,26 @@ del C:\SYSLINUX.CFG
 :sl_done
 call %USRC%\PREPDOS.BAT %USRC%\DOSFILES C:\DOS %USRC%
 if not exist C:\DOS\READY.TAG goto failed
+rem WINA20.386 in the root of the boot drive, as MS-DOS Setup places it
+rem (DOSSETUP.INI [dif-path]: beside COMMAND.COM, plain attributes). The DOS
+rem 5.0/6.x kernel asks Windows 3.0 enhanced mode (WIN, WIN /3) to load it;
+rem without it WIN stops with "You must have the file WINA20.386 in the root
+rem of your boot drive". Windows 3.1 and later ignore it. PREPDOS expanded it
+rem from WINA20.38_ of the user's MS-DOS media into C:\DOS; media without it
+rem = logged and skipped. Log: C:\DOS\USOSDOS.LOG.
+if exist C:\WINA20.386 goto wina20_have
+if not exist C:\DOS\WINA20.386 goto wina20_none
+copy C:\DOS\WINA20.386 C:\ /y >nul
+if errorlevel 1 goto wina20_none
+if not exist C:\WINA20.386 goto wina20_none
+echo WINA20.386: copied from C:\DOS to C:\>>C:\DOS\USOSDOS.LOG
+goto wina20_done
+:wina20_have
+echo WINA20.386: already in C:\>>C:\DOS\USOSDOS.LOG
+goto wina20_done
+:wina20_none
+echo WINA20.386: not on the MS-DOS media - Windows 3.0 needs WIN /S or /R>>C:\DOS\USOSDOS.LOG
+:wina20_done
 copy %USRC%\REBOOT.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\HIMEMX.EXE C:\DOS /y >nul
