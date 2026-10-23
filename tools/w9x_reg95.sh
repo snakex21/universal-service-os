@@ -229,14 +229,74 @@ open.</P>
 EOF
 }
 
-# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG]
+# Original RTM/OSR1 NETCLI.INF VREDIR.Install and NETTRANS.INF MSTCP.Install
+# copy groups. NETAPI.DLL is in PRECOPY, the other files in WIN95_*.CAB.
+# Use this target's original EXTRACT and cabinets; keep existing inbox
+# files (including patched ones). Copy the selected own driver separately.
+w9x_reg95_netfiles_write() {
+    nfdir=$1
+    [ -d "$nfdir/NET" ] || return 1
+    {
+        cat <<'EOF'
+@ECHO OFF
+REM USOS: original 950 network files before the NET95 registry import.
+IF EXIST C:\USOS9X\NET\NFILES.RUN GOTO FAIL
+ECHO run> C:\USOS9X\NET\NFILES.RUN
+IF EXIST C:\USOS9X\NET\NFILES.OK DEL C:\USOS9X\NET\NFILES.OK > NUL
+IF EXIST C:\USOS9X\NET\NFILES.ERR DEL C:\USOS9X\NET\NFILES.ERR > NUL
+ECHO begin> C:\USOS9X\NET\NFILES.LOG
+IF NOT EXIST C:\WIN95\EXTRACT.EXE GOTO FAIL
+IF NOT EXIST C:\WIN95\PRECOPY1.CAB GOTO FAIL
+IF NOT EXIST C:\WIN95\WIN95_02.CAB GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO FAIL
+IF NOT EXIST C:\WINDOWS\INF\NUL GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\USOSNET.SYS GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\USOSNET.INF GOTO FAIL
+COPY /Y C:\USOS9X\NET\USOSNET.SYS C:\WINDOWS\SYSTEM\USOSNET.SYS > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\USOSNET.SYS GOTO FAIL
+COPY /Y C:\USOS9X\NET\USOSNET.INF C:\WINDOWS\INF\USOSNET.INF > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+IF NOT EXIST C:\WINDOWS\INF\USOSNET.INF GOTO FAIL
+IF NOT EXIST C:\WINDOWS\HELP\NUL MD C:\WINDOWS\HELP
+IF NOT EXIST C:\WINDOWS\HELP\NUL GOTO FAIL
+EOF
+        n=0
+        while read -r dest cab names; do
+            for name in $names; do
+                n=$((n + 1))
+                printf 'IF EXIST %s\\%s GOTO F%02d\n' "$dest" "$name" "$n"
+                printf 'C:\\WIN95\\EXTRACT.EXE /A /Y /L %s C:\\WIN95\\%s %s >> C:\\USOS9X\\NET\\NFILES.LOG\n' "$dest" "$cab" "$name"
+                printf 'IF ERRORLEVEL 1 GOTO FAIL\nIF NOT EXIST %s\\%s GOTO FAIL\n:F%02d\n' "$dest" "$name" "$n"
+            done
+        done <<'EOF'
+C:\WINDOWS\SYSTEM PRECOPY1.CAB netapi.dll
+C:\WINDOWS\SYSTEM WIN95_02.CAB vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd
+C:\WINDOWS\SYSTEM WIN95_02.CAB msnp32.dll mspp32.dll lmscript.exe lmscript.pif filesec.vxd choosusr.dll mapi32.dll vlb32.dll
+C:\WINDOWS WIN95_02.CAB net.exe net.msg neth.msg winpopup.exe
+C:\WINDOWS\HELP WIN95_02.CAB winpopup.hlp winpopup.cnt
+C:\WINDOWS\SYSTEM WIN95_02.CAB vtdi.386 vip.386 vtcp.386 vdhcp.386 vnbt.386 icmp.dll afvxd.vxd wshtcp.vxd rpcltc3.dll rpclts3.dll wsock.vxd wsasrv.exe
+C:\WINDOWS WIN95_02.CAB ping.exe telnet.exe telnet.hlp ftp.exe hosts.sam lmhosts.sam networks protocol services inetmib1.dll arp.exe nbtstat.exe netstat.exe route.exe tracert.exe winipcfg.exe winsock.dll
+EOF
+        cat <<'EOF'
+ECHO complete> C:\USOS9X\NET\NFILES.OK
+DEL C:\USOS9X\NET\NFILES.RUN > NUL
+GOTO END
+:FAIL
+ECHO original network file preparation failed> C:\USOS9X\NET\NFILES.ERR
+:END
+EOF
+    } | sed 's/$/\r/' > "$nfdir/NET/NFILES.BAT"
+}
+
+# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
 # sections are appended to REG95.REG (one import) and REG95.BAT exports
 # them afterwards to DIR\NET\C1..C3.REG and checks them with FIND:
 # NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
     w9x_reg95_convert "$inf" "$usoslog" "$vmd" >"$dir/REG95.REG" || return 1
@@ -247,7 +307,27 @@ w9x_reg95_write() {
     F='C:\WINDOWS\COMMAND\FIND.EXE'
     R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
-    netbat=''
+    netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND
+    run_guard="IF EXIST ${U}REG95.RUN GOTO END"
+    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then
+        w9x_reg95_netfiles_write "$dir" || return 1
+        netprep="CALL ${U}NET\\NFILES.BAT
+IF NOT EXIST ${U}NET\\NFILES.OK GOTO PREPERR"
+        netguard="IF EXIST ${U}NET\\NET95.ERR GOTO PREPERR
+IF EXIST ${U}NET\\NFILES.ERR GOTO PREPERR
+IF EXIST ${U}NET\\NFILES.RUN GOTO PREPERR"
+        run_guard="IF EXIST ${U}REG95.RUN GOTO PREPERR"
+        neterrjump='GOTO REGFAIL'
+        net_findfail=REGFAIL
+        netfail=":REGFAIL
+$A +S +R +H SYSTEM.DAT
+$A +S +R +H USER.DAT
+:PREPERR
+ECHO Network preparation failed. See C:\\USOS9X\\NET. Windows start withheld.
+:PREPWAIT
+PAUSE > NUL
+GOTO PREPWAIT"
+    fi
     if [ -n "$net" ]; then
         devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
         [ -n "$devnode" ] || return 1
@@ -257,7 +337,7 @@ w9x_reg95_write() {
           tr -d '\r' < "$dir/REG95.REG" | sed -n '/^; USOS:/p'; } | sed 's/$/\r/' > "$dir/REG95.NEW" &&
             mv "$dir/REG95.NEW" "$dir/REG95.REG" || return 1
         N="${U}NET\\"
-        netbat="IF NOT EXIST $F GOTO NETEND
+        netbat="IF NOT EXIST $F GOTO $net_findfail
 $R /E ${N}C1.REG $devnode
 $R /E ${N}C2.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\Net
 $R /E ${N}C3.REG HKEY_LOCAL_MACHINE\\Enum\\Network
@@ -271,19 +351,22 @@ ECHO ok> ${N}NET95.OK
 GOTO NETEND
 :NETERR
 ECHO registry check after the import failed (C1..C3.REG)> ${N}NET95.ERR
+$neterrjump
 :NETEND"
     fi
     sed 's/$/\r/' > "$dir/REG95.BAT" <<EOF || return 1
 @ECHO OFF
 REM USOS: Windows 95 answer registry (tools/w9x_reg95.sh): 95 Setup ignores
 REM MSBATCH.INF [Install] AddReg. Runs from AUTOEXEC.BAT, imports once.
+$netguard
 IF EXIST ${U}REG95.OK GOTO END
-IF EXIST ${U}REG95.RUN GOTO END
+$run_guard
 IF NOT EXIST ${U}REG95.REG GOTO END
 IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO END
 IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
 IF NOT EXIST C:\WINDOWS\USER.DAT GOTO END
 IF NOT EXIST $A GOTO END
+$netprep
 ECHO run> ${U}REG95.RUN
 C:
 CD \WINDOWS
@@ -298,6 +381,8 @@ $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 ECHO ok> ${U}REG95.OK
 CD \\
+GOTO END
+$netfail
 :END
 EOF
 }
