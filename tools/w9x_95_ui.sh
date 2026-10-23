@@ -51,7 +51,7 @@ w9x_vm_95_page_ready() {
     case "$W9X_VM_PAGE" in
         coa|coa-single|coa-single-en) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
         owner|owner-en) w9x_vm_owner_valid ;;
-        directory-en|setup-type-en|hardware-list-en|communication-en|components-en|copy-ready-en) return 0 ;;
+        directory-en|setup-type-en|hardware-list-en|communication-en|components-en|copy-ready-en|finish-en) return 0 ;;
         recovery|welcome|welcome-en|directory|setup-type|hardware-list|communication|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm|network-device-en) return 0 ;;
         *) return 1 ;;
     esac
@@ -144,6 +144,12 @@ w9x_vm_95_input() {
             ;;
         copy-ready-en)
             w9x_vm_private_key ret || return 1
+            key_on_screen=0
+            ;;
+        finish-en)
+            # The only enabled control is Finish. Focus it explicitly;
+            # default Enter left this actual EN page waiting.
+            w9x_vm_private_key tab && w9x_vm_private_key spc || return 1
             key_on_screen=0
             ;;
         recovery|welcome|welcome-en|directory|setup-type|hardware-list|communication|components|computer-options|copy-ready|restart|reboot-confirm)

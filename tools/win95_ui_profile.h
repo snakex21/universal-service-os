@@ -18,6 +18,9 @@ static const Page pages[] = {
     {"communication-en", UINT64_C(0xff6d4a3e8fb49f38), UINT64_C(0x6e929060547d2e3a), 214, 129, 365, 43},
     {"components-en", UINT64_C(0xba085e9f60e1ec03), UINT64_C(0xd89f1aceaf9f1a8d), 214, 129, 365, 43},
     {"copy-ready-en", UINT64_C(0x5cc7b92f00ccacb7), UINT64_C(0x47ead39e433c9b6d), 214, 129, 365, 43},
+    /* First genuine USOS-prepared EN installation: short Finish page.
+     * Match the public restart instructions, not just its shared title. */
+    {"finish-en", UINT64_C(0xba4a453bdbc7f405), UINT64_C(0xed0d6d938e132c8a), 214, 140, 365, 65},
     /* Exact Network adapters selector; cancel through the visible button
      * instead of installing the old detected NDIS2/ODI placeholder. */
     {"network-device-en", UINT64_C(0x546e6568cf8848ff), UINT64_C(0xdf22bf26597d0dce), 74, 45, 453, 38},

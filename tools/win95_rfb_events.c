@@ -68,6 +68,7 @@ static int next_button_role(const char *role)
     if (length==sizeof("communication-en")-1 && !memcmp(role,"communication-en",sizeof("communication-en")-1)) return 0;
     if (length==sizeof("components-en")-1 && !memcmp(role,"components-en",sizeof("components-en")-1)) return 0;
     if (length==sizeof("copy-ready-en")-1 && !memcmp(role,"copy-ready-en",sizeof("copy-ready-en")-1)) return 0;
+    if (length==sizeof("finish-en")-1 && !memcmp(role,"finish-en",sizeof("finish-en")-1)) return 0;
     if (length==sizeof("network-device-en")-1 && !memcmp(role,"network-device-en",sizeof("network-device-en")-1)) return 0;
     if (length==sizeof("restart")-1 && !memcmp(role,"restart",sizeof("restart")-1)) return 0;
     if (length==sizeof("reboot-confirm")-1 && !memcmp(role,"reboot-confirm",sizeof("reboot-confirm")-1)) return 0;
