@@ -82,8 +82,9 @@ fn homeItems(ui: *const Ui, items: *[catalog.categories.all.len + 1]screens.Home
                 .linux => .category_linux_desc,
                 .beta => .category_beta_desc,
                 .dos => .category_dos_desc,
-                .macos => .category_macos_desc,
-                .other => .category_others_desc,
+                // macOS is UEFI-only (never in the Core's categories.all);
+                // its strings are left out of the Core's table.
+                .macos, .other => .category_others_desc,
                 .utilities => .category_utilities_desc,
             }),
         };
