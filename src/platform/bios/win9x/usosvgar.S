@@ -38,6 +38,11 @@
  *   259h = 0 (UC) with interrupts off, caches flushed and MTRRs disabled
  *   during the change, the bulk tests again, then the original 259h is
  *   written back the same way and checked. Nothing stays changed.
+ *
+ * Version 3 adds read-modify-write instruction tests (see "version 3"
+ * below): the X470 loads the latches of a locked XCHG from byte addr|3;
+ * this checks locked, unlocked, read-only and word RMW forms per
+ * alignment and prints a per-test verdict and an RMW RESULT line.
  */
 .intel_syntax noprefix
 .code16
@@ -46,7 +51,7 @@
 _start:
     jmp main
 
-sig:    .ascii "USOSVGR2"
+sig:    .ascii "USOSVGR3"
 omode:  .byte 0
 nbad:   .word 0
 nlist:  .byte 0
@@ -166,7 +171,7 @@ regtab:
 vals:   .byte 0x00, 0xff, 0x55, 0xaa, 0x01, 0x02, 0x03, 0x08, 0x0f, 0x10, 0x18, 0x41, 0x80
 .equ NVALS, 13
 
-s_head: .asciz "USOSVGAR 2 (VGA readback + MTRR + bulk latch probe, mode 12h)"
+s_head: .asciz "USOSVGAR 3 (VGA readback + MTRR + bulk latch + RMW probe, mode 12h)"
 s_def:  .asciz "after mode 12h: SEQ0-4"
 s_gc:   .asciz " GC0-8"
 s_idx:  .asciz "index readback 3C4/3CE:"
@@ -429,6 +434,7 @@ mem_done:
     call puts
     call hex16
     call crlf
+    call rmw_tests
     call uc_try
 
     mov si, offset s_okr
@@ -1522,3 +1528,591 @@ run_rm1:
     call gcdef
     mov si, word ptr [bx + 2]
     jmp vreport
+
+/* --- version 3: read-modify-write instruction tests ----------------------- */
+/* USOSVGAR 2 on the X470 (RX 560 under CSMWrap, A0000 UC) showed that an
+ * XCHG with video memory (implicitly locked) loads the VGA latches from
+ * byte (address | 3) instead of the addressed byte, while plain reads,
+ * writes and REP MOVSB latch copies are fine. These tests take every RMW
+ * form the 3.x drivers could use, one instruction per byte at offsets
+ * ending in 0, 1, 2 and 3 separately (distinct pattern bytes everywhere):
+ * WM1 (write = latches): which byte the latches came from, per alignment
+ *     ("=" the addressed byte, "3" byte OR 3, "+" next, "-" previous,
+ *     "?" none), plus "stray" changes to bytes no instruction touched;
+ * WM0 bit mask 3C (byte forms): written data and latches together against
+ *     the same instruction run on ordinary RAM ("=" correct, "3" latches
+ *     from byte OR 3 with correct data, "R" data and latches from there,
+ *     "?" other), and "cpu" = register results that differ from the RAM run.
+ * Word forms are informational (a 16-bit access reads two bytes; which one
+ * the latches keep is not defined by the VGA). */
+.equ RBUF, 0xd000                   /* 4 planes x OPLEN dump of the region */
+.equ RSITES, OPLEN / 4 - 1
+
+rfn:     .word 0
+rflg:    .word 0
+rk:      .byte 0
+rmode:   .byte 0                    /* 0 = WM1 latch source, 1 = WM0 data */
+cb:      .word 0
+csrc:    .word 0
+cdat:    .byte 0
+cmask:   .byte 0
+rsrc:    .word 0
+rbyte:   .word 0
+refal:   .byte 0
+rcnt:    .space 40                  /* WM1: 4 alignments x 5 classes */
+rcnth:   .space 40                  /* same for the high byte of word forms */
+bcnt:    .space 8                   /* WM0: = 3 R ? */
+rstray:  .word 0
+rcpu:    .word 0
+rlbad:   .word 0
+rltot:   .word 0
+rubad:   .word 0
+rutot:   .word 0
+
+/* flags: 1 = word access, 2 = locked (XCHG or LOCK prefix) */
+rmwtab:
+    .word st_xchg, 2, n_m1
+    .word st_lor, 2, n_m2
+    .word st_mov, 0, n_m3
+    .word st_or, 0, n_m4
+    .word st_and, 0, n_m5
+    .word st_xor, 0, n_m6
+    .word st_add, 0, n_m7
+    .word st_not, 0, n_m8
+    .word st_inc, 0, n_m9
+    .word st_test, 0, n_m10
+    .word st_xchgw, 3, n_m11
+    .word st_lorw, 3, n_m12
+    .word st_orw, 1, n_m13
+    .word st_movw, 1, n_m14
+    .word 0, 0, 0
+n_m1:  .asciz "RMW xchg es:[di],al     "
+n_m2:  .asciz "RMW lock or es:[di],al  "
+n_m3:  .asciz "RMW mov ah,[di]/[di],al "
+n_m4:  .asciz "RMW or es:[di],al       "
+n_m5:  .asciz "RMW and es:[di],al      "
+n_m6:  .asciz "RMW xor es:[di],al      "
+n_m7:  .asciz "RMW add es:[di],al      "
+n_m8:  .asciz "RMW not byte es:[di]    "
+n_m9:  .asciz "RMW inc byte es:[di]    "
+n_m10: .asciz "RMW test es:[di],al+mov "
+n_m11: .asciz "RMW xchg es:[di],ax     "
+n_m12: .asciz "RMW lock or es:[di],ax  "
+n_m13: .asciz "RMW or es:[di],ax       "
+n_m14: .asciz "RMW mov dx,[di]/[di],ax "
+
+/* stubs: ES:DI = target, AL (AX) = data; result in AL (AX); AH free */
+st_xchg:
+    xchg byte ptr es:[di], al
+    ret
+st_lor:
+    lock or byte ptr es:[di], al
+    ret
+st_mov:
+    mov ah, byte ptr es:[di]
+    mov byte ptr es:[di], al
+    mov al, ah
+    ret
+st_or:
+    or byte ptr es:[di], al
+    ret
+st_and:
+    and byte ptr es:[di], al
+    ret
+st_xor:
+    xor byte ptr es:[di], al
+    ret
+st_add:
+    add byte ptr es:[di], al
+    ret
+st_not:
+    not byte ptr es:[di]
+    ret
+st_inc:
+    inc byte ptr es:[di]
+    ret
+st_test:
+    test byte ptr es:[di], al
+    mov byte ptr es:[di], al
+    ret
+st_xchgw:
+    xchg word ptr es:[di], ax
+    ret
+st_lorw:
+    lock or word ptr es:[di], ax
+    ret
+st_orw:
+    or word ptr es:[di], ax
+    ret
+st_movw:
+    push dx
+    mov dx, word ptr es:[di]
+    mov word ptr es:[di], ax
+    mov ax, dx
+    pop dx
+    ret
+
+s_wm1:   .asciz "WM1"
+s_wm0:   .asciz "WM0/3C"
+s_a:     .asciz " a"
+s_hi:    .asciz " hi"
+s_str:   .asciz " stray "
+s_rcpu:   .asciz " cpu "
+s_vok:   .asciz " OK"
+s_va3:   .asciz " ADDR3"
+s_voth:  .asciz " OTHER"
+s_vinf:  .asciz " INFO"
+s_rsum:  .asciz "RMW summary: locked bad "
+s_rof:   .asciz " of "
+s_runl:  .asciz ", unlocked bad "
+s_rres:  .asciz "RMW RESULT "
+s_rr0:   .asciz "OK"
+s_rr1:   .asciz "LOCKED-ONLY (unlocked RMW and plain access fine)"
+s_rr2:   .asciz "UNLOCKED-BAD-TOO"
+clsch:   .ascii "=3+-?"
+bclsch:  .ascii "=3R?"
+
+rcall:
+    jmp word ptr [rfn]
+
+/* AX = site data for offset DI */
+rdata:
+    mov ax, di
+    xor ax, 0x5aa5
+    ret
+
+/* the stub on RAM: DI = site, [rsrc] = offset whose plane 0 pattern the
+ * RAM byte holds -> AL = byte written, [refal] = AL result */
+refrun:
+    push bx
+    push di
+    push es
+    push ds
+    pop es
+    push di
+    mov di, word ptr [rsrc]
+    xor bl, bl
+    call pat
+    mov byte ptr [rbyte], al
+    pop di
+    call rdata
+    mov di, offset rbyte
+    call rcall
+    mov byte ptr [refal], al
+    mov al, byte ptr [rbyte]
+    pop es
+    pop di
+    pop bx
+    ret
+
+/* ZF=1 if the dump at [cb] equals (cdat & cmask) | (P(., csrc) & ~cmask)
+ * on all four planes */
+tmatch:
+    push bx
+    push di
+    push si
+    push cx
+    mov si, word ptr [cb]
+    sub si, OPBASE
+    add si, RBUF
+    mov di, word ptr [csrc]
+    mov ch, byte ptr [cmask]
+    xor bl, bl
+1:  call pat
+    mov cl, ch
+    not cl
+    and al, cl
+    mov cl, byte ptr [cdat]
+    and cl, ch
+    or al, cl
+    cmp al, byte ptr [si]
+    jne 2f
+    add si, OPLEN
+    inc bl
+    cmp bl, 4
+    jb 1b
+    xor al, al
+2:  pop cx
+    pop si
+    pop di
+    pop bx
+    ret
+
+/* region -> RBUF, plane by plane */
+rdump:
+    push bx
+    push si
+    xor bl, bl
+    mov di, RBUF
+1:  mov dx, 0x3ce
+    mov ah, bl
+    mov al, 4
+    call wrreg
+    mov si, OPBASE
+    mov cx, OPLEN
+2:  mov al, byte ptr es:[si]
+    mov byte ptr [di], al
+    inc si
+    inc di
+    loop 2b
+    inc bl
+    cmp bl, 4
+    jb 1b
+    mov dx, 0x3ce
+    mov ax, 0x0004
+    call wrreg
+    pop si
+    pop bx
+    ret
+
+/* one pass: [rk] alignment, [rmode] mode; counts into rcnt/bcnt */
+rpass:
+    mov word ptr [rstart], OPBASE
+    mov word ptr [rlen], OPLEN
+    call fill_pat
+    mov dx, 0x3ce
+    mov ax, 0x0105                  /* WM1 */
+    cmp byte ptr [rmode], 0
+    je 1f
+    mov ax, 0x3c08                  /* WM0, bit mask 3C */
+1:  call wrreg
+    mov di, OPBASE
+    mov al, byte ptr [rk]
+    xor ah, ah
+    add di, ax
+    mov cx, RSITES
+2:  push cx
+    cmp byte ptr [rmode], 0
+    je 3f
+    mov word ptr [rsrc], di
+    call refrun
+3:  call rdata
+    call rcall
+    cmp byte ptr [rmode], 0
+    je 4f
+    cmp al, byte ptr [refal]
+    je 4f
+    inc word ptr [rcpu]
+4:  pop cx
+    add di, 4
+    loop 2b
+    call gcdef
+    call rdump
+    /* classify every byte of the region */
+    mov bx, OPBASE
+5:  mov word ptr [cb], bx
+    mov word ptr [csrc], bx
+    mov byte ptr [cmask], 0
+    mov ax, bx
+    sub ax, OPBASE
+    sub al, byte ptr [rk]
+    sbb ah, 0
+    cmp ax, RSITES * 4
+    jae 6f
+    test al, 3
+    jz 7f
+    test byte ptr [rflg], 1
+    jz 6f
+    mov ah, al
+    and ah, 3
+    cmp ah, 1
+    je 7f
+6:  call tmatch                     /* untouched: must be unchanged */
+    je 9f
+    inc word ptr [rstray]
+    jmp 9f
+7:  cmp byte ptr [rmode], 0
+    jne 8f
+    /* WM1: latch source */
+    xor si, si
+    call tmatch
+    je 71f
+    inc si
+    mov ax, bx
+    or ax, 3
+    mov word ptr [csrc], ax
+    call tmatch
+    je 71f
+    inc si
+    lea ax, [bx + 1]
+    mov word ptr [csrc], ax
+    call tmatch
+    je 71f
+    inc si
+    lea ax, [bx - 1]
+    mov word ptr [csrc], ax
+    call tmatch
+    je 71f
+    inc si
+71: mov al, byte ptr [rk]
+    mov ah, 10
+    mul ah
+    add si, si
+    add si, ax
+    mov ax, bx
+    sub al, byte ptr [rk]
+    test al, 3                      /* OPBASE is 4-aligned */
+    jz 72f
+    add si, 40                      /* high byte of a word form */
+72: inc word ptr [rcnt + si]
+    jmp 9f
+8:  /* WM0 bit mask 3C: data and latches */
+    mov byte ptr [cmask], 0x3c
+    mov di, bx
+    mov word ptr [rsrc], bx
+    call refrun
+    mov byte ptr [cdat], al
+    xor si, si
+    call tmatch
+    je 81f
+    inc si
+    mov ax, bx
+    or ax, 3
+    mov word ptr [csrc], ax
+    call tmatch
+    je 81f
+    inc si
+    mov ax, bx
+    or ax, 3
+    mov word ptr [rsrc], ax
+    call refrun
+    mov byte ptr [cdat], al
+    call tmatch
+    je 81f
+    inc si
+81: add si, si
+    inc word ptr [bcnt + si]
+9:  inc bx
+    cmp bx, OPBASE + OPLEN
+    jb 5b
+    ret
+
+/* in: DX = latch-from-OR-3 count, CX = other count (+ stray, cpu);
+ * prints the verdict; CF=1 if not OK */
+rverdict:
+    or cx, cx
+    jnz 2f
+    cmp word ptr [rstray], 0
+    jne 2f
+    cmp word ptr [rcpu], 0
+    jne 2f
+    or dx, dx
+    jnz 1f
+    mov si, offset s_vok
+    clc
+    jmp 3f
+1:  mov si, offset s_va3
+    stc
+    jmp 3f
+2:  mov si, offset s_voth
+    stc
+3:  pushf
+    test byte ptr [rflg], 1
+    jz 4f
+    mov si, offset s_vinf
+4:  call puts
+    call crlf
+    popf
+    ret
+
+/* tail: " stray n" (+ " cpu n") */
+rtail:
+    mov si, offset s_str
+    call puts
+    mov ax, word ptr [rstray]
+    call hex16
+    cmp byte ptr [rmode], 0
+    je 1f
+    mov si, offset s_rcpu
+    call puts
+    mov ax, word ptr [rcpu]
+    call hex16
+1:  ret
+
+/* count a test result: CF from rverdict; word forms are not counted */
+rtally:
+    pushf
+    test byte ptr [rflg], 1
+    jnz 3f
+    test byte ptr [rflg], 2
+    jz 1f
+    inc word ptr [rltot]
+    popf
+    jnc 4f
+    inc word ptr [rlbad]
+    ret
+1:  inc word ptr [rutot]
+    popf
+    jnc 4f
+    inc word ptr [rubad]
+    ret
+3:  popf
+4:  ret
+
+/* print the nonzero classes of alignment BL from rcnt + BP; adds the
+ * byte-OR-3 count to DX and "+", "-", "?" to CX */
+pcls:
+    xor di, di
+1:  mov al, bl
+    mov ah, 10
+    mul ah
+    add ax, di
+    add ax, di
+    add ax, bp
+    mov si, ax
+    mov ax, word ptr [rcnt + si]
+    or ax, ax
+    jz 5f
+    cmp di, 1
+    jb 4f
+    jne 3f
+    add dx, ax
+    jmp 4f
+3:  add cx, ax
+4:  push ax
+    call sp_
+    mov al, byte ptr [clsch + di]
+    call putc
+    mov al, ':'
+    call putc
+    pop ax
+    call hex16
+5:  inc di
+    cmp di, 5
+    jb 1b
+    ret
+
+/* BX -> rmwtab entry */
+rmw_one:
+    mov ax, word ptr [bx]
+    mov word ptr [rfn], ax
+    mov ax, word ptr [bx + 2]
+    mov word ptr [rflg], ax
+    push bx
+    /* WM1 latch source, four alignments */
+    mov byte ptr [rmode], 0
+    push ds
+    pop es
+    mov di, offset rcnt
+    mov cx, 40 + 40 + 8 + 4
+    xor al, al
+    rep stosb
+    mov ax, 0xa000
+    mov es, ax
+    mov byte ptr [rk], 0
+1:  call rpass
+    inc byte ptr [rk]
+    cmp byte ptr [rk], 4
+    jb 1b
+    pop bx
+    push bx
+    mov si, word ptr [bx + 4]
+    call puts
+    mov si, offset s_wm1
+    call puts
+    xor bx, bx                      /* alignment */
+    xor dx, dx                      /* latch-from-OR-3 total */
+    xor cx, cx                      /* other total */
+2:  mov si, offset s_a
+    call puts
+    mov al, bl
+    call hexd
+    xor bp, bp
+    call pcls
+    test byte ptr [rflg], 1
+    jz 3f
+    mov si, offset s_hi
+    call puts
+    mov bp, 40
+    call pcls
+3:
+    inc bl
+    cmp bl, 4
+    jb 2b
+    push cx
+    push dx
+    call rtail
+    pop dx
+    pop cx
+    call rverdict
+    call rtally
+    pop bx
+    test byte ptr [rflg], 1
+    jnz 9f
+    /* WM0 bit mask 3C, byte forms */
+    push bx
+    mov byte ptr [rmode], 1
+    mov word ptr [rstray], 0
+    mov byte ptr [rk], 0
+6:  call rpass
+    inc byte ptr [rk]
+    cmp byte ptr [rk], 4
+    jb 6b
+    pop bx
+    push bx
+    mov si, word ptr [bx + 4]
+    call puts
+    mov si, offset s_wm0
+    call puts
+    xor di, di
+7:  call sp_
+    mov al, byte ptr [bclsch + di]
+    call putc
+    mov al, ':'
+    call putc
+    mov si, di
+    add si, si
+    mov ax, word ptr [bcnt + si]
+    call hex16
+    inc di
+    cmp di, 4
+    jb 7b
+    call rtail
+    mov dx, word ptr [bcnt + 2]
+    add dx, word ptr [bcnt + 4]
+    mov cx, word ptr [bcnt + 6]
+    call rverdict
+    call rtally
+    pop bx
+9:  ret
+
+rmw_tests:
+    mov bx, offset rmwtab
+1:  cmp word ptr [bx], 0
+    je 2f
+    push bx
+    call rmw_one
+    pop bx
+    add bx, 6
+    jmp 1b
+2:  mov si, offset s_rsum
+    call puts
+    mov ax, word ptr [rlbad]
+    call hex16
+    mov si, offset s_rof
+    call puts
+    mov ax, word ptr [rltot]
+    call hex16
+    mov si, offset s_runl
+    call puts
+    mov ax, word ptr [rubad]
+    call hex16
+    mov si, offset s_rof
+    call puts
+    mov ax, word ptr [rutot]
+    call hex16
+    call crlf
+    mov si, offset s_rres
+    call puts
+    mov si, offset s_rr2
+    cmp word ptr [rubad], 0
+    jne 3f
+    mov si, offset s_rr1
+    cmp word ptr [rlbad], 0
+    jne 3f
+    mov si, offset s_rr0
+3:  call puts
+    call crlf
+    mov ax, 0xa000
+    mov es, ax
+    jmp gcdef

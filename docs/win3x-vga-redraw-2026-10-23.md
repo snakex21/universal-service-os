@@ -87,3 +87,80 @@ from the DOS menu item, or patch the start batch).
 3. If the log says `RESULT OK`, readback is not the cause; next suspects are
    the interrupt context of the pointer (VBMOUSE event delivery from
    SeaBIOS's timer path) and the per-plane helper bytes of 3.0.
+
+## Result of USOSVGAR 1/2 on the X470 and root cause
+
+Register readback, plane memory, the 9B0F/BFFF latch save and every write
+mode 1 latch copy (REP MOVSB and byte loops, forward/backward, overlaps)
+are fine, and A0000-BFFFF is UC (fixed MTRR 259h = 0). Only the tests
+that write with `xchg es:[di],al` (write modes 2/3 and the ALU functions)
+fail: the latches are loaded from byte `offset | 3` instead of the
+addressed byte (e.g. WM2 bit mask 3C at 9200: expected FE, got 3D = data
+3C combined with the latch of 9203). The Unicorn VGA model with this fault
+(`Vga(locked3=True)`: latches of a locked read from offset|3, CPU value
+correct) reproduces all 24 bulk lines of the X470 log byte for byte.
+XCHG with memory is implicitly locked; the locked read apparently goes out
+as an aligned dword read that the card's VGA core processes byte by byte,
+leaving the latches at the last byte. VGA.DRV 3.1 uses `xchg es:[di],reg8`
+(86 sites) and `xchg [di],reg8` with DS = A000 (8 sites) as "load latches
+and write" in text, line, pixel and bitmap output, so those draws combine
+with the wrong latch byte.
+
+## USOSVGAR 3: RMW instruction tests
+
+Version 3 runs, after the bulk tests, every RMW form one instruction per
+byte at offsets ending in 0, 1, 2 and 3 separately: `xchg`, `lock or`,
+`mov ah,[di]` + `mov [di],al`, `or/and/xor/add`, `not`, `inc`, `test` +
+`mov` (read-only), and the word forms `xchg/lock or/or/mov ...,ax`.
+WM1 lines show where the latches came from per alignment (`=` addressed
+byte, `3` byte |3, `+`/`-` neighbour, `?` other, plus stray changes);
+WM0/3C lines (byte forms) compare data + latches with the same instruction
+run on RAM (`=`, `3`, `R` = data and latches from |3, `?`) and count CPU
+result differences. Verdict per line (OK / ADDR3 / OTHER, word forms INFO),
+`RMW summary` and `RMW RESULT OK | LOCKED-ONLY | UNLOCKED-BAD-TOO`.
+Unicorn: faithful VGA -> OK, `locked3` -> LOCKED-ONLY (only `xchg` and
+`lock or` ADDR3), `rmw3` (every RMW) -> UNLOCKED-BAD-TOO.
+
+## Fix: tools/win3x_vga_patch.py (own tool, GPL-3.0-or-later)
+
+Input a Windows 3.x display driver (NE), output the patched file. The code
+segments are walked with capstone (16-bit) by recursive descent from the
+entry table and internal relocation targets, plus near code pointers found
+in reached code (MOV/PUSH imm16, LEA reg,[routine], CS: and LEA word tables;
+each accepted only if its walk decodes cleanly and agrees with the code
+already reached). Every reached `xchg mem,reg` with an ES override or with
+DS by default and a base/index register is replaced by `call stub` (+NOPs);
+the stub, appended to the same segment, is `push T / mov T,mem / mov mem,R
+/ mov R,T / pop T / ret` (no flag changes). Two-byte sites take the next
+(or previous) movable instruction into the window/stub (no control
+transfer, no stack/SP use, no fixup, no branch target inside). DS absolute
+variables (`xchg [1FEh],cl` busy flags), SS/BP stack variables, sites only
+found by a byte scan outside the reached code (templates?) and anything
+overlapping a fixup are left alone and listed. Grown segments (+ their
+relocation records) are written at the end of the file, the segment table
+is updated and the fast-load area is switched off. `--unlocked-rmw`
+(default off) also replaces unlocked RMW with video memory, only needed if
+a probe ever shows UNLOCKED-BAD-TOO. Patched Microsoft files stay local.
+
+VGA.DRV 3.1 (sha256 53312ed0...a820a): 94 sites replaced (86 ES + 8
+DS-register), 19 left alone (17 DS/SS variables incl. the busy flag, 0
+unreached ES sites); 3.0a VGA.DRV 42 and EGA.DRV 3.0 44 replaced but about
+46 ES sites each are only found by the byte scan (regular code blocks in
+segments 2/3, probably BitBlt/text templates), so 3.0 needs a closer look
+before use; EGA.DRV 3.1: 75 replaced.
+
+Tests (tools/tests/legacy_bios/test_win3x_vga_patch.py): a synthetic NE
+driver (entry, relocated far call, ES and DS-register sites, a 4-byte site,
+a DS busy flag, an unreached template) checks site selection, the file
+layout and, under Unicorn with the VGA model in four write modes, that the
+patched routines give the same registers, flags, RAM, stack and planes as
+the original on a faithful VGA and also on the `locked3` model, where the
+original is wrong. With `USOS_WIN3X_DRV=<VGA.DRV>` every replaced window
+of the real driver is executed alone (random registers/planes, 4 modes):
+VGA.DRV 3.1: 94 windows x 4 modes identical on both models; the original
+is wrong on the fault model in 275 of the 376 runs.
+
+Limits: the patch keeps the instruction effect but not its interrupt
+atomicity (not needed for video memory; the busy flags are not touched);
+code only reachable through pointers the walk does not find stays
+unpatched (none known in 3.1 VGA.DRV); not yet tried on hardware.

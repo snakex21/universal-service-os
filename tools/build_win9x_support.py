@@ -234,7 +234,7 @@ def build_usosvgar(out: Path, work: Path) -> Path:
     subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
     data = com.read_bytes()
     # Output buffer at 8000h: the image must end below it.
-    if not 0 < len(data) <= 0x8000 - 0x100 or data[0] != 0xE9 or b'USOSVGR2' not in data:
+    if not 0 < len(data) <= 0x8000 - 0x100 or data[0] != 0xE9 or b'USOSVGR3' not in data:
         raise ValueError('unexpected USOSVGAR.COM layout')
     return com
 

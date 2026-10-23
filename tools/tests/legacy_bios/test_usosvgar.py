@@ -4,6 +4,9 @@ graphics controller or sequencer data reads do not return the written value
 gives RESULT READBACK-BAD, broken off-screen latch storage gives
 RESULT MEMORY-OR-LATCH-BAD, a write mode 1 path that stores a stale latch or
 an ignored rotate gives RESULT BULK-BAD; the previous text mode is set again.
+Version 3 RMW tests: latches of locked reads taken from byte offset|3 (the
+X470 fault; reproduces the X470 USOSVGAR 2 bulk lines) give RMW RESULT
+LOCKED-ONLY, the same for every RMW gives UNLOCKED-BAD-TOO.
 CPUID and RDMSR/WRMSR are emulated by the test so the MTRR decode and the
 temporary 259h=UC experiment (always restored) can be checked."""
 from pathlib import Path
@@ -12,6 +15,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import capstone
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_INTR, UC_HOOK_INSN, UC_HOOK_CODE
 from unicorn.x86_const import *
 
@@ -35,10 +39,14 @@ class Vga:
     set/reset, bit mask), read modes 0/1, latches. Fault switches:
     bad_gc / bad_seq: data reads return a wrong value; bad_offscreen: no
     memory above BF00; lag: write mode 1 stores the latch of the read
-    BEFORE the last one; no_rotate: GC3 rotate ignored."""
+    BEFORE the last one; no_rotate: GC3 rotate ignored; locked3: a locked
+    read (XCHG with memory, LOCK prefix) loads the latches from byte
+    offset|3 (the X470/RX 560 fault seen with USOSVGAR 2; the CPU still
+    gets the addressed byte); rmw3: the same for every read-modify-write
+    instruction."""
 
     def __init__(self, bad_gc=None, bad_seq=False, bad_offscreen=False,
-                 lag=False, no_rotate=False):
+                 lag=False, no_rotate=False, locked3=False, rmw3=False):
         self.planes = [bytearray(0x10000) for _ in range(4)]
         self.latch = [0, 0, 0, 0]
         self.prev = [0, 0, 0, 0]
@@ -47,6 +55,7 @@ class Vga:
         self.si = self.gi = 0
         self.bad_gc, self.bad_seq, self.bad_off = bad_gc, bad_seq, bad_offscreen
         self.lag, self.no_rotate = lag, no_rotate
+        self.locked3, self.rmw3 = locked3, rmw3
 
     def out(self, port, v):
         if port == 0x3c4:
@@ -71,19 +80,25 @@ class Vga:
             return 0xff if self.bad_gc is not None and self.gi == self.bad_gc else v
         return 0xff
 
-    def read(self, off):
+    def read(self, off, kind=None):
+        """kind: None plain read, 'rmw' read of an RMW instruction,
+        'locked' read of a locked one."""
         if self.bad_off and off >= 0xbf00:
             self.latch = [0x00] * 4
             return 0
         self.prev = self.latch
-        self.latch = [p[off] for p in self.planes]
+        src = off
+        if (kind == 'locked' and self.locked3) or (kind and self.rmw3):
+            src = off | 3
+        self.latch = [p[src] for p in self.planes]
+        cpu = [p[off] for p in self.planes]
         if self.gc[5] & 8:
             r = 0xff
             for i in range(4):
                 if self.gc[7] >> i & 1:
-                    r &= ~(self.latch[i] ^ (0xff if self.gc[2] >> i & 1 else 0))
+                    r &= ~(cpu[i] ^ (0xff if self.gc[2] >> i & 1 else 0))
             return r & 0xff
-        return self.latch[self.gc[4] & 3]
+        return cpu[self.gc[4] & 3]
 
     def write(self, off, v):
         if self.bad_off and off >= 0xbf00:
@@ -107,6 +122,36 @@ class Vga:
                 d, m = (sr if gc[1] >> i & 1 else ror8(v, rot)), bm
             d = (d, d & lat, d | lat, d ^ lat)[fn]
             self.planes[i][off] = (d & m) | (lat & ~m & 0xff)
+
+
+RMW_MNEMONICS = {'add', 'or', 'adc', 'sbb', 'and', 'sub', 'xor', 'not', 'neg',
+                 'inc', 'dec', 'shl', 'shr', 'sal', 'sar', 'rol', 'ror', 'rcl', 'rcr'}
+
+
+def rmw_sites(code, base):
+    """{address: kind} for every byte position of a 16-bit image that
+    decodes as a locked ('locked': XCHG with memory or LOCK prefix) or other
+    read-modify-write ('rmw') instruction with a memory destination, plus
+    {address after it: None}. Positions inside data or other instructions
+    are harmless: hooks only fire at executed instruction starts."""
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_16)
+    md.detail = True
+    sites = {}
+    for i in range(len(code)):
+        insn = next(md.disasm(code[i:i + 15], base + i, 1), None)
+        if insn is None or not insn.operands:
+            continue
+        mem0 = insn.operands[0].type == capstone.x86.X86_OP_MEM
+        memany = any(o.type == capstone.x86.X86_OP_MEM for o in insn.operands)
+        if (capstone.x86.X86_PREFIX_LOCK in insn.prefix and memany) or                 (insn.mnemonic == 'xchg' and memany):
+            kind = 'locked'
+        elif mem0 and insn.mnemonic in RMW_MNEMONICS:
+            kind = 'rmw'
+        else:
+            continue
+        sites[base + i] = kind
+        sites.setdefault(base + i + insn.size, None)
+    return sites
 
 
 class Machine:
@@ -139,7 +184,17 @@ class Machine:
         for i in range(len(com) - 1):
             if com[i] == 0x0f and com[i + 1] in (0x30, 0x32):
                 u.hook_add(UC_HOOK_CODE, self._msr, None, base + i, base + i)
+        # MMIO callbacks do not see the current IP: mark the instruction
+        # kind (locked / rmw) with code hooks at those instructions and
+        # clear it at the next one.
+        self.kind = None
+        if vga.locked3 or vga.rmw3:
+            for a, k in rmw_sites(com, base).items():
+                u.hook_add(UC_HOOK_CODE, self._kind, k, a, a)
         self.done = False
+
+    def _kind(self, uc, addr, size, kind):
+        self.kind = kind
 
     def _cpuid(self, uc, data):
         leaf = uc.reg_read(UC_X86_REG_EAX)
@@ -171,9 +226,10 @@ class Machine:
         uc.reg_write(UC_X86_REG_IP, uc.reg_read(UC_X86_REG_IP) + 2)
 
     def _mr(self, uc, off, size, data):
+        kind = self.kind
         v = 0
         for i in range(size):
-            v |= self.vga.read(off + i) << (8 * i)
+            v |= self.vga.read(off + i, kind) << (8 * i)
         return v
 
     def _mw(self, uc, off, size, value, data):
@@ -254,6 +310,13 @@ class UsosVgarTest(unittest.TestCase):
         self.assertIn('UC experiment: skipped (no MTRR access)', text)
         # readback, plane memory, latch; 1 fill + 10 copies + 10 ops + 2 RM1; total
         self.assertEqual(text.count(' mismatches 0000\r\n'), 3 + 23 + 1, text)
+        # v3: 10 byte RMW forms x (WM1 + WM0/3C) + RMW RESULT + RESULT; 4 word forms INFO
+        self.assertEqual(text.count(' OK\r\n'), 22, text)
+        self.assertEqual(text.count(' INFO\r\n'), 4, text)
+        self.assertIn('RMW xchg es:[di],al     WM1 a0 =:01FF a1 =:01FF a2 =:01FF a3 =:01FF '
+                      'stray 0000 OK', text)
+        self.assertIn('RMW summary: locked bad 0000 of 0004, unlocked bad 0000 of 0010', text)
+        self.assertIn('RMW RESULT OK', text)
 
     def test_bad_gc8_readback(self):
         text = self.run_with(Vga(bad_gc=8))
@@ -282,6 +345,36 @@ class UsosVgarTest(unittest.TestCase):
         self.assertIn('WM0 AND mismatches 0000', text)
         self.assertNotIn('WM0 rot 3 mismatches 0000', text)
         self.assertIn('WM1 fwd  byte loop 0000->8000 len 6000 mismatches 0000', text)
+
+    def test_locked_addr3_latch_reproduces_x470(self):
+        # USOSVGAR 2 on the X470 (Micron, Windows 3.1 install): this fault
+        # model gives the same 24 bulk lines byte for byte; v3 then narrows
+        # it to locked RMW.
+        text = self.run_with(Vga(locked3=True))
+        self.assertIn('WM2 bit mask 3C mismatches 1800 @9200 p0 exp FE got 3D @9201 p0 '
+                      'exp C3 got 01 @9202 p0 exp 3C got 3D @9204 p0 exp 3E got 3D', text)
+        self.assertIn('WM0 AND mismatches 12B8 @9200 p0 exp A4 got 01', text)
+        self.assertIn('WM1 fwd  rep movsb 0000->8000 len 6000 mismatches 0000', text)
+        self.assertIn('bulk total mismatches A468', text)
+        self.assertIn('RMW xchg es:[di],al     WM1 a0 3:01FF a1 3:01FF a2 3:01FF a3 =:01FF '
+                      'stray 0000 ADDR3', text)
+        self.assertIn('RMW xchg es:[di],al     WM0/3C =:01FF 3:05FD R:0000 ?:0000 stray 0000 '
+                      'cpu 0000 ADDR3', text)
+        self.assertIn('RMW lock or es:[di],al  WM1 a0 3:01FF', text)
+        self.assertIn('RMW or es:[di],al       WM1 a0 =:01FF a1 =:01FF a2 =:01FF a3 =:01FF '
+                      'stray 0000 OK', text)
+        self.assertIn('RMW summary: locked bad 0004 of 0004, unlocked bad 0000 of 0010', text)
+        self.assertIn('RMW RESULT LOCKED-ONLY', text)
+        self.assertIn('RESULT BULK-BAD', text)
+
+    def test_all_rmw_addr3_latch(self):
+        text = self.run_with(Vga(rmw3=True))
+        self.assertIn('RMW or es:[di],al       WM1 a0 3:01FF', text)
+        self.assertIn('RMW mov ah,[di]/[di],al WM1 a0 =:01FF a1 =:01FF a2 =:01FF a3 =:01FF '
+                      'stray 0000 OK', text)
+        self.assertIn('RMW test es:[di],al+mov WM0/3C =:07FC', text)
+        self.assertIn('RMW summary: locked bad 0004 of 0004, unlocked bad 000C of 0010', text)
+        self.assertIn('RMW RESULT UNLOCKED-BAD-TOO', text)
 
     def test_restores_registers(self):
         vga = Vga()
