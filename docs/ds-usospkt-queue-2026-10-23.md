@@ -33,12 +33,43 @@ Zmiany w istniejącym kodzie:
   te same liczniki `st_pout`/`st_bout`/`st_eout`, ten sam descriptor i to samo czekanie na DD);
 * `rx_poll` woła `rx_dispatch` zamiast `deliver`, a przy ramce odrzuconej (CRC/SEO/brak EOP/za
   krótka) inkrementuje dodatkowo `rx_errors` w bloku, gdy kolejka istnieje;
-* init: po bloku DMA powstaje blok kolejki (własny segment, 16-bajtowo wyrównany), zerowany i
-  wypełniany nagłówkiem; wektor `INT 2Fh` jest zapisywany razem z `INT 08h` i IRQ; rozmiar
-  rezydentny raportowany przez instalator liczy się teraz do końca bloku kolejki.
+* init: **tylko z `/Q`** po bloku DMA powstaje blok kolejki (własny segment, 16-bajtowo
+  wyrównany), zerowany i wypełniany nagłówkiem, a wektor `INT 2Fh` jest zapisywany (razem z
+  `INT 08h` i IRQ); rozmiar rezydentny liczy się wtedy do końca bloku kolejki. Bez `/Q` blok
+  nie powstaje, `INT 2Fh` nie jest dotykany, a rozmiar liczy się ze starego wzoru
+  (`area + AREA_SIZE`, bez `Q_SIZE`);
+* argumenty: `/Q` (albo `-Q`, wielkość liter dowolna — jak `/P`, `/M`, `/S`) ustawia `opt_q`;
+  reszta ogona polecenia parsowana jak dotąd, nieznane opcje nadal kończą się `arg_bad`.
 
 **Bez `ATTACH` wszystko działa jak dotąd** — bit `QF_SUPPRESS` nie jest ustawiony, więc ramki
 idą upcallem, a `INT 60h` obsługuje mTCP bez żadnej zmiany semantyki.
+
+## Włączanie: przełącznik `/Q` (tryb opcjonalny)
+
+Tryb kolejkowy jest **domyślnie wyłączony**. Bez `/Q` sterownik jest pakietowym driverem jak
+przed zmianą: hookuje tylko `INT 08h` (i ewentualnie IRQ karty) oraz wektor packet drivera
+(`INT 60h`), nie alokuje bloku kolejki i nie dotyka `INT 2Fh`. `NETSTART.BAT` pozostaje bez zmian
+— `/Q` włączymy później tylko dla sesji Windows 3.1/WfW:
+
+```
+USOSPKT.COM            ; mTCP, DOS: same upcalls, ~pamięć jak dotąd
+USOSPKT.COM 60 /Q      ; + kolejka dla DLL w trybie chronionym
+```
+
+| | bez `/Q` | z `/Q` |
+|---|---|---|
+| pamięć rezydentna | **44 544 B** (2 784 akapity): obraz + blok DMA 34 816 B | **84 256 B** (5 266 akapitów): + blok kolejki 39 712 B |
+| wektory | `INT 08h`, IRQ karty, `INT 60h` | jak obok **+ `INT 2Fh`** (łańcuch do poprzedniego handlera) |
+| `INT 2Fh AX=5553h` | nieobsługiwane — przechodzi do poprzedniego handlera | `FFFFh/1/2/3/4` obsługiwane |
+| RX | upcall (far call do klienta z ISR) | po `ATTACH`: kopiowanie do pierścienia RX, bez upcalli |
+| TX | `INT 60h` AH=04h | dodatkowo `TX_KICK` (`BX=3`) z slotów TX |
+| banner/raport | tekst instalatora bez zmian | dodatkowa linia `Queue block: seg:0000, size 9B20` + wpis `QUEUE ON` w pierścieniu logu |
+| błąd braku pamięci | kod 6 (jak dotąd) | kod 6, gdy blok kolejki się nie mieści |
+
+Wartość 44 544 B to rozmiar, który gałąź raportuje dziś (przed trybem kolejkowym było
+43 264 B — kod nowych, nieaktywnych ścieżek to +1 280 B, czyli 10 akapitów wyrównania DMA).
+Testy pilnują obu liczb jednocześnie, żeby przyszła zmiana nie powiększyła po cichu wariantu
+domyślnego.
 
 ## Układ bloku współdzielonego
 
@@ -121,16 +152,17 @@ logu. Gdy klienta nie ma — dotychczasowa ścieżka `deliver` (upcall) bez zmia
 
 ## Rozmiar COM, rozmiar rezydentny
 
-* `USOSPKT.COM`: **9 355 B**, SHA-256
-  `1377383761412244938fdd5febf8db8ea1ccdfcc89999fe3edd98eafa474282d`
-  (przed zmianą 9 136 B — kod urósł o ~220 B; limit `check_usospkt` 4–16 KiB zachowany).
+* `USOSPKT.COM`: **9 436 B**, SHA-256
+  `b7ece027762c7413def6e3b050b13726874c757302d6e0e0768993c1888d5b48`
+  (przed trybem kolejkowym 8 157 B — kod obu ścieżek; limit `check_usospkt` 4–16 KiB zachowany).
 * Zbudowane `zig cc`/`ld.lld`/`objcopy` z `tools/build_dos_network.py` (`build_usospkt`) — w tym
   worktree nie ma `tools/zig` (toolchain nie jest śledzony w gicie), więc użyto
   `C:\Users\ASRock\Desktop\Universal_Service_OS\tools\zig\zig.exe` przez `USOS_ZIG`
   oraz cache `...\tools\cache\zig-global` przez `USOS_ZIG_CACHE`.
-* Pamięć rezydentna: **5 267 paragraphów = 84 272 B (~82,3 KiB)** wobec 2 784 paragraphów
-  (44 544 B, ~43,5 KiB) przed zmianą; wzrost **+39 728 B**. To dokładnie `Q_SIZE` (39 712 B)
-  plus wyrównanie segmentu. Uzasadnienie: kontrakt wymaga 16 buforów RX po 2048 B (32 896 B z
+* Pamięć rezydentna (z `/Q`): **5 266 akapitów = 84 256 B (~82,3 KiB)**; bez `/Q`:
+  **2 784 akapity = 44 544 B (~43,5 KiB)** — dokładnie jak dotąd (obraz + blok DMA).
+  Różnica to `Q_SIZE` = 39 712 B (oba warianty są akapitowo wyrównane, więc nic ponad blok).
+  Uzasadnienie rozmiaru bloku: kontrakt wymaga 16 buforów RX po 2048 B (32 896 B z
   nagłówkami), 4 slotów TX po 1536 B (6 176 B), 512 B logu i 128 B nagłówka — razem 39 712 B.
   Sprzętowy pierścień DMA (34 816 B) został nietknięty, żeby mTCP działał bez zmian; wersja
   „zero-copy” (oddawanie buforów sprzętowych klientowi) odrzucona jako zbyt ryzykowna dla
@@ -139,8 +171,8 @@ logu. Gdy klienta nie ma — dotychczasowa ścieżka `deliver` (upcall) bez zmia
 
 ## Testy
 
-`tools/tests/legacy_bios/test_usospkt_queue.py` (nowy plik, 16 testów) + istniejący
-`tools/tests/legacy_bios/test_usospkt.py` (bez zmian, regresja): **29 passed**.
+`tools/tests/legacy_bios/test_usospkt_queue.py` (nowy plik, 21 testów) + istniejący
+`tools/tests/legacy_bios/test_usospkt.py` (bez zmian, regresja): **34 passed**.
 
 Warstwa (a) — kontrakt źródłowy:
 * `test_multiplex_and_subfunctions` — `AX=5553h`, `BX=0xFFFF/1/2/3/4` → właściwe etykiety,
@@ -152,14 +184,24 @@ Warstwa (a) — kontrakt źródłowy:
 * `test_isr_never_calls_dos` — w `q_rx_frame` i `q_log` nie ma `int 0x21/0x10/0x2F`;
 * `test_packet_driver_entry_unchanged` — wszystkie dotychczasowe `AH` `INT 60h` (`1,2,3,4,5,6,7,
   20,21,24,25`), `"PKT DRVR"` za 3-bajtowym `JMP`, `check_usospkt`;
-* `test_dma_area_layout_kept` — `A_TXRING/A_TXBUF/A_RXBUF/AREA_SIZE` bez zmian.
+* `test_dma_area_layout_kept` — `A_TXRING/A_TXBUF/A_RXBUF/AREA_SIZE` bez zmian;
+* `test_queue_mode_is_opt_in` — parsowanie `/Q` (`-Q`, dowolna wielkość liter), blok tylko za
+  `cmp byte ptr [opt_q], 0 / je no_q_block`, hook `INT 2Fh` tylko między tym testem a
+  `hook_done:` (jedyne wystąpienie `offset int2f` w instalatorze), wzór rozmiaru bez `/Q`
+  (`area + AREA_SIZE`).
 
 Warstwa (b) — zbudowany sterownik w Unicorn (16-bit, emulowany rejestr igb za IOADDR/IODATA):
 `test_installed_block`, `test_query`, `test_attach_once_and_release`, `test_state`,
 `test_rx_goes_to_the_ring_not_the_upcall`, `test_rx_ring_full_drops`,
 `test_rx_errors_counted_for_the_client`, `test_tx_kick`, `test_tx_kick_timeout`,
 `test_release_returns_to_upcalls`, `test_other_multiplex_passed_on`,
-`test_queue_block_inside_the_resident_size`.
+`test_queue_block_inside_the_resident_size`, `test_without_q_multiplex_reports_absent`
+(bez `/Q`: `INT 2Fh 5553h` → `AL=0`, `ATTACH` → `AL=1`, a upcalls i `INT 60h` działają jak
+przed zmianą).
+
+Regresja rozmiarów: klasa `ResidentSize` liczy oba warianty z symboli zbudowanego obrazu w
+jednym przebiegu — `test_without_q_is_the_old_size` (44 544 B = 2 784 akapity),
+`test_with_q_adds_exactly_the_block` (84 256 B, różnica == `Q_SIZE`), `test_both_sizes_in_one_run`.
 
 Uwaga: pytest wypisuje na stderr ostrzeżenie `Windows fatal exception: access violation` z
 `unicorn.mem_map` — występuje także przy niezmienionym `test_usospkt.py` (Python 3.13 +

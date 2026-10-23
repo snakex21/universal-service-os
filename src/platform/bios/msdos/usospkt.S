@@ -4,12 +4,15 @@
  * the X470 Master board), I210 and 82576 (QEMU -device igb).
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- *   USOSPKT [vector] [/P] [/M] [/?]
+ *   USOSPKT [vector] [/P] [/M] [/Q] [/?]
  *
  *   vector  software interrupt, 0x60..0x80 (default 0x60), "60" or "0x60"
  *   /P      polled only (timer, INT 08h), never the PCI interrupt
  *   /M      registers through BAR0 MMIO even when an I/O BAR exists (test)
  *   /S      find the NIC with a config-space scan, not the PCI BIOS (test)
+ *   /Q      queue mode (INT 2Fh AX=5553h) for a protected-mode client: the
+ *           extra block costs 39712 paragraphs-worth of bytes; without /Q
+ *           nothing is allocated and INT 2Fh is not touched
  *
  * Errorlevel: 0 installed, 1 no supported NIC (nothing stays resident),
  * 2 vector already in use, 3 no usable register access, 4 NIC did not
@@ -242,6 +245,8 @@ qlog_full:   .ascii "RXQ FULL\r\n"
 .set qlog_full_l, 10
 qlog_txerr:  .ascii "TX ERR\r\n"
 .set qlog_txerr_l, 8
+qlog_ready:  .ascii "QUEUE ON\r\n"
+.set qlog_ready_l, 10
     .p2align 1
 handles: .space MAX_HANDLES * H_SIZE
 
@@ -1204,6 +1209,7 @@ pcibios:  .byte 0
 opt_p:    .byte 0
 opt_m:    .byte 0
 opt_s:    .byte 0
+opt_q:    .byte 0
 v86:      .byte 0
 vds:      .byte 0
 plltries: .byte 0
@@ -1453,8 +1459,12 @@ arg_opt:
     mov byte ptr [opt_m], 1
     jmp arg_next
 2:  cmp al, 's'
-    jne arg_bad
+    jne 3f
     mov byte ptr [opt_s], 1
+    jmp arg_next
+3:  cmp al, 'q'                         /* /Q or -Q, case-insensitive */
+    jne arg_bad
+    mov byte ptr [opt_q], 1
     jmp arg_next
 arg_bad:
     mov dx, offset msg_help
@@ -1764,10 +1774,13 @@ acc_ok:
 3:  mov eax, [dds + 12]
     mov [phys], eax
     mov byte ptr [vds], 1
-2:
-    /* Queue-mode block (INT 2Fh AX=5553h): its own segment directly behind
-     * the DMA area, so the client gets one contiguous, 16-byte aligned
-     * segment and the DMA block keeps the layout mTCP already uses. */
+2:  /* Queue-mode block (INT 2Fh AX=5553h) only with /Q: its own segment
+     * directly behind the DMA area, so the client gets one contiguous,
+     * 16-byte aligned segment and the DMA block keeps the layout mTCP
+     * already uses. Without /Q nothing is reserved and INT 2Fh is left
+     * alone (the driver is then exactly the packet driver above). */
+    cmp byte ptr [opt_q], 0
+    je no_q_block
     mov ax, [area]
     add ax, AREA_SIZE
     add ax, 15
@@ -1819,6 +1832,10 @@ acc_ok:
     rep movsw
     push cs
     pop es
+    mov si, offset qlog_ready          /* the log says the mode is on */
+    mov cx, qlog_ready_l
+    call q_log
+no_q_block:
     call nic_reset
     jnc 1f
     mov dx, offset msg_reset
@@ -1851,10 +1868,13 @@ acc_ok:
     mov [old08], eax
     mov word ptr es:[0x08 * 4], offset int08
     mov es:[0x08 * 4 + 2], cs
+    cmp byte ptr [opt_q], 0            /* /Q: the queue multiplex handler */
+    je hook_done
     mov eax, es:[0x2F * 4]
     mov [old2f], eax
     mov word ptr es:[0x2F * 4], offset int2f
     mov es:[0x2F * 4 + 2], cs
+hook_done:
     movzx bx, byte ptr [irq]
     cmp bl, 0xFF
     je 4f
@@ -1916,7 +1936,9 @@ acc_ok:
     je 3f
     mov dx, offset msg_vds
     call print
-3:  mov dx, offset msg_queue
+3:  cmp byte ptr [opt_q], 0
+    je no_q_report
+    mov dx, offset msg_queue
     call print
     mov eax, [qseg]
     mov cl, 4
@@ -1926,6 +1948,7 @@ acc_ok:
     mov eax, Q_SIZE
     mov cl, 4
     call print_hex
+no_q_report:
     mov dx, offset msg_mac
     call print
     mov si, offset mac
@@ -2001,8 +2024,16 @@ acc_ok:
     call print_hex
     mov dx, offset msg_res
     call print
+    cmp byte ptr [opt_q], 0            /* the block is the only extra memory */
+    je res_area
     movzx eax, word ptr [qoff]
-    add eax, Q_SIZE + 15
+    add eax, Q_SIZE
+    jmp res_size
+res_area:
+    movzx eax, word ptr [area]
+    add eax, AREA_SIZE
+res_size:
+    add eax, 15
     shr eax, 4
     push ax
     mov cl, 4

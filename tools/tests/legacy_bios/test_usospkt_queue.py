@@ -48,6 +48,9 @@ Q_RXDROP, Q_TXBUSY, Q_TXDONE, Q_TXERR = 36, 40, 44, 52
 Q_LOGHEAD, Q_LOGTAIL, Q_LOGBASE = 56, 58, 62
 Q_RXBASE, Q_TXBASE = 20, 32
 AREASIZE = 2048 + 16 * 2048                            # DMA block (unchanged)
+# resident memory the install asks for, from the history: the packet driver
+# alone (no /Q) and with the queue block (/Q). Both are paragraph aligned.
+NOQ_BYTES, Q_BYTES = 44544, 84256
 
 REGS = dict(ax=UC_X86_REG_AX, bx=UC_X86_REG_BX, cx=UC_X86_REG_CX, dx=UC_X86_REG_DX,
             si=UC_X86_REG_SI, di=UC_X86_REG_DI, sp=UC_X86_REG_SP, ds=UC_X86_REG_DS,
@@ -76,7 +79,7 @@ def build():
 
 
 class Machine:
-    def __init__(self, tx_done=True):
+    def __init__(self, tx_done=True, queue=True):
         com, self.s = build()
         self.u = Uc(UC_ARCH_X86, UC_MODE_16)
         self.u.mem_map(0, 0x110000)
@@ -98,8 +101,8 @@ class Machine:
         self.poke('mac', MAC)
         self.poke('old08', struct.pack('<HH', 0, STUB))
         self.poke('old2f', struct.pack('<HH', 0, STUB))
-        self.poke('qoff', struct.pack('<H', self.qoff))
-        self.poke('qseg', struct.pack('<H', self.qseg))
+        self.poke('qoff', struct.pack('<H', self.qoff if queue else 0))
+        self.poke('qseg', struct.pack('<H', self.qseg if queue else 0))
         self.ivt(0x60, TSR, self.s['pkt_entry'])
         self.ivt(0x08, TSR, self.s['int08'])
         self.ivt(0x2F, TSR, self.s['int2f'])
@@ -108,7 +111,8 @@ class Machine:
         self.regs, self.ioaddr, self.tdh, self.sent, self.tx_done = {RCTL: 0x04008002}, 0, 0, [], tx_done
         self.u.hook_add(UC_HOOK_INSN, self.port_in, None, 1, 0, UC_X86_INS_IN)
         self.u.hook_add(UC_HOOK_INSN, self.port_out, None, 1, 0, UC_X86_INS_OUT)
-        self.init_block()
+        if queue:                             # without /Q the block does not exist
+            self.init_block()
 
     # -- setup -------------------------------------------------------
     def init_block(self):
@@ -275,6 +279,54 @@ class SourceContract(unittest.TestCase):
         self.assertIn('.set A_RXBUF, 2048', self.src)
         self.assertIn('.set AREA_SIZE, A_RXBUF + RX_COUNT * BUF_SIZE', self.src)
 
+    def test_queue_mode_is_opt_in(self):
+        """Without /Q: no block, no INT 2Fh hook, no extra resident memory."""
+        # the switch: '/Q' and '-Q', folded to lower case like the others
+        self.assertIn("3:  cmp al, 'q'                         /* /Q or -Q, case-insensitive */", self.src)
+        self.assertIn('mov byte ptr [opt_q], 1', self.src)
+        self.assertIn('opt_q:    .byte 0', self.src)
+        self.assertIn("    or al, 0x20\n    cmp al, 'p'", self.src)  # case-insensitive, like /P
+        # the block is only built behind the switch
+        self.assertRegex(self.src, r'cmp byte ptr \[opt_q\], 0\n    je no_q_block\n    mov ax, \[area\]')
+        self.assertIn('no_q_block:', self.src)
+        # the INT 2Fh hook lives between the switch and hook_done
+        head, tail = self.src.split('hook_done:', 1)
+        self.assertEqual(head.count('offset int2f'), 1)          # the install hook
+        self.assertEqual(tail.count('offset int2f'), 0)          # nothing after it
+        self.assertRegex(head, r'cmp byte ptr \[opt_q\], 0[^\n]*\n    je hook_done\n    mov eax, es:\[0x2F \* 4\]')
+        self.assertEqual(self.src.count('[0x2F'), 3)            # read + 2 writes, all guarded
+        # resident size: the DMA area alone without /Q (the pre-queue formula)
+        self.assertIn('res_area:\n    movzx eax, word ptr [area]\n    add eax, AREA_SIZE', self.src)
+
+
+class ResidentSize(unittest.TestCase):
+    """Both resident sizes from the built image, so neither can grow silently."""
+
+    def sizes(self):
+        _, sym = build()
+        image_end = sym['image_end']
+        area = (image_end + 127) & ~127                      # DMA block, 128 B aligned
+        qoff = (area + AREASIZE + 15) & ~15                  # queue block, own segment
+        return (((area + AREASIZE + 15) >> 4) * 16,
+                ((qoff + Q_SIZE + 15) >> 4) * 16, area, qoff)
+
+    def test_without_q_is_the_old_size(self):
+        noq, q, area, qoff = self.sizes()
+        self.assertEqual(noq, NOQ_BYTES)                     # 2784 paragraphs
+        self.assertEqual(noq // 16, 2784)
+        self.assertLess(qoff, 0xF000)                        # block stays in one segment
+
+    def test_with_q_adds_exactly_the_block(self):
+        noq, q, area, qoff = self.sizes()
+        self.assertEqual(q, Q_BYTES)                         # 5266 paragraphs
+        self.assertEqual(q - noq, Q_SIZE)                    # nothing else grows
+        self.assertEqual(qoff, area + AREASIZE)              # 16-aligned already
+
+    def test_both_sizes_in_one_run(self):
+        noq, q, _, _ = self.sizes()
+        self.assertEqual((noq, q), (NOQ_BYTES, Q_BYTES))
+        self.assertLess(noq, q)
+
 
 @unittest.skipIf(Uc is None, 'unicorn missing')
 class QueueModeTest(unittest.TestCase):
@@ -402,6 +454,20 @@ class QueueModeTest(unittest.TestCase):
         self.assertEqual((r['ax'], r['bx'], r['cx']), (0x1224, 0x1234, 0x5678))
         r = self.m.call(vector=0x2F, ax=0x5553, bx=0x0099)
         self.assertEqual((r['ax'], r['bx']), (0x5553, 0x0099))
+
+    def test_without_q_multiplex_reports_absent(self):
+        m = Machine(queue=False)                             # the install left INT 2Fh alone
+        self.assertEqual(m.qword(Q_FLAGS) & 1, 0)
+        r = m.qcall(0xFFFF)
+        self.assertEqual(r['al'], 0)
+        self.assertEqual(m.qcall(1)['al'], 1)                # no driver to attach to
+        # the packet driver itself still works: upcalls as before
+        self.assertEqual(m.access(b'\x08\x00')['ax'], 1)
+        frame = MAC + bytes(6) + b'\x08\x00' + bytes(40)
+        m.rx_frame(0, frame)
+        m.call(vector=0x08)
+        self.assertEqual(m.mem(APP, 0x306, 1), b'\x01')
+        self.assertEqual(m.mem(APP, 0x400, len(frame)), frame)
 
     def test_queue_block_inside_the_resident_size(self):
         # what the install reports: qoff + Q_SIZE, rounded up to paragraphs
