@@ -307,6 +307,55 @@ EOF
     } | sed 's/$/\r/' > "$nfdir/NET/NFILES.BAT"
 }
 
+# TCP/IP needs its machine-wide Winsock registration as well as the
+# NetTrans/Enum bindings. CopyFiles alone does not run MSTCP.Install.
+# These settings correspond to the original 950 MSTCP.AddReg globals;
+# the class-relative settings are already in NET95.REG. Keep a separate
+# companion so the installed-system repair can import it without Setup.
+w9x_reg95_tcp_write() {
+    [ -d "$1/NET" ] || return 1
+    sed 's/$/\r/' > "$1/NET/TCP95.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\Winsock]
+"Ancillary Function Driver for Winsock"="afvxd.vxd"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\AFVXD]
+"MSTCP Helper for Winsock"="wshtcp.vxd"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\MSTCP\Parameters\Winsock]
+"MaxSockAddrLength"=hex:10,00,00,00
+"MinSockAddrLength"=hex:10,00,00,00
+"HelperDllName"="%windir%\\system\\wsock32.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\MSTCP\ServiceProvider]
+"LocalPriority"=hex:f3,01,00,00
+"HostsPriority"=hex:f4,01,00,00
+"DnsPriority"=hex:d0,07,00,00
+"NetbtPriority"=hex:d1,07,00,00
+"Class"=hex:08,00,00,00
+"ProviderPath"="%windir%\\system\\wsock32.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Winsock\Parameters]
+"MSTCP"=""
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\ServiceProvider\Order\ExcludedProviders]
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\ServiceProvider\Order\ProviderOrder]
+"MSTCP"=""
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Rpc\ClientProtocols]
+"ncacn_ip_tcp"="rpcltc3.dll"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Rpc\ServerProtocols]
+"ncacn_ip_tcp"="rpclts3.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SessionManager\CheckVerDLLs]
+"WINSOCK.DLL"="0"
+
+EOF
+}
+
 # w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
@@ -327,10 +376,12 @@ w9x_reg95_write() {
     F='C:\WINDOWS\COMMAND\FIND.EXE'
     R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
-    netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND
+    netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND tcp95=''
     run_guard="IF EXIST ${U}REG95.RUN GOTO END"
     if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then
         w9x_reg95_netfiles_write "$dir" || return 1
+        w9x_reg95_tcp_write "$dir" || return 1
+        tcp95="$dir/NET/TCP95.REG"
         netprep="CALL ${U}NET\\NFILES.BAT
 IF NOT EXIST ${U}NET\\NFILES.OK GOTO PREPERR"
         netguard="IF EXIST ${U}NET\\NET95.ERR GOTO PREPERR
@@ -354,6 +405,7 @@ GOTO PREPWAIT"
         # Before the "; USOS: not converted" comments, which stay last.
         # CRLF made once at the end (Git for Windows grep / sed drop the CR).
         { tr -d '\r' < "$dir/REG95.REG" | sed '/^; USOS:/d'; tr -d '\r' < "$net" | sed '1{/^REGEDIT4$/d}'
+          if [ -n "$tcp95" ]; then tr -d '\r' < "$tcp95" | sed '1{/^REGEDIT4$/d}'; fi
           tr -d '\r' < "$dir/REG95.REG" | sed -n '/^; USOS:/p'; } | sed 's/$/\r/' > "$dir/REG95.NEW" &&
             mv "$dir/REG95.NEW" "$dir/REG95.REG" || return 1
         N="${U}NET\\"
