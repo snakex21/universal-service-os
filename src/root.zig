@@ -45,6 +45,7 @@ pub const gui = struct {
     pub const font_pack = @embedFile("gui/fonts/usos-font.bin");
 };
 pub const dos = @import("compat/dos/root.zig");
+pub const win3x = @import("compat/win3x/root.zig");
 pub const device_guard = @import("device_guard/check.zig");
 pub const storage = struct {
     pub const random_reader = @import("storage/random_reader.zig");
@@ -103,6 +104,7 @@ pub const selftest = struct {
 
 test {
     _ = @import("flow/routing_golden_test.zig");
+    _ = win3x;
     _ = @import("catalog/os_profiles.zig");
     _ = @import("flow/xp_settings_summary.zig");
     _ = @import("flow/answer_screen.zig");

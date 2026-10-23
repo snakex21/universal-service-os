@@ -45,6 +45,12 @@ if not exist %USRC%\USOSV10.COM goto v10_done
 copy %USRC%\USOSV10.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :v10_done
+rem VGA readback/latch probe for C:\DOS, run on demand only
+rem (C:\DOS\USOSVGAR.COM>C:\USOS\DIAG\VGAREG.TXT); missing file = skipped.
+if not exist %USRC%\USOSVGAR.COM goto vgar_done
+copy %USRC%\USOSVGAR.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:vgar_done
 rem Prepared under CSMWrap (UEFI PC without CSM): USB mouse through VBADOS.
 if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done
 copy %USRC%\VBMOUSE.EXE C:\DOS /y >nul

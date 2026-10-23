@@ -88,6 +88,10 @@ def build(root: Path):
     # INT 10h on a private stack before WIN.COM of Windows 1.x/2.x (W1AUTO.BAT).
     shutil.copyfile(out / 'win9x/USOSV10.COM', dos_out / 'USOSV10.COM')
     print('[PASS] MS-DOS support: USOSV10.COM (INT 10h stack for Windows 1.x/2.x)')
+    # USOSVGAR.COM: one-shot VGA register readback probe before WIN (Windows 3.x
+    # redraw problem on the X470); report in C:\USOS\DIAG\VGAREG.TXT.
+    shutil.copyfile(out / 'win9x/USOSVGAR.COM', dos_out / 'USOSVGAR.COM')
+    print('[PASS] MS-DOS support: USOSVGAR.COM (VGA readback probe for Windows 3.x)')
 
 
 def dos_text(text: str) -> bytes:

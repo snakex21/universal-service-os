@@ -166,6 +166,20 @@ if [ -n "$WIN3_ISO" ]; then
         cp "$file" "$U/WINSETUP/$name" || fail "cannot copy $name"
     done
     log 'Windows 3.x Setup files copied'
+    # Windows 3.0a / 3.1 / 3.11 / WfW 3.11 (not 1.x/2.x): display driver(s)
+    # and VGA startup logo without locked XCHG on video memory (X470 latch
+    # fault, docs/win3x-vga-redraw-2026-10-23.md), patched in WINSETUP in the
+    # media's own container so Setup installs them and builds WIN.COM from
+    # the patched logo. Known files only, idempotent; unknown or already
+    # patched files stay as they are. Log: WINSETUP/USOSDISP.TXT.
+    case "$WIN_EARLY" in
+        ''|windows-3-0)
+            if command -v usos-fb-ui >/dev/null 2>&1; then
+                usos-fb-ui --win3x-display "$U/WINSETUP" 2>&1 | while IFS= read -r line; do log "$line"; done
+            else
+                log 'usos-fb-ui missing: Windows 3.x display files not patched'
+            fi ;;
+    esac
     # Windows 1.0x-3.0 (tools/w9x_csmwrap_prepare.sh): INSTALL.BAT copies
     # EARLY.TAG to C:\USOSW3; W3START.BAT runs their Setup from A: (SUBST)
     # and the start menu uses the early variants (no DOS=HIGH, SETVER).
