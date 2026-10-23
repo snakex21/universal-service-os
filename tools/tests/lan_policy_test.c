@@ -2,11 +2,21 @@
  * No desktop enumeration, COM, network, setup or target entry is executed. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-static DWORD WINAPI test_version(void){return 0x08ae5a04UL;}
+static DWORD test_os_version=0x08ae5a04UL;
+static DWORD WINAPI test_version(void){return test_os_version;}
+static LONG test_setup_status=ERROR_FILE_NOT_FOUND;
+static unsigned test_setup_opens,test_setup_closes;
+static LONG WINAPI test_reg_open(HKEY root,LPCSTR key,DWORD options,REGSAM access,PHKEY result){
+  (void)root;(void)key;(void)options;(void)access;test_setup_opens++;
+  if(test_setup_status==ERROR_SUCCESS)*result=(HKEY)(ULONG_PTR)1;
+  return test_setup_status;}
+static LONG WINAPI test_reg_close(HKEY key){(void)key;test_setup_closes++;return ERROR_SUCCESS;}
 static char *test_command="unit.exe";
 static LPSTR WINAPI test_command_line(void){return test_command;}
 #define GetVersion test_version
 #define GetCommandLineA test_command_line
+#define RegOpenKeyExA test_reg_open
+#define RegCloseKey test_reg_close
 #define entry target_entry_not_called
 #define USOS_LAN_9X
 #include "../windows_usos_lan.c"
@@ -27,6 +37,19 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   CHECK(icw_target("c:/x/icwconn1.exe")&&!icw_target("C:\\x\\ICWCONN1.EXE.txt")&&!icw_target("unrelated.exe"));
   test_command="unit.exe /refresh";CHECK(refresh_requested());test_command="unit.exe /r";CHECK(!refresh_requested());
   n=GetModuleFileNameA(0,dir,sizeof dir);CHECK(n&&n<sizeof dir);p=dir+n;while(p>dir&&p[-1]!='\\')p--;*p=0;
+  copy(system_id,"95");test_os_version=0x83b60004UL;
+  local(path,"PHASE1.OK");DeleteFileA(path);CHECK(!native95_handoff()&&test_setup_opens==0);
+  fixture("PHASE1.OK","phase1=qemu elapsed=123\r\n");CHECK(native95_handoff());
+  test_setup_status=ERROR_SUCCESS;CHECK(!native95_handoff()&&test_setup_closes==1);
+  test_setup_status=ERROR_ACCESS_DENIED;CHECK(!native95_handoff());
+  test_setup_status=ERROR_FILE_NOT_FOUND;
+  fixture("PHASE1.OK","phase1=qemu elapsed=x\r\n");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=qemu elapsed=123\r\nextra");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=qemu elapsed=0\r\n");CHECK(native95_handoff());
+  copy(system_id,"98");CHECK(!native95_handoff());copy(system_id,"95");
+  test_os_version=0x84570004UL;CHECK(!native95_handoff());
+  test_os_version=0x03b60004UL;CHECK(!native95_handoff());
+  test_os_version=0x08ae5a04UL;local(path,"PHASE1.OK");DeleteFileA(path);
   local(ini,"NETCFG.INI");DeleteFileA(ini);fixture("MSBATCH.INF","[Install]\r\n;USOS-NETWORK=on\r\n;USOS-HOME=http://example.test/?a=1&b=2\r\n");
   CHECK(read_config()&&eq(system_id,"ME")&&eq(home,"http://example.test/?a=1&b=2"));
   local(path,"NETSTATE.DAT");DeleteFileA(path);CHECK(load_state(0));CHECK(usos_lan_attempt(&state));state.done=USOS_LAN_IE;CHECK(save_state());
