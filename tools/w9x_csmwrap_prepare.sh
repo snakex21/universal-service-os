@@ -287,6 +287,21 @@ usos_w9x_csmwrap_prepare() {
     answer_inf=/run/w9x-msbatch.inf
     answer_kind=USOS
     time_zone=
+    # MS-DOS / Windows 1.x-3.x: a profile's regional settings (DOS.INI,
+    # answer_profiles.stageWin9x / src/flow/answer/dos.zig), copied to RAM;
+    # the staged 9x / NT answers go as for every profile start.
+    dos_regional=''
+    if [ -n "$dos_iso" ] && [ "$answer" = profile ]; then
+        if cp /mnt/esp/EFI/USOS/answer/DOS.INI /run/dos-regional.ini 2>/dev/null; then
+            dos_regional=/run/dos-regional.ini
+            w9x_csmwrap_log "DOS regional: $(grep -a '^\(mode\|country\|codepage\|keyb\)=' "$dos_regional" | tr -d '\r' | tr '\n' ' ')"
+        else
+            w9x_csmwrap_log 'DOS regional: the profile has no DOS.INI (US defaults)'
+        fi
+        rm -f /mnt/esp/EFI/USOS/answer/DOS.INI /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF /mnt/esp/EFI/USOS/answer/POSR.SIF
+        for staged in 98SE 98 ME 95 MIL NASH MEMPHIS CHICAGO; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+        sync
+    fi
     [ -z "$dos_iso" ] || answer=dos
     [ -z "$nt4" ] || answer_inf=/run/nt4-winnt.sif
     [ -z "$img" ] || answer=dos
@@ -600,6 +615,7 @@ usos_w9x_csmwrap_prepare() {
         set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT4_USB_STORAGE="$nt4usb" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
+            DOS_WIN_SYSTEM="$([ "$tag" = W3 ] && printf '%s' "$system")" DOS_REGIONAL="$dos_regional" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \

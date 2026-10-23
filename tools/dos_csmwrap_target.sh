@@ -31,6 +31,10 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 DOS_ISO=${W9X_SOURCE_ISO:?W9X_SOURCE_ISO is required}
 WIN3_ISO=${DOS_WIN3_ISO:-}
 WIN_EARLY=${DOS_WIN_EARLY:-}
+# The catalog id of the Windows on top (menu names) and the profile's
+# DOS.INI (regional settings); both optional.
+WIN_SYSTEM=${DOS_WIN_SYSTEM:-}
+REGIONAL=${DOS_REGIONAL:-}
 PROGRAMS_DIR=${DOS_PROGRAMS_DIR:-}
 SIZE_MIB=${DOS_SIZE_MIB:-256}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
@@ -52,6 +56,8 @@ for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/xp_csmwrap_esp.sh" "$ESP_DI
 done
 [ -z "$WIN3_ISO" ] || [ -r "$WIN3_ISO" ] || fail "missing: $WIN3_ISO"
 [ ! -d "$WIN3_ISO" ] || [ -r "$LIB/floppy_set.sh" ] || fail "missing: $LIB/floppy_set.sh"
+[ -r "$LIB/dos_win3_menu.sh" ] || fail "missing: $LIB/dos_win3_menu.sh"
+[ -z "$REGIONAL" ] || [ -r "$REGIONAL" ] || fail "missing: $REGIONAL"
 case "$SIZE_MIB" in 128|256|512) ;; *) fail "unexpected partition size: $SIZE_MIB" ;; esac
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
     fail 'a partition of the selected disk is mounted; no disk was changed'
@@ -149,6 +155,18 @@ for file in "$HELPERS"/*; do
     [ -f "$file" ] || continue
     cp "$file" "$U/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"
 done
+# Regional settings of the answer profile (DOS.INI of the UEFI menu,
+# src/flow/answer/dos.zig) and the installed Windows product in the start
+# menus (tools/dos_win3_menu.sh); before the Setup answers below, which a
+# manual choice changes.
+. "$LIB/dos_win3_menu.sh"
+if [ -n "$REGIONAL" ]; then
+    dos_regional_apply "$U" "$REGIONAL" 2>&1 | while IFS= read -r line; do log "$line"; done
+fi
+if [ -n "$WIN_SYSTEM" ]; then
+    dos_menu_names "$U" "$WIN_SYSTEM" "$WIN3_ISO"
+    log "start menu names: $(dos_win_name "$WIN_SYSTEM" "$WIN3_ISO" || echo Windows)"
+fi
 copied=0
 for file in "$work/dos"/*; do
     [ -f "$file" ] || continue

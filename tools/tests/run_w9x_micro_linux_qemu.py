@@ -54,7 +54,7 @@ import run_nt3_micro_linux_qemu as nt3  # noqa: E402
 from run_stage_drivers_qemu import Console  # noqa: E402
 
 SCRIPTS = ("w9x_csmwrap_prepare.sh", "w9x_phase1_qemu.sh", "w9x_csmwrap_target.sh", "dos_csmwrap_target.sh",
-           "xp_csmwrap_esp.sh", "w9x_nvme.sh", "floppy_set.sh")
+           "xp_csmwrap_esp.sh", "w9x_nvme.sh", "floppy_set.sh", "dos_win3_menu.sh")
 
 GUEST = r'''#!/bin/sh
 # run_w9x_micro_linux_qemu.py guest part: step 620's DOS / 9x calls, no screens.

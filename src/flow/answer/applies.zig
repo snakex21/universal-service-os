@@ -44,7 +44,9 @@ fn tokenMatches(token: []const u8, system_id: []const u8) bool {
     // Windows NT 4.0 renders WINNT.SIF (nt4.zig) without an NT5/NT6 family.
     // Windows NT 3.51 too (nt3.zig).
     const nt4 = @import("nt4.zig").isNt4(system_id) or @import("nt3.zig").isNt3(system_id) or @import("posready.zig").isPosReady(system_id);
-    if (std.mem.eql(u8, token, "windows")) return family != null or win9x or nt4;
+    // MS-DOS and Windows 1.x-3.x take the regional settings (dos.zig).
+    const dos = @import("dos.zig").isDos(system_id);
+    if (std.mem.eql(u8, token, "windows")) return family != null or win9x or nt4 or dos;
     if (std.mem.eql(u8, token, "windows-9x")) return win9x;
     if (std.mem.eql(u8, token, "windows-nt5")) return if (family) |f| f.nt5() else false;
     if (std.mem.eql(u8, token, "windows-nt6")) return if (family) |f| !f.nt5() else false;
@@ -215,7 +217,12 @@ test "systems: groups and ids" {
     try std.testing.expect(appliesTo(&nine, "windows-98-se") and appliesTo(&nine, "windows-95") and appliesTo(&nine, "windows-me"));
     try std.testing.expect(!appliesTo(&nine, "windows-xp") and !appliesTo(&nine, "windows-3-1"));
     const every = try profileFrom("name=A\nuser=Bob\n");
-    try std.testing.expect(appliesTo(&every, "windows-98") and !appliesTo(&every, "windows-3-11"));
+    // Every Windows includes the DOS-based ones and MS-DOS (DOS.INI regional
+    // settings, 2026-10-24); windows-9x does not.
+    try std.testing.expect(appliesTo(&every, "windows-98") and appliesTo(&every, "windows-3-11") and appliesTo(&every, "ms-dos"));
+    try std.testing.expect(!appliesTo(&every, "freedos") and !appliesTo(&nine, "ms-dos"));
+    const only_dos = try profileFrom("name=A\nuser=Bob\nsystems=ms-dos,windows-3-1\n");
+    try std.testing.expect(appliesTo(&only_dos, "windows-3-1") and !appliesTo(&only_dos, "windows-98"));
 }
 
 test "missing answers: Windows 95 needs a 95-shaped key" {

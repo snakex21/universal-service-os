@@ -17,6 +17,7 @@ pub const msbatch = @import("msbatch.zig");
 pub const nt4 = @import("nt4.zig");
 pub const nt3 = @import("nt3.zig");
 pub const posready = @import("posready.zig");
+pub const dos = @import("dos.zig");
 pub const options = @import("options.zig");
 pub const logon = @import("logon.zig");
 pub const beta_clock = @import("beta_clock.zig");
@@ -179,6 +180,7 @@ test {
     _ = nt4;
     _ = nt3;
     _ = posready;
+    _ = dos;
     _ = options;
     _ = beta_clock;
     _ = longhorn5048;

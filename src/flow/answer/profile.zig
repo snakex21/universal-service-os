@@ -131,6 +131,9 @@ pub const Field = enum {
     onedrive_off,
     user_script,
     beta_clock,
+    // MS-DOS 6.22 / Windows 1.x-3.x regional settings (dos.zig, 2026-10-24).
+    dos_regional,
+    dos_keyb,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -173,6 +176,12 @@ pub const NetworkLocation = enum {
 
 /// Theme for new users: XP Windows Classic ([Shell] DefaultThemesOff),
 /// Windows 7 Windows Classic or Windows 7 Basic (Themes/CustomDefaultThemeFile).
+/// MS-DOS 6.22 / Windows 1.x-3.x (dos.zig): `auto` = COUNTRY, code page and
+/// (with dos_keyb) KEYB from the profile's formats and keyboard, and the
+/// regional text pages of Windows 3.1 Setup answered; `manual` = none of it
+/// written or answered, the user picks them.
+pub const DosRegional = enum { auto, manual };
+
 pub const Theme = enum {
     default,
     classic,
@@ -318,6 +327,12 @@ pub const Profile = struct {
     gateway: Text(15) = .{},
     dns: Text(47) = .{},
     home_page: Text(200) = .{}, // empty = about:blank
+    /// MS-DOS / Windows 1.x-3.x regional settings (dos.zig).
+    dos_regional: DosRegional = .auto,
+    /// MS-DOS: also load KEYB with the profile's layout. Off by default:
+    /// KEYB translates in its INT 09h handler, which the keys of a USB
+    /// keyboard under CSMWrap never pass (dos.zig).
+    dos_keyb: bool = false,
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -345,6 +360,7 @@ pub const Profile = struct {
             .show_extensions => &self.show_extensions,
             .show_hidden => &self.show_hidden,
             .no_autorun => &self.no_autorun,
+            .dos_keyb => &self.dos_keyb,
             else => null,
         };
     }
@@ -817,6 +833,8 @@ pub fn knownSystemToken(token: []const u8) bool {
     if (@import("nt3.zig").isNt3(token)) return true;
     // Windows Embedded POSReady 2009 (posready.zig).
     if (@import("posready.zig").isPosReady(token)) return true;
+    // MS-DOS and Windows 1.x-3.x (dos.zig).
+    if (@import("dos.zig").isDos(token)) return true;
     for (system_groups ++ linux_systems) |known| {
         if (std.mem.eql(u8, known, token)) return true;
     }
@@ -936,6 +954,7 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             p.home_page.set(value) catch return .{ .field = field, .problem = .too_long };
         },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .dos_regional => p.dos_regional = enumByName(DosRegional, value) orelse return .{ .field = field, .problem = .bad_choice },
         .display => {
             p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice };
             p.display_explicit = value.len > 0;
@@ -1012,6 +1031,8 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     if (p.beta_clock.len > 0) try w.print("beta_clock={s}\r\n", .{p.beta_clock.slice()});
     if (p.network == .off) try w.writeAll("network=off\r\n");
     if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
+    if (p.dos_regional != .auto) try w.print("dos_regional={s}\r\n", .{@tagName(p.dos_regional)});
+    if (p.dos_keyb) try w.writeAll("dos_keyb=yes\r\n");
     inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
         if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
     }

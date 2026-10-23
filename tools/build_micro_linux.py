@@ -593,6 +593,7 @@ def main() -> int:
             ("tools/w9x_95_event_wait.sh", "usr/lib/usos/w9x_95_event_wait.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/floppy_set.sh", "usr/lib/usos/floppy_set.sh"),
+            ("tools/dos_win3_menu.sh", "usr/lib/usos/dos_win3_menu.sh"),
             ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),
             ("tools/uefi_boot_entry.sh", "usr/lib/usos/uefi_boot_entry.sh"),
             ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),

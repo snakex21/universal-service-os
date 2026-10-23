@@ -73,6 +73,9 @@ const F = enum(u8) {
     theme,
     display,
     display_bpp,
+    /// MS-DOS / Windows 1.x-3.x (answer.dos).
+    dos_regional,
+    dos_keyb,
     save,
     cancel,
 };
@@ -169,6 +172,10 @@ var saved_addons_preset: @TypeOf((Profile{}).addons_preset) = .praca;
 var saved_addons_options: answer.profile.Text(512) = .{};
 var saved_addons_exclude: answer.profile.Text(512) = .{};
 var network_options: [3][]const u8 = undefined;
+/// MS-DOS regional settings: index into DosRegional (auto, manual).
+var dos_regional_options: [2][]const u8 = undefined;
+var dos_regional_index: usize = 0;
+var dos_keyb = false;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
 
@@ -233,6 +240,7 @@ fn setOptions() void {
     display_option_count = @typeInfo(answer.profile.Display).@"enum".fields.len + offset;
     bpp_options = .{ t(.profile_value_auto), "32", "16" };
     network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
+    dos_regional_options = .{ t(.profile_value_dos_regional_auto), t(.profile_value_dos_regional_manual) };
     for (tables.languages, 0..) |entry, i| {
         language_options[i + 1] = entry.label;
         locale_options[i + 1] = entry.label;
@@ -284,6 +292,8 @@ fn load(p: *const Profile) void {
     saved_gateway = p.gateway;
     saved_dns = p.dns;
     saved_home = p.home_page;
+    dos_regional_index = @intFromEnum(p.dos_regional);
+    dos_keyb = p.dos_keyb;
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = if (answer.display_profile.supportsSystem(system_id))
         (if (answer.display_profile.requested(p)) @intFromEnum(p.display) + @as(usize, 1) else 0)
@@ -431,6 +441,8 @@ fn build(out: *Profile) void {
     out.gateway = saved_gateway;
     out.dns = saved_dns;
     out.home_page = saved_home;
+    out.dos_regional = @enumFromInt(dos_regional_index);
+    out.dos_keyb = dos_keyb;
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     if (answer.display_profile.supportsSystem(system_id)) {
@@ -519,6 +531,8 @@ fn helpKey(id: F) view.Key {
         .section_explorer, .section_taskbar, .section_system, .section_updates, .section_apps, .section_accounts => .profile_section_extras,
         .option => .profile_help_systems,
         .workgroup => .profile_help_workgroup,
+        .dos_regional => .profile_help_dos_regional,
+        .dos_keyb => .profile_help_dos_keyb,
         .save, .cancel => subtitleKey(),
     };
 }
@@ -660,11 +674,20 @@ fn buildFields() void {
     addField(.language, .{ .kind = .choice, .label = t(.profile_field_language), .options = &language_options, .index = &language_index });
     addField(.locale, .{ .kind = .choice, .label = t(.profile_field_locale), .options = &locale_options, .index = &locale_index });
     addField(.keyboard, .{ .kind = .choice, .label = t(.profile_field_keyboard), .options = keyboard_options[0..keyboard_option_count], .index = &keyboard_index });
-    addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
+    // MS-DOS / Windows 1.x-3.x: no product key, no accounts; the regional
+    // settings right after the formats and keyboard they come from.
+    const dos = answer.dos.isDos(system_id);
+    if (dos) {
+        addField(.dos_regional, .{ .kind = .choice, .label = t(.profile_field_dos_regional), .options = &dos_regional_options, .index = &dos_regional_index });
+        if (dos_regional_index == 0) addField(.dos_keyb, .{ .kind = .toggle, .label = t(.profile_field_dos_keyb), .flag = &dos_keyb });
+    }
+    if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
-    addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
-    addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
+    if (!dos) {
+        addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
+        addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
+    }
     if (win11) {
         addField(.bypass_tpm, .{ .kind = .toggle, .label = t(.profile_field_bypass_tpm), .flag = &bypass_tpm });
         addField(.bypass_secure_boot, .{ .kind = .toggle, .label = t(.profile_field_bypass_secure_boot), .flag = &bypass_secure_boot });
