@@ -47,7 +47,7 @@ HARNESS = Path(__file__).resolve().parent / 'net_harness.c'
 
 # The portable core: win16_pkt.c and win16_sock.c are the Win16 side and are
 # intentionally not compiled here.
-CORE = ['checksum.c', 'ip.c', 'arp.c', 'udp.c', 'icmp.c', 'tcp.c', 'dns.c']
+CORE = ['checksum.c', 'ip.c', 'arp.c', 'udp.c', 'icmp.c', 'tcp.c', 'dns.c', 'config.c']
 
 ZIG_CANDIDATES = [Path(os.environ.get('USOS_ZIG', ROOT / 'tools/zig/zig.exe'))]
 
@@ -279,7 +279,8 @@ def test_net_header_has_no_system_includes() -> None:
     assert includes == ['#include <limits.h>']
 
 
-def test_blocking_socket_keeps_all_segments_and_fin_data(tmp_path) -> None:
+@pytest.mark.parametrize('network', ['default','lan'])
+def test_blocking_socket_keeps_all_segments_and_fin_data(tmp_path,network) -> None:
     compiler = _compiler()
     assert compiler is not None, 'host compiler needed for socket regression'
     exe = tmp_path / ('socket-peer.exe' if os.name == 'nt' else 'socket-peer')
@@ -288,6 +289,50 @@ def test_blocking_socket_keeps_all_segments_and_fin_data(tmp_path) -> None:
     result = subprocess.run(compiler + ['-std=c89', '-I', str(NET_DIR), '-o', str(exe)] +
                             [str(p) for p in sources], capture_output=True, text=True, env=_compiler_env())
     assert result.returncode == 0, result.stdout + result.stderr
-    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
+    result = subprocess.run([str(exe)]+(['lan'] if network=='lan' else []), capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'bytes=5157 eof=0 routed=1 failures=0' in result.stdout
+    assert 'dns_onlink=1' in result.stdout
+
+
+@pytest.fixture(scope='session')
+def config_parser(tmp_path_factory):
+    compiler=_compiler()
+    assert compiler is not None
+    exe=tmp_path_factory.mktemp('config-parser')/'config.exe'
+    built=subprocess.run(compiler+['-std=c89','-pedantic','-Wall','-Wextra','-I',str(NET_DIR),
+        '-o',str(exe),str(HARNESS.with_name('config_harness.c')),str(NET_DIR/'config.c'),
+        str(NET_DIR/'ip.c'),str(NET_DIR/'checksum.c')],capture_output=True,text=True,env=_compiler_env())
+    assert built.returncode==0,built.stdout+built.stderr
+    return exe
+
+
+@pytest.mark.parametrize('suffix,valid',[
+    ('',True),
+    ('NAMESERVER 1.1.1.1\r\n',True),
+    ('NETMASK 255.0.255.0\r\n',False),
+    ('IPADDR 256.1.2.3\r\n',False),
+    ('GATEWAY 192.168.9.1\r\n',False),
+    ('IPADDR 172.31.8.99\r\n',False),
+])
+def test_config_parser_lease_and_invalid_duplicates(config_parser,tmp_path,suffix,valid):
+    cfg=tmp_path/'mtcp.cfg'
+    cfg.write_text('# DHCP output\r\nPACKETINT 0x60\r\nHOSTNAME USOSDOS\r\n'
+        'ipaddr\t172.31.8.15\r\nNETMASK 255.255.254.0\r\n'
+        'GATEWAY 172.31.8.1 # LAN router\r\nNAMESERVER 172.31.9.3\r\n'+suffix,encoding='ascii')
+    result=subprocess.run([str(config_parser),str(cfg)],capture_output=True,text=True,check=True)
+    assert ('valid=1' in result.stdout)==valid
+    if valid:
+        assert 'ip=ac1f080f mask=fffffe00 gateway=ac1f0801 dns=ac1f0903' in result.stdout
+
+
+@pytest.mark.parametrize('text',[
+    '', 'PACKETINT 0x60\nHOSTNAME USOSDOS\n',
+    'IPADDR 10.0.2.15\nNETMASK 255.255.255.0\nNAMESERVER 10.0.2.3\n',
+    'IPADDR 10.0.2.0\nNETMASK 255.255.255.0\nGATEWAY 10.0.2.2\nNAMESERVER 10.0.2.3\n',
+    'IPADDR 10.0.2.255\nNETMASK 255.255.255.0\nGATEWAY 10.0.2.2\nNAMESERVER 10.0.2.3\n',
+])
+def test_config_parser_rejects_partial_or_nonhost_addresses(config_parser,tmp_path,text):
+    cfg=tmp_path/'mtcp.cfg'; cfg.write_text(text,encoding='ascii')
+    result=subprocess.run([str(config_parser),str(cfg)],capture_output=True,text=True,check=True)
+    assert 'valid=0' in result.stdout

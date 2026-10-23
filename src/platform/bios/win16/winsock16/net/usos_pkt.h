@@ -65,12 +65,14 @@ usos_u32 usos_pkt_rx_frames(void);
 usos_u32 usos_pkt_tx_frames(void);
 int  usos_pkt_mac(usos_u8 mac[USOS_NET_ETH_ALEN]);
 
-/* Address configuration: milestone 2b has no DHCP client, so the provider
- * starts on the QEMU user-network defaults (guest 10.0.2.15, DNS 10.0.2.3) and
- * the caller may override both. */
+/* Read C:\NET\MTCP.CFG written by DOS DHCP before attaching the queue.
+ * QEMU defaults are used only if the complete file is absent/invalid. */
 usos_u32 usos_pkt_ip(void);
 void     usos_pkt_set_ip(usos_u32 ip);
 usos_u32 usos_pkt_dns(void);
 void     usos_pkt_set_dns(usos_u32 dns);
+usos_u32 usos_pkt_mask(void);
+usos_u32 usos_pkt_gateway(void);
+int      usos_pkt_config_from_file(void);
 
 #endif /* USOS_PKT_H */

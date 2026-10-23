@@ -137,13 +137,14 @@ static int usos_frame_send(usos_u32 dst_ip, usos_u16 ip_len)
     usos_u8 request[USOS_NET_ETH_HDR + USOS_NET_ARP_LEN];
     usos_u32 deadline;
     usos_u16 n;
-    /* Stage 1 uses the documented QEMU user-network configuration. Route
-     * remote destinations via its gateway; ARP resolves a local next hop. */
-    usos_u32 next_hop = ((dst_ip & 0xFFFFFF00UL) == (usos_pkt_ip() & 0xFFFFFF00UL))
-                       ? dst_ip : 0x0A000202UL;
+    /* Both subnet decisions and off-link routing use the DOS DHCP lease. */
+    usos_u32 mask = usos_pkt_mask();
+    usos_u32 next_hop = ((dst_ip & mask) == (usos_pkt_ip() & mask))
+                       ? dst_ip : usos_pkt_gateway();
 
     if (ip_len == 0 || (usos_u16)(ip_len + USOS_NET_ETH_HDR) > USOS_NET_FRAME_MAX)
         return 0;
+    if (!next_hop) return 0;
     if ((net_arp_lookup(&usos_arp, next_hop, mac)) == 0) {
         n = net_arp_build_request(request, &usos_arp, next_hop);
         if (n != 0)

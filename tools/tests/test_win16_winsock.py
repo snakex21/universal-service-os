@@ -126,6 +126,8 @@ def test_dll_exports_match_def() -> None:
     if not ARTIFACT.is_file():
         pytest.skip(SKIP_ARTIFACT)
     exports = parse_ne_exports(ARTIFACT)
+    assert 'LIBMAIN' not in exports, 'DLL initialization is not a public API'
+    assert set(exports) == {name.upper() for name in WINSOCK11.values()} | {'WEP'}
     assert all(name == name.upper() for name in exports), 'NE exports must be uppercase'
     wrong = []
     for ordinal, name in WINSOCK11.items():
@@ -135,6 +137,26 @@ def test_dll_exports_match_def() -> None:
         elif exports[key] != ordinal:
             wrong.append('%s @%d (expected @%d)' % (name, exports[key], ordinal))
     assert not wrong, 'WINSOCK.DLL export mismatch: %s' % ', '.join(wrong)
+
+
+@pytest.mark.parametrize('name,description', [
+    ('WINSOCK.DLL','USOS Winsock 1.1 Win16'),
+    ('TESTLOAD.EXE','USOS TESTLOAD Win16'),
+    ('GETHTTP.EXE','USOS GETHTTP Win16'),
+])
+def test_ne_description_has_no_build_path(name, description):
+    path=ARTIFACT.with_name(name)
+    assert path.is_file(), 'build all Win16 artifacts before acceptance'
+    data=path.read_bytes()
+    ne=struct.unpack_from('<I',data,0x3c)[0]
+    assert data[ne:ne+2]==b'NE'
+    offset=struct.unpack_from('<I',data,ne+0x2c)[0]
+    length=data[offset]
+    assert data[offset+1:offset+1+length].decode('ascii')==description
+    assert struct.unpack_from('<H',data,offset+1+length)[0]==0
+    normalized=data.lower().replace(b'\\',b'/')
+    assert str(ROOT).lower().replace('\\','/').encode() not in normalized
+    assert b'c:/users/' not in normalized
 
 
 def test_no_trumpet_winsock_files() -> None:

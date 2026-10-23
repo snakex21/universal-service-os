@@ -5,11 +5,20 @@ rem INT 60h; mTCP DHCP then writes the address into C:\NET\MTCP.CFG.
 rem The boot never waits long: no supported NIC = USOSPKT exits at once
 rem with errorlevel 1 and nothing else runs; no DHCP answer = at most two
 rem tries of 6 seconds (Esc skips). Logs: C:\NET\USOSPKT.LOG, C:\NET\DHCP.LOG.
+rem Win3.1/WfW queue opt-in: SET USOSPKT_QUEUE=1 before calling NETSTART.
+rem USOSPKTQ.COM must be staged separately; default USOSPKT.COM is unchanged.
 set MTCPCFG=C:\NET\MTCP.CFG
 path %PATH%;C:\NET
 if not exist C:\NET\MTCP.CFG copy C:\NET\MTCP.DEF C:\NET\MTCP.CFG >nul
+if "%USOSPKT_QUEUE%"=="1" goto queue_driver
 C:\NET\USOSPKT.COM 0x60 >C:\NET\USOSPKT.LOG
 if errorlevel 1 goto no_driver
+goto driver_ready
+:queue_driver
+if not exist C:\NET\USOSPKTQ.COM goto queue_missing
+C:\NET\USOSPKTQ.COM /Q 0x60 >C:\NET\USOSPKT.LOG
+if errorlevel 1 goto no_driver
+:driver_ready
 C:\NET\DHCP.EXE -retries 2 -timeout 6 >C:\NET\DHCP.LOG
 if errorlevel 1 goto no_dhcp
 echo USOS: siec gotowa (DHCP), programy mTCP w C:\NET (HTGET, PING, FTP, TELNET).
@@ -19,4 +28,8 @@ echo USOS: brak odpowiedzi DHCP - siec bez adresu (C:\NET\DHCP.LOG).
 goto end
 :no_driver
 echo USOS: brak obslugiwanej karty sieciowej (C:\NET\USOSPKT.LOG).
+goto end
+:queue_missing
+echo USOS: queue driver USOSPKTQ.COM missing>C:\NET\USOSPKT.LOG
+echo USOS: brak opcjonalnego C:\NET\USOSPKTQ.COM - nie uruchomiono DHCP.
 :end

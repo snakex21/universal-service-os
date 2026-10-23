@@ -13,7 +13,9 @@ static const usos_u8 gatewaymac[6] = {0x52,0x55,0x0a,0,2,2};
 static usos_u8 frames[16][1514];
 static usos_u16 sizes[16], head, tail, clientport;
 static usos_u32 now, clientseq, peerseq = 100;
-static int failures, routed;
+static int failures, routed, dns_onlink;
+static usos_u32 local_ip=0x0a00020fUL, dns_ip=0x0a000203UL;
+static usos_u32 local_mask=0xffffff00UL, router_ip=0x0a000202UL;
 
 unsigned long usos_abi_now(void) { return now++; }
 void usos_abi_idle(void) { ++now; }
@@ -21,8 +23,10 @@ int usos_pkt_init(void) { return 0; }
 int usos_pkt_attach(void) { return 0; }
 void usos_pkt_term(void) { }
 void usos_pkt_poll(usos_u16 ticks) { (void)ticks; }
-usos_u32 usos_pkt_ip(void) { return 0x0a00020fUL; }
-usos_u32 usos_pkt_dns(void) { return 0x0a000203UL; }
+usos_u32 usos_pkt_ip(void) { return local_ip; }
+usos_u32 usos_pkt_dns(void) { return dns_ip; }
+usos_u32 usos_pkt_mask(void) { return local_mask; }
+usos_u32 usos_pkt_gateway(void) { return router_ip; }
 int usos_pkt_mac(usos_u8 mac[6]) { memcpy(mac,clientmac,6); return 0; }
 
 static void segment(usos_u8 flags, usos_u16 length, usos_u16 offset)
@@ -48,8 +52,9 @@ int usos_pkt_send(const usos_u8 *frame, usos_u16 len)
     if(net_get16(frame+12)==0x0806) {
         usos_u8 *reply=frames[head];
         usos_u32 target=net_get32(frame+38);
-        if(target!=0x0a000202UL && target!=usos_pkt_dns()) { ++failures; return -8; }
-        if(target==0x0a000202UL) routed=1;
+        if(target!=usos_pkt_gateway() && target!=usos_pkt_dns()) { ++failures; return -8; }
+        if(target==usos_pkt_dns()) dns_onlink=1;
+        if(target==usos_pkt_gateway()) routed=1;
         memcpy(reply,frame,42);
         memcpy(reply,clientmac,6); memcpy(reply+6,gatewaymac,6);
         net_put16(reply+20,2); memcpy(reply+22,gatewaymac,6);
@@ -87,13 +92,17 @@ int usos_pkt_recv(usos_u8 *frame, usos_u16 room, usos_u16 *len)
     *len=sizes[tail]; memcpy(frame,frames[tail],*len); ++tail; return 0;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     int s, rc;
     usos_u8 buffer[317];
     usos_u16 i, total=0;
     usos_u16 count=0;
     usos_u32 addresses[USOS_NET_MAX_ADDRS];
+    if(argc>1 && !strcmp(argv[1],"lan")) {
+        local_ip=0xac1f080fUL; local_mask=0xfffffe00UL;
+        router_ip=0xac1f0801UL; dns_ip=0xac1f0903UL;
+    }
     if(usos_sock_startup()!=0) return 1;
     rc=usos_sock_resolve("68k.news",addresses,&count);
     if(rc || count!=1 || addresses[0]!=0xcb007108UL) {
@@ -107,7 +116,7 @@ int main(void)
         for(i=0;i<rc;i++) if(buffer[i]!=(total+i)%251) ++failures;
         total+=rc;
     }
-    printf("bytes=%u eof=%d routed=%d failures=%d\n",total,rc,routed,failures);
+    printf("bytes=%u eof=%d routed=%d failures=%d dns_onlink=%d\n",total,rc,routed,failures,dns_onlink);
     usos_sock_shutdown();
-    return total!=5157 || rc!=0 || !routed || failures;
+    return total!=5157 || rc!=0 || !routed || failures || !dns_onlink;
 }

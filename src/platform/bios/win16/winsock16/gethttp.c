@@ -34,6 +34,24 @@ static void number(long value)
     while (n) _lwrite(journal, &s[--n], 1);
 }
 
+static void log_windows_mode(void)
+{
+    DWORD flags = GetWinFlags();
+    static const char hex[] = "0123456789ABCDEF";
+    int shift;
+    logtext("GETHTTP Win16; GetWinFlags=0x");
+    for (shift = 28; shift >= 0; shift -= 4) {
+        char digit = hex[(unsigned int)((flags >> shift) & 15)];
+        _lwrite(journal, &digit, 1);
+    }
+    logtext(" mode=");
+    if (flags & WF_ENHANCED) logtext("386_ENHANCED");
+    else if (flags & WF_STANDARD) logtext("STANDARD");
+    else if (flags & WF_PMODE) logtext("PROTECTED_OTHER");
+    else logtext("REAL");
+    logtext("; http://68k.news/\r\n");
+}
+
 int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
 {
     HINSTANCE dll;
@@ -57,7 +75,7 @@ int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
 
     journal = _lcreat("C:\\GETHTTP.LOG", 0);
     if (journal == HFILE_ERROR) return 1;
-    logtext("GETHTTP Win16 STANDARD; http://68k.news/\r\n");
+    log_windows_mode();
     dll = LoadLibrary("WINSOCK.DLL");
     if ((UINT)dll < 32) { logtext("FAIL load="); number((UINT)dll); goto end; }
     start = (FN_START)GetProcAddress(dll, MAKEINTRESOURCE(115));
@@ -76,6 +94,7 @@ int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
     rc = start(0x0101, &data);
     logtext("WSAStartup="); number(rc); logtext("\r\n");
     if (rc) goto unload;
+    logtext("config="); logtext(data.szSystemStatus); logtext("\r\n");
     resolved = host("68k.news");
     if (!resolved || resolved->h_addrtype != AF_INET || resolved->h_length != 4) {
         logtext("FAIL DNS error="); number(error()); goto cleanup;

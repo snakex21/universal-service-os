@@ -28,6 +28,7 @@
 
 #include "net.h"
 #include "usos_pkt.h"
+#include "config.h"
 
 #ifdef USOS_WS_DIAG
 static void diag(const char *text)
@@ -123,8 +124,46 @@ static usos_u16 usos_tx_seq;
 
 static int usos_state = USOS_PKT_STATE_DOWN;
 
-static usos_u32 usos_local_ip = 0x0A00020FUL;   /* 10.0.2.15, QEMU slirp */
-static usos_u32 usos_dns_ip   = 0x0A000203UL;   /* 10.0.2.3,  QEMU slirp */
+/* Explicit emergency fallback only; DOS NETSTART/DHCP normally supplies all
+ * four fields. Never mix a partial lease with hardcoded routing values. */
+static usos_u32 usos_local_ip = 0x0A00020FUL;
+static usos_u32 usos_dns_ip = 0x0A000203UL;
+static usos_u32 usos_netmask = 0xFFFFFF00UL;
+static usos_u32 usos_gateway = 0x0A000202UL;
+static int usos_config_file;
+
+static void usos_load_config(void)
+{
+    HFILE file;
+    net_config candidate;
+    char block[128], line[160];
+    int count, i, used = 0, total = 0, invalid = 0;
+    usos_local_ip = 0x0A00020FUL; usos_dns_ip = 0x0A000203UL;
+    usos_netmask = 0xFFFFFF00UL; usos_gateway = 0x0A000202UL;
+    usos_config_file = 0;
+    net_config_begin(&candidate);
+    file = _lopen("C:\\NET\\MTCP.CFG", OF_READ | OF_SHARE_DENY_WRITE);
+    if (file == HFILE_ERROR) return;
+    while ((count = (int)_lread(file, block, sizeof(block))) > 0) {
+        total += count;
+        if (total > 8192) { invalid = 1; break; }
+        for (i = 0; i < count; ++i) {
+            if (!block[i]) { invalid = 1; break; }
+            if (block[i] == '\n') {
+                line[used] = 0; net_config_line(&candidate, line); used = 0;
+            } else if (used + 1 < sizeof(line)) line[used++] = block[i];
+            else { invalid = 1; break; }
+        }
+        if (invalid) break;
+    }
+    _lclose(file);
+    if (count < 0 || invalid) return;
+    if (used) { line[used] = 0; net_config_line(&candidate, line); }
+    if (!net_config_valid(&candidate)) return;
+    usos_local_ip = candidate.ip; usos_dns_ip = candidate.dns;
+    usos_netmask = candidate.mask; usos_gateway = candidate.gateway;
+    usos_config_file = 1;
+}
 
 static void usos_mem_zero(usos_u8 FAR *p, usos_u16 len)
 {
@@ -374,6 +413,7 @@ int usos_pkt_init(void)
 
     if (usos_state != USOS_PKT_STATE_DOWN)
         return USOS_PKT_OK;
+    usos_load_config();
     diag("transport init");
     if (!usos_dpmi_present())
         return USOS_PKT_ERR_DPMI;
@@ -676,6 +716,10 @@ usos_u32 usos_pkt_dns(void)
 {
     return usos_dns_ip;
 }
+
+usos_u32 usos_pkt_mask(void) { return usos_netmask; }
+usos_u32 usos_pkt_gateway(void) { return usos_gateway; }
+int usos_pkt_config_from_file(void) { return usos_config_file; }
 
 void usos_pkt_set_dns(usos_u32 dns)
 {

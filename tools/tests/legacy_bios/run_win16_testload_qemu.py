@@ -6,10 +6,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 All VM files belong in --out on a scratch drive. --build-root supplies only
 read-only dependencies. No private FAT formatter, boot sector, AUTOEXEC,
-CONFIG, WIN.INI edits or deletion of ADD852 are used. Installation calls
-run_w9x_micro_linux_qemu.install (dos_csmwrap_target -> INSTALL -> W3AUTO).
-Only closed test overlays receive a test application argument in W3AUTO and
-/Q in NETSTART. Linux mounts are exclusively the supplied file-backed disk.
+CONFIG, WIN.INI edits or deletion of ADD852 are used. Installation reuses
+the shared w9x overlay/guest flow (dos_csmwrap_target -> INSTALL -> W3AUTO)
+through a blocking serial init wrapper. Closed test overlays select the
+application and USOSPKT_QUEUE in AUTOEXEC; NETSTART uses the separate Q file.
+Linux mounts are exclusively the supplied file-backed disk.
 """
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -33,6 +35,40 @@ def command(args):
     return subprocess.run([str(x) for x in args], check=True, capture_output=True)
 
 
+def prepare_blocking(prep, out, target):
+    """Same USOS overlay and installer, with process-completion serial IO.
+
+    The shared historical install wrapper polls q.poll(); do not call it.
+    A tiny init wrapper calls its unchanged guest flow and powers off.
+    """
+    ml=prep.root/'zig-out/micro-linux'
+    wrapper=("#!/bin/sh\nexport PATH=/usr/sbin:/usr/bin:/sbin:/bin\n"
+        "/bin/busybox --install -s 2>/dev/null\n"
+        "mount -t proc proc /proc; mount -t sysfs sys /sys\n"
+        "mount -t devtmpfs dev /dev 2>/dev/null\n"
+        "mkdir -p /tmp /run; mount -t tmpfs tmp /tmp; mount -t tmpfs run /run\n"
+        "FAMILY=w3 sh /usos-e2e/w9x.sh 2>&1\n"
+        "status=$?; echo WS-PREPARE-EXIT=$status; sync; poweroff -f\n")
+    initrd=out/'initrd.cpio'
+    with initrd.open('xb') as f:
+        for part in ((ml/'initramfs-usos').read_bytes(),(ml/'qemu9x.cpio').read_bytes(),
+                     w9x.overlay(prep),nt3.cpio_newc([('winsock-prepare-init',0o100755,wrapper.encode())])):
+            f.write(part); f.write(bytes(-f.tell()%4))
+    cmd=[str(prep.qemu),'-machine','q35','-accel','whpx','-accel','tcg','-m',str(prep.outer_mb),'-smp','2',
+        '-display','none','-nic','none','-monitor','none','-kernel',str(ml/'vmlinuz-virt'),'-initrd',str(initrd),
+        '-append','console=ttyS0,115200 rdinit=/winsock-prepare-init loglevel=3','-serial','stdio',
+        '-drive',f'file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback','-device','ide-hd,drive=t,bus=ide.0']
+    for name,path in (('cd',prep.dos_iso),('w3',prep.win3)):
+        cmd+=['-drive',f'file={path.as_posix()},format=raw,if=none,id={name},readonly=on','-device',f'virtio-blk-pci,drive={name}']
+    (out/'prepare-command.json').write_text(json.dumps(cmd,indent=2))
+    proc=subprocess.Popen(cmd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    try: output,_=proc.communicate(timeout=prep.timeout)
+    except BaseException:
+        proc.kill(); output,_=proc.communicate(); (out/'console.log').write_bytes(output); raise
+    (out/'console.log').write_bytes(output)
+    return proc.returncode==0 and b'E2E-RESULT=PASS' in output and b'WS-PREPARE-EXIT=0' in output
+
+
 def linux(args, disk, tag, script, files=None):
     out = args.out / tag
     out.mkdir(parents=True, exist_ok=True)
@@ -40,9 +76,11 @@ def linux(args, disk, tag, script, files=None):
             "/bin/busybox --install -s 2>/dev/null\n"
             "mount -t proc proc /proc; mount -t sysfs sys /sys\n"
             "mount -t devtmpfs dev /dev 2>/dev/null\n"
+            "finish() { status=$?; umount /target 2>/dev/null; sync; echo WS-LINUX-EXIT=$status; poweroff -f; }\n"
+            "trap finish EXIT\n"
             "for m in ata_piix sd_mod vfat fat nls_cp437 nls_iso8859_1; do modprobe $m 2>/dev/null; done\n"
             "sleep 2; mdev -s 2>/dev/null; mkdir -p /target\n"
-            "if mount -t vfat /dev/sda1 /target; then\n" + script +
+            "if mount -t vfat /dev/sda1 /target; then\nset -e\n" + script +
             "\numount /target; sync; echo WS-LINUX-DONE\n"
             "else echo WS-LINUX-FAIL; fi\npoweroff -f\n")
     entries = [('ws.sh', 0o100755, body.encode()), ('ws', 0o040755, b'')]
@@ -56,7 +94,11 @@ def linux(args, disk, tag, script, files=None):
            '-kernel', args.build_root / 'zig-out/micro-linux/vmlinuz-virt',
            '-initrd', initrd, '-append', 'console=ttyS0,115200 rdinit=/ws.sh loglevel=3',
            '-serial', 'stdio', '-drive', f'file={disk.as_posix()},format=qcow2,if=ide']
-    result = subprocess.run([str(x) for x in cmd], capture_output=True, timeout=240)
+    try:
+        result = subprocess.run([str(x) for x in cmd], capture_output=True, timeout=240)
+    except subprocess.TimeoutExpired as error:
+        (out/'console.log').write_bytes((error.stdout or b'')+(error.stderr or b''))
+        raise
     (out / 'console.log').write_bytes(result.stdout + result.stderr)
     if b'WS-LINUX-DONE' not in result.stdout:
         raise RuntimeError('Linux disk operation failed: ' + str(out))
@@ -70,7 +112,7 @@ def boot(args, disk, tag, seconds, marker=None):
     port = nt3.free_port()
     cmd = [str(args.qemu), '-machine', 'pc,smm=off,vmport=off', '-accel', 'tcg',
            '-cpu', 'pentium3', '-m', '64', '-display', 'none', '-vga', 'std',
-           '-netdev', 'user,id=net0', '-device', 'igb,netdev=net0',
+           '-netdev', args.netdev, '-device', 'igb,netdev=net0',
            '-object', f'filter-dump,id=cap,netdev=net0,file={(out/"network.pcap").as_posix()}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
            '-serial', 'stdio', '-drive', f'file={disk.as_posix()},format=qcow2,if=ide,index=0']
@@ -128,9 +170,11 @@ def main():
     p.add_argument('--qemu', type=Path, required=True)
     p.add_argument('--dos-iso', type=Path)
     p.add_argument('--win-iso', type=Path)
-    p.add_argument('--case', choices=['queue', 'nodriver', 'nodll', 'gethttp'], default='queue')
+    p.add_argument('--case', choices=['queue', 'nodriver', 'nodll', 'gethttp', 'legacy'], default='queue')
+    p.add_argument('--netdev',default='user,id=net0',help='QEMU user network; custom subnet verifies DOS DHCP configuration')
     p.add_argument('--tag', help='Unique overlay/evidence name for a revised test')
     p.add_argument('--seconds', type=int, default=300)
+    p.add_argument('--resume-setup',action='store_true',help='Continue an interrupted first install on the same disk, before base exists')
     args = p.parse_args(); args.out.mkdir(parents=True, exist_ok=True)
     nt3.set_root(args.build_root)
     img = args.qemu.with_name('qemu-img.exe')
@@ -154,13 +198,24 @@ def main():
                                      0o100644, b.replace(b'\n', b'\r\n')))
         original_overlay = w9x.overlay
         w9x.overlay = lambda a: original_overlay(a) + nt3.cpio_newc(replacements)
-        if not w9x.install(prep, args.out, target):
+        if not prepare_blocking(prep, args.out, target):
             raise SystemExit('USOS preparation failed')
     elif args.mode == 'install':
         if (args.out/'base.qcow2').exists():
             raise SystemExit('Already installed; do not reinstall')
-        boot(args, target, 'install', args.seconds)
-        raw = linux(args, target, 'install-check',
+        tag=args.tag or ('install-continued' if args.resume_setup else 'install')
+        staging="test ! -f /target/USOSW3/MENU.TAG || exit 3\n"
+        if args.resume_setup:
+            # The first incomplete GUI Setup can leave drivers which the
+            # next Setup itself loads, preventing their replacement. Keep
+            # the partial directory, then complete the original USOS setup
+            # with its original clean destination; do not reformat/reprepare.
+            staging+="if test -d /target/WINDOWS; then test ! -e /target/W3PART01; mv /target/WINDOWS /target/W3PART01; fi\n"
+        staging+="sed -i '/^echo WS-INSTALL-COMPLETE/d' /target/USOSW3/WINMENU.BAT\n"
+        staging+="sed -i '/SMARTDRV.EXE \\/C/a echo WS-INSTALL-COMPLETE>COM1\\r' /target/USOSW3/WINMENU.BAT\n"
+        linux(args,target,tag+'-notify',staging)
+        boot(args, target, tag, args.seconds, 'WS-INSTALL-COMPLETE')
+        raw = linux(args, target, tag+'-check',
             "test -f /target/USOSW3/MENU.TAG && test -f /target/WINDOWS/WIN.COM && echo WS-INSTALL-PASS\n"
             "find /target -maxdepth 2 -type f | head -n 30\n")
         if b'WS-INSTALL-PASS' not in raw:
@@ -177,6 +232,8 @@ def main():
         artifact = ROOT/'zig-out/win16'
         files = {'WINSOCK.DLL':(artifact/'WINSOCK.DLL').read_bytes(),
                  'TESTLOAD.EXE':(artifact/'TESTLOAD.EXE').read_bytes(),
+                 'USOSPKT.COM':(artifact/'USOSPKT.COM').read_bytes(),
+                 'NETSTART.BAT':(ROOT/'src/platform/bios/msdos/network_start.cmd').read_text('ascii').replace('\n','\r\n').encode('ascii'),
                  'USOSPKTQ.COM':(artifact/'USOSPKTQ.COM').read_bytes()}
         app = 'GETHTTP' if args.case == 'gethttp' else 'TESTLOAD'
         if app == 'GETHTTP': files['GETHTTP.EXE']=(artifact/'GETHTTP.EXE').read_bytes()
@@ -185,18 +242,20 @@ def main():
             'sha256': {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
         }, indent=2))
         script = "mkdir -p /target/TEST\ncp /ws/*.EXE /target/WINDOWS/\n"
+        script += "cp /ws/USOSPKT.COM /target/NET/USOSPKT.COM\ncp /ws/USOSPKTQ.COM /target/NET/USOSPKTQ.COM\ncp /ws/NETSTART.BAT /target/NET/NETSTART.BAT\n"
+        script += "rm -f /target/NET/MTCP.CFG /target/NET/DHCP.LOG /target/NET/USOSPKT.LOG\n"
         script += "rm -f /target/WSTEST.LOG /target/WSDIAG.LOG /target/GETHTTP.LOG /target/GETHTTP.RSP /target/TEST/WINSOCK.DLL /target/WINDOWS/WINSOCK.DLL /target/WINDOWS/SYSTEM/WINSOCK.DLL\n"
         if args.case != 'nodll': script += "cp /ws/WINSOCK.DLL /target/WINDOWS/SYSTEM/\n"
-        if args.case != 'nodriver':
-            script += "cp /ws/USOSPKTQ.COM /target/NET/USOSPKT.COM\nsed -i 's@USOSPKT.COM 0x60@USOSPKT.COM /Q 0x60@' /target/NET/NETSTART.BAT\n"
-        else:
+        if args.case in ('queue','nodll','gethttp'):
+            script += "sed -i '1a set USOSPKT_QUEUE=1\\r' /target/AUTOEXEC.BAT\n"
+        elif args.case == 'nodriver':
             script += "mv /target/NET/NETSTART.BAT /target/NET/NETSTART.OFF\n"
         script += "sed -i 's@WIN.COM /S /B@WIN.COM /S /B "+app+".EXE@' /target/AUTOEXEC.BAT\n"
         script += "printf '\r\nECHO WS-APP-DONE>COM1\r\n' >> /target/AUTOEXEC.BAT\n"
         linux(args, disk, tag+'-stage', script, files)
         done = boot(args, disk, tag+'-run', args.seconds, 'WS-APP-DONE')
         raw = linux(args, disk, tag+'-read',
-            "for n in WSTEST.LOG WSDIAG.LOG GETHTTP.LOG GETHTTP.RSP NET/USOSPKT.LOG NET/DHCP.LOG; do if test -f /target/$n; then echo WS-FILE:$n; base64 /target/$n; echo WS-FILE-END; fi; done\n")
+            "for n in WSTEST.LOG WSDIAG.LOG GETHTTP.LOG GETHTTP.RSP NET/USOSPKT.LOG NET/DHCP.LOG NET/MTCP.CFG; do if test -f /target/$n; then echo WS-FILE:$n; base64 /target/$n; echo WS-FILE-END; fi; done\n")
         (args.out/(tag+'-result.txt')).write_bytes(raw)
         print('APP_RETURNED', done)
         extracted = {}
@@ -212,7 +271,7 @@ def main():
         if args.case == 'queue':
             passed = (b'name=0 ordinal=0 USOS WINSOCK OK' in result and
                       b'desc=USOS Winsock 1.1 (Win16)' in result)
-        elif args.case == 'nodriver':
+        elif args.case in ('nodriver','legacy'):
             passed = b'name=10091 ordinal=10091' in result
         elif args.case == 'nodll':
             passed = b'err=load:' in result and b'missing-export' not in result
@@ -225,8 +284,16 @@ def main():
             for header in headers.split(b'\r\n'):
                 if header.lower().startswith(b'content-length:'):
                     passed = passed and len(body) == int(header.split(b':', 1)[1])
+            mode=re.search(rb'GetWinFlags=0x([0-9A-F]{8}) mode=STANDARD',result)
+            passed=passed and bool(mode) and bool(int(mode[1],16)&0x10) and not bool(int(mode[1],16)&0x20)
+            passed=passed and b'config=USOSPKT queue; IP from C:\\NET\\MTCP.CFG' in result
+        dhcp = args.case != 'nodriver'
+        dhcp_pass=(b'Offer received, Acknowledged' in extracted.get('NET/DHCP.LOG',b'') and
+                   all(re.search(rb'^'+key+rb'\s+\d+\.\d+\.\d+\.\d+\s*$',extracted.get('NET/MTCP.CFG',b''),re.M)
+                       for key in (b'IPADDR',b'NETMASK',b'GATEWAY',b'NAMESERVER')))
+        passed=passed and done and (not dhcp or dhcp_pass)
         (args.out/(tag+'-verdict.json')).write_text(json.dumps({
-            'pass': passed, 'app_returned': done, 'case': args.case,
+            'pass': passed, 'app_returned': done, 'case': args.case,'dos_dhcp_pass':dhcp_pass if dhcp else None,'netdev':args.netdev,
             'files': {n: {'bytes': len(d), 'sha256':hashlib.sha256(d).hexdigest()}
                       for n, d in extracted.items()}}, indent=2))
         if not passed: return 1

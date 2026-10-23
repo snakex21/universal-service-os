@@ -24,7 +24,6 @@
 #include "net/win16_sock.h"
 
 #define USOS_WS_DESCRIPTION   "USOS Winsock 1.1 (Win16)"
-#define USOS_WS_SYSTEM_STATUS "USOSPKT queue mode - TCP/IP engine (no DHCP)"
 #define USOS_WS_MAX_SOCKETS   4
 #define USOS_WS_MAX_UDPDG     512
 
@@ -197,7 +196,9 @@ int __far __pascal __export WSAStartup(WORD wVersionRequired, LPWSADATA lpWSADat
     lpWSAData->wHighVersion = (WORD)0x0101;
     usos_far_copyz(lpWSAData->szDescription, USOS_WS_DESCRIPTION,
                    (unsigned int)sizeof(lpWSAData->szDescription));
-    usos_far_copyz(lpWSAData->szSystemStatus, USOS_WS_SYSTEM_STATUS,
+    usos_far_copyz(lpWSAData->szSystemStatus,
+                   usos_pkt_config_from_file() ? "USOSPKT queue; IP from C:\\NET\\MTCP.CFG" :
+                   "USOSPKT queue; QEMU fallback (missing/invalid MTCP.CFG)",
                    (unsigned int)sizeof(lpWSAData->szSystemStatus));
     lpWSAData->iMaxSockets = USOS_WS_MAX_SOCKETS;
     lpWSAData->iMaxUdpDg = USOS_WS_MAX_UDPDG;
@@ -695,7 +696,7 @@ int __far __pascal __export __WSAFDIsSet(SOCKET fd, fd_set FAR *set)
 /* Win16 DLL plumbing (not part of the Winsock ABI)                    */
 /* ------------------------------------------------------------------ */
 
-int __far __pascal __export LibMain(HANDLE hInstance, WORD wDataSeg, WORD wHeapSize, LPSTR lpCmdLine)
+int __far __pascal LibMain(HANDLE hInstance, WORD wDataSeg, WORD wHeapSize, LPSTR lpCmdLine)
 {
     (void)hInstance; (void)wDataSeg; (void)wHeapSize; (void)lpCmdLine;
     usos_startup_count = 0;
