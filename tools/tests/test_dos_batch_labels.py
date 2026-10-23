@@ -31,7 +31,22 @@ def batch_sources():
     for path in sorted((ROOT / 'tools').glob('*.sh')):
         lines = path.read_text(encoding='latin-1').splitlines()
         index = 0
+        # Heredocs inside one `{ ... } | ... > FILE` group write one batch
+        # file in pieces (w9x_reg95.sh NFILES.BAT: head, printf loop, tail
+        # with :FAIL/:END), so they are checked as one batch.
+        group = None
         while index < len(lines):
+            if group is None and re.match(r'^\s*\{\s*$', lines[index]):
+                group = (index + 1, [])
+                index += 1
+                continue
+            if group is not None and re.match(r'^\s*\}', lines[index]):
+                start, body = group
+                group = None
+                if any(LABEL.match(line) for line in body) or any(GOTO.search(line) for line in body):
+                    yield '%s heredoc group at line %d' % (path.relative_to(ROOT), start), body
+                index += 1
+                continue
             match = HEREDOC.search(lines[index])
             if not match:
                 index += 1
@@ -42,10 +57,13 @@ def batch_sources():
             while index < len(lines) and lines[index].strip() != end:
                 body.append(lines[index])
                 index += 1
+            index += 1
+            if group is not None:
+                group[1].extend(body)
+                continue
             # Batch text only: a label or a GOTO in the heredoc.
             if any(LABEL.match(line) for line in body) or any(GOTO.search(line) for line in body):
                 yield '%s heredoc %s' % (path.relative_to(ROOT), end), body
-            index += 1
 
 
 def labels(lines):
