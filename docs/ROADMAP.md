@@ -52,6 +52,9 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
 | L11 | Tryb BIOS przez CSMWrap (DOS, FreeDOS, Windows 3.x bez CSM) + klawiatura i mysz USB w Windows 3.x | **Done (1.1)**: w `master` (2026-09-29), QEMU PASS; X470: do testu | L2, L2b | test sprzętowy 1 dzień |
 | L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
+| L12 | Własny stos USB dla DOS (usosusb jako rezydentny sterownik DOS): xHCI, huby, klawiatura/mysz HID, pamięć masowa, hot-swap | **Later** (po 1.0) | usosusb, L11 | do oszacowania |
+| L13 | Własne środowisko przygotowania zamiast mikro-Linuksa Alpine | **Later** (po 1.0); przed 1.0 tylko pakiety Alpine offline | aplikacja UEFI (Zig) | do oszacowania, etapami |
+| L14 | Back-end Realtek RTL8111/8168 w usosnet4 (tylko NT4 / Windows 95) | **Later** (po 1.0) | usosnet4 | do oszacowania |
 
 ## 2. Pozycje
 
@@ -459,6 +462,33 @@ innym, w formie osobnego, opcjonalnego dodatku.
 - Ryzyka: EULA Apple (sprzęt inny niż Apple), wrażliwość VirtualSMC/OSK,
   brak kart NVIDIA nowszych niż Kepler, Wi-Fi Intela tylko częściowo.
 - Sprzęt testowy: X470 + RX 560, B550 + 5800X3D.
+
+### L12. Własny stos USB dla DOS: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: przenieść własny usosusb (xHCI, huby,
+klawiatura i mysz HID, pamięć masowa, hot-swap) do rezydentnego sterownika
+DOS. Jeden sterownik daje hot-swap pendrive'ów naraz w MS-DOS, FreeDOS
+i Windows 1.x–3.x. Wolnego sterownika xHCI dla DOS nie ma, a DOSUSB jest
+komercyjny (docs/ds-dos-usb-2026-10-23.md).
+
+### L13. Własne środowisko przygotowania zamiast Alpine: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: zastąpić mikro-Linuksa Alpine własnym
+środowiskiem przygotowania dysku, etapami:
+
+1. ntfs-3g i wimlib wkompilowane w aplikację UEFI (Zig), działające przez
+   UEFI BlockIo.
+2. Własne partycjonowanie, FAT i edycja gałęzi rejestru w Zig.
+3. Opcjonalnie: własny zapis NTFS.
+
+Przed 1.0 tylko: pakiety Alpine dołączone offline (vendoring), z
+przypiętymi wersjami; `blkid 2.42.1-r0` zniknął z CDN Alpine 2026-10-22.
+
+### L14. Realtek RTL8111/8168 w usosnet4: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: back-end RTL8111/8168 w usosnet4 tylko dla
+NT4 i Windows 95 (docs/ds-realtek-research-2026-10-22.md). Pozostałe
+systemy używają sterownika producenta z DATA.
 
 ## 2b. Wydanie 1.1 (scalone do `master` 2026-09-29, bez tagu)
 
