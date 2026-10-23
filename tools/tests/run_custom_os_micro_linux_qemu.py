@@ -79,7 +79,7 @@ if [ "${OVERVIEW:-0}" = 1 ]; then
     sed 's/^/E2E-OV /' /tmp/overview.txt; echo "E2E-TIME overview $a -> $b"
 fi
 a=$(up)
-if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE="$IMG" IMAGE_SYSTEM="$SYSTEM" IMAGE_TITLE="$TITLE" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap \
+if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE="$IMG" IMAGE_SYSTEM="$SYSTEM" IMAGE_TITLE="$TITLE" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap USOS_DOS_NET_DIR=/usos-e2e/dosnet \
     sh /usr/lib/usos/image_disk_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
     echo "E2E-TIME write $a -> $(up)"
     cat /tmp/prepare.log; cat /run/image-disk.result
@@ -134,6 +134,14 @@ def overlay(csmwrap: Path, root: Path, efivarfs_ko: Path | None = None) -> bytes
     for f in sorted(csmwrap.rglob("*")):
         if f.is_file():
             add("usos-e2e/csmwrap/" + f.relative_to(csmwrap).as_posix(), f.read_bytes())
+    # FreeDOS network (image_disk_target.sh freedos_net): the C:/NET files of
+    # the stick's EFI/USOS/dos-native/msdos, from the --root build.
+    sys.path.insert(0, str(ROOT / "tools"))
+    from build_dos_network import NET_FILES
+    for name in NET_FILES:
+        f = root / "zig-out" / "dos-native" / "msdos" / name
+        if f.is_file():
+            add("usos-e2e/dosnet/" + name, f.read_bytes())
     for name in SCRIPTS:
         add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes().replace(b"\r\n", b"\n"), 0o100755)
     # MBR blobs (build_xp_geometry_fix_mbr.ps1): this checkout's zig-out first.

@@ -21,7 +21,9 @@
 #     BootOrder and set as BootNext (tools/uefi_boot_entry.sh, efivarfs);
 #   - FreeDOS FullUSB: SETUP.BAT -> SETUP.OFF so the disk starts into the
 #     FreeDOS prompt instead of the installer (which aborts on its own disk);
-#     the package repository stays on the disk (FDIMPLES).
+#     the package repository stays on the disk (FDIMPLES); C:\NET gets the
+#     MS-DOS flow's network (USOSPKT.COM + mTCP) and FDAUTO.BAT one guarded
+#     call of C:\NET\NETSTART.BAT (freedos_net).
 # An image that cannot start from a hard disk (CD-only ISO such as TempleOS:
 # no partition table and no boot code in sector 0) is refused before any
 # write. Writes ONLY $TARGET_DEVICE; the rest of the disk stays unallocated.
@@ -211,10 +213,62 @@ freedos_fix() {
     case "$type" in 6|11|12|14) ;; *) return 0 ;; esac
     command -v mren >/dev/null 2>&1 || { log 'mren missing: FreeDOS keeps its installer'; return 0; }
     part="$TARGET_DEVICE@@$((lba * 512))"
-    mdir -i "$part" ::/SETUP.BAT >/dev/null 2>&1 || return 0
     mdir -i "$part" ::/KERNEL.SYS >/dev/null 2>&1 || return 0
-    mren -i "$part" ::/SETUP.BAT ::/SETUP.OFF || fail 'cannot switch FreeDOS from its installer to the prompt'
-    log 'FreeDOS: SETUP.BAT renamed to SETUP.OFF (starts into the prompt)'
+    if mdir -i "$part" ::/SETUP.BAT >/dev/null 2>&1; then
+        mren -i "$part" ::/SETUP.BAT ::/SETUP.OFF || fail 'cannot switch FreeDOS from its installer to the prompt'
+        log 'FreeDOS: SETUP.BAT renamed to SETUP.OFF (starts into the prompt)'
+    fi
+    freedos_net "$part"
+}
+
+# FreeDOS network (docs/freedos-net-2026-10-23.md): the MS-DOS flow's C:\NET
+# (USOSPKT.COM own igb packet driver + mTCP, tools/build_dos_network.py)
+# from the stick's EFI\USOS\dos-native\msdos into C:\NET of the written
+# FreeDOS disk, and one guarded call in FDAUTO.BAT. The FullUSB disk IS the
+# final system (its installer never runs, SETUP.OFF above), so the files stay.
+# The image's FDAUTO.BAT only calls FDNET.BAT if that package is installed
+# (it is not on FullUSB): no second packet driver. No NIC / no DHCP answer:
+# NETSTART.BAT returns at once / after two 6 s tries, FreeDOS boots on.
+DOS_NET_DIR=${USOS_DOS_NET_DIR:-/mnt/esp/EFI/USOS/dos-native/msdos}
+DOS_NET_FILES='USOSPKT.COM NETSTART.BAT MTCP.DEF MTCP.TXT MTCPSRC.ZIP DHCP.EXE PING.EXE HTGET.EXE FTP.EXE TELNET.EXE SNTP.EXE NC.EXE DNSTEST.EXE PKTTOOL.EXE'
+DOS_NET_CALL='if exist C:\NET\USOSPKT.COM call C:\NET\NETSTART.BAT'
+freedos_net() {
+    part=$1
+    for tool in mcopy mmd; do
+        command -v "$tool" >/dev/null 2>&1 || { log "FreeDOS network: $tool missing, no C:\\NET"; return 0; }
+    done
+    for name in $DOS_NET_FILES; do
+        [ -r "$DOS_NET_DIR/$name" ] || { log "FreeDOS network: $DOS_NET_DIR/$name missing, no C:\\NET"; return 0; }
+    done
+    mdir -i "$part" ::/NET >/dev/null 2>&1 || mmd -i "$part" ::/NET || fail 'FreeDOS: cannot create C:\NET'
+    rm -rf "$work/fdnet"; mkdir -p "$work/fdnet" || fail 'internal error: FreeDOS network work folder'
+    for name in $DOS_NET_FILES; do
+        mcopy -o -i "$part" "$DOS_NET_DIR/$name" "::/NET/$name" || fail "FreeDOS: cannot copy $name to C:\\NET"
+        mcopy -n -i "$part" "::/NET/$name" "$work/fdnet/$name" || fail "FreeDOS: cannot read back C:\\NET\\$name"
+        [ "$(sha256sum < "$work/fdnet/$name")" = "$(sha256sum < "$DOS_NET_DIR/$name")" ] || fail "read-back: C:\\NET\\$name differs"
+    done
+    auto="$work/fdnet/fdauto.old"
+    mcopy -n -i "$part" ::/FDAUTO.BAT "$auto" || fail 'FreeDOS: cannot read FDAUTO.BAT'
+    if tr -d '\r' < "$auto" | grep -qxF "$DOS_NET_CALL"; then
+        log 'FreeDOS network: C:\NET staged; FDAUTO.BAT already calls NETSTART.BAT'
+        return 0
+    fi
+    # Before the installer check (after the FDNET line): the network messages
+    # come before FreeDOS's welcome text. Not found: at the end.
+    # Text through ENVIRON, not awk -v or awk strings (backslashes). Every
+    # line ends CRLF (a trailing CR removed first: some awks drop it on read).
+    DOS_NET_REM='rem USOS network: C:\NET\NETSTART.BAT (USOSPKT + mTCP DHCP)'
+    DOS_NET_REM=$DOS_NET_REM DOS_NET_CALL=$DOS_NET_CALL awk '
+        BEGIN { cr = sprintf("%c", 13); rem = ENVIRON["DOS_NET_REM"]; call = ENVIRON["DOS_NET_CALL"] }
+        { sub(cr "$", "") }
+        !done && tolower($0) ~ /^if not exist setup\.bat goto done/ { print rem cr; print call cr; done = 1 }
+        { print $0 cr }
+        END { if (!done) { print rem cr; print call cr } }
+    ' "$auto" > "$work/fdnet/fdauto.new" || fail 'internal error: FDAUTO.BAT'
+    mcopy -o -i "$part" "$work/fdnet/fdauto.new" ::/FDAUTO.BAT || fail 'FreeDOS: cannot write FDAUTO.BAT'
+    mcopy -n -i "$part" ::/FDAUTO.BAT "$work/fdnet/fdauto.chk" || fail 'FreeDOS: cannot read back FDAUTO.BAT'
+    [ "$(sha256sum < "$work/fdnet/fdauto.chk")" = "$(sha256sum < "$work/fdnet/fdauto.new")" ] || fail 'read-back: FDAUTO.BAT differs'
+    log 'FreeDOS network: C:\NET staged (USOSPKT + mTCP), FDAUTO.BAT calls NETSTART.BAT, read-back PASS'
 }
 case "$SYSTEM" in freedos) freedos_fix ;; esac
 sync
