@@ -1,0 +1,477 @@
+USOS CSMWrap patch 0024 (2026-10-23): USB keyboard / mouse replug on every boot
+
+Builds on patch 0023 (root HID reconnect, Codex branch fix/win95-root-hid
+6fe7526a: POST records each root-port HID device with its identity and a
+4 KiB page; the USB disk service port watch of 0022 retires its slot on an
+unplug and re-attaches the same device on the same port, reusing the POST
+interrupt rings, buffers and list nodes). 0023 only works with the 0022
+pool (csmwrap.ini int13_boot_disk_only = true, the Windows 9x flow) and only
+after USOSUSB.MPD armed the helper-side watch. 0024:
+
+- records root HID devices on every boot: their controller is registered
+  for the port watch without the pool (no "stay running without devices"
+  change: such a controller has a device), and one 4 KiB input-context page
+  is reserved when there is no pool;
+- a second driver of the same port watch: the BIOS timer interrupt
+  (usb_check_event -> call32 -> usos_hid_tick on the helper core, with the
+  caller waiting) every 100 ms while the helper-side watch is not armed and
+  only after POST (HaveRunPost 2). That covers MS-DOS, FreeDOS, Windows
+  1.x-3.x, Windows 95/98/Me before or without USOSUSB.MPD and the boot
+  loaders. In this mode the watch handles HID only (no stick bring-up, no
+  media probe); arming reclassifies every port as in 0022;
+- ownership guard: a controller whose DCBAAP no longer points at SeaBIOS's
+  device context array, or that is stopped, is never touched again by the
+  watch (an OS driver took it over: xhci98, NT/Linux xHCI drivers);
+- the device may come back on another root port of a watched controller:
+  the offline entry with the same VID/PID/revision and configuration hash
+  is chosen after the descriptors are read (same port first);
+- retries: a bring-up that fails (port reset, Enable Slot, Address Device,
+  descriptors, SET_CONFIGURATION, Configure Endpoint) stays pending and is
+  retried in the next two watch passes, each with a new port reset (the
+  usosusb root-port debounce + 2 retries); "not ours" (no lost device,
+  other identity) is not retried;
+- fix in 0022's xhci_usos_ctl_mps: the Evaluate Context input slot context
+  named root port 1, and xhci_cmd_submit checks CCS of that port, so an EP0
+  packet size change (a full-speed device with bMaxPacketSize0 64) failed
+  whenever port 1 was empty; now the device's own port;
+- USOSUDSK events 18 (root HID unplugged) and 19 (root HID re-attached, the
+  retry count), attach reason 12 (HID bring-up failed); HID re-attaches and
+  unplugs count in attaches / detaches.
+
+Not covered: devices behind hubs, a HID device that was not present at POST,
+a different model on a lost device's place (identity must match).
+
+Own code. Applies after 0001-0010, 0012, 0014-0023, patch -p1 from the top
+of the tree. Part of a MODIFIED CSMWrap made by the USOS project (SeaBIOS
+LGPLv3).
+
+diff --git a/seabios/src/hw/usb-hid.c b/seabios/src/hw/usb-hid.c
+--- a/seabios/src/hw/usb-hid.c
++++ b/seabios/src/hw/usb-hid.c
+@@ -14,6 +14,7 @@
+ #include "usb-hid.h" // usb_keyboard_setup
+ #include "usb-xhci.h" // root-only reconnection
+ #include "usb-uds.h" // POST-reserved shared input context
++#include "stacks.h" // call32
+ #include "string.h" // memset
+ #include "util.h" // process_key
+ 
+@@ -228,6 +229,9 @@ struct root_hid {
+ };
+ struct root_hid RootHids[ROOT_HIDS] VARFSEG;
+ u8 RootHidCount VARFSEG;
++// USOS patch 0024: input context page when there is no USB disk service
++// pool (every boot that is not a Windows 9x target)
++void *RootHidIn VARFSEG;
+ 
+ static u32
+ root_config_hash(void *buf, u16 len)
+@@ -262,8 +266,15 @@ root_get_desc(struct usb_pipe *ctl, u16 value, u16 len, void *buf)
+ static void
+ usb_root_remember(struct usbdevice_s *dev, struct usb_pipe *pipe, u8 report)
+ {
+-    if (!usos_uds_pool() || dev->hub->usbdev)
++    // USOS patch 0024: every boot (DOS, Windows 3.x, 9x, the NT loaders),
++    // not only with the 9x USB disk service pool
++    if (dev->hub->usbdev || !xhci_usos_register_hid(pipe))
+         return;
++    if (!usos_uds_pool() && !RootHidIn) {
++        RootHidIn = memalign_high(4096, 4096);
++        if (!RootHidIn)
++            return;
++    }
+     u32 where = xhci_usos_root_where(pipe);
+     u8 c = where ? xhci_usos_ctl(pipe) : 0xff;
+     u8 port = where & 0xff;
+@@ -324,17 +335,32 @@ usb_hid_root_detach(int c, int port)
+     return 1;
+ }
+ 
++// Returns 0 re-attached, -1 not a device we lost (nothing offline, other
++// identity or shape: the port is left to others), -2 bring-up failed
++// (the port watch retries). USOS patch 0024: the device may come back on
++// any root port of a watched controller; the offline entry whose identity
++// matches is chosen after the descriptors are read (the same port first).
+ int
+ usb_hid_root_attach(int c, int port)
+ {
+-    struct root_hid *h = root_find(c, port);
+-    if (!h || h->online)
++    struct root_hid *h = root_find(c, port), *carrier = h;
++    int i, rc = -2;
++    if (h && h->online)
+         return -1;
++    for (i = 0; !carrier && i < RootHidCount; i++)
++        if (!RootHids[i].online)
++            carrier = &RootHids[i];
++    if (!carrier)
++        return -1;
++    h = carrier;
+     void *in = usos_uds_pool();
+-    u8 why, *buf = h->mem + 3584;
+-    struct usb_pipe *ctl = xhci_usos_attach(c, port - 1, h->mem, in, &why);
++    if (!in)
++        in = RootHidIn;
++    // the carrier's page holds the new device context while we look
++    u8 why, *buf = carrier->mem + 3584;
++    struct usb_pipe *ctl = xhci_usos_attach(c, port - 1, carrier->mem, in, &why);
+     if (!ctl)
+-        return -1;
++        return -2;
+     struct usb_device_descriptor *dd = (void*)buf;
+     if (root_get_desc(ctl, USB_DT_DEVICE << 8, 8, buf))
+         goto fail;
+@@ -342,20 +368,42 @@ usb_hid_root_attach(int c, int port)
+     if (mps < 8 || mps > 512 || xhci_usos_ctl_mps(ctl, in, mps)
+         || root_get_desc(ctl, USB_DT_DEVICE << 8, 18, buf))
+         goto fail;
+-    if (dd->idVendor != h->vid || dd->idProduct != h->pid || dd->bcdDevice != h->revision)
+-        goto fail;
++    u16 vid = dd->idVendor, pid = dd->idProduct, rev = dd->bcdDevice;
+     struct usb_config_descriptor *cfg = (void*)buf;
+     if (root_get_desc(ctl, USB_DT_CONFIG << 8, 9, buf))
+         goto fail;
+     u16 total = cfg->wTotalLength;
+-    if (cfg->bLength < 9 || total < cfg->bLength || total > 512
+-        || root_get_desc(ctl, USB_DT_CONFIG << 8, total, buf)
+-        || root_config_hash(buf, total) != h->config_hash)
++    rc = -1;
++    if (cfg->bLength < 9 || total < cfg->bLength || total > 512)
+         goto fail;
++    rc = -2;
++    if (root_get_desc(ctl, USB_DT_CONFIG << 8, total, buf))
++        goto fail;
++    u32 hash = root_config_hash(buf, total);
++    rc = -1;
++    struct root_hid *m = NULL;
++    for (i = 0; i < RootHidCount; i++) {
++        struct root_hid *e = &RootHids[i];
++        if (e->online || e->vid != vid || e->pid != pid || e->revision != rev
++            || e->config_hash != hash)
++            continue;
++        if (!m || (e->ctl == c && e->port == port))
++            m = e;
++    }
++    if (!m)
++        goto fail;
++    if (m != carrier) {
++        // both offline: m takes the page in use, carrier gets m's free one
++        void *t = m->mem;
++        m->mem = carrier->mem;
++        carrier->mem = t;
++        h = m;
++    }
++    rc = -2;
+     struct usb_endpoint_descriptor eps[2];
+     memset(eps, 0, sizeof(eps));
+     u8 *p = buf + cfg->bLength, *end = buf + total;
+-    int selected = -1, i;
++    int selected = -1;
+     for (; p + 2 <= end && p[0] >= 2 && p + p[0] <= end; p += p[0]) {
+         if (p[1] == USB_DT_INTERFACE && p[0] >= sizeof(struct usb_interface_descriptor)) {
+             struct usb_interface_descriptor *f = (void*)p;
+@@ -372,9 +420,11 @@ usb_hid_root_attach(int c, int port)
+             memcpy(&eps[selected], p, sizeof(eps[selected]));
+         }
+     }
++    rc = -1;
+     for (i = 0; i < h->n; i++)
+         if (!eps[i].bLength || !eps[i].bInterval || eps[i].wMaxPacketSize != h->ifs[i].pipe->maxpacket)
+             goto fail;
++    rc = -2;
+     struct usb_ctrlrequest req = {
+         .bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
+         .bRequest = USB_REQ_SET_CONFIGURATION, .wValue = cfg->bConfigurationValue,
+@@ -396,13 +446,15 @@ usb_hid_root_attach(int c, int port)
+         if (xhci_usos_hid_ep(ctl, in, f->pipe, &eps[i]))
+             goto fail;
+     }
++    h->ctl = c;
++    h->port = port;
+     h->online = 1;
+     return 0;
+ fail:
+     xhci_usos_teardown(ctl);
+     for (i = 0; i < h->n; i++)
+         xhci_usos_hid_forget(h->ifs[i].pipe);
+-    return -1;
++    return rc;
+ }
+ 
+ #define KEYREPEATWAITMS 500
+@@ -1139,4 +1191,11 @@ usb_check_event(void)
+ {
+     usb_check_key();
+     usb_check_mouse();
++    // USOS patch 0024: the root port watch for HID re-attach while the BIOS
++    // still serves USB input (DOS, Windows 3.x, 9x before USOSUSB arms the
++    // helper-side watch, a boot loader). It runs on the helper core inside
++    // this timer interrupt, so the OS waits for it; an OS that drives USB
++    // itself never reaches this interrupt handler.
++    if (CONFIG_USB_XHCI && GET_GLOBAL(RootHidCount))
++        call32(usos_hid_tick, 0, 0);
+ }
+diff --git a/seabios/src/hw/usb-hid.h b/seabios/src/hw/usb-hid.h
+--- a/seabios/src/hw/usb-hid.h
++++ b/seabios/src/hw/usb-hid.h
+@@ -12,6 +12,7 @@ void usb_mouse_diag_c2(u16 ax, u16 bx, u16 es, u16 cs, u16 ip, u8 res);
+ void usb_check_event(void);
+ int usb_hid_root_detach(int ctl, int port);
+ int usb_hid_root_attach(int ctl, int port);
++extern u8 RootHidCount;
+ 
+ 
+ /****************************************************************
+diff --git a/seabios/src/hw/usb-uds.c b/seabios/src/hw/usb-uds.c
+--- a/seabios/src/hw/usb-uds.c
++++ b/seabios/src/hw/usb-uds.c
+@@ -70,7 +70,10 @@ struct uds_watch {
+     u8 due[USOS_X_CTLS][32];
+     u32 next, pool, gen;
+     u8 armed, pass, pool_used;
++    u8 hid_init;                 // 0024: the timer-interrupt watch classified
++    u8 tries[USOS_X_CTLS][32];   // 0024: bring-up retries of a pending port
+ };
++#define UDS_RETRIES 2            // 0024: as usosusb's root-port connect retry
+ struct uds_watch UdsWatch VARLOW;
+ // The helper loop calls usos_uds_idle() from the start, before SeaBIOS has
+ // set up its low memory: the armed flag lives in the F-segment image.
+@@ -750,6 +753,8 @@ uds_attach(int c, int port, int *pidx)
+     if (idx < 0)
+         return UDS_AF_TABLE;
+     void *in = usos_uds_pool(), *m = in + 4096 * (1 + k);
++    if (!usos_uds_pool())
++        return UDS_AF_POOL;   // 0024: the timer-interrupt watch has no pool
+     u8 why, *buf = m + 3584;   // 512-byte descriptor buffer of the chunk
+     struct usb_pipe *ctl = xhci_usos_attach(c, port, m, in, &why);
+     if (!ctl)
+@@ -902,14 +907,17 @@ uds_arm(void)
+                 uds_ev(0xf0 | c, p + 1, UDS_EV_UNCLAIMED, uds_pls(c, p));
+             }
+             UdsWatch.st[c][p] = st;
++            UdsWatch.tries[c][p] = 0;
+         }
+     }
+     uds_ev(0xff, 0, UDS_EV_ARM, UsosXhciCount);
+     UdsWatch.next = timer_calc(UDS_WATCH_MS);
+ }
+ 
++// armed: the 9x client exists (helper idle loop): sticks and HID. Not
++// armed (0024, from the BIOS timer interrupt): HID re-attach only.
+ static void
+-uds_watch(void)
++uds_watch(int armed)
+ {
+     u8 pass = ++UdsWatch.pass;
+     int c, p, busy = 0;
+@@ -922,8 +930,11 @@ uds_watch(void)
+             u8 *st = &UdsWatch.st[c][p];
+             int on = (ccs >> p) & 1, changed = (chg >> p) & 1;
+             if (*st == UDS_P_BUSY && (!on || changed)
+-                && usb_hid_root_detach(c, p + 1))
++                && usb_hid_root_detach(c, p + 1)) {
+                 *st = UDS_P_FREE;
++                UdsDiag.detaches++;
++                uds_ev(0xf0 | c, p + 1, UDS_EV_HIDGONE, on);
++            }
+             if (*st & UDS_P_OURS) {
+                 int idx = *st & 0x7f;
+                 if (on && !changed) {
+@@ -939,6 +950,7 @@ uds_watch(void)
+             }
+             if (!on) {
+                 *st = UDS_P_FREE;
++                UdsWatch.tries[c][p] = 0;
+                 continue;
+             }
+             if (*st == UDS_P_BUSY || *st == UDS_P_FAILED)
+@@ -946,6 +958,7 @@ uds_watch(void)
+             if (*st == UDS_P_FREE || changed) {
+                 *st = UDS_P_PENDING;
+                 UdsWatch.due[c][p] = pass;
++                UdsWatch.tries[c][p] = 0;
+                 uds_ev(0xf0 | c, p + 1, UDS_EV_CONNECT, uds_pls(c, p));
+                 continue;
+             }
+@@ -954,9 +967,28 @@ uds_watch(void)
+                 continue;
+             busy = 1;   // one bring-up per pass: HID polls get the core back
+             int idx = -1;
+-            u8 why = uds_attach(c, p, &idx);
+-            if (why == UDS_AF_NOTMSC && !usb_hid_root_attach(c, p + 1)) {
+-                *st = UDS_P_BUSY;
++            u8 why = armed ? uds_attach(c, p, &idx) : UDS_AF_NOTMSC;
++            if (why == UDS_AF_NOTMSC) {
++                int hr = usb_hid_root_attach(c, p + 1);
++                if (!hr) {
++                    *st = UDS_P_BUSY;
++                    UdsDiag.attaches++;
++                    uds_ev(0xf0 | c, p + 1, UDS_EV_HIDBACK, UdsWatch.tries[c][p]);
++                    continue;
++                }
++                if (hr == -2)
++                    why = UDS_AF_HID;
++            }
++            // 0024: a failed bring-up (not "not ours") is retried in the
++            // next passes, each with a new port reset (usosusb: connect
++            // debounce + 2 retries)
++            if (why && why != UDS_AF_NOTMSC && why != UDS_AF_POOL
++                && why != UDS_AF_TABLE && UdsWatch.tries[c][p] < UDS_RETRIES) {
++                UdsWatch.tries[c][p]++;
++                UdsWatch.due[c][p] = pass;
++                UdsDiag.attach_fails++;
++                UdsDiag.last_fail = why;
++                uds_ev(0xf0 | c, p + 1, UDS_EV_ATTFAIL, why);
+                 continue;
+             }
+             if (why) {
+@@ -971,7 +1003,7 @@ uds_watch(void)
+         }
+     }
+     UdsDiag.pool_used = UdsWatch.pool_used;
+-    if (busy)
++    if (busy || !armed)
+         return;
+     // INQUIRY, READ CAPACITY and the media check of one new stick
+     for (c = 0; c < UdsCount; c++)
+@@ -991,12 +1023,45 @@ usos_uds_idle(void)
+     if (!UdsArmed)
+         return 0;
+     if (timer_check(UdsWatch.next)) {
+-        uds_watch();
++        uds_watch(1);
+         UdsWatch.next = timer_calc(UDS_WATCH_MS);
+     }
+     return 1;
+ }
+ 
++// USOS patch 0024: the HID part of the port watch, from the BIOS timer
++// interrupt (usb_check_event -> call32, so on the helper core, with the OS
++// waiting) while the helper-side watch is not armed: DOS, Windows 3.x,
++// Windows 9x before (or without) USOSUSB.MPD, boot loaders. Only after
++// POST (HaveRunPost 2: no enumeration thread left). Ports with a device
++// slot are BUSY, the rest FREE; a connect on a free port is debounced for
++// one period and then offered to usb_hid_root_attach only.
++void VISIBLE32FLAT
++usos_hid_tick(void)
++{
++    int c, p;
++    if (UdsArmed || HaveRunPost != 2 || !UsosXhciCount)
++        return;
++    if (!UdsWatch.hid_init) {
++        for (c = 0; c < UsosXhciCount && c < USOS_X_CTLS; c++) {
++            u32 ccs, chg;
++            int n = xhci_usos_scan(c, &ccs, &chg);
++            u32 busy = xhci_usos_busy(c);
++            for (p = 0; p < n; p++) {
++                UdsWatch.st[c][p] = (busy & (1 << p)) ? UDS_P_BUSY : UDS_P_FREE;
++                UdsWatch.tries[c][p] = 0;
++            }
++        }
++        UdsWatch.hid_init = 1;
++        UdsWatch.next = timer_calc(UDS_WATCH_MS);
++        return;
++    }
++    if (timer_check(UdsWatch.next)) {
++        uds_watch(0);
++        UdsWatch.next = timer_calc(UDS_WATCH_MS);
++    }
++}
++
+ // Called by the helper loop (romlayout.S) when the channel 1 doorbell
+ // differs from done; ch = mailbox + 48.
+ void VISIBLE32FLAT
+diff --git a/seabios/src/hw/usb-uds.h b/seabios/src/hw/usb-uds.h
+--- a/seabios/src/hw/usb-uds.h
++++ b/seabios/src/hw/usb-uds.h
+@@ -132,6 +132,8 @@ struct uds_diag_disk {
+ #define UDS_EV_UNCLAIMED 15  // connected at arming without a device slot (PLS)
+ #define UDS_EV_MEDIA    16   // media check (result: UDS_FS_*)
+ #define UDS_EV_ARM      17   // watch armed (result: controllers)
++#define UDS_EV_HIDGONE  18   // 0024: root HID unplugged (result: 1 = replugged)
++#define UDS_EV_HIDBACK  19   // 0024: root HID re-attached (result: retries)
+ 
+ #define UDS_AF_RESET    1    // port reset failed / disconnected
+ #define UDS_AF_SLOT     2    // Enable Slot
+@@ -144,6 +146,7 @@ struct uds_diag_disk {
+ #define UDS_AF_POOL     9    // both pool chunks in use
+ #define UDS_AF_TABLE   10    // device table full
+ #define UDS_AF_MPS     11    // EP0 packet size
++#define UDS_AF_HID     12    // 0024: HID re-attach bring-up failed
+ 
+ #define UDS_FS_UNREAD   0
+ #define UDS_FS_READFAIL 1
+diff --git a/seabios/src/hw/usb-xhci.c b/seabios/src/hw/usb-xhci.c
+--- a/seabios/src/hw/usb-xhci.c
++++ b/seabios/src/hw/usb-xhci.c
+@@ -264,6 +264,7 @@ struct usb_xhci_s {
+        runtime port watch of the USB disk service (src/hw/usb-uds.c) */
+     u32                  usos_latch;
+     u8                   usos_idx;      /* index in UsosXhci + 1, 0 none */
++    u8                   usos_lost;     /* 0024: an OS reprogrammed it */
+ };
+ 
+ struct xhci_pipe {
+@@ -1496,6 +1497,22 @@ xhci_usos_register(struct usb_xhci_s *xhci)
+     xhci->usos_idx = UsosXhciCount;
+ }
+ 
++// USOS patch 0024: the controller of a root HID device is watched on every
++// boot (HID re-attach), not only with the USB disk service pool. Returns 1
++// when the pipe's controller is (now) a watched one.
++int
++xhci_usos_register_hid(struct usb_pipe *p)
++{
++    if (p->type != USB_TYPE_XHCI)
++        return 0;
++    struct usb_xhci_s *xhci = container_of(p->cntl, struct usb_xhci_s, usb);
++    if (!xhci->usos_idx && UsosXhciCount < USOS_X_CTLS) {
++        UsosXhci[UsosXhciCount++] = xhci;
++        xhci->usos_idx = UsosXhciCount;
++    }
++    return xhci->usos_idx != 0;
++}
++
+ // root ports with CCS once POST enumerated the controller (for the record)
+ static void
+ xhci_usos_post_ports(struct usb_xhci_s *xhci)
+@@ -1527,6 +1544,14 @@ xhci_usos_scan(int c, u32 *ccs, u32 *chg)
+     if (c < 0 || c >= UsosXhciCount)
+         return 0;
+     struct usb_xhci_s *xhci = UsosXhci[c];
++    // USOS patch 0024: ownership guard. An OS driver that took the
++    // controller over (reset it, its own DCBAA) makes it untouchable for
++    // good: no event ring, no PORTSC write, no command from here on.
++    if (xhci->usos_lost || readl(&xhci->op->dcbaap_low) != (u32)xhci->devs
++        || !(readl(&xhci->op->usbcmd) & XHCI_CMD_RS)) {
++        xhci->usos_lost = 1;
++        return 0;
++    }
+     xhci_process_events(xhci);
+     int n = xhci->ports < 32 ? xhci->ports : 32, i;
+     for (i = 0; i < n; i++) {
+@@ -1708,7 +1733,12 @@ xhci_usos_ctl_mps(struct usb_pipe *p, void *in, u16 maxpacket)
+     if (pipe->pipe.maxpacket == maxpacket)
+         return 0;
+     pipe->pipe.maxpacket = maxpacket;
+-    xhci_usos_inctx(xhci, in, 1 << 1, 1, pipe->pipe.speed, 0);
++    // USOS patch 0024: the device's own root port (xhci_cmd_submit checks
++    // CCS of the port in the slot context); 0022 named port 1 here, so an
++    // EP0 size change failed whenever port 1 was empty
++    struct xhci_slotctx *dslot = (void*)xhci->devs[pipe->slotid].ptr_low;
++    u32 port = dslot ? ((dslot->ctx[1] >> 16) & 0xff) : 0;
++    xhci_usos_inctx(xhci, in, 1 << 1, 1, pipe->pipe.speed, port ? port - 1 : 0);
+     struct xhci_epctx *ep = (void*)&((struct xhci_inctx*)in)[2 << xhci->context64];
+     ep->ctx[1] = (u32)maxpacket << 16;
+     return xhci_cmd_evaluate_context(xhci, pipe->slotid, in) == CC_SUCCESS ? 0 : -1;
+diff --git a/seabios/src/hw/usb-xhci.h b/seabios/src/hw/usb-xhci.h
+--- a/seabios/src/hw/usb-xhci.h
++++ b/seabios/src/hw/usb-xhci.h
+@@ -48,6 +48,7 @@ int xhci_usos_bulk_eps(struct usb_pipe *p, void *m, void *in
+ void xhci_usos_teardown(struct usb_pipe *p);
+ u32 xhci_usos_root_where(struct usb_pipe *p);
+ void xhci_usos_hid_forget(struct usb_pipe *p);
++int xhci_usos_register_hid(struct usb_pipe *p);   // USOS patch 0024
+ int xhci_usos_hid_ep(struct usb_pipe *ctl, void *in, struct usb_pipe *p,
+                      struct usb_endpoint_descriptor *ep);
+ extern u8 UsosXhciCount;

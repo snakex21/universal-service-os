@@ -1,0 +1,1149 @@
+USOS CSMWrap patch 0022 (2026-10-19): USB disk service stage 2, hot-swap
+
+Stage 2 of docs/usb9x-hotswap-design-2026-10-19.md (USOS repository): a
+USB stick plugged in after boot, unplugged, or swapped is seen by the USB
+disk service of patch 0021 (channel 1 of the helper core, USOSUSB.MPD on
+Windows 95/98/98 SE/Me). SeaBIOS stays the only xHCI owner; the
+controller is never reset.
+
+Only with csmwrap.ini int13_boot_disk_only = true (patch 0014, written by
+the Windows 9x flow), detected at POST through csm_bootdisk_hash():
+
+- a fixed pool, 12 KiB from ZoneHigh at POST (E820 reserved, survives the
+  OS): page 0 = the input context of the bring-up commands and the sector
+  buffer of the media check, pages 1-2 = one device each (output device
+  context, control pipe, two bulk pipes, a 512-byte descriptor buffer).
+  Re-used on every plug: no runtime allocation, no leak;
+- every xHCI controller is registered (up to 4) and stays running when
+  POST found no device on it (upstream stops and frees it), so a stick can
+  arrive on any root port;
+- the port watch arms at the first channel 1 request (the OS client
+  exists; from then on all 32-bit SeaBIOS code runs on the helper core):
+  each root port is classified once (a UDS stick, a device POST set up such
+  as the keyboard / mouse / a hub, connected without a device slot, or
+  free). A port that is connected but has no slot (POST did not set it up,
+  e.g. the X470 stick after a warm restart) is brought up like a new plug;
+- about every 100 ms, only when neither channel has a request, the helper
+  processes the events of each watched controller and reads PORTSC: CCS,
+  and CSC directly or latched by xhci_process_events (which clears CSC on
+  a Port Status Change event, so a fast unplug / replug is not lost);
+  connect -> one watch period of debounce -> bring-up; unplug or a change
+  latch on a UDS port -> teardown (Disable Slot, events drained, the
+  slot's context pointer cleared, the pool chunk free) and the table entry
+  reports GONE; one bring-up per pass, so HID polls get the core back;
+- bring-up (own code from xHCI 1.2 and USB 2.0 chapter 9): port reset (USB2
+  PR; a USB3 port only when its link did not train by itself), Enable
+  Slot, Address Device, the device descriptor (8 bytes, Evaluate Context for
+  another EP0 packet size, 18 bytes), the configuration descriptor (at
+  most 512 bytes), the first bulk-only mass storage interface (alternate
+  setting 0) with its bulk endpoints, SET_CONFIGURATION, one Configure
+  Endpoint for both, GET MAX LUN (a stall = one LUN, EP0 reset). Anything
+  else (a keyboard plugged in again, a hub, UAS only) is disabled and left
+  until it is unplugged. The device table entry: an empty one or one whose
+  stick is gone / ejected (never one INT 13h owns), a new generation
+  (global, POST entries keep 1), so the miniport reports a media change;
+- the next watch pass: INQUIRY, READ CAPACITY and the media check;
+- EJECT now also disables the slot and frees the chunk; the port waits for
+  a disconnect, the next plug is a new stick.
+
+Every boot: the media check at a stick's first probe (sector 0, the MBR
+partition types, the boot sector of the first partition or of sector 0
+itself: FAT12/16/32, NTFS, exFAT, GPT protective, unknown); KiB counters
+exact over many requests (the remainder is carried; 0021 rounded each
+request down, so 512-byte writes counted 0).
+
+The USOSUDSK record becomes version 2 (984 bytes, version 1 unchanged as
+the first 768): watch passes, plugs, unplugs, failed plugs with the last
+reason, the pool, per controller the ports, CCS after POST, ports with a
+slot when the watch armed, CCS now; per device the media check (file
+system code, partition types, flags, controller, POST or hot-plug, the
+volume LBA, FNV-1a of sector 0); new events: plugged in, plug failed
+(reason), connect, unplugged, connected without a slot, media, armed.
+
+romlayout.S: the helper loop calls usos_uds_idle() when neither channel has
+a request; it returns 1 once armed and the loop then spins with PAUSE
+instead of MWAIT (which only wakes on the mailbox line). The armed flag is
+a VARFSEG byte: the loop runs before SeaBIOS has set up its low memory.
+
+ROM room (SeaBIOS build, usos16 4416 bytes free): seabios-config turns off
+CONFIG_MEGASAS (LSI MegaRAID SAS) and CONFIG_USB_UHCI (UHCI exists only on
+pre-2011 chipsets, which have a firmware CSM; xHCI, EHCI, OHCI, AHCI,
+NVMe, SD, USB HID / MSC / UAS stay).
+
+Without int13_boot_disk_only every path behaves as in 3.1.2-usos16 apart
+from the media check, the exact KiB counters and the two drivers.
+
+Own code. Applies after 0001-0010, 0012, 0014-0021, patch -p1 from the
+top of the tree. Part of a MODIFIED CSMWrap made by the USOS project
+(SeaBIOS LGPLv3).
+
+diff -ruN a/seabios-config b/seabios-config
+--- a/seabios-config
++++ b/seabios-config
+@@ -6,3 +6,5 @@ CONFIG_VGA_COREBOOT=y
+ # CONFIG_BOOTSPLASH is not set
+ # CONFIG_SERCON is not set
+ # CONFIG_HOST_BIOS_GEOMETRY is not set
++# CONFIG_MEGASAS is not set
++# CONFIG_USB_UHCI is not set
+diff -ruN a/seabios/src/hw/usb-uds.c b/seabios/src/hw/usb-uds.c
+--- a/seabios/src/hw/usb-uds.c
++++ b/seabios/src/hw/usb-uds.c
+@@ -20,7 +20,15 @@
+ //
+ // Stage 1 of docs/usb9x-hotswap-design-2026-10-19.md (USOS repository): the
+ // sticks found at POST; an unplugged stick ends its request at once
+-// (GONE), its slot is disabled and it stays gone until the next boot.
++// (GONE), its slot is disabled.
++// Stage 2 (USOS patch 0022, CSMWrap 3.1.2-usos17), only with csmwrap.ini
++// int13_boot_disk_only = true: a fixed pool reserved at POST, a port watch
++// on the helper core about every 100 ms once an OS client used channel 1
++// (root ports of every xHCI: connect status + a latch of the change bit),
++// runtime bring-up of a stick plugged in later (port reset, Enable Slot,
++// Address Device, descriptors, SET_CONFIGURATION, Configure Endpoint, GET
++// MAX LUN, then INQUIRY / READ CAPACITY / the partition table), teardown
++// on unplug, device table entries re-used with a new generation.
+ 
+ #include "biosvar.h" // GET_GLOBAL
+ #include "block.h" // getDrive
+@@ -34,17 +42,38 @@
+ #include "usb-uds.h" // struct uds_req
+ #include "usb-xhci.h" // xhci_usos_bulk
+ #include "util.h" // timer_calc
++#include "malloc.h" // memalign_high
+ 
+ struct uds_int {
+     struct usb_pipe *in, *out, *ctl;
+     u32 capword;
+     u8 iface, probed;
+     char vendor[8], product[16];
++    u8 ctlidx, chunk;   // 0022: watched controller (0xff none), pool chunk + 1
++    u16 rem_in, rem_out;   // 0022: bytes below 1 KiB not yet in kib_in / kib_out
+ };
+ 
+ struct uds_int UdsInt[UDS_MAX_DEVS] VARFSEG;
+ u8 UdsCount VARFSEG;
+ struct uds_diag UdsDiag VARLOW __aligned(16);
++
++// 0022: port watch state (low memory, not in the ROM image)
++#define UDS_POOL_DEVS  2
++#define UDS_P_FREE     0
++#define UDS_P_BUSY     1   // a device POST set up that is not ours (HID, hub)
++#define UDS_P_FAILED   2   // bring-up failed / ejected: until disconnect
++#define UDS_P_PENDING  3   // connected, debouncing
++#define UDS_P_OURS     0x80
++struct uds_watch {
++    u8 st[USOS_X_CTLS][32];
++    u8 due[USOS_X_CTLS][32];
++    u32 next, pool, gen;
++    u8 armed, pass, pool_used;
++};
++struct uds_watch UdsWatch VARLOW;
++// The helper loop calls usos_uds_idle() from the start, before SeaBIOS has
++// set up its low memory: the armed flag lives in the F-segment image.
++u8 UdsArmed VARFSEG;
+ extern u32 TimerKHz;
+ extern u32 UsbMscNextTag;
+ 
+@@ -94,20 +123,62 @@ usos_uds_init(void)
+ }
+ 
+ static void
+-uds_event(int idx, u8 event, u8 result)
++uds_ev(u8 dev, u8 port, u8 event, u8 result)
+ {
+     u8 slot = UdsDiag.next_event % UDS_DIAG_EVENTS;
+     struct uds_diag_event *e = &UdsDiag.ev[slot];
+     u32 khz = GET_GLOBAL(TimerKHz);
+     e->ms = khz ? timer_calc(0) / khz : 0;
+-    e->dev = idx;
+-    e->port = (idx >= 0 && idx < UDS_MAX_DEVS) ? UdsDiag.dev[idx].port : 0;
++    e->dev = dev;
++    e->port = port;
+     e->event = event;
+     e->result = result;
+     UdsDiag.next_event = (slot + 1) % UDS_DIAG_EVENTS;
+     UdsDiag.events++;
+ }
+ 
++static void
++uds_event(int idx, u8 event, u8 result)
++{
++    uds_ev(idx, (idx >= 0 && idx < UDS_MAX_DEVS) ? UdsDiag.dev[idx].port : 0
++           , event, result);
++}
++
++// 0022: the runtime pool (POST, xhci_setup): only for a Windows 9x target
++// (csmwrap.ini int13_boot_disk_only = true, patch 0014), so every other
++// boot keeps the stage 1 behaviour (no watch, empty controllers stopped).
++// Page 0: the input context of the bring-up commands and the sector
++// buffer of the media check; pages 1-2: one device each.
++void
++usos_uds_pool_setup(void)
++{
++    u32 hash;
++    int only = 0;
++    if (!CONFIG_CSM || !csm_bootdisk_hash(&hash, &only) || !only)
++        return;
++    void *p = memalign_high(4096, 4096 * (1 + UDS_POOL_DEVS));
++    if (!p)
++        return;
++    memset(p, 0, 4096 * (1 + UDS_POOL_DEVS));
++    UdsWatch.pool = UdsDiag.pool = (u32)p;
++}
++
++void *
++usos_uds_pool(void)
++{
++    return (void*)UdsWatch.pool;
++}
++
++void
++usos_uds_ctl_info(int c, u32 ports, u32 ccs)
++{
++    if (c < 0 || c >= USOS_X_CTLS)
++        return;
++    UdsDiag.ctl[c].ports = ports;
++    UdsDiag.ctl[c].ccs_post = ccs;
++    UdsDiag.ctls = c + 1;
++}
++
+ // BIOS drive number of a UDS entry: 80h+ hard disk, E0h+ CD-ROM, 0 none
+ static u8
+ uds_bios_drive(int idx)
+@@ -180,14 +251,29 @@ uds_clear_halt(struct uds_int *u, struct usb_pipe *pipe, int in)
+             , pipe->ep | (in ? USB_DIR_IN : 0));
+ }
+ 
++// the device's slot disabled and its pool chunk free again (idempotent)
++static void
++uds_release(int idx, u8 state)
++{
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    if (d->state == UDS_DEV_PRESENT)
++        d->state = state;
++    if (u->ctl)
++        xhci_usos_teardown(u->ctl);
++    if (u->chunk) {
++        UdsWatch.pool_used &= ~(1 << (u->chunk - 1));
++        u->chunk = 0;
++    }
++}
++
+ static void
+ uds_gone(int idx)
+ {
+     struct uds_diag_dev *d = &UdsDiag.dev[idx];
+     if (d->state == UDS_DEV_GONE)
+         return;
+-    d->state = UDS_DEV_GONE;
+-    xhci_usos_disable(UdsInt[idx].in);
++    uds_release(idx, UDS_DEV_GONE);
+     uds_event(idx, UDS_EV_GONE, d->last_op);
+ }
+ 
+@@ -338,6 +424,8 @@ usos_uds_commit(int idx, struct usbdevice_s *usbdev, struct usb_pipe *inpipe
+     usbdev->defpipe = NULL;
+     u->iface = usbdev->iface->bInterfaceNumber;
+     u->capword = xhci_usos_capword(inpipe);
++    u->ctlidx = xhci_usos_ctl(inpipe);
++    UdsDiag.media[idx].ctl = u->ctlidx;
+     u32 where = xhci_usos_where(inpipe);
+     d->slotid = where >> 8;
+     d->port = where;
+@@ -357,6 +445,81 @@ usos_uds_commit(int idx, struct usbdevice_s *usbdev, struct usb_pipe *inpipe
+  * Channel 1 requests (helper core)
+  ****************************************************************/
+ 
++// 0022: what is on the stick, for the logs (USOSDBG: "NTFS - 9x cannot
++// read it"): sector 0, the MBR partition types and the boot sector of the
++// volume (sector 0 itself for a stick without a partition table).
++static u8
++uds_fs_of(const u8 *b)
++{
++    if (b[510] != 0x55 || b[511] != 0xaa)
++        return 0;
++    if (!memcmp(b + 3, "NTFS    ", 8))
++        return UDS_FS_NTFS;
++    if (!memcmp(b + 3, "EXFAT   ", 8))
++        return UDS_FS_EXFAT;
++    if (!memcmp(b + 82, "FAT32", 5))
++        return UDS_FS_FAT32;
++    if (!memcmp(b + 54, "FAT12", 5))
++        return UDS_FS_FAT12;
++    if (!memcmp(b + 54, "FAT1", 4) || !memcmp(b + 54, "FAT ", 4))
++        return UDS_FS_FAT16;
++    return 0;
++}
++
++static int
++uds_read1(int idx, u32 lba, void *buf, u32 bs)
++{
++    u8 cdb[10] = { 0x28, 0, lba >> 24, lba >> 16, lba >> 8, lba, 0, 0, 1, 0 };
++    return uds_cmd_in(idx, cdb, sizeof(cdb), buf, bs) == UDS_S_OK ? 0 : -1;
++}
++
++static void
++uds_media(int idx)
++{
++    struct uds_diag_media *m = &UdsDiag.media[idx];
++    u32 bs = UdsDiag.dev[idx].block_size;
++    u8 *b = usos_uds_pool();
++    u32 h = 0x811c9dc5, i;
++    m->fs = UDS_FS_UNREAD;
++    if (!b || bs < 512 || bs > 4096 || (bs & 511))
++        goto out;
++    m->fs = UDS_FS_READFAIL;
++    if (uds_read1(idx, 0, b, bs))
++        goto out;
++    for (i = 0; i < 512; i++)
++        h = (h ^ b[i]) * 0x01000193;
++    m->hash0 = h;
++    m->fs = UDS_FS_NOSIG;
++    if (b[510] != 0x55 || b[511] != 0xaa)
++        goto out;
++    m->flags |= UDS_MF_SIG;
++    u8 fs = uds_fs_of(b);
++    if (fs) {   // a volume without a partition table
++        m->flags |= UDS_MF_VBR;
++        m->fs = fs;
++        goto out;
++    }
++    u32 lba = 0;
++    for (i = 0; i < 4; i++) {
++        u8 *e = b + 446 + 16 * i;
++        m->types[i] = e[4];
++        if (e[4] && !lba)
++            lba = e[8] | (e[9] << 8) | (e[10] << 16) | ((u32)e[11] << 24);
++    }
++    m->fs = m->types[0] == 0xee ? UDS_FS_GPT : UDS_FS_OTHER;
++    if (!lba || m->fs == UDS_FS_GPT)
++        goto out;
++    m->part_lba = lba;
++    if (uds_read1(idx, lba, b, bs))
++        goto out;
++    m->flags |= UDS_MF_VBR;
++    fs = uds_fs_of(b);
++    if (fs)
++        m->fs = fs;
++out:
++    uds_event(idx, UDS_EV_MEDIA, m->fs);
++}
++
+ // VID:PID, INQUIRY strings and READ CAPACITY(10) of LUN 0, on the helper
+ // core at the first request for a device without a BIOS number (POST
+ // sends nothing beyond what SeaBIOS always sent).
+@@ -374,7 +537,7 @@ uds_probe(int idx)
+         .wValue = USB_DT_DEVICE << 8, .wIndex = 0, .wLength = sizeof(dd),
+     };
+     memset(&dd, 0, sizeof(dd));
+-    if (!usb_send_default_control(u->ctl, &req, &dd)) {
++    if (!d->vid && !usb_send_default_control(u->ctl, &req, &dd)) {
+         d->vid = dd.idVendor;
+         d->pid = dd.idProduct;
+     }
+@@ -396,6 +559,7 @@ uds_probe(int idx)
+     if (ok) {
+         d->last_lba_lo = be32_to_cpu(*(u32*)buf);
+         d->block_size = be32_to_cpu(*(u32*)(buf + 4));
++        uds_media(idx);
+     }
+     dprintf(1, "USOS UDS: dev %d %04x:%04x cap %u x %u\n"
+             , idx, d->vid, d->pid, d->last_lba_lo, d->block_size);
+@@ -473,11 +637,18 @@ uds_op_scsi(struct uds_req *r)
+             st = UDS_S_GONE;
+         }
+     } else if (st == UDS_S_OK) {
+-        u32 kib = (r->data_len - residue) >> 10;
+-        if (r->dir == UDS_DIR_IN)
+-            d->kib_in += kib;
+-        else
+-            d->kib_out += kib;
++        // 0022: exact over many requests (512-byte writes counted 0 in usos16)
++        struct uds_int *u = &UdsInt[idx];
++        u32 n = r->data_len - residue;
++        if (r->dir == UDS_DIR_IN) {
++            n += u->rem_in;
++            d->kib_in += n >> 10;
++            u->rem_in = n & 1023;
++        } else if (r->dir == UDS_DIR_OUT) {
++            n += u->rem_out;
++            d->kib_out += n >> 10;
++            u->rem_out = n & 1023;
++        }
+     }
+     if (st == UDS_S_GONE)
+         d->gone++;
+@@ -530,11 +701,294 @@ uds_op_eject(struct uds_req *r)
+         r->status = UDS_S_GONE;
+         return;
+     }
+-    UdsDiag.dev[idx].state = UDS_DEV_EJECTED;
++    uds_release(idx, UDS_DEV_EJECTED);
+     uds_event(idx, UDS_EV_EJECT, st);
+     r->status = UDS_S_OK;
+ }
+ 
++
++/****************************************************************
++ * 0022: runtime bring-up and the port watch (helper core)
++ ****************************************************************/
++
++// device table entry for a new stick: an unused one, or one whose stick
++// is gone / ejected (never one INT 13h owns); -1 when the table is full
++static int
++uds_free_entry(void)
++{
++    int i;
++    for (i = 0; i < UdsCount; i++) {
++        u8 st = UdsDiag.dev[i].state;
++        if (st != UDS_DEV_PRESENT && !UdsInt[i].chunk && !uds_bios_drive(i))
++            return i;
++    }
++    return UdsCount < UDS_MAX_DEVS ? UdsCount : -1;
++}
++
++static int
++uds_ctl_in(struct usb_pipe *ctl, u16 value, u16 len, void *buf)
++{
++    struct usb_ctrlrequest req = {
++        .bRequestType = USB_DIR_IN, .bRequest = USB_REQ_GET_DESCRIPTOR,
++        .wValue = value, .wIndex = 0, .wLength = len,
++    };
++    return usb_send_default_control(ctl, &req, buf);
++}
++
++// Bring up the stick on root port 'port' (0-based) of watched controller
++// c. Returns 0 and *pidx, or the reason (UDS_AF_*).
++static u8
++uds_attach(int c, int port, int *pidx)
++{
++    int k;
++    for (k = 0; k < UDS_POOL_DEVS && (UdsWatch.pool_used & (1 << k)); k++)
++        ;
++    if (k == UDS_POOL_DEVS)
++        return UDS_AF_POOL;
++    int idx = uds_free_entry();
++    if (idx < 0)
++        return UDS_AF_TABLE;
++    void *in = usos_uds_pool(), *m = in + 4096 * (1 + k);
++    u8 why, *buf = m + 3584;   // 512-byte descriptor buffer of the chunk
++    struct usb_pipe *ctl = xhci_usos_attach(c, port, m, in, &why);
++    if (!ctl)
++        return why;
++    struct usb_device_descriptor *dd = (void*)buf;
++    why = UDS_AF_DEVDESC;
++    if (uds_ctl_in(ctl, USB_DT_DEVICE << 8, 8, buf))
++        goto fail;
++    u16 mps = dd->bcdUSB >= 0x0300 ? 1 << (dd->bMaxPacketSize0 & 15)
++        : dd->bMaxPacketSize0;
++    why = UDS_AF_MPS;
++    if (mps < 8 || mps > 512 || xhci_usos_ctl_mps(ctl, in, mps))
++        goto fail;
++    why = UDS_AF_DEVDESC;
++    if (uds_ctl_in(ctl, USB_DT_DEVICE << 8, 18, buf))
++        goto fail;
++    u16 vid = dd->idVendor, pid = dd->idProduct;
++    struct usb_config_descriptor *cfg = (void*)buf;
++    why = UDS_AF_CONFIG;
++    if (uds_ctl_in(ctl, USB_DT_CONFIG << 8, 9, buf) || cfg->bLength < 9)
++        goto fail;
++    u16 total = cfg->wTotalLength > 512 ? 512 : cfg->wTotalLength;
++    if (total < 9 || uds_ctl_in(ctl, USB_DT_CONFIG << 8, total, buf))
++        goto fail;
++    u8 cfgval = cfg->bConfigurationValue, *p = buf + cfg->bLength, *end = buf + total;
++    struct usb_interface_descriptor *iface = NULL;
++    struct usb_endpoint_descriptor ei, eo;
++    ei.bLength = eo.bLength = 0;
++    for (; p + 2 <= end && p[0] >= 2 && p + p[0] <= end; p += p[0]) {
++        if (p[1] == USB_DT_INTERFACE && p[0] >= sizeof(*iface)) {
++            if (iface)
++                break;
++            struct usb_interface_descriptor *d = (void*)p;
++            if (d->bInterfaceClass == USB_CLASS_MASS_STORAGE
++                && d->bInterfaceProtocol == US_PR_BULK && !d->bAlternateSetting)
++                iface = d;
++        } else if (iface && p[1] == USB_DT_ENDPOINT && p[0] >= 7
++                   && (p[3] & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK) {
++            struct usb_endpoint_descriptor *e = (p[2] & USB_DIR_IN) ? &ei : &eo;
++            if (!e->bLength)
++                memcpy(e, p, sizeof(*e));
++        }
++    }
++    why = UDS_AF_NOTMSC;
++    if (!iface || !ei.bLength || !eo.bLength)
++        goto fail;
++    u8 ifnum = iface->bInterfaceNumber;
++    struct usb_ctrlrequest req = {
++        .bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
++        .bRequest = USB_REQ_SET_CONFIGURATION, .wValue = cfgval,
++    };
++    why = UDS_AF_SETCFG;
++    if (usb_send_default_control(ctl, &req, NULL))
++        goto fail;
++    struct usb_pipe *bin, *bout;
++    why = UDS_AF_EPS;
++    if (xhci_usos_bulk_eps(ctl, m, in, &ei, &eo, &bin, &bout))
++        goto fail;
++    // GET MAX LUN (BOT 3.2); a stall means one LUN and halts EP0
++    struct usb_ctrlrequest ml = {
++        .bRequestType = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
++        .bRequest = 0xfe, .wIndex = ifnum, .wLength = 1,
++    };
++    u8 maxlun = 0;
++    buf[0] = 0;
++    if (usb_send_default_control(ctl, &ml, buf))
++        xhci_usos_reset_ep(ctl);
++    else if (buf[0] <= UDS_MAX_LUN)
++        maxlun = buf[0];
++
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    memset(u, 0, sizeof(*u));
++    memset(d, 0, sizeof(*d));
++    memset(&UdsDiag.media[idx], 0, sizeof(UdsDiag.media[idx]));
++    u->in = bin;
++    u->out = bout;
++    u->ctl = ctl;
++    u->iface = ifnum;
++    u->capword = xhci_usos_capword(bin);
++    u->ctlidx = c;
++    u->chunk = k + 1;
++    UdsWatch.pool_used |= 1 << k;
++    d->port = port + 1;
++    d->slotid = xhci_usos_where(bin) >> 8;
++    d->speed = ctl->speed;
++    d->luns = maxlun + 1;
++    d->vid = vid;
++    d->pid = pid;
++    d->generation = ++UdsWatch.gen + 1;   // POST entries have generation 1
++    d->state = UDS_DEV_PRESENT;
++    UdsDiag.media[idx].ctl = c;
++    UdsDiag.media[idx].attach = 1;
++    if (idx >= UdsCount)
++        UdsCount = idx + 1;
++    UdsDiag.devs = UdsCount;
++    uds_event(idx, UDS_EV_ATTACH, d->luns);
++    *pidx = idx;
++    return 0;
++fail:
++    xhci_usos_teardown(ctl);
++    return why;
++}
++
++// the present stick (not owned by INT 13h) on root port 'port' (1-based)
++static int
++uds_on_port(int c, int port)
++{
++    int i;
++    for (i = 0; i < UdsCount; i++)
++        if (UdsInt[i].ctlidx == c && UdsDiag.dev[i].port == port
++            && UdsDiag.dev[i].state == UDS_DEV_PRESENT && !uds_bios_drive(i))
++            return i;
++    return -1;
++}
++
++static u8
++uds_pls(int c, int port)
++{
++    return (xhci_usos_portsc(c, port) >> 5) & 0xf;
++}
++
++// First channel 1 request: the OS client exists, all 32-bit SeaBIOS code
++// now runs on this core. Every root port is classified once.
++static void
++uds_arm(void)
++{
++    int c, p;
++    UdsWatch.armed = 1;
++    UdsDiag.armed = 1;
++    UdsArmed = 1;
++    for (c = 0; c < UsosXhciCount && c < USOS_X_CTLS; c++) {
++        u32 ccs, chg;
++        int n = xhci_usos_scan(c, &ccs, &chg);
++        u32 busy = xhci_usos_busy(c);
++        UdsDiag.ctl[c].busy_arm = busy;
++        UdsDiag.ctl[c].ccs_now = ccs;
++        for (p = 0; p < n; p++) {
++            u8 st = UDS_P_FREE;
++            int idx = uds_on_port(c, p + 1);
++            if (idx >= 0) {
++                st = UDS_P_OURS | idx;
++            } else if (busy & (1 << p)) {
++                st = UDS_P_BUSY;
++            } else if (ccs & (1 << p)) {
++                // connected without a device slot: POST did not set it up
++                // (the X470 stick after a warm restart); brought up below
++                st = UDS_P_PENDING;
++                UdsWatch.due[c][p] = UdsWatch.pass;
++                uds_ev(0xf0 | c, p + 1, UDS_EV_UNCLAIMED, uds_pls(c, p));
++            }
++            UdsWatch.st[c][p] = st;
++        }
++    }
++    uds_ev(0xff, 0, UDS_EV_ARM, UsosXhciCount);
++    UdsWatch.next = timer_calc(UDS_WATCH_MS);
++}
++
++static void
++uds_watch(void)
++{
++    u8 pass = ++UdsWatch.pass;
++    int c, p, busy = 0;
++    UdsDiag.watch_passes++;
++    for (c = 0; c < UsosXhciCount && c < USOS_X_CTLS; c++) {
++        u32 ccs, chg;
++        int n = xhci_usos_scan(c, &ccs, &chg);
++        UdsDiag.ctl[c].ccs_now = ccs;
++        for (p = 0; p < n; p++) {
++            u8 *st = &UdsWatch.st[c][p];
++            int on = (ccs >> p) & 1, changed = (chg >> p) & 1;
++            if (*st & UDS_P_OURS) {
++                int idx = *st & 0x7f;
++                if (on && !changed) {
++                    if (UdsDiag.dev[idx].state != UDS_DEV_PRESENT)
++                        *st = UDS_P_FAILED;   // ejected: until it is unplugged
++                    continue;
++                }
++                if (UdsDiag.dev[idx].state == UDS_DEV_PRESENT)
++                    uds_event(idx, UDS_EV_DETACH, on);
++                uds_release(idx, UDS_DEV_GONE);
++                UdsDiag.detaches++;
++                *st = UDS_P_FREE;
++            }
++            if (!on) {
++                *st = UDS_P_FREE;
++                continue;
++            }
++            if (*st == UDS_P_BUSY || *st == UDS_P_FAILED)
++                continue;
++            if (*st == UDS_P_FREE || changed) {
++                *st = UDS_P_PENDING;
++                UdsWatch.due[c][p] = pass;
++                uds_ev(0xf0 | c, p + 1, UDS_EV_CONNECT, uds_pls(c, p));
++                continue;
++            }
++            // pending and connected for at least one watch period
++            if (busy || UdsWatch.due[c][p] == pass)
++                continue;
++            busy = 1;   // one bring-up per pass: HID polls get the core back
++            int idx = -1;
++            u8 why = uds_attach(c, p, &idx);
++            if (why) {
++                *st = UDS_P_FAILED;
++                UdsDiag.attach_fails++;
++                UdsDiag.last_fail = why;
++                uds_ev(0xf0 | c, p + 1, UDS_EV_ATTFAIL, why);
++            } else {
++                *st = UDS_P_OURS | idx;
++                UdsDiag.attaches++;
++            }
++        }
++    }
++    UdsDiag.pool_used = UdsWatch.pool_used;
++    if (busy)
++        return;
++    // INQUIRY, READ CAPACITY and the media check of one new stick
++    for (c = 0; c < UdsCount; c++)
++        if (UdsDiag.dev[c].state == UDS_DEV_PRESENT && !UdsInt[c].probed
++            && !uds_bios_drive(c)) {
++            uds_probe(c);
++            break;
++        }
++}
++
++// Helper loop (romlayout.S), when neither channel has a request: the port
++// watch every UDS_WATCH_MS once armed. Returns 1 when armed (the loop then
++// spins with PAUSE instead of MWAIT, which only wakes on the mailbox).
++u32 VISIBLE32FLAT
++usos_uds_idle(void)
++{
++    if (!UdsArmed)
++        return 0;
++    if (timer_check(UdsWatch.next)) {
++        uds_watch();
++        UdsWatch.next = timer_calc(UDS_WATCH_MS);
++    }
++    return 1;
++}
++
+ // Called by the helper loop (romlayout.S) when the channel 1 doorbell
+ // differs from done; ch = mailbox + 48.
+ void VISIBLE32FLAT
+@@ -547,6 +1001,8 @@ usos_uds_service(struct uds_channel *ch)
+     UdsDiag.channel = (u32)ch;
+     if (!UdsDiag.disks)
+         uds_fill_disks();
++    if (!UdsArmed && UdsWatch.pool)
++        uds_arm();
+     if (!rp || (rp & 3) || rp > 0xffffffff - sizeof(struct uds_req)
+         || (rp + sizeof(struct uds_req) > 0xa0000 && rp < 0x100000)) {
+         UdsDiag.badreq++;
+diff -ruN a/seabios/src/hw/usb-uds.h b/seabios/src/hw/usb-uds.h
+--- a/seabios/src/hw/usb-uds.h
++++ b/seabios/src/hw/usb-uds.h
+@@ -93,7 +93,7 @@ struct uds_dev_info {
+ #define UDS_WHY_ADDR      10
+ 
+ // diagnostics record "USOS" "UDSK" (VARLOW, written only)
+-#define UDS_DIAG_VERSION  1
++#define UDS_DIAG_VERSION  2   // 0022: version 1 + the block after ev[]
+ #define UDS_DIAG_DISKS    8
+ #define UDS_DIAG_EVENTS   16
+ 
+@@ -124,6 +124,56 @@ struct uds_diag_disk {
+ #define UDS_EV_PHASE     8
+ #define UDS_EV_REGFAIL   9
+ #define UDS_EV_STALL    10
++// 0022 (port events: dev = F0h | controller index, port 1-based)
++#define UDS_EV_ATTACH   11   // runtime bring-up done (result: LUNs)
++#define UDS_EV_ATTFAIL  12   // bring-up failed (result: UDS_AF_*)
++#define UDS_EV_CONNECT  13   // connect seen by the watch (result: PLS)
++#define UDS_EV_DETACH   14   // unplug seen by the watch (result: 1 = replugged)
++#define UDS_EV_UNCLAIMED 15  // connected at arming without a device slot (PLS)
++#define UDS_EV_MEDIA    16   // media check (result: UDS_FS_*)
++#define UDS_EV_ARM      17   // watch armed (result: controllers)
++
++#define UDS_AF_RESET    1    // port reset failed / disconnected
++#define UDS_AF_SLOT     2    // Enable Slot
++#define UDS_AF_ADDRESS  3    // Address Device
++#define UDS_AF_DEVDESC  4
++#define UDS_AF_CONFIG   5
++#define UDS_AF_NOTMSC   6    // no BOT mass storage interface (HID, hub, UAS only)
++#define UDS_AF_SETCFG   7
++#define UDS_AF_EPS      8    // Configure Endpoint
++#define UDS_AF_POOL     9    // both pool chunks in use
++#define UDS_AF_TABLE   10    // device table full
++#define UDS_AF_MPS     11    // EP0 packet size
++
++#define UDS_FS_UNREAD   0
++#define UDS_FS_READFAIL 1
++#define UDS_FS_NOSIG    2    // no 55AAh: blank / not a PC medium
++#define UDS_FS_FAT12    3
++#define UDS_FS_FAT16    4
++#define UDS_FS_FAT32    5
++#define UDS_FS_NTFS     6
++#define UDS_FS_EXFAT    7
++#define UDS_FS_GPT      8    // protective MBR (GPT)
++#define UDS_FS_OTHER    9    // MBR, unknown or unread volume
++
++#define UDS_MF_SIG      1    // sector 0 ends with 55AAh
++#define UDS_MF_VBR      2    // a boot sector was read and checked
++
++#define UDS_WATCH_MS  100
++#define UDS_DIAG_CTLS 4
++
++struct uds_diag_ctl {        // 16 bytes per watched xHCI
++    u32 ports;
++    u32 ccs_post;            // CCS of root ports 1-32 after POST enumeration
++    u32 busy_arm;            // ports with a device slot when the watch armed
++    u32 ccs_now;             // CCS at the last watch pass
++};
++
++struct uds_diag_media {      // 16 bytes per device table entry
++    u8  fs, types[4], flags, ctl, attach;   // attach: 0 POST, 1 port watch
++    u32 part_lba;            // boot sector checked (0: sector 0)
++    u32 hash0;               // FNV-1a of the first 512 bytes of sector 0
++};
+ 
+ struct uds_diag_event {
+     u32 ms;
+@@ -137,6 +187,12 @@ struct uds_diag {
+     struct uds_diag_dev dev[UDS_MAX_DEVS];
+     struct uds_diag_disk disk[UDS_DIAG_DISKS];
+     struct uds_diag_event ev[UDS_DIAG_EVENTS];
++    // version 2 (0022), +768
++    u32 watch_passes, attaches, detaches, attach_fails;
++    u8  ctls, armed, pool_used, last_fail;
++    u32 pool;
++    struct uds_diag_ctl ctl[UDS_DIAG_CTLS];
++    struct uds_diag_media media[UDS_MAX_DEVS];
+ };
+ 
+ struct usb_pipe;
+@@ -146,5 +202,8 @@ int usos_uds_reserve(struct usb_pipe *inpipe);
+ void usos_uds_commit(int idx, struct usbdevice_s *usbdev
+                      , struct usb_pipe *inpipe, struct usb_pipe *outpipe
+                      , int maxlun);
++void usos_uds_pool_setup(void);
++void *usos_uds_pool(void);
++void usos_uds_ctl_info(int c, u32 ports, u32 ccs);
+ 
+ #endif // usb-uds.h
+diff -ruN a/seabios/src/hw/usb-xhci.c b/seabios/src/hw/usb-xhci.c
+--- a/seabios/src/hw/usb-xhci.c
++++ b/seabios/src/hw/usb-xhci.c
+@@ -19,6 +19,10 @@
+ #include "util.h" // timer_calc
+ #include "x86.h" // readl
+ 
++struct usb_xhci_s;
++static void xhci_usos_register(struct usb_xhci_s *xhci);    // USOS patch 0022
++static void xhci_usos_post_ports(struct usb_xhci_s *xhci);
++
+ // --------------------------------------------------------------
+ // configuration
+ 
+@@ -255,6 +259,11 @@ struct usb_xhci_s {
+     struct xhci_ring     *cmds;
+     struct xhci_ring     *evts;
+     struct xhci_er_seg   *eseg;
++
++    /* USOS patch 0022: root ports whose CSC an event cleared, for the
++       runtime port watch of the USB disk service (src/hw/usb-uds.c) */
++    u32                  usos_latch;
++    u8                   usos_idx;      /* index in UsosXhci + 1, 0 none */
+ };
+ 
+ struct xhci_pipe {
+@@ -525,10 +534,15 @@ configure_xhci(void *data)
+     reg |= XHCI_CMD_RS;
+     writel(&xhci->op->usbcmd, reg);
+ 
++    // USOS patch 0022: a controller the USB disk service watches at
++    // runtime stays running without devices too (hot-plug)
++    xhci_usos_register(xhci);
++
+     // Find devices
+     int count = xhci_check_ports(xhci);
+     xhci_free_pipes(xhci);
+-    if (count)
++    xhci_usos_post_ports(xhci);
++    if (count || xhci->usos_idx)
+         // Success
+         return;
+ 
+@@ -703,6 +717,7 @@ xhci_setup(void)
+     if (! CONFIG_USB_XHCI)
+         return;
+     usos_uds_init();   // USOS patch 0021: the USOSUDSK record header
++    usos_uds_pool_setup();   // USOS patch 0022: runtime pool (9x only)
+ 
+     struct pci_device *pci;
+     foreachpci(pci) {
+@@ -774,6 +789,8 @@ static void xhci_process_events(struct usb_xhci_s *xhci)
+                                     | (XHCI_PORTSC_PLS_MASK
+                                        << XHCI_PORTSC_PLS_SHIFT));
+             writel(&xhci->pr[port].portsc, pclear);
++            if ((portsc & XHCI_PORTSC_CSC) && port < 32)
++                xhci->usos_latch |= 1 << port;   // USOS patch 0022
+ 
+             xhci_print_port_state(3, __func__, port, portsc);
+             break;
+@@ -1426,3 +1443,270 @@ xhci_usos_bulk(struct usb_pipe *p, u32 addr, u32 len, u32 timeout, u32 capword)
+     dprintf(1, "%s: cc %d\n", __func__, cc);
+     return USOS_X_ERR;
+ }
++
++
++/****************************************************************
++ * USOS patch 0022: runtime bring-up of a USB stick on a root port and
++ * the port watch primitives for the USB disk service (usb-uds.c, helper
++ * core). Own code from xHCI 1.2 (4.3 device slot initialisation, 4.6.3-4.6.6
++ * commands, 4.19.1 root hub port state machines) and USB 2.0 chapter 9.
++ ****************************************************************/
++
++struct usb_xhci_s *UsosXhci[USOS_X_CTLS] VARFSEG;
++u8 UsosXhciCount VARFSEG;
++
++static void
++xhci_usos_register(struct usb_xhci_s *xhci)
++{
++    if (!usos_uds_pool() || UsosXhciCount >= USOS_X_CTLS)
++        return;
++    UsosXhci[UsosXhciCount++] = xhci;
++    xhci->usos_idx = UsosXhciCount;
++}
++
++// root ports with CCS once POST enumerated the controller (for the record)
++static void
++xhci_usos_post_ports(struct usb_xhci_s *xhci)
++{
++    if (!xhci->usos_idx)
++        return;
++    u32 ccs, chg;
++    xhci_usos_scan(xhci->usos_idx - 1, &ccs, &chg);
++    usos_uds_ctl_info(xhci->usos_idx - 1, xhci->ports, ccs);
++}
++
++// controller index of a pipe's controller, 0xff when it is not watched
++u8
++xhci_usos_ctl(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    u8 i = xhci_usos_cntl(pipe)->usos_idx;
++    return i ? i - 1 : 0xff;
++}
++
++// Root ports 1-32 of watched controller c: CCS bitmap, and the ports whose
++// CSC was set (directly or latched by an event) since the last call; the
++// pending events are processed first, CSC is cleared. Returns the port
++// count (at most 32), 0 when c is not a watched controller.
++int
++xhci_usos_scan(int c, u32 *ccs, u32 *chg)
++{
++    *ccs = *chg = 0;
++    if (c < 0 || c >= UsosXhciCount)
++        return 0;
++    struct usb_xhci_s *xhci = UsosXhci[c];
++    xhci_process_events(xhci);
++    int n = xhci->ports < 32 ? xhci->ports : 32, i;
++    for (i = 0; i < n; i++) {
++        u32 portsc = readl(&xhci->pr[i].portsc);
++        if (portsc == 0xffffffff)
++            return 0;
++        if (portsc & XHCI_PORTSC_CCS)
++            *ccs |= 1 << i;
++        if (portsc & XHCI_PORTSC_CSC) {
++            *chg |= 1 << i;
++            writel(&xhci->pr[i].portsc, (portsc & XHCI_PORTSC_PP) | XHCI_PORTSC_CSC);
++        }
++    }
++    *chg |= xhci->usos_latch;
++    xhci->usos_latch = 0;
++    return n;
++}
++
++// Root ports (bit = port - 1) that have an enabled device slot: the
++// devices POST set up (keyboard, mouse, hub, stick, unsupported ones).
++u32
++xhci_usos_busy(int c)
++{
++    if (c < 0 || c >= UsosXhciCount)
++        return 0;
++    struct usb_xhci_s *xhci = UsosXhci[c];
++    u32 busy = 0, s;
++    for (s = 1; s <= xhci->slots; s++) {
++        struct xhci_slotctx *slot = (void*)xhci->devs[s].ptr_low;
++        u32 port = slot ? (slot->ctx[1] >> 16) & 0xff : 0;
++        if (port && port <= 32)
++            busy |= 1 << (port - 1);
++    }
++    return busy;
++}
++
++u32
++xhci_usos_portsc(int c, int port)
++{
++    return readl(&UsosXhci[c]->pr[port].portsc);
++}
++
++// Port reset of root port 'port' (0-based): USB2 ports always get PR, a
++// USB3 port gets PR only when its link did not reach the enabled state by
++// itself (link training). Returns the SeaBIOS speed or -1.
++static int
++xhci_usos_port_reset(struct usb_xhci_s *xhci, u32 port)
++{
++    u32 *reg = &xhci->pr[port].portsc;
++    int usb3 = port + 1 >= xhci->usb3.start
++        && port + 1 < xhci->usb3.start + xhci->usb3.count;
++    u32 end = timer_calc(300), portsc;
++    for (;;) {
++        portsc = readl(reg);
++        if (!(portsc & XHCI_PORTSC_CCS))
++            return -1;
++        if (!usb3 || (portsc & XHCI_PORTSC_PED) || timer_check(end))
++            break;
++        yield();
++    }
++    if (!usb3 || !(portsc & XHCI_PORTSC_PED)) {
++        writel(reg, (portsc & XHCI_PORTSC_PP) | XHCI_PORTSC_PR);
++        end = timer_calc(200);
++        for (;;) {
++            portsc = readl(reg);
++            if (!(portsc & XHCI_PORTSC_CCS) || timer_check(end))
++                return -1;
++            if ((portsc & XHCI_PORTSC_PED) && !(portsc & XHCI_PORTSC_PR))
++                break;
++            yield();
++        }
++    }
++    // clear the change bits of the reset (PRC, WRC, PEC, PLC); CSC stays
++    writel(reg, (portsc & XHCI_PORTSC_PP) | XHCI_PORTSC_PRC | XHCI_PORTSC_WRC
++           | XHCI_PORTSC_PEC | XHCI_PORTSC_PLC);
++    msleep(USB_TIME_RSTRCY);
++    return speed_from_xhci[xhci_get_field(portsc, XHCI_PORTSC_SPEED)];
++}
++
++static void
++xhci_usos_pipe(struct usb_xhci_s *xhci, struct xhci_pipe *pipe, u32 slotid
++               , u8 speed, u8 ep, u8 eptype, u16 maxpacket)
++{
++    memset(pipe, 0, sizeof(*pipe));
++    pipe->pipe.cntl = &xhci->usb;
++    pipe->pipe.type = USB_TYPE_XHCI;
++    pipe->pipe.ep = ep & USB_ENDPOINT_NUMBER_MASK;
++    pipe->pipe.devaddr = 1;   // not 0: the normal transfer time limit
++    pipe->pipe.speed = speed;
++    pipe->pipe.maxpacket = maxpacket;
++    pipe->pipe.eptype = eptype;
++    pipe->slotid = slotid;
++    pipe->epid = eptype == USB_ENDPOINT_XFER_CONTROL
++        ? 1 : (ep & USB_ENDPOINT_NUMBER_MASK) * 2 + ((ep & USB_DIR_IN) ? 1 : 0);
++    pipe->reqs.cs = 1;
++}
++
++// endpoint context of the input context 'in' for 'pipe'
++static void
++xhci_usos_epctx(struct usb_xhci_s *xhci, struct xhci_inctx *in
++                , struct xhci_pipe *pipe)
++{
++    struct xhci_epctx *ep = (void*)&in[(pipe->epid + 1) << xhci->context64];
++    u32 t = pipe->pipe.eptype == USB_ENDPOINT_XFER_CONTROL ? 4
++        : (pipe->epid & 1) ? 6 : 2;   // control, bulk in, bulk out
++    ep->ctx[1] = (t << 3) | (3 << 1) | ((u32)pipe->pipe.maxpacket << 16);
++    ep->deq_low = (u32)&pipe->reqs.ring[0] | 1;
++    ep->length = pipe->pipe.maxpacket;
++}
++
++static void
++xhci_usos_inctx(struct usb_xhci_s *xhci, struct xhci_inctx *in, u32 add
++                , u32 entries, u8 speed, u32 port)
++{
++    memset(in, 0, (sizeof(struct xhci_inctx) * 33) << xhci->context64);
++    in->add = add;
++    struct xhci_slotctx *slot = (void*)&in[1 << xhci->context64];
++    slot->ctx[0] = (entries << 27) | (speed_to_xhci[speed] << 20);
++    slot->ctx[1] = (port + 1) << 16;
++}
++
++// Disable Slot (aborts every queued TD, the controller forgets the
++// device), events processed, the slot's context pointer cleared.
++void
++xhci_usos_teardown(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    u32 slotid = pipe->slotid;
++    if (!slotid || slotid > xhci->slots)
++        return;
++    xhci_cmd_disable_slot(xhci, slotid);
++    xhci_process_events(xhci);
++    xhci->devs[slotid].ptr_low = 0;
++    pipe->slotid = 0;
++}
++
++// Bring up the device on root port 'port' (0-based) of watched controller
++// c to an addressed default control pipe: port reset, Enable Slot,
++// Address Device. m: the device's pool chunk (4 KiB, 4 KiB aligned:
++// output device context at +0, control pipe at +2048, bulk pipes at +2560
++// and +3072); in: the shared input context page. Returns the control
++// pipe, or NULL with *why set (USOS_A_*).
++struct usb_pipe *
++xhci_usos_attach(int c, int port, void *m, void *in, u8 *why)
++{
++    struct usb_xhci_s *xhci = UsosXhci[c];
++    struct xhci_pipe *ctl = m + 2048;
++    *why = USOS_A_RESET;
++    int speed = xhci_usos_port_reset(xhci, port);
++    if (speed < 0)
++        return NULL;
++    *why = USOS_A_SLOT;
++    int slotid = xhci_cmd_enable_slot(xhci);
++    if (slotid <= 0 || slotid > xhci->slots)
++        return NULL;
++    memset(m, 0, 4096);
++    xhci->devs[slotid].ptr_low = (u32)m;
++    xhci->devs[slotid].ptr_high = 0;
++    static const u16 ctlsize[] = { 8, 8, 64, 512 };
++    xhci_usos_pipe(xhci, ctl, slotid, speed, 0, USB_ENDPOINT_XFER_CONTROL
++                   , ctlsize[speed]);
++    xhci_usos_inctx(xhci, in, 0x03, 1, speed, port);
++    xhci_usos_epctx(xhci, in, ctl);
++    *why = USOS_A_ADDRESS;
++    if (xhci_cmd_address_device(xhci, slotid, in) != CC_SUCCESS) {
++        xhci_usos_teardown(&ctl->pipe);
++        return NULL;
++    }
++    return &ctl->pipe;
++}
++
++// A new EP0 packet size (from the device descriptor): Evaluate Context.
++int
++xhci_usos_ctl_mps(struct usb_pipe *p, void *in, u16 maxpacket)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    if (pipe->pipe.maxpacket == maxpacket)
++        return 0;
++    pipe->pipe.maxpacket = maxpacket;
++    xhci_usos_inctx(xhci, in, 1 << 1, 1, pipe->pipe.speed, 0);
++    struct xhci_epctx *ep = (void*)&((struct xhci_inctx*)in)[2 << xhci->context64];
++    ep->ctx[1] = (u32)maxpacket << 16;
++    return xhci_cmd_evaluate_context(xhci, pipe->slotid, in) == CC_SUCCESS ? 0 : -1;
++}
++
++// The two bulk endpoints of a BOT interface in one Configure Endpoint.
++// Pipes at m + 2560 (in) and m + 3072 (out), see xhci_usos_attach.
++int
++xhci_usos_bulk_eps(struct usb_pipe *p, void *m, void *in
++                   , struct usb_endpoint_descriptor *epin
++                   , struct usb_endpoint_descriptor *epout
++                   , struct usb_pipe **pin, struct usb_pipe **pout)
++{
++    struct xhci_pipe *ctl = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(ctl);
++    struct xhci_pipe *bi = m + 2560, *bo = m + 3072;
++    xhci_usos_pipe(xhci, bi, ctl->slotid, ctl->pipe.speed, epin->bEndpointAddress
++                   , USB_ENDPOINT_XFER_BULK, epin->wMaxPacketSize);
++    xhci_usos_pipe(xhci, bo, ctl->slotid, ctl->pipe.speed, epout->bEndpointAddress
++                   , USB_ENDPOINT_XFER_BULK, epout->wMaxPacketSize);
++    struct xhci_slotctx *dslot = (void*)xhci->devs[ctl->slotid].ptr_low;
++    u32 port = ((dslot->ctx[1] >> 16) & 0xff) - 1;
++    u32 entries = bi->epid > bo->epid ? bi->epid : bo->epid;
++    xhci_usos_inctx(xhci, in, 1 | (1 << bi->epid) | (1 << bo->epid), entries
++                    , ctl->pipe.speed, port);
++    xhci_usos_epctx(xhci, in, bi);
++    xhci_usos_epctx(xhci, in, bo);
++    if (xhci_cmd_configure_endpoint(xhci, ctl->slotid, in) != CC_SUCCESS)
++        return -1;
++    *pin = &bi->pipe;
++    *pout = &bo->pipe;
++    return 0;
++}
+diff -ruN a/seabios/src/hw/usb-xhci.h b/seabios/src/hw/usb-xhci.h
+--- a/seabios/src/hw/usb-xhci.h
++++ b/seabios/src/hw/usb-xhci.h
+@@ -29,6 +29,24 @@ int xhci_usos_reset_ep(struct usb_pipe *p);
+ void xhci_usos_disable(struct usb_pipe *p);
+ int xhci_usos_bulk(struct usb_pipe *p, u32 addr, u32 len, u32 timeout
+                    , u32 capword);
++// USOS patch 0022 (runtime bring-up and port watch)
++#define USOS_X_CTLS     4
++#define USOS_A_RESET    1   // xhci_usos_attach *why
++#define USOS_A_SLOT     2
++#define USOS_A_ADDRESS  3
++struct usb_endpoint_descriptor;
++u8 xhci_usos_ctl(struct usb_pipe *p);
++int xhci_usos_scan(int c, u32 *ccs, u32 *chg);
++u32 xhci_usos_busy(int c);
++u32 xhci_usos_portsc(int c, int port);
++struct usb_pipe *xhci_usos_attach(int c, int port, void *m, void *in, u8 *why);
++int xhci_usos_ctl_mps(struct usb_pipe *p, void *in, u16 maxpacket);
++int xhci_usos_bulk_eps(struct usb_pipe *p, void *m, void *in
++                       , struct usb_endpoint_descriptor *epin
++                       , struct usb_endpoint_descriptor *epout
++                       , struct usb_pipe **pin, struct usb_pipe **pout);
++void xhci_usos_teardown(struct usb_pipe *p);
++extern u8 UsosXhciCount;
+ 
+ // --------------------------------------------------------------
+ // register interface
+diff -ruN a/seabios/src/romlayout.S b/seabios/src/romlayout.S
+--- a/seabios/src/romlayout.S
++++ b/seabios/src/romlayout.S
+@@ -525,6 +525,13 @@ bios_proxy_helper_16_entry:
+         movl 56(%ebp), %eax
+         cmpl 60(%ebp), %eax
+         jne .Lhelper_uds_request
++        // USOS patch 0022: the USB disk service port watch; EAX != 0 when
++        // armed (a timed poll: PAUSE, not MWAIT, which only wakes on the
++        // mailbox line). EBP / ESI are callee-saved.
++        movl $_cfunc32flat_usos_uds_idle, %edi
++        calll *%edi
++        testl %eax, %eax
++        jnz .Lhelper_do_pause
+ 
+         // Check if we should use mwait or pause
+         testl %esi, %esi

@@ -40,7 +40,7 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos17 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos18 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
 	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
 	// from as 0x80, an ACPI 1.0 view (RSDT, 32-bit FADT fields) for 2000/XP,
@@ -56,7 +56,8 @@ const (
 	// shapes and a mouse behind a keyboard interface; a diagnostics record;
 	// the wheel in the handler Z word also without the knock; a USB disk
 	// service on the helper core for the 9x miniport USOSUSB.MPD and, only
-	// with int13_boot_disk_only = true, USB stick hot-swap for it);
+	// with int13_boot_disk_only = true, USB stick hot-swap for it; USB
+	// keyboard / mouse replug on root ports, patches 0023-0024);
 	// docs/research/csmwrap.md sections 6
 	// and 7, docs/design/bios-via-csmwrap.md) for XP / Vista without firmware
 	// CSM and for the UEFI menu's "Legacy BIOS mode (CSMWrap)": copied
@@ -64,7 +65,7 @@ const (
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos17"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos18"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -475,9 +476,14 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"true, the Windows 9x flow) USB stick hot-swap for that service (a port watch\r\n" +
 		"on the helper core, runtime bring-up and teardown of bulk-only sticks, a\r\n" +
 		"media check, record version 2); the SeaBIOS build has no MegaRAID SAS and no\r\n" +
-		"UHCI driver (ROM room).\r\n" +
-		"Version strings: CSMWrap Version 3.1.2-usos17, SeaBIOS\r\n" +
-		"578d260b-CSMWrap-3.1.2-usos17.\r\n" +
+		"UHCI driver (ROM room), and on 2026-10-23 (patch 0023, written by Codex for\r\n" +
+		"USOS, and patch 0024) USB keyboard / mouse replug: a root-port HID device set\r\n" +
+		"up at POST is brought up again when the same device is plugged into a root\r\n" +
+		"port of the same controller (port watch from the helper loop with the USB\r\n" +
+		"disk service, otherwise from the BIOS timer interrupt; never on a controller\r\n" +
+		"an OS driver took over).\r\n" +
+		"Version strings: CSMWrap Version 3.1.2-usos18, SeaBIOS\r\n" +
+		"578d260b-CSMWrap-3.1.2-usos18.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +

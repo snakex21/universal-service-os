@@ -19,6 +19,9 @@ same qemu-xhci, i8042 off (keys reach INT 16h only through the USB keyboard). Th
          (32 MiB, "UDSTICK1") plugged -> a new generation in entry 0, its capacity and sector 0;
          stick 2 out and stick 1 in within one QMP write -> a new generation, "UDSTICK0"; EJECT;
          6 unplug / replug cycles; the keyboard again ('b').
+         --kbd-replug (usos18, patches 0023/0024): before 'b' the USB keyboard is unplugged and
+         plugged in again (QEMU picks the port): the helper-side watch re-attaches it, the record
+         then counts one more attach and detach and has events 18 / 19.
   owned  without the key: the stick is BIOS drive 81h, ENUM reports it and SCSI is refused (OWNED).
 
   python tools/tests/csmwrap/run_csmwrap_uds_qemu.py --out DIR --csmwrap-efi EFI [--mode free --mode owned]
@@ -116,7 +119,7 @@ def make_disks(boot: Path, stick: Path, stick2: Path, code: bytes, efi: bytes, o
         f.write(vbr)
 
 
-def record_check(rec: bytes) -> str:
+def record_check(rec: bytes, kbd_replug: bool = False) -> str:
     """the USOSUDSK version 2 record after the run (src/platform/bios/win9x/usosuds.h)"""
     import struct
     if len(rec) != 984 or rec[:8] != b'USOSUDSK' or rec[8] != 2:
@@ -130,21 +133,23 @@ def record_check(rec: bytes) -> str:
     why = []
     if not (armed == 1 and ctls == 1 and pool and pool_used == 1):
         why.append(f'armed {armed} ctls {ctls} pool {pool:x} used {pool_used}')
-    if att != 2 + CYCLES or det < 1 + CYCLES or fails:
+    extra = 1 if kbd_replug else 0
+    if att != 2 + CYCLES + extra or det < 1 + CYCLES + extra or fails:
         why.append(f'attaches {att} detaches {det} fails {fails}/{last_fail}')
     if bin(busy_arm).count('1') != 3:   # keyboard, mouse and the POST stick had slots at arming
         why.append(f'busy_arm {busy_arm:x}')
     # last cycle (6th, even): stick 1, a FAT32 volume without a partition table
     if (fs, flags, attach, ctl, part_lba) != (5, 3, 1, 0, 0):
         why.append(f'media fs {fs} flags {flags} attach {attach} ctl {ctl} lba {part_lba}')
-    if 11 not in evs or 16 not in evs:
+    if 11 not in evs or 16 not in evs or (kbd_replug and (18 not in evs or 19 not in evs)):
         why.append(f'events {evs}')
     return ('ok' if not why else 'FAIL ' + '; '.join(why)) + (
         f' (passes {passes}, attaches {att}, detaches {det}, ports {ports}, ccs_post {ccs_post:x},'
         f' busy {busy_arm:x}, media fs {fs} types {t0:02x}{t1:02x}{t2:02x}{t3:02x} hash0 {hash0:08x})')
 
 
-def run(root: Path, code: bytes, efi: bytes, mode: str, out: Path, minutes: float, hotswap: bool) -> bool:
+def run(root: Path, code: bytes, efi: bytes, mode: str, out: Path, minutes: float, hotswap: bool,
+        kbd_replug: bool = False) -> bool:
     out.mkdir(parents=True, exist_ok=True)
     for f in ('debugcon.log', 'serial.log'):
         (out / f).unlink(missing_ok=True)
@@ -250,6 +255,12 @@ def run(root: Path, code: bytes, efi: bytes, mode: str, out: Path, minutes: floa
                 if hot and b' UDS-KEY2? ' in dbg and 'k2' not in done_marks:
                     done_marks.add('k2')
                     time.sleep(0.3)
+                    if kbd_replug:
+                        qmp(q, {'execute': 'device_del', 'arguments': {'id': 'kbd'}})
+                        time.sleep(1.0)
+                        qmp(q, {'execute': 'device_add', 'arguments': {'driver': 'usb-kbd', 'bus': 'xhci.0',
+                                                                       'id': 'kbd'}})
+                        time.sleep(3.0)
                     qmp(q, key('b'))
                 if hot and b' UDS-REC ' in dbg and 'rec' not in done_marks:
                     done_marks.add('rec')
@@ -288,7 +299,7 @@ def run(root: Path, code: bytes, efi: bytes, mode: str, out: Path, minutes: floa
         if hot:
             ok = ok and cycles_done == CYCLES and dbg.count(' UDS-CYC? ') == CYCLES
             rec = (out / 'udsk.bin').read_bytes() if (out / 'udsk.bin').exists() else b''
-            check = record_check(rec)
+            check = record_check(rec, kbd_replug)
             print(f'    record: {check}', flush=True)
             ok = ok and check.startswith('ok')
     else:
@@ -311,6 +322,7 @@ def main() -> int:
     p.add_argument('--csmwrap-efi', type=Path, default=REPO / 'tools/vendor/csmwrap/3.1.2-usos17/csmwrapx64.efi')
     p.add_argument('--mode', action='append', choices=('free', 'owned'))
     p.add_argument('--minutes', type=float, default=8)
+    p.add_argument('--kbd-replug', action='store_true', help='replug the USB keyboard before the last key')
     a = p.parse_args()
     root = a.root.resolve()
     out = a.out.resolve()
@@ -319,7 +331,7 @@ def main() -> int:
     efi = a.csmwrap_efi.read_bytes()
     ok = True
     for mode in a.mode or ['free', 'owned']:
-        ok &= run(root, code, efi, mode, out / mode, a.minutes, True)
+        ok &= run(root, code, efi, mode, out / mode, a.minutes, True, a.kbd_replug)
     print('UDS-QEMU-' + ('PASS' if ok else 'FAIL'), flush=True)
     return 0 if ok else 1
 
