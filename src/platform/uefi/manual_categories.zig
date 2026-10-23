@@ -1,16 +1,24 @@
+const std = @import("std");
 const usos = @import("usos");
 const input = @import("input.zig");
 const manual_power = @import("manual_power.zig");
 const manual_secure_boot = @import("manual_secure_boot.zig");
+const system_icons = @import("system_icons.zig");
 const view = @import("manual_view.zig");
 
 const category_count = usos.catalog.categories.all.len;
 const power_index = category_count;
 const item_count = category_count + 1;
 
-pub fn select() usos.catalog.Category {
+pub fn select(root: *std.os.uefi.protocol.File) usos.catalog.Category {
     var items: [item_count]usos.gui.menu_screens.HomeItem = undefined;
-    for (&items, 0..) |*item, index| item.* = .{ .icon = icon(index), .title = title(index), .description = description(index) };
+    for (&items, 0..) |*item, index| item.* = .{
+        .icon = icon(index),
+        .image = image(root, index),
+        .title = title(index),
+        .description = description(index),
+        .enabled = enabled(index),
+    };
     var home: view.Home = undefined;
     home.open(&items, 0, manual_secure_boot.banner());
 
@@ -27,6 +35,11 @@ pub fn select() usos.catalog.Category {
                 }
                 if (home.selected == power_index) {
                     manual_power.show();
+                    home.redraw();
+                    continue;
+                }
+                if (!enabled(home.selected)) {
+                    showUnavailable(home.selected);
                     home.redraw();
                     continue;
                 }
@@ -61,6 +74,11 @@ pub fn select() usos.catalog.Category {
                             home.redraw();
                             continue;
                         }
+                        if (!enabled(index)) {
+                            showUnavailable(index);
+                            home.redraw();
+                            continue;
+                        }
                         return usos.catalog.categories.all[index];
                     }
                 }
@@ -79,6 +97,34 @@ fn openBanner(home: *view.Home) void {
     home.setBanner(manual_secure_boot.banner());
 }
 
+fn enabled(index: usize) bool {
+    if (index >= category_count) return true;
+    return usos.catalog.categories.available(usos.catalog.categories.all[index]);
+}
+
+/// A disabled tile explains itself instead of opening (only macOS without
+/// its add-on today).
+fn showUnavailable(index: usize) void {
+    switch (usos.catalog.categories.all[index]) {
+        .macos => {
+            const lines = [_][]const u8{ view.t(.macos_addon_line1), view.t(.macos_addon_line2), view.t(.macos_addon_line3) };
+            view.notice(view.t(.macos_addon_title), .info, .neutral, view.t(.macos_addon_heading), &lines);
+            view.waitForDismiss();
+        },
+        else => {},
+    }
+}
+
+/// The colour tile icon (one swappable PNG, categories.macos_icon_id); the
+/// vector icon is drawn when it is missing.
+fn image(root: *std.os.uefi.protocol.File, index: usize) ?[]const u8 {
+    if (index >= category_count) return null;
+    return switch (usos.catalog.categories.all[index]) {
+        .macos => if (system_icons.builtin(root, usos.catalog.categories.macos_icon_id)) |icon_image| &icon_image.pixels else null,
+        else => null,
+    };
+}
+
 fn title(index: usize) []const u8 {
     if (index == power_index) return view.t(.category_power);
     return view.tr(usos.catalog.categories.all[index].label());
@@ -91,6 +137,7 @@ fn description(index: usize) []const u8 {
         .linux => view.t(.category_linux_desc),
         .beta => view.t(.category_beta_desc),
         .dos => view.t(.category_dos_desc),
+        .macos => view.t(if (enabled(index)) .category_macos_desc else .category_macos_addon),
         .other => view.t(.category_others_desc),
         .utilities => view.t(.category_utilities_desc),
     };
@@ -103,7 +150,7 @@ pub fn icon(index: usize) usos.gui.icons.Kind {
         .linux => .terminal,
         .beta => .flask,
         .dos => .floppy,
-        .other => .disc,
+        .macos, .other => .disc,
         .utilities => .gear,
     };
 }

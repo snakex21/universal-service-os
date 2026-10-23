@@ -67,7 +67,7 @@ pub fn run() void {
     boot_timing.mark("DATA catalog open (BlockIo, GPT, NTFS mount)");
     const discovery = &state.discovery;
     while (true) {
-        const category = manual_categories.select();
+        const category = manual_categories.select(root);
         if (category == .utilities) {
             while (manual_utilities.select(root, discovery, info.firmware)) |utility| runEntry(root, discovery, utility, info.firmware);
             continue;

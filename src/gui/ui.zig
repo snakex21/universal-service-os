@@ -581,7 +581,19 @@ pub const Ui = struct {
     }
 
     pub fn homeCard(self: *const Ui, rect: Rect, icon: Icon, title: []const u8, description: []const u8, state: RowState) void {
+        self.homeCardWith(rect, .{ .icon = icon }, title, description, state);
+    }
+
+    pub const HomeCardLook = struct {
+        icon: Icon,
+        /// 32x32 RGBA colour icon drawn on a neutral tile instead of `icon`.
+        image: ?[]const u8 = null,
+        enabled: bool = true,
+    };
+
+    pub fn homeCardWith(self: *const Ui, rect: Rect, look: HomeCardLook, title: []const u8, description: []const u8, state: RowState) void {
         const theme = self.theme;
+        const enabled = look.enabled;
         const fill = switch (state) {
             .selected => theme.accent_soft,
             .hover => theme.panel_alt,
@@ -601,10 +613,20 @@ pub const Ui = struct {
         const tile = @min(self.px(52), rect.h -| (2 * self.px(16)));
         const tile_x = rect.x + pad;
         const tile_y = rect.y + (rect.h -| tile) / 2;
-        const tile_fill = if (state == .selected) theme.accent else theme.accent_soft;
-        paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), tile_fill, fill);
-        const glyph = tile * 3 / 5;
-        icons.drawKind(self.surface, icon, tile_x + (tile - glyph) / 2, tile_y + (tile - glyph) / 2, glyph, if (state == .selected) theme.on_accent else theme.accent, null);
+        if (look.image) |pixels| {
+            // Colour icons keep their own colours: a neutral tile, the
+            // image a little larger than a vector glyph.
+            const image_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent_soft else theme.panel_alt;
+            paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), image_fill, fill);
+            const size = tile * 4 / 5;
+            drawRgba(self.surface, pixels, tile_x + (tile - size) / 2, tile_y + (tile - size) / 2, size, image_fill, enabled);
+        } else {
+            const tile_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent else theme.accent_soft;
+            paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), tile_fill, fill);
+            const glyph = tile * 3 / 5;
+            const glyph_color = if (!enabled) theme.disabled_text else if (state == .selected) theme.on_accent else theme.accent;
+            icons.drawKind(self.surface, look.icon, tile_x + (tile - glyph) / 2, tile_y + (tile - glyph) / 2, glyph, glyph_color, null);
+        }
 
         const chevron = self.px(18);
         const text_x = tile_x + tile + self.px(18);
@@ -615,13 +637,13 @@ pub const Ui = struct {
         const line_count = self.fonts.wrap(.body, description, text_w, &lines, null);
         const block_h = title_h + self.px(4) + @as(u32, @intCast(line_count)) * self.fonts.lineHeight(.body);
         var y = rect.y + (rect.h -| block_h) / 2;
-        _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .strong, title, theme.text, fill);
+        _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .strong, title, if (enabled) theme.text else theme.muted, fill);
         y += title_h + self.px(4);
         for (lines[0..line_count]) |value| {
-            _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .body, value, theme.muted, fill);
+            _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .body, value, if (enabled) theme.muted else theme.disabled_text, fill);
             y += self.fonts.lineHeight(.body);
         }
-        icons.draw(self.surface, .chevron_right, rect.right() -| pad -| chevron, rect.y + (rect.h -| chevron) / 2, chevron, if (state == .selected) theme.accent else theme.faint, null);
+        if (enabled) icons.draw(self.surface, .chevron_right, rect.right() -| pad -| chevron, rect.y + (rect.h -| chevron) / 2, chevron, if (state == .selected) theme.accent else theme.faint, null);
     }
 
     // ---------------------------------------------------------------- lists
