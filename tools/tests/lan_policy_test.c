@@ -6,17 +6,27 @@ static DWORD test_os_version=0x08ae5a04UL;
 static DWORD WINAPI test_version(void){return test_os_version;}
 static LONG test_setup_status=ERROR_FILE_NOT_FOUND;
 static unsigned test_setup_opens,test_setup_closes;
+static const char *test_ie_version;
 static LONG WINAPI test_reg_open(HKEY root,LPCSTR key,DWORD options,REGSAM access,PHKEY result){
-  (void)root;(void)key;(void)options;(void)access;test_setup_opens++;
+  (void)root;(void)options;(void)access;
+  if(!lstrcmpA(key,"Software\\Microsoft\\Internet Explorer")){
+    if(test_ie_version){*result=(HKEY)(ULONG_PTR)2;return ERROR_SUCCESS;}return ERROR_FILE_NOT_FOUND;}
+  test_setup_opens++;
   if(test_setup_status==ERROR_SUCCESS)*result=(HKEY)(ULONG_PTR)1;
   return test_setup_status;}
 static LONG WINAPI test_reg_close(HKEY key){(void)key;test_setup_closes++;return ERROR_SUCCESS;}
+static LONG WINAPI test_reg_query(HKEY key,LPCSTR name,LPDWORD reserved,LPDWORD type,LPBYTE data,LPDWORD size){
+  DWORD needed;(void)reserved;
+  if(key!=(HKEY)(ULONG_PTR)2||lstrcmpA(name,"Version")||!test_ie_version)return ERROR_FILE_NOT_FOUND;
+  needed=(DWORD)lstrlenA(test_ie_version)+1;if(*size<needed)return ERROR_MORE_DATA;
+  lstrcpyA((char*)data,test_ie_version);*size=needed;*type=REG_SZ;return ERROR_SUCCESS;}
 static char *test_command="unit.exe";
 static LPSTR WINAPI test_command_line(void){return test_command;}
 #define GetVersion test_version
 #define GetCommandLineA test_command_line
 #define RegOpenKeyExA test_reg_open
 #define RegCloseKey test_reg_close
+#define RegQueryValueExA test_reg_query
 #define entry target_entry_not_called
 #define USOS_LAN_9X
 #include "../windows_usos_lan.c"
@@ -50,6 +60,16 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   test_os_version=0x84570004UL;CHECK(!native95_handoff());
   test_os_version=0x03b60004UL;CHECK(!native95_handoff());
   test_os_version=0x08ae5a04UL;local(path,"PHASE1.OK");DeleteFileA(path);
+  copy(system_id,"95");lstrcpyA(home,"about:blank");fixture("START.HTM","own local legacy page");
+  CHECK(!memcmp(start_page(),"file://",7));
+  test_ie_version="4.70.1158";CHECK(!memcmp(start_page(),"file://",7));
+  test_ie_version="5.50.4807.2300";CHECK(!lstrcmpA(start_page(),"about:blank"));
+  test_ie_version="6.00.2800.1106";CHECK(!lstrcmpA(start_page(),"about:blank"));
+  test_ie_version="5.invalid";CHECK(!memcmp(start_page(),"file://",7));
+  test_ie_version="5..50";CHECK(!memcmp(start_page(),"file://",7));
+  test_ie_version=0;lstrcpyA(home,"http://example.test");CHECK(!lstrcmpA(start_page(),home));
+  copy(system_id,"ME");lstrcpyA(home,"about:blank");CHECK(!lstrcmpA(start_page(),home));
+  local(path,"START.HTM");DeleteFileA(path);
   local(ini,"NETCFG.INI");DeleteFileA(ini);fixture("MSBATCH.INF","[Install]\r\n;USOS-NETWORK=on\r\n;USOS-HOME=http://example.test/?a=1&b=2\r\n");
   CHECK(read_config()&&eq(system_id,"ME")&&eq(home,"http://example.test/?a=1&b=2"));
   local(path,"NETSTATE.DAT");DeleteFileA(path);CHECK(load_state(0));CHECK(usos_lan_attempt(&state));state.done=USOS_LAN_IE;CHECK(save_state());

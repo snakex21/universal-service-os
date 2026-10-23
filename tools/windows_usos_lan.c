@@ -45,11 +45,26 @@ static const char *run="Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 /* Internet Explorer 3 (Windows 95 OSR2) cannot open about:blank ("cannot
    find"); its own Local Page is a plain file and it writes local pages as
    file://C:\path (SHDOCVW.DLL 4.70 "file://%c:%s"). On 95 the default page
-   is the small START.HTM the install writes beside this helper. */
+   is the small START.HTM the install writes beside this helper. After an
+   original IE5/6 upgrade, preserve the requested about:blank instead.
+   Use the installed product Version, not SHDOCVW's 4.70 file version. */
+#ifndef USOS_LAN_NT
+static int installed_ie5plus(void){char version[80];unsigned i=0,part=0,major=0;
+  if(!query(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Internet Explorer","Version",version,sizeof version))return 0;
+  if(version[0]!='5'&&version[0]!='6')return 0;
+  major=(unsigned)(version[i++]-'0');
+  if(version[i++]!='.')return 0;
+  for(;version[i];i++){
+    if(version[i]>='0'&&version[i]<='9'){part++;continue;}
+    if(version[i]!='.'||!part)return 0;part=0;
+  }
+  return major>=5&&part!=0;
+}
+#endif
 static const char *start_page(void){
 #ifndef USOS_LAN_NT
   static char page[MAX_PATH+8];
-  if(eq(system_id,"95")&&!lstrcmpA(home,"about:blank")){local(path,"START.HTM");
+  if(eq(system_id,"95")&&!lstrcmpA(home,"about:blank")&&!installed_ie5plus()){local(path,"START.HTM");
     if(GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES&&len(path)<MAX_PATH){lstrcpyA(page,"file://");lstrcatA(page,path);return page;}}
 #endif
   return home;}
