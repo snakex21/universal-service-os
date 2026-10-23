@@ -28,6 +28,8 @@ NT5_FOLDERS={'windows xp','windows xp x64','windows 2000','windows 2000 server',
     'windows server 2003','windows xp media center edition 2005','windows xp tablet pc edition 2005'}
 _driver_spec=importlib.util.spec_from_file_location('coverage_driver_inputs',Path(__file__).with_name('driver_inputs.py'))
 driver_inputs=importlib.util.module_from_spec(_driver_spec);_driver_spec.loader.exec_module(driver_inputs)
+_fixture_spec=importlib.util.spec_from_file_location('coverage_fixture_init',Path(__file__).with_name('fixture_init.py'))
+fixture_init=importlib.util.module_from_spec(_fixture_spec);_fixture_spec.loader.exec_module(fixture_init)
 LEGACY_OBSERVER_AWK = r'''
 {
     sub(/\r$/, "")
@@ -399,15 +401,20 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
     if args.nvme_9x:
         directory=f'/mnt/data/Systems/Windows/{args.folder}/Unattended'
         commands += f"mkdir -p '{directory}'\ntouch '{directory}/nvme-experimental.txt'\n"
-    commands += 'sync\numount /mnt/esp\numount /mnt/data\numount /mnt/work\necho LOWRAM-RESULT=PASS\npoweroff -f\n'
+    commands += "cmp -s /mnt/share/EFI/BOOT/BOOTX64.EFI /mnt/esp/EFI/BOOT/BOOTX64.EFI\n"
+    commands += "cmp -s /mnt/share/EFI/USOS/micro-linux/initramfs-usos /mnt/esp/EFI/USOS/micro-linux/initramfs-usos\n"
+    commands += f"cmp -s /dev/vdc '/mnt/data/Systems/Windows/{args.folder}/Images/source.iso'\n"
+    for index,(_,destination) in enumerate(extras,3):
+        commands += f"cmp -s /dev/vd{chr(ord('a')+index)} '{destination}'\n"
+    commands += 'sync\numount /mnt/esp\numount /mnt/data\numount /mnt/work\n'
     disks = ['-drive',f'file={disk.as_posix()},format=qcow2,if=virtio',
              '-drive',f'file=fat:ro:{share.as_posix()},format=raw,if=virtio,readonly=on',
              '-drive',f'file={args.iso.resolve().as_posix()},format=raw,if=virtio,readonly=on']
     for path,_ in extras:
         disks += ['-drive',f'file={path.resolve().as_posix()},format=raw,if=virtio,readonly=on']
-    result = await load_bootstrap().run_case(args.qemu, args.assets/'zig-out/micro-linux/vmlinuz-virt',
-        args.assets/'zig-out/micro-linux/initramfs-usos', work, 1024, 'qemu64', 900,
-        disks, commands=commands, suffix='-fixture')
+    result,verification = await fixture_init.run(load_bootstrap(),args.qemu, args.assets/'zig-out/micro-linux/vmlinuz-virt',
+        args.assets/'zig-out/micro-linux/initramfs-usos', work, 1024,
+        disks, commands,nonce)
     metadata = dict(disk=str(disk), disk_guid=disk_guid, esp_guid=esp_guid,
         data_guid=data_guid, work_guid=work_guid, source=str(args.iso), folder=args.folder,
         resources=resources, result=result, menu_observation=args.trace_menus,
@@ -427,7 +434,7 @@ printf 'nonce={nonce}\\n' > /mnt/work/.usos-work
         legacy_service_pack=str(service_pack) if service_pack else None,
         boot_floppy=str(args.boot_floppy) if args.boot_floppy else None, nvme_9x=args.nvme_9x,
         virtual_bytes=virtual_gib*1024**3,
-        current_bytes=disk.stat().st_size)
+        current_bytes=disk.stat().st_size,fixture_verification=verification)
     (work/'fixture.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     if not share.resolve().is_relative_to(work):raise ValueError('Fixture share escaped the owned work directory')
     shutil.rmtree(share)  # Only the new per-test copied asset share.

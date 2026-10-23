@@ -6,7 +6,8 @@
 #
 # Writes ONLY $TARGET_DEVICE:
 #   MBR     USOS MBR code (boots the active partition), new disk signature
-#   slot 1  FAT32 (type 0Ch, LBA), active, from LBA 2048, at most 32 GiB
+#   slot 1  FAT32 (type 0Ch, LBA), active, from LBA 2048, at most 32 GiB;
+#           95 RTM/OSR1: FAT16 type 06h, at most 2047 MiB, real CHS fields
 #           (Microsoft cluster sizes: 4/8/16 KiB, FAT below 16 MiB for the
 #           16-bit ScanDisk), 255 heads / 63 sectors like the BIOS Core path
 #   slot 2  CSMWrap ESP, 64 MiB at the end (tools/xp_csmwrap_esp.sh, unchanged)
@@ -189,6 +190,22 @@ for name in "$SETUP_FOLDER" "$(printf '%s' "$SETUP_FOLDER" | tr '[:upper:]' '[:l
 done
 [ -n "$setup_dir" ] || fail "the ISO has no $SETUP_FOLDER\\SETUP.EXE"
 
+. "$LIB/w9x_filesystem.sh"
+setup_version=''
+if [ "$SYSTEM_TAG" = 95 ]; then
+    setup_launcher=''
+    for name in SETUP.EXE setup.exe; do
+        [ ! -f "$work/iso/$name" ] || setup_launcher="$work/iso/$name"
+    done
+    [ -n "$setup_launcher" ] || fail 'Windows 95 needs its original root SETUP.EXE to identify FAT16/FAT32 support; no disk was changed'
+    setup_version=$("$LIB/pe-file-version" "$setup_launcher") || fail 'cannot read the Windows 95 launcher version; no disk was changed'
+fi
+usos_w9x_fs_select "$SYSTEM_TAG" "$setup_version" || fail 'unknown Windows 95 source version; refusing to guess filesystem support; no disk was changed'
+log "source_setup_version=${setup_version:-not-required} filesystem=FAT$W9X_FAT_BITS partition_type=$W9X_MBR_TYPE"
+# For the caller (w9x_csmwrap_prepare.sh): the Windows 95 Setup phase-1 input
+# controller is chosen by this version (950 = event controller, OSR2 = timed).
+printf 'setup_version=%s\n' "$setup_version" > "${W9X_TARGET_RESULT:-/run/w9x-target.result}" 2>/dev/null || true
+
 floppy="$work/BOOT.IMG"
 if [ -n "$BOOT_FLOPPY" ]; then
     # Windows 95 CDs do not boot: the user's startup disk image (bridge).
@@ -221,7 +238,8 @@ part_start=2048
 part_sectors=$((SIZE_GIB * 2097152))
 [ $((part_start + part_sectors)) -le "$esp_start" ] || part_sectors=$(( (esp_start - part_start) / 2048 * 2048 ))
 [ "$part_sectors" -ge 1048576 ] || fail 'no room for a Windows partition of 512 MiB or more'
-if [ "$part_sectors" -le 16777216 ]; then cluster=8; elif [ "$part_sectors" -le 33554432 ]; then cluster=16; else cluster=32; fi
+usos_w9x_fs_layout "$part_sectors" || fail 'cannot choose filesystem geometry'
+part_sectors=$W9X_FS_SECTORS cluster=$W9X_FS_CLUSTER
 log "disk_sectors=$total part_start=$part_start part_sectors=$part_sectors cluster_sectors=$cluster esp_start=$esp_start"
 
 # Whole-disk mode: both GPT copies and the old MBR go.
@@ -231,12 +249,8 @@ mbr="$work/mbr.bin"
 dd if=/dev/zero of="$mbr" bs=512 count=1 2>/dev/null
 dd if="$LIB/xp-geometry-fix-mbr-440.bin" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if=/dev/urandom of="$mbr" bs=1 seek=440 count=4 conv=notrunc 2>/dev/null
-le32() {
-    v=$1
-    printf "\\$(printf %03o $((v & 255)))\\$(printf %03o $(((v >> 8) & 255)))\\$(printf %03o $(((v >> 16) & 255)))\\$(printf %03o $(((v >> 24) & 255)))"
-}
-# CHS fields: 1023/254/63 (beyond CHS), Windows 9x uses the LBA type 0Ch.
-{ printf '\200\376\377\377\014\376\377\377'; le32 "$part_start"; le32 "$part_sectors"; } | dd of="$mbr" bs=1 seek=446 count=16 conv=notrunc 2>/dev/null
+# FAT32 retains sentinel CHS; RTM FAT16 gets real 255/63 CHS and type 06h.
+usos_w9x_partition_entry "$W9X_FAT_BITS" "$part_start" "$part_sectors" | dd of="$mbr" bs=1 seek=446 count=16 conv=notrunc 2>/dev/null
 printf '\125\252' | dd of="$mbr" bs=1 seek=510 count=2 conv=notrunc 2>/dev/null
 dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR'
 
@@ -247,9 +261,9 @@ losetup -o $((part_start * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot a
 label=WINDOWS98
 [ "$SYSTEM_TAG" != ME ] || label=WINDOWSME
 [ "$SYSTEM_TAG" != 95 ] || label=WINDOWS95
-mkfs.fat -F 32 -s "$cluster" -R 32 -f 2 -h "$part_start" -g 255/63 -D 0x80 -M 0xF8 -n "$label" "$part_loop" $((part_sectors / 2)) >/dev/null || fail 'cannot format the FAT32 partition'
+mkfs.fat -F "$W9X_FAT_BITS" -s "$cluster" -R "$W9X_FAT_RESERVED" -f 2 -h "$part_start" -g 255/63 -D 0x80 -M 0xF8 -n "$label" "$part_loop" $((part_sectors / 2)) >/dev/null || fail "cannot format the FAT$W9X_FAT_BITS partition"
 
-mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail 'cannot mount the new FAT32 partition'
+mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail "cannot mount the new FAT$W9X_FAT_BITS partition"
 mkdir -p "$work/c/$SETUP_FOLDER" "$work/c/USOS9X"
 copied=0
 for file in "$setup_dir"/*; do
@@ -267,6 +281,14 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# The pinned MIT VESA driver's unregister call stalls RTM shutdown. Patch
+# only this newly staged target copy for the exact 950 source, never OSR2.
+if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    [ -r "$LIB/w9x_vesa950.sh" ] || fail 'missing 950 VESA compatibility helper'
+    . "$LIB/w9x_vesa950.sh"
+    w9x_vesa950_prepare "$work/c/USOS9X" "$setup_version" || fail 'cannot prepare the pinned 950 VESA compatibility driver'
+    log 'display: pinned MIT VESA 950 unregister workaround, target copy only'
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -309,7 +331,7 @@ if [ -f "$LIB/w9x_logon.sh" ] && [ -f "$LIB/w9x/USOSME.PWL" ]; then
 fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
-usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+USOS_NET_W95_VERSION=$setup_version usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
@@ -530,14 +552,17 @@ case "$SYSTEM_TAG:$TIME_ZONE" in
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
         fi ;;
 esac
-# Windows 95 never enumerates PCI under SeaBIOS (VM phase 1 or CSMWrap), so
-# Setup leaves the display on Standard VGA: C:\USOS9X\VESA95.BAT
+# The early legacy path leaves the display on Standard VGA: VESA95.BAT
 # (tools/w9x_vesa95.sh) moves it to the vmdisp9x VESA driver at the first
-# start, the end state 98 gets from Setup.
+# start, the end state 98 gets from Setup. Source950 can also enumerate a
+# later PCI display; its post-Setup hook binds that actual existing device.
 if [ "$SYSTEM_TAG" = 95 ]; then
-    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X"; then
+    vesa95_source=''
+    [ "$ANSWER_KIND" = USER ] || vesa95_source=${setup_version:-}
+    if [ -r "$LIB/w9x_vesa95.sh" ] && . "$LIB/w9x_vesa95.sh" && w9x_vesa95_write "$work/c/USOS9X" 16 1024,768 "$vesa95_source"; then
         log 'display: VESA95.BAT (vmdisp9x VESA at the first start, 16-bit 1024x768)'
     else
+        [ "$vesa95_source" != '4 0 0 950' ] || fail 'cannot prepare the 950 post-Setup display binding'
         rm -f "$work/c/USOS9X/VESA95.BAT" "$work/c/USOS9X/VESA95.REG"
         log 'display: no VESA95.BAT (Standard VGA stays)'
     fi
@@ -558,10 +583,13 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         # usos_net_w95_stage): imported with REG95.REG, checked into NET.
         reg95_net=
         [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || reg95_net="$work/c/USOS9X/NET/NET95.REG"
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net"; then
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}"; then
             log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
             [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
         else
+            if [ -n "$reg95_net" ] && [ "${setup_version:-}" = '4 0 0 950' ]; then
+                fail 'RTM/OSR1 network files and registry helpers could not be prepared; target start withheld'
+            fi
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
             if [ "$vmd_ok" = 1 ]; then
@@ -625,6 +653,6 @@ blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 # pci_irq_routing = true, CSMWrap 3.1.2-usos12 patch 0015).
 TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on USOS_INT13_BOOT_DISK_ONLY=$int13_only sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
-[ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 12 ] || fail 'read-back: the Windows partition type differs'
+[ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = "$W9X_MBR_TYPE" ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'
 log "PASS target=$TARGET_DEVICE release=$SYSTEM_TAG answer=$ANSWER_KIND; next boot: this disk's UEFI entry -> CSMWrap -> Windows $SYSTEM_TAG Setup"

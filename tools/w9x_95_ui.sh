@@ -1,4 +1,4 @@
-# Windows 95 PL OEM Setup input, gated by the native page classifier.
+# Windows 95 PL/EN OEM Setup input, gated by the native page classifier.
 # Sourced by w9x_phase1_qemu.sh; contains no key or Windows implementation.
 W9X_VM_95_HELPER=${W9X_VM_95_HELPER:-/usr/lib/usos/win95-setup-ui}
 W9X_VM_OWNER=${W9X_VM_OWNER:-USOS}
@@ -52,12 +52,43 @@ w9x_vm_95_page_ready() {
         coa) [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
         owner) w9x_vm_owner_valid ;;
         recovery|welcome|directory|setup-type|hardware-list|components|computer-options|startup-disk|copy-ready|restart|reboot-confirm) return 0 ;;
+        # SETUP 4.0.0.950 (RTM / OSR1) pages: only with W9X_VM_95_SETUP950=1,
+        # i.e. under the event controller (w9x_95_event_wait.sh). OSR2/OSR2.1
+        # (timed controller) never acts on them.
+        coa-single|coa-single-en) [ "${W9X_VM_95_SETUP950:-0}" = 1 ] && [ "$key_tries" = 0 ] && [ "${#key}" = 17 ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] ;;
+        owner-en) [ "${W9X_VM_95_SETUP950:-0}" = 1 ] && w9x_vm_owner_valid ;;
+        welcome-en|directory-en|setup-type-en|hardware-list-en|communication|communication-en|components-en|copy-ready-en|finish-en|network-device-en) [ "${W9X_VM_95_SETUP950:-0}" = 1 ] ;;
         *) return 1 ;;
     esac
 }
 
 w9x_vm_95_input() {
     case "$W9X_VM_PAGE" in
+        coa-single|coa-single-en)
+            key_on_screen=1
+            w9x_vm_clear_edit || return 1
+            w95_remaining=$key
+            w95_group=0
+            for w95_length in 5 7 5; do
+                case "$w95_group" in
+                    1) for w95_scan in minus shift-o shift-e shift-m minus; do
+                           w9x_vm_private_key "$w95_scan" || return 1
+                       done ;;
+                    2) w9x_vm_private_key minus || return 1 ;;
+                esac
+                w95_count=0
+                while [ "$w95_count" -lt "$w95_length" ]; do
+                    w95_digit=${w95_remaining%"${w95_remaining#?}"}
+                    w95_remaining=${w95_remaining#?}
+                    w9x_vm_private_key "$w95_digit" || return 1
+                    w95_count=$((w95_count + 1))
+                done
+                w95_group=$((w95_group + 1))
+            done
+            w95_remaining=''; w95_digit=''
+            key_tries=$((key_tries + 1))
+            w9x_vm_private_key ret || return 1
+            ;;
         coa)
             key_on_screen=1
             w95_remaining=$key
@@ -75,6 +106,16 @@ w9x_vm_95_input() {
             key_tries=$((key_tries + 1))
             w9x_vm_private_key ret || return 1
             ;;
+        owner-en)
+            w9x_vm_owner_valid || return 1
+            # Accepted key -> recognized public User Information page.
+            # Keep the private-screen guard until this public navigation
+            # completes. Name -> organization -> Back -> Next.
+            w9x_vm_clear_edit && w9x_vm_type_owner_text "$W9X_VM_OWNER" &&
+                w9x_vm_private_key tab && w9x_vm_clear_edit && w9x_vm_type_owner_text "$W9X_VM_ORG" &&
+                w9x_vm_private_key tab && w9x_vm_private_key tab && w9x_vm_private_key spc || return 1
+            key_on_screen=0
+            ;;
         owner)
             w9x_vm_owner_valid || return 1
             w9x_vm_clear_edit && w9x_vm_type_owner_text "$W9X_VM_OWNER" &&
@@ -86,7 +127,37 @@ w9x_vm_95_input() {
             w9x_vm_private_key down && w9x_vm_private_key ret || return 1
             key_on_screen=0
             ;;
-        recovery|welcome|directory|setup-type|hardware-list|components|computer-options|copy-ready|restart|reboot-confirm)
+        network-device-en)
+            # OSR1 EN's selector does not accept Escape/Alt+C here.
+            # Models -> Have Disk -> OK -> Cancel; no component installed.
+            for w95_scan in tab tab tab spc; do w9x_vm_private_key "$w95_scan" || return 1; done
+            key_on_screen=0
+            ;;
+        directory-en)
+            w9x_vm_private_key alt-n || return 1
+            key_on_screen=0
+            ;;
+        setup-type-en|hardware-list-en|components-en)
+            # Initial radio/list -> Back -> Next; preserve default choices.
+            for w95_scan in tab tab spc; do w9x_vm_private_key "$w95_scan" || return 1; done
+            key_on_screen=0
+            ;;
+        communication-en)
+            # MSN -> Mail -> Fax -> Back -> Next; preserve all defaults.
+            for w95_scan in tab tab tab tab spc; do w9x_vm_private_key "$w95_scan" || return 1; done
+            key_on_screen=0
+            ;;
+        copy-ready-en)
+            w9x_vm_private_key ret || return 1
+            key_on_screen=0
+            ;;
+        finish-en)
+            # The only enabled control is Finish. Focus it explicitly;
+            # default Enter left this actual EN page waiting.
+            w9x_vm_private_key tab && w9x_vm_private_key spc || return 1
+            key_on_screen=0
+            ;;
+        recovery|welcome|directory|setup-type|hardware-list|components|computer-options|copy-ready|restart|reboot-confirm|welcome-en|communication)
             w9x_vm_private_key ret || return 1
             key_on_screen=0
             ;;

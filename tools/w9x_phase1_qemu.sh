@@ -189,6 +189,17 @@ w9x_vm_answer() {
 # caller defines it. 0 = the guest restarted (Setup phase 1 ended), 2 = QEMU
 # failed, 3 = timeout. Logs in $W9X_VM_RUN.
 w9x_phase1_run() {
+    if [ -n "${W9X_VM_KEY:-}" ] && [ "${W9X_VM_95_SETUP950:-0}" = 1 ]; then
+        # Windows 95 RTM / OSR1 (root SETUP.EXE 4.0.0.950, set by the caller
+        # from w9x_csmwrap_target.sh's result): its own event-driven input
+        # controller. OSR2 / OSR2.1 keep the timed controller below unchanged
+        # (X470 PASS). Never enter the timed monitor for 950 when the event
+        # helper is absent.
+        [ -r "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" ] || return 2
+        . "${W9X_VM_95_EVENT_LIB:-/usr/lib/usos/w9x_95_event_wait.sh}" || return 2
+        w9x_95_event_run "$@"
+        return $?
+    fi
     target=$1
     accel=${2:-tcg}
     rm -rf "$W9X_VM_RUN"
@@ -394,6 +405,43 @@ w9x_phase1_fsck() {
     return "$fsck_rc"
 }
 
+# RTM Setup can leave a WINDOWS95 root label and a blank FAT16 BPB label.
+# Normalize only that known pair with fatlabel; the strict fsck still follows.
+w9x_phase1_label95() {
+    [ "${3:-}" = 95 ] || return 0
+    w95_label_dev=$1 w95_label_log=$2
+    w95_label_before=$W9X_VM_RUN/label-boot.before
+    w95_label_expected=$W9X_VM_RUN/label-boot.expected
+    w95_label_after=$W9X_VM_RUN/label-boot.after
+    dd if="$w95_label_dev" of="$w95_label_before" bs=512 count=1 2>/dev/null || return 1
+    [ "$(wc -c < "$w95_label_before")" = 512 ] || return 1
+    if ! od -An -v -tx1 -j54 -N8 "$w95_label_before" | awk '
+        { for (i=1;i<=NF;i++) s=s (s?" ":"") $i }
+        END { exit(s!="46 41 54 31 36 20 20 20") }'; then return 0; fi
+    # Both are zero for FAT32, whose extended BPB has different offsets.
+    od -An -v -tu2 -j17 -N2 "$w95_label_before" | awk '{ n+=$1 } END { exit(n==0) }' || return 0
+    od -An -v -tu2 -j22 -N2 "$w95_label_before" | awk '{ n+=$1 } END { exit(n==0) }' || return 0
+    command -v fatlabel >/dev/null 2>&1 || return 1
+    w95_label_root=$(LC_ALL=C fatlabel "$w95_label_dev" 2>> "$w95_label_log") || return 1
+    [ "$w95_label_root" = WINDOWS95 ] || return 0
+    if ! od -An -v -tx1 -j43 -N11 "$w95_label_before" | awk '
+        { n+=NF; for (i=1;i<=NF;i++) if ($i!="00" && $i!="20") bad=1 }
+        END { exit(bad || n!=11) }'; then return 0; fi
+    printf '== normalize RTM FAT16 blank BPB label from WINDOWS95 root label\n' >> "$w95_label_log"
+    cp "$w95_label_before" "$w95_label_expected" || return 1
+    printf '%-11s' "$w95_label_root" | dd of="$w95_label_expected" bs=1 seek=43 conv=notrunc 2>/dev/null || return 1
+    LC_ALL=C fatlabel "$w95_label_dev" "$w95_label_root" >> "$w95_label_log" 2>&1 || return 1
+    sync
+    dd if="$w95_label_dev" of="$w95_label_after" bs=512 count=1 2>/dev/null || return 1
+    w95_label_readback=$(LC_ALL=C fatlabel "$w95_label_dev" 2>> "$w95_label_log") || return 1
+    if ! cmp -s "$w95_label_expected" "$w95_label_after" || [ "$w95_label_readback" != WINDOWS95 ]; then
+        printf 'FAT16 label readback failed\n' >> "$w95_label_log"
+        return 1
+    fi
+    printf '== label readback: only 11 BPB label bytes changed; root label preserved\n' >> "$w95_label_log"
+    rm -f "$w95_label_before" "$w95_label_expected" "$w95_label_after"
+}
+
 # Checks C: on $1 (partition at LBA 2048, as w9x_csmwrap_target.sh writes it),
 # copies Setup's logs to $2, removes what the VM left for the real machine
 # (w9x_phase1_patch_c, patch.txt) and marks C:\USOS9X\PHASE1.OK. fsck.fat -n
@@ -409,6 +457,11 @@ w9x_phase1_verify() {
     blockdev --flushbufs "$target" 2>/dev/null || true
     loop=$(losetup -f) || return 1
     losetup -o 1048576 "$loop" "$target" || return 1
+    if ! w9x_phase1_label95 "$loop" "$logs/fsck.txt" "${3:-}"; then
+        losetup -d "$loop" 2>/dev/null || true
+        echo 'Windows 95 FAT16 label normalization failed (fsck.txt)'
+        return 1
+    fi
     if ! w9x_phase1_fsck "$loop" "$logs/fsck.txt" 'C: after Setup phase 1'; then
         losetup -d "$loop" 2>/dev/null || true
         echo 'fsck.fat found errors on C: after Setup phase 1 (fsck.txt)'
@@ -454,7 +507,7 @@ w9x_phase1_verify() {
 # The VM's logs (and the last screen) next to prepare.log on the USOS ESP.
 w9x_phase1_keep_logs() {
     mkdir -p "$1"
-    for file in command.txt qemu.log serial.log seabios.log monitor.log screen.ppm answer-1.ppm answer-2.ppm answer-3.ppm; do
+    for file in command.txt qemu.log serial.log seabios.log monitor.log event-errors.log screen.ppm answer-1.ppm answer-2.ppm answer-3.ppm; do
         [ -f "$W9X_VM_RUN/$file" ] && cp "$W9X_VM_RUN/$file" "$1/$file" 2>/dev/null
     done
     sync

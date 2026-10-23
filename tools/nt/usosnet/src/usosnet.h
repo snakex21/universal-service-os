@@ -53,14 +53,24 @@
 #ifndef USOSNET_NT35
 #define USOSNET_NT35 0
 #endif
-#define USOSNET_NDIS3 (USOSNET_NT351 || USOSNET_NT35)
-#if USOSNET_NT351 && USOSNET_NT35
-#error Select one NT3 target
+#ifndef USOSNET_W95RTM
+#define USOSNET_W95RTM 0
 #endif
-#if USOSNET_NDIS3 && !USOSNET_NDIS4
+#define USOSNET_NDIS3 (USOSNET_NT351 || USOSNET_NT35)
+/* NDIS 3.0 registration (MajorNdisVersion 3, 0x3C characteristics, the
+ * four-argument NdisMSetAttributes): the NT 3.5x family above and Windows 95
+ * RTM / OSR1 (NDIS.VXD of SETUP 4.0.0.950, USOSNET_W95RTM). Only NT 3.5x
+ * drops the driver timer for the NDIS-owned CheckForHang; 95 RTM keeps the
+ * NT4/95 driver timer, re-armed with the one-shot NdisSetTimer because its
+ * NDIS.VXD has no NdisMSetPeriodicTimer. */
+#define USOSNET_NDIS30 (USOSNET_NDIS3 || USOSNET_W95RTM)
+#if USOSNET_NT351 + USOSNET_NT35 + USOSNET_W95RTM > 1
+#error Select one NDIS 3.0 target
+#endif
+#if USOSNET_NDIS30 && !USOSNET_NDIS4
 #error NT351 uses the legacy receive and PCI paths
 #endif
-#if USOSNET_NDIS3
+#if USOSNET_NDIS30
 #define USOSNET_NDIS_MAJOR 3
 #elif USOSNET_NDIS4
 #define USOSNET_NDIS_MAJOR 4

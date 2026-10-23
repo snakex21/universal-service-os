@@ -20,7 +20,10 @@ class Win95Input(unittest.TestCase):
         if not self.shell:
             self.skipTest('POSIX shell unavailable')
 
-    def run_policy(self, body):
+    def run_policy(self, body, setup950=False):
+        # SETUP 950 (RTM / OSR1) roles act only under W9X_VM_95_SETUP950=1.
+        if setup950:
+            body = 'W9X_VM_95_SETUP950=1\n' + body
         script = ('. "' + (ROOT / 'tools/w9x_95_ui.sh').as_posix() + '"\n'
                   'key=98765001234554321\nkey_tries=0\nkey_on_screen=0\nwritten=0\n'
                   'W9X_VM_KEY_MAX_MB=64\nw95_last_page=\n'
@@ -53,6 +56,28 @@ class Win95Input(unittest.TestCase):
         self.assertIn('coa=1', r.stdout)
         self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').strip(), 'ret')
 
+    def test_single_edit_uses_complete_oem_form_without_tabs(self):
+        r=self.run_policy('W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready && w9x_vm_95_input; echo "$key_tries $key_on_screen"',setup950=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('1 1',r.stdout)
+        inputs=(self.temp/'input').read_text().splitlines()
+        self.assertEqual(inputs[:3],['home','shift-end','backspace'])
+        self.assertNotIn('tab',inputs)
+        text=''.join({'minus':'-','shift-o':'O','shift-e':'E','shift-m':'M'}.get(x,x) for x in inputs[3:-1])
+        self.assertEqual(text,'98765-OEM-0012345-54321')
+        self.assertEqual(inputs[-1],'ret')
+        self.assertNotIn('98765',(self.temp/'command.txt').read_text())
+
+    def test_single_edit_shares_one_attempt_with_three_field_form(self):
+        r=self.run_policy('W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready && w9x_vm_95_input; w95_last_page=; W9X_VM_PAGE=coa; w9x_vm_95_page_ready; echo again=$?',setup950=True)
+        self.assertIn('again=1',r.stdout)
+
+    def test_single_edit_requires_oem_shape_and_copy_guard(self):
+        for change in ('written=64','key=1234567890'):
+            r=self.run_policy(change+'; W9X_VM_PAGE=coa-single; w9x_vm_95_page_ready; echo ready=$?',setup950=True)
+            self.assertIn('ready=1',r.stdout)
+            self.assertFalse((self.temp/'input').exists())
+
     def test_owner_uses_separate_fields_and_never_the_key(self):
         r = self.run_policy('W9X_VM_OWNER=Retro; W9X_VM_ORG=USOS; W9X_VM_PAGE=owner; w9x_vm_95_page_ready && w9x_vm_95_input; echo "$key_tries $key_on_screen"')
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -70,11 +95,19 @@ class Win95Input(unittest.TestCase):
             self.assertIn('input=1', r.stdout)
             self.assertFalse((self.temp / 'input').exists())
 
-    def test_navigation_is_not_limited_to_five_key_attempts(self):
-        r = self.run_policy('for W9X_VM_PAGE in welcome directory setup-type hardware-list components computer-options startup-disk copy-ready restart reboot-confirm; do w9x_vm_95_page_ready && w9x_vm_95_input || exit 2; done; echo "keytries=$key_tries"')
+    def test_osr2_navigation_is_unchanged_without_the_950_flag(self):
+        # The 4e084310 OSR2 / OSR2.1 sequence on the timed controller.
+        r = self.run_policy('for W9X_VM_PAGE in welcome directory setup-type hardware-list components computer-options startup-disk copy-ready restart reboot-confirm; do w9x_vm_95_page_ready && w9x_vm_95_input || exit 2; done; echo "keytries=$key_tries"; W9X_VM_PAGE=communication; w9x_vm_95_page_ready; echo comm=$?')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('keytries=0', r.stdout)
+        self.assertIn('comm=1', r.stdout)
         self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').splitlines().count('ret'), 10)
+
+    def test_navigation_is_not_limited_to_five_key_attempts(self):
+        r = self.run_policy('for W9X_VM_PAGE in welcome directory setup-type hardware-list communication components computer-options startup-disk copy-ready restart reboot-confirm; do w9x_vm_95_page_ready && w9x_vm_95_input || exit 2; done; echo "keytries=$key_tries"', setup950=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('keytries=0', r.stdout)
+        self.assertEqual((self.temp / 'input').read_text(encoding='utf-8').splitlines().count('ret'), 11)
 
     def test_owner_parser_reads_only_the_name_section(self):
         inf = self.temp / 'answer.inf'

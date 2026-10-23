@@ -43,6 +43,8 @@ class Phase1Vm(unittest.TestCase):
         self.tmp = scratch('usos-w9x-vm-')
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         (self.tmp / 'share').mkdir()
+        (self.tmp / 'share/keymaps').mkdir()
+        (self.tmp / 'share/keymaps/en-us').write_bytes(b'# fake QEMU test input only\n')
         for name in ('bios-256k.bin', 'vgabios-stdvga.bin'):
             (self.tmp / 'share' / name).write_bytes(b'x')
         (self.tmp / 'flags').mkdir()
@@ -54,6 +56,9 @@ class Phase1Vm(unittest.TestCase):
         self.page_helper = self.tmp / 'page-helper'
         self.page_helper.write_text('#!/bin/sh\necho unknown\n', newline='\n')
         self.page_helper.chmod(0o755)
+        self.event_helper = self.tmp / 'event-helper'
+        self.event_helper.write_text('#!/bin/sh\necho ready\nif [ "${W9X_FAKE_PAGE:-}" = coa ]; then echo "page coa"; fi\nsleep 60\n', newline='\n')
+        self.event_helper.chmod(0o755)
 
     def env(self, **extra):
         env = {
@@ -63,6 +68,8 @@ class Phase1Vm(unittest.TestCase):
             'W9X_FAKE_ARGS': (self.tmp / 'args.txt').as_posix(),
             'W9X_VM_95_LIB': (ROOT / 'tools/w9x_95_ui.sh').as_posix(),
             'W9X_VM_95_HELPER': self.page_helper.as_posix(),
+            'W9X_VM_95_EVENT_LIB': (ROOT / 'tools/w9x_95_event_wait.sh').as_posix(),
+            'W9X_VM_95_EVENTS': self.event_helper.as_posix(),
         }
         env.update(extra)
         return env
@@ -111,19 +118,85 @@ class Phase1Vm(unittest.TestCase):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')
         rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
+            W9X_VM_KEY='98765001234554321', W9X_VM_95_SETUP950='1', W9X_VM_95_EVENTS=(self.tmp / 'absent').as_posix())
+        self.assertIn('rc=2', out, err)
+        self.assertFalse((self.tmp / 'args.txt').exists())
+        self.assertFalse((self.tmp / 'run/command.txt').exists())
+
+    def test_missing_95_keymap_stops_before_qemu_starts(self):
+        (self.tmp / 'share/keymaps/en-us').unlink()
+        rc,out,err=self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',W9X_VM_KEY='98765001234554321',W9X_VM_95_SETUP950='1')
+        self.assertIn('rc=2',out,err)
+        self.assertFalse((self.tmp/'args.txt').exists())
+        self.assertIn('keymap missing',(self.tmp/'run/event-errors.log').read_text())
+
+    def test_unsupported_95_page_stops_without_typing(self):
+        self.event_helper.write_text('#!/bin/sh\necho ready\nsleep .2\necho "unsupported c001cafe"\nexit 4\n',newline='\n')
+        rc,out,err=self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
+            W9X_VM_KEY='98765001234554321',W9X_VM_95_SETUP950='1',W9X_FAKE_SLEEP='2')
+        self.assertIn('rc=2',out,err)
+        self.assertIn('public heading hash=c001cafe',(self.tmp/'run/event-errors.log').read_text())
+        command=(self.tmp/'run/command.txt').read_text()
+        self.assertNotIn('95 input:',command);self.assertNotIn('98765',command)
+
+    def test_missing_95_classifier_stops_the_osr2_timed_controller(self):
+        # OSR2 / OSR2.1 (no W9X_VM_95_SETUP950): the 4e084310 timed controller.
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
             W9X_VM_KEY='98765001234554321', W9X_VM_95_HELPER=(self.tmp / 'absent').as_posix())
         self.assertIn('rc=2', out, err)
         self.assertFalse((self.tmp / 'args.txt').exists())
         self.assertNotIn('98765', (self.tmp / 'run/command.txt').read_text())
+
+    def test_osr21_pl_key_uses_the_timed_controller_not_the_event_one(self):
+        # 95 OSR2.1 PL (SETUP 4.0.0.1111, X470 PASS): a key but no SETUP 950
+        # flag -> the old timed controller types the COA once; the RFB event
+        # helper is never started.
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        marker = self.tmp / 'event-helper-ran'
+        self.event_helper.write_text(f'#!/bin/sh\n: > "{marker.as_posix()}"\necho ready\nsleep 60\n', newline='\n')
+        for setup950 in (None, '0', ''):
+            extra = {} if setup950 is None else {'W9X_VM_95_SETUP950': setup950}
+            rc, out, err = self.run_lib('w9x_vm_graphics_screen() { W9X_VM_PAGE=coa; return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
+                                        W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1', W9X_VM_KEY_TRIES='1', **extra)
+            self.assertIn('rc=0', out, err)
+            command = (self.tmp / 'run/command.txt').read_text()
+            self.assertEqual(command.count('95 input: coa'), 1, setup950)
+            self.assertNotIn('controller=rfb-blocking-events', command)
+            self.assertFalse((self.tmp / 'run/event-errors.log').exists())
+            self.assertFalse(marker.exists(), setup950)
+            self.assertNotIn('98765', command)
+
+    def test_timed_controller_never_acts_on_950_only_pages(self):
+        lib = (ROOT / 'tools/w9x_95_ui.sh').as_posix()
+        roles = ('coa-single', 'coa-single-en', 'owner-en', 'welcome-en', 'directory-en', 'setup-type-en',
+                 'hardware-list-en', 'communication', 'communication-en', 'components-en', 'copy-ready-en',
+                 'finish-en', 'network-device-en')
+        for role in roles:
+            body = (f'. "{lib}"\nkey=98765001234554321 key_tries=0 written=0 W9X_VM_KEY_MAX_MB=64 w95_last_page=\n'
+                    f'W9X_VM_PAGE={role}\nw9x_vm_95_page_ready; echo "old=$?"\n'
+                    'W9X_VM_95_SETUP950=1; w9x_vm_95_page_ready; echo "new=$?"')
+            rc, out, err = sh(body)
+            self.assertIn('old=1', out, (role, err))
+            self.assertIn('new=0', out, (role, err))
+        # The OSR2 roles keep their 4e084310 answers without the flag.
+        for role in ('coa', 'owner', 'welcome', 'restart', 'reboot-confirm', 'startup-disk'):
+            body = (f'. "{lib}"\nkey=98765001234554321 key_tries=0 written=0 W9X_VM_KEY_MAX_MB=64 w95_last_page=\n'
+                    f'W9X_VM_PAGE={role}\nw9x_vm_95_page_ready; echo "old=$?"')
+            self.assertIn('old=0', sh(body)[1], role)
 
     def test_the_key_is_typed_once_idle_and_never_logged(self):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')
         # No /sys/block here: the written counter stays 0, i.e. a waiting page;
         # the fake QEMU draws nothing, so the screen test is replaced.
-        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { W9X_VM_PAGE=coa; return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
-                                    W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1', W9X_VM_KEY_TRIES='1')
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { echo forbidden-screen-query >&2; return 2; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
+                                    W9X_VM_KEY='98765001234554321', W9X_VM_95_SETUP950='1', W9X_FAKE_PAGE='coa')
         self.assertIn('rc=0', out, err)
+        self.assertNotIn('forbidden-screen-query', err)
+        self.assertIn('controller=rfb-blocking-events', (self.tmp / 'run/command.txt').read_text())
         command = (self.tmp / 'run/command.txt').read_text()
         self.assertEqual(command.count('95 input: coa'), 1)
         for name in ('command.txt', 'monitor.log', 'qemu.log'):
@@ -492,6 +565,33 @@ class PrepareWiring(unittest.TestCase):
         self.assertLess(run, verify)
         self.assertLess(verify, reboot)
         self.assertIn("stop 'Windows Setup stage 1 did not finish.", text[verify:reboot])
+
+    def test_event_controller_only_for_setup_950_from_the_target_result(self):
+        text = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        clear = text.index('rm -f /run/w9x-target.result')
+        target = text.index('"$@" >> "$W9X_LOG/prepare.log"')
+        flag = text.index("grep -qx 'setup_version=4 0 0 950' /run/w9x-target.result")
+        run = text.index('w9x_phase1_run "$TARGET_DEVICE"')
+        self.assertLess(clear, target)
+        self.assertLess(target, flag)
+        self.assertLess(flag, run)
+        self.assertIn('W9X_VM_95_SETUP950=0', text[target:flag])
+        self.assertIn('[ "$tag" = 95 ]', text[flag - 200:flag])
+        writer = TARGET.read_text(encoding='utf-8')
+        self.assertIn("printf 'setup_version=%s\\n' \"$setup_version\" > \"${W9X_TARGET_RESULT:-/run/w9x-target.result}\"", writer)
+        self.assertLess(writer.index('usos_w9x_fs_select "$SYSTEM_TAG"'), writer.index("printf 'setup_version="))
+        lib = (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8')
+        self.assertIn('if [ -n "${W9X_VM_KEY:-}" ] && [ "${W9X_VM_95_SETUP950:-0}" = 1 ]; then', lib)
+        # The same condition on result files: only an exact 950 line.
+        folder = scratch('usos-w9x-result-')
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        for line, expected in (('setup_version=4 0 0 950', '1'), ('setup_version=4 0 0 1111', '0'),
+                               ('setup_version=4 0 0 1212', '0'), ('setup_version=', '0'),
+                               ('setup_version=4 0 0 9500', '0')):
+            result = folder / 'r'
+            result.write_text(line + '\n', newline='\n')
+            rc, out, err = sh(f"f=0; if [ 95 = 95 ] && grep -qx 'setup_version=4 0 0 950' '{result.as_posix()}'; then f=1; fi; echo $f")
+            self.assertEqual(out.strip(), expected, line)
 
     def test_the_script_is_in_the_initramfs(self):
         self.assertIn('("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh")',

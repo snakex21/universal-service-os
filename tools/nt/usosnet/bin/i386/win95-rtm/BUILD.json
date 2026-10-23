@@ -1,0 +1,25 @@
+{
+  "scope": "Windows 95 RTM / OSR1 (SETUP 4.0.0.950) only; this build has no runtime PASS",
+  "binary": "usosnet4.sys",
+  "sha256": "e075652b41413504654eb471b6a40d5f4c4b981f23d39dfea9bba117cac1fb3e",
+  "size": 20096,
+  "ndis_version": "3.0",
+  "characteristics_size": 60,
+  "ethdb_offset": 216,
+  "driver_owned_timer": true,
+  "timer": "NdisMInitializeTimer + one-shot NdisSetTimer re-armed after each 20 ms callback; cancelled in Halt",
+  "set_attributes": "NdisMSetAttributes (four-argument NDIS 3.0 export)",
+  "toolchain": "WDK 7.1 build, fre x86 WXP, tools/nt/usosnet/src95rtm/sources",
+  "runtime_pass": false,
+  "source_sha256": {
+    "makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
+    "sources": "da3be3c503437cdeb36300df46061e4a4d25b6dc66e9982dca856db2e048aefb",
+    "usosnet.c": "d65b2cb278c509299c85dc0b15ea569016d6d245843e5a6bc71b4f4226e0cdb6",
+    "usosnet.h": "fbc31ace56176a7607c02c6a0e844f1dfde0c5c4f766ea6b8f39a4615ebfdb96",
+    "usosnet.rc": "f674bbd874efd7a3137cb51bd33caad72739b0aa177ffcb821da38cebcc5fea4",
+    "usosnet351_policy.h": "71210e6cb1a5762094a7b0eb6ef9a52f931cb97767632258e59f1e6b0d2be4a2",
+    "usosnet_igb.c": "b9c028df51062d4963bc0118b080d30b219e16c63be3a79ccaafdcf57d4180d4",
+    "usosnet_irq.h": "c9f041e9dba482cd64af623f6bdbdfbecdd6a81c21de30db98ea2b98b10f4c6c",
+    "usosnet_proto.h": "660273b5702aea0df547ed4461e24308eeb5192ed0b8a2b78610c5e45db3eed8"
+  }
+}

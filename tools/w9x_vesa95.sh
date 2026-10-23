@@ -2,7 +2,7 @@
 # (docs/win9x-modern-2026-09-30.md section 4h). Sourced by
 # tools/w9x_csmwrap_target.sh.
 #
-# Why 95 needs this: 98 / 98 SE / Me detect the PCI bus as a root device
+# Early legacy path: 98 / 98 SE / Me detect the PCI bus as a root device
 # (*PNP0A03), so the display card shows up as PCI\VEN_..&DEV_.. and Setup's
 # device install picks USOSVESA.INF (DevicePath=1, PCI\CC_0300 or the IDs
 # U9FIX /VGA / w9x_add_display_ids add). Windows 95 detection skips the PCI
@@ -29,11 +29,14 @@
 #      after a crash). Result in C:\USOS9X\VESA95.OK or VESA95.BAD.
 # SYSTEM.INI needs nothing: 95 Setup already wrote display.drv=pnpdrvr.drv
 # (the registry's DEFAULT drv) and display=*vdd,*vflatd, as on 98.
+# Source950 exception: GUI Setup can enumerate a PCI display later and bind
+# it to another VGA class. VESALATE.BAT resolves that existing device after
+# RunOnce\Setup is gone, before the early step's old completion guard.
 
 W9X_VESA95_MODES='640,480 800,600 1024,768 1152,864 1280,720 1280,800 1280,960 1280,1024 1400,1050 1600,900 1600,1200 1680,1050 1920,1080 1920,1200'
 
 w9x_vesa95_write() {
-    dir=$1 bpp=${2:-16} res=${3:-1024,768}
+    dir=$1 bpp=${2:-16} res=${3:-1024,768} source_version=${4:-}
     case "$bpp" in 8|16|24|32) ;; *) return 1 ;; esac
     case " $W9X_VESA95_MODES " in *" $res "*) ;; *) return 1 ;; esac
     [ -d "$dir" ] || return 1
@@ -120,6 +123,101 @@ FOR %%F IN (VG0 VG1) DO IF EXIST %%F.CHK DEL %%F.CHK
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 CD \\
+:END
+EOF
+    if [ "$source_version" = '4 0 0 950' ]; then
+        [ -f "$dir/VESBIND.EXE" ] || return 1
+        w9x_vesa950_late_write "$dir" || return 1
+        {
+            printf '@ECHO OFF\r\n'
+            printf '%s\r\n' 'CALL C:\USOS9X\VESALATE.BAT' \
+                'IF EXIST C:\USOS9X\VLATE.ERR GOTO VLFAIL' \
+                'IF EXIST C:\USOS9X\VLATE.RUN GOTO VLFAIL' 'GOTO VLNEXT' \
+                ':VLFAIL' 'REM Fail-soft: log to the target disk, Windows starts with the display it has.' \
+                'ECHO USOS: display preparation failed, see C:\USOS9X. Windows starts with its current display.' \
+                'ECHO VESA95: 950 late display binding failed, see C:\USOS9X\VLATE.*; Windows started>> C:\USOS9X\USOSLOG.TXT' \
+                ':VLNEXT'
+            tail -n +2 "$dir/VESA95.BAT"
+        } > "$dir/VESA95.NEW" && mv "$dir/VESA95.NEW" "$dir/VESA95.BAT" || return 1
+    fi
+}
+
+# 950 Setup may create a new PCI Display instance after the early VESA import.
+# Wait for the real RunOnce\Setup boundary, then bind the one existing VGA
+# device to the existing VESA class. VESBIND reads exports, never hive bytes.
+w9x_vesa950_late_write() {
+    sed 's/$/\r/' > "$1/VESALATE.BAT" <<'EOF'
+@ECHO OFF
+IF EXIST C:\USOS9X\VLATE.ERR GOTO FAIL
+IF EXIST C:\USOS9X\VLATE.RUN GOTO FAIL
+IF EXIST C:\USOS9X\VLATE.OK GOTO END
+IF NOT EXIST C:\USOS9X\REG95.OK GOTO END
+IF NOT EXIST C:\USOS9X\VESA95.OK GOTO END
+IF NOT EXIST C:\USOS9X\VESBIND.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO FAIL
+IF NOT EXIST C:\WINDOWS\USER.DAT GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\ATTRIB.EXE GOTO FAIL
+C:
+CD \WINDOWS
+IF EXIST C:\USOS9X\VL1.REG DEL C:\USOS9X\VL1.REG > NUL
+IF EXIST C:\USOS9X\VL1.REG GOTO FAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL1.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
+IF NOT EXIST C:\USOS9X\VL1.REG GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce]" C:\USOS9X\VL1.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce\Setup]" C:\USOS9X\VL1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+FOR %%F IN (VL2 VL3 VL4 VL5 VL6 VLATE) DO IF EXIST C:\USOS9X\%%F.REG DEL C:\USOS9X\%%F.REG > NUL
+FOR %%F IN (VL2 VL3 VL4 VL5 VL6 VLATE) DO IF EXIST C:\USOS9X\%%F.REG GOTO FAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL2.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\Display
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL3.REG HKEY_LOCAL_MACHINE\Enum
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL4.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\IDConfigDB
+IF NOT EXIST C:\USOS9X\VL2.REG GOTO FAIL
+IF NOT EXIST C:\USOS9X\VL3.REG GOTO FAIL
+IF NOT EXIST C:\USOS9X\VL4.REG GOTO FAIL
+CD \USOS9X
+VESBIND.EXE PLAN VL2.REG VL3.REG VL4.REG VLATE.REG
+IF ERRORLEVEL 1 GOTO FAIL
+IF NOT EXIST C:\USOS9X\VLATE.REG GOTO FAIL
+CD \WINDOWS
+ECHO run> C:\USOS9X\VLATE.RUN
+IF NOT EXIST C:\USOS9X\VLATE.RUN GOTO FAIL
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H USER.DAT
+COPY /Y SYSTEM.DAT C:\USOS9X\SYSTEM.VL > NUL
+IF ERRORLEVEL 1 GOTO ATTRFAIL
+COPY /Y USER.DAT C:\USOS9X\USER.VL > NUL
+IF ERRORLEVEL 1 GOTO ATTRFAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\VLATE.REG
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL5.REG HKEY_LOCAL_MACHINE\Enum
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL6.REG HKEY_LOCAL_MACHINE\Config
+IF NOT EXIST C:\USOS9X\VL5.REG GOTO ROLLBACK
+IF NOT EXIST C:\USOS9X\VL6.REG GOTO ROLLBACK
+CD \USOS9X
+VESBIND.EXE CHECK VL2.REG VL5.REG VL4.REG VL6.REG
+IF ERRORLEVEL 1 GOTO ROLLBACK
+CD \WINDOWS
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
+ECHO complete> C:\USOS9X\VLATE.OK
+DEL C:\USOS9X\VLATE.RUN > NUL
+GOTO PENDING
+:ROLLBACK
+C:
+CD \WINDOWS
+COPY /Y C:\USOS9X\SYSTEM.VL SYSTEM.DAT > NUL
+COPY /Y C:\USOS9X\USER.VL USER.DAT > NUL
+:ATTRFAIL
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
+:FAIL
+ECHO late display preparation failed> C:\USOS9X\VLATE.ERR
+:PENDING
+C:
+CD \
 :END
 EOF
 }

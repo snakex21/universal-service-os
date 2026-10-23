@@ -66,7 +66,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -187,6 +187,24 @@ w9x_reg95_convert() {
                 if (tolower(f[2]) ~ /internet connection wizard$/ && tolower(f[3]) == "completed") icw = 1
             }
         }
+        # Original RTM PnP asks for these again if only [Network] in the
+        # answer carries them. Seed the actual 95 VNETSUP identity fields.
+        # Enabled only by the 950 static-NET95 writer, using answer values.
+        if (ENVIRON["W9X_REG95_NET_IDENTITY"] == "1") {
+            nl = split(body["network"], lines, "\n")
+            for (l = 1; l <= nl; l++) {
+                eq = index(lines[l], "=")
+                if (!eq) continue
+                id = tolower(trim(substr(lines[l], 1, eq - 1)))
+                if (id != "computername" && id != "workgroup" && id != "description") continue
+                if (fields(substr(lines[l], eq + 1), f) != 1) continue
+                identity[id] = strings(f[1])
+            }
+            idkey = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\VNETSUP"
+            if (identity["computername"] != "") emit(idkey, "ComputerName", "\"" esc(identity["computername"]) "\"")
+            if (identity["workgroup"] != "") emit(idkey, "Workgroup", "\"" esc(identity["workgroup"]) "\"")
+            if ("description" in identity) emit(idkey, "Comment", "\"" esc(identity["description"]) "\"")
+        }
         if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
@@ -229,17 +247,204 @@ open.</P>
 EOF
 }
 
-# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG]
+# Original RTM/OSR1 NETCLI.INF VREDIR.Install and NETTRANS.INF MSTCP.Install
+# copy groups. NETAPI.DLL is in PRECOPY, the other files in WIN95_*.CAB.
+# Use this target's original EXTRACT and cabinets; keep existing inbox
+# files (including patched ones). Copy the selected own driver separately.
+w9x_reg95_netfiles_write() {
+    nfdir=$1
+    [ -d "$nfdir/NET" ] || return 1
+    {
+        cat <<'EOF'
+@ECHO OFF
+REM USOS: original 950 network files before the NET95 registry import.
+IF EXIST C:\USOS9X\NET\NFILES.RUN GOTO FAIL
+ECHO run> C:\USOS9X\NET\NFILES.RUN
+IF EXIST C:\USOS9X\NET\NFILES.OK DEL C:\USOS9X\NET\NFILES.OK > NUL
+IF EXIST C:\USOS9X\NET\NFILES.ERR DEL C:\USOS9X\NET\NFILES.ERR > NUL
+ECHO begin> C:\USOS9X\NET\NFILES.LOG
+IF NOT EXIST C:\WIN95\EXTRACT.EXE GOTO FAIL
+IF NOT EXIST C:\WIN95\PRECOPY1.CAB GOTO FAIL
+IF NOT EXIST C:\WIN95\WIN95_02.CAB GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO FAIL
+IF NOT EXIST C:\WINDOWS\INF\NUL GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\USOSNET.SYS GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\USOSNET.INF GOTO FAIL
+COPY /Y C:\USOS9X\NET\USOSNET.SYS C:\WINDOWS\SYSTEM\USOSNET.SYS > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\USOSNET.SYS GOTO FAIL
+COPY /Y C:\USOS9X\NET\USOSNET.INF C:\WINDOWS\INF\USOSNET.INF > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+IF NOT EXIST C:\WINDOWS\INF\USOSNET.INF GOTO FAIL
+IF NOT EXIST C:\WINDOWS\HELP\NUL MD C:\WINDOWS\HELP
+IF NOT EXIST C:\WINDOWS\HELP\NUL GOTO FAIL
+EOF
+        n=0
+        while read -r dest cab names; do
+            for name in $names; do
+                n=$((n + 1))
+                printf 'IF EXIST %s\\%s GOTO F%02d\n' "$dest" "$name" "$n"
+                printf 'C:\\WIN95\\EXTRACT.EXE /A /Y /L %s C:\\WIN95\\%s %s >> C:\\USOS9X\\NET\\NFILES.LOG\n' "$dest" "$cab" "$name"
+                printf 'IF ERRORLEVEL 1 GOTO FAIL\nIF NOT EXIST %s\\%s GOTO FAIL\n:F%02d\n' "$dest" "$name" "$n"
+            done
+        done <<'EOF'
+C:\WINDOWS\SYSTEM PRECOPY1.CAB netapi.dll
+C:\WINDOWS\SYSTEM WIN95_02.CAB vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd
+C:\WINDOWS\SYSTEM WIN95_02.CAB msnp32.dll mspp32.dll lmscript.exe lmscript.pif filesec.vxd choosusr.dll mapi32.dll vlb32.dll
+C:\WINDOWS WIN95_02.CAB net.exe net.msg neth.msg winpopup.exe
+C:\WINDOWS\HELP WIN95_02.CAB winpopup.hlp winpopup.cnt
+C:\WINDOWS\SYSTEM WIN95_02.CAB vtdi.386 vip.386 vtcp.386 vdhcp.386 vnbt.386 icmp.dll afvxd.vxd wshtcp.vxd rpcltc3.dll rpclts3.dll wsock.vxd wsasrv.exe
+C:\WINDOWS WIN95_02.CAB ping.exe telnet.exe telnet.hlp ftp.exe hosts.sam lmhosts.sam networks protocol services inetmib1.dll arp.exe nbtstat.exe netstat.exe route.exe tracert.exe winipcfg.exe winsock.dll
+EOF
+        cat <<'EOF'
+ECHO complete> C:\USOS9X\NET\NFILES.OK
+DEL C:\USOS9X\NET\NFILES.RUN > NUL
+GOTO END
+:FAIL
+ECHO original network file preparation failed> C:\USOS9X\NET\NFILES.ERR
+:END
+EOF
+    } | sed 's/$/\r/' > "$nfdir/NET/NFILES.BAT"
+}
+
+# TCP/IP needs its machine-wide Winsock registration as well as the
+# NetTrans/Enum bindings. CopyFiles alone does not run MSTCP.Install.
+# These settings correspond to the original 950 MSTCP.AddReg globals;
+# the class-relative settings are already in NET95.REG. Keep a separate
+# companion so the installed-system repair can import it without Setup.
+w9x_reg95_tcp_write() {
+    [ -d "$1/NET" ] || return 1
+    sed 's/$/\r/' > "$1/NET/TCP95.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\Winsock]
+"Ancillary Function Driver for Winsock"="afvxd.vxd"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\AFVXD]
+"MSTCP Helper for Winsock"="wshtcp.vxd"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\MSTCP\Parameters\Winsock]
+"MaxSockAddrLength"=hex:10,00,00,00
+"MinSockAddrLength"=hex:10,00,00,00
+"HelperDllName"="%windir%\\system\\wsock32.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\MSTCP\ServiceProvider]
+"LocalPriority"=hex:f3,01,00,00
+"HostsPriority"=hex:f4,01,00,00
+"DnsPriority"=hex:d0,07,00,00
+"NetbtPriority"=hex:d1,07,00,00
+"Class"=hex:08,00,00,00
+"ProviderPath"="%windir%\\system\\wsock32.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Winsock\Parameters]
+"MSTCP"=""
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\ServiceProvider\Order\ExcludedProviders]
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\ServiceProvider\Order\ProviderOrder]
+"MSTCP"=""
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Rpc\ClientProtocols]
+"ncacn_ip_tcp"="rpcltc3.dll"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Rpc\ServerProtocols]
+"ncacn_ip_tcp"="rpclts3.dll"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SessionManager\CheckVerDLLs]
+"WINSOCK.DLL"="0"
+
+EOF
+}
+
+# Original 950 first-GUI Network PnP removes the early static protocol and
+# client classes (R111). Reapply just networking once the original
+# RunOnce\Setup subtree is gone. No timer, desktop helper or forced reboot.
+w9x_reg95_netlate_write() {
+    [ -d "$1/NET" ] || return 1
+    sed 's/$/\r/' > "$1/NET/NET95L.BAT" <<'EOF'
+@ECHO OFF
+IF EXIST C:\USOS9X\NET\NLATE.ERR GOTO FAIL
+IF EXIST C:\USOS9X\NET\NLATE.RUN GOTO FAIL
+IF EXIST C:\USOS9X\NET\NLATE.OK GOTO END
+IF NOT EXIST C:\USOS9X\REG95.OK GOTO END
+IF NOT EXIST C:\USOS9X\NET\NFILES.OK GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\NET95.REG GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\TCP95.REG GOTO FAIL
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\ATTRIB.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO FAIL
+IF NOT EXIST C:\WINDOWS\USER.DAT GOTO FAIL
+C:
+CD \WINDOWS
+IF EXIST C:\USOS9X\NL1.REG DEL C:\USOS9X\NL1.REG > NUL
+IF EXIST C:\USOS9X\NL1.REG GOTO FAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL1.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
+IF NOT EXIST C:\USOS9X\NL1.REG GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce]" C:\USOS9X\NL1.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce\Setup]" C:\USOS9X\NL1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+IF NOT EXIST C:\WINDOWS\SYSTEM\AFVXD.VXD GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\WSHTCP.VXD GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\WSOCK32.DLL GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\VREDIR.VXD GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\VTCP.386 GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM\VDHCP.386 GOTO FAIL
+IF EXIST C:\USOS9X\NL2.REG DEL C:\USOS9X\NL2.REG > NUL
+IF EXIST C:\USOS9X\NL3.REG DEL C:\USOS9X\NL3.REG > NUL
+IF EXIST C:\USOS9X\NL4.REG DEL C:\USOS9X\NL4.REG > NUL
+IF EXIST C:\USOS9X\NL2.REG GOTO FAIL
+IF EXIST C:\USOS9X\NL3.REG GOTO FAIL
+IF EXIST C:\USOS9X\NL4.REG GOTO FAIL
+ECHO run> C:\USOS9X\NET\NLATE.RUN
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H USER.DAT
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\NET\NET95.REG
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\NET\TCP95.REG
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL2.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL3.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\NetTrans
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL4.REG HKEY_LOCAL_MACHINE\Enum\Network
+C:\WINDOWS\COMMAND\FIND.EXE "MaxSockAddrLength" C:\USOS9X\NL2.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\WINDOWS\COMMAND\FIND.EXE "HelperDllName" C:\USOS9X\NL2.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\WINDOWS\COMMAND\FIND.EXE "TCP/IP" C:\USOS9X\NL3.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\WINDOWS\COMMAND\FIND.EXE "NetTrans\\0009" C:\USOS9X\NL4.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\WINDOWS\COMMAND\FIND.EXE "NetClient\\0009" C:\USOS9X\NL4.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
+ECHO complete> C:\USOS9X\NET\NLATE.OK
+DEL C:\USOS9X\NET\NLATE.RUN > NUL
+GOTO PENDING
+:RESTORE
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
+:FAIL
+ECHO post-Setup network preparation failed> C:\USOS9X\NET\NLATE.ERR
+:PENDING
+CD \
+:END
+EOF
+}
+
+# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
 # sections are appended to REG95.REG (one import) and REG95.BAT exports
 # them afterwards to DIR\NET\C1..C3.REG and checks them with FIND:
 # NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
-    w9x_reg95_convert "$inf" "$usoslog" "$vmd" >"$dir/REG95.REG" || return 1
+    reg95_identity=''
+    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_identity=1; fi
+    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" >"$dir/REG95.REG" || return 1
     grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
     if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
@@ -247,17 +452,43 @@ w9x_reg95_write() {
     F='C:\WINDOWS\COMMAND\FIND.EXE'
     R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
-    netbat=''
+    netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND tcp95='' netlate=''
+    run_guard="IF EXIST ${U}REG95.RUN GOTO END"
+    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then
+        w9x_reg95_netfiles_write "$dir" || return 1
+        w9x_reg95_tcp_write "$dir" || return 1
+        w9x_reg95_netlate_write "$dir" || return 1
+        tcp95="$dir/NET/TCP95.REG"
+        netlate="CALL ${U}NET\\NET95L.BAT
+IF EXIST ${U}NET\\NLATE.ERR GOTO PREPERR
+IF EXIST ${U}NET\\NLATE.RUN GOTO PREPERR"
+        netprep="CALL ${U}NET\\NFILES.BAT
+IF NOT EXIST ${U}NET\\NFILES.OK GOTO PREPERR"
+        netguard="IF EXIST ${U}NET\\NET95.ERR GOTO PREPERR
+IF EXIST ${U}NET\\NFILES.ERR GOTO PREPERR
+IF EXIST ${U}NET\\NFILES.RUN GOTO PREPERR"
+        run_guard="IF EXIST ${U}REG95.RUN GOTO PREPERR"
+        neterrjump='GOTO REGFAIL'
+        net_findfail=REGFAIL
+        netfail=":REGFAIL
+$A +S +R +H SYSTEM.DAT
+$A +S +R +H USER.DAT
+:PREPERR
+REM Fail-soft: log to the target disk, Windows starts without the USOS network.
+ECHO USOS: network preparation failed, see C:\\USOS9X\\NET. Windows starts without it.
+ECHO REG95: 950 network preparation failed, see C:\\USOS9X\\NET; Windows started>> ${U}USOSLOG.TXT"
+    fi
     if [ -n "$net" ]; then
         devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
         [ -n "$devnode" ] || return 1
         # Before the "; USOS: not converted" comments, which stay last.
         # CRLF made once at the end (Git for Windows grep / sed drop the CR).
         { tr -d '\r' < "$dir/REG95.REG" | sed '/^; USOS:/d'; tr -d '\r' < "$net" | sed '1{/^REGEDIT4$/d}'
+          if [ -n "$tcp95" ]; then tr -d '\r' < "$tcp95" | sed '1{/^REGEDIT4$/d}'; fi
           tr -d '\r' < "$dir/REG95.REG" | sed -n '/^; USOS:/p'; } | sed 's/$/\r/' > "$dir/REG95.NEW" &&
             mv "$dir/REG95.NEW" "$dir/REG95.REG" || return 1
         N="${U}NET\\"
-        netbat="IF NOT EXIST $F GOTO NETEND
+        netbat="IF NOT EXIST $F GOTO $net_findfail
 $R /E ${N}C1.REG $devnode
 $R /E ${N}C2.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\Net
 $R /E ${N}C3.REG HKEY_LOCAL_MACHINE\\Enum\\Network
@@ -271,19 +502,23 @@ ECHO ok> ${N}NET95.OK
 GOTO NETEND
 :NETERR
 ECHO registry check after the import failed (C1..C3.REG)> ${N}NET95.ERR
+$neterrjump
 :NETEND"
     fi
     sed 's/$/\r/' > "$dir/REG95.BAT" <<EOF || return 1
 @ECHO OFF
 REM USOS: Windows 95 answer registry (tools/w9x_reg95.sh): 95 Setup ignores
 REM MSBATCH.INF [Install] AddReg. Runs from AUTOEXEC.BAT, imports once.
+$netguard
+$netlate
 IF EXIST ${U}REG95.OK GOTO END
-IF EXIST ${U}REG95.RUN GOTO END
+$run_guard
 IF NOT EXIST ${U}REG95.REG GOTO END
 IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO END
 IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
 IF NOT EXIST C:\WINDOWS\USER.DAT GOTO END
 IF NOT EXIST $A GOTO END
+$netprep
 ECHO run> ${U}REG95.RUN
 C:
 CD \WINDOWS
@@ -298,6 +533,8 @@ $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 ECHO ok> ${U}REG95.OK
 CD \\
+GOTO END
+$netfail
 :END
 EOF
 }

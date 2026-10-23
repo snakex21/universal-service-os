@@ -343,9 +343,10 @@ def qemu9x_entries(
     binary = str(lock["binary"])
     if binary not in entries:
         raise RuntimeError(f"qemu9x: {binary} missing from the pinned packages")
-    for required in ("usr/share/qemu/bios-256k.bin", "usr/share/qemu/vgabios-stdvga.bin"):
+    for required in ("usr/share/qemu/bios-256k.bin", "usr/share/qemu/vgabios-stdvga.bin",
+                     "usr/share/qemu/keymaps/en-us"):
         if required not in entries:
-            raise RuntimeError(f"qemu9x: firmware missing: {required}")
+            raise RuntimeError(f"qemu9x: required runtime data missing: {required}")
 
     def resolve(soname: str) -> Entry | None:
         name = "usr/lib/" + soname
@@ -584,10 +585,12 @@ def main() -> int:
             ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
+            ("tools/w9x_vesa950.sh", "usr/lib/usos/w9x_vesa950.sh"),
             ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/w9x_95_ui.sh", "usr/lib/usos/w9x_95_ui.sh"),
+            ("tools/w9x_95_event_wait.sh", "usr/lib/usos/w9x_95_event_wait.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),
             ("tools/uefi_boot_entry.sh", "usr/lib/usos/uefi_boot_entry.sh"),
@@ -630,6 +633,7 @@ def main() -> int:
             ("tools/xp_detect_system.sh", "usr/lib/usos/xp_detect_system.sh"),
             ("tools/xp_disk_overview.sh", "usr/lib/usos/xp_disk_overview.sh"),
             ("tools/prepare_xp_windows_partition.sh", "usr/lib/usos/prepare_xp_windows_partition.sh"),
+            ("tools/w9x_filesystem.sh", "usr/lib/usos/w9x_filesystem.sh"),
             ("tools/prepare_wimboot.sh", "usr/lib/usos/prepare_wimboot.sh"),
             ("tools/prepare_vhdboot.sh", "usr/lib/usos/prepare_vhdboot.sh"),
             ("tools/work_boot_relocate.sh", "usr/lib/usos/work_boot_relocate.sh"),
@@ -653,6 +657,8 @@ def main() -> int:
         win95_ui = build_win95_setup_ui(root, root / 'zig-out/win95-setup-ui')
         verify_static_linux_elf(win95_ui)
         put(entries, Entry('usr/lib/usos/win95-setup-ui', stat.S_IFREG | 0o755, win95_ui.read_bytes()))
+        put(entries, Entry('usr/lib/usos/win95-rfb-events', stat.S_IFREG | 0o755,
+                           win95_ui.with_name('win95-rfb-events').read_bytes()))
         # Windows NT 4.0 (tools/nt4_csmwrap_target.sh): own GPL builds for NT 4.0.
         for source_name, target_name in (
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys", "usr/lib/usos/nt4/AHCINT.SYS"),
@@ -820,6 +826,12 @@ def main() -> int:
         lan_files.append(build_usoslog(lan_out, logger_work))
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        for relative, source in (
+            ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
+            ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
+        ):
+            put(entries, Entry('usr/lib/usos/network/' + relative, stat.S_IFREG | 0o644,
+                               (root / source).read_bytes()))
         from build_usosadd import build as build_addons_runner
         from build_legacy_stage import build as build_addons_planner
         addons_out = root / "zig-out/legacy-pack"
