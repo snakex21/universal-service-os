@@ -66,7 +66,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -187,6 +187,24 @@ w9x_reg95_convert() {
                 if (tolower(f[2]) ~ /internet connection wizard$/ && tolower(f[3]) == "completed") icw = 1
             }
         }
+        # Original RTM PnP asks for these again if only [Network] in the
+        # answer carries them. Seed the actual 95 VNETSUP identity fields.
+        # Enabled only by the 950 static-NET95 writer, using answer values.
+        if (ENVIRON["W9X_REG95_NET_IDENTITY"] == "1") {
+            nl = split(body["network"], lines, "\n")
+            for (l = 1; l <= nl; l++) {
+                eq = index(lines[l], "=")
+                if (!eq) continue
+                id = tolower(trim(substr(lines[l], 1, eq - 1)))
+                if (id != "computername" && id != "workgroup" && id != "description") continue
+                if (fields(substr(lines[l], eq + 1), f) != 1) continue
+                identity[id] = strings(f[1])
+            }
+            idkey = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\VNETSUP"
+            if (identity["computername"] != "") emit(idkey, "ComputerName", "\"" esc(identity["computername"]) "\"")
+            if (identity["workgroup"] != "") emit(idkey, "Workgroup", "\"" esc(identity["workgroup"]) "\"")
+            if ("description" in identity) emit(idkey, "Comment", "\"" esc(identity["description"]) "\"")
+        }
         if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
@@ -299,7 +317,9 @@ w9x_reg95_write() {
     dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
-    w9x_reg95_convert "$inf" "$usoslog" "$vmd" >"$dir/REG95.REG" || return 1
+    reg95_identity=''
+    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_identity=1; fi
+    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" >"$dir/REG95.REG" || return 1
     grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
     if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
