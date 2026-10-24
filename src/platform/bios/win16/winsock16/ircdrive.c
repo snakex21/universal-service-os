@@ -65,7 +65,7 @@ BOOL FAR PASCAL __export channel_controls(HWND item,LPARAM unused)
 }
 LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 {
-    char record[160],entered[64];const char *key;HWND about,options,channels;FARPROC proc;
+    char record[160];const char *key;HWND about,options,channels;FARPROC proc;
     if(message==WM_TIMER){
         KillTimer(hwnd,(UINT)wp);
         if(phase==0){
@@ -96,14 +96,10 @@ LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
             }else line("FAIL expected Channels Folder action checkpoint");
             phase=4;SetTimer(hwnd,5,1000,NULL);
         }else if(phase==4){
-            if(channel_edit&&channel_join){
-                GetWindowText(channel_edit,entered,sizeof(entered));
-                wsprintf(record,"Normal channel keyboard input confirmed: %s",entered);line(record);
-                if(!lstrcmp(entered,"#usos-test")){
-                    PostMessage(GetParent(channel_join),WM_COMMAND,(WPARAM)GetDlgCtrlID(channel_join),MAKELONG((UINT)channel_join,BN_CLICKED));
-                    line("Normal Channels Folder action: press Join");
-                }else line("FAIL channel input text did not match, Join not issued");
-            }
+            if(channel_edit&&channel_join&&IsWindowEnabled(channel_join)){
+                PostMessage(GetParent(channel_join),WM_COMMAND,(WPARAM)GetDlgCtrlID(channel_join),MAKELONG((UINT)channel_join,BN_CLICKED));
+                line("Normal Channels Folder action: press enabled Join after fixed #usos-test input");
+            }else line("FAIL expected enabled Join button at action checkpoint");
             phase=5;SetTimer(hwnd,6,29000,NULL);
         }else if(phase==5){
             proc=MakeProcInstance((FARPROC)inventory,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
