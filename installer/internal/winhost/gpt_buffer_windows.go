@@ -22,7 +22,34 @@ const (
 	// freshDataWorkAttributes: GPT attributes DATA and WORK are created
 	// with; ExposeFormattedVolumes clears them after formatting.
 	freshDataWorkAttributes = gptBasicDataAttributeNoDriveLetter
+	// gptAttributeNoBlockIOProtocol: UEFI GPT attribute bit 1
+	// (EFI_PART_ATTR_NO_BLOCK_IO_PROTOCOL). Firmware creates no partition
+	// Block I/O handle for the partition, so no boot-menu entry either
+	// (AMI lists one entry per mountable partition: ESP, DATA, WORK).
+	// Windows and Linux ignore the bit; the USOS UEFI app installs its own
+	// partition handles for DATA/WORK (src/platform/uefi/partition_handles.zig).
+	gptAttributeNoBlockIOProtocol = uint64(1 << 1)
 )
+
+// hideDataWorkFromFirmwareMenu: set GPT bit 1 on DATA and WORK when a fresh
+// install exposes them and when an update visits an installed medium, so the
+// firmware boot menu shows a single USOS (ESP) entry. false = the old
+// behaviour (attributes 0, one entry per partition); an update then also
+// clears the bit on media that carry it.
+const hideDataWorkFromFirmwareMenu = true
+
+// installedDataWorkAttributes: the attributes DATA and WORK carry on an
+// installed medium written by this build.
+func installedDataWorkAttributes() uint64 {
+	if hideDataWorkFromFirmwareMenu {
+		return gptAttributeNoBlockIOProtocol
+	}
+	return 0
+}
+
+// optionalInstalledDataWorkAttributes: bits an installed DATA/WORK may carry
+// either way (media from builds with the other setting).
+const optionalInstalledDataWorkAttributes = gptAttributeNoBlockIOProtocol
 
 type gptHeader struct {
 	DiskID               windows.GUID
