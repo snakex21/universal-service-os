@@ -92,6 +92,32 @@ def test_server_bounds_invalid_input_without_join(tmp_path, line):
     assert not summary["pass"] and "ValueError" in summary["error"]
 
 
+def test_loopback_bare_lf_is_explicit_and_replies_remain_crlf(tmp_path):
+    server, thread = start_server(tmp_path, allow_legacy_lf=True)
+    with socket.create_connection(("127.0.0.1", server.port), timeout=2) as connection:
+        connection.sendall(b"NICK USOS16\nUSER usos 0 * :USOS local test\n")
+        welcome = receive_until(connection, b" 376 USOS16 ")
+        assert b"\n" not in welcome.replace(b"\r\n", b"")
+        connection.sendall(b"JOIN #usos-test\n")
+        joined = receive_until(connection, b" 366 USOS16 ")
+        assert b":USOS16!usos@localhost JOIN :#usos-test\r\n" in joined
+        connection.sendall(b"QUIT\n")
+    summary = finish(server, thread)
+    assert summary["pass"] and summary["allow_legacy_lf"] and summary["bare_lf_observed"]
+    events = [json.loads(line) for line in (tmp_path / "events.jsonl").read_text().splitlines()]
+    assert all(event["line_ending"] == "LF" for event in events if event["event"] == "client_line")
+
+
+@pytest.mark.parametrize("line", [b"X" * 511 + b"\n", b"NICK X\0\n", b"NICK X\rY\n"])
+def test_legacy_lf_does_not_relax_message_or_length_bounds(tmp_path, line):
+    server, thread = start_server(tmp_path, allow_legacy_lf=True)
+    with socket.create_connection(("127.0.0.1", server.port), timeout=2) as connection:
+        connection.sendall(line)
+        assert server.finished.wait(2)
+    summary = finish(server, thread)
+    assert not summary["pass"] and "ValueError" in summary["error"]
+
+
 def test_no_connection_timeout_is_terminal_event(tmp_path):
     server = IrcStage3Server(tmp_path, port=0, timeout=0.05, linger=0)
     thread = threading.Thread(target=server.run)
@@ -183,6 +209,33 @@ def test_pcap_split_out_of_order_retransmission_and_sequence_wrap(tmp_path):
     result = parse_pcap(write_capture(tmp_path / "reordered.pcap", packets))
     assert result["pass"]
     assert result["flows"][0]["client_lines"] == REQUEST.decode().splitlines()
+
+
+def test_closed_pcap_bare_lf_requires_explicit_opt_in(tmp_path):
+    path = write_capture(tmp_path / "legacy-lf.pcap", normal_frames(request=REQUEST.replace(b"\r\n", b"\n")))
+    strict = parse_pcap(path)
+    assert not strict["pass"] and not strict["allow_legacy_lf"]
+    assert "bare LF" in strict["flows"][0]["errors"][0]
+    legacy = parse_pcap(path, allow_legacy_lf=True)
+    assert legacy["pass"] and legacy["allow_legacy_lf"]
+    assert legacy["flows"][0]["client_bare_lf_observed"]
+    assert legacy["flows"][0]["client_lines"] == REQUEST.decode().splitlines()
+
+
+@pytest.mark.parametrize("damage", ["gap", "conflict", "embedded-cr", "server-lf"])
+def test_legacy_lf_pcap_keeps_integrity_and_server_framing_gates(tmp_path, damage):
+    request = REQUEST.replace(b"\r\n", b"\n")
+    packets = normal_frames(request=request)
+    if damage == "gap":
+        packets = packets[:2] + [tcp_frame(101, request[:12]), tcp_frame(114, request[13:]), packets[-1]]
+    elif damage == "conflict":
+        packets.append(tcp_frame(101, b"X" + request[1:]))
+    elif damage == "embedded-cr":
+        packets = normal_frames(request=request.replace(b"NICK", b"NI\rCK"))
+    else:
+        packets = normal_frames(request=request, reply=REPLY.replace(b"\r\n", b"\n"))
+    result = parse_pcap(write_capture(tmp_path / "legacy-damaged.pcap", packets), allow_legacy_lf=True)
+    assert not result["pass"]
 
 
 @pytest.mark.parametrize("change", ["request-only", "wrong-nick", "wrong-channel", "missing-end", "no-user", "other-port"])

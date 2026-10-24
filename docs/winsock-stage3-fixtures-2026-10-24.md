@@ -40,9 +40,13 @@ materials are retained; no application binary or license data was patched.
 | Opera 3.62 16-bit | [OW362E16.EXE](https://apajalista.net/tiedostot/PC/Windows_3x/Internet/OW362E16.EXE) | `686bd46d7c68bddb6cf22f61689e65eb91b26c46fc787f9879085bda1ce759f0` |
 | mIRC 5.91 16-bit | [mirc591s.exe](https://www.sac.sk/download/comm/mirc591s.exe) | `2394447015f086b2e3b0cc7812258f10e9856d8b0eb98089aff49fb798a623b9` |
 
-Opera and mIRC installers also match byte-for-byte the installer members
-in the independent [Opera ZIP](https://www.modula.org.uk/files/retrorig/OW362E16.ZIP)
-and [mIRC ZIP](https://www.modula.org.uk/files/retrorig/MIRC591S.ZIP).
+Opera also matches the installer in the independent
+[Opera ZIP](https://www.modula.org.uk/files/retrorig/OW362E16.ZIP).
+A secondary mIRC mirror contained the same installer bytes but also unrelated
+third-party registration text. That secondary archive and text are excluded
+and quarantined in the external library; do not use either. Only the separate
+SAC installer is used, with normal evaluation behavior and no registration
+data. Quarantine preserves the evidence without copying it into any VM.
 The author's [mIRC 5.91 announcement](https://www.mail-archive.com/announce%40mirc.com/msg00003.html)
 identifies `mirc591s.exe` as the Windows3.x 16-bit evaluation package.
 
@@ -75,11 +79,17 @@ JSDLL16, OPJPEG16 and OPPNG16. No direct Win32s imports were found.
 The current WiseUnpacker recognized the container but could not parse opcode
 102, so its partial output is not treated as a complete extraction.
 
-mIRC's installer is NE (`mIRCSetup`), not a Win32s launcher. Its installer
-payload container was not extracted by ZIP/Wise/raw-DEFLATE tools. The
-installed MIRC.EXE must still be inspected after the original installer runs
-on an application COW. No extra VM or system installation was created for
-this extraction problem.
+mIRC's installer is NE (`mIRCSetup`), not a Win32s launcher. ZIP/Wise/raw-DEFLATE
+tools did not unpack its payload. The original SAC installer was then run in
+normal evaluation mode on a WfW application COW, without another OS install.
+The closed final capture confirms successful installation. The Finish action
+had been scheduled before copying completed; it was not retried or used to
+reinstall the app. A separate application snapshot protects the copied files.
+The actual `files/MIRC.EXE` is NE, Windows target, 1529504 bytes, SHA-256
+`0d41c7ae3f8f5ad110cef54b0e9ad35db1163e339e4963c8ac7f1f70b83b7900`.
+It imports WINSOCK and ordinary Win16 support modules, with no direct Win32s
+imports. `payload-ne-inspection.json` records the complete import list and
+every file extracted from the installed original package.
 
 ## Network preflight and scope
 
@@ -90,5 +100,55 @@ This does not establish an application or TLS failure. Guest PCAP and actual
 rendering remain separate acceptance requirements.
 
 No application compatibility PASS follows from these installation or NE
-checks alone. Root owns the enhanced-mode browser/IRC runs and final report.
+checks alone. Root owns the enhanced-mode browser runs and final report.
 All images and evidence remain until the final report; cleanup is separate.
+
+## Controlled mIRC evaluation fixture
+
+`ircsetup.c` drives ordinary installer buttons at distinct fixed checkpoints.
+It disables shortcuts, does not register the application and does not modify
+the installer. The first invocation used a resource title different from the
+actual top-level window, so no installation occurred. Correcting that title
+on the same application COW completed the single installation. The bounded
+final screenshot records the original installer's success page. Finish was
+scheduled too early and was not retried; this does not claim an unattended
+exit from the wizard. `apps/irc-install01/app-base.json` records the protected
+`app-installed` snapshot, original installed bytes and NE imports.
+
+`ircdrive.c` launches the installed original client, closes its normal About
+evaluation dialog once, then invokes the configured Connect button once at
+a separate checkpoint. A final bounded window inventory records actual
+GetWinFlags `ENHANCED`. The client itself sends all network commands; the
+ordinary `on CONNECT` script requests `JOIN #usos-test`. This controller has
+no registration function and no repeated progress/window polling.
+
+`run_win16_irc_stage3.py` creates a COW of that application base, stages only
+an explicit original-file allowlist and local-only INI/script configuration,
+then coordinates a blocking loopback endpoint and guest run. It reads the
+PCAP only after the guest and server have stopped. Endpoint registration,
+matching server replies, a real client JOIN and completed capture reassembly
+are independent requirements; enhanced-mode launch alone is not IRC PASS.
+
+The closed `apps/irc-join02` discovery capture contains contiguous TCP bytes
+`NICK USOS16` plus LF (12 bytes at sequence 1343245449), then `USER ...` plus
+LF (58 bytes at sequence 1343245461). Packet lengths are not truncated and
+reassembly reports no gap/conflicting retransmission. This is direct wire
+evidence, not attribution to uninspected mIRC source. The strict endpoint
+rejected it, so that attempt remains FAIL. The diagnostic receipt is
+`validation/irc-lf-wire-evidence02.json`.
+
+The server and independent analyzer default to strict CRLF. Explicit
+`allow_legacy_lf` / `--allow-legacy-lf` accepts client LF for this original
+evaluation client and records the option and observed line endings. Server
+replies remain strict CRLF. Bounds, NUL/embedded-CR rejection, exact channel,
+registration, reply matching and TCP integrity checks remain in force.
+The mIRC fixture opts in openly. The 42 completed host tests, including
+negative default-LF and damaged-stream cases, are recorded in
+`validation/irc-lf-host01.log`. This is a controlled local endpoint test,
+not public Internet IRC interoperability or an X470 result.
+
+With that explicit option, `apps/irc-join03` completed real mIRC registration
+and received all eight 001..376 replies. Its screenshot shows the connected
+status and original Channels Folder dialog. That attempt still has no JOIN
+on the wire and remains a protocol FAIL; script presence is not proof that
+the client executed it. A subsequent normal UI channel action is required.

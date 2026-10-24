@@ -12,6 +12,10 @@ client at the QEMU user-network host address, port 16667. Completion is an
 Event set after registered JOIN #usos-test and its replies have been sent.
 ``analyze --pcap FILE --out DIR`` reads a *completed* classic Ethernet PCAP
 once; it does not tail an active capture or poll a VM.
+
+CRLF framing is strict by default. The explicit ``--allow-legacy-lf`` option
+also accepts bare LF from the original mIRC 5.91 Win16 evaluation client;
+it is recorded in the evidence and never changes the server's CRLF replies.
 """
 from __future__ import annotations
 
@@ -72,14 +76,17 @@ class IrcStage3Server:
     """
 
     def __init__(self, out: Path, *, port: int = 16667, timeout: float = 180,
-                 linger: float = 5, on_event: Callable[[dict], None] | None = None):
+                 linger: float = 5, on_event: Callable[[dict], None] | None = None,
+                 allow_legacy_lf: bool = False):
         if not 0 <= port <= 65535 or timeout <= 0 or linger < 0:
             raise ValueError("invalid port or timeout")
         self.out = Path(out)
         self.port, self.timeout, self.linger = port, timeout, linger
         self.on_event = on_event
+        self.allow_legacy_lf = allow_legacy_lf
         self.ready, self.completion, self.finished = (threading.Event() for _ in range(3))
-        self.summary: dict = {"scope": SCOPE, "registered": False, "joined": False, "pass": False}
+        self.summary: dict = {"scope": SCOPE, "registered": False, "joined": False, "pass": False,
+                              "allow_legacy_lf": allow_legacy_lf, "bare_lf_observed": False}
         self._events = self._log = None
 
     def _event(self, kind: str, **values) -> None:
@@ -157,13 +164,19 @@ class IrcStage3Server:
                         self._event("peer_closed")
                         return
                     buffer += data
-                    while b"\r\n" in buffer:
-                        raw, buffer = buffer.split(b"\r\n", 1)
+                    delimiter = b"\n" if self.allow_legacy_lf else b"\r\n"
+                    while delimiter in buffer:
+                        raw, buffer = buffer.split(delimiter, 1)
+                        bare_lf = self.allow_legacy_lf and not raw.endswith(b"\r")
+                        if self.allow_legacy_lf and not bare_lf:
+                            raw = raw[:-1]
                         if len(raw) > MAX_LINE:
                             raise ValueError("IRC line exceeds 512 bytes")
                         line = raw.decode("latin1")
                         prefix, command, parameters = parse_message(line)
-                        self._event("client_line", line="PASS :[redacted]" if command == "PASS" else line)
+                        self.summary["bare_lf_observed"] |= bare_lf
+                        self._event("client_line", line="PASS :[redacted]" if command == "PASS" else line,
+                                    line_ending="LF" if bare_lf else "CRLF")
                         if prefix and irc_casefold(prefix) != irc_casefold(nick):
                             raise ValueError("untrusted client prefix")
                         if command == "NICK":
@@ -245,6 +258,7 @@ class Direction:
     pieces: list[tuple[int, bytes]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     size: int = 0
+    bare_lf_observed: bool = False
 
     def add(self, sequence: int, flags: int, payload: bytes) -> None:
         if flags & 2:
@@ -256,7 +270,7 @@ class Direction:
                 raise ValueError("too much TCP payload/retransmission in one direction")
             self.pieces.append((sequence, payload))
 
-    def lines(self) -> list[str]:
+    def lines(self, *, allow_legacy_lf: bool = False) -> list[str]:
         if not self.pieces:
             return []
         origin = (self.syn + 1) & 0xffffffff if self.syn is not None else self.pieces[0][0]
@@ -280,8 +294,16 @@ class Direction:
             end = size
         if end != size:
             self.errors.append("TCP stream has a capture gap")
-        raw_lines = bytes(contents[:end]).split(b"\r\n")[:-1]
-        if any(len(line) > MAX_LINE or b"\n" in line or b"\0" in line for line in raw_lines):
+        stream = bytes(contents[:end])
+        if not allow_legacy_lf and any(i == 0 or stream[i - 1] != 13
+                                     for i, byte in enumerate(stream) if byte == 10):
+            self.errors.append("bare LF IRC framing requires explicit opt-in")
+            return []
+        raw_lines = stream.split(b"\n" if allow_legacy_lf else b"\r\n")[:-1]
+        if allow_legacy_lf:
+            self.bare_lf_observed = any(not line.endswith(b"\r") for line in raw_lines)
+            raw_lines = [line[:-1] if line.endswith(b"\r") else line for line in raw_lines]
+        if any(len(line) > MAX_LINE or any(char in line for char in (b"\r", b"\n", b"\0")) for line in raw_lines):
             self.errors.append("malformed IRC line in TCP stream")
             return []
         return [line.decode("latin1") for line in raw_lines if line]
@@ -313,7 +335,8 @@ def _tcp_frame(frame: bytes):
     return source, dest, sport, dport, sequence, ack, tcp[13], tcp[tcp_header:]
 
 
-def parse_pcap(path: Path, *, port: int = 16667, server_ip: str | None = None) -> dict:
+def parse_pcap(path: Path, *, port: int = 16667, server_ip: str | None = None,
+               allow_legacy_lf: bool = False) -> dict:
     """Reassemble a finished classic Ethernet PCAP, rejecting gaps/conflicts.
 
     Retransmissions, segmentation, out-of-order capture and 32-bit sequence
@@ -367,7 +390,8 @@ def parse_pcap(path: Path, *, port: int = 16667, server_ip: str | None = None) -
             flow[direction].add(sequence, flags, payload)
     results = []
     for flow in flows:
-        client_lines, server_lines = flow["client"].lines(), flow["server"].lines()
+        client_lines = flow["client"].lines(allow_legacy_lf=allow_legacy_lf)
+        server_lines = flow["server"].lines()  # Replies always require CRLF.
         errors = flow["client"].errors + flow["server"].errors
         try:
             requests = [parse_message(line) for line in client_lines]
@@ -394,10 +418,12 @@ def parse_pcap(path: Path, *, port: int = 16667, server_ip: str | None = None) -
         passed = bool(users and joins and not errors and any(all(item[key] for key in
                       ("welcome", "motd_complete", "join_echo", "names_reply", "end_names")) for item in matching))
         results.append({"endpoints": flow["endpoints"], "client_lines": client_lines, "server_lines": server_lines,
+                        "client_bare_lf_observed": flow["client"].bare_lf_observed,
                         "nicknames": nicknames, "user_seen": bool(users), "join_requested": bool(joins),
                         "matching_replies": matching, "errors": errors, "pass": passed})
     return {"scope": SCOPE, "pcap": str(Path(path)), "packets": packet_count, "irc_packets": relevant,
-            "channel": CHANNEL, "flows": results, "pass": any(flow["pass"] for flow in results)}
+            "channel": CHANNEL, "allow_legacy_lf": allow_legacy_lf,
+            "flows": results, "pass": any(flow["pass"] for flow in results)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -408,21 +434,24 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--port", type=int, default=16667)
     serve.add_argument("--timeout", type=float, default=180)
     serve.add_argument("--linger", type=float, default=5)
+    serve.add_argument("--allow-legacy-lf", action="store_true")
     analyze = commands.add_parser("analyze")
     analyze.add_argument("--pcap", type=Path, required=True)
     analyze.add_argument("--out", type=Path, required=True)
     analyze.add_argument("--port", type=int, default=16667)
     analyze.add_argument("--server-ip")
+    analyze.add_argument("--allow-legacy-lf", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "serve":
         def notify(event):
             if event["event"] in {"ready", "join_complete", "finished"}:
                 print(json.dumps(event), flush=True)
         result = IrcStage3Server(args.out, port=args.port, timeout=args.timeout,
-                                linger=args.linger, on_event=notify).run()
+                                linger=args.linger, on_event=notify, allow_legacy_lf=args.allow_legacy_lf).run()
     else:
         args.out.mkdir(parents=True, exist_ok=True)
-        result = parse_pcap(args.pcap, port=args.port, server_ip=args.server_ip)
+        result = parse_pcap(args.pcap, port=args.port, server_ip=args.server_ip,
+                            allow_legacy_lf=args.allow_legacy_lf)
         with (args.out / "pcap-summary.json").open("x", encoding="utf-8") as output:
             json.dump(result, output, indent=2)
             output.write("\n")
