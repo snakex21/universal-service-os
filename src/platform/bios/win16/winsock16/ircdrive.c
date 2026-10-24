@@ -10,6 +10,8 @@ static HFILE log_file=HFILE_ERROR;
 static HWND window;
 static UINT phase,children;
 static BOOL connect_clicked;
+static HWND channel_edit,channel_join;
+static int join_top;
 static void line(const char FAR *text)
 {
     if(log_file==HFILE_ERROR)return;
@@ -48,9 +50,22 @@ BOOL FAR PASCAL __export connect_button(HWND item,LPARAM unused)
     line("Normal configured local profile: Connect to IRC Server button");
     connect_clicked=TRUE;return FALSE;
 }
+BOOL FAR PASCAL __export channel_controls(HWND item,LPARAM unused)
+{
+    char title[100],plain[100],kind[64],record[240],*p,*q;RECT rect;(void)unused;
+    GetWindowText(item,title,sizeof(title));GetClassName(item,kind,sizeof(kind));
+    wsprintf(record,"channel child id=%u class=%s title=%s",(UINT)GetDlgCtrlID(item),kind,title);line(record);
+    if(!lstrcmpi(kind,"Edit")&&!channel_edit)channel_edit=item;
+    q=plain;for(p=title;*p;p++)if(*p!='&')*q++=*p;*q=0;
+    if(!lstrcmpi(kind,"Button")&&!lstrcmpi(plain,"Join")){
+        GetWindowRect(item,&rect);
+        if(!channel_join||rect.top<join_top){channel_join=item;join_top=rect.top;}
+    }
+    return TRUE;
+}
 LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 {
-    char record[160];HWND about,options;FARPROC proc;
+    char record[160],entered[64];const char *key;HWND about,options,channels;FARPROC proc;
     if(message==WM_TIMER){
         KillTimer(hwnd,(UINT)wp);
         if(phase==0){
@@ -68,11 +83,32 @@ LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
                 EnumChildWindows(options,(WNDENUMPROC)proc,0);FreeProcInstance(proc);
                 if(!connect_clicked)line("FAIL configured Connect button unavailable");
             }else line("FAIL expected configured Options action checkpoint");
-            phase=3;SetTimer(hwnd,4,50000,NULL);
+            phase=3;SetTimer(hwnd,4,20000,NULL);
         }else if(phase==3){
+            channels=FindWindow(NULL,"mIRC Channels Folder");
+            if(channels){
+                proc=MakeProcInstance((FARPROC)channel_controls,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
+                EnumChildWindows(channels,(WNDENUMPROC)proc,0);FreeProcInstance(proc);
+                if(channel_edit&&channel_join){
+                    for(key="#usos-test";*key;key++)SendMessage(channel_edit,WM_CHAR,(WPARAM)(BYTE)*key,1L);
+                    line("Normal Channels Folder action: type #usos-test");
+                }else line("FAIL normal channel controls unavailable");
+            }else line("FAIL expected Channels Folder action checkpoint");
+            phase=4;SetTimer(hwnd,5,1000,NULL);
+        }else if(phase==4){
+            if(channel_edit&&channel_join){
+                GetWindowText(channel_edit,entered,sizeof(entered));
+                wsprintf(record,"Normal channel keyboard input confirmed: %s",entered);line(record);
+                if(!lstrcmp(entered,"#usos-test")){
+                    PostMessage(GetParent(channel_join),WM_COMMAND,(WPARAM)GetDlgCtrlID(channel_join),MAKELONG((UINT)channel_join,BN_CLICKED));
+                    line("Normal Channels Folder action: press Join");
+                }else line("FAIL channel input text did not match, Join not issued");
+            }
+            phase=5;SetTimer(hwnd,6,29000,NULL);
+        }else if(phase==5){
             proc=MakeProcInstance((FARPROC)inventory,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
             EnumWindows((WNDENUMPROC)proc,0);FreeProcInstance(proc);
-            line("APPCTL inventory complete");phase=4;
+            line("APPCTL inventory complete");phase=6;
         }
         return 0;
     }

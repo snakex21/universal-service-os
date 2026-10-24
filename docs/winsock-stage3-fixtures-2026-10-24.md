@@ -152,3 +152,27 @@ and received all eight 001..376 replies. Its screenshot shows the connected
 status and original Channels Folder dialog. That attempt still has no JOIN
 on the wire and remains a protocol FAIL; script presence is not proof that
 the client executed it. A subsequent normal UI channel action is required.
+
+The final authorized UI correction is closed as **BLOCKED**, not JOIN PASS.
+In `apps/irc-join06`, original mIRC runs ENHANCED (`GetWinFlags=3113`) with
+provider07 SHA-256
+`1e33ecc917f4ce85253558e965dd4c7362df5f5dbfd1519c6d5bdaa8d72f70db`.
+The endpoint and independently reassembled closed PCAP both confirm NICK,
+USER and the complete eight-reply 001..376 registration dialogue, without
+TCP gaps. The final screenshot visibly contains `#usos-test` in the Channels
+Folder edit control. However, the controller's cross-task GetWindowText
+returns empty even at the separate one-second checkpoint. Its exact-input
+guard therefore withholds the Join action. No JOIN appears on the wire and
+neither endpoint nor analyzer passes. No additional UI variations, OS
+installations or VM attempts follow that bounded result. This diagnoses a
+test-controller barrier; it does not demonstrate an application/provider
+inability to JOIN manually. The final closed review is
+`validation/irc-final-closed-review01.json`.
+
+All installer/client bytes remain original, with no registration data.
+IRCSETUP02 and the final IRCDRIVE05 have fixed NE descriptions containing
+USOS and Win16, with no absolute build path; the final metadata receipt is
+`validation/irc-helper-ne-final01.json`. Build commands and source/artifact
+hashes are preserved in `apps/irc-drive-build/build05.json`. The application
+base, every diagnostic overlay and all screenshots/PCAP/logs are retained
+for the final report's separate cleanup decision.
