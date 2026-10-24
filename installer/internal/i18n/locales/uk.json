@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "Програми DOS містяться в C:\\PROGRAMS.",
   "dos.start.missing": "У C:\\WINDOWS бракує файлів Windows.",
   "dos.start.restart_hint": "Щоб знову вибрати режим запуску, перезавантажте комп'ютер.",
+  "dos.mouse.vbmouse_failed": "USOS: драйвер миші DOS (VBMOUSE) не завантажено.",
   "dos.menu.standard": "Windows - стандартний режим (типово)",
   "dos.menu.enhanced": "Windows - розширений режим 386 (запасний)",
   "dos.menu.dos": "MS-DOS - командний рядок",

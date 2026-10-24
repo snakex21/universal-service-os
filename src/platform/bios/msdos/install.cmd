@@ -100,7 +100,12 @@ if not exist %USRC%\USOSWHER.COM goto where_done
 copy %USRC%\USOSWHER.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :where_done
+rem CTTY NUL around VBMOUSE: its VirtualBox/VMware probe lines go to
+rem stderr, which COMMAND.COM cannot redirect; a failure is still reported.
+echo ctty nul>>C:\AUTOEXEC.BAT
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+echo ctty con>>C:\AUTOEXEC.BAT
+echo if errorlevel 1 echo USOS: the DOS mouse driver (VBMOUSE) did not load.>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
 if not exist %USRC%\PROGRAMS\nul goto programs_done

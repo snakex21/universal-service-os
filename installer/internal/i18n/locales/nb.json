@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-programmer ligger i C:\\PROGRAMS.",
   "dos.start.missing": "Det mangler Windows-filer i C:\\WINDOWS.",
   "dos.start.restart_hint": "Start datamaskinen på nytt for å velge startmodus igjen.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-musedriveren (VBMOUSE) ble ikke lastet.",
   "dos.menu.standard": "Windows - standardmodus (standard)",
   "dos.menu.enhanced": "Windows - utvidet 386-modus (alternativ)",
   "dos.menu.dos": "MS-DOS - ledetekst",

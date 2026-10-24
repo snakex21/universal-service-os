@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "DOS programos yra aplanke C:\\PROGRAMS.",
   "dos.start.missing": "Aplanke C:\\WINDOWS trūksta Windows failų.",
   "dos.start.restart_hint": "Norėdami vėl pasirinkti paleidimo režimą, paleiskite kompiuterį iš naujo.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS pelės tvarkyklė (VBMOUSE) neįkelta.",
   "dos.menu.standard": "Windows - standartinis režimas (numatytasis)",
   "dos.menu.enhanced": "Windows - išplėstinis 386 režimas (alternatyvus)",
   "dos.menu.dos": "MS-DOS - komandų eilutė",

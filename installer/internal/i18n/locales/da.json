@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-programmer ligger i C:\\PROGRAMS.",
   "dos.start.missing": "Der mangler Windows-filer i C:\\WINDOWS.",
   "dos.start.restart_hint": "Genstart computeren for at vælge starttilstand igen.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-musedriveren (VBMOUSE) blev ikke indlæst.",
   "dos.menu.standard": "Windows - standardtilstand (standard)",
   "dos.menu.enhanced": "Windows - udvidet 386-tilstand (alternativ)",
   "dos.menu.dos": "MS-DOS - kommandoprompt",

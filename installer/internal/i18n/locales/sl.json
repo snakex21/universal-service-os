@@ -1407,6 +1407,7 @@
   "dos.start.dos_programs": "Programi DOS so v C:\\PROGRAMS.",
   "dos.start.missing": "V C:\\WINDOWS manjkajo datoteke Windows.",
   "dos.start.restart_hint": "Za ponovno izbiro načina zagona znova zaženite računalnik.",
+  "dos.mouse.vbmouse_failed": "USOS: gonilnik miške za DOS (VBMOUSE) se ni naložil.",
   "dos.menu.standard": "Windows - standardni način (privzeto)",
   "dos.menu.enhanced": "Windows - razširjeni način 386 (alternativa)",
   "dos.menu.dos": "MS-DOS - ukazna vrstica",

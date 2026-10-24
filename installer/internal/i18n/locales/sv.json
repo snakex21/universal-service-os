@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-program finns i C:\\PROGRAMS.",
   "dos.start.missing": "Windows-filer saknas i C:\\WINDOWS.",
   "dos.start.restart_hint": "Starta om datorn för att välja startläge igen.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-musdrivrutinen (VBMOUSE) lästes inte in.",
   "dos.menu.standard": "Windows - standardläge (standard)",
   "dos.menu.enhanced": "Windows - utökat 386-läge (alternativ)",
   "dos.menu.dos": "MS-DOS - kommandotolk",

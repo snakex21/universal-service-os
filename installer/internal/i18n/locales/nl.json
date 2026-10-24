@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-programma's staan in C:\\PROGRAMS.",
   "dos.start.missing": "Er ontbreken Windows-bestanden in C:\\WINDOWS.",
   "dos.start.restart_hint": "Herstart de computer om de startmodus opnieuw te kiezen.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-muisstuurprogramma (VBMOUSE) niet geladen.",
   "dos.menu.standard": "Windows - standaardmodus (standaard)",
   "dos.menu.enhanced": "Windows - uitgebreide 386-modus (alternatief)",
   "dos.menu.dos": "MS-DOS - opdrachtprompt",

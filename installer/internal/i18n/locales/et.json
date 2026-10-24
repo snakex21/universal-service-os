@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-i programmid on kaustas C:\\PROGRAMS.",
   "dos.start.missing": "Kaustast C:\\WINDOWS puuduvad Windowsi failid.",
   "dos.start.restart_hint": "Käivitusrežiimi uuesti valimiseks taaskäivita arvuti.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-i hiiredraiverit (VBMOUSE) ei laaditud.",
   "dos.menu.standard": "Windows - standardrežiim (vaikimisi)",
   "dos.menu.enhanced": "Windows - laiendatud 386 režiim (alternatiiv)",
   "dos.menu.dos": "MS-DOS - käsuviip",

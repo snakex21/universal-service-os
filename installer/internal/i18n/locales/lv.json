@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "DOS programmas ir mapē C:\\PROGRAMS.",
   "dos.start.missing": "Mapē C:\\WINDOWS trūkst Windows failu.",
   "dos.start.restart_hint": "Lai vēlreiz izvēlētos startēšanas režīmu, restartējiet datoru.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS peles draiveris (VBMOUSE) netika ielādēts.",
   "dos.menu.standard": "Windows - standarta režīms (noklusējums)",
   "dos.menu.enhanced": "Windows - paplašināts 386 režīms (alternatīva)",
   "dos.menu.dos": "MS-DOS - komandu uzvedne",

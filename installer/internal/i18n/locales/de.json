@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS-Programme befinden sich in C:\\PROGRAMS.",
   "dos.start.missing": "Windows-Dateien fehlen in C:\\WINDOWS.",
   "dos.start.restart_hint": "Um den Startmodus erneut zu wählen, den Computer neu starten.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS-Maustreiber (VBMOUSE) nicht geladen.",
   "dos.menu.standard": "Windows - Standardmodus (Standard)",
   "dos.menu.enhanced": "Windows - erweiterter 386-Modus (Alternative)",
   "dos.menu.dos": "MS-DOS - Eingabeaufforderung",

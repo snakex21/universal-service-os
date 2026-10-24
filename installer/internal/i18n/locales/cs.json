@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "Programy DOS jsou v C:\\PROGRAMS.",
   "dos.start.missing": "V C:\\WINDOWS chybí soubory Windows.",
   "dos.start.restart_hint": "Chcete-li znovu zvolit režim spuštění, restartujte počítač.",
+  "dos.mouse.vbmouse_failed": "USOS: ovladač myši pro DOS (VBMOUSE) se nenačetl.",
   "dos.menu.standard": "Windows - standardní režim (výchozí)",
   "dos.menu.enhanced": "Windows - rozšířený režim 386 (alternativní)",
   "dos.menu.dos": "MS-DOS - příkazový řádek",

@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "DOS programi su u C:\\PROGRAMS.",
   "dos.start.missing": "Nedostaju Windows datoteke u C:\\WINDOWS.",
   "dos.start.restart_hint": "Za ponovni odabir načina pokretanja ponovno pokrenite računalo.",
+  "dos.mouse.vbmouse_failed": "USOS: DOS upravljački program miša (VBMOUSE) nije učitan.",
   "dos.menu.standard": "Windows - standardni način (zadano)",
   "dos.menu.enhanced": "Windows - prošireni način 386 (alternativa)",
   "dos.menu.dos": "MS-DOS - naredbeni redak",

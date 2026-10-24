@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "Les programmes DOS sont dans C:\\PROGRAMS.",
   "dos.start.missing": "Des fichiers Windows manquent dans C:\\WINDOWS.",
   "dos.start.restart_hint": "Pour choisir à nouveau le mode de démarrage, redémarrez l'ordinateur.",
+  "dos.mouse.vbmouse_failed": "USOS : le pilote souris DOS (VBMOUSE) ne s'est pas chargé.",
   "dos.menu.standard": "Windows - mode standard (par défaut)",
   "dos.menu.enhanced": "Windows - mode étendu 386 (alternatif)",
   "dos.menu.dos": "MS-DOS - invite de commandes",

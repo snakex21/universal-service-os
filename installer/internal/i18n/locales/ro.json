@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "Programele DOS sunt în C:\\PROGRAMS.",
   "dos.start.missing": "Lipsesc fișiere Windows din C:\\WINDOWS.",
   "dos.start.restart_hint": "Pentru a alege din nou modul de pornire, reporniți computerul.",
+  "dos.mouse.vbmouse_failed": "USOS: driverul de mouse DOS (VBMOUSE) nu s-a încărcat.",
   "dos.menu.standard": "Windows - mod standard (implicit)",
   "dos.menu.enhanced": "Windows - mod extins 386 (alternativ)",
   "dos.menu.dos": "MS-DOS - linie de comandă",
