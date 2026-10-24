@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* Private Win16 event and database support, included after ABI copy helpers.
  * Copyright (C)2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  * Contracts: public Windows Sockets1.1 documentation and RFC1035.

@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef USOS_TEST_WINSOCK_H
 #define USOS_TEST_WINSOCK_H
 #include "windows.h"

@@ -1,4 +1,6 @@
-# Copyright(C)2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
 """Independent RFC1035 packets exercise both reverse and A parser bounds."""
 import os
 import struct

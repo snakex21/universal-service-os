@@ -1,6 +1,8 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* The actual Win16 ABI source executes against a fake Windows queue and
  * the real packet/TCP engine. Only Windows API calls are replaced.
- * Copyright(C)2026 Maksymilian and the USOS Authors. GPL-3.0-or-later. */
+ * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later. */
 #include "shim/windows.h"
 #include "shim/winsock.h"
 /* Reuse the deterministic packet peer, not its engine clock/main. */

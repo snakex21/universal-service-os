@@ -1,5 +1,5 @@
 /* RFC1035 PTR wire format; no transport, heap or platform headers.
- * Copyright(C)2026 Maksymilian and the USOS Authors.
+ * Copyright (C) 2026 Maksymilian and the USOS Authors.
  * SPDX-License-Identifier: GPL-3.0-or-later
  * Public specification:https://www.rfc-editor.org/rfc/rfc1035.html
  * Compression points to prior names; forward/self references are rejected.

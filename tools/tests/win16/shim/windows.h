@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* Host-native Win16 API shim for executing the real wrapper, not an ABI
  * layout emulator. The QEMU gate verifies actual 16-bit pointer layouts. */
 #ifndef USOS_TEST_WINDOWS_H

@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* Host-only wire test bridge. GPL-3.0-or-later. */
 #include <stdio.h>
 #include <stdlib.h>

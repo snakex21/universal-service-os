@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* Bounded reverse DNS helpers. GPL-3.0-or-later. */
 #ifndef USOS_DNS_EXTRA_H
 #define USOS_DNS_EXTRA_H

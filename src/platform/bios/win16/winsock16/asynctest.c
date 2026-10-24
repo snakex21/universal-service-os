@@ -1,5 +1,7 @@
+/* Copyright (C) 2026 Maksymilian and the USOS Authors
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 /* Actual Win16 async ABI test; all artifacts stay beside this executable.
- * Copyright(C)2026 Maksymilian and the USOS Authors. GPL-3.0-or-later. */
+ * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later. */
 #include <windows.h>
 #include <winsock.h>
 #include <string.h>

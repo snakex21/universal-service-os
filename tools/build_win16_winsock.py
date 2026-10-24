@@ -272,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
                         help='fail when Open Watcom is not available')
     parser.add_argument('--verbose', action='store_true', help='echo every command')
     parser.add_argument('--keep-objects', action='store_true', help='keep .obj files')
+    parser.add_argument('--stage2-tests', action='store_true', help='also build ASYNCTEST and MOSRUN Win16 test controllers')
     args = parser.parse_args(argv)
 
     watcom = find_watcom()
@@ -290,6 +291,10 @@ def main(argv: list[str] | None = None) -> int:
     print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     exe = build_testload(watcom, args.verbose, 'gethttp')
     print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
+    if args.stage2_tests:
+        for stem in ('asynctest', 'mosrun'):
+            exe = build_testload(watcom, args.verbose, stem)
+            print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     if not args.keep_objects:
         shutil.rmtree(OBJ_DIR, ignore_errors=True)
     return 0

@@ -1,4 +1,6 @@
-# Copyright(C)2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
+# Copyright (C) 2026 Maksymilian and the USOS Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
 """Execute the actual wrapper with native pointers and fake Windows events.
 
 This supplements QEMU; it does not claim to emulate segmented pointers,
