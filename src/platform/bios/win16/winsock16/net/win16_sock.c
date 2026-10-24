@@ -31,14 +31,15 @@
 typedef struct {
     int used, type, connected, connecting, nonblocking, peer_fin, error;
     int connect_done, fin_pending, tx_started;
+    int recovering, fast_pending;
     int listening, backlog, parent, read_shutdown, write_shutdown, udp_ready;
     net_tcp tcp;
     usos_u32 raddr, rx_base, fin_seq;
-    usos_u32 tx_tick, tx_rto, connect_at, arp_tick;
+    usos_u32 tx_tick, tx_rto, connect_at, arp_tick, recover_edge;
     usos_u32 udp_address;
-    usos_u16 lport, rport, rx_head, rx_len, udp_len, tx_len, tx_sent, cwnd;
+    usos_u16 lport, rport, rx_head, rx_len, udp_len, tx_len, tx_sent, cwnd, ssthresh;
     usos_u16 udp_port;
-    usos_u8 control;
+    usos_u8 control, dupacks;
     usos_u8 rx[USOS_RX_ROOM], rx_map[USOS_RX_ROOM/8];
     usos_u8 tx[USOS_TX_ROOM], udp[USOS_UDP_RX];
 } usos_sock_st;
@@ -140,6 +141,60 @@ static void usos_tcp_send_ack(usos_sock_st *sk)
         USOS_TCP_ACK,sk->tcp.rcv_wnd,0,0);
     if(n) (void)usos_frame_try(sk->raddr,n,0);
 }
+
+/* All congestion state is bounded by the retained 4096-byte send queue.
+ * RFC5681/6582: loss reduces the threshold once per recovery window. */
+static usos_u16 usos_tcp_threshold(usos_sock_st *sk)
+{
+    usos_u32 threshold=(usos_u32)(sk->tcp.snd_nxt-sk->tcp.snd_una)/2;
+    usos_u32 minimum=(usos_u32)sk->tcp.peer_mss*2;
+    if(threshold<minimum) threshold=minimum;
+    return (usos_u16)(threshold>USOS_TX_ROOM?USOS_TX_ROOM:threshold);
+}
+static usos_u16 usos_tcp_window(usos_u32 window)
+{ return (usos_u16)(window>USOS_TX_ROOM?USOS_TX_ROOM:window); }
+
+static void usos_tcp_acknowledged(usos_sock_st *sk,usos_u16 bytes)
+{
+    usos_u32 window,growth;
+    sk->dupacks=0;
+    if(sk->recovering) {
+        if((usos_s32)(sk->tcp.snd_una-sk->recover_edge)>=0) {
+            sk->recovering=0; sk->fast_pending=0; sk->cwnd=sk->ssthresh;
+        } else {
+            /* Partial ACK: another hole remains below the original sent
+             * upper edge. Retained bytes now start at the next lost range.
+             * Deflate by newly ACKed bytes and add back one SMSS when a
+             * full segment was ACKed, without rewinding SND.NXT. */
+            window=sk->cwnd>bytes?(usos_u32)(sk->cwnd-bytes):0;
+            if(bytes>=sk->tcp.peer_mss) window+=sk->tcp.peer_mss;
+            if(window<sk->tcp.peer_mss) window=sk->tcp.peer_mss;
+            sk->cwnd=usos_tcp_window(window); sk->fast_pending=1;
+        }
+        return;
+    }
+    if(sk->cwnd<sk->ssthresh) {
+        growth=bytes<sk->tcp.peer_mss?bytes:sk->tcp.peer_mss;
+    } else {
+        growth=(usos_u32)sk->tcp.peer_mss*sk->tcp.peer_mss/sk->cwnd;
+        if(!growth) growth=1;
+    }
+    sk->cwnd=usos_tcp_window((usos_u32)sk->cwnd+growth);
+}
+
+static void usos_tcp_duplicate_ack(usos_sock_st *sk)
+{
+    if(sk->recovering) {
+        sk->cwnd=usos_tcp_window((usos_u32)sk->cwnd+sk->tcp.peer_mss);
+        return;
+    }
+    if(sk->dupacks<3) ++sk->dupacks;
+    if(sk->dupacks!=3 || (usos_s32)(sk->tcp.snd_una-sk->recover_edge)<0) return;
+    sk->ssthresh=usos_tcp_threshold(sk);
+    sk->recover_edge=sk->tcp.snd_nxt;
+    sk->cwnd=usos_tcp_window((usos_u32)sk->ssthresh+3UL*sk->tcp.peer_mss);
+    sk->recovering=1; sk->fast_pending=1;
+}
 static void usos_fail(usos_sock_st *sk,int error)
 { sk->error=error; if(sk->connecting) sk->connect_done=1; sk->connecting=0; sk->tcp.state=USOS_TCP_RESET; }
 
@@ -192,7 +247,7 @@ static void usos_tcp_input(usos_u8 *packet,usos_u16 length)
 {
     net_ip_view ip;
     const usos_u8 *segment,*data;
-    usos_u16 len,sport,dport,acknowledged;
+    usos_u16 len,sport,dport,acknowledged,previous_window;
     usos_u8 flags;
     usos_u32 before,delta;
     int i,event,j,child,count;
@@ -202,7 +257,7 @@ static void usos_tcp_input(usos_u8 *packet,usos_u16 length)
     for(i=0;i<USOS_MAX_SOCKETS;i++) {
         sk=usos_socks[i];
         if(!sk->used || sk->type!=USOS_SOCK_STREAM || sk->lport!=dport || sk->rport!=sport || sk->raddr!=ip.src) continue;
-        before=sk->tcp.snd_una;
+        before=sk->tcp.snd_una; previous_window=sk->tcp.snd_wnd;
         if(sk->tcp.state==USOS_TCP_SYN_RCVD && (segment[13]&USOS_TCP_SYN) && !(segment[13]&USOS_TCP_ACK)) {
             if(net_get32(segment+4)+1==sk->tcp.rcv_nxt && !net_checksum_tcp(ip.src,ip.dst,segment,ip.len))
                 (void)usos_tcp_wire(sk,sk->tcp.iss,USOS_TCP_SYN|USOS_TCP_ACK,0,0,(usos_u32)usos_abi_now());
@@ -218,6 +273,8 @@ static void usos_tcp_input(usos_u8 *packet,usos_u16 length)
             sk->control=0; sk->tx_started=0; sk->tx_rto=USOS_TCP_RTO_MS;
             sk->cwnd=(usos_u16)(2*sk->tcp.peer_mss);
             if(sk->cwnd>USOS_TX_ROOM) sk->cwnd=USOS_TX_ROOM;
+            sk->ssthresh=USOS_TX_ROOM; sk->recover_edge=sk->tcp.snd_una;
+            sk->recovering=sk->fast_pending=0; sk->dupacks=0;
             sk->rx_base=sk->tcp.rcv_nxt;
             usos_tcp_receive(sk,data,len,sk->tcp.input_seq,(usos_u8)(flags&USOS_TCP_FIN));
             return;
@@ -234,8 +291,16 @@ static void usos_tcp_input(usos_u8 *packet,usos_u16 length)
                 sk->tx_len=(usos_u16)(sk->tx_len-acknowledged);
                 sk->tx_sent=(usos_u16)(sk->tx_sent-acknowledged);
                 sk->tx_tick=(usos_u32)usos_abi_now(); sk->tx_rto=USOS_TCP_RTO_MS;
-                if(sk->cwnd<USOS_TX_ROOM) sk->cwnd=(usos_u16)((sk->cwnd+sk->tcp.peer_mss>USOS_TX_ROOM)?USOS_TX_ROOM:sk->cwnd+sk->tcp.peer_mss);
+                usos_tcp_acknowledged(sk,acknowledged);
             }
+        } else if(!delta && sk->tx_sent && !sk->control &&
+                  !len && !(flags&(USOS_TCP_SYN|USOS_TCP_FIN|USOS_TCP_RST)) &&
+                  (flags&USOS_TCP_ACK) && net_get32(segment+8)==before &&
+                  previous_window==sk->tcp.snd_wnd &&
+                  sk->tcp.input_seq==sk->tcp.rcv_nxt) {
+            /* A window update, stale ACK, data packet or unrelated sequence
+             * must not manufacture the three duplicate ACKs of a loss. */
+            usos_tcp_duplicate_ack(sk);
         }
         if(event==USOS_TCP_EV_DATA) usos_tcp_receive(sk,data,len,sk->tcp.input_seq,flags);
         else if(event==USOS_TCP_EV_DUP) usos_tcp_send_ack(sk);
@@ -338,10 +403,21 @@ static void usos_tcp_service(usos_sock_st *sk,usos_u32 now)
         chunk=sk->tx_sent>sk->tcp.peer_mss?sk->tcp.peer_mss:sk->tx_sent;
         rc=usos_tcp_wire(sk,sk->tcp.snd_una,sk->control?sk->control:(USOS_TCP_ACK|USOS_TCP_PSH),chunk?sk->tx:0,chunk,now);
         if(rc>0) {
+            sk->ssthresh=usos_tcp_threshold(sk);
+            sk->recover_edge=sk->tcp.snd_nxt;
+            sk->recovering=sk->fast_pending=0; sk->dupacks=0;
             (void)net_tcp_timeout(&sk->tcp);
             sk->tx_tick=now; sk->tx_rto=sk->tx_rto<USOS_TCP_RTO_MAX/2?sk->tx_rto*2:USOS_TCP_RTO_MAX;
             sk->cwnd=sk->tcp.peer_mss;
         }
+        return;
+    }
+    if(sk->fast_pending && sk->tx_sent && !sk->control) {
+        chunk=sk->tx_sent>sk->tcp.peer_mss?sk->tcp.peer_mss:sk->tx_sent;
+        rc=usos_tcp_wire(sk,sk->tcp.snd_una,USOS_TCP_ACK|USOS_TCP_PSH,sk->tx,chunk,now);
+        /* A full transport queue leaves the recovery request pending. The
+         * send upper edge and retained byte counts never change on retry. */
+        if(rc>0) { sk->fast_pending=0; sk->tx_tick=now; }
         return;
     }
     if(!sk->connected || sk->control) return;
@@ -408,7 +484,7 @@ int usos_sock_open(int type)
     for(i=0;i<USOS_MAX_SOCKETS;i++) {
         sk=usos_socks[i]; if(sk->used) continue;
         usos_zero(sk,sizeof(*sk)); sk->used=1; sk->type=type; sk->lport=usos_ephemeral(); sk->parent=-1;
-        sk->tx_rto=USOS_TCP_RTO_MS; sk->cwnd=2*USOS_NET_TCP_MSS;
+        sk->tx_rto=USOS_TCP_RTO_MS; sk->cwnd=2*USOS_NET_TCP_MSS; sk->ssthresh=USOS_TX_ROOM;
         net_tcp_init(&sk->tcp,((usos_u32)sk->lport<<16)^(usos_u32)usos_abi_now()); return i;
     }
     return USOS_SOCK_EMFILE;

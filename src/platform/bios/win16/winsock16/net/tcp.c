@@ -16,8 +16,9 @@
  * rewinding snd_nxt; the latter always denotes the true sent upper edge.
  * ISNs are seeded LFSR values, not cryptographic randomness.
  * Protocol references: RFC9293 (sequence space, windows, open/close),
- * RFC6298 (initial one-second RTO and exponential backoff). This bounded
- * implementation does not yet estimate SRTT/RTTVAR or implement fast recovery.
+ * RFC6298 (initial one-second RTO and exponential backoff). The socket engine
+ * implements bounded NewReno fast recovery (RFC5681/6582). SRTT/RTTVAR and
+ * SACK remain outside this implementation.
  */
 
 #include "net.h"
