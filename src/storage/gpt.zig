@@ -19,15 +19,18 @@ pub const Partition = struct {
     end_lba: u64,
     part_guid: [16]u8,
     name_utf16: [36]u16,
-    /// GPT attribute flags (entry bytes 48..56).
-    attributes: u64 = 0,
+    /// GPT attribute flags (entry bytes 48..56). Not kept in the i386
+    /// Legacy BIOS Core (void there): only UEFI partition handles use it and
+    /// the Core has a fixed size budget.
+    attributes: AttributesField = if (keep_entry_details) 0 else {},
     /// Zero-based index of the entry in the GPT entry array. UEFI partition
     /// handles number partitions entry_index + 1 (HD device path node).
-    entry_index: u32 = 0,
+    entry_index: EntryIndexField = if (keep_entry_details) 0 else {},
 
     /// Bit 1, EFI_PART_ATTR_NO_BLOCK_IO_PROTOCOL: firmware creates no
     /// partition Block I/O handle (and so no boot-menu entry) for it.
     pub fn firmwareHidden(self: Partition) bool {
+        if (!keep_entry_details) return false;
         return self.attributes & attribute_no_block_io_protocol != 0;
     }
 
@@ -48,6 +51,13 @@ pub const Partition = struct {
 
 /// UEFI 2.x GPT partition attribute bit 1 (No Block IO Protocol).
 pub const attribute_no_block_io_protocol: u64 = 1 << 1;
+
+/// The i386 Legacy BIOS Core (freestanding x86) never reads attributes or
+/// entry_index; leaving them out keeps its Core inside the headroom gate.
+const legacy_core_target = @import("builtin").os.tag == .freestanding and @import("builtin").cpu.arch == .x86;
+const keep_entry_details = !legacy_core_target;
+const AttributesField = if (keep_entry_details) u64 else void;
+const EntryIndexField = if (keep_entry_details) u32 else void;
 
 const sector_bytes: usize = 512;
 const entry_bytes: usize = 128;
@@ -156,8 +166,8 @@ fn findUsosPartition(reader: random_reader.Reader, type_guid: *const [16]u8, wan
                 .end_lba = end_lba,
                 .part_guid = part_guid,
                 .name_utf16 = name,
-                .attributes = le64(entry[48..56]),
-                .entry_index = index,
+                .attributes = if (keep_entry_details) le64(entry[48..56]) else {},
+                .entry_index = if (keep_entry_details) index else {},
             };
         }
     }
