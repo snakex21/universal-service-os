@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <string.h>
 #include <direct.h>
+#include <stdlib.h>
 
 #define CONFIG "C:\\NET\\WIN16\\APPCTL.INI"
 #define LOGFILE "C:\\NET\\WIN16\\APPCTL.LOG"
@@ -14,6 +15,8 @@ static HWND window;
 static unsigned int launched;
 static char button_wanted[80];
 static HWND action_button;
+static HWND action_dialog;
+static int dialog_control;
 
 static void line(const char FAR *value)
 {
@@ -52,6 +55,16 @@ BOOL FAR PASCAL __export find_button(HWND item,LPARAM unused)
     return TRUE;
 }
 
+BOOL FAR PASCAL __export find_dialog_control(HWND item,LPARAM unused)
+{
+    char kind[30];
+    (void)unused;GetClassName(item,kind,sizeof(kind));
+    if(IsWindowVisible(item) && !lstrcmp(kind,"#32770") && GetDlgItem(item,dialog_control)) {
+        action_dialog=item;return FALSE;
+    }
+    return TRUE;
+}
+
 LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 {
     char command[240],directory[240],name[16],record[300],dialog_title[80],*slash;
@@ -68,8 +81,15 @@ LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
             wsprintf(name,"button%d",i);
             GetPrivateProfileString("test",name,"",button_wanted,sizeof(button_wanted),CONFIG);
             if(dialog_title[0] && button_wanted[0]) {
-                dialog=FindWindow(NULL,dialog_title);action_button=NULL;
-                if(dialog) {
+                action_button=NULL;dialog=NULL;
+                if(!strncmp(dialog_title,"@control:",9)) {
+                    dialog_control=atoi(dialog_title+9);action_dialog=NULL;
+                    enumerator=MakeProcInstance((FARPROC)find_dialog_control,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
+                    EnumWindows((WNDENUMPROC)enumerator,0);FreeProcInstance(enumerator);
+                    dialog=action_dialog;
+                    if(dialog) action_button=GetDlgItem(dialog,dialog_control);
+                } else dialog=FindWindow(NULL,dialog_title);
+                if(dialog && !action_button) {
                     enumerator=MakeProcInstance((FARPROC)find_button,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
                     EnumChildWindows(dialog,(WNDENUMPROC)enumerator,0);FreeProcInstance(enumerator);
                 }

@@ -114,6 +114,27 @@ def boot(args, disk: Path, tag: str, seconds: int, marker=None) -> bool:
                     matched.set(); event.set()
             event.set()  # Actual EOF is completion, never a status probe.
         reader = threading.Thread(target=read_serial, daemon=True); reader.start()
+        # Optional finite keyboard inputs are functional UI actions, never
+        # screenshot/status probes. They affect this disposable guest only.
+        keys_done=threading.Event(); key_receipts=[]
+        def input_keys():
+            for delay,key in getattr(args,'input_events',[]):
+                remaining=delay-(time.monotonic()-started)
+                if keys_done.wait(max(0,remaining)): return
+                result={'at_seconds':delay,'key':key}
+                try:
+                    with socket.create_connection(('127.0.0.1',port),timeout=10) as control:
+                        control.settimeout(10); control.recv(4096)
+                        control.sendall(('sendkey '+key+'\n').encode('ascii'))
+                        reply=bytearray()
+                        while not reply.endswith(b'(qemu) '):
+                            part=control.recv(4096)
+                            if not part: raise RuntimeError('HMP closed during keyboard input')
+                            reply.extend(part)
+                        result['reply']=reply.decode('ascii','backslashreplace')
+                except (OSError,RuntimeError) as error: result['error']=str(error)
+                key_receipts.append(result)
+        key_thread=threading.Thread(target=input_keys,daemon=True);key_thread.start()
         try:
             event.wait(seconds)
             with socket.create_connection(('127.0.0.1', port), timeout=10) as monitor:
@@ -138,6 +159,8 @@ def boot(args, disk: Path, tag: str, seconds: int, marker=None) -> bool:
                 try: process.wait(timeout=3)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=10)
             reader.join(timeout=5)
+            keys_done.set();key_thread.join(timeout=15)
+    receipt(out/'keyboard-actions.json',key_receipts)
     if (out/'final.ppm').exists():
         from PIL import Image
         Image.open(out/'final.ppm').save(out/'final.png')

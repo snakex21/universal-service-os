@@ -47,5 +47,21 @@ class AppPlanTests(unittest.TestCase):
             with self.subTest(actions=actions), self.assertRaises(ValueError):
                 app.load_plan(self.plan({**plan,'actions':actions}))
 
+    def test_control_selector_requires_exact_button(self):
+        plan={'command1':'C:\\NET\\WIN16\\A.EXE'}
+        app.load_plan(self.plan({**plan,'actions':[{'dialog':'@control:11151','button':'@id:11151'}]}))
+        for control,button in (('0','@id:0'),('65536','@id:65536'),('11151','@id:11150'),('x','@id:x')):
+            with self.subTest(control=control), self.assertRaises(ValueError):
+                app.load_plan(self.plan({**plan,'actions':[{'dialog':'@control:'+control,'button':button}]}))
+
+    def test_keyboard_actions_are_finite_ordered_and_safe(self):
+        plan={'command1':'C:\\NET\\WIN16\\A.EXE'}
+        app.load_plan(self.plan({**plan,'keys':[{'at_seconds':10,'key':'alt-f4'},{'at_seconds':20,'key':'ret'}]}))
+        for keys in ([{'at_seconds':0,'key':'ret'}], [{'at_seconds':121,'key':'ret'}],
+                     [{'at_seconds':20,'key':'ret'},{'at_seconds':10,'key':'ret'}],
+                     [{'at_seconds':10,'key':'ret\nquit'}], [{'at_seconds':10,'key':'ret'}]*4):
+            with self.subTest(keys=keys), self.assertRaises(ValueError):
+                app.load_plan(self.plan({**plan,'keys':keys}))
+
 
 if __name__=='__main__': unittest.main()

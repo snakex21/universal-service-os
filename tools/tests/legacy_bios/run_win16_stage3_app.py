@@ -66,6 +66,18 @@ def load_plan(path):
             if not isinstance(value,str) or not 1<=len(value)<=75 or any(c in value for c in '\r\n\x00'):
                 raise ValueError('Invalid one-shot dialog action')
             value.encode('ascii')
+        if action['dialog'].startswith('@control:'):
+            raw=action['dialog'][9:]
+            if not raw.isdigit() or not 1<=int(raw)<=65535 or action['button']!='@id:'+raw:
+                raise ValueError('Control selector requires the same explicit button ID')
+    keys=plan.get('keys',[])
+    if len(keys)>3: raise ValueError('At most three finite keyboard inputs')
+    previous=0
+    for action in keys:
+        when,key=action['at_seconds'],action['key']
+        if not isinstance(when,(int,float)) or not previous<when<=120 or not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',key):
+            raise ValueError('Invalid finite keyboard input')
+        previous=when
     return commands, copies, data, collected
 
 
@@ -96,9 +108,12 @@ def main():
         data['NET/WIN16/APITEST.EXE'] = args.api_test.read_bytes()
     data['NET/WIN16/WINSOCK.DLL'] = args.provider.read_bytes()
     data['WINDOWS/WINSOCK.DLL'] = args.provider.read_bytes()
+    input_events=[(entry['at_seconds'],entry['key']) for entry in json.loads(args.plan.read_text(encoding='utf-8')).get('keys',[])]
+    if any(delay>=args.seconds for delay,_ in input_events): raise ValueError('Keyboard input must precede final capture')
     disk = stage.make_overlay(args.out, args.base, args.tag, args.qemu)
     stage.flow.nt3.set_root(args.build_root)
     vm = SimpleNamespace(out=args.out, build_root=args.build_root, qemu=args.qemu, netdev=stage.LAN)
+    vm.input_events=input_events
     files, script = {}, []
     for i, (target, content) in enumerate(data.items()):
         source = 'F%06d.BIN' % i
