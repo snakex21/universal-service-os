@@ -176,6 +176,7 @@ static int usos_map_error(int rc)
     case USOS_SOCK_EADDRNOTAVAIL:usos_last_error = WSAEADDRNOTAVAIL; break;
     case USOS_SOCK_ESHUTDOWN:    usos_last_error = WSAESHUTDOWN; break;
     case USOS_SOCK_EOPNOTSUPP:   usos_last_error = WSAEOPNOTSUPP; break;
+    case USOS_SOCK_ENOBUFS:      usos_last_error = WSAENOBUFS; break;
     case USOS_NET_ERR_NAME:      usos_last_error = WSAHOST_NOT_FOUND; break;
     case USOS_NET_ERR_ROOM:      usos_last_error = WSAEFAULT; break;
     default:                     usos_last_error = WSAEINVAL; break;
@@ -325,7 +326,11 @@ int __far __pascal __export closesocket(SOCKET s)
     int rc;
 
     if (!usos_owned_socket(s)) return SOCKET_ERROR;
-    rc = usos_block_done(usos_sock_close((int)s));
+    if (usos_socket_options[s].linger_value.l_onoff &&
+        !usos_socket_options[s].linger_value.l_linger)
+        rc = usos_block_done(usos_sock_abort((int)s));
+    else
+        rc = usos_block_done(usos_sock_close((int)s));
     if (s < USOS_MAX_SOCKETS) usos_socket_defaults(s);
     if (s < USOS_MAX_SOCKETS) usos_socket_owners[s] = NULL;
     if (rc < 0)
@@ -598,6 +603,7 @@ SOCKET __far __pascal __export socket(int af, int type, int protocol)
     int kind;
     int slot;
 
+    USOS_TRACE("socket type",NULL,type);
     if (!usos_require_startup()) return INVALID_SOCKET;
     if (af != AF_INET) {
         usos_last_error = WSAEAFNOSUPPORT;
@@ -729,9 +735,10 @@ int __far __pascal __export gethostname(char FAR *name, int namelen)
 int __far __pascal __export WSAAsyncSelect(SOCKET s, HWND hWnd, unsigned int wMsg, long lEvent)
 {
     int rc;
+    USOS_TRACE("async select mask",NULL,lEvent);
     if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (s >= USOS_MAX_SOCKETS || usos_sock_kind((int)s) < 0) { usos_last_error = WSAENOTSOCK; return SOCKET_ERROR; }
-    if ((lEvent & ~(FD_READ | FD_WRITE | FD_CONNECT | FD_CLOSE | FD_ACCEPT)) != 0 ||
+    if ((lEvent & ~(FD_READ | FD_WRITE | FD_OOB | FD_CONNECT | FD_CLOSE | FD_ACCEPT)) != 0 ||
         (lEvent && (hWnd == NULL || !IsWindow(hWnd) || wMsg == 0))) {
         usos_last_error = WSAEINVAL; return SOCKET_ERROR;
     }
@@ -830,6 +837,7 @@ int __far __pascal __export WSAUnhookBlockingHook(void)
 
 int __far __pascal __export WSAGetLastError(void)
 {
+    USOS_TRACE("last error",NULL,usos_last_error);
     return usos_last_error;
 }
 

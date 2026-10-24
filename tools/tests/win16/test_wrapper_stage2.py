@@ -38,6 +38,7 @@ def wrapper_bridge(tmp_path_factory):
     ("nested", "nested_tasks=1 separate_cancel_flags=1 transport_survives_nested_cleanup=1"),
     ("cancel", "select_cancel=1 forward_dns_cancel=1 reverse_dns_cancel=1 state_restored=1"),
     ("contexts", "eight_context_limit=1 freed_context_reuse=1 startup_reference_counts=1 remaining_app_survives=1"),
+    ("linger", "linger_zero_abort=1 positive_linger_explicit=1 freed_handle=1"),
 ])
 def test_real_wrapper_with_fake_windows(wrapper_bridge, case, marker):
     result = subprocess.run([str(wrapper_bridge), case], capture_output=True, text=True, timeout=15)

@@ -142,6 +142,7 @@ static void usos_async_done(usos_async_job *job, const char *name,
                              usos_u32 ip, int error)
 {
     int size = 0;
+    USOS_TRACE("async name done",name,error);
     if (!error) {
         size = usos_pack_host(job->buffer, job->room, name, ip);
         if (size > 0) error = WSAENOBUFS;
@@ -149,6 +150,7 @@ static void usos_async_done(usos_async_job *job, const char *name,
     }
     if (IsWindow(job->window)) PostMessage(job->window, job->message,
                 (WPARAM)job->handle, MAKELONG((WORD)size, (WORD)error));
+    USOS_TRACE("async result size",NULL,size);
     if (job->socket_id >= 0) usos_sock_close(job->socket_id);
     job->active = 0;
 }
@@ -176,6 +178,7 @@ static HANDLE usos_queue_name(HWND window, unsigned int message,
     job->buffer = buffer; job->room = room; job->address = ip;
     job->began = (usos_u32)GetTickCount();
     if (!reverse) usos_far_tostr(job->name, name, sizeof(job->name));
+    USOS_TRACE("async name queued",job->name,job->handle);
     usos_last_error = 0;
     return (HANDLE)job->handle;
 }
@@ -367,14 +370,19 @@ static int usos_set_option(SOCKET s, int level, int option, const char FAR *valu
 {
     int input;
     struct linger linger_value;
+    USOS_TRACE("set option level",NULL,level);
+    USOS_TRACE("set option name",NULL,option);
     if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (s >= USOS_MAX_SOCKETS || usos_sock_kind((int)s) < 0) { usos_last_error = WSAENOTSOCK; return SOCKET_ERROR; }
     if (value == NULL) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }
     if (level == SOL_SOCKET && option == SO_LINGER) {
         if (length < (int)sizeof(linger_value)) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }
         usos_far_tobuf(&linger_value, value, sizeof(linger_value));
-        /* The engine has a bounded close, not caller-selected linger. */
-        if (linger_value.l_onoff) { usos_last_error = WSAEOPNOTSUPP; return SOCKET_ERROR; }
+        USOS_TRACE("linger onoff",NULL,linger_value.l_onoff);
+        USOS_TRACE("linger seconds",NULL,linger_value.l_linger);
+        /* Zero-time enabled linger is a real abort/RST. A positive caller
+         * timeout still requires graceful-linger support beyond this stage. */
+        if (linger_value.l_onoff && linger_value.l_linger) { usos_last_error = WSAEOPNOTSUPP; return SOCKET_ERROR; }
         usos_socket_options[s].linger_value = linger_value;
     } else {
         if (length < (int)sizeof(input)) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }

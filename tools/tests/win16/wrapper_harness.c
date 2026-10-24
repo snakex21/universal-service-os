@@ -115,6 +115,7 @@ static void case_empty_select(void)
 static void case_async_rearm(void)
 {
     SOCKET s=wrapper_socket();char buffer[4096];u_long mode=0,count=0;int rc,before;
+    CHECK(WSAAsyncSelect(s,1,WM_NET,FD_READ|FD_WRITE|FD_CONNECT|FD_CLOSE|FD_ACCEPT|FD_OOB)==0);
     CHECK(ioctlsocket(s,FIONBIO,&mode)==SOCKET_ERROR && WSAGetLastError()==WSAEINVAL);
     CHECK(recv(s,buffer,sizeof(buffer),0)==SOCKET_ERROR && WSAGetLastError()==WSAEWOULDBLOCK);
     push_data(0,0,100,USOS_TCP_PSH);pulse(2);CHECK(net_events[FD_READ]==1);
@@ -156,6 +157,21 @@ static void case_so_error(void)
     length=sizeof(error);CHECK(getsockopt(s,SOL_SOCKET,SO_ERROR,(char *)&error,&length)==0 && error==WSAECONNRESET);
     length=sizeof(error);CHECK(getsockopt(s,SOL_SOCKET,SO_ERROR,(char *)&error,&length)==0 && error==0);
     CHECK(closesocket(s)==0);printf("invalid_optlen_preserves_so_error=1\n");
+}
+
+static void case_linger(void)
+{
+    SOCKET s=wrapper_socket();struct linger setting,readback;int length=sizeof(readback);char byte;
+    setting.l_onoff=1;setting.l_linger=1;
+    CHECK(setsockopt(s,SOL_SOCKET,SO_LINGER,(const char *)&setting,sizeof(setting))==SOCKET_ERROR);
+    CHECK(WSAGetLastError()==WSAEOPNOTSUPP);
+    setting.l_linger=0;
+    CHECK(setsockopt(s,SOL_SOCKET,SO_LINGER,(const char *)&setting,sizeof(setting))==0);
+    CHECK(getsockopt(s,SOL_SOCKET,SO_LINGER,(char *)&readback,&length)==0);
+    CHECK(readback.l_onoff==1 && readback.l_linger==0);
+    CHECK(closesocket(s)==0);
+    CHECK(recv(s,&byte,1,0)==SOCKET_ERROR && WSAGetLastError()==WSAENOTSOCK);
+    printf("linger_zero_abort=1 positive_linger_explicit=1 freed_handle=1\n");
 }
 
 static SOCKET blocking_socket;
@@ -303,6 +319,6 @@ int main(int argc,char **argv)
     else if(!strcmp(argv[1],"name")) case_name_cancel_and_pack();else if(!strcmp(argv[1],"error")) case_so_error();
     else if(!strcmp(argv[1],"blocking")) case_blocking_reentry();else if(!strcmp(argv[1],"tasks")) case_tasks_and_ownership();
     else if(!strcmp(argv[1],"nested")) case_nested_tasks();else if(!strcmp(argv[1],"cancel")) case_select_dns_cancel();
-    else if(!strcmp(argv[1],"contexts")) case_context_limits_and_refs();else return 2;
+    else if(!strcmp(argv[1],"contexts")) case_context_limits_and_refs();else if(!strcmp(argv[1],"linger")) case_linger();else return 2;
     CHECK(WSACleanup()==0);printf("failures=%d\n",failures);return failures?1:0;
 }

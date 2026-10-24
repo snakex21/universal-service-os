@@ -92,8 +92,8 @@ static void diag(const char *text)
 #define MPX_KICK     0x0003
 #define MPX_RELEASE  0x0004
 
-/* Real-mode call structure (DPMI INT 31h AX=0300h), 50 bytes at offset 0 of
- * the DOS block; the rest of the block is the real-mode stack. */
+/* Real-mode call structure (DPMI INT 31h AX=0300h), 50 protected-mode bytes.
+ * Each call supplies its own structure; zero SS:SP requests a host stack. */
 #define RMCS_EBX     0x10
 #define RMCS_EDX     0x14
 #define RMCS_ECX     0x18
