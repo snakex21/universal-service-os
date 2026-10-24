@@ -17,6 +17,14 @@ del C:\SYSLINUX.CFG
 :sl_done
 call %USRC%\PREPDOS.BAT %USRC%\DOSFILES C:\DOS %USRC%
 if not exist C:\DOS\READY.TAG goto failed
+rem C:\DOS as MS-DOS 6.22 Setup leaves it (docs/dos-setup-parity-2026-10-24.md):
+rem a COMMAND.COM copy, none of the Supplemental Disk installer files (they
+rem work only from that diskette; SETUP.BAT, 720ID0x.BAT), and the volume
+rem label Setup gives the drive.
+copy C:\COMMAND.COM C:\DOS /y >nul
+for %%f in (SETUP.BAT SETUP.MSG SD6COPY.BAT 360ID01.BAT 360ID02.BAT) do if exist C:\DOS\%%f del C:\DOS\%%f
+for %%f in (720ID01.BAT 720ID02.BAT) do if exist C:\DOS\%%f del C:\DOS\%%f
+if exist C:\DOS\LABEL.EXE C:\DOS\LABEL.EXE C:MS-DOS_6
 rem WINA20.386 in the root of the boot drive, as MS-DOS Setup places it
 rem (DOSSETUP.INI [dif-path]: beside COMMAND.COM, plain attributes). The DOS
 rem 5.0/6.x kernel asks Windows 3.0 enhanced mode (WIN, WIN /3) to load it;
@@ -48,7 +56,11 @@ if errorlevel 1 goto failed
 copy %USRC%\LICENSE.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
 md C:\TEMP
-echo DEVICE=C:\DOS\HIMEMX.EXE /MAX=32768 /X2MAX32>C:\CONFIG.SYS
+rem SETVER first, as MS-DOS Setup writes it (programs that ask for an older
+rem DOS version); the same driver the X470-proven Windows 1.x-3.0 menu loads.
+rem No SMARTDRV and no EMM386 (EMM386 breaks the USOSPKT MMIO fallback).
+echo DEVICE=C:\DOS\SETVER.EXE>C:\CONFIG.SYS
+echo DEVICE=C:\DOS\HIMEMX.EXE /MAX=32768 /X2MAX32>>C:\CONFIG.SYS
 echo DOS=HIGH>>C:\CONFIG.SYS
 echo FILES=40>>C:\CONFIG.SYS
 echo BUFFERS=20>>C:\CONFIG.SYS
@@ -268,6 +280,16 @@ if not exist C:\DOS\CHOICE.COM goto restart_go
 C:\DOS\CHOICE.COM /C:R /T:R,8 Restarting in 8 seconds. Press R to restart now
 :restart_go
 echo Restarting from the target disk...
+rem MS-DOS only: C:\USOSDOS (media copy, MEMDISK, helpers) goes like the Setup
+rem disks; a batch outside it removes it (this one is read line by line).
+if exist C:\WINSETUP\SETUP.EXE goto finreboot
+if not exist C:\DOS\DELTREE.EXE goto finreboot
+if not exist C:\DOS\REBOOT.COM goto finreboot
+echo @echo off>C:\TEMP\USOSFIN.BAT
+echo C:\DOS\DELTREE.EXE /Y C:\USOSDOS>>C:\TEMP\USOSFIN.BAT
+echo C:\DOS\REBOOT.COM>>C:\TEMP\USOSFIN.BAT
+C:\TEMP\USOSFIN.BAT
+:finreboot
 %USRC%\REBOOT.COM
 goto end
 :failed
