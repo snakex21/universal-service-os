@@ -50,6 +50,7 @@
 #define USOS_SOCK_ESHUTDOWN    (-45)
 #define USOS_SOCK_EOPNOTSUPP   (-46)
 #define USOS_SOCK_ECANCELLED   (-47)
+#define USOS_SOCK_ENOBUFS      (-48)
 
 /* Provided by winsock16.c (GetTickCount / PeekMessage pump). */
 unsigned long usos_abi_now(void);
@@ -66,6 +67,13 @@ int  usos_sock_ready(void);
 
 int  usos_sock_open(int type);   /* slot >= 0, or USOS_SOCK_EMFILE */
 int  usos_sock_close(int slot);
+/* Abortive close: one best-effort RST for an active TCP endpoint, no FIN,
+ * idle, ARP wait or retransmission. Always releases a valid slot and its
+ * unaccepted listener children, even on error. Accepted children survive.
+ * ENOBUFS means the reset was not accepted by the full transport queue;
+ * EHOSTUNREACH means no cached next hop or another transmit failure. Neither
+ * error leaves the socket open, unlike close's EWOULDBLOCK convention. */
+int  usos_sock_abort(int slot);
 int  usos_sock_connect(int slot, usos_u32 ip, usos_u16 port, const char *name);
 int  usos_sock_send(int slot, const usos_u8 *buf, usos_u16 len);
 int  usos_sock_recv(int slot, usos_u8 *buf, usos_u16 len);

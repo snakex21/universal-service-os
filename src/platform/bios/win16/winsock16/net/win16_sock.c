@@ -598,6 +598,41 @@ static int usos_receive(int slot,usos_u8 *buffer,usos_u16 length,int peek)
 }
 int usos_sock_recv(int slot,usos_u8 *buffer,usos_u16 length) { return usos_receive(slot,buffer,length,0); }
 int usos_sock_peek(int slot,usos_u8 *buffer,usos_u16 length) { return usos_receive(slot,buffer,length,1); }
+int usos_sock_abort(int slot)
+{
+    usos_sock_st *sk=usos_slot(slot);
+    usos_u8 mac[6],flags;
+    usos_u16 bytes;
+    int i,rc=0,result;
+    if(!sk) return USOS_SOCK_ENOTSOCK;
+    /* Only children still in this listener's backlog belong to it. accept()
+     * has already detached accepted sockets by setting their parent to -1. */
+    if(sk->listening) for(i=0;i<USOS_MAX_SOCKETS;i++)
+        if(usos_socks[i]->used && usos_socks[i]->parent==slot) {
+            result=usos_sock_abort(i);
+            if(!rc && result<0) rc=result;
+        }
+    if(sk->type==USOS_SOCK_STREAM && !sk->listening &&
+       (sk->connected || sk->connecting || sk->tcp.state==USOS_TCP_SYN_RCVD)) {
+        /* Do not pump or retry: a callback may close a socket during another
+         * application's cooperative wait. This path owns only this slot.
+         * Sequence space covers bytes actually sent, not the unsent queue. */
+        flags=USOS_TCP_RST;
+        if(sk->tcp.state!=USOS_TCP_SYN_SENT) flags|=USOS_TCP_ACK;
+        bytes=net_tcp_build_at(&sk->tcp,usos_tx_frame+14,sk->tcp.snd_nxt,flags,0,0,0);
+        if(!bytes || usos_mac(sk->raddr,mac,0)<=0) rc=USOS_SOCK_EHOSTUNREACH;
+        else {
+            net_eth_build(usos_tx_frame,mac,usos_our_mac,USOS_ETH_IPV4);
+            result=usos_pkt_send(usos_tx_frame,(usos_u16)(bytes+14));
+            if(result==USOS_PKT_ERR_FULL) rc=USOS_SOCK_ENOBUFS;
+            else if(result!=USOS_PKT_OK) rc=USOS_SOCK_EHOSTUNREACH;
+        }
+    }
+    /* A failed RST is not a failed local close. No later tick retries the
+     * discarded data or reset; the wrapper must invalidate its handle too. */
+    usos_zero(sk,sizeof(*sk));
+    return rc;
+}
 int usos_sock_close(int slot)
 {
     usos_sock_st *sk=usos_slot(slot); usos_u32 now,started; usos_u16 n; int i,cancelled=0;
