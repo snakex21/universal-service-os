@@ -40,6 +40,19 @@ def build_usospkt(root: Path, out: Path, work: Path) -> Path:
     return com
 
 
+def build_usospkt_queue(root: Path, out: Path, work: Path) -> Path:
+    """Experimental queue binary, never part of the default NET_FILES payload."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=os.environ.get('USOS_ZIG_CACHE', str(root / 'tools/cache/zig-global')))
+    obj, elf, com = work / 'usospktq.o', work / 'usospktq.elf', out / 'USOSPKTQ.COM'
+    subprocess.run([zig(), 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(root / 'src/platform/bios/msdos/usospktq.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig(), 'ld.lld', '-m', 'elf_i386', '-T', str(root / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig(), 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    check_usospkt(com.read_bytes())
+    return com
+
+
 def check_usospkt(data: bytes):
     """Layout the packet driver spec and the second-load check rely on."""
     if not 4096 <= len(data) <= 16384:
