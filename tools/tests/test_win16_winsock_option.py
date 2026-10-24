@@ -127,13 +127,28 @@ class WinsockApply(unittest.TestCase):
             self.assertEqual('\n'.join(lines).encode('ascii'), lf(crlf('windows_auto.cmd')))
         menu = lf((self.u / 'WINMENU.BAT').read_bytes()).decode('ascii').split('\n')
         at = menu.index(':ini_done')
-        self.assertEqual(menu[at + 1:at + 4], [
-            'if exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG',
-            'if not exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG',
-            'if not exist C:\\WINDOWS\\WINSOCK.DLL copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul'])
+        # No IF with a redirection (COMMAND.COM opens the target even when
+        # the condition is false), the log directory made first.
+        added = [
+            'if not exist C:\\NET\\NUL md C:\\NET',
+            'if not exist C:\\NET\\WIN16\\NUL md C:\\NET\\WIN16',
+            'if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_copy',
+            'echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG',
+            'goto wsk_done',
+            ':wsk_copy',
+            'copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul',
+            'if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_fail',
+            'echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG',
+            'goto wsk_done',
+            ':wsk_fail',
+            'echo WINSOCK.DLL: copy to C:\\WINDOWS failed>>C:\\NET\\WIN16\\STAGE.LOG',
+            ':wsk_done']
+        self.assertEqual(menu[at + 1:at + 1 + len(added)], added)
         for line in menu:
             self.assertLessEqual(len(line), 127)
-        del menu[at + 1:at + 4]
+        labels = [l[1:9].lower() for l in menu if l.startswith(':')]
+        self.assertEqual(len(labels), len(set(labels)), labels)
+        del menu[at + 1:at + 1 + len(added)]
         self.assertEqual('\n'.join(menu).encode('ascii'), lf(crlf('windows_menu.cmd')))
         inf = lf((self.u / 'WINSETUP/SETUP.INF').read_bytes()).decode('latin-1')
         # Setup ignores new groups: the icon goes into the Main group (",1",

@@ -22,6 +22,9 @@ rem this menu (no DOSKEY macro yet; in C:\WINDOWS WIN.COM was found before any
 rem PATH entry; X470 2026-10-24: a second Windows started there). Checked at
 rem every start: Windows Setup may write WIN.COM again. C:\USOSW3\WINRUN.ON
 rem exists only while Windows 3.0 runs; one left by a reset goes here.
+rem Every directory this file writes into is made first (a missing one =
+rem "File creation error" from COMMAND.COM; tools/tests/test_dos_redirects.py).
+if not exist C:\USOSW3\NUL md C:\USOSW3
 if exist C:\USOSW3\WINRUN.ON del C:\USOSW3\WINRUN.ON
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto shadow_ok
 if exist C:\WIN386\WIN386.EXE goto shadow_ok
@@ -153,6 +156,8 @@ del C:\USOSW3\WINRUN.ON
 echo W1AUTO: Windows 3.0 returned>>C:\USOSW3\WINRUN.LOG
 :flag_off
 if "%UDIAG%"=="" goto end_msg
+if not exist C:\USOS\NUL md C:\USOS
+if not exist C:\USOS\DIAG\NUL md C:\USOS\DIAG
 echo ==== WIN returned>>C:\USOS\DIAG\%UDIAG%.TXT
 if "%UDIAG%"=="D5" goto v10_log2
 C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT

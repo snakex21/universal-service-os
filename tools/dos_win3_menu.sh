@@ -179,10 +179,22 @@ dos_winsock_apply() {
         awk '!done && /^if exist C:\\NET\\NETSTART\.BAT call / { printf "set USOSPKT_QUEUE=1\r\n"; done = 1 } { print }' "$dwf" > "$dwf.new" && mv "$dwf.new" "$dwf" || return 1
         grep -q '^set USOSPKT_QUEUE=1' "$dwf" || { echo "Winsock: no NETSTART call in $(basename "$dwf")" >&2; return 1; }
     done
+    # No IF with a redirection (COMMAND.COM opens the file even when the
+    # condition is false), and the log directory is made first.
     awk '{ print } !done && /^:ini_done/ {
-        printf "if exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
-        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
-        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul\r\n"
+        printf "if not exist C:\\NET\\NUL md C:\\NET\r\n"
+        printf "if not exist C:\\NET\\WIN16\\NUL md C:\\NET\\WIN16\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_copy\r\n"
+        printf "echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "goto wsk_done\r\n"
+        printf ":wsk_copy\r\n"
+        printf "copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_fail\r\n"
+        printf "echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "goto wsk_done\r\n"
+        printf ":wsk_fail\r\n"
+        printf "echo WINSOCK.DLL: copy to C:\\WINDOWS failed>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf ":wsk_done\r\n"
         done = 1 }' "$1/WINMENU.BAT" > "$1/WINMENU.NEW" && mv "$1/WINMENU.NEW" "$1/WINMENU.BAT" || return 1
     grep -q 'WIN16\\WINSOCK.DLL C:\\WINDOWS' "$1/WINMENU.BAT" || { echo 'Winsock: no :ini_done in WINMENU.BAT' >&2; return 1; }
     dwi="$1/WINSETUP/SETUP.INF"

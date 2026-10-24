@@ -14,7 +14,9 @@ rem Windows 3.0: C:\USOSW3\WINRUN.ON exists while it runs (written by
 rem W1AUTO.BAT and here, removed when WIN returns or at the next boot); a
 rem file, because the DOS window of 3.0 real mode cannot be relied on to
 rem see the environment. USOSWIN=1: set around every WIN.COM call of
-rem W3AUTO/W1AUTO/WINRUN. Every call appends one line to C:\USOSW3\WINRUN.LOG.
+rem W3AUTO/W1AUTO/WINRUN. Every call appends one line to C:\USOSW3\WINRUN.LOG
+rem (the directory is made first: a missing one = "File creation error").
+if not exist C:\USOSW3\NUL md C:\USOSW3
 echo WINRUN [%1 %2 %3] USOSWIN=[%USOSWIN%]>>C:\USOSW3\WINRUN.LOG
 if not exist C:\USOSW3\WINRUN.ON goto no_flag
 echo WINRUN: WINRUN.ON present, Windows runs, hint only>>C:\USOSW3\WINRUN.LOG
