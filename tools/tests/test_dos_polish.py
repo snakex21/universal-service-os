@@ -106,11 +106,18 @@ class MenuLib(unittest.TestCase):
             self.assertEqual(out.splitlines(), ['Windows 1.01', 'Windows 2.03', 'Windows/286 2.11', 'Windows/386 2.11', 'Windows 3.1',
                                                 'Windows for Workgroups 3.11', 'Windows 3.0a', 'Windows 3.0a', 'Windows 3.0', 'Windows 3.1', 'none'])
 
-    def menu(self, system: str, image: str) -> dict[str, bytes]:
+    def menu(self, system: str, image: str, lang: str = 'pl') -> dict[str, bytes]:
+        """The start files after dos_i18n_apply (Polish by default, as the
+        menus were before the DOS texts followed the language) and
+        dos_menu_names."""
+        import sys
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import build_dos_i18n
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
             self.staged(d)
-            self.sh(f'dos_menu_names . {system} "{image}"', d)
+            (d / 'DOSTEXT.TXT').write_bytes(build_dos_i18n.dostext(build_dos_i18n.catalogs()))
+            self.sh(f'dos_i18n_apply . DOSTEXT.TXT {lang} 437 >/dev/null; dos_menu_names . {system} "{image}"', d)
             return {p.name: lf(p.read_bytes()) for p in d.iterdir()}
 
     def test_menu_31(self):
@@ -131,6 +138,9 @@ class MenuLib(unittest.TestCase):
         w30 = self.menu('windows-3-0', 'Windows 3.0a EN.iso')['W1CONFIG.SYS']
         self.assertIn(b'menuitem=WINSTD,Windows 3.0a (domyslny)\n', w30)
         self.assertIn(b'menuitem=WINREAL,Windows 3.0a - tryb standardowy (WIN /S, test)\n', w30)
+        en = self.menu('windows-wfw-3-11', 'WfW.iso', 'en')['W3CONFIG.SYS']
+        self.assertIn(b'menuitem=WINSTD,Windows for Workgroups 3.11 - 386 enhanced mode (default)\n', en)
+        self.assertIn(b'menuitem=WIN386,Windows for Workgroups 3.11 - 386 mode with SMARTDRV\n', en)
         w386 = self.menu('windows-2-11-386', 'x.iso')['W1CONFIG.CSM']
         self.assertIn(b'menuitem=WINSTD,Windows/386 2.11 (domyslny)\n', w386)
         self.assertNotIn(b'WINREAL', w386.split(b'[DIAG]')[0])

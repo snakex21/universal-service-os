@@ -1,9 +1,9 @@
 [menu]
 menucolor=15,1
-menuitem=WINSTD,Windows - tryb standardowy (domyslny)
-menuitem=WIN386,Windows - tryb rozszerzony 386 (alternatywny)
-menuitem=DOSONLY,MS-DOS - wiersz polecen
-menuitem=WINSET,Ustawienia myszy PS/2 - Windows Setup
+menuitem=WINSTD,Windows - standard mode (default)
+menuitem=WIN386,Windows - 386 enhanced mode (alternative)
+menuitem=DOSONLY,MS-DOS - command prompt
+menuitem=WINSET,PS/2 mouse settings - Windows Setup
 menudefault=WINSTD,8
 
 [common]

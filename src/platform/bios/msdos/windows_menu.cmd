@@ -78,16 +78,16 @@ goto end
 echo Restart the computer to open the menu. Do not run WIN in this session.
 goto end
 :missing
-echo USOS: brakuje plikow Windows lub menu. Nie zmieniono konfiguracji.
+echo USOS: Windows files or the menu are missing. The configuration was not changed.
 goto end
 :failed
 if exist C:\USOSW3\MENU.TAG del C:\USOSW3\MENU.TAG
-echo USOS: zapis menu nie powiodl sie. Przywracanie konfiguracji.
+echo USOS: writing the menu failed. Restoring the configuration.
 if exist C:\USOSW3\CONFIG.OLD copy C:\USOSW3\CONFIG.OLD C:\CONFIG.SYS /y
 if exist C:\USOSW3\AUTOEXEC.OLD copy C:\USOSW3\AUTOEXEC.OLD C:\AUTOEXEC.BAT /y
 if exist C:\USOSW3\W3INI.OK goto restore_done
 if exist C:\USOSW3\SYSTEM.OLD copy C:\USOSW3\SYSTEM.OLD C:\WINDOWS\SYSTEM.INI /y
 :restore_done
 if exist C:\WINDOWS\SMARTDRV.EXE C:\WINDOWS\SMARTDRV.EXE /C
-echo Sprawdz bledy zapisu. Zrestartuj komputer, aby ponowic probe.
+echo Check for write errors. Restart the computer to try again.
 :end

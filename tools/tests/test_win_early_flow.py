@@ -215,7 +215,7 @@ class DiagnosticMenu(unittest.TestCase):
             self.assertIn(r'C:\DOS\USOSKBC.COM /R /M', ran)
             self.assertNotIn('USOSWHER.COM', names, config)
         self.assertIn('menudefault=WINSTD,8', self.config)
-        self.assertIn('submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)', self.config)
+        self.assertIn('submenu=DIAG,Diagnostics (D1-D6, for tests only)', self.config)
 
     def test_diag_log(self):
         for config, tag in (('D1WHERE', 'D1'), ('D2NOKBC', 'D2'), ('D4CLEAN', 'D4'), ('D5MIN', 'D5'),

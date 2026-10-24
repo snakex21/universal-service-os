@@ -7,6 +7,10 @@
 #   dos_regional_apply DIR INI     COUNTRY / code page / KEYB from DOS.INI
 #                                  (src/flow/answer/dos.zig) into the start
 #                                  files; manual: W3PL.KEY is not used
+#   dos_i18n_apply DIR TEXT LANG CP  the DOS-side texts (menus, batch
+#                                  messages) in the profile / USOS menu
+#                                  language (after dos_regional_apply,
+#                                  before dos_menu_names)
 #   dos_winsock_apply DIR INI SRC C  Windows 3.1 / 3.11 / WfW only, DOS.INI
 #                                  winsock=yes: the opt-in Winsock set (SRC =
 #                                  EFI\USOS\dos-native\winsock16) into C:\NET
@@ -53,9 +57,19 @@ dos_menu_names() {
     # '|' as the sed delimiter: Windows/386 has a slash.
     for dmf in "$1/W3CONFIG.SYS" "$1/W3CONFIG.CSM"; do
         if [ "$2" = windows-wfw-3-11 ]; then
-            # W3AUTO.BAT starts every WfW item in 386 enhanced mode.
-            dos_sed "$dmf" -e "s|^menuitem=WINSTD,Windows - tryb standardowy (domyslny)|menuitem=WINSTD,$dmn - tryb rozszerzony 386 (domyslny)|" \
-                -e "s|^menuitem=WIN386,Windows - tryb rozszerzony 386 (alternatywny)|menuitem=WIN386,$dmn - tryb 386 z SMARTDRV|"
+            # W3AUTO.BAT starts every WfW item in 386 enhanced mode. The two
+            # texts in the menu language (dos_text, after dos_i18n_apply);
+            # awk compares only the ASCII start of a line and prints the
+            # others whole (code page bytes).
+            dmt1=$(dos_text dos.menu.wfw_enhanced)
+            dmt2=$(dos_text dos.menu.wfw_smartdrv)
+            [ -n "$dmt1" ] || dmt1='386 enhanced mode (default)'
+            [ -n "$dmt2" ] || dmt2='386 mode with SMARTDRV'
+            [ ! -f "$dmf" ] || DMN_STD="$dmn - $dmt1" DMN_386="$dmn - $dmt2" \
+                awk '{ l = $0; cr = (index(l, "\r") > 0) ? "\r" : ""
+                    if (index(l, "menuitem=WINSTD,") == 1) { printf "menuitem=WINSTD,%s%s\n", ENVIRON["DMN_STD"], cr; next }
+                    if (index(l, "menuitem=WIN386,") == 1) { printf "menuitem=WIN386,%s%s\n", ENVIRON["DMN_386"], cr; next }
+                    print }' "$dmf" > "$dmf.new" && mv "$dmf.new" "$dmf"
         else
             dos_sed "$dmf" -e "s|^menuitem=WINSTD,Windows |menuitem=WINSTD,$dmn |" -e "s|^menuitem=WIN386,Windows |menuitem=WIN386,$dmn |"
         fi
@@ -154,6 +168,8 @@ dos_winsock_apply() {
     done
     cp "$3/USOSPKTQ.COM" "$4/NET/USOSPKTQ.COM" || return 1
     cp "$3/NETSTART.BAT" "$1/NETSTART.BAT" || return 1
+    # Its messages in the menu language, as the default NETSTART.BAT.
+    dos_i18n_file "$1/NETSTART.BAT" "$DOS_I18N_437" || return 1
     printf 'USOS Winsock (answer profile): C:\\NET\\WIN16 and C:\\NET\\USOSPKTQ.COM staged before the first boot\r\n' > "$4/NET/WIN16/STAGE.LOG"
     for dwf in "$1/W3AUTO.BAT" "$1/W3AUTO.CSM"; do
         [ -f "$dwf" ] || continue
@@ -185,4 +201,108 @@ dos_winsock_apply() {
         dwg='no Main group in SETUP.INF: File > Run C:\NET\WIN16\GETHTTP.EXE'
     fi
     printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg"
+}
+
+# DOS-side texts in the profile / USOS menu language (tools/build_dos_i18n.py
+# writes EFI\USOS\dos-native\i18n\DOSTEXT.TXT from the dos.* keys of the USOS
+# catalogs). The start files are English; dos_i18n_apply replaces the
+# English text of their echo / menuitem / submenu / CHOICE lines with the
+# section [<language>-<code page>] (a key line, then the text as code page
+# bytes). awk never looks into a translated line: it is stored and printed
+# whole (BusyBox awk would count code page bytes as UTF-8).
+#   dos_i18n_apply DIR TEXTFILE LANGUAGE CODEPAGE
+# LANGUAGE: a catalog or locale tag (pl, pl-PL, pt-BR, sr-Latn-RS); CODEPAGE:
+# the one DOS.INI switches the console to (437 when none). Files shown before
+# that switch (CONFIG.SYS menu, INSTALL / WINMENU / NETSTART) take the 437
+# section, the start-menu batch files W3AUTO / W1AUTO the CODEPAGE one; no
+# section for the language (Cyrillic or Greek in 437, Ukrainian): English.
+DOS_I18N_TEXT=''
+DOS_I18N_437=''
+DOS_I18N_CP=''
+
+# The first section of TEXTFILE named <tag>-<cp>, tag shortened from the end.
+dos_i18n_section() {
+    dis_tag=$(printf '%s' "$2" | tr 'A-Z' 'a-z')
+    while [ -n "$dis_tag" ]; do
+        if grep -qx "\[$dis_tag-$3\]" "$1"; then
+            printf '%s-%s\n' "$dis_tag" "$3"
+            return 0
+        fi
+        case "$dis_tag" in *-*) dis_tag=${dis_tag%-*} ;; *) dis_tag='' ;; esac
+    done
+    return 1
+}
+
+# One file through the section (nothing when the file or section is empty).
+dos_i18n_file() {
+    [ -f "$1" ] && [ -n "$2" ] && [ -n "$DOS_I18N_TEXT" ] || return 0
+    awk -v want="[$2]" -v tf="$DOS_I18N_TEXT" '
+        BEGIN {
+            sec = ""; key = ""
+            while ((getline l < tf) > 0) {
+                if (key == "") {
+                    if (substr(l, 1, 1) == ";") continue
+                    if (substr(l, 1, 1) == "[") { sec = l; continue }
+                    key = l
+                    continue
+                }
+                if (sec == "[en-437]") en[l] = key
+                if (sec == want) tr[key] = l
+                key = ""
+            }
+            close(tf)
+        }
+        {
+            line = $0
+            cr = sub(/\r$/, "", line)
+            p = ""; r = ""
+            if (substr(line, 1, 5) == "echo ") { p = "echo "; r = substr(line, 6) }
+            else if (match(line, /^(menuitem|submenu)=[A-Za-z0-9_]+,/)) { p = substr(line, 1, RLENGTH); r = substr(line, RLENGTH + 1) }
+            else if (match(line, /CHOICE\.COM( \/[^ ]+)* /)) { p = substr(line, 1, RSTART + RLENGTH - 1); r = substr(line, RSTART + RLENGTH) }
+            if (p != "" && (r in en) && (en[r] in tr)) {
+                printf "%s%s%s\n", p, tr[en[r]], (cr ? "\r" : "")
+                next
+            }
+            print
+        }' "$1" > "$1.i18n" && mv "$1.i18n" "$1"
+}
+
+# The text of KEY in the 437 section (or English), for the lines this
+# script writes itself.
+dos_text() {
+    [ -n "$DOS_I18N_TEXT" ] || return 0
+    awk -v want="[${DOS_I18N_437:-en-437}]" -v k="$1" -v tf="$DOS_I18N_TEXT" '
+        BEGIN {
+            sec = ""; key = ""; en = ""; out = ""
+            while ((getline l < tf) > 0) {
+                if (key == "") {
+                    if (substr(l, 1, 1) == ";") continue
+                    if (substr(l, 1, 1) == "[") { sec = l; continue }
+                    key = l
+                    continue
+                }
+                if (key == k && sec == "[en-437]") en = l
+                if (key == k && sec == want) out = l
+                key = ""
+            }
+            printf "%s", (out != "" ? out : en)
+        }' < /dev/null
+}
+
+dos_i18n_apply() {
+    [ -f "$2" ] || { echo 'DOS texts: no DOSTEXT.TXT, English'; return 0; }
+    DOS_I18N_TEXT=$2
+    DOS_I18N_437=$(dos_i18n_section "$2" "${3:-en}" 437) || DOS_I18N_437=''
+    DOS_I18N_CP=''
+    case "${4:-437}" in
+        437) DOS_I18N_CP=$DOS_I18N_437 ;;
+        [0-9][0-9][0-9]) DOS_I18N_CP=$(dos_i18n_section "$2" "${3:-en}" "$4") || DOS_I18N_CP='' ;;
+    esac
+    for dif in W3CONFIG.SYS W3CONFIG.CSM W1CONFIG.SYS W1CONFIG.CSM INSTALL.BAT WINMENU.BAT W3START.BAT W1SETUP.BAT NETSTART.BAT; do
+        dos_i18n_file "$1/$dif" "$DOS_I18N_437" || return 1
+    done
+    for dif in W3AUTO.BAT W3AUTO.CSM W1AUTO.BAT W1AUTO.CSM; do
+        dos_i18n_file "$1/$dif" "$DOS_I18N_CP" || return 1
+    done
+    echo "DOS texts: ${3:-en} (menus ${DOS_I18N_437:-English 437}, start files ${DOS_I18N_CP:-English 437})"
 }

@@ -13,12 +13,12 @@ cd \WINDOWS
 if "%CONFIG%"=="WIN386" goto enhanced
 rem Windows for Workgroups 3.11 runs in 386 enhanced mode only.
 if exist C:\WINSETUP\WFWSETUP.DL_ goto enhanced
-echo Windows 3.x - tryb standardowy, bez cache dysku.
+echo Windows 3.x - standard mode, no disk cache.
 WIN.COM /S /B
 goto end
 :enhanced
-echo Windows 3.x - test trybu rozszerzonego 386.
-echo Jesli Windows nie startuje, po restarcie wybierz tryb standardowy.
+echo Windows 3.x - 386 enhanced mode test.
+echo If Windows does not start, restart and choose standard mode.
 WIN.COM /3 /B
 goto end
 :settings
@@ -37,21 +37,21 @@ if errorlevel 1 goto mouse_failed
 :mouse_ready
 C:
 cd \WINDOWS
-echo Dla myszy PS/2 wybierz w Setup: Microsoft lub IBM PS/2.
-echo Jesli Setup pyta o istniejacy MOUSE.DRV, zachowaj go klawiszem Enter.
+echo For a PS/2 mouse choose Microsoft or IBM PS/2 in Setup.
+echo If Setup asks about the existing MOUSE.DRV, keep it with Enter.
 pause
 SETUP.EXE
 goto end
 :mouse_failed
-echo Nie udalo sie przygotowac sterownika myszy z C:\WINSETUP.
-echo Sprawdz pliki zrodla i wolne miejsce na dysku.
+echo Could not prepare the mouse driver from C:\WINSETUP.
+echo Check the source files and the free disk space.
 goto end
 :dos
 ver
-echo Programy DOS sa w C:\PROGRAMS.
+echo DOS programs are in C:\PROGRAMS.
 goto end
 :missing
-echo Brakuje plikow Windows w C:\WINDOWS.
+echo Windows files are missing in C:\WINDOWS.
 :end
 rem WIN typed at the DOS prompt from now on: the mode of the default menu item
 rem (C:\USOSW3\WINRUN.BAT; WIN /3 and other arguments unchanged). DOSKEY
@@ -62,4 +62,4 @@ if not exist C:\DOS\DOSKEY.COM goto macro_ok
 C:\DOS\DOSKEY.COM win=C:\USOSW3\WINRUN.BAT $* >nul
 :macro_ok
 echo.
-echo Aby ponownie wybrac tryb uruchomienia, zrestartuj komputer.
+echo To choose the start mode again, restart the computer.

@@ -621,6 +621,7 @@ payload_zip	EFI/USOS/dos-native/freedos/doszip.zip
 payload_zip	EFI/USOS/dos-native/freedos/freecom.zip
 payload_zip	EFI/USOS/dos-native/freedos/kernel.zip
 payload_zip	EFI/USOS/dos-native/freedos/manifest.json
+payload_zip	EFI/USOS/dos-native/i18n/DOSTEXT.TXT
 payload_zip	EFI/USOS/dos-native/manifest.json
 payload_zip	EFI/USOS/dos-native/memdisk
 payload_zip	EFI/USOS/dos-native/msdos/COPYDOS.BAT

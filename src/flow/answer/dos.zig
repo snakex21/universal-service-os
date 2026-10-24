@@ -160,6 +160,10 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     try w.writeAll("; USOS MS-DOS / Windows 1.x-3.x regional settings (src/flow/answer/dos.zig)\r\n");
     try w.writeAll("[dos]\r\n");
     try w.print("mode={s}\r\n", .{@tagName(p.dos_regional)});
+    // The profile's language: the DOS-side USOS texts (start menus, batch
+    // messages; tools/dos_win3_menu.sh dos_i18n_apply) follow it, also with
+    // mode=manual. No language: the USOS menu language.
+    if (p.languageEntry()) |l| try w.print("language={s}\r\n", .{l.tag});
     const s = settings(p);
     if (s.country) |c| {
         try w.print("country={d:0>3}\r\ncodepage={d}\r\n", .{ c.code, c.code_page });
@@ -207,11 +211,11 @@ fn profileFrom(text: []const u8) !Profile {
 test "Polish profile: COUNTRY 048, code page 852, KEYB PL only with dos_keyb" {
     var buffer: [512]u8 = undefined;
     const pl = try profileFrom("name=Dom\nuser=Jan\nlanguage=pl-PL\n");
-    try std.testing.expectEqualStrings("; USOS MS-DOS / Windows 1.x-3.x regional settings (src/flow/answer/dos.zig)\r\n[dos]\r\nmode=auto\r\ncountry=048\r\ncodepage=852\r\ncpi=EGA.CPI\r\n", try render(&pl, &buffer));
+    try std.testing.expectEqualStrings("; USOS MS-DOS / Windows 1.x-3.x regional settings (src/flow/answer/dos.zig)\r\n[dos]\r\nmode=auto\r\nlanguage=pl-PL\r\ncountry=048\r\ncodepage=852\r\ncpi=EGA.CPI\r\n", try render(&pl, &buffer));
     const keyb = try profileFrom("name=Dom\nuser=Jan\nlanguage=pl-PL\ndos_keyb=yes\n");
     try std.testing.expect(std.mem.endsWith(u8, try render(&keyb, &buffer), "cpi=EGA.CPI\r\nkeyb=PL\r\nkeybfile=KEYBOARD.SYS\r\n"));
     const manual = try profileFrom("name=Dom\nuser=Jan\nlanguage=pl-PL\ndos_regional=manual\ndos_keyb=yes\n");
-    try std.testing.expect(std.mem.endsWith(u8, try render(&manual, &buffer), "[dos]\r\nmode=manual\r\n"));
+    try std.testing.expect(std.mem.endsWith(u8, try render(&manual, &buffer), "[dos]\r\nmode=manual\r\nlanguage=pl-PL\r\n"));
 }
 
 test "formats and keyboard: locale wins, KEYB only for a layout of the same code page" {
@@ -232,7 +236,9 @@ test "formats and keyboard: locale wins, KEYB only for a layout of the same code
     const auto_lang = try profileFrom("name=A\nuser=B\n");
     try std.testing.expect(std.mem.endsWith(u8, try render(&auto_lang, &buffer), "mode=auto\r\n"));
     const uk = try profileFrom("name=A\nuser=B\nlanguage=uk-UA\n");
-    try std.testing.expect(std.mem.endsWith(u8, try render(&uk, &buffer), "mode=auto\r\n"));
+    try std.testing.expect(std.mem.endsWith(u8, try render(&uk, &buffer), "mode=auto\r\nlanguage=uk-UA\r\n"));
+    // English UI with Polish formats: English texts, Polish country.
+    try std.testing.expect(std.mem.indexOf(u8, try render(&mixed, &buffer), "mode=auto\r\nlanguage=en-US\r\ncountry=048\r\n") != null);
 }
 
 test "Winsock option: one line only when on, any regional mode" {
