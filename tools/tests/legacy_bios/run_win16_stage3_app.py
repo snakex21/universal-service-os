@@ -92,8 +92,8 @@ def main():
         script += ['mkdir -p ' + shlex.quote(str(PurePosixPath(dest).parent)),
                    'cp /ws/' + source + ' ' + shlex.quote(dest)]
     script += ["rm -f /target/NET/MTCP.CFG /target/NET/DHCP.LOG /target/NET/USOSPKT.LOG",
-               "grep -q 'WIN.COM /S /B' /target/AUTOEXEC.BAT",
-               "sed -i 's@WIN.COM /S /B.*@WIN.COM /3 /B C:\\\\NET\\\\WIN16\\\\APPCTL.EXE\\r@' /target/AUTOEXEC.BAT"]
+               "grep -q '^WIN.COM /[S3] /B' /target/AUTOEXEC.BAT",
+               "sed -i 's@^WIN.COM /[S3] /B.*@WIN.COM /3 /B C:\\\\NET\\\\WIN16\\\\APPCTL.EXE\\r@' /target/AUTOEXEC.BAT"]
     stage.flow.ws.linux(vm, disk, args.tag+'-stage', '\n'.join(script)+'\n', files)
     stage.receipt(args.out/(args.tag+'-inputs.json'), {
         'plan': json.loads(args.plan.read_text(encoding='utf-8')), 'applications': copies,
