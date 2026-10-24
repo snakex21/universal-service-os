@@ -658,3 +658,30 @@ Program Manager group: one log line, SETUP.INF unchanged. Test:
 `tools/tests/test_win3_program_icons.py` (host shell; the micro-Linux
 BusyBox awk is not run by it). Not yet run through a real Setup: 3.0 Setup
 with a full path in a `[Main]` entry is unverified (QEMU or X470 check).
+
+**C, round 2 (X470 B261024-201426: FAIL).** In the DOS Prompt of Windows
+3.0a, `win` started a second Windows (then no mouse) instead of the hint.
+Cause, from the scripts: `WINRUN.BAT` was never reached. The DOSKEY macro
+`win=` is loaded only at `:macro_ok`, i.e. after the first Windows started
+from the boot menu has returned, so in that first session the DOS Prompt
+has no macro; its current directory is `C:\WINDOWS`, where COMMAND.COM finds
+`WIN.COM` before any PATH entry, so a WIN.BAT elsewhere in the PATH would
+not help either. (Checked and not the cause: environment space, `SHELL=
+C:\COMMAND.COM C:\ /E:2048 /P` in W1CONFIG; the default item sets USOSWIN
+like WINREAL. Windows 3.0 sets no `windir`; WINOLDAP.MOD only reads COMSPEC,
+so whether its shell sees USOSWIN at all is unproven.) Fix, independent of
+DOSKEY and the environment, Windows 3.0 only:
+- W1AUTO.BAT at every start: `C:\WINDOWS\WIN.COM` is renamed to `WIN30.COM`
+  (a WIN.COM written again by Windows Setup replaces it) and
+  `C:\USOSW3\WIN.BAT` (helper `W30WIN.BAT`, `windows_win30.cmd`, staged by
+  INSTALL.BAT) is copied to `C:\WINDOWS\WIN.BAT`, which calls WINRUN.BAT. So
+  `win` typed anywhere, in any session, reaches WINRUN. The menu items and
+  WINRUN start `WIN30.COM` (WIN.COM when it is not there); WINMENU.BAT and
+  W3START.BAT accept WIN30.COM as "installed".
+- Flag file `C:\USOSW3\WINRUN.ON`: written right before Windows 3.0 starts
+  (W1AUTO, WINRUN), deleted when it returns and at every boot (a reset
+  leaves it). WINRUN shows the hint when the file exists or USOSWIN=1.
+- Silent log `C:\USOSW3\WINRUN.LOG`: one line per WINRUN call (arguments,
+  USOSWIN value), the branch taken (WINRUN.ON / USOSWIN hint, mode,
+  WIN30.COM or WIN.COM, VBMOUSE unloaded or not), "returned"; W1AUTO logs
+  the rename, its start (item, program, USOSWIN) and the return.

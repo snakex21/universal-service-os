@@ -50,7 +50,8 @@ class WinMacro(unittest.TestCase):
         self.assertIn('C:\\WINDOWS\\WIN.COM /3 /B', lines)
         # Windows 3.0: real mode like the menu default; its standard mode
         # (WIN /S) resets the X470 (2026-10-24).
-        self.assertIn('C:\\WINDOWS\\WIN.COM /R', lines)
+        # (UWIN = WIN30.COM once W1AUTO.BAT renamed WIN.COM, else WIN.COM)
+        self.assertIn('C:\\WINDOWS\\%UWIN% /R', lines)
         self.assertNotIn('C:\\WINDOWS\\WIN.COM /S', lines)
         self.assertIn('C:\\WINDOWS\\WIN.COM %1 %2 %3 %4 %5 %6 %7 %8 %9', lines)
         # The same choice as W3AUTO.BAT: WfW only in 386 enhanced mode.

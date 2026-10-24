@@ -51,7 +51,8 @@ def build(root: Path):
                          ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT'),
                          ('windows_early_config.sys', 'W1CONFIG.SYS'), ('windows_early_auto.cmd', 'W1AUTO.BAT'),
                          ('windows_early_setup.cmd', 'W1SETUP.BAT'),
-                         ('windows_run.cmd', 'WINRUN.BAT')]:
+                         ('windows_run.cmd', 'WINRUN.BAT'),
+                         ('windows_win30.cmd', 'W30WIN.BAT')]:
         text = (root / 'src/platform/bios/msdos' / source).read_text(encoding='ascii')
         # COMMAND.COM expands arguments before applying its 127-byte line
         # limit. Long FOR lists can silently lose the final loop variable.

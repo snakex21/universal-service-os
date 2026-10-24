@@ -15,6 +15,25 @@ if "%CONFIG%"=="D2NOKBC" set UDIAG=D2
 if "%CONFIG%"=="D4CLEAN" set UDIAG=D4
 if "%CONFIG%"=="D5MIN" set UDIAG=D5
 if "%CONFIG%"=="D6V10" set UDIAG=D6
+rem Windows 3.0: C:\WINDOWS\WIN.COM becomes WIN30.COM and C:\WINDOWS\WIN.BAT
+rem (from C:\USOSW3\WIN.BAT) calls WINRUN.BAT, so WIN typed anywhere reaches
+rem its already-running guard: also in a DOS window of a Windows started from
+rem this menu (no DOSKEY macro yet; in C:\WINDOWS WIN.COM was found before any
+rem PATH entry; X470 2026-10-24: a second Windows started there). Checked at
+rem every start: Windows Setup may write WIN.COM again. C:\USOSW3\WINRUN.ON
+rem exists only while Windows 3.0 runs; one left by a reset goes here.
+if exist C:\USOSW3\WINRUN.ON del C:\USOSW3\WINRUN.ON
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto shadow_ok
+if exist C:\WIN386\WIN386.EXE goto shadow_ok
+if exist C:\WINDOWS\WIN386.EXE goto shadow_ok
+if not exist C:\USOSW3\WIN.BAT goto shadow_ok
+if not exist C:\WINDOWS\WIN.COM goto shadow_bat
+if exist C:\WINDOWS\WIN30.COM del C:\WINDOWS\WIN30.COM
+ren C:\WINDOWS\WIN.COM WIN30.COM
+echo W1AUTO: C:\WINDOWS\WIN.COM renamed to WIN30.COM>>C:\USOSW3\WINRUN.LOG
+:shadow_bat
+copy C:\USOSW3\WIN.BAT C:\WINDOWS\WIN.BAT /y >nul
+:shadow_ok
 rem USOSV10 first: INT 10h on its own 2 KiB stack. WIN.COM 2.x calls the video
 rem BIOS for its logo with about 200 bytes of stack left above its own code;
 rem a modern video BIOS (RX 560) needs more and overwrites that code (hang at
@@ -90,18 +109,24 @@ set USOSWIN=1
 C:
 if exist C:\WIN386\WIN386.EXE goto w386dir
 if exist C:\WINDOWS\WIN386.EXE goto w386win
+if exist C:\WINDOWS\WIN30.COM goto win_have
 if not exist C:\WINDOWS\WIN.COM goto missing
+:win_have
 cd \WINDOWS
 rem Windows 3.0 (SYSTEM\DOSX.EXE = standard mode present): real mode by
 rem default. Under CSMWrap 386 enhanced mode hangs in the BIOS USB code (V86)
 rem and standard mode (WIN /S) resets the X470 (2026-10-24; QEMU: stopped at
 rem the logo or restarted the VM). WINREAL, only in the DIAG submenu, runs it.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto plain
+set UWIN=WIN.COM
+if exist C:\WINDOWS\WIN30.COM set UWIN=WIN30.COM
+echo USOS>C:\USOSW3\WINRUN.ON
+echo W1AUTO %CONFIG%: %UWIN% USOSWIN=[%USOSWIN%]>>C:\USOSW3\WINRUN.LOG
 if "%CONFIG%"=="WINREAL" goto standard
-WIN.COM /R
+%UWIN% /R
 goto end
 :standard
-WIN.COM /S
+%UWIN% /S
 goto end
 :plain
 WIN.COM
@@ -122,6 +147,11 @@ goto end
 echo Windows files are missing in C:\WINDOWS.
 :end
 set USOSWIN=
+set UWIN=
+if not exist C:\USOSW3\WINRUN.ON goto flag_off
+del C:\USOSW3\WINRUN.ON
+echo W1AUTO: Windows 3.0 returned>>C:\USOSW3\WINRUN.LOG
+:flag_off
 if "%UDIAG%"=="" goto end_msg
 echo ==== WIN returned>>C:\USOS\DIAG\%UDIAG%.TXT
 if "%UDIAG%"=="D5" goto v10_log2

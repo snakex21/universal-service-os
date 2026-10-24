@@ -188,6 +188,11 @@ copy %USRC%\EARLY.TAG C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1SETUP.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+rem Windows 3.0: W1AUTO.BAT puts it into C:\WINDOWS as WIN.BAT (WIN.COM -> WIN30.COM).
+if not exist %USRC%\W30WIN.BAT goto w30win_done
+copy %USRC%\W30WIN.BAT C:\USOSW3\WIN.BAT /y >nul
+if errorlevel 1 goto failed
+:w30win_done
 copy %USRC%\W1CONFIG.SYS C:\USOSW3\W3CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1AUTO.BAT C:\USOSW3\W3AUTO.BAT /y >nul
