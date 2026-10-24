@@ -188,7 +188,17 @@ static void usos_post_event(SOCKET slot, long event, int error)
     usos_selector *selector = &usos_selectors[slot];
     if ((selector->events & event) == 0 || (selector->notified & event) != 0) return;
     if (PostMessage(selector->window, selector->message, (WPARAM)slot,
-                    MAKELONG((WORD)event, (WORD)error))) selector->notified |= event;
+                    MAKELONG((WORD)event, (WORD)error))) {
+        selector->notified |= event;
+        /* Socket, FD_* event; then the window and message; then the error
+         * when there is one (USOS_WS_DIAG only). */
+        USOS_TRACE_SR("post event", slot, event);
+        USOS_TRACE_SR("post hwnd msg", (WORD)selector->window, selector->message);
+        if (error != 0) USOS_TRACE_SR("post error", slot, error);
+    } else {
+        USOS_TRACE_SR("post event FAILED", slot, event);
+        USOS_TRACE_SR("post hwnd msg", (WORD)selector->window, selector->message);
+    }
 }
 
 /* dns_extra.h/c supply only bounded RFC1035 PTR parsing, no transport. */

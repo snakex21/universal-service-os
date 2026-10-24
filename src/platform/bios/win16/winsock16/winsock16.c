@@ -49,7 +49,13 @@ static void usos_abi_trace(const char FAR *label, const char FAR *text, unsigned
     _lwrite(file, "\r\n", 2); _lclose(file);
 }
 #define USOS_TRACE(label,text,value) usos_abi_trace(label,text,value)
+/* Successful data calls and posted events (2026-10-25: Netscape 3.04 GPF in
+ * Windows 3.1 standard mode on the X470 left no trace after the last
+ * would-block recv). Values: socket in the high word, result (byte count,
+ * 0, the ioctlsocket argument) in the low word, unless noted. */
+#define USOS_TRACE_SR(label,s,rc) usos_abi_trace(label,NULL,((unsigned long)(unsigned int)(s) << 16) | (unsigned int)(rc))
 #else
+#define USOS_TRACE_SR(label,s,rc) ((void)0)
 #define USOS_TRACE(label,text,value) ((void)0)
 #endif
 
@@ -327,14 +333,18 @@ int __far __pascal __export closesocket(SOCKET s)
 
     if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (usos_socket_options[s].linger_value.l_onoff &&
-        !usos_socket_options[s].linger_value.l_linger)
+        !usos_socket_options[s].linger_value.l_linger) {
+        USOS_TRACE_SR("closesocket abort", s, 0);
         rc = usos_block_done(usos_sock_abort((int)s));
-    else
+    } else {
+        USOS_TRACE_SR("closesocket", s, 0);
         rc = usos_block_done(usos_sock_close((int)s));
+    }
     if (s < USOS_MAX_SOCKETS) usos_socket_defaults(s);
     if (s < USOS_MAX_SOCKETS) usos_socket_owners[s] = NULL;
     if (rc < 0)
         return usos_map_error(rc);
+    USOS_TRACE_SR("closesocket ok", s, 0);
     usos_last_error = 0;
     return 0;
 }
@@ -461,6 +471,9 @@ int __far __pascal __export ioctlsocket(SOCKET s, long cmd, u_long FAR *argp)
 {
     usos_u32 count;
     int rc;
+    /* The command itself (FIONBIO 8004667E, FIONREAD 4004667F, SIOCATMARK
+     * 40047307): an unknown one is the WSAEINVAL seen after setsockopt. */
+    USOS_TRACE("ioctlsocket cmd", NULL, (unsigned long)cmd);
     if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (argp == NULL) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }
     if (cmd == FIONBIO) {
@@ -474,6 +487,7 @@ int __far __pascal __export ioctlsocket(SOCKET s, long cmd, u_long FAR *argp)
         if (rc >= 0) *argp = (u_long)count;
     } else { usos_last_error = WSAEINVAL; return SOCKET_ERROR; }
     if (rc < 0) return usos_map_error(rc);
+    USOS_TRACE_SR("ioctlsocket ok", s, *argp);
     usos_last_error = 0; return 0;
 }
 
@@ -513,6 +527,7 @@ int __far __pascal __export recv(SOCKET s, char FAR *buf, int len, int flags)
     else { usos_last_error = WSAEOPNOTSUPP; return SOCKET_ERROR; }
     if (rc < 0)
         return usos_map_error(rc);
+    USOS_TRACE_SR(flags == MSG_PEEK ? "recv peek ok" : "recv ok", s, rc);
     usos_last_error = 0;
     return rc;
 }
@@ -532,6 +547,7 @@ int __far __pascal __export recvfrom(SOCKET s, char FAR *buf, int len, int flags
     rc = usos_block_done(usos_sock_recvfrom((int)s, (usos_u8 FAR *)buf, (usos_u16)len, &ip, &port));
     if (rc < 0) return usos_map_error(rc);
     if (from != NULL) usos_fill_sockaddr(from, fromlen, ip, port);
+    USOS_TRACE_SR("recvfrom ok", s, rc);
     usos_last_error = 0; return rc;
 }
 
@@ -539,7 +555,20 @@ int __far __pascal __export select(int nfds, fd_set FAR *readfds, fd_set FAR *wr
                           fd_set FAR *exceptfds, const struct timeval FAR *timeout)
 {
     (void)nfds;
+#ifdef USOS_WS_DIAG
+    {
+        /* Ready count (or -1) in the low word, the read/write/except set
+         * sizes the caller passed in the high word (4 bits each). */
+        unsigned int sizes = (readfds != NULL ? (readfds->fd_count & 15) << 8 : 0)
+                           | (writefds != NULL ? (writefds->fd_count & 15) << 4 : 0)
+                           | (exceptfds != NULL ? exceptfds->fd_count & 15 : 0);
+        int rc = usos_select_wait(readfds, writefds, exceptfds, timeout);
+        USOS_TRACE_SR(timeout == NULL ? "select" : "select timeout", sizes, rc);
+        return rc;
+    }
+#else
     return usos_select_wait(readfds, writefds, exceptfds, timeout);
+#endif
 }
 
 int __far __pascal __export send(SOCKET s, const char FAR *buf, int len, int flags)
@@ -561,6 +590,7 @@ int __far __pascal __export send(SOCKET s, const char FAR *buf, int len, int fla
     if (s < USOS_MAX_SOCKETS && rc == USOS_SOCK_EWOULDBLOCK) usos_selectors[s].notified &= ~FD_WRITE;
     if (rc < 0)
         return usos_map_error(rc);
+    USOS_TRACE_SR("send ok", s, rc);
     usos_last_error = 0;
     return rc;                         /* partial writes are reported as such */
 }
@@ -579,6 +609,7 @@ int __far __pascal __export sendto(SOCKET s, const char FAR *buf, int len, int f
     rc = usos_block_done(usos_sock_sendto((int)s, net_ntohl(addr.sin_addr.s_addr), net_ntohs(addr.sin_port), (const usos_u8 FAR *)buf, (usos_u16)len));
     if (s < USOS_MAX_SOCKETS && rc == USOS_SOCK_EWOULDBLOCK) usos_selectors[s].notified &= ~FD_WRITE;
     if (rc < 0) return usos_map_error(rc);
+    USOS_TRACE_SR("sendto ok", s, rc);
     usos_last_error = 0; return rc;
 }
 

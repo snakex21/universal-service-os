@@ -184,3 +184,27 @@ def test_ne_names_use_absolute_nonresident_offset_and_preserve_case(tmp_path):
     path = tmp_path/'exports.dll'
     path.write_bytes(data)
     assert parse_ne_exports(path) == {'WEP': 1024, 'WSAStartup': 115}
+
+
+def test_diag_traces_data_calls_and_posted_events():
+    """USOS_WS_DIAG only: successful recv/send/select/closesocket/
+    ioctlsocket (with its command) and every posted FD_* event go to
+    WINSOCK.LOG (X470 2026-10-24: Netscape's standard-mode GPF came after
+    the last traced call). Without the define the macros are empty."""
+    c = (SRC_DIR / 'winsock16.c').read_text(encoding='ascii')
+    inc = (SRC_DIR / 'ws2_private.inc').read_text(encoding='ascii')
+    diag, release = c.split('#ifdef USOS_WS_DIAG', 1)[1].split('#else', 1)
+    release = release.split('#endif', 1)[0]
+    assert '#define USOS_TRACE_SR(label,s,rc) usos_abi_trace(' in diag
+    assert '#define USOS_TRACE_SR(label,s,rc) ((void)0)' in release
+    for label in ('"recv ok"', '"recv peek ok"', '"recvfrom ok"', '"send ok"', '"sendto ok"',
+                  '"closesocket"', '"closesocket abort"', '"closesocket ok"', '"ioctlsocket ok"',
+                  '"select"', '"select timeout"'):
+        assert label in c, label
+    assert 'USOS_TRACE("ioctlsocket cmd", NULL, (unsigned long)cmd);' in c
+    post = inc.split('static void usos_post_event', 1)[1].split('\n}\n', 1)[0]
+    for label in ('"post event"', '"post hwnd msg"', '"post error"', '"post event FAILED"'):
+        assert label in post, label
+    # The select trace is compiled only in the diagnostic DLL.
+    sel = c.split('__export select(', 1)[1].split('\n}\n', 1)[0]
+    assert '#ifdef USOS_WS_DIAG' in sel and 'return usos_select_wait(readfds, writefds, exceptfds, timeout);' in sel
