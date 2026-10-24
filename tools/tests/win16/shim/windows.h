@@ -16,6 +16,11 @@
 typedef unsigned short WORD;
 typedef unsigned char BYTE;
 typedef unsigned int DWORD,UINT,WPARAM,HANDLE,HINSTANCE,HWND;
+typedef unsigned int HTASK;
+typedef void *HGLOBAL;
+#define GMEM_FIXED 0
+#define GMEM_ZEROINIT 0x40
+#define GMEM_DDESHARE 0x2000
 typedef signed int LONG,LPARAM;
 typedef int BOOL;
 typedef char *LPSTR;
@@ -37,6 +42,11 @@ typedef struct { unsigned int style;WNDPROC lpfnWndProc;int cbClsExtra,cbWndExtr
 #define MAKEWORD(lo,hi) ((WORD)((BYTE)(lo)|((WORD)(BYTE)(hi)<<8)))
 #define MAKELONG(lo,hi) ((LONG)((DWORD)(WORD)(lo)|((DWORD)(WORD)(hi)<<16)))
 DWORD GetTickCount(void);
+HTASK GetCurrentTask(void);
+HGLOBAL GlobalAlloc(UINT,DWORD);
+void *GlobalLock(HGLOBAL);
+BOOL GlobalUnlock(HGLOBAL);
+HGLOBAL GlobalFree(HGLOBAL);
 BOOL PeekMessage(MSG *,HWND,UINT,UINT,UINT);
 BOOL TranslateMessage(const MSG *);
 LONG DispatchMessage(const MSG *);

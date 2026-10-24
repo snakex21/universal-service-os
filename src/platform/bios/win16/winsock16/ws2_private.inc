@@ -5,46 +5,8 @@
  * Contracts: public Windows Sockets1.1 documentation and RFC1035.
  * No callback is added to the public NE export table.
  */
-#define USOS_ASYNC_JOBS 4
 #define USOS_ASYNC_CLASS "USOS Winsock events"
-
-typedef struct {
-    HWND window;
-    unsigned int message;
-    long events, notified;
-    int connecting;
-} usos_selector;
-typedef struct {
-    int keepalive, reuseaddr, nodelay;
-    struct linger linger_value;
-} usos_options;
-typedef struct {
-    int active, reverse, socket_id, sent, retries;
-    unsigned int handle;
-    HWND window;
-    unsigned int message;
-    char FAR *buffer;
-    int room;
-    char name[USOS_NET_NAME_MAX];
-    usos_u32 address, last_sent, began;
-} usos_async_job;
-
-static usos_selector usos_selectors[USOS_MAX_SOCKETS];
-static usos_options usos_socket_options[USOS_MAX_SOCKETS];
-static usos_async_job usos_jobs[USOS_ASYNC_JOBS];
-static HINSTANCE usos_instance;
-static HWND usos_poll_window;
-static FARPROC usos_poll_proc;
-static unsigned int usos_next_async;
-static int usos_in_async_pump, usos_class_registered;
 static void usos_async_pump(void);
-
-static int usos_require_startup(void)
-{
-    if (usos_startup_count != 0) return 1;
-    usos_last_error = WSANOTINITIALISED;
-    return 0;
-}
 
 static int usos_text_equal(const char FAR *left, const char *right)
 {
@@ -83,7 +45,7 @@ static int usos_error_number(int engine_error)
 static LONG FAR PASCAL __loadds usos_event_window(HWND window, UINT message,
                                                   WPARAM wp, LPARAM lp)
 {
-    if (message == WM_TIMER && wp == 1) { usos_async_pump(); return 0; }
+    if (message == WM_TIMER && wp == 1 && window == usos_poll_window) { usos_async_pump(); return 0; }
     return DefWindowProc(window, message, wp, lp);
 }
 
@@ -111,24 +73,37 @@ static int usos_async_start(void)
     return 1;
 }
 
-static void usos_async_cleanup(void)
+static void usos_async_cleanup(usos_app_context FAR *app)
 {
     int i;
-    if (usos_poll_window != NULL && IsWindow(usos_poll_window)) {
-        KillTimer(usos_poll_window, 1);
-        DestroyWindow(usos_poll_window);
+    if (app->poll_window != NULL && IsWindow(app->poll_window)) {
+        KillTimer(app->poll_window, 1);
+        DestroyWindow(app->poll_window);
     }
-    usos_poll_window = NULL;
+    app->poll_window = NULL;
+    for (i = 0; i < USOS_ASYNC_JOBS; i++) {
+        if (app->jobs[i].active && app->jobs[i].socket_id >= 0) {
+            usos_sock_nonblocking(app->jobs[i].socket_id, 1);
+            usos_sock_close(app->jobs[i].socket_id);
+        }
+        app->jobs[i].active = 0;
+    }
+    for (i = 0; i < USOS_MAX_SOCKETS; i++) if (usos_socket_owners[i] == app->task) {
+        usos_sock_nonblocking(i, 1);
+        usos_sock_close(i);
+        usos_socket_owners[i] = NULL;
+        usos_socket_defaults((SOCKET)i);
+    }
+    app->hook = NULL;
+    app->blocking = app->cancelled = app->in_pump = 0;
+}
+
+static void usos_async_class_cleanup(void)
+{
     if (usos_class_registered) UnregisterClass(USOS_ASYNC_CLASS, usos_instance);
     usos_class_registered = 0;
     if (usos_poll_proc != NULL) FreeProcInstance(usos_poll_proc);
     usos_poll_proc = NULL;
-    for (i = 0; i < USOS_ASYNC_JOBS; i++) {
-        if (usos_jobs[i].active && usos_jobs[i].socket_id >= 0)
-            usos_sock_close(usos_jobs[i].socket_id);
-        usos_jobs[i].active = 0;
-    }
-    for (i = 0; i < USOS_MAX_SOCKETS; i++) usos_socket_defaults((SOCKET)i);
 }
 
 static int usos_pack_host(char FAR *buffer, int room, const char *name,
@@ -281,6 +256,7 @@ static void usos_async_pump(void)
     usos_sock_tick();
     for (i = 0; i < USOS_ASYNC_JOBS; i++) if (usos_jobs[i].active) usos_name_step(&usos_jobs[i]);
     for (i = 0; i < USOS_MAX_SOCKETS; i++) {
+        if (usos_socket_owners[i] != GetCurrentTask()) continue;
         selector = &usos_selectors[i];
         if (!selector->events) continue;
         if (!IsWindow(selector->window)) { selector->events = 0; continue; }
@@ -306,6 +282,7 @@ static int usos_filter_set(fd_set *destination, const fd_set *source, int mask)
     int ready;
     destination->fd_count = 0;
     for (i = 0; i < source->fd_count; i++) {
+        if (source->fd_array[i] >= USOS_MAX_SOCKETS || usos_socket_owners[source->fd_array[i]] != GetCurrentTask()) { usos_last_error = WSAENOTSOCK; return SOCKET_ERROR; }
         ready = usos_sock_readiness((int)source->fd_array[i]);
         if (ready < 0) return usos_map_error(ready);
         if (ready & mask) destination->fd_array[destination->fd_count++] = source->fd_array[i];
@@ -346,13 +323,16 @@ static int usos_select_wait(fd_set FAR *readset, fd_set FAR *writeset,
         total = 0;
         for (i = 0; i < 3; i++) {
             rc = usos_filter_set(&result[i], &sources[i], masks[i]);
-            if (rc < 0) return SOCKET_ERROR;
+            if (rc < 0) { usos_block_done(rc); return SOCKET_ERROR; }
             total += rc;
         }
         if (total || (timeout != NULL && (usos_u32)((usos_u32)GetTickCount() - began) >= limit)) break;
+        if (usos_abi_cancelled()) return usos_map_error(usos_block_done(USOS_SOCK_ECANCELLED));
         usos_abi_idle();
+        if (usos_abi_cancelled()) return usos_map_error(usos_block_done(USOS_SOCK_ECANCELLED));
     } while (1);
     for (i = 0; i < 3; i++) if (sets[i] != NULL) usos_far_tobuf(sets[i], &result[i], sizeof(fd_set));
+    usos_block_done(0);
     usos_last_error = 0;
     return total;
 }
@@ -361,7 +341,7 @@ static int usos_get_option(SOCKET s, int level, int option, char FAR *value, int
 {
     int result, needed;
     struct linger linger_value;
-    if (!usos_require_startup()) return SOCKET_ERROR;
+    if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (s >= USOS_MAX_SOCKETS || usos_sock_kind((int)s) < 0) { usos_last_error = WSAENOTSOCK; return SOCKET_ERROR; }
     if (value == NULL || length == NULL) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }
     needed = sizeof(int); result = 0;
@@ -387,7 +367,7 @@ static int usos_set_option(SOCKET s, int level, int option, const char FAR *valu
 {
     int input;
     struct linger linger_value;
-    if (!usos_require_startup()) return SOCKET_ERROR;
+    if (!usos_owned_socket(s)) return SOCKET_ERROR;
     if (s >= USOS_MAX_SOCKETS || usos_sock_kind((int)s) < 0) { usos_last_error = WSAENOTSOCK; return SOCKET_ERROR; }
     if (value == NULL) { usos_last_error = WSAEFAULT; return SOCKET_ERROR; }
     if (level == SOL_SOCKET && option == SO_LINGER) {
@@ -423,15 +403,14 @@ static int usos_set_option(SOCKET s, int level, int option, const char FAR *valu
  * next call in this database, as required by the Win16 interface. */
 static struct protoent FAR *usos_protocol(int number)
 {
-    static struct protoent result;
-    static char FAR *aliases[1];
+    usos_app_context FAR *app = usos_app();
     static char tcp_name[] = "tcp", udp_name[] = "udp", icmp_name[] = "icmp";
-    if (number == 6) result.p_name = tcp_name;
-    else if (number == 17) result.p_name = udp_name;
-    else if (number == 1) result.p_name = icmp_name;
+    if (number == 6) app->protocol.p_name = tcp_name;
+    else if (number == 17) app->protocol.p_name = udp_name;
+    else if (number == 1) app->protocol.p_name = icmp_name;
     else { usos_last_error = WSANO_DATA; return NULL; }
-    aliases[0] = NULL; result.p_aliases = aliases; result.p_proto = number;
-    usos_last_error = 0; return &result;
+    app->protocol_aliases[0] = NULL; app->protocol.p_aliases = app->protocol_aliases; app->protocol.p_proto = number;
+    usos_last_error = 0; return &app->protocol;
 }
 
 typedef struct { char *name; unsigned int port; char *protocol; } usos_service_entry;
@@ -445,17 +424,16 @@ static usos_service_entry usos_services[] = {
 static struct servent FAR *usos_service(const char FAR *name, unsigned int port,
                                          const char FAR *protocol)
 {
-    static struct servent result;
-    static char FAR *aliases[1];
+    usos_app_context FAR *app = usos_app();
     unsigned int i;
     for (i = 0; i < sizeof(usos_services) / sizeof(usos_services[0]); i++) {
         if (protocol != NULL && !usos_text_equal(protocol, usos_services[i].protocol)) continue;
         if (name != NULL ? !usos_text_equal(name, usos_services[i].name) : port != usos_services[i].port) continue;
-        result.s_name = usos_services[i].name;
-        result.s_port = net_htons(usos_services[i].port);
-        result.s_proto = usos_services[i].protocol;
-        aliases[0] = NULL; result.s_aliases = aliases;
-        usos_last_error = 0; return &result;
+        app->service.s_name = usos_services[i].name;
+        app->service.s_port = net_htons(usos_services[i].port);
+        app->service.s_proto = usos_services[i].protocol;
+        app->service_aliases[0] = NULL; app->service.s_aliases = app->service_aliases;
+        usos_last_error = 0; return &app->service;
     }
     usos_last_error = WSANO_DATA; return NULL;
 }
@@ -491,7 +469,9 @@ static int usos_reverse_name(usos_u32 ip, char *name, unsigned int room)
             usos_sock_close(slot); return rc;
         }
         if (rc < 0 && rc != USOS_SOCK_EWOULDBLOCK) break;
+        if (usos_abi_cancelled()) { rc = USOS_SOCK_ECANCELLED; break; }
         usos_abi_idle();
+        if (usos_abi_cancelled()) { rc = USOS_SOCK_ECANCELLED; break; }
         rc = USOS_SOCK_ETIMEDOUT;
     }
     usos_sock_close(slot); return rc;
