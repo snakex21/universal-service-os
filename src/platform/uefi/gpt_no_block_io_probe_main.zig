@@ -30,6 +30,8 @@ fn volumeLabelEquals(root: *uefi.protocol.File, expected: []const u8) bool {
 const data_marker = std.unicode.utf8ToUtf16LeStringLiteral("\\usos-data-marker.txt");
 const work_marker = std.unicode.utf8ToUtf16LeStringLiteral("\\.usos-work");
 
+const start_work_flag = std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\USOS\\probe-start-work.flag");
+
 fn hasFile(root: *uefi.protocol.File, path: [*:0]const u16) bool {
     const file = root.open(path, .read, .{}) catch return false;
     file.close() catch {};
@@ -123,8 +125,17 @@ pub fn main() uefi.Status {
             say("NO-BLOCK-IO VISIBILITY FAIL\n");
             return .load_error;
         };
-        _ = boot_services.unloadImage(image) catch .load_error;
         say("WORK LOADIMAGE PASS\n");
+        if (hasFile(esp_root, start_work_flag)) {
+            // Optional: hand over to the WORK boot file (the Windows boot
+            // manager in the bootmgr variant of the QEMU test).
+            say("NO-BLOCK-IO VISIBILITY PASS\n");
+            say("WORK STARTIMAGE BEGIN\n");
+            _ = boot_services.startImage(image) catch {};
+            say("WORK STARTIMAGE RETURNED\n");
+            return .success;
+        }
+        _ = boot_services.unloadImage(image) catch .load_error;
     } else {
         say("WORK LOADIMAGE SKIPPED (no EFI/USOS-WORK boot file)\n");
     }

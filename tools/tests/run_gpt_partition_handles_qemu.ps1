@@ -1,7 +1,13 @@
 param(
     # Toolchain checkout (tools/qemu, tools/cache/efifs); defaults to this checkout.
     [string]$ToolsRoot = '',
-    [int]$TimeoutSeconds = 40
+    [int]$TimeoutSeconds = 40,
+    # Put the host's Windows boot manager (bootmgfw.efi + a two-entry menu
+    # BCD) on WORK and StartImage it: a visible boot menu proves bootmgr read
+    # its BCD from WORK through the partition handle. Screenshots land in
+    # the artifact folder (<case>-bootmgr.ppm).
+    [switch]$WindowsBootManager,
+    [int]$BootManagerWaitSeconds = 45
 )
 
 # QEMU/OVMF check of the USOS partition handles for GPT bit 1
@@ -12,6 +18,8 @@ param(
 #   hidden    same plus bit 1 on DATA/WORK    -> OVMF makes no handles; USOS
 #             installs its own; DATA/WORK SimpleFS, WORK discovery and
 #             LoadImage from WORK must PASS
+# -WindowsBootManager: the WORK boot file is the host's bootmgfw.efi; the
+# probe starts it and a monitor screendump shows the BCD boot menu.
 # Only disposable files under tools/tests/artifacts/qemu are touched.
 
 $ErrorActionPreference = 'Stop'
@@ -75,7 +83,40 @@ try {
     $dataRoot = "$($data.DriveLetter):\"
     [IO.File]::WriteAllText((Join-Path $workRoot '.usos-work'), "nonce=partition-handles`r`n")
     New-Item -ItemType Directory -Force -Path (Join-Path $workRoot 'EFI\USOS-WORK') | Out-Null
-    Copy-Item -LiteralPath $probeEfi -Destination (Join-Path $workRoot 'EFI\USOS-WORK\BOOTX64.EFI') -Force
+    if ($WindowsBootManager) {
+        $winBoot = Join-Path $env:WINDIR 'Boot'
+        $msBoot = Join-Path $workRoot 'EFI\Microsoft\Boot'
+        New-Item -ItemType Directory -Force -Path $msBoot | Out-Null
+        Copy-Item -Path (Join-Path $winBoot 'EFI\*') -Destination $msBoot -Recurse -Force
+        Copy-Item -Path (Join-Path $winBoot 'Fonts') -Destination $msBoot -Recurse -Force
+        Remove-Item -LiteralPath (Join-Path $msBoot 'BCD') -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath (Join-Path $winBoot 'EFI\bootmgfw.efi') -Destination (Join-Path $workRoot 'EFI\USOS-WORK\BOOTX64.EFI') -Force
+        $bcd = Join-Path $msBoot 'BCD'
+        $bcdedit = Join-Path $env:WINDIR 'System32\bcdedit.exe'
+        function Bcd { $out = & $bcdedit /store $bcd @args 2>&1; if ($LASTEXITCODE -ne 0) { throw "bcdedit $args failed: $out" }; return ($out -join ' ') }
+        & $bcdedit /createstore $bcd | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'bcdedit /createstore failed' }
+        Bcd /create '{bootmgr}' /d 'USOS bootmgr probe' | Out-Null
+        Bcd /set '{bootmgr}' device boot | Out-Null
+        Bcd /set '{bootmgr}' displaybootmenu yes | Out-Null
+        Bcd /timeout 120 | Out-Null
+        $entries = @()
+        foreach ($label in @('USOS BCD READ FROM WORK - A', 'USOS BCD READ FROM WORK - B')) {
+            $created = Bcd /create /d $label /application osloader
+            if ($created -notmatch '\{[0-9a-fA-F-]{36}\}') { throw "no BCD entry GUID: $created" }
+            $guid = $Matches[0]
+            Bcd /set $guid device boot | Out-Null
+            Bcd /set $guid osdevice boot | Out-Null
+            Bcd /set $guid systemroot '\Windows' | Out-Null
+            Bcd /set $guid path '\Windows\system32\winload.efi' | Out-Null
+            $entries += $guid
+        }
+        Bcd /displayorder @entries | Out-Null
+        Bcd /default $entries[0] | Out-Null
+        Set-Content -LiteralPath (Join-Path $esp 'EFI\USOS\probe-start-work.flag') -Value 'start' -Encoding ascii
+    } else {
+        Copy-Item -LiteralPath $probeEfi -Destination (Join-Path $workRoot 'EFI\USOS-WORK\BOOTX64.EFI') -Force
+    }
     [IO.File]::WriteAllText((Join-Path $dataRoot 'usos-data-marker.txt'), "DATA`r`n")
 } finally {
     if ($mounted) { Dismount-DiskImage -ImagePath $vhd -ErrorAction SilentlyContinue | Out-Null }
@@ -90,6 +131,19 @@ Copy-Item -LiteralPath $baseRaw -Destination $hiddenRaw -Force
 & py.exe -3 -I $patcher $hiddenRaw --usos-names
 if ($LASTEXITCODE -ne 0) { throw "GPT bit 1 patch failed: $LASTEXITCODE" }
 
+$monitorPort = 45871
+function Send-Monitor([string]$command) {
+    $client = New-Object System.Net.Sockets.TcpClient('127.0.0.1', $monitorPort)
+    try {
+        $stream = $client.GetStream()
+        $writer = New-Object System.IO.StreamWriter($stream)
+        Start-Sleep -Milliseconds 300
+        $writer.Write("$command`n")
+        $writer.Flush()
+        Start-Sleep -Milliseconds 1500
+    } finally { $client.Close() }
+}
+
 function Run-Probe([string]$name, [string]$image) {
     $serial = Join-Path $artifactRoot "$name-serial.log"
     $vars = Join-Path $artifactRoot "$name-vars.fd"
@@ -98,7 +152,7 @@ function Run-Probe([string]$name, [string]$image) {
     $espForQemu = $esp.Replace('\','/')
     $qargs = @(
         '-name',"USOS-partition-handles-$name", '-machine','q35', '-accel','tcg,thread=multi', '-cpu','max', '-m','512', '-smp','2',
-        '-nic','none', '-display','none', '-monitor','none', '-serial',"file:$($serial.Replace('\','/'))",
+        '-nic','none', '-display','none', '-monitor',"tcp:127.0.0.1:$monitorPort,server,nowait", '-serial',"file:$($serial.Replace('\','/'))",
         '-drive',"if=pflash,format=raw,readonly=on,file=$firmwareCode", '-drive',"if=pflash,format=raw,file=$vars",
         '-drive',"if=none,id=probeesp,format=raw,file=fat:rw:$espForQemu",
         '-device','ide-hd,bus=ide.0,drive=probeesp,bootindex=1',
@@ -118,6 +172,12 @@ function Run-Probe([string]$name, [string]$image) {
         }
     }
     Start-Sleep -Milliseconds 300
+    if ($WindowsBootManager -and $result -eq 'PASS' -and -not $process.HasExited) {
+        Start-Sleep -Seconds $BootManagerWaitSeconds
+        $shot = Join-Path $artifactRoot "$name-bootmgr.ppm"
+        Send-Monitor ("screendump " + $shot.Replace('\','/'))
+        if (Test-Path -LiteralPath $shot) { Write-Host "[INFO] $name bootmgr screen: $shot" } else { Write-Host "[WARN] $name screendump missing" }
+    }
     if (-not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     $text = if (Test-Path -LiteralPath $serial) { Get-Content -LiteralPath $serial -Raw } else { '' }
     Write-Host "----- $name -----"
@@ -133,6 +193,10 @@ if ($baseline.Text -match 'USOS PARTITION HANDLES INSTALLED') { Write-Host '[FAI
 if ($hidden.Result -ne 'PASS') { Write-Host '[FAIL] hidden (bit 1) probe' -ForegroundColor Red; $ok = $false }
 if ($hidden.Text -notmatch 'USOS PARTITION HANDLES INSTALLED') { Write-Host '[FAIL] hidden probe did not use USOS partition handles' -ForegroundColor Red; $ok = $false }
 if ($hidden.Text -match 'FIRMWARE IGNORED GPT BIT 1') { Write-Host '[FAIL] OVMF ignored bit 1; the hidden case was not exercised' -ForegroundColor Red; $ok = $false }
+if ($WindowsBootManager) {
+    if ($hidden.Text -notmatch 'WORK STARTIMAGE BEGIN') { Write-Host '[FAIL] hidden probe did not start the WORK boot manager' -ForegroundColor Red; $ok = $false }
+    Write-Host '[INFO] check <case>-bootmgr.ppm: the menu with both "USOS BCD READ FROM WORK" entries = bootmgr read BCD from WORK'
+}
 if ($hidden.Text -notmatch 'WORK LOADIMAGE PASS') { Write-Host '[FAIL] hidden probe: no LoadImage from WORK' -ForegroundColor Red; $ok = $false }
 if (-not $ok) { exit 1 }
 Remove-Item -LiteralPath $baseRaw,$hiddenRaw -Force
