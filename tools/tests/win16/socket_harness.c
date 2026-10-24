@@ -14,6 +14,8 @@ static usos_u8 frames[16][1514];
 static usos_u16 sizes[16], head, tail, clientport;
 static usos_u32 now, clientseq, peerseq = 100;
 static int failures, routed, dns_onlink;
+static int response_active;
+static usos_u16 response_offset;
 static usos_u32 local_ip=0x0a00020fUL, dns_ip=0x0a000203UL;
 static usos_u32 local_mask=0xffffff00UL, router_ip=0x0a000202UL;
 
@@ -44,10 +46,23 @@ static void segment(usos_u8 flags, usos_u16 length, usos_u16 offset)
     peerseq += length + ((flags & (USOS_TCP_SYN|USOS_TCP_FIN)) ? 1 : 0);
 }
 
+static void response(const usos_u8 *ack)
+{
+    usos_u32 edge=net_get32(ack+8)+net_get16(ack+14);
+    usos_u16 count;
+    while(response_active && (usos_s32)(edge-peerseq)>0) {
+        count=(usos_u16)(5157-response_offset);
+        if(count>1024) count=1024;
+        if((usos_u32)count+(response_offset+count==5157?1:0)>edge-peerseq) break;
+        segment((usos_u8)(USOS_TCP_ACK|USOS_TCP_PSH|(response_offset+count==5157?USOS_TCP_FIN:0)),count,response_offset);
+        response_offset=(usos_u16)(response_offset+count);
+        if(response_offset==5157) response_active=0;
+    }
+}
+
 int usos_pkt_send(const usos_u8 *frame, usos_u16 len)
 {
     const usos_u8 *tcp = frame+34;
-    usos_u16 i;
     (void)len;
     if(net_get16(frame+12)==0x0806) {
         usos_u8 *reply=frames[head];
@@ -77,11 +92,12 @@ int usos_pkt_send(const usos_u8 *frame, usos_u16 len)
         segment(USOS_TCP_SYN|USOS_TCP_ACK,0,0);
     } else if(tcp[13] & USOS_TCP_PSH) {
         clientseq=net_get32(tcp+4)+(len-54);
-        for(i=0;i<5;i++) segment(USOS_TCP_ACK|USOS_TCP_PSH,1024,i*1024);
-        /* Payload and FIN in the same segment must both reach the caller. */
-        segment(USOS_TCP_ACK|USOS_TCP_PSH|USOS_TCP_FIN,37,5120);
+        response_active=1; response_offset=0;
+        response(tcp);
     } else if(tcp[13] & USOS_TCP_FIN) {
         clientseq=net_get32(tcp+4)+1; segment(USOS_TCP_ACK,0,0);
+    } else if((tcp[13]&USOS_TCP_ACK) && response_active) {
+        response(tcp);
     }
     return 0;
 }

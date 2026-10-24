@@ -1,4 +1,4 @@
-/* tcp.c - blocking TCP client: one connection, one segment in flight.
+/* tcp.c - portable client TCP validation and wire-sequence state.
  *
  * Copyright (C) 2026 Maksymilian and the USOS Authors
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -10,13 +10,14 @@
  *   ESTABLISHED --our close--> FIN_WAIT --peer FIN--> TIME_WAIT
  *   anything --RST--> RESET
  *
- * The send window is one segment (USOS_NET_TCP_WINDOW), so there is never more
- * than one unacknowledged segment: snd_una advances only when the peer
- * acknowledges all of snd_nxt, and net_tcp_timeout() rewinds snd_nxt to
- * snd_una so the caller can rebuild the very same segment.  Sequence numbers
- * come from a 32-bit LFSR seeded per socket, which keeps the ISN
- * unpredictable enough for an educational stack and keeps the host tests
- * deterministic.
+ * The socket engine owns bounded TX/RX windows and out-of-order bytes.
+ * Sequence comparisons use explicit 32-bit signed differences, including
+ * wraparound. net_tcp_build_at rebuilds an outstanding range without
+ * rewinding snd_nxt; the latter always denotes the true sent upper edge.
+ * ISNs are seeded LFSR values, not cryptographic randomness.
+ * Protocol references: RFC9293 (sequence space, windows, open/close),
+ * RFC6298 (initial one-second RTO and exponential backoff). This bounded
+ * implementation does not yet estimate SRTT/RTTVAR or implement fast recovery.
  */
 
 #include "net.h"
@@ -51,6 +52,8 @@ void net_tcp_init(net_tcp *t, usos_u32 seed)
     t->state = (usos_u8)USOS_TCP_CLOSED;
     t->ip_id = (usos_u16)USOS_NET_IPID_START;
     t->snd_wnd = (usos_u16)USOS_NET_TCP_RCVWND;
+    t->rcv_wnd = (usos_u16)USOS_NET_TCP_RCVWND;
+    t->peer_mss = 536;
 }
 
 usos_u32 net_tcp_next_isn(net_tcp *t)
@@ -92,14 +95,19 @@ int net_tcp_open(net_tcp *t, usos_u32 local_ip, usos_u16 local_port,
     t->retries = 0;
     t->fin_sent = 0;
     t->rst = 0;
+    t->snd_wnd = (usos_u16)USOS_NET_TCP_RCVWND;
+    t->rcv_wnd = (usos_u16)USOS_NET_TCP_RCVWND;
+    t->peer_mss = 536;
     return USOS_NET_OK;
 }
 
-usos_u16 net_tcp_build(net_tcp *t, usos_u8 *pkt, usos_u8 flags, usos_u16 wnd,
-                       const usos_u8 *data, usos_u16 data_len)
+usos_u16 net_tcp_build_at(net_tcp *t, usos_u8 *pkt, usos_u32 sequence,
+                          usos_u8 flags, usos_u16 wnd,
+                          const usos_u8 *data, usos_u16 data_len)
 {
     usos_u8 *seg;
     usos_u16 seglen;
+    usos_u16 header;
     usos_u16 i;
 
     if (t == 0 || pkt == 0)
@@ -112,32 +120,23 @@ usos_u16 net_tcp_build(net_tcp *t, usos_u8 *pkt, usos_u8 flags, usos_u16 wnd,
         (usos_u32)(USOS_NET_MTU - USOS_NET_IP_HDR))
         return 0;
     seg = pkt + USOS_NET_IP_HDR;
-    seglen = (usos_u16)(USOS_NET_TCP_HDR + data_len);
+    header = (flags & USOS_TCP_SYN) ? 24 : USOS_NET_TCP_HDR;
+    seglen = (usos_u16)(header + data_len);
     net_put16(seg + 0, t->local_port);
     net_put16(seg + 2, t->remote_port);
-    net_put32(seg + 4, t->snd_nxt);
+    net_put32(seg + 4, sequence);
     net_put32(seg + 8, (flags & (usos_u8)USOS_TCP_ACK) ? t->rcv_nxt : 0);
-    seg[12] = (usos_u8)(5 << 4);           /* data offset: 20 bytes, no options */
+    seg[12] = (usos_u8)((header / 4) << 4);
     seg[13] = flags;
-    net_put16(seg + 14, (wnd != 0) ? wnd : (usos_u16)USOS_NET_TCP_RCVWND);
+    net_put16(seg + 14, wnd);
     net_put16(seg + 16, 0);                /* checksum placeholder */
     net_put16(seg + 18, 0);                /* urgent pointer */
+    if (header == 24) { seg[20]=2; seg[21]=4; net_put16(seg+22,USOS_NET_TCP_MSS); }
     for (i = 0; i < data_len; i++)
-        seg[USOS_NET_TCP_HDR + i] = data[i];
+        seg[header + i] = data[i];
     net_put16(seg + 16, net_checksum_tcp(t->local_ip, t->remote_ip, seg,
                                          seglen));
 
-    /* Advance the send sequence space.  SYN and FIN each consume one number,
-     * data consumes its length; nothing is acknowledged locally. */
-    if (flags & (usos_u8)USOS_TCP_SYN) {
-        t->snd_nxt = t->snd_nxt + 1;
-    } else {
-        t->snd_nxt = t->snd_nxt + (usos_u32)data_len;
-        if (flags & (usos_u8)USOS_TCP_FIN) {
-            t->snd_nxt = t->snd_nxt + 1;
-            t->fin_sent = 1;
-        }
-    }
     {
         usos_u16 id = t->ip_id;
 
@@ -148,6 +147,21 @@ usos_u16 net_tcp_build(net_tcp *t, usos_u8 *pkt, usos_u8 flags, usos_u16 wnd,
                                (usos_u8)USOS_IP_TCP, 64, id,
                                (usos_u16)USOS_IP_DF, seglen);
     }
+}
+
+usos_u16 net_tcp_build(net_tcp *t, usos_u8 *pkt, usos_u8 flags, usos_u16 wnd,
+                       const usos_u8 *data, usos_u16 data_len)
+{
+    usos_u16 length;
+    if (t == 0) return 0;
+    length = net_tcp_build_at(t, pkt, t->snd_nxt, flags,
+        wnd ? wnd : t->rcv_wnd, data, data_len);
+    if (length) {
+        t->snd_nxt += (usos_u32)data_len;
+        if (flags & USOS_TCP_SYN) ++t->snd_nxt;
+        if (flags & USOS_TCP_FIN) { ++t->snd_nxt; t->fin_sent = 1; }
+    }
+    return length;
 }
 
 usos_u16 net_tcp_build_ack(net_tcp *t, usos_u8 *pkt)
@@ -183,6 +197,7 @@ int net_tcp_input(net_tcp *t, const usos_u8 *pkt, usos_u16 caplen,
     const usos_u8 *seg;
     usos_u16 doff;
     usos_u16 dlen;
+    usos_u16 option, option_len;
     usos_u32 seq;
     usos_u32 ack;
     usos_u8 flags;
@@ -215,10 +230,26 @@ int net_tcp_input(net_tcp *t, const usos_u8 *pkt, usos_u16 caplen,
     if (net_checksum_tcp(ip.src, ip.dst, seg, ip.len) != 0)
         return USOS_TCP_EV_BAD;
     flags = seg[13];
+    if (flags & USOS_TCP_SYN) {
+        option=20;
+        while (option<doff) {
+            if (!seg[option]) break;
+            if (seg[option]==1) { ++option; continue; }
+            if (option+2>doff) return USOS_TCP_EV_BAD;
+            option_len=seg[option+1];
+            if (option_len<2 || option+option_len>doff) return USOS_TCP_EV_BAD;
+            if (seg[option]==2 && option_len==4 && net_get16(seg+option+2)) {
+                t->peer_mss=net_get16(seg+option+2);
+                if (t->peer_mss>USOS_NET_TCP_MSS) t->peer_mss=USOS_NET_TCP_MSS;
+            }
+            option=(usos_u16)(option+option_len);
+        }
+    }
     if (flags_out != 0)
         *flags_out = flags;
     seq = net_get32(seg + 4);
     ack = net_get32(seg + 8);
+    t->input_seq = seq;
     dlen = (usos_u16)(ip.len - doff);
     if (data != 0)
         *data = seg + doff;
@@ -226,14 +257,27 @@ int net_tcp_input(net_tcp *t, const usos_u8 *pkt, usos_u16 caplen,
         *data_len = dlen;
 
     if (flags & (usos_u8)USOS_TCP_RST) {
+        if (t->state == USOS_TCP_SYN_SENT) {
+            if (!(flags & USOS_TCP_ACK) || ack != t->snd_nxt)
+                return USOS_TCP_EV_IGNORE;
+        } else if ((usos_s32)(seq - t->rcv_nxt) < 0 ||
+                   (usos_u32)(seq - t->rcv_nxt) > t->rcv_wnd) {
+            return USOS_TCP_EV_IGNORE;
+        }
         t->rst = 1;
         t->state = (usos_u8)USOS_TCP_RESET;
-        t->rcv_nxt = seq + (usos_u32)dlen;
         return USOS_TCP_EV_RST;
     }
     if (t->state == (usos_u8)USOS_TCP_CLOSED ||
         t->state == (usos_u8)USOS_TCP_RESET)
         return USOS_TCP_EV_IGNORE;
+
+    if (t->state == USOS_TCP_LISTEN) {
+        if (!(flags & USOS_TCP_SYN) || (flags & (USOS_TCP_ACK|USOS_TCP_FIN))) return USOS_TCP_EV_BAD;
+        t->rcv_nxt=seq+1; t->input_seq=seq+1;
+        t->snd_wnd=net_get16(seg+14); t->state=USOS_TCP_SYN_RCVD;
+        return USOS_TCP_EV_SYNACK;
+    }
 
     if (t->state == (usos_u8)USOS_TCP_SYN_SENT) {
         if (!(flags & (usos_u8)USOS_TCP_SYN) ||
@@ -241,7 +285,8 @@ int net_tcp_input(net_tcp *t, const usos_u8 *pkt, usos_u16 caplen,
             return USOS_TCP_EV_BAD;        /* no simultaneous open */
         if (ack != t->snd_nxt)
             return USOS_TCP_EV_BAD;        /* ACK of a SYN we did not send */
-        t->rcv_nxt = seq + 1 + (usos_u32)dlen;
+        t->input_seq = seq + 1;
+        t->rcv_nxt = seq + 1 + (t->buffered_receive ? 0 : (usos_u32)dlen);
         t->snd_una = ack;
         t->snd_wnd = net_get16(seg + 14);
         t->retries = 0;
@@ -249,24 +294,46 @@ int net_tcp_input(net_tcp *t, const usos_u8 *pkt, usos_u16 caplen,
         return USOS_TCP_EV_SYNACK;
     }
 
+    if (t->state == USOS_TCP_SYN_RCVD) {
+        if (!(flags & USOS_TCP_ACK) || (flags & USOS_TCP_SYN) ||
+            ack != t->snd_nxt || seq != t->rcv_nxt) return USOS_TCP_EV_BAD;
+        t->snd_una=ack; t->snd_wnd=net_get16(seg+14); t->retries=0;
+        t->state=USOS_TCP_ESTABLISHED;
+        return USOS_TCP_EV_SYNACK;
+    }
+
     /* Everything below is a state where the connection is up (or closing). */
     if (!(flags & (usos_u8)USOS_TCP_ACK))
         return USOS_TCP_EV_BAD;            /* data/ackless segment: not for us */
 
-    if ((usos_u32)(ack - t->snd_una) <= (usos_u32)(t->snd_nxt - t->snd_una)) {
+    if ((usos_s32)(ack - t->snd_nxt) > 0)
+        return USOS_TCP_EV_BAD;            /* ACKs data we never sent */
+    if ((usos_s32)(ack - t->snd_una) >= 0) {
+        if (ack != t->snd_una) t->retries = 0;
         t->snd_una = ack;
         t->snd_wnd = net_get16(seg + 14);
-        t->retries = 0;
         event = USOS_TCP_EV_ACK;
-    } else {
-        return USOS_TCP_EV_BAD;            /* ACKs data we never sent */
+    }
+
+    if ((flags & USOS_TCP_SYN) && seq + 1 == t->rcv_nxt)
+        return USOS_TCP_EV_DUP;            /* lost final handshake ACK */
+
+    if (t->state == (usos_u8)USOS_TCP_LAST_ACK && t->snd_una == t->snd_nxt)
+        t->state = (usos_u8)USOS_TCP_CLOSED;
+
+    if (t->buffered_receive) {
+        /* ACK state above is independent of receive ordering. The caller
+         * clips the segment to its ring window, stores holes, and advances
+         * rcv_nxt only after contiguous bytes were retained successfully. */
+        if (dlen || (flags & USOS_TCP_FIN)) return USOS_TCP_EV_DATA;
+        return event;
     }
 
     if (dlen != 0) {
         if (seq == t->rcv_nxt) {
             t->rcv_nxt = t->rcv_nxt + (usos_u32)dlen;
             event = USOS_TCP_EV_DATA;
-        } else if ((usos_u32)(seq - t->rcv_nxt) > 0xF0000000UL) {
+        } else if ((usos_s32)(seq - t->rcv_nxt) < 0) {
             return USOS_TCP_EV_DUP;        /* old retransmission: re-ACK it */
         } else {
             return USOS_TCP_EV_BAD;        /* gap: out of order, no reassembly */
@@ -294,13 +361,16 @@ int net_tcp_can_send(const net_tcp *t, usos_u16 len)
 {
     if (t == 0)
         return 0;
-    if (t->state != (usos_u8)USOS_TCP_ESTABLISHED)
+    if (t->state != (usos_u8)USOS_TCP_ESTABLISHED && t->state != USOS_TCP_CLOSE_WAIT)
         return 0;
     if (len == 0)
         return 0;
     if (len > (usos_u16)USOS_NET_TCP_MSS)
         return 0;
-    return t->snd_nxt == t->snd_una;       /* nothing in flight */
+    if (len > t->peer_mss) return 0;
+    return (usos_u32)(t->snd_nxt - t->snd_una) + len <= t->snd_wnd &&
+           (usos_u32)(t->snd_nxt - t->snd_una) + len <=
+               (usos_u32)USOS_NET_TCP_WINDOW * USOS_NET_TCP_MSS;
 }
 
 int net_tcp_timeout(net_tcp *t)
@@ -317,7 +387,6 @@ int net_tcp_timeout(net_tcp *t)
         t->state = (usos_u8)USOS_TCP_CLOSED;
         return USOS_NET_ERR_TIME;
     }
-    t->snd_nxt = t->snd_una;               /* rewind: rebuild the same segment */
     return 1;
 }
 

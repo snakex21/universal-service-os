@@ -32,8 +32,10 @@
 /* ------------------------------------------------------------------ */
 #if UINT_MAX == 4294967295U
 typedef unsigned int usos_u32;
+typedef signed int usos_s32;
 #else
 typedef unsigned long usos_u32;
+typedef signed long usos_s32;
 #endif
 typedef unsigned short usos_u16;
 typedef unsigned char usos_u8;
@@ -65,8 +67,8 @@ typedef unsigned char usos_u8;
 
 #define USOS_NET_TCP_MSS      (USOS_NET_MTU - USOS_NET_IP_HDR - USOS_NET_TCP_HDR)
 #define USOS_NET_TCP_RETRIES  4        /* retransmissions before giving up */
-#define USOS_NET_TCP_WINDOW   1        /* in segments; the window is not scaled */
-#define USOS_NET_TCP_RCVWND   1024     /* what we advertise, in bytes */
+#define USOS_NET_TCP_WINDOW   3        /* maximum local flight, in segments */
+#define USOS_NET_TCP_RCVWND   4096     /* bounded receive window, in bytes */
 
 /* EtherTypes */
 #define USOS_ETH_IPV4         0x0800
@@ -98,7 +100,7 @@ typedef unsigned char usos_u8;
 #define USOS_TCP_ACK          0x10
 #define USOS_TCP_URG          0x20
 
-/* TCP states (blocking client only: no listen/accept path) */
+/* TCP states; the socket layer owns listen backlogs and accepted handles. */
 #define USOS_TCP_CLOSED       0
 #define USOS_TCP_SYN_SENT     1
 #define USOS_TCP_ESTABLISHED  2
@@ -107,6 +109,8 @@ typedef unsigned char usos_u8;
 #define USOS_TCP_FIN_WAIT     5
 #define USOS_TCP_TIME_WAIT    6
 #define USOS_TCP_RESET        7
+#define USOS_TCP_LISTEN       8
+#define USOS_TCP_SYN_RCVD     9
 
 /* TCP input events */
 #define USOS_TCP_EV_NONE      0
@@ -261,7 +265,7 @@ int      net_icmp_echo_request(const usos_u8 *pkt, usos_u16 caplen, usos_u16 *id
                                usos_u16 *seq);
 
 /* ------------------------------------------------------------------ */
-/* tcp.c - blocking client, one segment in flight                      */
+/* tcp.c - wire validation and sequence state for bounded TCP windows  */
 /* ------------------------------------------------------------------ */
 typedef struct {
     usos_u32 local_ip;
@@ -271,14 +275,18 @@ typedef struct {
     usos_u32 snd_nxt;
     usos_u32 rcv_nxt;
     usos_u32 lfsr;        /* ISN generator state */
+    usos_u32 input_seq;   /* validated payload's first sequence number */
     usos_u16 local_port;
     usos_u16 remote_port;
     usos_u16 snd_wnd;     /* peer's advertised window */
+    usos_u16 rcv_wnd;     /* socket reassembler's current advertised room */
+    usos_u16 peer_mss;    /* SYN MSS option, else IPv4 default536 */
     usos_u16 ip_id;
     usos_u8  state;
     usos_u8  retries;
     usos_u8  fin_sent;
     usos_u8  rst;
+    usos_u8  buffered_receive; /* caller owns receive advancement/reassembly */
 } net_tcp;
 
 void     net_tcp_init(net_tcp *t, usos_u32 seed);
@@ -287,6 +295,11 @@ int      net_tcp_open(net_tcp *t, usos_u32 local_ip, usos_u16 local_port,
                       usos_u32 remote_ip, usos_u16 remote_port);
 usos_u16 net_tcp_build(net_tcp *t, usos_u8 *pkt, usos_u8 flags, usos_u16 wnd,
                        const usos_u8 *data, usos_u16 data_len);
+/* Does not consume sequence space; rebuilding retransmissions cannot erase
+ * the upper edge of a multi-segment flight. wnd=0 really advertises zero. */
+usos_u16 net_tcp_build_at(net_tcp *t, usos_u8 *pkt, usos_u32 sequence,
+                          usos_u8 flags, usos_u16 wnd,
+                          const usos_u8 *data, usos_u16 data_len);
 usos_u16 net_tcp_build_ack(net_tcp *t, usos_u8 *pkt);
 usos_u16 net_tcp_build_fin(net_tcp *t, usos_u8 *pkt);
 usos_u16 net_tcp_build_rst(net_tcp *t, usos_u8 *pkt);
