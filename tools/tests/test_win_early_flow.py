@@ -110,30 +110,39 @@ class Heading(unittest.TestCase):
         self.assertIn('" usos.heading="', prep)
 
 
-def run_early_auto(config):
+WIN30_FILES = (r'C:\WINDOWS\SYSTEM\DOSX.EXE', r'C:\USOSW3\WINRUN.BAT', r'C:\DOS\DOSKEY.COM')
+
+
+def run_early_auto(config, extra=(), name='windows_early_auto.cmd', args=(), env=None):
     r"""Walk W1AUTO.BAT for one CONFIG value (files in C:\DOS present, Windows
-    2.x installed): the commands that run, in order, without the comments."""
-    lines = [l.strip() for l in (MSDOS / 'windows_early_auto.cmd').read_text(encoding='ascii').splitlines()]
-    env = {'CONFIG': config}
+    2.x installed; extra=WIN30_FILES: Windows 3.0): the commands that run, in
+    order, without the comments. Every program exits with errorlevel 0."""
+    lines = [l.strip() for l in (MSDOS / name).read_text(encoding='ascii').splitlines()]
+    env = dict(env or {}, CONFIG=config)
+    for n, a in enumerate(args, 1):
+        env[str(n)] = a
     exists = {r'C:\DOS\VBMOUSE.EXE', r'C:\DOS\USOSKBC.COM', r'C:\DOS\USOSWHER.COM', r'C:\DOS\USOSV10.COM',
-              r'C:\WINDOWS\WIN.COM'}
+              r'C:\WINDOWS\WIN.COM', *extra}
     labels = {l[1:].lower()[:8]: i for i, l in reversed(list(enumerate(lines))) if l.startswith(':')}
     ran, i = [], 0
-    expand = lambda s: re.sub(r'%(\w+)%', lambda m: env.get(m.group(1), ''), s)
+    expand = lambda s: re.sub(r'%(\d)', lambda m: env.get(m.group(1), ''),
+                              re.sub(r'%(\w+)%', lambda m: env.get(m.group(1), ''), s))
     while i < len(lines):
         line = lines[i]
         i += 1
         if not line or line.lower().startswith(('rem', '@echo', ':')):
             continue
-        cond = re.match(r'if (not )?(?:"([^"]*)"=="([^"]*)"|exist (\S+)) (.*)$', line, re.I)
+        cond = re.match(r'if (not )?(?:"([^"]*)"=="([^"]*)"|exist (\S+)|errorlevel (\d+)) (.*)$', line, re.I)
         if cond:
-            if cond.group(4):
+            if cond.group(5):
+                value = int(cond.group(5)) <= 0
+            elif cond.group(4):
                 value = cond.group(4) in exists or cond.group(4).upper().endswith(r'\NUL')
             else:
                 value = expand('"%s"' % cond.group(2)) == '"%s"' % cond.group(3)
             if bool(cond.group(1)) == value:
                 continue
-            line = cond.group(5)
+            line = cond.group(6)
         jump = re.match(r'goto (\S+)$', line, re.I)
         if jump:
             i = labels[jump.group(1).lower()[:8]] + 1
@@ -207,6 +216,47 @@ class DiagnosticMenu(unittest.TestCase):
                 self.assertIn(r'C:\DOS\USOSKBC.COM /R /M', ran)
             if 'USOSWHER.COM' in programs:
                 self.assertIn(r'C:\DOS\USOSWHER.COM /G', ran)
+
+    def test_win30_vbmouse_after_windows(self):
+        # Windows 3.0 (X470 2026-10-24): real-mode WINOLDAP resets INT 33h and
+        # VBMOUSE took the C207h callback from MOUSE.DRV (dead mouse after the
+        # DOS prompt). No VBMOUSE before WIN; loaded after DOSKEY (last hook,
+        # so WINRUN.BAT can unload it), also for the DOS item.
+        for config in ('WINSTD', 'WINREAL', 'D1WHERE', 'D2NOKBC', 'DOSONLY'):
+            ran = run_early_auto(config, WIN30_FILES)
+            names = [r.split()[0].split('\\')[-1] for r in ran]
+            self.assertEqual(names.count('VBMOUSE.EXE'), 1, config)
+            vbm = names.index('VBMOUSE.EXE')
+            if 'WIN.COM' in names:
+                self.assertLess(names.index('WIN.COM'), vbm, config)
+            self.assertLess(names.index('DOSKEY.COM'), vbm, config)
+            self.assertEqual(ran[vbm - 1:vbm + 2], ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'], config)
+        for config in ('D4CLEAN', 'D5MIN', 'D6V10'):
+            self.assertNotIn(r'C:\DOS\VBMOUSE.EXE', run_early_auto(config, WIN30_FILES), config)
+        # Windows 1.0x/2.x (and Windows/386): before WIN as before, quiet.
+        ran = run_early_auto('WINSTD')
+        self.assertEqual(ran[ran.index(r'C:\DOS\VBMOUSE.EXE') - 1:ran.index(r'C:\DOS\VBMOUSE.EXE') + 2],
+                         ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'])
+        self.assertLess(ran.index(r'C:\DOS\VBMOUSE.EXE'), ran.index('WIN.COM'))
+        # Every ctty nul is undone right after one program.
+        for name in ('windows_early_auto.cmd', 'windows_run.cmd'):
+            lines = batch_lines(MSDOS / name)
+            for n, line in enumerate(lines):
+                if line.lower() == 'ctty nul':
+                    self.assertEqual(lines[n + 2].lower(), 'ctty con', name)
+                    self.assertIn('VBMOUSE.EXE', lines[n + 1], name)
+
+    def test_winrun_win30(self):
+        early = (r'C:\USOSW3\EARLY.TAG', r'C:\DOS\VBMOUSE.EXE')
+        for args, win in (((), r'C:\WINDOWS\WIN.COM /R'), (('/3',), r'C:\WINDOWS\WIN.COM /3')):
+            ran = run_early_auto('', early, 'windows_run.cmd', args)
+            self.assertEqual(ran[:3], ['ctty nul', r'C:\DOS\VBMOUSE.EXE uninstall', 'ctty con'], args)
+            self.assertEqual(ran[3].rstrip(), win, args)
+            self.assertEqual(ran[4:7], ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'], args)
+        # Windows 3.1 / 3.11 (no EARLY.TAG): VBMOUSE stays (VBMOUSE.DRV uses it).
+        ran = run_early_auto('', (r'C:\DOS\VBMOUSE.EXE',), 'windows_run.cmd')
+        self.assertFalse(any('VBMOUSE' in r for r in ran))
+        self.assertIn(r'C:\WINDOWS\WIN.COM /S /B', ran)
 
     def test_default_items(self):
         # X470 PASS 2026-10-09 (Windows 2.03 via D6): every default item loads

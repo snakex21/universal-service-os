@@ -588,3 +588,38 @@ does not honour) or its 24-bit descriptors with more than 16 MiB of XMS
   only "Windows 3.0a (default)" and "MS-DOS"; the default stays `WIN /R`.
 - Windows 3.1 / 3.11 standard mode (`WIN /S /B`, menu default and typed
   `win`) is unchanged: it passed on the X470.
+
+**B. Windows mouse dead after the DOS Prompt (3.0a real mode).** The user
+confirmed the cause on the X470 with D4 (no VBMOUSE): DOS Prompt, EXIT,
+the mouse still moves. Mechanism (static: expanded 3.0a WINOLDAP.MOD,
+VBADOS 0.67 source `mousetsr.c`): real-mode WINOLDAP calls INT 33h AX=0
+around a DOS program; VBMOUSE's reset re-registers its own INT 15h C207h
+callback, which USOSKBC /M now hands its packets to, and 3.0a MOUSE.DRV
+never registers again. Change (Windows 3.0 only, i.e. `SYSTEM\DOSX.EXE`):
+- `W1AUTO.BAT`: no VBMOUSE before WIN (all items that loaded it: default,
+  WINREAL, D1, D2). It is loaded after Windows returned, or after the DOS
+  item, at `:macro_ok`, i.e. after DOSKEY, so it is the last INT 33h /
+  INT 2Fh hook (D4/D5/D6 stay without it).
+- `WINRUN.BAT` (typed `win`, also with arguments): `VBMOUSE uninstall`
+  (VBADOS 0.67 action; it refuses when another TSR hooked INT 33h/2Fh
+  after it) before `WIN.COM`, `VBMOUSE` again afterwards only when the
+  uninstall succeeded.
+- Not changed: Windows 1.0x/2.x and Windows/386 (VBMOUSE before WIN as
+  before). Their WINOLDAP.MOD (1.01, 1.04, 2.03, 2.11) also contains
+  `xor ax,ax; int 33h`, so the same reset happens there; whether their mouse
+  driver recovers was never tested on the X470 (2.03/2.11 mouse PASS did
+  not include a DOS program). Windows 3.1/3.11/WfW use VBMOUSE.DRV, which
+  needs VBMOUSE, and passed on the X470.
+
+**D. Quiet VBMOUSE.** VBMOUSE 0.67 has no quiet switch, and its probe
+lines "Cannot find VirtualBox PCI device, err=..." / "Could not detect
+VMware, err=..." go to stderr (`mousmain.c`), which `>nul` does not catch
+and MS-DOS 6.22 COMMAND.COM cannot redirect. Every load in this flow is
+now `ctty nul` / `VBMOUSE.EXE` / `ctty con`, then on errorlevel 1 (for
+example "Cannot init PS/2 mouse BIOS") one line "USOS: the DOS mouse driver
+(VBMOUSE) did not load." (`dos.mouse.vbmouse_failed`, menu language in
+W1AUTO / W3AUTO.CSM / WINRUN; English in the install-stage AUTOEXEC that
+INSTALL.BAT writes). Places: W1AUTO.BAT, WINRUN.BAT, the install AUTOEXEC
+(`install.cmd`, also the final AUTOEXEC of an MS-DOS-only install) and
+W3AUTO.CSM (`tools/build_dos_native_support.py`). LIVE.BAT (RAM session)
+keeps its plain call: it clears the screen right after.

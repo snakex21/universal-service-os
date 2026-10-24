@@ -214,7 +214,7 @@ dos_winsock_apply() {
 # LANGUAGE: a catalog or locale tag (pl, pl-PL, pt-BR, sr-Latn-RS); CODEPAGE:
 # the one DOS.INI switches the console to (437 when none). Files shown before
 # that switch (CONFIG.SYS menu, INSTALL / WINMENU / NETSTART) take the 437
-# section, the start-menu batch files W3AUTO / W1AUTO the CODEPAGE one; no
+# section, the start-menu batch files W3AUTO / W1AUTO and WINRUN the CODEPAGE one; no
 # section for the language (Cyrillic or Greek in 437, Ukrainian): English.
 DOS_I18N_TEXT=''
 DOS_I18N_437=''
@@ -301,7 +301,8 @@ dos_i18n_apply() {
     for dif in W3CONFIG.SYS W3CONFIG.CSM W1CONFIG.SYS W1CONFIG.CSM INSTALL.BAT WINMENU.BAT W3START.BAT W1SETUP.BAT NETSTART.BAT; do
         dos_i18n_file "$1/$dif" "$DOS_I18N_437" || return 1
     done
-    for dif in W3AUTO.BAT W3AUTO.CSM W1AUTO.BAT W1AUTO.CSM; do
+    # WINRUN.BAT (typed WIN) runs after the start file switched the code page.
+    for dif in W3AUTO.BAT W3AUTO.CSM W1AUTO.BAT W1AUTO.CSM WINRUN.BAT; do
         dos_i18n_file "$1/$dif" "$DOS_I18N_CP" || return 1
     done
     echo "DOS texts: ${3:-en} (menus ${DOS_I18N_437:-English 437}, start files ${DOS_I18N_CP:-English 437})"

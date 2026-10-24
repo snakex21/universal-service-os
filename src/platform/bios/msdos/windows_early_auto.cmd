@@ -31,7 +31,26 @@ rem Windows 1.0x: USOSMS1.DRV (bound as MOUSE.DRV) takes the same INT 74h.
 if "%UDIAG%"=="D4" goto kbc_load
 if "%UDIAG%"=="D5" goto tsr_done
 if "%UDIAG%"=="D6" goto tsr_done
-if exist C:\DOS\VBMOUSE.EXE C:\DOS\VBMOUSE.EXE
+rem Windows 3.0 (SYSTEM\DOSX.EXE): VBMOUSE only after Windows returned or
+rem the DOS item ran (USOSVBM=1, :macro_ok). Real-mode WINOLDAP resets
+rem INT 33h around every DOS program; VBMOUSE then takes the INT 15h C207h
+rem callback from MOUSE.DRV and the Windows mouse stays dead after the DOS
+rem prompt (X470 2026-10-24; D4 without VBMOUSE keeps it). Windows 1.0x/2.x
+rem and Windows/386 load it here as before (their mouse passed on the X470).
+rem CTTY NUL: VBMOUSE prints its VirtualBox/VMware probe lines to stderr,
+rem which COMMAND.COM cannot redirect; a failure is reported by errorlevel.
+set USOSVBM=
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto vbm_now
+set USOSVBM=1
+goto vbm_done
+:vbm_now
+if not exist C:\DOS\VBMOUSE.EXE goto vbm_done
+ctty nul
+C:\DOS\VBMOUSE.EXE
+ctty con
+if not errorlevel 1 goto vbm_done
+echo USOS: the DOS mouse driver (VBMOUSE) did not load.
+:vbm_done
 if "%UDIAG%"=="D2" goto tsr_done
 :kbc_load
 if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M
@@ -109,8 +128,9 @@ echo USOS %UDIAG%: log in C:\USOS\DIAG\%UDIAG%.TXT
 :end_msg
 rem Windows 3.0 (SYSTEM\DOSX.EXE): WIN typed at the DOS prompt from now on
 rem starts real mode like the menu default (C:\USOSW3\WINRUN.BAT; WIN /3,
-rem /S and other arguments unchanged). DOSKEY (about 4 KiB) only after Windows or the menu
-rem item. Windows 1.0x/2.x and Windows/386 keep their own WIN / WIN386.
+rem /S and other arguments unchanged). DOSKEY (about 4 KiB) only after
+rem Windows or the menu item. Windows 1.0x/2.x and Windows/386 keep their
+rem own WIN / WIN386.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto macro_ok
 if exist C:\WIN386\WIN386.EXE goto macro_ok
 if exist C:\WINDOWS\WIN386.EXE goto macro_ok
@@ -118,5 +138,16 @@ if not exist C:\USOSW3\WINRUN.BAT goto macro_ok
 if not exist C:\DOS\DOSKEY.COM goto macro_ok
 C:\DOS\DOSKEY.COM win=C:\USOSW3\WINRUN.BAT $* >nul
 :macro_ok
+rem Windows 3.0: VBMOUSE now, after DOSKEY, so it is the last INT 33h/2Fh
+rem hook and WINRUN.BAT can unload it (VBMOUSE uninstall) for a typed WIN.
+if not "%USOSVBM%"=="1" goto vbm_lok
+set USOSVBM=
+if not exist C:\DOS\VBMOUSE.EXE goto vbm_lok
+ctty nul
+C:\DOS\VBMOUSE.EXE
+ctty con
+if not errorlevel 1 goto vbm_lok
+echo USOS: the DOS mouse driver (VBMOUSE) did not load.
+:vbm_lok
 echo.
 echo To choose the start mode again, restart the computer.

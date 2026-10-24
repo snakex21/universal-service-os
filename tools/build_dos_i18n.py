@@ -26,7 +26,7 @@ Code pages (the text-mode font of the screen the line is shown on):
         (Cyrillic, Greek) has no 437 section and stays English.
   native  the code page of the language's MS-DOS 6.22 country (852 Central
         European, 850 Western, 866 Russian, 855 Bulgarian, 869 Greek, 857
-        Turkish): only for the start-menu batch files (W3AUTO / W1AUTO),
+        Turkish): only for the start-menu batch files (W3AUTO / W1AUTO, WINRUN),
         whose lines run after MODE CON CODEPAGE SELECT, and only when the
         profile's DOS.INI switches to that code page.
 Batch-special characters (< > | %) are refused in translations.

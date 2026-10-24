@@ -27,7 +27,8 @@ SH = shutil.which('sh') or shutil.which('bash')
 FILES = {'W3CONFIG.SYS': 'windows_config.sys', 'W1CONFIG.SYS': 'windows_early_config.sys',
          'W3AUTO.BAT': 'windows_auto.cmd', 'W1AUTO.BAT': 'windows_early_auto.cmd',
          'INSTALL.BAT': 'install.cmd', 'WINMENU.BAT': 'windows_menu.cmd', 'W3START.BAT': 'windows_start.cmd',
-         'W1SETUP.BAT': 'windows_early_setup.cmd', 'NETSTART.BAT': 'network_start.cmd'}
+         'W1SETUP.BAT': 'windows_early_setup.cmd', 'NETSTART.BAT': 'network_start.cmd',
+         'WINRUN.BAT': 'windows_run.cmd'}
 CP437_FILES = ('W3CONFIG.SYS', 'W1CONFIG.SYS', 'INSTALL.BAT', 'WINMENU.BAT', 'W3START.BAT', 'W1SETUP.BAT', 'NETSTART.BAT')
 
 
