@@ -270,8 +270,15 @@ if [ -n "$PROGRAMS_DIR" ] && [ -d "$PROGRAMS_DIR" ]; then
     cp -r "$PROGRAMS_DIR" "$U/PROGRAMS" || fail 'cannot copy the DOS programs from DATA'
     # Windows 3.x: Program Manager icons from PROGRAMS\<FOLDER>\USOSICON.TXT
     # into the Main group of SETUP.INF (tools/dos_win3_menu.sh).
+    # The installed version against an optional minimum per icon line.
+    case "$WIN_EARLY:$WIN_SYSTEM" in
+        windows-3-0:*) icons_ver=3.0 ;;
+        :windows-3-11|:windows-wfw-3-11) icons_ver=3.11 ;;
+        :windows-3-1) icons_ver=3.1 ;;
+        *) icons_ver='' ;;
+    esac
     if [ -n "$WIN3_ISO" ]; then
-        dos_program_icons "$U" > "$work/icons.log" 2>&1 || { while IFS= read -r line; do log "$line"; done < "$work/icons.log"; fail 'the Program Manager icons could not be written'; }
+        dos_program_icons "$U" "$icons_ver" > "$work/icons.log" 2>&1 || { while IFS= read -r line; do log "$line"; done < "$work/icons.log"; fail 'the Program Manager icons could not be written'; }
         while IFS= read -r line; do log "$line"; done < "$work/icons.log"
     fi
 fi

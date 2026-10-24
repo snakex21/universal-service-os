@@ -685,3 +685,13 @@ DOSKEY and the environment, Windows 3.0 only:
   USOSWIN value), the branch taken (WINRUN.ON / USOSWIN hint, mode,
   WIN30.COM or WIN.COM, VBMOUSE unloaded or not), "returned"; W1AUTO logs
   the rename, its start (item, program, USOSWIN) and the return.
+
+**E, round 2.** X470: the Netscape/Opera icons appeared on 3.0a, and
+starting them reports that they need a newer Windows (expected). A
+`USOSICON.TXT` line may now end in an optional third field, the oldest
+Windows the program runs on: `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE,3.1`
+(values `3.0`, `3.1`, `3.11`; any other value skips the line). The target
+script passes the installed version (`windows-3-0` = 3.0, `windows-3-1` =
+3.1, `windows-3-11` / `windows-wfw-3-11` = 3.11); an older Windows skips
+the line with "needs Windows 3.1, this is Windows 3.0". Lines without the
+field behave as before; the field never reaches SETUP.INF.

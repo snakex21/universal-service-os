@@ -179,6 +179,32 @@ class ProgramIcons(unittest.TestCase):
         self.assertEqual(r.stdout, '')
         self.assertEqual((self.u / 'WINSETUP/SETUP.INF').read_bytes(), INF_30)
 
+    def test_minimum_version(self):
+        # optional third field: the oldest Windows the program runs on
+        lines = ('"Netscape",C:\\PROGRAMS\\NETSCAPE\\NETSCAPE.EXE,3.1\n'
+                 '"Opera", C:\\PROGRAMS\\NETSCAPE\\OPERA.EXE , 3.11\n'
+                 '"Any",C:\\PROGRAMS\\NETSCAPE\\ANY.EXE,3.0\n'
+                 '"Bad",C:\\PROGRAMS\\NETSCAPE\\ANY.EXE,95\n'
+                 '"Plain",C:\\PROGRAMS\\NETSCAPE\\PLAIN.EXE\n')
+        self.program('NETSCAPE', ('NETSCAPE.EXE', 'OPERA.EXE', 'ANY.EXE', 'PLAIN.EXE'), lines)
+        for version, added in (('3.0', ('ANY', 'PLAIN')), ('3.1', ('NETSCAPE', 'ANY', 'PLAIN')),
+                               ('3.11', ('NETSCAPE', 'OPERA', 'ANY', 'PLAIN')), ('', ('NETSCAPE', 'OPERA', 'ANY', 'PLAIN'))):
+            (self.u / 'WINSETUP/SETUP.INF').write_bytes(INF_30)
+            script = f'. "{LIB.as_posix()}"; dos_program_icons "$1" "$2"'
+            r = subprocess.run([SH, '-c', script, 'sh', self.u.as_posix(), version], capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            out = self.inf()
+            for exe in ('NETSCAPE', 'OPERA', 'ANY', 'PLAIN'):
+                entry = ('C:\\PROGRAMS\\NETSCAPE\\%s.EXE\n' % exe).encode()
+                self.assertEqual(entry in out, exe in added, (version, exe))
+            self.assertIn('line 4 skipped: minimum Windows version must be 3.0, 3.1 or 3.11', r.stdout)
+            self.assertNotIn(b',3.1', out)  # the field never reaches SETUP.INF
+            if version == '3.0':
+                self.assertIn('line 1 skipped: needs Windows 3.1, this is Windows 3.0', r.stdout)
+        target = (ROOT / 'tools/dos_csmwrap_target.sh').read_text(encoding='ascii')
+        self.assertIn('windows-3-0:*) icons_ver=3.0 ;;', target)
+        self.assertIn('dos_program_icons "$U" "$icons_ver"', target)
+
     def test_target_wiring(self):
         target = (ROOT / 'tools/dos_csmwrap_target.sh').read_text(encoding='ascii')
         call = target.index('dos_program_icons "$U"')

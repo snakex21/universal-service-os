@@ -237,8 +237,12 @@ dos_ci_find() {
 # Program Manager icons for the staged DOS programs (DATA
 # Systems\DOS\MS-DOS\Programs -> DIR/PROGRAMS -> C:\PROGRAMS by INSTALL.BAT).
 # Each PROGRAMS\<FOLDER>\USOSICON.TXT may hold lines
-#   "Name",C:\PROGRAMS\<FOLDER>\FILE.EXE
-# (blank lines and ";" comments ignored). A line is used when the name is
+#   "Name",C:\PROGRAMS\<FOLDER>\FILE.EXE[,MIN]
+# (blank lines and ";" comments ignored). MIN (optional): the oldest Windows
+# the program runs on, 3.0, 3.1 or 3.11; when VERSION (dos_program_icons DIR
+# VERSION: the installed Windows, same values) is older, the line is skipped
+# with a log line (Netscape/Opera need 3.1). No VERSION: MIN only checked
+# for its form. A line is used when the name is
 # 1-40 printable ASCII characters without " , ( ) [ ] (Setup quotes the name
 # and passes it in a Program Manager DDE command), the path stays in its own
 # folder, every part is an 8.3 name, the file is .EXE/.COM/.PIF/.BAT, it was
@@ -267,7 +271,8 @@ dos_program_icons() {
             echo "Program icons: folder $(basename "$dpd") is not an 8.3 name, its USOSICON.TXT is skipped"
             continue
         fi
-        awk -v dir="$dpu" '
+        awk -v dir="$dpu" -v have="${2:-}" '
+            function ver(v) { return v == "3.0" ? 300 : v == "3.1" ? 310 : v == "3.11" ? 311 : 0 }
             function part(p, ext,   b, x) {
                 if (p !~ /^[A-Z0-9_~$!#&@-]+(\.[A-Z0-9_~$!#&@-]+)?$/) return 0
                 b = p; x = ""
@@ -284,6 +289,12 @@ dos_program_icons() {
                 name = substr($0, 1, RLENGTH); path = substr($0, RLENGTH + 1)
                 sub(/^[ \t]*"/, "", name); sub(/"[ \t]*,[ \t]*$/, "", name)
                 sub(/^ +/, "", name); sub(/ +$/, "", name); sub(/[ \t]+$/, "", path)
+                min = ""
+                if (index(path, ",")) {
+                    min = substr(path, index(path, ",") + 1); path = substr(path, 1, index(path, ",") - 1)
+                    gsub(/[ \t]/, "", min); sub(/[ \t]+$/, "", path)
+                    if (!ver(min)) { print "SKIP\t" NR "\tminimum Windows version must be 3.0, 3.1 or 3.11"; next }
+                }
                 if (name == "" || length(name) > 40 || name ~ /[",()\[\]\t]/) { print "SKIP\t" NR "\tbad name (1-40 characters, no \" , ( ) [ ])"; next }
                 up = toupper(path)
                 head = "C:\\PROGRAMS\\" dir "\\"
@@ -293,6 +304,7 @@ dos_program_icons() {
                 ok = n >= 2; list = ""
                 for (i = 1; i <= n && ok; i++) { ok = part(c[i], i == n); list = list (i > 1 ? " " : "") c[i] }
                 if (!ok) { print "SKIP\t" NR "\tnot an 8.3 path to an .EXE, .COM, .PIF or .BAT file"; next }
+                if (min != "" && ver(have) && ver(have) < ver(min)) { print "SKIP\t" NR "\tneeds Windows " min ", this is Windows " have; next }
                 print "OK\t" NR "\t" name "\t" up "\t" list
             }' "$dpf" > "$dpk" || return 1
         while IFS="$dpt" read -r dps dpno dpa dpb dpc; do
