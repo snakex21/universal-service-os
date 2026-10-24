@@ -480,13 +480,14 @@ static int case_tcp(void)
     check("state syn_sent", client.state, USOS_TCP_SYN_SENT);
 
     len = net_tcp_build(&client, pkt, (usos_u8)USOS_TCP_SYN, 0, 0, 0);
-    check("syn len", len, 40);
+    check("syn len", len, 44);
     check("syn seq", (long)(net_get32(pkt + 24) == c_isn), 1);
     check("syn flags", pkt[33], USOS_TCP_SYN);
     check("syn snd_nxt", (long)(client.snd_nxt == c_isn + 1), 1);
     check("syn snd_una", (long)(client.snd_una == c_isn), 1);
     check("syn port", net_get16(pkt + 20), cport);
-    check("syn checksum", net_checksum_tcp(cip, sip, pkt + 20, 20), 0);
+    check("syn checksum", net_checksum_tcp(cip, sip, pkt + 20, 24), 0);
+    check("syn mss option", net_get16(pkt+42), USOS_NET_TCP_MSS);
     check("cannot send in syn_sent", net_tcp_can_send(&client, 10), 0);
 
     /* SYN/ACK from the server. */
@@ -509,7 +510,7 @@ static int case_tcp(void)
     check("ack snd_nxt unchanged", (long)(client.snd_nxt == c_isn + 1), 1);
     check("ack checksum", net_checksum_tcp(cip, sip, pkt + 20, 20), 0);
 
-    /* Send one segment; the window is one segment, so it is now in flight. */
+    /* A second segment fits without waiting for the first one's ACK. */
     check("can send", net_tcp_can_send(&client, 100), 1);
     len = net_tcp_build(&client, pkt, (usos_u8)(USOS_TCP_ACK | USOS_TCP_PSH), 0,
                         (const usos_u8 *)"GET / HTTP/1.0\r\n\r\n", 18);
@@ -518,14 +519,14 @@ static int case_tcp(void)
     check("data ack", (long)(net_get32(pkt + 28) == s_isn + 1), 1);
     check("data snd_nxt", (long)(client.snd_nxt == c_isn + 1 + 18), 1);
     check("in flight", (long)(client.snd_una != client.snd_nxt), 1);
-    check("window full", net_tcp_can_send(&client, 10), 0);
+    check("window has room", net_tcp_can_send(&client, 10), 1);
     check("data checksum", net_checksum_tcp(cip, sip, pkt + 20, 38), 0);
 
-    /* Retransmission after the RTO: snd_nxt rewinds, then rebuilds. */
+    /* Retransmission preserves the true upper edge of sent sequence space. */
     check("timeout 1", net_tcp_timeout(&client), 1);
-    check("rewound", (long)(client.snd_nxt == client.snd_una), 1);
+    check("upper edge preserved", (long)(client.snd_nxt == c_isn+19), 1);
     check("retries", client.retries, 1);
-    len = net_tcp_build(&client, pkt, (usos_u8)(USOS_TCP_ACK | USOS_TCP_PSH), 0,
+    len = net_tcp_build_at(&client, pkt, client.snd_una, (usos_u8)(USOS_TCP_ACK | USOS_TCP_PSH), client.rcv_wnd,
                         (const usos_u8 *)"GET / HTTP/1.0\r\n\r\n", 18);
     check("retransmit seq", (long)(net_get32(pkt + 24) == c_isn + 1), 1);
     check("retransmit snd_nxt", (long)(client.snd_nxt == c_isn + 1 + 18), 1);
@@ -571,8 +572,8 @@ static int case_tcp(void)
         for (i = 0; i < (int)USOS_NET_TCP_RETRIES + 1; i++) {
             rc = net_tcp_timeout(&client);
             if (rc == 1) {
-                len = net_tcp_build(&client, pkt,
-                                    (usos_u8)(USOS_TCP_ACK | USOS_TCP_PSH), 0,
+                len = net_tcp_build_at(&client, pkt, client.snd_una,
+                                    (usos_u8)(USOS_TCP_ACK | USOS_TCP_PSH), client.rcv_wnd,
                                     (const usos_u8 *)"x", 1);
                 check("retransmit rebuild", (long)(len != 0), 1);
             }
@@ -615,6 +616,7 @@ static int case_tcp(void)
     /* RST aborts whatever is open. */
     net_tcp_open(&client, cip, cport, sip, sport);
     c_isn = client.iss;
+    (void)net_tcp_build(&client,pkt,USOS_TCP_SYN,0,0,0);
     len = synth_tcp(pkt, sip, cip, sport, cport, 0, c_isn + 1,
                     (usos_u8)(USOS_TCP_RST | USOS_TCP_ACK), 0, 0);
     ev = net_tcp_input(&client, pkt, len, &data, &dlen, &flags);

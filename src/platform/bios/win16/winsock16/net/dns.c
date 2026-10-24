@@ -28,12 +28,14 @@ usos_u16 net_dns_encode_name(usos_u8 *buf, usos_u16 room, const char *name)
         return 0;
     while (*name != '\0') {
         usos_u16 label = 0;
-        usos_u16 at = (usos_u16)(pos + 1);
+        usos_u16 at;
+        if (pos >= 254) return 0;
+        at = (usos_u16)(pos + 1);
 
         while (name[label] != '\0' && name[label] != '.') {
             if (label == (usos_u16)USOS_DNS_LABEL)
                 return 0;
-            if (at + label + 2 > room)
+            if (at + label + 2 > room || at + label + 2 > 255)
                 return 0;
             buf[at + label] = (usos_u8)name[label];
             label++;
@@ -84,24 +86,37 @@ static int net_dns_skip_name(const usos_u8 *msg, usos_u16 len, usos_u16 off,
 {
     usos_u16 pos = off;
     usos_u16 guard = 0;
+    usos_u16 target;
+    usos_u16 wire = 1;
+    int jumped = 0;
 
     while (pos < len) {
         usos_u8 c = msg[pos];
 
         if (c == 0) {
-            *next = (usos_u16)(pos + 1);
+            if (!jumped) *next = (usos_u16)(pos + 1);
             return USOS_NET_OK;
         }
         if ((c & 0xC0U) == 0xC0U) {
-            if ((usos_u16)(pos + 1) >= len)
+            if (len - pos < 2)
                 return USOS_NET_ERR_SHORT;
-            *next = (usos_u16)(pos + 2);
-            return USOS_NET_OK;
+            target = (usos_u16)(((usos_u16)(c & 0x3f) << 8) | msg[pos + 1]);
+            if (target < USOS_DNS_HDR || target >= pos || target >= len)
+                return USOS_NET_ERR_NAME;
+            if (!jumped) { *next = (usos_u16)(pos + 2); jumped = 1; }
+            pos = target;
+            if (++guard > 256) return USOS_NET_ERR_NAME;
+            continue;
         }
         if ((c & 0xC0U) != 0)
             return USOS_NET_ERR_NAME;
+        if ((usos_u16)c > len - pos - 1)
+            return USOS_NET_ERR_SHORT;
+        if ((usos_u16)c + 1 > 255 - wire)
+            return USOS_NET_ERR_NAME;
+        wire = (usos_u16)(wire + c + 1);
         pos = (usos_u16)(pos + 1 + (usos_u16)c);
-        if (++guard > 128)
+        if (++guard > 256)
             return USOS_NET_ERR_NAME;
     }
     return USOS_NET_ERR_SHORT;
@@ -127,8 +142,9 @@ int net_dns_parse_response(const usos_u8 *msg, usos_u16 len, usos_u16 id,
     if (net_get16(msg + 0) != id)
         return USOS_NET_ERR_ARG;
     flags = net_get16(msg + 2);
-    if (!(flags & (usos_u16)USOS_DNS_FLAG_QR))
+    if (!(flags & (usos_u16)USOS_DNS_FLAG_QR) || (flags & 0x7800U))
         return USOS_NET_ERR_PROTO;         /* a query, not a response */
+    if (flags & 0x0200U) return USOS_NET_ERR_SHORT;
     switch (flags & 0x000FU) {
     case 0:
         break;
@@ -144,7 +160,7 @@ int net_dns_parse_response(const usos_u8 *msg, usos_u16 len, usos_u16 id,
         rc = net_dns_skip_name(msg, len, off, &off);
         if (rc != USOS_NET_OK)
             return rc;
-        if ((usos_u16)(off + 4) > len)
+        if (off > len || len - off < 4)
             return USOS_NET_ERR_SHORT;
         off = (usos_u16)(off + 4);         /* qtype + qclass */
     }
@@ -157,13 +173,13 @@ int net_dns_parse_response(const usos_u8 *msg, usos_u16 len, usos_u16 id,
         rc = net_dns_skip_name(msg, len, off, &off);
         if (rc != USOS_NET_OK)
             return rc;
-        if ((usos_u16)(off + 10) > len)
+        if (off > len || len - off < 10)
             return USOS_NET_ERR_SHORT;
         type = net_get16(msg + off);
         class_ = net_get16(msg + off + 2);
         rdlen = net_get16(msg + off + 8);
         rdata = (usos_u16)(off + 10);
-        if ((usos_u16)(rdata + rdlen) > len)
+        if (rdlen > len - rdata)
             return USOS_NET_ERR_SHORT;
         if (type == (usos_u16)USOS_DNS_QTYPE_A &&
             class_ == (usos_u16)USOS_DNS_QCLASS && rdlen == 4) {

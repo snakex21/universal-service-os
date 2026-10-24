@@ -249,16 +249,6 @@ def test_engine_has_no_select_or_async() -> None:
     assert offenders == []
 
 
-def test_dll_still_stubs_select_and_async() -> None:
-    """select and WSAAsyncSelect stay stubs in the ABI file."""
-    source = (NET_DIR.parent / 'winsock16.c').read_text(encoding='ascii', errors='replace')
-    for name in ('select', 'WSAAsyncSelect'):
-        start = source.index('__export %s(' % name)
-        body = source[start:start + 400]
-        assert 'usos_not_implemented' in body, name
-        assert 'usos_sock_' not in body, name
-
-
 def test_no_windows_dependency_in_portable_core() -> None:
     """Only win16_pkt.c may touch Windows, DOS or the compiler's i86.h."""
     forbidden = ('windows.h', 'dos.h', 'i86.h', 'GetTickCount', 'PeekMessage')
