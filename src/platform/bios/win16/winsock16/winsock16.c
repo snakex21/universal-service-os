@@ -266,14 +266,18 @@ int __far __pascal __export WSAStartup(WORD wVersionRequired, LPWSADATA lpWSADat
 int __far __pascal __export WSACleanup(void)
 {
     if (!usos_require_startup()) return SOCKET_ERROR;
+    USOS_TRACE("cleanup enter",NULL,usos_global_startups);
     usos_startup_count--;
     usos_global_startups--;
     if (usos_startup_count == 0) {
         usos_async_cleanup(usos_app());
+        USOS_TRACE("cleanup own done",NULL,usos_global_startups);
     }
     if (usos_global_startups == 0) {
         usos_async_class_cleanup();
+        USOS_TRACE("cleanup class done",NULL,usos_global_startups);
         usos_sock_shutdown();      /* closes every socket, RELEASEs the queue */
+        USOS_TRACE("cleanup transport done",NULL,usos_global_startups);
     }
     usos_last_error = 0;
     return 0;

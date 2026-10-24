@@ -56,12 +56,13 @@ static int usos_async_start(void)
     usos_poll_window = NULL;
     if (!usos_class_registered) {
         usos_far_zero(&cls, sizeof(cls));
-        usos_poll_proc = MakeProcInstance((FARPROC)usos_event_window, usos_instance);
-        if (usos_poll_proc == NULL) return 0;
+        /* This shared DLL callback loads its own DS. A MakeProcInstance
+         * thunk belongs to the creating task and can disappear on its exit. */
+        usos_poll_proc = (FARPROC)usos_event_window;
         cls.lpfnWndProc = (WNDPROC)usos_poll_proc;
         cls.hInstance = usos_instance;
         cls.lpszClassName = USOS_ASYNC_CLASS;
-        if (!RegisterClass(&cls)) { FreeProcInstance(usos_poll_proc); usos_poll_proc = NULL; return 0; }
+        if (!RegisterClass(&cls)) { usos_poll_proc = NULL; return 0; }
         usos_class_registered = 1;
     }
     usos_poll_window = CreateWindow(USOS_ASYNC_CLASS, "", 0, 0, 0, 0, 0,
@@ -102,7 +103,6 @@ static void usos_async_class_cleanup(void)
 {
     if (usos_class_registered) UnregisterClass(USOS_ASYNC_CLASS, usos_instance);
     usos_class_registered = 0;
-    if (usos_poll_proc != NULL) FreeProcInstance(usos_poll_proc);
     usos_poll_proc = NULL;
 }
 
