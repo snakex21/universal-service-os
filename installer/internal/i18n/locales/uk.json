@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - командний рядок",
   "dos.menu.mouse_setup": "Налаштування миші PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (типово)",
-  "dos.menu.early_standard": "Windows 3.0 - стандартний режим (WIN /S, тест)",
+  "dos.menu.early_standard": "Windows 3.0 - стандартний (WIN /S, перезапускає нові ПК)",
   "dos.menu.diag": "Діагностика (D1-D6, лише для тестів)",
   "dos.menu.wfw_enhanced": "розширений режим 386 (типово)",
   "dos.menu.wfw_smartdrv": "режим 386 зі SMARTDRV",

@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - wiersz poleceń",
   "dos.menu.mouse_setup": "Ustawienia myszy PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (domyślny)",
-  "dos.menu.early_standard": "Windows 3.0 - tryb standardowy (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - tryb standardowy (WIN /S, restartuje nowe PC)",
   "dos.menu.diag": "Diagnostyka (D1-D6, tylko do testów)",
   "dos.menu.wfw_enhanced": "tryb rozszerzony 386 (domyślny)",
   "dos.menu.wfw_smartdrv": "tryb 386 z SMARTDRV",

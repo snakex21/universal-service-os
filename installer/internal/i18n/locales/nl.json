@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - opdrachtprompt",
   "dos.menu.mouse_setup": "PS/2-muisinstellingen - Windows Setup",
   "dos.menu.early_default": "Windows (standaard)",
-  "dos.menu.early_standard": "Windows 3.0 - standaardmodus (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standaardmodus (WIN /S, herstart nieuwe pc's)",
   "dos.menu.diag": "Diagnose (D1-D6, alleen voor tests)",
   "dos.menu.wfw_enhanced": "uitgebreide 386-modus (standaard)",
   "dos.menu.wfw_smartdrv": "386-modus met SMARTDRV",

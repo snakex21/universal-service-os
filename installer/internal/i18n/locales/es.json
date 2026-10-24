@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - símbolo del sistema",
   "dos.menu.mouse_setup": "Ajustes del ratón PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (predeterminado)",
-  "dos.menu.early_standard": "Windows 3.0 - modo estándar (WIN /S, prueba)",
+  "dos.menu.early_standard": "Windows 3.0 - modo estándar (WIN /S, reinicia PC nuevos)",
   "dos.menu.diag": "Diagnóstico (D1-D6, solo pruebas)",
   "dos.menu.wfw_enhanced": "modo mejorado 386 (predeterminado)",
   "dos.menu.wfw_smartdrv": "modo 386 con SMARTDRV",

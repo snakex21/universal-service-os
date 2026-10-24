@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - parancssor",
   "dos.menu.mouse_setup": "PS/2 egér beállításai - Windows Setup",
   "dos.menu.early_default": "Windows (alapértelmezett)",
-  "dos.menu.early_standard": "Windows 3.0 - normál mód (WIN /S, teszt)",
+  "dos.menu.early_standard": "Windows 3.0 - normál mód (WIN /S, újraindítja az új PC-ket)",
   "dos.menu.diag": "Diagnosztika (D1-D6, csak tesztekhez)",
   "dos.menu.wfw_enhanced": "kiterjesztett 386 mód (alapért.)",
   "dos.menu.wfw_smartdrv": "386 mód SMARTDRV-vel",

@@ -73,7 +73,8 @@ if not exist C:\WINDOWS\WIN.COM goto missing
 cd \WINDOWS
 rem Windows 3.0 (SYSTEM\DOSX.EXE = standard mode present): real mode by
 rem default. Under CSMWrap 386 enhanced mode hangs in the BIOS USB code (V86)
-rem and standard mode stopped at the logo in QEMU; the menu offers WIN /S.
+rem and standard mode (WIN /S) resets the X470 (2026-10-24; QEMU: stopped at
+rem the logo or restarted the VM). WINREAL, only in the DIAG submenu, runs it.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto plain
 if "%CONFIG%"=="WINREAL" goto standard
 WIN.COM /R
@@ -107,8 +108,8 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 echo USOS %UDIAG%: log in C:\USOS\DIAG\%UDIAG%.TXT
 :end_msg
 rem Windows 3.0 (SYSTEM\DOSX.EXE): WIN typed at the DOS prompt from now on
-rem starts standard mode (C:\USOSW3\WINRUN.BAT; WIN /3, /R and other
-rem arguments unchanged). DOSKEY (about 4 KiB) only after Windows or the menu
+rem starts real mode like the menu default (C:\USOSW3\WINRUN.BAT; WIN /3,
+rem /S and other arguments unchanged). DOSKEY (about 4 KiB) only after Windows or the menu
 rem item. Windows 1.0x/2.x and Windows/386 keep their own WIN / WIN386.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto macro_ok
 if exist C:\WIN386\WIN386.EXE goto macro_ok

@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - komandna linija",
   "dos.menu.mouse_setup": "Podešavanja PS/2 miša - Windows Setup",
   "dos.menu.early_default": "Windows (podrazumevano)",
-  "dos.menu.early_standard": "Windows 3.0 - standardni režim (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standardni režim (WIN /S, restartuje nove PC)",
   "dos.menu.diag": "Dijagnostika (D1-D6, samo za testove)",
   "dos.menu.wfw_enhanced": "prošireni režim 386 (podraz.)",
   "dos.menu.wfw_smartdrv": "režim 386 sa SMARTDRV",

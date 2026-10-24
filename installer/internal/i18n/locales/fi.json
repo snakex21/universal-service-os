@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - komentokehote",
   "dos.menu.mouse_setup": "PS/2-hiiren asetukset - Windows Setup",
   "dos.menu.early_default": "Windows (oletus)",
-  "dos.menu.early_standard": "Windows 3.0 - vakiotila (WIN /S, testi)",
+  "dos.menu.early_standard": "Windows 3.0 - vakiotila (WIN /S, nollaa uudet PC:t)",
   "dos.menu.diag": "Vianmääritys (D1-D6, vain testeihin)",
   "dos.menu.wfw_enhanced": "laajennettu 386-tila (oletus)",
   "dos.menu.wfw_smartdrv": "386-tila ja SMARTDRV",

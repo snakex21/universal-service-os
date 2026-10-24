@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - prompt de comando",
   "dos.menu.mouse_setup": "Configurações do mouse PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (padrão)",
-  "dos.menu.early_standard": "Windows 3.0 - modo padrão (WIN /S, teste)",
+  "dos.menu.early_standard": "Windows 3.0 - modo padrão (WIN /S, reinicia PCs novos)",
   "dos.menu.diag": "Diagnóstico (D1-D6, só para testes)",
   "dos.menu.wfw_enhanced": "modo avançado 386 (padrão)",
   "dos.menu.wfw_smartdrv": "modo 386 com SMARTDRV",

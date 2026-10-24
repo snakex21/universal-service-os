@@ -1,11 +1,13 @@
 [menu]
 menucolor=15,1
 menuitem=WINSTD,Windows (default)
-menuitem=WINREAL,Windows 3.0 - standard mode (WIN /S, test)
 menuitem=DOSONLY,MS-DOS - command prompt
 submenu=DIAG,Diagnostics (D1-D6, for tests only)
 menudefault=WINSTD,8
 
+; Windows 3.0 standard mode (WIN /S, DOSX) resets the X470
+; (2026-10-24): offered only here and labelled so; the default item and a
+; typed WIN run real mode (WIN /R). dos_menu_names drops it for 1.0x/2.x.
 ; Diagnostic start variants only (Windows 2.03 logo hang on the X470, fixed
 ; by USOSV10 in every default item; D6 PASS 2026-10-09):
 ; each isolates one suspect; W1AUTO.BAT logs to C:\USOS\DIAG\<variant>.TXT.
@@ -17,6 +19,7 @@ menuitem=D2NOKBC,D2 - no USOSKBC (PS/2 keyboard only)
 menuitem=D4CLEAN,D4 - no HIMEM and VBMOUSE (SETVER + USOSKBC only)
 menuitem=D5MIN,D5 - minimum: SETVER + USOSWHER only (no USOSV10)
 menuitem=D6V10,D6 - as D5 + USOSV10 (INT 10h on its own stack)
+menuitem=WINREAL,Windows 3.0 - standard mode (WIN /S, restarts new PCs)
 menuitem=DOSONLY,MS-DOS - command prompt
 
 ; HIMEM per item (D4/D5/D6 without it), before SETVER as before.

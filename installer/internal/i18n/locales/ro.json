@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - linie de comandă",
   "dos.menu.mouse_setup": "Setări mouse PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (implicit)",
-  "dos.menu.early_standard": "Windows 3.0 - mod standard (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - mod standard (WIN /S, repornește PC-uri noi)",
   "dos.menu.diag": "Diagnosticare (D1-D6, doar pentru teste)",
   "dos.menu.wfw_enhanced": "mod extins 386 (implicit)",
   "dos.menu.wfw_smartdrv": "mod 386 cu SMARTDRV",

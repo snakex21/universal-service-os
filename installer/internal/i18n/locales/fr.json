@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - invite de commandes",
   "dos.menu.mouse_setup": "Réglages souris PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (par défaut)",
-  "dos.menu.early_standard": "Windows 3.0 - mode standard (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - mode standard (WIN /S, redémarre PC récents)",
   "dos.menu.diag": "Diagnostic (D1-D6, tests uniquement)",
   "dos.menu.wfw_enhanced": "mode étendu 386 (par défaut)",
   "dos.menu.wfw_smartdrv": "mode 386 avec SMARTDRV",

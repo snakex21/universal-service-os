@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - príkazový riadok",
   "dos.menu.mouse_setup": "Nastavenia myši PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (predvolený)",
-  "dos.menu.early_standard": "Windows 3.0 - štandardný režim (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - štandardný režim (WIN /S, reštartuje nové PC)",
   "dos.menu.diag": "Diagnostika (D1-D6, len na testy)",
   "dos.menu.wfw_enhanced": "rozšírený režim 386 (predvolený)",
   "dos.menu.wfw_smartdrv": "režim 386 so SMARTDRV",

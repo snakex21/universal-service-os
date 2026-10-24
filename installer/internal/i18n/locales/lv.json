@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - komandu uzvedne",
   "dos.menu.mouse_setup": "PS/2 peles iestatījumi - Windows Setup",
   "dos.menu.early_default": "Windows (noklusējums)",
-  "dos.menu.early_standard": "Windows 3.0 - standarta režīms (WIN /S, tests)",
+  "dos.menu.early_standard": "Windows 3.0 - standarta režīms (WIN /S, restartē jaunus PC)",
   "dos.menu.diag": "Diagnostika (D1-D6, tikai testiem)",
   "dos.menu.wfw_enhanced": "paplašināts 386 režīms (noklusējums)",
   "dos.menu.wfw_smartdrv": "386 režīms ar SMARTDRV",

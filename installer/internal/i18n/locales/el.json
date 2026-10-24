@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - γραμμή εντολών",
   "dos.menu.mouse_setup": "Ρυθμίσεις ποντικιού PS/2 - Windows Setup",
   "dos.menu.early_default": "Windows (προεπιλογή)",
-  "dos.menu.early_standard": "Windows 3.0 - τυπική λειτουργία (WIN /S, δοκιμή)",
+  "dos.menu.early_standard": "Windows 3.0 - τυπική λειτουργία (WIN /S, επανεκκινεί νέα PC)",
   "dos.menu.diag": "Διαγνωστικά (D1-D6, μόνο για δοκιμές)",
   "dos.menu.wfw_enhanced": "επεκταμένη λειτουργία 386",
   "dos.menu.wfw_smartdrv": "λειτουργία 386 με SMARTDRV",

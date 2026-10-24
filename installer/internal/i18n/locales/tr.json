@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - komut istemi",
   "dos.menu.mouse_setup": "PS/2 fare ayarları - Windows Setup",
   "dos.menu.early_default": "Windows (varsayılan)",
-  "dos.menu.early_standard": "Windows 3.0 - standart mod (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standart mod (WIN /S, yeni PC'leri sıfırlar)",
   "dos.menu.diag": "Tanılama (D1-D6, yalnızca test için)",
   "dos.menu.wfw_enhanced": "386 genişletilmiş mod (varsayılan)",
   "dos.menu.wfw_smartdrv": "SMARTDRV ile 386 modu",

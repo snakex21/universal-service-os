@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - komandų eilutė",
   "dos.menu.mouse_setup": "PS/2 pelės nuostatos - Windows Setup",
   "dos.menu.early_default": "Windows (numatytasis)",
-  "dos.menu.early_standard": "Windows 3.0 - standartinis režimas (WIN /S, bandymas)",
+  "dos.menu.early_standard": "Windows 3.0 - standartinis (WIN /S, perkrauna naujus PC)",
   "dos.menu.diag": "Diagnostika (D1-D6, tik bandymams)",
   "dos.menu.wfw_enhanced": "išplėstinis 386 režimas (numatytasis)",
   "dos.menu.wfw_smartdrv": "386 režimas su SMARTDRV",

@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - команден ред",
   "dos.menu.mouse_setup": "Настройки на PS/2 мишка - Windows Setup",
   "dos.menu.early_default": "Windows (по подразбиране)",
-  "dos.menu.early_standard": "Windows 3.0 - стандартен режим (WIN /S, тест)",
+  "dos.menu.early_standard": "Windows 3.0 - стандартен режим (WIN /S, рестартира нови PC)",
   "dos.menu.diag": "Диагностика (D1-D6, само за тестове)",
   "dos.menu.wfw_enhanced": "разширен режим 386 (по подр.)",
   "dos.menu.wfw_smartdrv": "режим 386 със SMARTDRV",

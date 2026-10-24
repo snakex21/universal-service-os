@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - ledetekst",
   "dos.menu.mouse_setup": "PS/2-museinnstillinger - Windows Setup",
   "dos.menu.early_default": "Windows (standard)",
-  "dos.menu.early_standard": "Windows 3.0 - standardmodus (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standardmodus (WIN /S, restarter nye PC-er)",
   "dos.menu.diag": "Diagnostikk (D1-D6, kun for tester)",
   "dos.menu.wfw_enhanced": "utvidet 386-modus (standard)",
   "dos.menu.wfw_smartdrv": "386-modus med SMARTDRV",

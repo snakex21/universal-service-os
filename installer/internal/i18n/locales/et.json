@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - käsuviip",
   "dos.menu.mouse_setup": "PS/2 hiire sätted - Windows Setup",
   "dos.menu.early_default": "Windows (vaikimisi)",
-  "dos.menu.early_standard": "Windows 3.0 - standardrežiim (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standardrežiim (WIN /S, lähtestab uued PC-d)",
   "dos.menu.diag": "Diagnostika (D1-D6, ainult testideks)",
   "dos.menu.wfw_enhanced": "laiendatud 386 režiim (vaikimisi)",
   "dos.menu.wfw_smartdrv": "386 režiim koos SMARTDRV-ga",

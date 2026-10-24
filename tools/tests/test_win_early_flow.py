@@ -164,7 +164,9 @@ class DiagnosticMenu(unittest.TestCase):
     def test_menu(self):
         self.assertIn('submenu=DIAG,', '\n'.join(self.blocks['menu']))
         items = [l.split('=', 1)[1].split(',')[0] for l in self.blocks['DIAG'] if l.startswith('menuitem=')]
-        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'D6V10', 'DOSONLY'])
+        # WINREAL (Windows 3.0 WIN /S) resets the X470: only here, not in [menu].
+        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'D6V10', 'WINREAL', 'DOSONLY'])
+        self.assertNotIn('WINREAL', '\n'.join(self.blocks['menu']))
         self.assertLessEqual(len(items), 9)
         for item in items:
             self.assertIn(item, self.blocks)

@@ -1409,7 +1409,7 @@
   "dos.menu.dos": "MS-DOS - naredbeni redak",
   "dos.menu.mouse_setup": "Postavke PS/2 miša - Windows Setup",
   "dos.menu.early_default": "Windows (zadano)",
-  "dos.menu.early_standard": "Windows 3.0 - standardni način (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standardni način (WIN /S, resetira nova PC)",
   "dos.menu.diag": "Dijagnostika (D1-D6, samo za testove)",
   "dos.menu.wfw_enhanced": "prošireni način 386 (zadano)",
   "dos.menu.wfw_smartdrv": "način 386 sa SMARTDRV",

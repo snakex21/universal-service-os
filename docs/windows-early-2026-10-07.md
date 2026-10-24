@@ -533,16 +533,19 @@ leaving Windows. Details: `docs/win3-net-2026-10-23.md`.
   current directory; a `WIN.BAT` in the PATH would lose to `WIN.COM` in
   `C:\WINDOWS`, where the prompt is after leaving Windows. `WINRUN.BAT`
   without arguments: 3.1 / 3.11 `/S /B`, WfW 3.11 `/3 /B` (enhanced only),
-  3.0 `/S` (386 enhanced mode under CSMWrap: keyboard late, no mouse);
-  with arguments unchanged (`win /3` = 386 enhanced, `win progman`).
-  Windows 1.0x / 2.x / Windows/386 keep their own WIN / WIN386 and get no
-  DOSKEY. Note: the 3.0 menu default is still `WIN /R` (item 2 `WIN /S`).
+  3.0 `/R` since 2026-10-24 (was `/S`: 3.0 standard mode resets the X470,
+  see "Windows 3.0a fixes" below; 386 enhanced mode under CSMWrap: keyboard
+  late, no mouse); with arguments unchanged (`win /3` = 386 enhanced,
+  `win progman`). Windows 1.0x / 2.x / Windows/386 keep their own WIN /
+  WIN386 and get no DOSKEY. The 3.0 menu default stays `WIN /R`; the
+  `WIN /S` item is only in the Diagnostics submenu now.
 - **Product names** (`tools/dos_win3_menu.sh` `dos_menu_names`, called by
   `dos_csmwrap_target.sh` with `DOS_WIN_SYSTEM`): "Windows 3.1 - tryb
   standardowy (domyslny)", "Windows 3.0a (domyslny)", "Windows/386 2.11
   (domyslny)", "Windows for Workgroups 3.11 - tryb rozszerzony 386
   (domyslny)"; the revision letter comes from the image or folder name
-  (`Windows 3.0a EN.iso`). Item "WIN /S" only for 3.0. The BIOS Core path
+  (`Windows 3.0a EN.iso`). Item "WIN /S" only for 3.0 (Diagnostics
+  submenu since 2026-10-24). The BIOS Core path
   keeps the generic labels.
 - **Regional settings** from the answer profile: `docs/answer-profiles.md`
   (`dos_regional`, `dos_keyb`, renderer `dos.zig`).
@@ -563,3 +566,25 @@ tested):
   falls back to Real Mode for `WIN /S` as well, QEMU only), `win /3` = 386
   Enhanced Mode (PS/2 keyboard; with the USB keyboard enhanced mode hangs in
   QEMU, the known BIOS-USB-in-V86 problem).
+
+## Windows 3.0a fixes after the X470 round (2026-10-24, B261024-183643)
+
+**A. Standard mode resets the X470.** After File > Exit Windows a typed
+`win` ran `WINRUN.BAT` -> `WIN.COM /S` (3.0 standard mode, DOSX) and the PC
+restarted. The user confirmed the cause on the X470: the boot menu item
+"Windows 3.0a - tryb standardowy" (`WIN /S`, no USOS batch involved after
+it) restarts the PC as well. Static candidates (not proven): DOSX's 286
+exit path (CMOS shutdown code 09h + triple fault, which a UEFI reset vector
+does not honour) or its 24-bit descriptors with more than 16 MiB of XMS
+(HIMEM reports 64512K). Change:
+- `WINRUN.BAT` (`windows_run.cmd`): Windows 3.0 (`C:\USOSW3\EARLY.TAG`)
+  without arguments runs `WIN.COM /R`, the menu default and the only 3.0
+  mode that passed on the X470. Explicit `win /s` is passed through as
+  typed.
+- `W1CONFIG.SYS` (`windows_early_config.sys`): the `WINREAL` item (`WIN /S`)
+  left the main menu. It is the last-but-one entry of the Diagnostics
+  submenu, labelled "Windows 3.0a - standard mode (WIN /S, restarts new
+  PCs)" (`dos.menu.early_standard`, all 27 catalogs). The main menu now has
+  only "Windows 3.0a (default)" and "MS-DOS"; the default stays `WIN /R`.
+- Windows 3.1 / 3.11 standard mode (`WIN /S /B`, menu default and typed
+  `win`) is unchanged: it passed on the X470.

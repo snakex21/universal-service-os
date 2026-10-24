@@ -1406,7 +1406,7 @@
   "dos.menu.dos": "MS-DOS - kommandotolk",
   "dos.menu.mouse_setup": "PS/2-musinställningar - Windows Setup",
   "dos.menu.early_default": "Windows (standard)",
-  "dos.menu.early_standard": "Windows 3.0 - standardläge (WIN /S, test)",
+  "dos.menu.early_standard": "Windows 3.0 - standardläge (WIN /S, startar om nya datorer)",
   "dos.menu.diag": "Diagnostik (D1-D6, endast för tester)",
   "dos.menu.wfw_enhanced": "utökat 386-läge (standard)",
   "dos.menu.wfw_smartdrv": "386-läge med SMARTDRV",
