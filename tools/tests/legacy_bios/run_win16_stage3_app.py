@@ -58,6 +58,14 @@ def load_plan(path):
         if target in data: raise ValueError('Duplicate guest file')
         data[target] = value.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii')
     collected = [guest_path(name) for name in plan.get('collect', [])]
+    actions=plan.get('actions', [])
+    if len(actions)>3: raise ValueError('At most three one-shot dialog actions')
+    for action in actions:
+        for key in ('dialog','button'):
+            value=action[key]
+            if not isinstance(value,str) or not 1<=len(value)<=75 or any(c in value for c in '\r\n\x00'):
+                raise ValueError('Invalid one-shot dialog action')
+            value.encode('ascii')
     return commands, copies, data, collected
 
 
@@ -78,7 +86,10 @@ def main():
     commands, copies, data, collected = load_plan(args.plan)
     if 'NET/WIN16/APPCTL.INI' in data or 'NET/WIN16/APPCTL.EXE' in data or 'WINDOWS/WINSOCK.DLL' in data:
         raise ValueError('Plan cannot replace fixture or provider')
-    data['NET/WIN16/APPCTL.INI'] = ('[test]\r\ncommand1=' + commands[0] + '\r\ncommand2=' + commands[1] + '\r\n').encode('ascii')
+    config='[test]\r\ncommand1=' + commands[0] + '\r\ncommand2=' + commands[1] + '\r\n'
+    for i,action in enumerate(json.loads(args.plan.read_text(encoding='utf-8')).get('actions',[]),1):
+        config+='dialog%d=%s\r\nbutton%d=%s\r\n'%(i,action['dialog'],i,action['button'])
+    data['NET/WIN16/APPCTL.INI'] = config.encode('ascii')
     data['NET/WIN16/APPCTL.EXE'] = args.controller.read_bytes()
     if args.api_test:
         if 'NET/WIN16/APITEST.EXE' in data: raise ValueError('Plan cannot replace the own API client')
@@ -104,7 +115,7 @@ def main():
         'injected_sha256': {k: hashlib.sha256(v).hexdigest() for k,v in data.items()},
         'normal_base_preserved': True, 'required_mode': 'ENHANCED', 'run_seconds': args.seconds})
     stage.boot(vm, disk, args.tag+'-run', args.seconds)
-    names = ['NET/WIN16/APPCTL.LOG', 'NET/WIN16/WINSOCK.LOG',
+    names = ['NET/WIN16/APPCTL.LOG', 'NET/WIN16/WINSOCK.LOG', 'NET/WIN16/WSDIAG.LOG',
              'NET/MTCP.CFG', 'NET/DHCP.LOG', 'NET/USOSPKT.LOG'] + collected
     raw = stage.flow.ws.linux(vm, disk, args.tag+'-read', stage.flow.dump(names))
     dumped = stage.flow.files_of(raw)

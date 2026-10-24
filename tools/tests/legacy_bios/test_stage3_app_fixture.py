@@ -39,5 +39,13 @@ class AppPlanTests(unittest.TestCase):
             app.load_plan(self.plan({'command1':'C:\\NET\\WIN16\\A.EXE',
                 'files':[{'source':str(own),'target':'NET/WIN16/A.EXE'}]}))
 
+    def test_dialog_actions_are_finite_and_single_line(self):
+        plan={'command1':'C:\\NET\\WIN16\\A.EXE'}
+        for actions in ([{'dialog':'License','button':'Accept'}]*4,
+                        [{'dialog':'License\ncommand1=bad','button':'Accept'}],
+                        [{'dialog':'License','button':''}]):
+            with self.subTest(actions=actions), self.assertRaises(ValueError):
+                app.load_plan(self.plan({**plan,'actions':actions}))
+
 
 if __name__=='__main__': unittest.main()

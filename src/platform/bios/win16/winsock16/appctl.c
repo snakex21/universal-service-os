@@ -12,6 +12,8 @@
 static HFILE log_file=HFILE_ERROR;
 static HWND window;
 static unsigned int launched;
+static char button_wanted[80];
+static HWND action_button;
 
 static void line(const char FAR *value)
 {
@@ -37,14 +39,45 @@ BOOL FAR PASCAL __export inventory(HWND item,LPARAM unused)
     line(record);return TRUE;
 }
 
+BOOL FAR PASCAL __export find_button(HWND item,LPARAM unused)
+{
+    char caption[100],plain[100],kind[30];int i,j;
+    (void)unused;
+    GetClassName(item,kind,sizeof(kind));
+    if(lstrcmpi(kind,"Button")) return TRUE;
+    GetWindowText(item,caption,sizeof(caption));
+    for(i=j=0;caption[i] && j<99;i++) if(caption[i]!='&') plain[j++]=caption[i];
+    plain[j]=0;
+    if(!lstrcmpi(plain,button_wanted) && IsWindowEnabled(item)) { action_button=item;return FALSE; }
+    return TRUE;
+}
+
 LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 {
-    char command[240],directory[240],name[16],record[300],*slash;
+    char command[240],directory[240],name[16],record[300],dialog_title[80],*slash;
     UINT result;
     int i;
     FARPROC enumerator;
+    HWND dialog;
     if(message==WM_TIMER) {
         KillTimer(hwnd,(UINT)wp);
+        if(wp>=3 && wp<=5) {
+            i=(int)wp-2;
+            wsprintf(name,"dialog%d",i);
+            GetPrivateProfileString("test",name,"",dialog_title,sizeof(dialog_title),CONFIG);
+            wsprintf(name,"button%d",i);
+            GetPrivateProfileString("test",name,"",button_wanted,sizeof(button_wanted),CONFIG);
+            if(dialog_title[0] && button_wanted[0]) {
+                dialog=FindWindow(NULL,dialog_title);action_button=NULL;
+                if(dialog) {
+                    enumerator=MakeProcInstance((FARPROC)find_button,(HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
+                    EnumChildWindows(dialog,(WNDENUMPROC)enumerator,0);FreeProcInstance(enumerator);
+                }
+                wsprintf(record,"one-shot action%d dialog=%s button=%s found=%u",i,dialog_title,button_wanted,action_button!=NULL);line(record);
+                if(action_button) SendMessage(dialog,WM_COMMAND,GetDlgCtrlID(action_button),MAKELONG((WORD)action_button,BN_CLICKED));
+            }
+            return 0;
+        }
         if(!launched) {
             launched=1;
             for(i=1;i<=2;i++) {
@@ -63,6 +96,7 @@ LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
                 chdir("C:\\NET\\WIN16");
             }
             SetTimer(hwnd,2,60000,NULL);
+            SetTimer(hwnd,3,5000,NULL);SetTimer(hwnd,4,20000,NULL);SetTimer(hwnd,5,35000,NULL);
         } else {
             enumerator=MakeProcInstance((FARPROC)inventory,
                                        (HANDLE)GetWindowWord(hwnd,GWW_HINSTANCE));
