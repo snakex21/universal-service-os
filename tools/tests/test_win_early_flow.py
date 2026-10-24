@@ -258,6 +258,24 @@ class DiagnosticMenu(unittest.TestCase):
         self.assertFalse(any('VBMOUSE' in r for r in ran))
         self.assertIn(r'C:\WINDOWS\WIN.COM /S /B', ran)
 
+    def test_usoswin_guard(self):
+        # WIN typed in a DOS window of the running Windows: one hint, no WIN.COM.
+        for extra in ((), (r'C:\USOSW3\EARLY.TAG', r'C:\DOS\VBMOUSE.EXE')):
+            ran = run_early_auto('', extra, 'windows_run.cmd', env={'USOSWIN': '1'})
+            self.assertEqual(ran, ['echo Windows is already running - type EXIT to return.'], extra)
+        # Otherwise WINRUN sets it for WIN.COM and clears it afterwards.
+        lines = batch_lines(MSDOS / 'windows_run.cmd')
+        code = [l for l in lines if l and not l.lower().startswith(('rem', '@echo'))]
+        self.assertEqual(code[:2], ['if "%USOSWIN%"=="1" goto running', 'set USOSWIN=1'])
+        self.assertLess(lines.index(':end'), lines.index('set USOSWIN='))
+        self.assertLess(lines.index('set USOSWIN='), lines.index(':running'))
+        # The start files: set before WIN.COM, cleared at :end.
+        for name in ('windows_early_auto.cmd', 'windows_auto.cmd'):
+            lines = batch_lines(MSDOS / name)
+            first_win = min(n for n, l in enumerate(lines) if l.upper().startswith(('WIN.COM', 'WIN386.EXE')))
+            self.assertLess(lines.index('set USOSWIN=1'), first_win, name)
+            self.assertEqual(lines[lines.index(':end') + 1], 'set USOSWIN=', name)
+
     def test_default_items(self):
         # X470 PASS 2026-10-09 (Windows 2.03 via D6): every default item loads
         # USOSV10 first and USOSKBC /R; the USOSWHER overlay only in diagnostics

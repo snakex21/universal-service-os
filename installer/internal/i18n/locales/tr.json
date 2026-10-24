@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "DOS programları C:\\PROGRAMS içinde.",
   "dos.start.missing": "C:\\WINDOWS içinde Windows dosyaları eksik.",
   "dos.start.restart_hint": "Başlatma modunu yeniden seçmek için bilgisayarı yeniden başlatın.",
+  "dos.run.already_running": "Windows zaten çalışıyor - geri dönmek için EXIT yazın.",
   "dos.mouse.vbmouse_failed": "USOS: DOS fare sürücüsü (VBMOUSE) yüklenemedi.",
   "dos.menu.standard": "Windows - standart mod (varsayılan)",
   "dos.menu.enhanced": "Windows - 386 genişletilmiş mod (alternatif)",

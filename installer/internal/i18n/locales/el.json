@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "Τα προγράμματα DOS είναι στο C:\\PROGRAMS.",
   "dos.start.missing": "Λείπουν αρχεία των Windows στο C:\\WINDOWS.",
   "dos.start.restart_hint": "Για να επιλέξετε ξανά τη λειτουργία εκκίνησης, επανεκκινήστε τον υπολογιστή.",
+  "dos.run.already_running": "Τα Windows εκτελούνται ήδη - πληκτρολογήστε EXIT για επιστροφή.",
   "dos.mouse.vbmouse_failed": "USOS: το πρόγραμμα οδήγησης ποντικιού DOS (VBMOUSE) δεν φορτώθηκε.",
   "dos.menu.standard": "Windows - τυπική λειτουργία (προεπιλογή)",
   "dos.menu.enhanced": "Windows - επεκταμένη λειτουργία 386 (εναλλακτική)",

@@ -623,3 +623,14 @@ INSTALL.BAT writes). Places: W1AUTO.BAT, WINRUN.BAT, the install AUTOEXEC
 (`install.cmd`, also the final AUTOEXEC of an MS-DOS-only install) and
 W3AUTO.CSM (`tools/build_dos_native_support.py`). LIVE.BAT (RAM session)
 keeps its plain call: it clears the screen right after.
+
+**C. WIN typed inside Windows.** W3AUTO.BAT / W3AUTO.CSM / W1AUTO.BAT set
+`USOSWIN=1` before WIN.COM (WIN386.EXE for Windows/386) and clear it at
+`:end`; WINRUN.BAT sets it around its own WIN.COM call. A DOS window of the
+running Windows inherits that environment, so `win` typed there (the
+DOSKEY macro is resident once Windows was started by a typed `win`) only
+prints "Windows is already running - type EXIT to return."
+(`dos.run.already_running`, all catalogs; PL "Windows już działa - wpisz
+EXIT, aby wrócić."). Real-mode 3.0 answers no INT 2Fh 1600h/4680h query
+reliably, hence the environment flag. 10 bytes of the 2048-byte
+environment (`SHELL=... /E:2048`).

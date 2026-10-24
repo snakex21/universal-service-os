@@ -85,6 +85,8 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 :v10_log1
 echo ==== WIN started (no "WIN returned" below = hang)>>C:\USOS\DIAG\%UDIAG%.TXT
 :win_go
+rem USOSWIN=1 while Windows runs (WINRUN.BAT: WIN in its DOS window).
+set USOSWIN=1
 C:
 if exist C:\WIN386\WIN386.EXE goto w386dir
 if exist C:\WINDOWS\WIN386.EXE goto w386win
@@ -119,6 +121,7 @@ goto end
 :missing
 echo Windows files are missing in C:\WINDOWS.
 :end
+set USOSWIN=
 if "%UDIAG%"=="" goto end_msg
 echo ==== WIN returned>>C:\USOS\DIAG\%UDIAG%.TXT
 if "%UDIAG%"=="D5" goto v10_log2

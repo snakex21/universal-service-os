@@ -7,6 +7,10 @@ rem Without arguments: the mode of the menu's default item. Under CSMWrap the
 rem keyboard and mouse of 386 enhanced mode go through the BIOS USB code and
 rem lag or stop; standard mode has them. With arguments: unchanged, so
 rem WIN /3 still starts 386 enhanced mode and WIN PROGMAN works.
+rem USOSWIN=1: set by W3AUTO/W1AUTO/WINRUN around WIN.COM, inherited by the
+rem DOS windows of the running Windows; WIN typed there only gets a hint.
+if "%USOSWIN%"=="1" goto running
+set USOSWIN=1
 rem Windows 3.0 (W1AUTO.BAT, EARLY.TAG): real mode, as the menu default;
 rem its standard mode (WIN /S, DOSX) resets the X470 (2026-10-24).
 if exist C:\USOSW3\EARLY.TAG goto early
@@ -48,3 +52,8 @@ goto end
 :pass
 C:\WINDOWS\WIN.COM %1 %2 %3 %4 %5 %6 %7 %8 %9
 :end
+set USOSWIN=
+goto done
+:running
+echo Windows is already running - type EXIT to return.
+:done

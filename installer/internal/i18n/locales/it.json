@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "I programmi DOS sono in C:\\PROGRAMS.",
   "dos.start.missing": "Mancano file di Windows in C:\\WINDOWS.",
   "dos.start.restart_hint": "Per scegliere di nuovo la modalità di avvio, riavvia il computer.",
+  "dos.run.already_running": "Windows è già in esecuzione - digitare EXIT per tornare.",
   "dos.mouse.vbmouse_failed": "USOS: driver mouse DOS (VBMOUSE) non caricato.",
   "dos.menu.standard": "Windows - modalità standard (predefinita)",
   "dos.menu.enhanced": "Windows - modalità estesa 386 (alternativa)",

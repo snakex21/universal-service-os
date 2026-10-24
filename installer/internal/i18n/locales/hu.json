@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "A DOS programok helye: C:\\PROGRAMS.",
   "dos.start.missing": "Windows-fájlok hiányoznak innen: C:\\WINDOWS.",
   "dos.start.restart_hint": "Az indítási mód újbóli választásához indítsa újra a számítógépet.",
+  "dos.run.already_running": "A Windows már fut - a visszatéréshez írja be: EXIT.",
   "dos.mouse.vbmouse_failed": "USOS: a DOS egérmeghajtó (VBMOUSE) nem töltődött be.",
   "dos.menu.standard": "Windows - normál mód (alapértelmezett)",
   "dos.menu.enhanced": "Windows - kiterjesztett 386 mód (alternatív)",

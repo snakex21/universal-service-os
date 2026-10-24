@@ -1401,6 +1401,7 @@
   "dos.start.dos_programs": "Los programas DOS están en C:\\PROGRAMS.",
   "dos.start.missing": "Faltan archivos de Windows en C:\\WINDOWS.",
   "dos.start.restart_hint": "Para elegir de nuevo el modo de inicio, reinicie el equipo.",
+  "dos.run.already_running": "Windows ya se está ejecutando - escriba EXIT para volver.",
   "dos.mouse.vbmouse_failed": "USOS: no se cargó el controlador de ratón DOS (VBMOUSE).",
   "dos.menu.standard": "Windows - modo estándar (predeterminado)",
   "dos.menu.enhanced": "Windows - modo mejorado 386 (alternativo)",

@@ -1404,6 +1404,7 @@
   "dos.start.dos_programs": "Programy DOS są w C:\\PROGRAMS.",
   "dos.start.missing": "Brakuje plików Windows w C:\\WINDOWS.",
   "dos.start.restart_hint": "Aby ponownie wybrać tryb uruchomienia, zrestartuj komputer.",
+  "dos.run.already_running": "Windows już działa - wpisz EXIT, aby wrócić.",
   "dos.mouse.vbmouse_failed": "USOS: sterownik myszy DOS (VBMOUSE) nie został załadowany.",
   "dos.menu.standard": "Windows - tryb standardowy (domyślny)",
   "dos.menu.enhanced": "Windows - tryb rozszerzony 386 (alternatywny)",
