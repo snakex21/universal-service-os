@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Diagnose (D1-D6, kun til test)",
   "dos.menu.wfw_enhanced": "udvidet 386-tilstand (standard)",
   "dos.menu.wfw_smartdrv": "386-tilstand med SMARTDRV",
+  "dos.menu.winsock_standard": "standardtilstand (alternativ)",
   "dos.winmenu.ready": "USOS - Windows 3.x-startmenuen er klar.",
   "dos.winmenu.final_restart": "En sidste genstart indlæser de nye indstillinger.",
   "dos.winmenu.auto_start": "Windows standardtilstand starter automatisk efter 8 sekunder.",

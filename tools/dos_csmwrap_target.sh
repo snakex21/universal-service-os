@@ -259,7 +259,7 @@ if [ -n "$WIN3_ISO" ]; then
     # says winsock=yes (answer profile dos_winsock; tools/dos_win3_menu.sh).
     # Without it nothing changes.
     if [ -z "$WIN_EARLY" ] && [ -n "$REGIONAL" ]; then
-        if ! dos_winsock_apply "$U" "$REGIONAL" "$ESP_DIR/dos-native/winsock16" "$work/c" > "$work/winsock.log" 2>&1; then
+        if ! dos_winsock_apply "$U" "$REGIONAL" "$ESP_DIR/dos-native/winsock16" "$work/c" "$WIN_SYSTEM" > "$work/winsock.log" 2>&1; then
             while IFS= read -r line; do log "$line"; done < "$work/winsock.log"
             fail 'the Winsock option of the answer profile could not be staged'
         fi

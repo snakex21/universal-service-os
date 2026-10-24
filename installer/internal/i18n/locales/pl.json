@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Diagnostyka (D1-D6, tylko do testów)",
   "dos.menu.wfw_enhanced": "tryb rozszerzony 386 (domyślny)",
   "dos.menu.wfw_smartdrv": "tryb 386 z SMARTDRV",
+  "dos.menu.winsock_standard": "tryb standardowy (alternatywny)",
   "dos.winmenu.ready": "USOS - menu startowe Windows 3.x jest gotowe.",
   "dos.winmenu.final_restart": "Potrzebny jest jeszcze jeden restart, aby wczytać nowe ustawienia.",
   "dos.winmenu.auto_start": "Tryb standardowy Windows uruchomi się sam po 8 sekundach.",

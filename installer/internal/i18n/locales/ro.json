@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Diagnosticare (D1-D6, doar pentru teste)",
   "dos.menu.wfw_enhanced": "mod extins 386 (implicit)",
   "dos.menu.wfw_smartdrv": "mod 386 cu SMARTDRV",
+  "dos.menu.winsock_standard": "mod standard (alternativ)",
   "dos.winmenu.ready": "USOS - meniul de pornire Windows 3.x este gata.",
   "dos.winmenu.final_restart": "O ultimă repornire încarcă noile setări.",
   "dos.winmenu.auto_start": "Modul standard Windows va porni singur după 8 secunde.",

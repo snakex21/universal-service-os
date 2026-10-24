@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Diagnostika (D1-D6, tik bandymams)",
   "dos.menu.wfw_enhanced": "išplėstinis 386 režimas (numatytasis)",
   "dos.menu.wfw_smartdrv": "386 režimas su SMARTDRV",
+  "dos.menu.winsock_standard": "standartinis režimas (alternatyvus)",
   "dos.winmenu.ready": "USOS - Windows 3.x paleisties meniu paruoštas.",
   "dos.winmenu.final_restart": "Paskutinis paleidimas iš naujo įkels naujas nuostatas.",
   "dos.winmenu.auto_start": "Standartinis Windows režimas pasileis pats po 8 sekundžių.",

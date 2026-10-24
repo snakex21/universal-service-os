@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Diagnostika (D1-D6, jen pro testy)",
   "dos.menu.wfw_enhanced": "rozšířený režim 386 (výchozí)",
   "dos.menu.wfw_smartdrv": "režim 386 se SMARTDRV",
+  "dos.menu.winsock_standard": "standardní režim (alternativní)",
   "dos.winmenu.ready": "USOS - spouštěcí nabídka Windows 3.x je připravena.",
   "dos.winmenu.final_restart": "Poslední restart načte nová nastavení.",
   "dos.winmenu.auto_start": "Standardní režim Windows se spustí sám po 8 sekundách.",

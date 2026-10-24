@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Diagnostika (D1-D6, tikai testiem)",
   "dos.menu.wfw_enhanced": "paplašināts 386 režīms (noklusējums)",
   "dos.menu.wfw_smartdrv": "386 režīms ar SMARTDRV",
+  "dos.menu.winsock_standard": "standarta režīms (alternatīva)",
   "dos.winmenu.ready": "USOS - Windows 3.x startēšanas izvēlne ir gatava.",
   "dos.winmenu.final_restart": "Pēdējā restartēšana ielādēs jaunos iestatījumus.",
   "dos.winmenu.auto_start": "Windows standarta režīms startēs pats pēc 8 sekundēm.",

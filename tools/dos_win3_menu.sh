@@ -11,7 +11,7 @@
 #                                  messages) in the profile / USOS menu
 #                                  language (after dos_regional_apply,
 #                                  before dos_menu_names)
-#   dos_winsock_apply DIR INI SRC C  Windows 3.1 / 3.11 / WfW only, DOS.INI
+#   dos_winsock_apply DIR INI SRC C [SYSTEM]  Windows 3.1 / 3.11 / WfW only, DOS.INI
 #                                  winsock=yes: the opt-in Winsock set (SRC =
 #                                  EFI\USOS\dos-native\winsock16) into C:\NET
 #                                  (C = mounted target root), queue lines in
@@ -156,6 +156,9 @@ dos_regional_apply() {
 #   WINMENU.BAT     after Setup: WINSOCK.DLL into C:\WINDOWS unless one is
 #                   there already (logged in STAGE.LOG)
 #   SETUP.INF       icon "USOS Winsock test (GETHTTP)" in the Main group
+#   SYSTEM ($5)     windows-3-1 / windows-3-11: 386 enhanced mode becomes
+#                   the default start mode (dos_winsock_enhanced); WfW
+#                   3.11 starts every item in 386 enhanced mode already
 dos_winsock_apply() {
     [ -f "$2" ] || return 0
     [ "$(dos_ini_value "$2" winsock)" = yes ] || return 0
@@ -195,7 +198,55 @@ dos_winsock_apply() {
     else
         dwg='no Main group in SETUP.INF: File > Run C:\NET\WIN16\GETHTTP.EXE'
     fi
-    printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg"
+    dwe=''
+    case "${5:-}" in
+        windows-3-1|windows-3-11)
+            dos_winsock_enhanced "$1" || return 1
+            dwe=', 386 enhanced mode is the default start mode' ;;
+    esac
+    printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg$dwe"
+}
+
+# Windows 3.1 / 3.11 with the Winsock profile: 386 enhanced mode (WIN /3 /B,
+# the existing WIN386 item) becomes the default of the start menu and of
+# WIN typed at the DOS prompt; standard mode stays as a menu item and as
+# WIN /S. Why: on the X470 (2026-10-24, Windows 3.1 PL, B261024-210648)
+# GETHTTP passes in standard mode, but Netscape 3.04 (GPF 002A:A404 in its
+# MFC handle map, then a hard freeze) and Opera 3.62 (GPF 000D:4D50) fail
+# in standard mode only; in 386 enhanced mode Netscape works. The root cause
+# in standard mode (KRNL286/DOSX with 32-bit browser code, or the DLL's
+# async path under DOSX) is still being investigated
+# (docs/winsock-etap1-5-2026-10-24.md). After dos_menu_names and
+# dos_i18n_apply: the menu texts are rewritten in the 437 section of the
+# menu language (dos_text), the product name in front of " - " is kept.
+dos_winsock_enhanced() {
+    dwe_enh=$(dos_text dos.menu.wfw_enhanced)
+    dwe_std=$(dos_text dos.menu.winsock_standard)
+    [ -n "$dwe_enh" ] || dwe_enh='386 enhanced mode (default)'
+    [ -n "$dwe_std" ] || dwe_std='standard mode (alternative)'
+    for dwf in "$1/W3CONFIG.SYS" "$1/W3CONFIG.CSM"; do
+        [ -f "$dwf" ] || continue
+        # Only index()/substr() on the ASCII start of a line (the product
+        # name); the texts come from ENVIRON as code page bytes.
+        DWE_ENH="$dwe_enh" DWE_STD="$dwe_std" awk '{ l = $0; cr = (index(l, "\r") > 0) ? "\r" : ""
+            k = ""
+            if (index(l, "menuitem=WINSTD,") == 1) k = "WINSTD"
+            if (index(l, "menuitem=WIN386,") == 1) k = "WIN386"
+            if (k != "" && index(l, " - ") > 17) {
+                n = substr(l, 17, index(l, " - ") - 17)
+                printf "menuitem=%s,%s - %s%s\n", k, n, ENVIRON[k == "WINSTD" ? "DWE_STD" : "DWE_ENH"], cr; next }
+            if (index(l, "menudefault=WINSTD,") == 1) { sub(/^menudefault=WINSTD,/, "menudefault=WIN386,", l); printf "%s\n", l; next }
+            print }' "$dwf" > "$dwf.new" && mv "$dwf.new" "$dwf" || return 1
+        grep -q '^menudefault=WIN386,' "$dwf" || { echo "Winsock: no menudefault=WINSTD in $(basename "$dwf")" >&2; return 1; }
+    done
+    # WIN typed at the DOS prompt (WINRUN.BAT without arguments): 386
+    # enhanced mode, as the WfW branch; WIN /S still starts standard mode.
+    dwr="$1/WINRUN.BAT"
+    [ -f "$dwr" ] || return 0
+    awk '!done && /^if exist C:\\WINSETUP\\WFWSETUP\.DL_ goto enhanced/ {
+        printf "rem USOS Winsock profile (Windows 3.1 / 3.11): 386 enhanced mode by default.\r\n"
+        printf "goto enhanced\r\n"; done = 1 } { print }' "$dwr" > "$dwr.new" && mv "$dwr.new" "$dwr" || return 1
+    grep -q '^goto enhanced' "$dwr" || { echo 'Winsock: no WfW line in WINRUN.BAT' >&2; return 1; }
 }
 
 # The section name of the Program Manager Main group in a Windows 3.x

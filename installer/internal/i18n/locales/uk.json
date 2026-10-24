@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Діагностика (D1-D6, лише для тестів)",
   "dos.menu.wfw_enhanced": "розширений режим 386 (типово)",
   "dos.menu.wfw_smartdrv": "режим 386 зі SMARTDRV",
+  "dos.menu.winsock_standard": "стандартний режим (запасний)",
   "dos.winmenu.ready": "USOS - меню запуску Windows 3.x готове.",
   "dos.winmenu.final_restart": "Останнє перезавантаження завантажить нові налаштування.",
   "dos.winmenu.auto_start": "Стандартний режим Windows запуститься сам через 8 секунд.",

@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Dijagnostika (D1-D6, samo za testove)",
   "dos.menu.wfw_enhanced": "prošireni način 386 (zadano)",
   "dos.menu.wfw_smartdrv": "način 386 sa SMARTDRV",
+  "dos.menu.winsock_standard": "standardni način (alternativa)",
   "dos.winmenu.ready": "USOS - izbornik pokretanja Windows 3.x je spreman.",
   "dos.winmenu.final_restart": "Posljednje ponovno pokretanje učitava nove postavke.",
   "dos.winmenu.auto_start": "Standardni način Windowsa pokrenut će se sam nakon 8 sekundi.",

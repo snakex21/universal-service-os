@@ -165,3 +165,29 @@ copies nothing into the system:
 - First install: Setup ignored a new `group9` group, so the icon now goes
   into the Main group. BusyBox awk counts the CP852 group name as UTF-8,
   so the Main group is found with index() only.
+
+### Start mode with the Winsock profile (2026-10-25)
+
+With `winsock=yes` on Windows 3.1 and 3.11 (not WfW 3.11, which already
+starts every item in 386 enhanced mode; not 3.0, which gets no Winsock),
+`dos_winsock_enhanced` (tools/dos_win3_menu.sh) makes 386 enhanced mode
+the default:
+- W3CONFIG.SYS / .CSM: `menudefault=WIN386`, item WIN386 "<product> - 386
+  enhanced mode (default)" (`dos.menu.wfw_enhanced`), item WINSTD
+  "<product> - standard mode (alternative)" (`dos.menu.winsock_standard`).
+  The [WIN386] block is unchanged (`WIN.COM /3 /B`, SMARTDRV), i.e. the
+  item tested on the X470.
+- WINRUN.BAT (WIN typed at the DOS prompt, no arguments): `goto enhanced`
+  before the WfW line. `WIN /S` still starts standard mode.
+Without the profile nothing changes (standard mode stays the default).
+
+Why: X470, Windows 3.1 PL on MS-DOS 6.22, B261024-210648-46901993. In
+standard mode GETHTTP gets HTTP 200, but Netscape 3.04 fails with a GPF at
+002A:A404 (MFC `CMapWordToPtr::GetAssocAt` on the static HWND handle map,
+an invalid selector in m_pHashTable) followed by a hard freeze, and Opera
+3.62 with a GPF at 000D:4D50. In 386 enhanced mode Netscape works. The
+standard-mode root cause is not known yet (KRNL286/DOSX with the browsers'
+32-bit code, or our DLL's async path under DOSX); the diagnostic DLL now
+also logs successful recv/send/select/closesocket/ioctlsocket and the
+posted FD_* events (USOS_WS_DIAG) so the next standard-mode crash leaves
+a trail in WINSOCK.LOG.

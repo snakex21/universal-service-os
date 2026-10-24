@@ -1418,6 +1418,7 @@
   "dos.menu.diag": "Diagnostika (D1-D6, samo za preizkuse)",
   "dos.menu.wfw_enhanced": "razširjeni način 386 (privzeto)",
   "dos.menu.wfw_smartdrv": "način 386 s SMARTDRV",
+  "dos.menu.winsock_standard": "standardni način (alternativa)",
   "dos.winmenu.ready": "USOS - zagonski meni Windows 3.x je pripravljen.",
   "dos.winmenu.final_restart": "Zadnji ponovni zagon naloži nove nastavitve.",
   "dos.winmenu.auto_start": "Standardni način Windows se bo sam zagnal čez 8 sekund.",

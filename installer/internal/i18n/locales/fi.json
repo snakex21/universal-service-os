@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Vianmääritys (D1-D6, vain testeihin)",
   "dos.menu.wfw_enhanced": "laajennettu 386-tila (oletus)",
   "dos.menu.wfw_smartdrv": "386-tila ja SMARTDRV",
+  "dos.menu.winsock_standard": "vakiotila (vaihtoehto)",
   "dos.winmenu.ready": "USOS - Windows 3.x -käynnistysvalikko on valmis.",
   "dos.winmenu.final_restart": "Viimeinen uudelleenkäynnistys lataa uudet asetukset.",
   "dos.winmenu.auto_start": "Windowsin vakiotila käynnistyy itsestään 8 sekunnin kuluttua.",

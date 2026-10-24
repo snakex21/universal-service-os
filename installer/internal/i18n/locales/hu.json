@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Diagnosztika (D1-D6, csak tesztekhez)",
   "dos.menu.wfw_enhanced": "kiterjesztett 386 mód (alapért.)",
   "dos.menu.wfw_smartdrv": "386 mód SMARTDRV-vel",
+  "dos.menu.winsock_standard": "normál mód (alternatív)",
   "dos.winmenu.ready": "USOS - a Windows 3.x indítómenü kész.",
   "dos.winmenu.final_restart": "Egy utolsó újraindítás betölti az új beállításokat.",
   "dos.winmenu.auto_start": "A Windows normál módja 8 másodperc múlva magától indul.",

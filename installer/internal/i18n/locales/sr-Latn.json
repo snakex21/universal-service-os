@@ -1415,6 +1415,7 @@
   "dos.menu.diag": "Dijagnostika (D1-D6, samo za testove)",
   "dos.menu.wfw_enhanced": "prošireni režim 386 (podraz.)",
   "dos.menu.wfw_smartdrv": "režim 386 sa SMARTDRV",
+  "dos.menu.winsock_standard": "standardni režim (alternativa)",
   "dos.winmenu.ready": "USOS - meni za pokretanje Windows 3.x je spreman.",
   "dos.winmenu.final_restart": "Poslednje ponovno pokretanje učitava nova podešavanja.",
   "dos.winmenu.auto_start": "Standardni režim Windowsa pokrenuće se sam posle 8 sekundi.",

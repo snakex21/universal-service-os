@@ -107,8 +107,8 @@ class Catalog(unittest.TestCase):
                 if m:
                     lines.add(m.group(2))
         for key, text in self.cat['en'].items():
-            if key in i18n.WFW_KEYS:
-                continue            # written by dos_menu_names
+            if key in i18n.SCRIPT_KEYS:
+                continue            # written by dos_menu_names / dos_winsock_apply
             self.assertIn(text.encode('ascii'), lines, key)
         # No Polish left in the English sources.
         for src in set(FILES.values()):

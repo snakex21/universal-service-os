@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Diagnostic (D1-D6, tests uniquement)",
   "dos.menu.wfw_enhanced": "mode étendu 386 (par défaut)",
   "dos.menu.wfw_smartdrv": "mode 386 avec SMARTDRV",
+  "dos.menu.winsock_standard": "mode standard (alternatif)",
   "dos.winmenu.ready": "USOS - le menu de démarrage Windows 3.x est prêt.",
   "dos.winmenu.final_restart": "Un dernier redémarrage charge les nouveaux réglages.",
   "dos.winmenu.auto_start": "Le mode standard de Windows démarre seul après 8 secondes.",

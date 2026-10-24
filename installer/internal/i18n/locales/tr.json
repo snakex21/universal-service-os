@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Tanılama (D1-D6, yalnızca test için)",
   "dos.menu.wfw_enhanced": "386 genişletilmiş mod (varsayılan)",
   "dos.menu.wfw_smartdrv": "SMARTDRV ile 386 modu",
+  "dos.menu.winsock_standard": "standart mod (alternatif)",
   "dos.winmenu.ready": "USOS - Windows 3.x başlangıç menüsü hazır.",
   "dos.winmenu.final_restart": "Son bir yeniden başlatma yeni ayarları yükler.",
   "dos.winmenu.auto_start": "Windows standart modu 8 saniye sonra kendiliğinden başlar.",

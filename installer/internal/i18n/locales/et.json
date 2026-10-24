@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Diagnostika (D1-D6, ainult testideks)",
   "dos.menu.wfw_enhanced": "laiendatud 386 režiim (vaikimisi)",
   "dos.menu.wfw_smartdrv": "386 režiim koos SMARTDRV-ga",
+  "dos.menu.winsock_standard": "standardrežiim (alternatiiv)",
   "dos.winmenu.ready": "USOS - Windows 3.x käivitusmenüü on valmis.",
   "dos.winmenu.final_restart": "Viimane taaskäivitus laadib uued sätted.",
   "dos.winmenu.auto_start": "Windowsi standardrežiim käivitub ise 8 sekundi pärast.",

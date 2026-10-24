@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Diagnostik (D1-D6, endast för tester)",
   "dos.menu.wfw_enhanced": "utökat 386-läge (standard)",
   "dos.menu.wfw_smartdrv": "386-läge med SMARTDRV",
+  "dos.menu.winsock_standard": "standardläge (alternativ)",
   "dos.winmenu.ready": "USOS - startmenyn för Windows 3.x är klar.",
   "dos.winmenu.final_restart": "En sista omstart läser in de nya inställningarna.",
   "dos.winmenu.auto_start": "Windows standardläge startar automatiskt efter 8 sekunder.",

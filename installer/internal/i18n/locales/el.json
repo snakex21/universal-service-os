@@ -1412,6 +1412,7 @@
   "dos.menu.diag": "Διαγνωστικά (D1-D6, μόνο για δοκιμές)",
   "dos.menu.wfw_enhanced": "επεκταμένη λειτουργία 386",
   "dos.menu.wfw_smartdrv": "λειτουργία 386 με SMARTDRV",
+  "dos.menu.winsock_standard": "τυπική λειτουργία (εναλλακτική)",
   "dos.winmenu.ready": "USOS - το μενού εκκίνησης των Windows 3.x είναι έτοιμο.",
   "dos.winmenu.final_restart": "Μια τελευταία επανεκκίνηση φορτώνει τις νέες ρυθμίσεις.",
   "dos.winmenu.auto_start": "Η τυπική λειτουργία των Windows θα ξεκινήσει μόνη σε 8 δευτερόλεπτα.",
