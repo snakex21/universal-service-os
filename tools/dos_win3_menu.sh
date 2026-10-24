@@ -7,9 +7,15 @@
 #   dos_regional_apply DIR INI     COUNTRY / code page / KEYB from DOS.INI
 #                                  (src/flow/answer/dos.zig) into the start
 #                                  files; manual: W3PL.KEY is not used
+#   dos_winsock_apply DIR INI SRC C  Windows 3.1 / 3.11 / WfW only, DOS.INI
+#                                  winsock=yes: the opt-in Winsock set (SRC =
+#                                  EFI\USOS\dos-native\winsock16) into C:\NET
+#                                  (C = mounted target root), queue lines in
+#                                  DIR's start files
 #
 # Every file in DIR is CRLF text (tools/build_dos_native_support.py); the
-# lines written here are CRLF too. Nothing outside DIR is touched.
+# lines written here are CRLF too. Nothing outside DIR is touched, except
+# C:\NET by dos_winsock_apply.
 
 # The product name of a catalog id; a letter revision in the image or
 # folder name is kept (Windows 3.0a EN.iso -> Windows 3.0a).
@@ -123,4 +129,60 @@ dos_regional_apply() {
         rm -f "$1/REGAUTO.BAT"
     fi
     echo "DOS regional settings: COUNTRY=$dra_country code page $dra_cp${dra_cpi:+ ($dra_cpi)}${dra_keyb:+ KEYB $dra_keyb}"
+}
+
+# Windows 3.1 / 3.11 / WfW 3.11 Winsock (experimental, answer profile
+# dos_winsock -> DOS.INI winsock=yes; docs/winsock-etap1-5-2026-10-24.md).
+# Without that line nothing here runs and the install is the same as before.
+#   C:\NET\WIN16    GETHTTP.EXE, TESTLOAD.EXE, WINSOCK.DLL, WINSOCK.TXT,
+#                   STAGE.LOG (written before the first DOS boot)
+#   C:\NET          USOSPKTQ.COM; NETSTART.BAT = the queue variant
+#                   (INSTALL.BAT copies DIR's NETSTART.BAT there)
+#   W3AUTO          "set USOSPKT_QUEUE=1" before the NETSTART call
+#   WINMENU.BAT     after Setup: WINSOCK.DLL into C:\WINDOWS unless one is
+#                   there already (logged in STAGE.LOG)
+#   SETUP.INF       icon "USOS Winsock test (GETHTTP)" in the Main group
+dos_winsock_apply() {
+    [ -f "$2" ] || return 0
+    [ "$(dos_ini_value "$2" winsock)" = yes ] || return 0
+    for dwf in WINSOCK.DLL GETHTTP.EXE TESTLOAD.EXE USOSPKTQ.COM NETSTART.BAT WINSOCK.TXT; do
+        [ -f "$3/$dwf" ] || { echo "Winsock: missing $dwf in the USOS files, option not applied" >&2; return 1; }
+    done
+    mkdir -p "$4/NET/WIN16" || return 1
+    for dwf in WINSOCK.DLL GETHTTP.EXE TESTLOAD.EXE WINSOCK.TXT; do
+        cp "$3/$dwf" "$4/NET/WIN16/$dwf" || return 1
+    done
+    cp "$3/USOSPKTQ.COM" "$4/NET/USOSPKTQ.COM" || return 1
+    cp "$3/NETSTART.BAT" "$1/NETSTART.BAT" || return 1
+    printf 'USOS Winsock (answer profile): C:\\NET\\WIN16 and C:\\NET\\USOSPKTQ.COM staged before the first boot\r\n' > "$4/NET/WIN16/STAGE.LOG"
+    for dwf in "$1/W3AUTO.BAT" "$1/W3AUTO.CSM"; do
+        [ -f "$dwf" ] || continue
+        awk '!done && /^if exist C:\\NET\\NETSTART\.BAT call / { printf "set USOSPKT_QUEUE=1\r\n"; done = 1 } { print }' "$dwf" > "$dwf.new" && mv "$dwf.new" "$dwf" || return 1
+        grep -q '^set USOSPKT_QUEUE=1' "$dwf" || { echo "Winsock: no NETSTART call in $(basename "$dwf")" >&2; return 1; }
+    done
+    awk '{ print } !done && /^:ini_done/ {
+        printf "if exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul\r\n"
+        done = 1 }' "$1/WINMENU.BAT" > "$1/WINMENU.NEW" && mv "$1/WINMENU.NEW" "$1/WINMENU.BAT" || return 1
+    grep -q 'WIN16\\WINSOCK.DLL C:\\WINDOWS' "$1/WINMENU.BAT" || { echo 'Winsock: no :ini_done in WINMENU.BAT' >&2; return 1; }
+    dwi="$1/WINSETUP/SETUP.INF"
+    # Setup creates only the groups it knows (a new [progman.groups] entry
+    # is ignored, QEMU 3.1 PL 2026-10-24), so the icon goes into the Main
+    # group: the [progman.groups] entry marked ",1" (maximized), group3 in
+    # 3.1 / 3.11 / WfW 3.11.
+    dwm=''
+    # Byte-safe: group names are code page text (852 in the Polish INF);
+    # BusyBox awk counts them as UTF-8 (length/substr/regex go wrong), so
+    # only index() is used on the name part.
+    [ -f "$dwi" ] && dwm=$(awk '{ sub(/\r$/, "") } /^\[/ { s = tolower($0) == "[progman.groups]"; next }
+        s && index($0, "=") > 1 && index($0, ",1") > index($0, "=") { k = substr($0, 1, index($0, "=") - 1); if (k ~ /^[A-Za-z0-9]+$/) { print k; exit } }' "$dwi")
+    if [ -n "$dwm" ] && grep -qi "^\[$dwm\]" "$dwi" && ! grep -q 'WIN16\\GETHTTP.EXE' "$dwi"; then
+        awk -v h="[$dwm]" '{ print } !done { l = $0; sub(/\r$/, "", l) } !done && tolower(l) == tolower(h) {
+            printf "\"USOS Winsock test (GETHTTP)\", C:\\NET\\WIN16\\GETHTTP.EXE\r\n"; done = 1 }' "$dwi" > "$dwi.new" && mv "$dwi.new" "$dwi" || return 1
+        dwg="icon \"USOS Winsock test (GETHTTP)\" in the Main group ($dwm)"
+    else
+        dwg='no Main group in SETUP.INF: File > Run C:\NET\WIN16\GETHTTP.EXE'
+    fi
+    printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg"
 }

@@ -472,6 +472,7 @@ pub const Key = enum(u16) {
     profile_field_display_bpp,
     profile_field_dos_keyb,
     profile_field_dos_regional,
+    profile_field_dos_winsock,
     profile_field_edition,
     profile_field_end_task,
     profile_field_firewall_off,
@@ -556,6 +557,7 @@ pub const Key = enum(u16) {
     profile_help_display_legacy,
     profile_help_dos_keyb,
     profile_help_dos_regional,
+    profile_help_dos_winsock,
     profile_help_edition,
     profile_help_end_task,
     profile_help_firewall_off,
@@ -1307,6 +1309,7 @@ pub const hashes = [_]u32{
     0x724f2711, // profile.field.display_bpp
     0xc49c37ba, // profile.field.dos_keyb
     0xf5438598, // profile.field.dos_regional
+    0x78e1a8a1, // profile.field.dos_winsock
     0x9c409bd4, // profile.field.edition
     0x90ff1671, // profile.field.end_task
     0xc81dad84, // profile.field.firewall_off
@@ -1391,6 +1394,7 @@ pub const hashes = [_]u32{
     0x2158e6ff, // profile.help.display_legacy
     0x1a0b63c3, // profile.help.dos_keyb
     0x3f668a55, // profile.help.dos_regional
+    0xf90fae82, // profile.help.dos_winsock
     0xbe0d347f, // profile.help.edition
     0xbd1a9960, // profile.help.end_task
     0x179d8dad, // profile.help.firewall_off
@@ -2503,6 +2507,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2979,6 +2985,7 @@ pub const english = [_][]const u8{
     "Color depth",
     "DOS: keyboard layout (KEYB)",
     "DOS settings",
+    "Winsock (experimental)",
     "Edition",
     "End task in the taskbar menu",
     "Turn off the firewall",
@@ -3063,6 +3070,7 @@ pub const english = [_][]const u8{
     "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Automatic (monitor native) works the same way. Color depth: automatic prefers 32-bit where available, otherwise 16-bit. Windows default: USOS does not change the resolution after installation.",
     "Loads KEYB with the profile's layout. PS/2 keyboard only: a USB keyboard on a PC without CSM keeps the US layout in DOS.",
     "MS-DOS and Windows 1.x-3.x: country, code page and keyboard from the formats and keyboard above. Manual: nothing is set, Windows 3.1 Setup asks.",
+    "Windows 3.1, 3.11 and WfW 3.11: installs the USOS WINSOCK.DLL, the network driver with the Windows queue and the \"USOS Winsock test\" group (GETHTTP). Off: installation as before.",
     "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
     "Right-clicking a taskbar button offers End task (for every new user).",
     "Windows Firewall is off for every network type. Only for computers behind another firewall or for tests.",

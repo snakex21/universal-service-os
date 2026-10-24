@@ -53,6 +53,16 @@ pub fn isDos(system_id: []const u8) bool {
     return false;
 }
 
+/// Windows 3.1 / 3.11 / WfW 3.11: the systems the experimental Winsock
+/// option (dos_winsock -> DOS.INI winsock=yes, tools/dos_win3_menu.sh
+/// dos_winsock_apply) applies to.
+pub fn winsockCapable(system_id: []const u8) bool {
+    for ([_][]const u8{ "windows-3-1", "windows-3-11", "windows-wfw-3-11" }) |id| {
+        if (std.ascii.eqlIgnoreCase(id, system_id)) return true;
+    }
+    return false;
+}
+
 pub const KeybFile = enum { keyboard, keybrd2 };
 
 pub const Country = struct {
@@ -156,6 +166,8 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
         if (c.cpi.len > 0) try w.print("cpi={s}\r\n", .{c.cpi});
     }
     if (s.keyb) |k| try w.print("keyb={s}\r\nkeybfile={s}\r\n", .{ k.keyb, if (k.keyb_file == .keybrd2) "KEYBRD2.SYS" else "KEYBOARD.SYS" });
+    // Off: no line at all, so DOS.INI stays as it was before the option.
+    if (p.dos_winsock) try w.writeAll("winsock=yes\r\n");
     return w.buffered();
 }
 
@@ -221,6 +233,29 @@ test "formats and keyboard: locale wins, KEYB only for a layout of the same code
     try std.testing.expect(std.mem.endsWith(u8, try render(&auto_lang, &buffer), "mode=auto\r\n"));
     const uk = try profileFrom("name=A\nuser=B\nlanguage=uk-UA\n");
     try std.testing.expect(std.mem.endsWith(u8, try render(&uk, &buffer), "mode=auto\r\n"));
+}
+
+test "Winsock option: one line only when on, any regional mode" {
+    var buffer: [512]u8 = undefined;
+    var off_buffer: [512]u8 = undefined;
+    const off = try profileFrom("name=Dom\nuser=Jan\nlanguage=pl-PL\n");
+    const on = try profileFrom("name=Dom\nuser=Jan\nlanguage=pl-PL\ndos_winsock=yes\n");
+    const off_text = try render(&off, &off_buffer);
+    const on_text = try render(&on, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, off_text, "winsock") == null);
+    try std.testing.expect(std.mem.startsWith(u8, on_text, off_text));
+    try std.testing.expectEqualStrings("winsock=yes\r\n", on_text[off_text.len..]);
+    const manual = try profileFrom("name=Dom\nuser=Jan\ndos_regional=manual\ndos_winsock=yes\n");
+    try std.testing.expect(std.mem.endsWith(u8, try render(&manual, &buffer), "mode=manual\r\nwinsock=yes\r\n"));
+    // Round trip through the profile writer; off writes nothing.
+    var out: [4096]u8 = undefined;
+    const written = try profile_mod.write(&on, &out);
+    try std.testing.expect(std.mem.indexOf(u8, written, "dos_winsock=yes\r\n") != null);
+    const back = try profileFrom(written);
+    try std.testing.expect(back.dos_winsock);
+    try std.testing.expect(std.mem.indexOf(u8, try profile_mod.write(&off, &out), "dos_winsock") == null);
+    try std.testing.expect(winsockCapable("windows-3-1") and winsockCapable("windows-3-11") and winsockCapable("windows-wfw-3-11"));
+    try std.testing.expect(!winsockCapable("windows-3-0") and !winsockCapable("ms-dos") and !winsockCapable("windows-1-01"));
 }
 
 test "DOS systems" {

@@ -1146,6 +1146,8 @@
   "boot.profile.help.dos_regional": "MS-DOS a Windows 1.x-3.x: krajina, kódová stránka a klávesnica z formátov a klávesnice vyššie. Ručne: nič sa nenastaví, Inštalácia Windows 3.1 sa opýta.",
   "boot.profile.field.dos_keyb": "DOS: rozloženie klávesnice (KEYB)",
   "boot.profile.help.dos_keyb": "Načíta KEYB s rozložením profilu. Len klávesnica PS/2: klávesnica USB na PC bez CSM má v DOS rozloženie US.",
+  "boot.profile.field.dos_winsock": "Winsock (experimentálny)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 a WfW 3.11: nainštaluje WINSOCK.DLL od USOS, sieťový ovládač s frontom pre Windows a skupinu \"USOS Winsock test\" (GETHTTP). Vypnuté: inštalácia ako doteraz.",
   "boot.profile.field.show_extensions": "Zobraziť prípony súborov",
   "boot.profile.help.show_extensions": "Prieskumník zobrazuje prípony názvov súborov, napríklad .exe (pre každého nového používateľa).",
   "boot.profile.field.show_hidden": "Zobraziť skryté súbory",

@@ -74,6 +74,10 @@ def build(root: Path):
     # Network for MS-DOS (INSTALL.BAT -> C:\NET): own packet driver + mTCP.
     from build_dos_network import build as build_dos_network
     build_dos_network(root, dos_out)
+    # Windows 3.1 / WfW Winsock, opt-in (answer profile dos_winsock): its own
+    # folder, staged by dos_csmwrap_target.sh only when the option is on.
+    from build_win16_winsock import build_payload as build_winsock16
+    build_winsock16(root, out / 'winsock16')
     build_csmwrap_variants(root, dos_out)
     build_reboot(root)
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')

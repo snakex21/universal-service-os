@@ -1146,6 +1146,8 @@
   "boot.profile.help.dos_regional": "MS-DOS і Windows 1.x-3.x: країна, кодова сторінка й клавіатура з форматів і клавіатури вище. Вручну: нічого не задається, запитає Windows 3.1 Setup.",
   "boot.profile.field.dos_keyb": "DOS: розкладка клавіатури (KEYB)",
   "boot.profile.help.dos_keyb": "Завантажує KEYB з розкладкою профілю. Лише клавіатура PS/2: USB-клавіатура на ПК без CSM лишається в DOS з розкладкою US.",
+  "boot.profile.field.dos_winsock": "Winsock (експериментальний)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 і WfW 3.11: встановлює WINSOCK.DLL USOS, мережевий драйвер із чергою для Windows і групу \"USOS Winsock test\" (GETHTTP). Вимкнено: встановлення як раніше.",
   "boot.profile.field.show_extensions": "Показувати розширення файлів",
   "boot.profile.help.show_extensions": "Провідник показує розширення імен файлів, наприклад .exe (для кожного нового користувача).",
   "boot.profile.field.show_hidden": "Показувати приховані файли",

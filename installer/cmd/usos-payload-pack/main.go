@@ -127,6 +127,13 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/USOSVGAR.COM`, `EFI/USOS/dos-native/msdos/USOSVGAR.COM`},
 	{`zig-out/dos-native/msdos/USOSPKT.COM`, `EFI/USOS/dos-native/msdos/USOSPKT.COM`},
 	{`zig-out/dos-native/msdos/NETSTART.BAT`, `EFI/USOS/dos-native/msdos/NETSTART.BAT`},
+	// Windows 3.1 / WfW Winsock, opt-in (answer profile dos_winsock): own folder.
+	{`zig-out/dos-native/winsock16/WINSOCK.DLL`, `EFI/USOS/dos-native/winsock16/WINSOCK.DLL`},
+	{`zig-out/dos-native/winsock16/GETHTTP.EXE`, `EFI/USOS/dos-native/winsock16/GETHTTP.EXE`},
+	{`zig-out/dos-native/winsock16/TESTLOAD.EXE`, `EFI/USOS/dos-native/winsock16/TESTLOAD.EXE`},
+	{`zig-out/dos-native/winsock16/USOSPKTQ.COM`, `EFI/USOS/dos-native/winsock16/USOSPKTQ.COM`},
+	{`zig-out/dos-native/winsock16/NETSTART.BAT`, `EFI/USOS/dos-native/winsock16/NETSTART.BAT`},
+	{`zig-out/dos-native/winsock16/WINSOCK.TXT`, `EFI/USOS/dos-native/winsock16/WINSOCK.TXT`},
 	{`zig-out/dos-native/msdos/MTCP.DEF`, `EFI/USOS/dos-native/msdos/MTCP.DEF`},
 	{`zig-out/dos-native/msdos/MTCP.TXT`, `EFI/USOS/dos-native/msdos/MTCP.TXT`},
 	{`zig-out/dos-native/msdos/MTCPSRC.ZIP`, `EFI/USOS/dos-native/msdos/MTCPSRC.ZIP`},

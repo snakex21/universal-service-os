@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS και Windows 1.x-3.x: χώρα, κωδικοσελίδα και πληκτρολόγιο από τις μορφές και το πληκτρολόγιο παραπάνω. Χειροκίνητα: τίποτα, ρωτά το Windows 3.1 Setup.",
   "boot.profile.field.dos_keyb": "DOS: διάταξη πληκτρολογίου (KEYB)",
   "boot.profile.help.dos_keyb": "Φορτώνει το KEYB με τη διάταξη του προφίλ. Μόνο πληκτρολόγιο PS/2: ένα USB σε PC χωρίς CSM μένει σε διάταξη US στο DOS.",
+  "boot.profile.field.dos_winsock": "Winsock (πειραματικό)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 και WfW 3.11: εγκαθιστά το WINSOCK.DLL του USOS, το πρόγραμμα οδήγησης δικτύου με ουρά για τα Windows και την ομάδα \"USOS Winsock test\" (GETHTTP). Ανενεργό: εγκατάσταση όπως πριν.",
   "boot.profile.field.show_extensions": "Εμφάνιση επεκτάσεων αρχείων",
   "boot.profile.help.show_extensions": "Η Εξερεύνηση δείχνει τις επεκτάσεις ονομάτων αρχείων, π.χ. .exe (για κάθε νέο χρήστη).",
   "boot.profile.field.show_hidden": "Εμφάνιση κρυφών αρχείων",

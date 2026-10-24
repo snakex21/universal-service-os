@@ -76,6 +76,8 @@ const F = enum(u8) {
     /// MS-DOS / Windows 1.x-3.x (answer.dos).
     dos_regional,
     dos_keyb,
+    /// Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (answer.dos).
+    dos_winsock,
     save,
     cancel,
 };
@@ -176,6 +178,7 @@ var network_options: [3][]const u8 = undefined;
 var dos_regional_options: [2][]const u8 = undefined;
 var dos_regional_index: usize = 0;
 var dos_keyb = false;
+var dos_winsock = false;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
 
@@ -294,6 +297,7 @@ fn load(p: *const Profile) void {
     saved_home = p.home_page;
     dos_regional_index = @intFromEnum(p.dos_regional);
     dos_keyb = p.dos_keyb;
+    dos_winsock = p.dos_winsock;
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = if (answer.display_profile.supportsSystem(system_id))
         (if (answer.display_profile.requested(p)) @intFromEnum(p.display) + @as(usize, 1) else 0)
@@ -443,6 +447,7 @@ fn build(out: *Profile) void {
     out.home_page = saved_home;
     out.dos_regional = @enumFromInt(dos_regional_index);
     out.dos_keyb = dos_keyb;
+    out.dos_winsock = dos_winsock;
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     if (answer.display_profile.supportsSystem(system_id)) {
@@ -533,6 +538,7 @@ fn helpKey(id: F) view.Key {
         .workgroup => .profile_help_workgroup,
         .dos_regional => .profile_help_dos_regional,
         .dos_keyb => .profile_help_dos_keyb,
+        .dos_winsock => .profile_help_dos_winsock,
         .save, .cancel => subtitleKey(),
     };
 }
@@ -680,6 +686,8 @@ fn buildFields() void {
     if (dos) {
         addField(.dos_regional, .{ .kind = .choice, .label = t(.profile_field_dos_regional), .options = &dos_regional_options, .index = &dos_regional_index });
         if (dos_regional_index == 0) addField(.dos_keyb, .{ .kind = .toggle, .label = t(.profile_field_dos_keyb), .flag = &dos_keyb });
+        // Off by default; Windows 3.1 / 3.11 / WfW 3.11 only.
+        if (answer.dos.winsockCapable(system_id)) addField(.dos_winsock, .{ .kind = .toggle, .label = t(.profile_field_dos_winsock), .flag = &dos_winsock });
     }
     if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).

@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS und Windows 1.x-3.x: Land, Codepage und Tastatur aus den Formaten und der Tastatur oben. Manuell: nichts wird gesetzt, Windows 3.1 Setup fragt.",
   "boot.profile.field.dos_keyb": "DOS: Tastaturlayout (KEYB)",
   "boot.profile.help.dos_keyb": "Lädt KEYB mit dem Layout des Profils. Nur PS/2-Tastatur: eine USB-Tastatur an einem PC ohne CSM behält in DOS das US-Layout.",
+  "boot.profile.field.dos_winsock": "Winsock (experimentell)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 und WfW 3.11: installiert die USOS-WINSOCK.DLL, den Netzwerktreiber mit Warteschlange für Windows und die Gruppe \"USOS Winsock test\" (GETHTTP). Aus: Installation wie bisher.",
   "boot.profile.field.show_extensions": "Dateierweiterungen anzeigen",
   "boot.profile.help.show_extensions": "Der Explorer zeigt Dateinamenerweiterungen wie .exe an (für jeden neuen Benutzer).",
   "boot.profile.field.show_hidden": "Versteckte Dateien anzeigen",

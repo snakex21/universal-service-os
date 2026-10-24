@@ -1146,6 +1146,8 @@
   "boot.profile.help.dos_regional": "MS-DOS un Windows 1.x-3.x: valsts, kodu lapa un tastatūra no augstāk norādītajiem formātiem un tastatūras. Manuāli: nekas netiek iestatīts, jautā Windows 3.1 Setup.",
   "boot.profile.field.dos_keyb": "DOS: tastatūras izkārtojums (KEYB)",
   "boot.profile.help.dos_keyb": "Ielādē KEYB ar profila izkārtojumu. Tikai PS/2 tastatūra: USB tastatūra datorā bez CSM DOS vidē paliek ar US izkārtojumu.",
+  "boot.profile.field.dos_winsock": "Winsock (eksperimentāls)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 un WfW 3.11: instalē USOS WINSOCK.DLL, tīkla draiveri ar Windows rindu un grupu \"USOS Winsock test\" (GETHTTP). Izslēgts: instalēšana kā līdz šim.",
   "boot.profile.field.show_extensions": "Rādīt failu paplašinājumus",
   "boot.profile.help.show_extensions": "Pārlūks rāda failu nosaukumu paplašinājumus, piem., .exe (katram jaunam lietotājam).",
   "boot.profile.field.show_hidden": "Rādīt slēptos failus",

@@ -233,6 +233,16 @@ if [ -n "$WIN3_ISO" ]; then
             log "early Windows: $WIN_EARLY (Setup from A: = C:\WINSETUP)" ;;
         *) fail "unexpected DOS_WIN_EARLY: $WIN_EARLY" ;;
     esac
+    # Windows 3.1 / 3.11 / WfW 3.11: the opt-in Winsock set when DOS.INI
+    # says winsock=yes (answer profile dos_winsock; tools/dos_win3_menu.sh).
+    # Without it nothing changes.
+    if [ -z "$WIN_EARLY" ] && [ -n "$REGIONAL" ]; then
+        if ! dos_winsock_apply "$U" "$REGIONAL" "$ESP_DIR/dos-native/winsock16" "$work/c" > "$work/winsock.log" 2>&1; then
+            while IFS= read -r line; do log "$line"; done < "$work/winsock.log"
+            fail 'the Winsock option of the answer profile could not be staged'
+        fi
+        while IFS= read -r line; do log "$line"; done < "$work/winsock.log"
+    fi
 fi
 if [ -n "$PROGRAMS_DIR" ] && [ -d "$PROGRAMS_DIR" ]; then
     cp -r "$PROGRAMS_DIR" "$U/PROGRAMS" || fail 'cannot copy the DOS programs from DATA'
