@@ -57,13 +57,40 @@ BOOL FAR PASCAL __export test_hook(void)
 static void finish_b(void)
 {
     char byte;
+    struct hostent FAR *internet;
+    struct sockaddr_in address;
+    SOCKET tcp;
+    char prefix[13];
+    int got,part;
+    static char request[]="GET / HTTP/1.0\r\nHost: www.68k.news\r\nConnection: close\r\n\r\n";
     u_long nonblock = 1;
+    KillTimer(window,1);
     VERIFY(!WSAIsBlocking(),"taskB independent blocking state");
     VERIFY(dns_seen,"taskB own DNS completion");
     VERIFY(host_result != NULL && host_result->h_name[0]=='u',"taskB retained result");
     VERIFY(ioctlsocket(own_socket,FIONBIO,&nonblock)==0,"taskB socket survives A cleanup");
     VERIFY(recv(own_socket,&byte,1,0)==SOCKET_ERROR && WSAGetLastError()==WSAEWOULDBLOCK,"taskB transport survives A cleanup");
     VERIFY(closesocket(own_socket)==0,"taskB close"); own_socket=INVALID_SOCKET;
+    internet=gethostbyname("www.68k.news");
+    VERIFY(internet!=NULL && internet->h_addr_list!=NULL,"taskB real DNS after taskA exit");
+    if(internet && internet->h_addr_list && internet->h_addr_list[0]) {
+        _fmemset(&address,0,sizeof(address));address.sin_family=AF_INET;address.sin_port=htons(80);
+        _fmemcpy(&address.sin_addr.s_addr,internet->h_addr_list[0],4);
+        tcp=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+        VERIFY(tcp!=INVALID_SOCKET,"taskB TCP after taskA exit");
+        if(tcp!=INVALID_SOCKET) {
+            part=connect(tcp,(struct sockaddr FAR *)&address,sizeof(address));
+            VERIFY(part==0,"taskB connect after taskA exit");
+            if(part==0) {
+                VERIFY(send(tcp,request,sizeof(request)-1,0)==sizeof(request)-1,"taskB send after taskA exit");
+                got=0;
+                while(got<12) { part=recv(tcp,prefix+got,12-got,0);if(part<=0) break;got+=part; }
+                prefix[got]=0;
+                VERIFY(got==12 && (!strcmp(prefix,"HTTP/1.0 200") || !strcmp(prefix,"HTTP/1.1 200")),"taskB HTTP 200 after taskA exit");
+            }
+            closesocket(tcp);
+        }
+    }
     VERIFY(WSACleanup()==0,"taskB cleanup");
     line(failures ? "FINAL FAIL" : "FINAL PASS");
     DestroyWindow(window); PostQuitMessage(0);
