@@ -268,6 +268,12 @@ if [ -n "$WIN3_ISO" ]; then
 fi
 if [ -n "$PROGRAMS_DIR" ] && [ -d "$PROGRAMS_DIR" ]; then
     cp -r "$PROGRAMS_DIR" "$U/PROGRAMS" || fail 'cannot copy the DOS programs from DATA'
+    # Windows 3.x: Program Manager icons from PROGRAMS\<FOLDER>\USOSICON.TXT
+    # into the Main group of SETUP.INF (tools/dos_win3_menu.sh).
+    if [ -n "$WIN3_ISO" ]; then
+        dos_program_icons "$U" > "$work/icons.log" 2>&1 || { while IFS= read -r line; do log "$line"; done < "$work/icons.log"; fail 'the Program Manager icons could not be written'; }
+        while IFS= read -r line; do log "$line"; done < "$work/icons.log"
+    fi
 fi
 printf 'CSMWRAP\r\n' > "$U/CSMWRAP.TAG"
 cp "$ESP_DIR/dos-native/memdisk" "$U/MEMDISK" || fail 'cannot copy MEMDISK'

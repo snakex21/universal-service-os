@@ -634,3 +634,27 @@ prints "Windows is already running - type EXIT to return."
 EXIT, aby wrócić."). Real-mode 3.0 answers no INT 2Fh 1600h/4680h query
 reliably, hence the environment flag. 10 bytes of the 2048-byte
 environment (`SHELL=... /E:2048`).
+
+**E. Program Manager icons for staged programs (Windows 3.0 / 3.1 / 3.11 /
+WfW 3.11).** `tools/dos_win3_menu.sh` `dos_program_icons`, called by
+`dos_csmwrap_target.sh` right after `DATA\Systems\DOS\MS-DOS\Programs` was
+copied to `C:\USOSDOS\PROGRAMS` (INSTALL.BAT then copies it to
+`C:\PROGRAMS`). Each `PROGRAMS\<FOLDER>\USOSICON.TXT` (any case) may hold
+lines `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE`; blank lines and `;` comments
+are ignored. A line is used when the name is 1-40 printable ASCII
+characters without `" , ( ) [ ]` (Setup passes it in a Program Manager DDE
+command), the folder and every path part are 8.3 names, the path stays
+inside its own folder (at most 64 characters), the file ends in
+`.EXE/.COM/.PIF/.BAT`, it was staged, and SETUP.INF does not list it yet;
+at most 30 icons. Every skipped line gets one prep-log line ("Program icons:
+<FOLDER>\USOSICON.TXT line N skipped: <reason>"). Good lines are appended
+to the end of the Main group section in Setup's own shape (`"Name",
+C:\...\FILE.EXE`, the same shape as `"File Manager", WINFILE.EXE` and the
+QEMU-proven Winsock icon): Windows 3.0 lists the group as `Main,1` ->
+section `[Main]`; 3.1 / 3.11 / WfW 3.11 as `group3=<name>,1` -> `[group3]`
+(`dos_main_group`, shared with `dos_winsock_apply`; checked against the
+3.0a EN, 3.1 PL, 3.11 EN and WfW 3.11 PL INFs). Windows 1.x/2.x have no
+Program Manager group: one log line, SETUP.INF unchanged. Test:
+`tools/tests/test_win3_program_icons.py` (host shell; the micro-Linux
+BusyBox awk is not run by it). Not yet run through a real Setup: 3.0 Setup
+with a full path in a `[Main]` entry is unverified (QEMU or X470 check).
