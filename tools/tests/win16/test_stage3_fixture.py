@@ -42,5 +42,15 @@ class FixtureSafety(unittest.TestCase):
     def test_real_catalog_identifiers(self):
         self.assertEqual(fixture.SYSTEMS,{'win31':'windows-3-1','wfw311':'windows-wfw-3-11'})
 
+    def test_free_space_reserve_is_required(self):
+        with patch.object(fixture.shutil,'disk_usage',return_value=SimpleNamespace(free=fixture.FREE_RESERVE)), patch.object(Path,'rglob',return_value=[]):
+            with self.assertRaises(ValueError): fixture.storage_budget(1)
+            self.assertEqual(fixture.storage_budget(0)['free_reserve_bytes'],fixture.FREE_RESERVE)
+
+    def test_generated_image_cap_is_required(self):
+        item=SimpleNamespace(suffix='.qcow2',is_file=lambda:True,stat=lambda:SimpleNamespace(st_size=fixture.IMAGE_LIMIT))
+        with patch.object(fixture.shutil,'disk_usage',return_value=SimpleNamespace(free=1024**4)), patch.object(Path,'rglob',return_value=[item]):
+            with self.assertRaises(ValueError): fixture.storage_budget(1)
+
 
 if __name__=='__main__': unittest.main()

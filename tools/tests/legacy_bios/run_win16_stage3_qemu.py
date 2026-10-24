@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import socket
 import stat
 import subprocess
@@ -29,6 +30,23 @@ import run_win16_winsock_flow_qemu as flow
 RUNTIME = Path(r'K:\USOS-VM\winsock-etap3-20261024')
 SYSTEMS = {'win31': 'windows-3-1', 'wfw311': 'windows-wfw-3-11'}
 LAN = flow.LAN
+IMAGE_LIMIT = 100 * 1024**3
+FREE_RESERVE = 8 * 1024**3
+
+
+def storage_budget(additional_bytes=0):
+    """Preflight owned image files and preserve the user's free-space reserve."""
+    free = shutil.disk_usage(RUNTIME).free
+    files = [path for path in RUNTIME.rglob('*') if path.is_file()]
+    pool = sum(path.stat().st_size for path in files)
+    used = sum(path.stat().st_size for path in files
+               if path.suffix.lower() in ('.qcow2','.raw','.vhd','.vhdx','.img','.cpio'))
+    if additional_bytes < 0 or pool + additional_bytes > IMAGE_LIMIT:
+        raise ValueError('Stage3 owned VM pool would exceed 100 GiB')
+    if free - additional_bytes < FREE_RESERVE:
+        raise ValueError('Stage3 must preserve at least 8 GiB free space')
+    return {'owned_pool_file_bytes':pool,'owned_image_file_bytes':used,'additional_worst_case_bytes':additional_bytes,
+            'free_bytes':free,'free_reserve_bytes':FREE_RESERVE,'image_limit_bytes':IMAGE_LIMIT}
 
 
 def guarded(path: Path) -> Path:
@@ -64,9 +82,10 @@ def make_overlay(out: Path, base: Path, tag: str, qemu: Path) -> Path:
         raise ValueError('An installed named base.qcow2 is required')
     disk = guarded(out / (tag + '.qcow2'))
     if disk.exists(): raise ValueError('Refusing to overwrite a test overlay')
+    budget = storage_budget(1024**3)
     flow.ws.command([qemu.with_name('qemu-img.exe'), 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', base, disk])
     receipt(out / (tag + '-overlay.json'), {'base': str(base), 'base_sha256': sha(base),
-            'overlay': str(disk), 'applications_on_base': False})
+            'overlay': str(disk), 'applications_on_base': False,'storage_preflight':budget})
     return disk
 
 
@@ -133,6 +152,7 @@ def prepare(args, vm, target):
     if not args.dos_iso or not args.win_iso: raise ValueError('Both original media are required')
     for path in (args.dos_iso, args.win_iso):
         if not path.is_file() or any(c in str(path) for c in ',\r\n\x00'): raise ValueError('Invalid media path')
+    budget = storage_budget(1024**3)
     flow.ws.command([args.qemu.with_name('qemu-img.exe'), 'create', '-f', 'qcow2', target, '1G'])
     prep = SimpleNamespace(root=args.build_root, scripts=True, qemu=args.qemu, family='w3', iso=None,
             dos_iso=args.dos_iso, win3=args.win_iso, win3_floppies=None, nvme=False,
@@ -148,7 +168,7 @@ def prepare(args, vm, target):
     receipt(args.out/'prepared.json', {'system': args.system, 'catalog_id': SYSTEMS[args.system],
             'normal_usos_flow': True, 'passed': ok and staged, 'winsock_profile_staged': staged,
             'dos_iso_sha256': sha(args.dos_iso), 'win_iso_sha256': sha(args.win_iso),
-            'console_sha256': sha(args.out/'console.log'), 'build_root_readonly': True})
+            'console_sha256': sha(args.out/'console.log'), 'build_root_readonly': True,'storage_preflight':budget})
     if not ok or not staged: raise RuntimeError('USOS preparation failed; retained for diagnosis')
 
 
