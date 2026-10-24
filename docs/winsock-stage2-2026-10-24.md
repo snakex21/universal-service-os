@@ -54,6 +54,11 @@ Content-Length albo poprawną granicę FIN przy `Connection: close`.
 Dowody są w ignorowanym `zig-out/win16/stage2/evidence`; zewnętrzny raport
 końcowy wymienia commity, wyniki oraz dokładne sprzątanie. Raport powstaje
 przed usunięciem obrazów; PCAP, logi, zrzuty i manifesty pozostają zachowane.
+Końcowy bilans: 129 różnych testów hostowych PASS. Po zapisaniu raportu
+usunięto 19 własnych qcow2/initrd (639515452 B), z porównaniem SHA i
+usunięciem przez te same wyłączne uchwyty. Kopia raportu sprzed usunięcia,
+wersja końcowa i dokładny wykaz są zachowane w evidence. Pozostało 567
+plików dowodowych; żadnego logu, PCAP ani zrzutu nie usuwano.
 
 Domyślny USOSPKT.COM jest identyczny: 8157 B,
 `98cfdf5ad6c8d7c805927d7f7247ef326ca36414c3622189a0a238c16ae933eb`.
