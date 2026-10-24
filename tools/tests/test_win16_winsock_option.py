@@ -223,6 +223,26 @@ class Wiring(unittest.TestCase):
         self.assertEqual(json.loads((ROOT / 'installer/internal/i18n/locales/pl.json').read_text(encoding='utf-8'))
                          ['boot.profile.field.dos_winsock'], 'Winsock (eksperymentalny)')
 
+    def test_answer_screen_opens_for_dos_systems(self):
+        # X470 2026-10-24: the answer screen never opened for MS-DOS /
+        # Windows 1.x-3.x (no Unattended folder), so no DOS profile could be
+        # chosen. manual_app enters it through answer_screen.entryFor
+        # (zig tests there: Win 3.1 ISO + floppy set, 3.11, WfW, MS-DOS), the
+        # manager lists no files without a folder, and the win9x_uefi start
+        # stages the chosen profile as DOS.INI (stageWin9x).
+        app = (ROOT / 'src/platform/uefi/manual_app.zig').read_text(encoding='utf-8')
+        self.assertIn('usos.flow.answer_screen.entryFor(entry, image.kind, method, firmware,', app)
+        self.assertIn('if (!screen.enter) return manual_summary.show(', app)
+        self.assertNotIn('entry.unattended_directory == null or', app)
+        manager = (ROOT / 'src/platform/uefi/manual_unattended.zig').read_text(encoding='utf-8')
+        self.assertNotIn('system.unattended_directory orelse return .{}', manager)
+        self.assertIn('if (directory == null and !context.profiles_allowed) return .{};', manager)
+        summary = (ROOT / 'src/platform/uefi/manual_summary.zig').read_text(encoding='utf-8')
+        win9x = summary[summary.index('// Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on'):]
+        self.assertIn('answer_profiles.stageWin9x(root, p)', win9x[:1500])
+        profiles = (ROOT / 'src/platform/uefi/answer_profiles.zig').read_text(encoding='utf-8')
+        self.assertIn('for (answer.dos.staged) |entry| {', profiles)
+
 
 if __name__ == '__main__':
     unittest.main()

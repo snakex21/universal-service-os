@@ -99,15 +99,14 @@ fn runEntry(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_dis
 /// the first of them that was shown. Back from the summary goes to the
 /// answer-file screen when that was shown.
 fn answerAndSummary(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, entry: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, method: usos.catalog.BootMethod, firmware: usos.firmware.Firmware) void {
-    if (entry.unattended_directory == null or !(image.kind == .iso or image.kind == .wim)) {
-        return manual_summary.show(root, entry, image, method, .{}, 0, firmware);
-    }
     // Vista hands profiles and answer files on with and without firmware CSM
     // (the installer merges them with its servicing answer; 2026-09-28).
-    const vista_csmwrap = usos.flow.answer_screen.vistaCsmwrap(entry, image.kind, method, firmware, @import("secure_boot.zig").csm().likelyOn());
-    const profiles_allowed = usos.flow.answer_screen.profileCapable(entry, image.kind, method, firmware) or vista_csmwrap;
+    // MS-DOS / Windows 1.x-3.x have no Unattended folder: profiles only
+    // (DOS.INI), also from a floppy disk set (answer_screen.entryFor).
+    const screen = usos.flow.answer_screen.entryFor(entry, image.kind, method, firmware, @import("secure_boot.zig").csm().likelyOn());
+    if (!screen.enter) return manual_summary.show(root, entry, image, method, .{}, 0, firmware);
     while (true) {
-        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed, .image = image });
+        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = screen.profiles_allowed, .list_files = screen.list_files, .image = image });
         if (unattended.back) return;
         manual_summary.show(root, entry, image, method, unattended.choice, unattended.available, firmware);
         if (!unattended.shown) return;

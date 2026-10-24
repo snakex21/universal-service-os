@@ -59,6 +59,9 @@ pub const Context = struct {
     system: *const usos.catalog.SystemEntry,
     /// USOS profiles can be handed on for this selection.
     profiles_allowed: bool,
+    /// List the answer files of the Unattended folder (none for MS-DOS /
+    /// Windows 1.x-3.x, which have no folder; answer_screen.entryFor).
+    list_files: bool = true,
     /// Vista on UEFI: the screen shows only the "not supported yet" note.
     answers_unsupported: bool = false,
     /// The image chosen before this screen (the editor lists its editions).
@@ -90,8 +93,10 @@ fn editorImages(context: Context) ?*const usos.flow.answer.editions.List {
 
 pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Context) Result {
     const system = context.system;
-    const directory = system.unattended_directory orelse return .{};
-    const found = discovery.listFilesWithExtension(directory, usos.flow.unattended_policy.extension(system), file_storage[0..]);
+    // No Unattended folder (MS-DOS / Windows 1.x-3.x): profiles only.
+    const directory = system.unattended_directory;
+    if (directory == null and !context.profiles_allowed) return .{};
+    const found = if (directory) |d| (if (context.list_files) discovery.listFilesWithExtension(d, usos.flow.unattended_policy.extension(system), file_storage[0..]) else 0) else 0;
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
     if (context.profiles_allowed) {
         answer_profiles.reload(context.root);
@@ -100,7 +105,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
     }
     const in_first = answer_screen.Input{ .settings_file = settings_name != null, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found, .unsupported = context.answers_unsupported };
     if (!answer_screen.shown(in_first)) return .{};
-    settings = if (settings_name) |name| xp_settings.read(directory, name) else .{};
+    settings = if (settings_name) |name| (if (directory) |d| xp_settings.read(d, name) else .{}) else .{};
 
     var selected: ?usize = null;
     while (true) {
@@ -129,7 +134,8 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
                     @memcpy(stem_copy[0..s.len], s);
                     if (profile_editor.edit(context.root, &p, stem_copy[0..s.len], system.id, system.name, editorImages(context))) |name| selected = rowOfProfile(name);
                 } else if (row == .xp_settings) {
-                    selected = importXp(context, directory, settings_name.?) orelse outcome.index;
+                    // xp_settings rows exist only for XP, which has its folder
+                    selected = importXp(context, directory orelse continue, settings_name.?) orelse outcome.index;
                 }
             },
             .delete => {
