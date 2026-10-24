@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS and Windows 1.x-3.x: country, code page and keyboard from the formats and keyboard above. Manual: nothing is set, Windows 3.1 Setup asks.",
   "boot.profile.field.dos_keyb": "DOS: keyboard layout (KEYB)",
   "boot.profile.help.dos_keyb": "Loads KEYB with the profile's layout. PS/2 keyboard only: a USB keyboard on a PC without CSM keeps the US layout in DOS.",
+  "boot.profile.field.dos_winsock": "Winsock (experimental)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 and WfW 3.11: installs the USOS WINSOCK.DLL, the network driver with the Windows queue and the \"USOS Winsock test\" group (GETHTTP). Off: installation as before.",
   "boot.profile.field.show_extensions": "Show file extensions",
   "boot.profile.help.show_extensions": "Explorer shows file name extensions such as .exe (for every new user).",
   "boot.profile.field.show_hidden": "Show hidden files",

@@ -1,4 +1,7 @@
 /* Blocking Win16 HTTP client: use the public Winsock 1.1 ordinal ABI.
+ * Log C:\NET\WIN16\GETHTTP.LOG, response C:\NET\WIN16\GETHTTP.RSP.
+ * /EXIT (test harness): leave Windows when done; otherwise (Program
+ * Manager icon) a message box shows the verdict.
  * Copyright (C) 2026 Maksymilian and the USOS Authors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -19,6 +22,7 @@ typedef int (FAR PASCAL *FN_ERROR)(void);
 static HFILE journal;
 static char buffer[1024];
 static char status[80];
+static int passed;
 static const char request[] = "GET / HTTP/1.0\r\nHost: 68k.news\r\nConnection: close\r\n\r\n";
 
 static void logtext(const char *s)
@@ -71,10 +75,13 @@ int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
     HFILE response = HFILE_ERROR;
     int rc, count, sent = 0, i, line = 0;
     long total = 0;
-    (void)instance; (void)previous; (void)cmdline; (void)show;
+    (void)instance; (void)previous; (void)show;
 
-    journal = _lcreat("C:\\GETHTTP.LOG", 0);
-    if (journal == HFILE_ERROR) return 1;
+    journal = _lcreat("C:\\NET\\WIN16\\GETHTTP.LOG", 0);
+    if (journal == HFILE_ERROR) {
+        MessageBox(NULL, "Cannot create C:\\NET\\WIN16\\GETHTTP.LOG", "USOS Winsock test", MB_OK | MB_ICONSTOP);
+        return 1;
+    }
     log_windows_mode();
     dll = LoadLibrary("WINSOCK.DLL");
     if ((UINT)dll < 32) { logtext("FAIL load="); number((UINT)dll); goto end; }
@@ -115,7 +122,7 @@ int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
         if (rc <= 0) { logtext("FAIL send error="); number(error()); goto close; }
         sent += rc;
     }
-    response = _lcreat("C:\\GETHTTP.RSP", 0);
+    response = _lcreat("C:\\NET\\WIN16\\GETHTTP.RSP", 0);
     if (response == HFILE_ERROR) { logtext("FAIL create response"); goto close; }
     while ((count = readsocket(sock, buffer, sizeof(buffer), 0)) > 0) {
         if (_lwrite(response, buffer, count) != count) { logtext("FAIL disk write"); goto close; }
@@ -132,7 +139,10 @@ int PASCAL WinMain(HANDLE instance, HANDLE previous, LPSTR cmdline, int show)
     logtext("status="); logtext(status); logtext(" bytes="); number(total);
     if (count == 0 && total > 12 &&
         (!strncmp(status, "HTTP/1.0 200", 12) || !strncmp(status, "HTTP/1.1 200", 12)))
-        logtext("\r\nPASS HTTP 200; response=C:\\GETHTTP.RSP\r\n");
+    {
+        logtext("\r\nPASS HTTP 200; response=C:\\NET\\WIN16\\GETHTTP.RSP\r\n");
+        passed = 1;
+    }
     else { logtext("\r\nFAIL recv/status error="); number(error()); }
 close:
     if (response != HFILE_ERROR) _lclose(response);
@@ -143,6 +153,12 @@ unload:
     FreeLibrary(dll);
 end:
     logtext("\r\n"); _lclose(journal);
-    ExitWindows(0, 0);
-    return 0;
+    if (cmdline && _fstrstr(cmdline, "/EXIT")) {
+        ExitWindows(0, 0);
+        return 0;
+    }
+    MessageBox(NULL, passed ? "OK: HTTP 200 from 68k.news.\nLog: C:\\NET\\WIN16\\GETHTTP.LOG"
+                            : "FAILED - see C:\\NET\\WIN16\\GETHTTP.LOG",
+               "USOS Winsock test", MB_OK | (passed ? MB_ICONINFORMATION : MB_ICONSTOP));
+    return passed ? 0 : 1;
 }

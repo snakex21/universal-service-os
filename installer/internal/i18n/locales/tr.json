@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS ve Windows 1.x-3.x: ülke, kod sayfası ve klavye yukarıdaki biçimlerden ve klavyeden. Elle: hiçbir şey ayarlanmaz, Windows 3.1 Setup sorar.",
   "boot.profile.field.dos_keyb": "DOS: klavye düzeni (KEYB)",
   "boot.profile.help.dos_keyb": "KEYB'yi profilin düzeniyle yükler. Yalnızca PS/2 klavye: CSM'siz bir PC'de USB klavye DOS'ta US düzeninde kalır.",
+  "boot.profile.field.dos_winsock": "Winsock (deneysel)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 ve WfW 3.11: USOS WINSOCK.DLL dosyasını, Windows kuyruklu ağ sürücüsünü ve \"USOS Winsock test\" grubunu (GETHTTP) kurar. Kapalı: kurulum eskisi gibi.",
   "boot.profile.field.show_extensions": "Dosya uzantılarını göster",
   "boot.profile.help.show_extensions": "Gezgin, .exe gibi dosya adı uzantılarını gösterir (her yeni kullanıcı için).",
   "boot.profile.field.show_hidden": "Gizli dosyaları göster",

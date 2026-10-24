@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS ja Windows 1.x-3.x: maa, merkistö ja näppäimistö yllä olevista muotoiluista ja näppäimistöstä. Käsin: mitään ei aseteta, Windows 3.1 Setup kysyy.",
   "boot.profile.field.dos_keyb": "DOS: näppäimistöasettelu (KEYB)",
   "boot.profile.help.dos_keyb": "Lataa KEYB:n profiilin asettelulla. Vain PS/2-näppäimistö: USB-näppäimistö PC:ssä ilman CSM:ää pysyy DOSissa US-asettelussa.",
+  "boot.profile.field.dos_winsock": "Winsock (kokeellinen)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 ja WfW 3.11: asentaa USOSin WINSOCK.DLL:n, verkkoajurin Windowsin jonolla ja ryhmän \"USOS Winsock test\" (GETHTTP). Pois: asennus kuten ennen.",
   "boot.profile.field.show_extensions": "Näytä tiedostotunnisteet",
   "boot.profile.help.show_extensions": "Resurssienhallinta näyttää tiedostonimien tunnisteet, kuten .exe (jokaiselle uudelle käyttäjälle).",
   "boot.profile.field.show_hidden": "Näytä piilotiedostot",

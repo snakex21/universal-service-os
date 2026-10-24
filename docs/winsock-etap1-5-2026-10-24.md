@@ -110,3 +110,58 @@ installation was repeated to test a DLL change.
 
 QEMU Intel82576/Win3.1 STANDARD acceptance does not establish X470/I211,
 WfW386-enhanced mode, arbitrary hardware LANs, async APIs or browser support.
+
+## Opt-in integration (test/x470-98se-qemu, 2026-10-24)
+
+Answer profile option `dos_winsock` ("Winsock (eksperymentalny)", editor
+row only for Windows 3.1 / 3.11 / WfW 3.11, default off) writes
+`winsock=yes` into DOS.INI. Off writes no line, so DOS.INI, every file in
+`EFI\USOS\dos-native\msdos` and everything an install stages stay as
+before. The Codex change of `network_start.cmd` was reverted: the default
+NETSTART.BAT is again the X470-proven text, and the queue text lives in
+`network_start_queue.cmd`. The opt-in files are built into their own ESP
+folder `EFI\USOS\dos-native\winsock16` (WINSOCK.DLL, GETHTTP.EXE,
+TESTLOAD.EXE, USOSPKTQ.COM, NETSTART.BAT, WINSOCK.TXT) by
+`build_win16_winsock.build_payload` (pinned Open Watcom, from
+`build_dos_native_support.py`).
+
+With the option on, `dos_csmwrap_target.sh` calls
+`dos_winsock_apply` (tools/dos_win3_menu.sh) for 3.1 / 3.11 / WfW only:
+
+- `C:\NET\WIN16`: GETHTTP.EXE, TESTLOAD.EXE, WINSOCK.DLL, WINSOCK.TXT,
+  STAGE.LOG; `C:\NET\USOSPKTQ.COM`, written before the first DOS boot.
+- `C:\USOSDOS\NETSTART.BAT` = the queue variant (INSTALL.BAT copies it to
+  `C:\NET`); `set USOSPKT_QUEUE=1` before the NETSTART call in W3AUTO.
+- WINMENU.BAT (after `:ini_done`): WINSOCK.DLL into `C:\WINDOWS` only if
+  none is there; the result goes into `C:\NET\WIN16\STAGE.LOG`.
+- SETUP.INF: the icon "USOS Winsock test (GETHTTP)" with
+  `C:\NET\WIN16\GETHTTP.EXE` in the Main group (the `[progman.groups]`
+  entry marked `,1`, group3 in 3.1 / 3.11 / WfW 3.11). A group of its own
+  does not work: Setup ignored an added `group9` entry and created only
+  its own four groups (QEMU, 3.1 PL). Without a Main group in the INF:
+  File > Run `C:\NET\WIN16\GETHTTP.EXE`.
+
+GETHTTP now writes `C:\NET\WIN16\GETHTTP.LOG` and `.RSP`. It leaves
+Windows only with `/EXIT` (test harnesses). Started from the icon, it
+shows a message box: "OK: HTTP 200" or "FAILED".
+
+Tests: `tools/tests/test_win16_winsock_option.py` checks that off is
+byte-identical and that on stages the files above. Flow VM:
+`tools/tests/legacy_bios/run_win16_winsock_flow_qemu.py` (prepare /
+install / show / test). The test copies no file into the installed system.
+
+QEMU only (2026-10-24; X470 not tested). Fresh MS-DOS 6.22 + Windows 3.1 PL
+through dos_csmwrap_target.sh -> INSTALL.BAT -> batch Setup -> WINMENU.BAT,
+SeaBIOS without CSMWrap, igb, Polish DOS.INI with `winsock=yes`; the test
+copies nothing into the system:
+- staging: WINSOCK.DLL in C:\WINDOWS = the built file (sha 05f7d622...),
+  STAGE.LOG "copied to C:\WINDOWS", `set USOSPKT_QUEUE=1` in AUTOEXEC.BAT,
+  queue NETSTART.BAT, USOSPKTQ.COM, default USOSPKT.COM unchanged (8157 B,
+  98cfdf5a...); the icon in Grupa glowna (GRUPAGDD.GRP, screenshot).
+- GETHTTP from C:\NET\WIN16 (/EXIT): `mode=STANDARD`, config from
+  C:\NET\MTCP.CFG (DOS DHCP lease 172.31.8.15/25 on a non-default QEMU
+  subnet), DNS OK, connect OK, `HTTP/1.1 200 OK`, 100860 bytes,
+  body = Content-Length. Run twice (installs 1 and 2) with the same result.
+- First install: Setup ignored a new `group9` group, so the icon now goes
+  into the Main group. BusyBox awk counts the CP852 group name as UTF-8,
+  so the Main group is found with index() only.

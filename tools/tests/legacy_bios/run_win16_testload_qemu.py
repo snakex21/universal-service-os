@@ -35,7 +35,7 @@ def command(args):
     return subprocess.run([str(x) for x in args], check=True, capture_output=True)
 
 
-def prepare_blocking(prep, out, target):
+def prepare_blocking(prep, out, target, env=""):
     """Same USOS overlay and installer, with process-completion serial IO.
 
     The shared historical install wrapper polls q.poll(); do not call it.
@@ -47,7 +47,7 @@ def prepare_blocking(prep, out, target):
         "mount -t proc proc /proc; mount -t sysfs sys /sys\n"
         "mount -t devtmpfs dev /dev 2>/dev/null\n"
         "mkdir -p /tmp /run; mount -t tmpfs tmp /tmp; mount -t tmpfs run /run\n"
-        "FAMILY=w3 sh /usos-e2e/w9x.sh 2>&1\n"
+        + env + "FAMILY=w3 sh /usos-e2e/w9x.sh 2>&1\n"
         "status=$?; echo WS-PREPARE-EXIT=$status; sync; poweroff -f\n")
     initrd=out/'initrd.cpio'
     with initrd.open('xb') as f:
@@ -233,7 +233,7 @@ def main():
         files = {'WINSOCK.DLL':(artifact/'WINSOCK.DLL').read_bytes(),
                  'TESTLOAD.EXE':(artifact/'TESTLOAD.EXE').read_bytes(),
                  'USOSPKT.COM':(artifact/'USOSPKT.COM').read_bytes(),
-                 'NETSTART.BAT':(ROOT/'src/platform/bios/msdos/network_start.cmd').read_text('ascii').replace('\n','\r\n').encode('ascii'),
+                 'NETSTART.BAT':(ROOT/'src/platform/bios/msdos/network_start_queue.cmd').read_text('ascii').replace('\n','\r\n').encode('ascii'),
                  'USOSPKTQ.COM':(artifact/'USOSPKTQ.COM').read_bytes()}
         app = 'GETHTTP' if args.case == 'gethttp' else 'TESTLOAD'
         if app == 'GETHTTP': files['GETHTTP.EXE']=(artifact/'GETHTTP.EXE').read_bytes()
@@ -241,21 +241,21 @@ def main():
             'case': args.case, 'base_snapshot': 'base',
             'sha256': {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
         }, indent=2))
-        script = "mkdir -p /target/TEST\ncp /ws/*.EXE /target/WINDOWS/\n"
+        script = "mkdir -p /target/TEST /target/NET/WIN16\ncp /ws/*.EXE /target/WINDOWS/\n"
         script += "cp /ws/USOSPKT.COM /target/NET/USOSPKT.COM\ncp /ws/USOSPKTQ.COM /target/NET/USOSPKTQ.COM\ncp /ws/NETSTART.BAT /target/NET/NETSTART.BAT\n"
         script += "rm -f /target/NET/MTCP.CFG /target/NET/DHCP.LOG /target/NET/USOSPKT.LOG\n"
-        script += "rm -f /target/WSTEST.LOG /target/WSDIAG.LOG /target/GETHTTP.LOG /target/GETHTTP.RSP /target/TEST/WINSOCK.DLL /target/WINDOWS/WINSOCK.DLL /target/WINDOWS/SYSTEM/WINSOCK.DLL\n"
+        script += "rm -f /target/WSTEST.LOG /target/WSDIAG.LOG /target/NET/WIN16/GETHTTP.LOG /target/NET/WIN16/GETHTTP.RSP /target/TEST/WINSOCK.DLL /target/WINDOWS/WINSOCK.DLL /target/WINDOWS/SYSTEM/WINSOCK.DLL\n"
         if args.case != 'nodll': script += "cp /ws/WINSOCK.DLL /target/WINDOWS/SYSTEM/\n"
         if args.case in ('queue','nodll','gethttp'):
             script += "sed -i '1a set USOSPKT_QUEUE=1\\r' /target/AUTOEXEC.BAT\n"
         elif args.case == 'nodriver':
             script += "mv /target/NET/NETSTART.BAT /target/NET/NETSTART.OFF\n"
-        script += "sed -i 's@WIN.COM /S /B@WIN.COM /S /B "+app+".EXE@' /target/AUTOEXEC.BAT\n"
+        script += "sed -i 's@WIN.COM /S /B@WIN.COM /S /B "+app+".EXE"+(' /EXIT' if app == 'GETHTTP' else '')+"@' /target/AUTOEXEC.BAT\n"
         script += "printf '\r\nECHO WS-APP-DONE>COM1\r\n' >> /target/AUTOEXEC.BAT\n"
         linux(args, disk, tag+'-stage', script, files)
         done = boot(args, disk, tag+'-run', args.seconds, 'WS-APP-DONE')
         raw = linux(args, disk, tag+'-read',
-            "for n in WSTEST.LOG WSDIAG.LOG GETHTTP.LOG GETHTTP.RSP NET/USOSPKT.LOG NET/DHCP.LOG NET/MTCP.CFG; do if test -f /target/$n; then echo WS-FILE:$n; base64 /target/$n; echo WS-FILE-END; fi; done\n")
+            "for n in WSTEST.LOG WSDIAG.LOG NET/WIN16/GETHTTP.LOG NET/WIN16/GETHTTP.RSP NET/USOSPKT.LOG NET/DHCP.LOG NET/MTCP.CFG; do if test -f /target/$n; then echo WS-FILE:$n; base64 /target/$n; echo WS-FILE-END; fi; done\n")
         (args.out/(tag+'-result.txt')).write_bytes(raw)
         print('APP_RETURNED', done)
         extracted = {}
@@ -266,7 +266,7 @@ def main():
         evidence.mkdir()
         for name, content in extracted.items():
             (evidence/name.replace('/', '-')).write_bytes(content)
-        result = extracted.get('GETHTTP.LOG' if app == 'GETHTTP' else 'WSTEST.LOG', b'')
+        result = extracted.get('NET/WIN16/GETHTTP.LOG' if app == 'GETHTTP' else 'WSTEST.LOG', b'')
         print(result.decode('ascii', errors='replace'))
         if args.case == 'queue':
             passed = (b'name=0 ordinal=0 USOS WINSOCK OK' in result and
@@ -276,7 +276,7 @@ def main():
         elif args.case == 'nodll':
             passed = b'err=load:' in result and b'missing-export' not in result
         else:
-            response = extracted.get('GETHTTP.RSP', b'')
+            response = extracted.get('NET/WIN16/GETHTTP.RSP', b'')
             passed = (b'PASS HTTP 200' in result and len(response) > 12 and
                       response.startswith((b'HTTP/1.0 200', b'HTTP/1.1 200')))
             headers, separator, body = response.partition(b'\r\n\r\n')

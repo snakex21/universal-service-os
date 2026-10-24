@@ -211,6 +211,61 @@ def build_testload(watcom: Path, verbose: bool, stem: str = 'testload') -> Path:
     return artifact
 
 
+# The opt-in Winsock set for Windows 3.1 / 3.11 / WfW 3.11 installs (answer
+# profile dos_winsock, tools/dos_win3_menu.sh dos_winsock_apply). It lives in
+# its own ESP folder (EFI\USOS\dos-native\winsock16), never in msdos\, so an
+# install without the option copies exactly the same files as before.
+PAYLOAD_FILES = ('WINSOCK.DLL', 'GETHTTP.EXE', 'TESTLOAD.EXE', 'USOSPKTQ.COM', 'NETSTART.BAT', 'WINSOCK.TXT')
+
+PAYLOAD_NOTICE = """USOS Winsock for Windows 3.1 / 3.11 / Windows for Workgroups 3.11
+(experimental, answer profile option "Winsock (eksperymentalny)").
+
+WINSOCK.DLL   own Winsock 1.1 provider (TCP/IP in the DLL), C:\\WINDOWS
+GETHTTP.EXE   test: HTTP GET http://68k.news/ -> C:\\NET\\WIN16\\GETHTTP.LOG/.RSP
+TESTLOAD.EXE  test: WSAStartup only
+USOSPKTQ.COM  USOSPKT packet driver with the /Q queue for WINSOCK.DLL
+NETSTART.BAT  loads USOSPKTQ /Q when USOSPKT_QUEUE=1 (set in AUTOEXEC.BAT)
+
+Copyright (C) 2026 Maksymilian and the USOS Authors.
+Licence: GPL-3.0-or-later. Source: src/platform/bios/win16/winsock16 and
+src/platform/bios/msdos/usospktq.S of the USOS repository.
+WINSOCK.DLL, GETHTTP.EXE and TESTLOAD.EXE are built with Open Watcom 2.0
+(pinned snapshot 2026-09-01) and contain its Win16 startup code and C
+runtime (clibl.lib, libentry.obj; Sybase Open Watcom Public License 1.0).
+"""
+
+
+def build_payload(root: Path, out: Path) -> list[Path]:
+    """Build the opt-in set into out (zig-out/dos-native/winsock16)."""
+    sys.path.insert(0, str(root / 'tools'))
+    from build_dos_network import build_usospkt_queue
+    from build_win3_usb_keyboard import openwatcom
+    watcom = Path(os.environ['USOS_WATCOM']) if os.environ.get('USOS_WATCOM') else openwatcom()
+    if not (watcom / 'binnt64' / 'wcc.exe').is_file():
+        raise SystemExit('Open Watcom without binnt64\\wcc.exe: %s' % watcom)
+    out.mkdir(parents=True, exist_ok=True)
+    built = [build(watcom, False, False), build_testload(watcom, False), build_testload(watcom, False, 'gethttp')]
+    shutil.rmtree(OBJ_DIR, ignore_errors=True)
+    for one in built:
+        shutil.copyfile(one, out / one.name)
+    work = OUT_DIR / 'q-work'
+    work.mkdir(parents=True, exist_ok=True)
+    build_usospkt_queue(root, out, work)
+    shutil.rmtree(work, ignore_errors=True)
+    start = (root / 'src/platform/bios/msdos/network_start_queue.cmd').read_text(encoding='ascii')
+    for line in start.splitlines():
+        if len(line) > 127:
+            raise ValueError('network_start_queue.cmd: MS-DOS command line exceeds 127 bytes')
+    (out / 'NETSTART.BAT').write_bytes(start.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii'))
+    (out / 'WINSOCK.TXT').write_bytes(PAYLOAD_NOTICE.replace('\n', '\r\n').encode('ascii'))
+    files = [out / name for name in PAYLOAD_FILES]
+    for one in files:
+        if not one.is_file():
+            raise SystemExit('Winsock payload incomplete: %s' % one)
+    print('[PASS] Win16 Winsock (opt-in): ' + ', '.join('%s %d B' % (f.name, f.stat().st_size) for f in files))
+    return files
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--strict', action='store_true',

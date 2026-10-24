@@ -1143,6 +1143,8 @@
   "boot.profile.help.dos_regional": "MS-DOS et Windows 1.x-3.x : pays, page de codes et clavier d'après les formats et le clavier ci-dessus. Manuel : rien n'est défini, Windows 3.1 Setup demande.",
   "boot.profile.field.dos_keyb": "DOS : disposition du clavier (KEYB)",
   "boot.profile.help.dos_keyb": "Charge KEYB avec la disposition du profil. Clavier PS/2 seulement : un clavier USB sur un PC sans CSM garde la disposition US sous DOS.",
+  "boot.profile.field.dos_winsock": "Winsock (expérimental)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 et WfW 3.11 : installe le WINSOCK.DLL d'USOS, le pilote réseau avec file d'attente pour Windows et le groupe \"USOS Winsock test\" (GETHTTP). Désactivé : installation comme avant.",
   "boot.profile.field.show_extensions": "Afficher les extensions",
   "boot.profile.help.show_extensions": "L'Explorateur affiche les extensions des noms de fichiers, comme .exe (pour chaque nouvel utilisateur).",
   "boot.profile.field.show_hidden": "Afficher les fichiers cachés",

@@ -1146,6 +1146,8 @@
   "boot.profile.help.dos_regional": "MS-DOS i Windows 1.x-3.x: zemlja, kodna stranica i tastatura iz formata i tastature iznad. Ručno: ništa se ne podešava, pita Windows 3.1 Setup.",
   "boot.profile.field.dos_keyb": "DOS: raspored tastature (KEYB)",
   "boot.profile.help.dos_keyb": "Učitava KEYB sa rasporedom profila. Samo PS/2 tastatura: USB tastatura na računaru bez CSM-a u DOS-u ostaje na US rasporedu.",
+  "boot.profile.field.dos_winsock": "Winsock (eksperimentalno)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 i WfW 3.11: instalira USOS WINSOCK.DLL, mrežni drajver sa redom za Windows i grupu \"USOS Winsock test\" (GETHTTP). Isključeno: instalacija kao do sada.",
   "boot.profile.field.show_extensions": "Prikaži oznake tipa datoteka",
   "boot.profile.help.show_extensions": "Explorer prikazuje oznake tipa u imenima datoteka, npr. .exe (za svakog novog korisnika).",
   "boot.profile.field.show_hidden": "Prikaži skrivene datoteke",

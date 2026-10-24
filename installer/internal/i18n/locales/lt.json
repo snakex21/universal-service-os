@@ -1146,6 +1146,8 @@
   "boot.profile.help.dos_regional": "MS-DOS ir Windows 1.x-3.x: šalis, kodų lentelė ir klaviatūra pagal aukščiau esančius formatus ir klaviatūrą. Rankiniu būdu: nieko nenustatoma, klausia Windows 3.1 Setup.",
   "boot.profile.field.dos_keyb": "DOS: klaviatūros išdėstymas (KEYB)",
   "boot.profile.help.dos_keyb": "Įkelia KEYB su profilio išdėstymu. Tik PS/2 klaviatūra: USB klaviatūra kompiuteryje be CSM DOS aplinkoje lieka su US išdėstymu.",
+  "boot.profile.field.dos_winsock": "Winsock (eksperimentinis)",
+  "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 ir WfW 3.11: įdiegia USOS WINSOCK.DLL, tinklo tvarkyklę su Windows eile ir grupę \"USOS Winsock test\" (GETHTTP). Išjungta: diegimas kaip anksčiau.",
   "boot.profile.field.show_extensions": "Rodyti failų plėtinius",
   "boot.profile.help.show_extensions": "Naršyklė rodo failų vardų plėtinius, pvz., .exe (kiekvienam naujam vartotojui).",
   "boot.profile.field.show_hidden": "Rodyti paslėptus failus",

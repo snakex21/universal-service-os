@@ -134,6 +134,8 @@ pub const Field = enum {
     // MS-DOS 6.22 / Windows 1.x-3.x regional settings (dos.zig, 2026-10-24).
     dos_regional,
     dos_keyb,
+    // Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (dos.zig, 2026-10-24).
+    dos_winsock,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -333,6 +335,9 @@ pub const Profile = struct {
     /// KEYB translates in its INT 09h handler, which the keys of a USB
     /// keyboard under CSMWrap never pass (dos.zig).
     dos_keyb: bool = false,
+    /// Windows 3.1 / 3.11 / WfW 3.11: stage the experimental USOS Winsock
+    /// (WINSOCK.DLL, USOSPKTQ queue driver, GETHTTP test icon). Off by default.
+    dos_winsock: bool = false,
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -361,6 +366,7 @@ pub const Profile = struct {
             .show_hidden => &self.show_hidden,
             .no_autorun => &self.no_autorun,
             .dos_keyb => &self.dos_keyb,
+            .dos_winsock => &self.dos_winsock,
             else => null,
         };
     }
@@ -1033,6 +1039,7 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
     if (p.dos_regional != .auto) try w.print("dos_regional={s}\r\n", .{@tagName(p.dos_regional)});
     if (p.dos_keyb) try w.writeAll("dos_keyb=yes\r\n");
+    if (p.dos_winsock) try w.writeAll("dos_winsock=yes\r\n");
     inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
         if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
     }
