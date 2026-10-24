@@ -22,6 +22,7 @@ GPT_HEADER_MIN_SIZE = 92
 GPT_ATTRIBUTE_NO_BLOCK_IO_PROTOCOL = 1 << 1
 TARGET_NAMES = {"USOS_DATA", "USOS_WORK"}
 BASIC_DATA_TYPE = uuid.UUID("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7").bytes_le
+ESP_TYPE = uuid.UUID("C12A7328-F81F-11D2-BA4B-00A0C93EC93B").bytes_le
 
 
 @dataclass
@@ -114,7 +115,14 @@ def decode_name(entry: bytes) -> str:
     return text.split("\x00", 1)[0]
 
 
-def patch_entries(entries: bytearray, header: Header) -> dict[str, tuple[int, int]]:
+def set_name(entries: bytearray, start: int, name: str) -> None:
+    encoded = name.encode("utf-16-le")
+    entries[start + 56 : start + 128] = encoded + bytes(72 - len(encoded))
+
+
+def patch_entries(
+    entries: bytearray, header: Header, set_attribute: bool = True, usos_names: bool = False
+) -> dict[str, tuple[int, int]]:
     found: dict[str, tuple[int, int]] = {}
     named_indices: dict[str, int] = {}
     basic_data_indices: list[tuple[int, int]] = []
@@ -149,10 +157,21 @@ def patch_entries(entries: bytearray, header: Header) -> dict[str, tuple[int, in
             "USOS_WORK": basic_data_indices[1][1],
         }
 
+    if usos_names:
+        # Windows-made fixtures carry generic GPT names; production USOS media
+        # name the entries USOS_ESP/USOS_DATA/USOS_WORK and the UEFI app finds
+        # them by those names.
+        esp = [i for i in range(header.entry_count) if entries[i * header.entry_size : i * header.entry_size + 16] == ESP_TYPE]
+        if len(esp) != 1:
+            raise RuntimeError(f"expected exactly one ESP entry, got {len(esp)}")
+        set_name(entries, esp[0] * header.entry_size, "USOS_ESP")
+        for name, index in target_indices.items():
+            set_name(entries, index * header.entry_size, name)
+
     for name, index in target_indices.items():
         start = index * header.entry_size
         attrs = struct.unpack_from("<Q", entries, start + 48)[0]
-        new_attrs = attrs | GPT_ATTRIBUTE_NO_BLOCK_IO_PROTOCOL
+        new_attrs = attrs | GPT_ATTRIBUTE_NO_BLOCK_IO_PROTOCOL if set_attribute else attrs
         struct.pack_into("<Q", entries, start + 48, new_attrs)
         found[name] = (attrs, new_attrs)
     return found
@@ -196,6 +215,8 @@ def partition_attributes(entries: bytes, header: Header) -> dict[str, int]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("image", type=Path)
+    parser.add_argument("--usos-names", action="store_true", help="also name the entries USOS_ESP/USOS_DATA/USOS_WORK")
+    parser.add_argument("--names-only", action="store_true", help="leave the attributes unchanged (baseline fixture)")
     args = parser.parse_args()
 
     image = args.image.resolve()
@@ -221,7 +242,7 @@ def main() -> int:
         if primary_entries != backup_entries:
             raise RuntimeError("primary and backup GPT partition arrays differ before patch")
 
-        changes = patch_entries(primary_entries, primary)
+        changes = patch_entries(primary_entries, primary, not args.names_only, args.usos_names)
         backup_entries[:] = primary_entries
         commit_header_and_entries(f, primary, primary_entries)
         commit_header_and_entries(f, backup, backup_entries)
@@ -238,7 +259,7 @@ def main() -> int:
         if set(attrs) != TARGET_NAMES:
             raise RuntimeError(f"verification did not find both target partitions: {attrs}")
         for name, value in attrs.items():
-            if value & GPT_ATTRIBUTE_NO_BLOCK_IO_PROTOCOL == 0:
+            if not args.names_only and value & GPT_ATTRIBUTE_NO_BLOCK_IO_PROTOCOL == 0:
                 raise RuntimeError(f"{name} is missing NO_BLOCK_IO_PROTOCOL after patch")
 
     for name in sorted(changes):
