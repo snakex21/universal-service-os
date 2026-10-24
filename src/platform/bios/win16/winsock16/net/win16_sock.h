@@ -49,10 +49,16 @@
 #define USOS_SOCK_EADDRNOTAVAIL (-44)
 #define USOS_SOCK_ESHUTDOWN    (-45)
 #define USOS_SOCK_EOPNOTSUPP   (-46)
+#define USOS_SOCK_ECANCELLED   (-47)
 
 /* Provided by winsock16.c (GetTickCount / PeekMessage pump). */
 unsigned long usos_abi_now(void);
 void          usos_abi_idle(void);
+/* Reads the current application's blocking-call flag. Never called by tick.
+ * recv/accept cancellation leaves the socket intact; connect retains a
+ * disconnected reusable slot. send returns bytes already accepted, if any.
+ * close always releases its own slot, including when it returns ECANCELLED. */
+int           usos_abi_cancelled(void);
 
 int  usos_sock_startup(void);    /* pkt init + attach + ARP; USOS_NET_OK or <0 */
 void usos_sock_shutdown(void);   /* close every socket, release the driver */

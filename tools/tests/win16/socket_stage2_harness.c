@@ -22,6 +22,7 @@ static usos_u32 initial_server=0x12340000UL;
 #define CHECK(x) do { if(!(x)) { printf("FAIL line=%d expr=%s\n",__LINE__,#x); failures++; } } while(0)
 unsigned long usos_abi_now(void) { return now; }
 void usos_abi_idle(void) { now++; idles++; }
+int usos_abi_cancelled(void) { return 0; }
 int usos_pkt_init(void) { return 0; }
 int usos_pkt_attach(void) { return 0; }
 void usos_pkt_term(void) { }

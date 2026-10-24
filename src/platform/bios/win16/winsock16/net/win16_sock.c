@@ -63,10 +63,6 @@ static net_arp usos_arp;
 static int usos_ready, usos_pumping, usos_ticking;
 static usos_u16 usos_next_port=USOS_EPHEMERAL_BASE, usos_dns_seq;
 static usos_u32 usos_arp_age_at;
-static int usos_capture_active;
-static usos_u16 usos_capture_port, usos_capture_len;
-static usos_u32 usos_capture_ip;
-static usos_u8 usos_capture_buf[512];
 
 static void usos_zero(void *dst,unsigned int len)
 { usos_u8 *d=(usos_u8 *)dst; while(len--) *d++=0; }
@@ -74,6 +70,14 @@ static void usos_copy(void *dst,const void *src,unsigned int len)
 { usos_u8 *d=(usos_u8 *)dst; const usos_u8 *s=(const usos_u8 *)src; while(len--) *d++=*s++; }
 static int usos_due(usos_u32 now,usos_u32 before,usos_u32 period)
 { return (usos_u32)(now-before)>=period; }
+/* Only actual blocking wait sites use this hook. A timer tick never observes
+ * another application's cancellation flag or dispatches a Windows callback. */
+static int usos_idle_cancelled(void)
+{
+    if(usos_abi_cancelled()) return 1;
+    usos_abi_idle();
+    return usos_abi_cancelled();
+}
 static usos_sock_st *usos_slot(int n)
 { return n>=0 && n<USOS_MAX_SOCKETS && usos_socks[n]->used ? usos_socks[n] : 0; }
 static usos_u16 usos_ephemeral(void)
@@ -128,7 +132,7 @@ static int usos_frame_send(usos_u32 dst,usos_u16 length)
         rc=usos_frame_try(dst,length,1);
         if(rc) return rc>0;
         if(usos_due((usos_u32)usos_abi_now(),start,USOS_ARP_TIMEOUT_MS)) return 0;
-        usos_sock_tick(); usos_abi_idle();
+        usos_sock_tick(); if(usos_idle_cancelled()) return USOS_SOCK_ECANCELLED;
     }
 }
 static usos_u16 usos_receive_window(usos_sock_st *sk)
@@ -333,10 +337,6 @@ static void usos_udp_input(usos_u8 *packet,usos_u16 length)
     int i;
     usos_sock_st *sk;
     if(net_ip_parse(packet,length,&ip,0) || net_udp_parse(packet,length,&udp)) return;
-    if(usos_capture_active && ip.src==usos_capture_ip && udp.sport==53 && udp.dport==usos_capture_port) {
-        count=udp.data_len>sizeof(usos_capture_buf)?sizeof(usos_capture_buf):udp.data_len;
-        usos_copy(usos_capture_buf,udp.data,count); usos_capture_len=count;
-    }
     for(i=0;i<USOS_MAX_SOCKETS;i++) {
         sk=usos_socks[i];
         if(!sk->used || sk->type!=USOS_SOCK_DGRAM || sk->lport!=udp.dport || (sk->connected && (sk->raddr!=ip.src || sk->rport!=udp.sport))) continue;
@@ -467,7 +467,7 @@ int usos_sock_startup(void)
     if(usos_pkt_mac(usos_our_mac)) usos_zero(usos_our_mac,6);
     net_arp_init(&usos_arp,usos_our_mac,usos_pkt_ip());
     for(i=0;i<USOS_MAX_SOCKETS;i++) usos_zero(usos_socks[i],sizeof(usos_sock_st));
-    usos_ready=1; usos_pumping=usos_ticking=0; usos_capture_active=0;
+    usos_ready=1; usos_pumping=usos_ticking=0;
     usos_arp_age_at=(usos_u32)usos_abi_now(); usos_next_port=USOS_EPHEMERAL_BASE; return 0;
 }
 void usos_sock_shutdown(void)
@@ -524,7 +524,19 @@ int usos_sock_connect(int slot,usos_u32 ip,usos_u16 port,const char *name)
     usos_sock_tick();
     if(sk->connected) return 0;
     if(sk->nonblocking) return sk->error?sk->error:USOS_SOCK_EWOULDBLOCK;
-    while(!sk->connected && !sk->error) { usos_sock_tick(); usos_abi_idle(); }
+    while(!sk->connected && !sk->error) {
+        usos_sock_tick();
+        if(usos_idle_cancelled()) {
+            /* Best-effort abort only this pending connection. Preserve its
+             * allocation/local port so the application may reconnect. */
+            if(sk->tx_started || sk->connected)
+                (void)usos_tcp_wire(sk,sk->tcp.snd_nxt,USOS_TCP_RST|USOS_TCP_ACK,0,0,(usos_u32)usos_abi_now());
+            sk->connecting=sk->connected=sk->connect_done=0;
+            sk->control=0; sk->tx_started=0; sk->error=0;
+            sk->tcp.state=USOS_TCP_CLOSED; sk->tcp.snd_una=sk->tcp.snd_nxt;
+            return USOS_SOCK_ECANCELLED;
+        }
+    }
     return sk->error?sk->error:0;
 }
 int usos_sock_send(int slot,const usos_u8 *buffer,usos_u16 length)
@@ -540,7 +552,8 @@ int usos_sock_send(int slot,const usos_u8 *buffer,usos_u16 length)
         if(length>USOS_UDP_RX) return USOS_NET_ERR_ARG;
         n=net_udp_build(usos_tx_frame+14,usos_pkt_ip(),sk->raddr,sk->lport,sk->rport,buffer,length);
         if(sk->nonblocking) { rc=usos_frame_try(sk->raddr,n,1); return rc>0?(int)length:(rc<0?USOS_SOCK_EHOSTUNREACH:USOS_SOCK_EWOULDBLOCK); }
-        return usos_frame_send(sk->raddr,n)?(int)length:USOS_SOCK_EHOSTUNREACH;
+        rc=usos_frame_send(sk->raddr,n);
+        return rc>0?(int)length:(rc<0?rc:USOS_SOCK_EHOSTUNREACH);
     }
     for(;;) {
         if(sk->error) return sent?(int)sent:sk->error;
@@ -552,7 +565,7 @@ int usos_sock_send(int slot,const usos_u8 *buffer,usos_u16 length)
         if(sk->nonblocking) return sent?(int)sent:USOS_SOCK_EWOULDBLOCK;
         if(sent==length && !sk->tx_len) return (int)sent;
         if(usos_due((usos_u32)usos_abi_now(),start,USOS_IO_MS)) return sent?(int)sent:USOS_SOCK_ETIMEDOUT;
-        usos_abi_idle();
+        if(usos_idle_cancelled()) return sent?(int)sent:USOS_SOCK_ECANCELLED;
     }
 }
 static int usos_receive(int slot,usos_u8 *buffer,usos_u16 length,int peek)
@@ -580,33 +593,40 @@ static int usos_receive(int slot,usos_u8 *buffer,usos_u16 length,int peek)
         if(sk->peer_fin) return 0;
         if(sk->nonblocking) return USOS_SOCK_EWOULDBLOCK;
         if(usos_due((usos_u32)usos_abi_now(),start,USOS_IO_MS)) return USOS_SOCK_ETIMEDOUT;
-        usos_sock_tick(); usos_abi_idle();
+        usos_sock_tick(); if(usos_idle_cancelled()) return USOS_SOCK_ECANCELLED;
     }
 }
 int usos_sock_recv(int slot,usos_u8 *buffer,usos_u16 length) { return usos_receive(slot,buffer,length,0); }
 int usos_sock_peek(int slot,usos_u8 *buffer,usos_u16 length) { return usos_receive(slot,buffer,length,1); }
 int usos_sock_close(int slot)
 {
-    usos_sock_st *sk=usos_slot(slot); usos_u32 now,started; usos_u16 n; int i;
+    usos_sock_st *sk=usos_slot(slot); usos_u32 now,started; usos_u16 n; int i,cancelled=0;
     if(!sk) return USOS_SOCK_ENOTSOCK;
     if(sk->listening) for(i=0;i<USOS_MAX_SOCKETS;i++) if(usos_socks[i]->used && usos_socks[i]->parent==slot) {
         usos_socks[i]->nonblocking=1; (void)usos_sock_close(i);
     }
     started=(usos_u32)usos_abi_now();
     if(sk->type==USOS_SOCK_STREAM && sk->connected && !sk->error && !sk->tcp.fin_sent) {
-        if(!sk->nonblocking) while(sk->tx_len && !sk->error && !usos_due((usos_u32)usos_abi_now(),started,USOS_CLOSE_MS)) { usos_sock_tick(); usos_abi_idle(); }
-        if(!sk->tx_len) {
+        if(!sk->nonblocking) while(sk->tx_len && !sk->error && !usos_due((usos_u32)usos_abi_now(),started,USOS_CLOSE_MS)) {
+            usos_sock_tick(); if(usos_idle_cancelled()) { cancelled=1;break; }
+        }
+        if(!sk->tx_len && !cancelled) {
             now=(usos_u32)usos_abi_now();
             if(usos_tcp_wire(sk,sk->tcp.snd_nxt,USOS_TCP_ACK|USOS_TCP_FIN,0,0,now)>0) {
                 sk->tcp.snd_nxt++; sk->control=USOS_TCP_ACK|USOS_TCP_FIN; sk->tx_started=1; sk->tx_tick=now;
                 sk->tcp.state=sk->peer_fin?USOS_TCP_LAST_ACK:USOS_TCP_FIN_WAIT;
-                if(!sk->nonblocking) while(sk->tcp.snd_nxt!=sk->tcp.snd_una && !sk->error && !usos_due((usos_u32)usos_abi_now(),started,USOS_CLOSE_MS)) { usos_sock_tick(); usos_abi_idle(); }
+                if(!sk->nonblocking) while(sk->tcp.snd_nxt!=sk->tcp.snd_una && !sk->error && !usos_due((usos_u32)usos_abi_now(),started,USOS_CLOSE_MS)) {
+                    usos_sock_tick(); if(usos_idle_cancelled()) { cancelled=1;break; }
+                }
             }
         } else {
             n=net_tcp_build_rst(&sk->tcp,usos_tx_frame+14); if(n) (void)usos_frame_try(sk->raddr,n,0);
         }
     } else if(sk->connecting) { n=net_tcp_build_rst(&sk->tcp,usos_tx_frame+14); if(n) (void)usos_frame_try(sk->raddr,n,0); }
-    usos_zero(sk,sizeof(*sk)); return 0;
+    if(cancelled && sk->connected && !sk->tx_len && !sk->error) {
+        n=net_tcp_build_rst(&sk->tcp,usos_tx_frame+14); if(n) (void)usos_frame_try(sk->raddr,n,0);
+    }
+    usos_zero(sk,sizeof(*sk)); return cancelled?USOS_SOCK_ECANCELLED:0;
 }
 int usos_sock_local(int slot,usos_u32 *ip,usos_u16 *port)
 { usos_sock_st *sk=usos_slot(slot); if(!sk) return USOS_SOCK_ENOTSOCK; if(ip) *ip=usos_pkt_ip(); if(port) *port=sk->lport; return 0; }
@@ -647,7 +667,7 @@ int usos_sock_accept(int slot,usos_u32 *ip,usos_u16 *port)
         }
         if(sk->nonblocking) return USOS_SOCK_EWOULDBLOCK;
         if(usos_due((usos_u32)usos_abi_now(),start,USOS_IO_MS)) return USOS_SOCK_ETIMEDOUT;
-        usos_sock_tick(); usos_abi_idle();
+        usos_sock_tick(); if(usos_idle_cancelled()) return USOS_SOCK_ECANCELLED;
     }
 }
 int usos_sock_shutdown_one(int slot,int how)
@@ -670,7 +690,8 @@ int usos_sock_sendto(int slot,usos_u32 ip,usos_u16 port,const usos_u8 *buffer,us
     n=net_udp_build(usos_tx_frame+14,usos_pkt_ip(),ip,sk->lport,port,buffer,length);
     if(!n) return USOS_NET_ERR_ARG;
     if(sk->nonblocking) { rc=usos_frame_try(ip,n,1); return rc>0?(int)length:(rc<0?USOS_SOCK_EHOSTUNREACH:USOS_SOCK_EWOULDBLOCK); }
-    return usos_frame_send(ip,n)?(int)length:USOS_SOCK_EHOSTUNREACH;
+    rc=usos_frame_send(ip,n);
+    return rc>0?(int)length:(rc<0?rc:USOS_SOCK_EHOSTUNREACH);
 }
 int usos_sock_recvfrom(int slot,usos_u8 *buffer,usos_u16 length,usos_u32 *ip,usos_u16 *port)
 {
@@ -702,12 +723,11 @@ int usos_sock_resolve(const char *name, usos_u32 addrs[USOS_NET_MAX_ADDRS],
                       usos_u16 *count)
 {
     usos_u8 query[USOS_NET_NAME_MAX];
+    usos_u8 response[512];
     usos_u32 dns_ip;
     usos_u16 qlen;
-    usos_u16 sport;
     usos_u16 id;
-    usos_u16 n;
-    int attempt;
+    int attempt,slot,sent;
     int rc = USOS_NET_ERR_NAME;
 
     if (name == 0 || addrs == 0 || count == 0)
@@ -733,46 +753,44 @@ int usos_sock_resolve(const char *name, usos_u32 addrs[USOS_NET_MAX_ADDRS],
     qlen = net_dns_build_query(query, (usos_u16)sizeof(query), id, name);
     if (qlen == 0)
         return USOS_NET_ERR_NAME;
-    sport = usos_ephemeral();
-
-    usos_capture_active = 1;
-    usos_capture_port = sport;
-    usos_capture_ip = dns_ip;
-    usos_capture_len = 0;
+    /* Each blocking resolver owns an ordinary connected UDP socket, so a
+     * second application resolving inside a yield cannot replace its port,
+     * ID or response buffer. The stack buffer lives across that yield. */
+    slot=usos_sock_open(USOS_SOCK_DGRAM);
+    if(slot<0) return slot;
+    (void)usos_sock_nonblocking(slot,1);
+    rc=usos_sock_connect(slot,dns_ip,53,0);
+    if(rc<0) { (void)usos_sock_close(slot);return rc; }
 
     for (attempt = 0; attempt < 2; attempt++) {
         usos_u32 deadline;
 
-        usos_capture_len = 0;
-        n = net_udp_build(usos_tx_frame + USOS_NET_ETH_HDR, usos_pkt_ip(),
-                          dns_ip, sport, 53, query, qlen);
-        if (n == 0) {
-            rc = USOS_NET_ERR_ARG;
-            break;
-        }
-        if (!usos_frame_send(dns_ip, n)) {
-            rc = USOS_SOCK_EHOSTUNREACH;
-            break;
-        }
+        sent=0;
         deadline = usos_abi_now() + USOS_DNS_TIMEOUT_MS;
         for (;;) {
-            if (usos_capture_len != 0) {
-                rc = net_dns_parse_response(usos_capture_buf, usos_capture_len,
-                                            id, addrs, count);
-                if (rc == USOS_NET_OK)
-                    break;
+            if(!sent) {
+                rc=usos_sock_send(slot,query,qlen);
+                if(rc>=0) sent=1;
+                else if(rc!=USOS_SOCK_EWOULDBLOCK) goto finished;
+            }
+            rc=usos_sock_recv(slot,response,sizeof(response));
+            if(rc>=0) {
+                rc=net_dns_parse_response(response,(usos_u16)rc,id,addrs,count);
+                if(rc==USOS_NET_OK) goto finished;
+            } else if(rc!=USOS_SOCK_EWOULDBLOCK) {
+                goto finished;
             }
             if ((usos_s32)((usos_u32)usos_abi_now() - deadline) >= 0) {
                 rc = USOS_SOCK_ETIMEDOUT;
                 break;
             }
             usos_sock_tick();
-            usos_abi_idle();
+            if(usos_idle_cancelled()) { rc=USOS_SOCK_ECANCELLED;goto finished; }
         }
         if (rc == USOS_NET_OK)
             break;
     }
-    usos_capture_active = 0;
-    usos_capture_len = 0;
+finished:
+    (void)usos_sock_close(slot);
     return rc;
 }
