@@ -69,6 +69,7 @@ def main():
     parser.add_argument('--plan', type=Path, required=True)
     parser.add_argument('--provider', type=Path, required=True)
     parser.add_argument('--controller', type=Path, required=True)
+    parser.add_argument('--api-test', type=Path, help='Own APITEST.EXE artifact, never a third-party application')
     parser.add_argument('--build-root', type=Path, required=True)
     parser.add_argument('--qemu', type=Path, required=True)
     parser.add_argument('--seconds', type=int, default=120)
@@ -79,6 +80,9 @@ def main():
         raise ValueError('Plan cannot replace fixture or provider')
     data['NET/WIN16/APPCTL.INI'] = ('[test]\r\ncommand1=' + commands[0] + '\r\ncommand2=' + commands[1] + '\r\n').encode('ascii')
     data['NET/WIN16/APPCTL.EXE'] = args.controller.read_bytes()
+    if args.api_test:
+        if 'NET/WIN16/APITEST.EXE' in data: raise ValueError('Plan cannot replace the own API client')
+        data['NET/WIN16/APITEST.EXE'] = args.api_test.read_bytes()
     data['NET/WIN16/WINSOCK.DLL'] = args.provider.read_bytes()
     data['WINDOWS/WINSOCK.DLL'] = args.provider.read_bytes()
     disk = stage.make_overlay(args.out, args.base, args.tag, args.qemu)
@@ -112,7 +116,7 @@ def main():
         'one_inventory_completed': b'APPCTL inventory complete' in log,
         'application_pass': None, 'requires_final_screenshot_and_closed_pcap_review': True,
         'files': {k: {'bytes':len(v), 'sha256':hashlib.sha256(v).hexdigest()} for k,v in dumped.items()}})
-    print(log.decode('ascii', 'replace'))
+    print(log.decode('ascii', 'backslashreplace'))
     return 0 if b'mode=ENHANCED' in log else 1
 
 

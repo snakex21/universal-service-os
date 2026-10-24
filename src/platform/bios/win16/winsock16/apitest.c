@@ -33,7 +33,7 @@ static void line(const char *text)
 }
 #define VERIFY(value,label) do { if (!(value)) { failures++; line("FAIL " label); } else line("PASS " label); } while (0)
 
-static BOOL FAR PASCAL test_hook(void)
+BOOL FAR PASCAL __export test_hook(void)
 {
     u_long nonblock = 1;
     WSADATA data;
@@ -68,7 +68,7 @@ static void finish_b(void)
     line(failures ? "FINAL FAIL" : "FINAL PASS");
     DestroyWindow(window); PostQuitMessage(0);
 }
-static LONG FAR PASCAL wndproc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp)
+LONG FAR PASCAL __export wndproc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp)
 {
     char byte;
     (void)wp;

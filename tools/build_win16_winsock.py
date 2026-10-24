@@ -201,6 +201,7 @@ def build_testload(watcom: Path, verbose: bool, stem: str = 'testload') -> Path:
         'name %s' % artifact,
         'file %s' % obj,
         'library %s' % (libs / 'windows.lib'),
+        *(['library %s' % (libs / 'winsock.lib')] if stem == 'apitest' else []),
         'library %s' % (libs / 'clibl.lib'),
     ]
     response = OBJ_DIR / (stem + '.lnk')
@@ -273,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--verbose', action='store_true', help='echo every command')
     parser.add_argument('--keep-objects', action='store_true', help='keep .obj files')
     parser.add_argument('--stage2-tests', action='store_true', help='also build ASYNCTEST and MOSRUN Win16 test controllers')
+    parser.add_argument('--stage3-tests', action='store_true', help='also build APITEST and APPCTL Win16 test controllers')
     args = parser.parse_args(argv)
 
     watcom = find_watcom()
@@ -293,6 +295,10 @@ def main(argv: list[str] | None = None) -> int:
     print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     if args.stage2_tests:
         for stem in ('asynctest', 'mosrun'):
+            exe = build_testload(watcom, args.verbose, stem)
+            print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
+    if args.stage3_tests:
+        for stem in ('apitest', 'appctl'):
             exe = build_testload(watcom, args.verbose, stem)
             print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     if not args.keep_objects:

@@ -25,7 +25,7 @@ static void line(const char FAR *value)
     if(file!=HFILE_ERROR) _llseek(file,0,2);
 }
 
-static BOOL FAR PASCAL inventory(HWND item,LPARAM unused)
+BOOL FAR PASCAL __export inventory(HWND item,LPARAM unused)
 {
     char title[160],kind[64],module[160],record[450];
     (void)unused;
@@ -37,7 +37,7 @@ static BOOL FAR PASCAL inventory(HWND item,LPARAM unused)
     line(record);return TRUE;
 }
 
-static LRESULT FAR PASCAL events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
+LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 {
     char command[240],directory[240],name[16],record[300],*slash;
     UINT result;
