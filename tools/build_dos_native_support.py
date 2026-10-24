@@ -79,6 +79,10 @@ def build(root: Path):
     from build_win16_winsock import build_payload as build_winsock16
     build_winsock16(root, out / 'winsock16')
     build_csmwrap_variants(root, dos_out)
+    # DOS-side texts in the USOS languages (dos.* catalog keys), applied by
+    # micro-Linux at prep time (tools/dos_win3_menu.sh dos_i18n_apply).
+    from build_dos_i18n import build as build_dos_i18n
+    print('[PASS] DOS texts: ' + build_dos_i18n(root).relative_to(root).as_posix())
     build_reboot(root)
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')
     from build_freedos_support import build as build_freedos

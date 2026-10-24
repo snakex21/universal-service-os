@@ -1,9 +1,9 @@
 [menu]
 menucolor=15,1
-menuitem=WINSTD,Windows (domyslny)
-menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
-menuitem=DOSONLY,MS-DOS - wiersz polecen
-submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)
+menuitem=WINSTD,Windows (default)
+menuitem=WINREAL,Windows 3.0 - standard mode (WIN /S, test)
+menuitem=DOSONLY,MS-DOS - command prompt
+submenu=DIAG,Diagnostics (D1-D6, for tests only)
 menudefault=WINSTD,8
 
 ; Diagnostic start variants only (Windows 2.03 logo hang on the X470, fixed
@@ -12,12 +12,12 @@ menudefault=WINSTD,8
 ; D3 (EGA instead of VGA) needs a second Windows 2.x Setup: the display
 ; driver is bound into WIN200.BIN. Not offered.
 [DIAG]
-menuitem=D1WHERE,D1 - jak domyslny + USOSWHER (CS:IP w rogu ekranu)
-menuitem=D2NOKBC,D2 - bez USOSKBC (tylko klawiatura PS/2)
-menuitem=D4CLEAN,D4 - bez HIMEM i VBMOUSE (tylko SETVER + USOSKBC)
-menuitem=D5MIN,D5 - minimum: tylko SETVER + USOSWHER (bez USOSV10)
-menuitem=D6V10,D6 - jak D5 + USOSV10 (INT 10h na wlasnym stosie)
-menuitem=DOSONLY,MS-DOS - wiersz polecen
+menuitem=D1WHERE,D1 - as default + USOSWHER (CS:IP in the corner)
+menuitem=D2NOKBC,D2 - no USOSKBC (PS/2 keyboard only)
+menuitem=D4CLEAN,D4 - no HIMEM and VBMOUSE (SETVER + USOSKBC only)
+menuitem=D5MIN,D5 - minimum: SETVER + USOSWHER only (no USOSV10)
+menuitem=D6V10,D6 - as D5 + USOSV10 (INT 10h on its own stack)
+menuitem=DOSONLY,MS-DOS - command prompt
 
 ; HIMEM per item (D4/D5/D6 without it), before SETVER as before.
 [WINSTD]

@@ -39,7 +39,8 @@
  * the timer interrupt, so Setup programs get their answers without a person
  * at the keyboard. Ops: 0 end, 1 wait for text on the text screen, 2 delay
  * (ticks), 3 key (set-1 bytes + BIOS word), 4 wait for a graphics mode,
- * 5 wait until a text is gone. Keys go through the 8042 when there is one
+ * 5 wait until a text is gone, 6 wait for a picture in VGA mode 12h
+ * (hash of a plane-0 rectangle, with a timeout). Keys go through the 8042 when there is one
  * (also into Windows), otherwise into the BIOS keyboard buffer (text Setup
  * pages only). A missing text simply stops the script: the keyboard keeps
  * working, a person can answer.
@@ -86,6 +87,8 @@ mkicks:  .long 0                  /* software INT 74h issued */
 old74:   .long 0
 mpend:   .byte 0                  /* packet delivered, INT 74h due */
 msoft:   .byte 0                  /* inside the software INT 74h */
+/* op 6 (pix): checks of the current step, for its timeout */
+pcount:  .word 0
 
 /* INT 08h: the BIOS first (SeaBIOS polls USB there and sends the EOI),
  * then one queued byte to the 8042 and one script step. */
@@ -242,6 +245,8 @@ script:
     je op_gfx
     cmp al, 5
     je op_gone
+    cmp al, 6
+    je op_pix
     and byte ptr [kflags], 0xfb      /* 0 (or unknown): script done */
     ret
 op_wait:
@@ -260,6 +265,28 @@ skiptext:
     xor ah, ah
     add si, ax
     add si, 2
+    jmp next
+/* 6, word plane-0 offset, byte rows, byte bytes per row, dword hash,
+ * word timeout (checks, 4 ticks each): a picture in VGA mode 12h (the
+ * Windows 3.0 Setup dialogs have no text-mode page to wait for). Plane 0
+ * of the rectangle hashed (h = rol(h, 5) xor byte); equal -> next op. Past
+ * the timeout the step ends as well (the old timed behaviour), so a
+ * picture that never matches cannot hold the script forever. */
+op_pix:
+    test byte ptr [tick], 3
+    jnz 9f
+    inc word ptr [pcount]
+    mov ax, word ptr [pcount]
+    cmp ax, word ptr [si + 9]
+    jae 1f
+    mov ax, 0x40
+    mov es, ax
+    cmp byte ptr es:[0x49], 0x12
+    jne 9f
+    call pixhash
+    jnc 9f
+1:  mov word ptr [pcount], 0
+    add si, 11
     jmp next
 op_delay:
     mov ax, word ptr [si + 1]
@@ -320,6 +347,87 @@ next:
     mov word ptr [spos], si
     inc word ptr [step]
 9:  ret
+
+/* CF set = the hash of the op-6 rectangle at [si] (plane 0, read mode 0)
+ * is the one of the op; all 32-bit registers kept (the interrupted code
+ * may use the upper halves). The
+ * graphics controller index, read map select and mode registers are put
+ * back; the latches are not (one read in the middle of a latched write of
+ * the display driver can spoil a few pixels of Setup's screen, nothing
+ * else). Keeps SI; DS = CS. */
+pixhash:
+    push eax
+    push bx
+    push cx
+    push dx
+    push di
+    push bp
+    mov dx, 0x3ce
+    in al, dx
+    mov bl, al                      /* index register */
+    mov al, 4
+    out dx, al
+    inc dx
+    in al, dx
+    mov bh, al                      /* read map select */
+    dec dx
+    mov al, 5
+    out dx, al
+    inc dx
+    in al, dx
+    mov bp, ax                      /* mode (low byte) */
+    and al, 0xf7                    /* read mode 0 */
+    out dx, al
+    dec dx
+    mov al, 4
+    out dx, al
+    inc dx
+    xor al, al                      /* plane 0 */
+    out dx, al
+    mov ax, 0xa000
+    mov es, ax
+    mov di, word ptr [si + 1]
+    mov ch, byte ptr [si + 3]       /* rows */
+    xor eax, eax
+1:  mov cl, byte ptr [si + 4]       /* bytes per row */
+    push di
+2:  rol eax, 5
+    xor al, byte ptr es:[di]
+    inc di
+    dec cl
+    jnz 2b
+    pop di
+    add di, 80
+    dec ch
+    jnz 1b
+    cmp eax, dword ptr [si + 5]
+    pushf
+    mov dx, 0x3ce
+    mov al, 5
+    out dx, al
+    inc dx
+    mov ax, bp
+    out dx, al
+    dec dx
+    mov al, 4
+    out dx, al
+    inc dx
+    mov al, bh
+    out dx, al
+    dec dx
+    mov al, bl
+    out dx, al
+    popf
+    pop bp
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop eax
+    stc
+    je 3f
+    clc
+3:  ret
 
 /* Is the counted string at [si+1] on the text screen? CF set = yes.
  * Keeps SI; DS = CS. */

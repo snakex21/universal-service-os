@@ -5,13 +5,22 @@ Source: src/platform/bios/msdos/keys/<name>.txt, one step per line:
     wait "text"     until the text is on the text-mode screen (then 0.5 s)
     gone "text"     until the text is no longer on the screen
     gfx             until the BIOS video mode is a graphics mode
+    pix X Y W H HASH [TIMEOUT]
+                    until VGA mode 12h shows a picture: plane 0 of the
+                    rectangle at byte column X (8 pixels each), line Y, W
+                    bytes x H lines hashes to HASH (pixel_hash); then 0.5 s.
+                    After TIMEOUT seconds (default 900) the script goes on
+                    anyway. Pick black-and-white areas (white = all planes
+                    set) away from the mouse pointer (screen centre).
     delay 2.5       seconds
     key enter       one key; modifiers as in alt+p, shift+tab, ctrl+c
     type "C:\\WIN"  one key per character
     # comment
 
 Binary (<NAME>.KEY): "UKS1", then ops: 1 len text (wait), 5 len text (gone),
-4 (gfx), 2 word ticks (delay), 3 n set-1 bytes... word BIOS key (key).
+4 (gfx), 2 word ticks (delay), 3 n set-1 bytes... word BIOS key (key),
+6 word offset, byte rows, byte width, dword hash, word checks (pix; one
+check every 4 ticks).
 The TSR appends the end op (0).
 
     python tools/usos_keyscript.py --out DIR      (builds every script)
@@ -85,6 +94,38 @@ def char_key(ch: str) -> bytes:
     return key_bytes(('shift+' if shifted else '') + name)
 
 
+PIX_TICKS_PER_CHECK = 4
+
+
+def pixel_hash(plane_bytes: bytes, width: int) -> int:
+    """The hash USOSKBC computes for op 6 (h = rol(h, 5) xor byte), over
+    the rows of `width` bytes in order."""
+    h = 0
+    for b in plane_bytes:
+        h = ((h << 5) | (h >> 27)) & 0xffffffff
+        h ^= b
+    return h
+
+
+def plane0_bytes(image, x: int, y: int, width: int, rows: int) -> bytes:
+    """Plane-0 bytes of a 640x480 screenshot (PIL image) of a black-and-white
+    area: white -> 1, black -> 0, MSB = leftmost pixel. Other colours are an
+    error (their plane-0 bit depends on the driver's palette)."""
+    rgb = image.convert('RGB')
+    out = bytearray()
+    for row in range(y, y + rows):
+        for col in range(x, x + width):
+            v = 0
+            for bit in range(8):
+                px = rgb.getpixel((col * 8 + bit, row))
+                if px == (255, 255, 255):
+                    v |= 0x80 >> bit
+                elif px != (0, 0, 0):
+                    raise ValueError(f'pixel {col * 8 + bit},{row} is {px}, not black or white')
+            out.append(v)
+    return bytes(out)
+
+
 def compile_script(text: str) -> bytes:
     out = bytearray(b'UKS1')
     for number, raw in enumerate(text.splitlines(), 1):
@@ -103,6 +144,15 @@ def compile_script(text: str) -> bytes:
                     out += bytes([2]) + struct.pack('<H', SETTLE_TICKS)
             elif op == 'gfx':
                 out += bytes([4])
+            elif op == 'pix':
+                x, y, w, h = (int(v, 0) for v in args[:4])
+                digest = int(args[4], 16)
+                timeout = float(args[5]) if len(args) > 5 else 900.0
+                if not (0 <= x < 80 and 0 < w <= 80 - x and 0 <= y < 480 and 0 < h <= 480 - y and h < 256):
+                    raise ValueError('rectangle outside 80 x 480 bytes')
+                checks = max(1, round(timeout * TICKS_PER_SECOND / PIX_TICKS_PER_CHECK))
+                out += bytes([6]) + struct.pack('<HBBIH', y * 80 + x, h, w, digest, min(checks, 0xffff))
+                out += bytes([2]) + struct.pack('<H', SETTLE_TICKS)
             elif op == 'delay':
                 out += bytes([2]) + struct.pack('<H', max(1, round(float(args[0]) * TICKS_PER_SECOND)))
             elif op == 'key':
@@ -133,7 +183,14 @@ def build_all(out: Path) -> list:
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, default=ROOT / 'zig-out/dos-native/msdos')
+    p.add_argument('--hash', nargs=5, metavar=('PNG', 'X', 'Y', 'W', 'H'),
+                   help='print the pix hash of a rectangle of a 640x480 screenshot')
     a = p.parse_args()
+    if a.hash:
+        from PIL import Image
+        x, y, w, h = (int(v, 0) for v in a.hash[1:])
+        print('pix %d %d %d %d %08x' % (x, y, w, h, pixel_hash(plane0_bytes(Image.open(a.hash[0]), x, y, w, h), w)))
+        raise SystemExit(0)
     a.out.mkdir(parents=True, exist_ok=True)
     for f in build_all(a.out):
         print(f, f.stat().st_size)

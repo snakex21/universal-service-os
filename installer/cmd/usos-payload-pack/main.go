@@ -127,6 +127,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/USOSVGAR.COM`, `EFI/USOS/dos-native/msdos/USOSVGAR.COM`},
 	{`zig-out/dos-native/msdos/USOSPKT.COM`, `EFI/USOS/dos-native/msdos/USOSPKT.COM`},
 	{`zig-out/dos-native/msdos/NETSTART.BAT`, `EFI/USOS/dos-native/msdos/NETSTART.BAT`},
+	{`zig-out/dos-native/i18n/DOSTEXT.TXT`, `EFI/USOS/dos-native/i18n/DOSTEXT.TXT`},
 	// Windows 3.1 / WfW Winsock, opt-in (answer profile dos_winsock): own folder.
 	{`zig-out/dos-native/winsock16/WINSOCK.DLL`, `EFI/USOS/dos-native/winsock16/WINSOCK.DLL`},
 	{`zig-out/dos-native/winsock16/GETHTTP.EXE`, `EFI/USOS/dos-native/winsock16/GETHTTP.EXE`},

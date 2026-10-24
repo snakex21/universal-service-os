@@ -38,6 +38,8 @@ REGIONAL=${DOS_REGIONAL:-}
 PROGRAMS_DIR=${DOS_PROGRAMS_DIR:-}
 SIZE_MIB=${DOS_SIZE_MIB:-256}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
+# The USOS menu language ([ui] language=), for the DOS texts without a profile.
+SETTINGS_INI=${USOS_SETTINGS_INI:-$ESP_DIR/usos-settings.ini}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 
@@ -163,6 +165,26 @@ done
 if [ -n "$REGIONAL" ]; then
     dos_regional_apply "$U" "$REGIONAL" 2>&1 | while IFS= read -r line; do log "$line"; done
 fi
+# DOS-side texts: the profile's language (DOS.INI language=), else the USOS
+# menu language (usos-settings.ini [ui] language=), else English; the code
+# page DOS.INI switches the console to (tools/build_dos_i18n.py).
+text_lang=''
+text_cp=437
+if [ -n "$REGIONAL" ]; then
+    text_lang=$(dos_ini_value "$REGIONAL" language)
+    if [ "$(dos_ini_value "$REGIONAL" mode)" != manual ] && [ -n "$(dos_ini_value "$REGIONAL" cpi)" ]; then
+        text_cp=$(dos_ini_value "$REGIONAL" codepage)
+    fi
+fi
+[ -n "$text_lang" ] || text_lang=${DOS_LANGUAGE:-}
+if [ -z "$text_lang" ] && [ -f "$SETTINGS_INI" ]; then
+    text_lang=$(awk -F= '{ sub(/\r$/, "") } /^\[/ { s = ($0 == "[ui]"); next } s && $1 == "language" { print $2; exit }' "$SETTINGS_INI")
+fi
+case "$text_lang" in *[!A-Za-z-]*) text_lang='' ;; esac
+case "$text_cp" in [0-9][0-9][0-9]) ;; *) text_cp=437 ;; esac
+# Not in a pipe: the sections it picks are used by the later steps.
+dos_i18n_apply "$U" "$ESP_DIR/dos-native/i18n/DOSTEXT.TXT" "${text_lang:-en}" "$text_cp" > "$work/i18n.log" 2>&1     || { while IFS= read -r line; do log "$line"; done < "$work/i18n.log"; fail 'the DOS texts could not be written'; }
+while IFS= read -r line; do log "$line"; done < "$work/i18n.log"
 if [ -n "$WIN_SYSTEM" ]; then
     dos_menu_names "$U" "$WIN_SYSTEM" "$WIN3_ISO"
     log "start menu names: $(dos_win_name "$WIN_SYSTEM" "$WIN3_ISO" || echo Windows)"

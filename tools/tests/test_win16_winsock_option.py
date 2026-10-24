@@ -159,7 +159,19 @@ class WinsockApply(unittest.TestCase):
 class Wiring(unittest.TestCase):
     def test_default_netstart_unchanged(self):
         data = (MSDOS / 'network_start.cmd').read_bytes().replace(b'\r\n', b'\n')
-        self.assertEqual(hashlib.sha256(data).hexdigest(), DEFAULT_NETSTART_SHA256)
+        # 2026-10-24: the three messages are English in the source (the DOS
+        # texts follow the language, tools/build_dos_i18n.py); with the old
+        # Polish texts put back the file is the X470-proven one byte for byte.
+        proven = data
+        for new, old in ((b'echo USOS: network ready (DHCP), mTCP programs in C:\\NET (HTGET, PING, FTP, TELNET).',
+                          b'echo USOS: siec gotowa (DHCP), programy mTCP w C:\\NET (HTGET, PING, FTP, TELNET).'),
+                         (b'echo USOS: no DHCP answer, network without an address (C:\\NET\\DHCP.LOG).',
+                          b'echo USOS: brak odpowiedzi DHCP - siec bez adresu (C:\\NET\\DHCP.LOG).'),
+                         (b'echo USOS: no supported network card (C:\\NET\\USOSPKT.LOG).',
+                          b'echo USOS: brak obslugiwanej karty sieciowej (C:\\NET\\USOSPKT.LOG).')):
+            self.assertEqual(proven.count(new), 1)
+            proven = proven.replace(new, old)
+        self.assertEqual(hashlib.sha256(proven).hexdigest(), DEFAULT_NETSTART_SHA256)
         self.assertNotIn(b'USOSPKTQ', data)
         queue = (MSDOS / 'network_start_queue.cmd').read_text(encoding='ascii')
         self.assertIn('if "%USOSPKT_QUEUE%"=="1" goto queue_driver', queue)

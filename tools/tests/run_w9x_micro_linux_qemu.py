@@ -112,11 +112,24 @@ else
         dd if=/dev/vdb of=/mnt/data/win3.iso bs=1M 2>/dev/null || { echo E2E-RESULT=FAIL; exit 1; }
         WIN3=/mnt/data/win3.iso
     fi
-    if ! env TARGET_DEVICE="$TARGET" W9X_SOURCE_ISO=/mnt/data/source.iso DOS_WIN3_ISO="$WIN3" DOS_WIN_EARLY= \
-        DOS_PROGRAMS_DIR=/mnt/data/none sh /usr/lib/usos/dos_csmwrap_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
+    # --env E2E_WIN_EARLY=windows-3-0 / E2E_WIN_SYSTEM=windows-3-1 as step 620
+    # passes them; --dos-ini: DOS.INI of an answer profile (DOS_REGIONAL).
+    REG=''
+    [ -f /usos-e2e/DOS.INI ] && REG=/usos-e2e/DOS.INI
+    if ! env TARGET_DEVICE="$TARGET" W9X_SOURCE_ISO=/mnt/data/source.iso DOS_WIN3_ISO="$WIN3" DOS_WIN_EARLY="${E2E_WIN_EARLY:-}" \
+        DOS_WIN_SYSTEM="${E2E_WIN_SYSTEM:-}" DOS_REGIONAL="$REG" DOS_PROGRAMS_DIR=/mnt/data/none sh /usr/lib/usos/dos_csmwrap_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
         cat /tmp/prepare.log; echo E2E-RESULT=FAIL; exit 1
     fi
     cat /tmp/prepare.log
+    # --env E2E_DUMP=1: the prepared start files byte for byte (base64) for
+    # the host checks (DOS texts, code pages).
+    if [ "${E2E_DUMP:-0}" = 1 ] && dl=$(losetup -f) && losetup -o 1048576 "$dl" "$TARGET"; then
+        mkdir -p /mnt/dump && mount -t vfat -o ro "$dl" /mnt/dump && for f in /mnt/dump/USOSDOS/*.BAT /mnt/dump/USOSDOS/*.SYS /mnt/dump/USOSDOS/*.CSM; do
+            [ -f "$f" ] || continue
+            echo "E2E-FILE:${f##*/}"; base64 "$f" | tr -d '\n'; echo; echo E2E-FILE-END
+        done
+        umount /mnt/dump 2>/dev/null; losetup -d "$dl"
+    fi
 fi
 fdisk -l "$TARGET" 2>/dev/null | tail -n 4
 sync
@@ -139,9 +152,20 @@ def overlay(args) -> bytes:
 
     add("usos-e2e/w9x.sh", GUEST.replace("\r\n", "\n").encode(), 0o100755)
     dos = args.root / "zig-out" / "dos-native"
+    # --dos-native DIR: files of a fresh build (same layout) replace the
+    # root's ones, e.g. msdos/USOSKBC.COM and msdos/W30.KEY of a checkout
+    # without a full build.
+    extra = Path(args.dos_native) if args.dos_native else None
     for f in sorted(dos.rglob("*")):
         if f.is_file() and f.name != "source.zip":
-            add("usos-e2e/esp/EFI/USOS/dos-native/" + f.relative_to(dos).as_posix(), f.read_bytes())
+            rel = f.relative_to(dos).as_posix()
+            if extra is not None and (extra / rel).is_file():
+                continue
+            add("usos-e2e/esp/EFI/USOS/dos-native/" + rel, f.read_bytes())
+    if extra is not None:
+        for f in sorted(extra.rglob("*")):
+            if f.is_file():
+                add("usos-e2e/esp/EFI/USOS/dos-native/" + f.relative_to(extra).as_posix(), f.read_bytes())
     csmwrap = args.root / "zig-out" / "usb" / "EFI" / "USOS" / "csmwrap"
     for f in sorted(csmwrap.rglob("*")):
         if f.is_file():
@@ -151,6 +175,8 @@ def overlay(args) -> bytes:
         for f in sorted(folder.iterdir()):
             if f.is_file():
                 add(f"usos-e2e/floppies/{folder.name}/{f.name}", f.read_bytes())
+    if args.dos_ini:
+        add("usos-e2e/DOS.INI", Path(args.dos_ini).read_bytes())
     if args.scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -247,7 +273,8 @@ def boot(args, out: Path, target: Path) -> None:
     cmd = [str(args.qemu), "-machine", "q35", "-accel", "tcg", "-cpu", args.boot_cpu, "-smp", "2", "-m", str(args.boot_mb),
            "-drive", f"if=pflash,unit=0,format=raw,readonly=on,file={nt3.OVMF_CODE.as_posix()}",
            "-drive", f"if=pflash,unit=1,format=raw,file={vars_.as_posix()}",
-           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback", *disk,
+           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback"
+           + (f",throttling.iops-total={args.boot_iops}" if args.boot_iops else ""), *disk,
            "-display", "none", "-nic", "none", "-vga", "std", "-rtc", "base=localtime",
            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0",
            "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off"]
@@ -328,6 +355,8 @@ def main() -> int:
     p.add_argument("--outer-mb", type=int, default=1536)
     p.add_argument("--timeout", type=int, default=7200)
     p.add_argument("--env", action="append", default=[])
+    p.add_argument("--dos-native", help="folder laid out like zig-out/dos-native whose files replace the root's")
+    p.add_argument("--dos-ini", help="w3 / dos: DOS.INI of an answer profile (src/flow/answer/dos.zig)")
     p.add_argument("--boot", action="store_true")
     p.add_argument("--boot-only", action="store_true")
     p.add_argument("--boot-seconds", type=int, default=900)
@@ -335,6 +364,7 @@ def main() -> int:
     p.add_argument("--shot-start", type=int, default=0, help="first screenshot number - 1 (continue a series)")
     p.add_argument("--boot-cpu", default="EPYC-Rome")
     p.add_argument("--boot-mb", type=int, default=1024)
+    p.add_argument("--boot-iops", type=int, default=0, help="throttle the boot disk (slow-disk timing test)")
     args = p.parse_args()
     nt3.set_root(args.root)
     args.qemu = args.qemu or nt3.QEMU

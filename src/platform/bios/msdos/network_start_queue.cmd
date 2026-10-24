@@ -22,15 +22,15 @@ if errorlevel 1 goto no_driver
 :driver_ready
 C:\NET\DHCP.EXE -retries 2 -timeout 6 >C:\NET\DHCP.LOG
 if errorlevel 1 goto no_dhcp
-echo USOS: siec gotowa (DHCP), programy mTCP w C:\NET (HTGET, PING, FTP, TELNET).
+echo USOS: network ready (DHCP), mTCP programs in C:\NET (HTGET, PING, FTP, TELNET).
 goto end
 :no_dhcp
-echo USOS: brak odpowiedzi DHCP - siec bez adresu (C:\NET\DHCP.LOG).
+echo USOS: no DHCP answer, network without an address (C:\NET\DHCP.LOG).
 goto end
 :no_driver
-echo USOS: brak obslugiwanej karty sieciowej (C:\NET\USOSPKT.LOG).
+echo USOS: no supported network card (C:\NET\USOSPKT.LOG).
 goto end
 :queue_missing
 echo USOS: queue driver USOSPKTQ.COM missing>C:\NET\USOSPKT.LOG
-echo USOS: brak opcjonalnego C:\NET\USOSPKTQ.COM - nie uruchomiono DHCP.
+echo USOS: optional C:\NET\USOSPKTQ.COM missing, DHCP not started.
 :end

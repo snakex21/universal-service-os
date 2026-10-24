@@ -1,9 +1,17 @@
 # Windows 3.0 Setup (USOSKBC, tools/usos_keyscript.py). DOS part: C:\WINDOWS,
-# detected hardware. Windows part (graphics, no text to wait for; the keys
-# reach Windows through the 8042): no printers, no application search, no
-# documents, then Continue / OK, and "Return to DOS" in the exit dialog: its
-# default button reboots, and USOS restarts once more anyway after it writes
-# the start menu (WINMENU.BAT), so a Setup reboot would be one restart too many.
+# detected hardware. Windows part (VGA 640x480, no text page): every answer
+# waits for its dialog on the screen (pix: plane-0 hash of a black-and-white
+# area, from QEMU screendumps of Windows 3.0a EN Setup, 2026-10-24), not for
+# a fixed time: on the X470 the copy step takes longer than the old timed
+# script allowed, its keys went into the copy and the dialogs waited for a
+# person. Answers: no printers, no application search, no documents
+# (Continue); "make all modifications" (Continue); OK to the saved
+# CONFIG.SYS/AUTOEXEC.BAT note; "Return to DOS" in the exit dialog (its
+# focused button restarts Windows, Reboot one restart too many: USOS
+# restarts once more anyway after WINMENU.BAT writes the start menu).
+# Rectangles: Instructions box, first text line (byte column 3, line 398,
+# 60 bytes x 12 lines); the note's first text line (24, 196, 34 x 14).
+# Each one has a timeout: after it the key goes out anyway (old behaviour).
 wait "Welcome to Setup."
 key enter
 wait "Setup is ready to install Windows into"
@@ -11,11 +19,21 @@ key enter
 wait "Setup has determined that your system includes"
 key enter
 gfx
-delay 25
+# "After Setup installs Windows 3.0, it will perform each of the following
+# checked procedures." (all three checked)
+pix 3 398 60 12 9cd9712f 600
+delay 1
 key alt+p alt+a alt+d enter
-delay 90
+# "In order for Windows to be installed optimally, Setup needs to modify
+# your CONFIG.SYS and AUTOEXEC.BAT files." (after the file copy)
+pix 3 398 60 12 90b78f68 1800
+delay 1
 key enter
-delay 20
+# "The new versions of your AUTOEXEC.BAT and CONFIG.SYS have been saved"
+pix 24 196 34 14 c82adeef 600
+delay 1
 key enter
-delay 20
+# "Exit Windows Setup": Windows 3.0 is now installed.
+pix 3 398 60 12 0306cc11 600
+delay 1
 key alt+d
