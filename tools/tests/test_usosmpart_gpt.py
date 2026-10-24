@@ -172,6 +172,12 @@ class SyntheticMbr(unittest.TestCase):
         # bit 0 (platform required) alone does not hide a data partition
         rc, parts, _, _ = self.run_img(self.USOS, self.usos_parts(data_attrs=1))
         self.assertEqual(len(parts), 3)
+        # bit 1 (EFI No Block IO Protocol, set by the installer on DATA and
+        # WORK to hide them from the firmware boot menu) hides nothing here
+        rc, parts, _, w = self.run_img(self.USOS, self.usos_parts(2, 2), 'w', 4096, 8)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(parts), 3)
+        self.assertEqual(w, ['w 4096 8 1'])                 # DATA stays writable
         # both data partitions hidden: nothing to letter -> fallback (hide)
         rc, _, _, _ = self.run_img(self.USOS, self.usos_parts(1 << 63, 1 << 63))
         self.assertEqual(rc, 4)

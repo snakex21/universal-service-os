@@ -52,9 +52,11 @@ Write-Output ("PASS data={0}" -f ($dataLetters -join ','))
 
 // ExposeFormattedVolumes runs after DATA and WORK are formatted: it clears
 // their GPT NoDriveLetter bit (set at creation so the raw volumes stay
-// unmounted) and gives DATA a drive letter while WORK keeps none.
+// unmounted), sets GPT bit 1 when hideDataWorkFromFirmwareMenu is on (single
+// firmware boot-menu entry) and gives DATA a drive letter while WORK keeps
+// none.
 func (b Backend) ExposeFormattedVolumes(media install.MediaLayout) error {
-	if err := b.clearNoDriveLetter(media, "DATA/WORK", media.DATA, media.WORK); err != nil {
+	if err := b.applyInstalledDataWorkAttributes(media, "DATA/WORK"); err != nil {
 		return err
 	}
 	cmd, err := exposeLettersCommand(media)
