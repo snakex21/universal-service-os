@@ -328,7 +328,10 @@ class DiagnosticMenu(unittest.TestCase):
             self.assertIn('WINRUN.ON present', ran[1])
         # Otherwise WINRUN sets it for WIN.COM and clears it afterwards.
         lines = batch_lines(MSDOS / 'windows_run.cmd')
-        code = [l for l in lines if l and not l.lower().startswith(('rem', '@echo', 'echo winrun'))]
+        # The redirect guard (directory made before the WINRUN.LOG append) comes first.
+        self.assertIn(r'if not exist C:\USOSW3\NUL md C:\USOSW3', lines)
+        code = [l for l in lines if l and not l.lower().startswith(
+            ('rem', '@echo', 'echo winrun', r'if not exist c:\usosw3\nul md'))]
         self.assertEqual(code[:6], [r'if not exist C:\USOSW3\WINRUN.ON goto no_flag', 'goto running', ':no_flag',
                                     'if not "%USOSWIN%"=="1" goto start', 'goto running', ':start'])
         self.assertEqual(code[6], 'set USOSWIN=1')
