@@ -43,6 +43,8 @@ typedef struct { unsigned int style;WNDPROC lpfnWndProc;int cbClsExtra,cbWndExtr
 #define MAKELONG(lo,hi) ((LONG)((DWORD)(WORD)(lo)|((DWORD)(WORD)(hi)<<16)))
 DWORD GetTickCount(void);
 HTASK GetCurrentTask(void);
+BOOL IsTask(HTASK);
+UINT GetCurrentPDB(void);
 HGLOBAL GlobalAlloc(UINT,DWORD);
 void *GlobalLock(HGLOBAL);
 BOOL GlobalUnlock(HGLOBAL);

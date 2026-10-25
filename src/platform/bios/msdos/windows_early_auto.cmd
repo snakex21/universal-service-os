@@ -15,6 +15,28 @@ if "%CONFIG%"=="D2NOKBC" set UDIAG=D2
 if "%CONFIG%"=="D4CLEAN" set UDIAG=D4
 if "%CONFIG%"=="D5MIN" set UDIAG=D5
 if "%CONFIG%"=="D6V10" set UDIAG=D6
+rem Windows 3.0: C:\WINDOWS\WIN.COM becomes WIN30.COM and C:\WINDOWS\WIN.BAT
+rem (from C:\USOSW3\WIN.BAT) calls WINRUN.BAT, so WIN typed anywhere reaches
+rem its already-running guard: also in a DOS window of a Windows started from
+rem this menu (no DOSKEY macro yet; in C:\WINDOWS WIN.COM was found before any
+rem PATH entry; X470 2026-10-24: a second Windows started there). Checked at
+rem every start: Windows Setup may write WIN.COM again. C:\USOSW3\WINRUN.ON
+rem exists only while Windows 3.0 runs; one left by a reset goes here.
+rem Every directory this file writes into is made first (a missing one =
+rem "File creation error" from COMMAND.COM; tools/tests/test_dos_redirects.py).
+if not exist C:\USOSW3\NUL md C:\USOSW3
+if exist C:\USOSW3\WINRUN.ON del C:\USOSW3\WINRUN.ON
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto shadow_ok
+if exist C:\WIN386\WIN386.EXE goto shadow_ok
+if exist C:\WINDOWS\WIN386.EXE goto shadow_ok
+if not exist C:\USOSW3\WIN.BAT goto shadow_ok
+if not exist C:\WINDOWS\WIN.COM goto shadow_bat
+if exist C:\WINDOWS\WIN30.COM del C:\WINDOWS\WIN30.COM
+ren C:\WINDOWS\WIN.COM WIN30.COM
+echo W1AUTO: C:\WINDOWS\WIN.COM renamed to WIN30.COM>>C:\USOSW3\WINRUN.LOG
+:shadow_bat
+copy C:\USOSW3\WIN.BAT C:\WINDOWS\WIN.BAT /y >nul
+:shadow_ok
 rem USOSV10 first: INT 10h on its own 2 KiB stack. WIN.COM 2.x calls the video
 rem BIOS for its logo with about 200 bytes of stack left above its own code;
 rem a modern video BIOS (RX 560) needs more and overwrites that code (hang at
@@ -31,7 +53,26 @@ rem Windows 1.0x: USOSMS1.DRV (bound as MOUSE.DRV) takes the same INT 74h.
 if "%UDIAG%"=="D4" goto kbc_load
 if "%UDIAG%"=="D5" goto tsr_done
 if "%UDIAG%"=="D6" goto tsr_done
-if exist C:\DOS\VBMOUSE.EXE C:\DOS\VBMOUSE.EXE
+rem Windows 3.0 (SYSTEM\DOSX.EXE): VBMOUSE only after Windows returned or
+rem the DOS item ran (USOSVBM=1, :macro_ok). Real-mode WINOLDAP resets
+rem INT 33h around every DOS program; VBMOUSE then takes the INT 15h C207h
+rem callback from MOUSE.DRV and the Windows mouse stays dead after the DOS
+rem prompt (X470 2026-10-24; D4 without VBMOUSE keeps it). Windows 1.0x/2.x
+rem and Windows/386 load it here as before (their mouse passed on the X470).
+rem CTTY NUL: VBMOUSE prints its VirtualBox/VMware probe lines to stderr,
+rem which COMMAND.COM cannot redirect; a failure is reported by errorlevel.
+set USOSVBM=
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto vbm_now
+set USOSVBM=1
+goto vbm_done
+:vbm_now
+if not exist C:\DOS\VBMOUSE.EXE goto vbm_done
+ctty nul
+C:\DOS\VBMOUSE.EXE
+ctty con
+if not errorlevel 1 goto vbm_done
+echo USOS: the DOS mouse driver (VBMOUSE) did not load.
+:vbm_done
 if "%UDIAG%"=="D2" goto tsr_done
 :kbc_load
 if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M
@@ -66,20 +107,29 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 :v10_log1
 echo ==== WIN started (no "WIN returned" below = hang)>>C:\USOS\DIAG\%UDIAG%.TXT
 :win_go
+rem USOSWIN=1 while Windows runs (WINRUN.BAT: WIN in its DOS window).
+set USOSWIN=1
 C:
 if exist C:\WIN386\WIN386.EXE goto w386dir
 if exist C:\WINDOWS\WIN386.EXE goto w386win
+if exist C:\WINDOWS\WIN30.COM goto win_have
 if not exist C:\WINDOWS\WIN.COM goto missing
+:win_have
 cd \WINDOWS
 rem Windows 3.0 (SYSTEM\DOSX.EXE = standard mode present): real mode by
 rem default. Under CSMWrap 386 enhanced mode hangs in the BIOS USB code (V86)
-rem and standard mode stopped at the logo in QEMU; the menu offers WIN /S.
+rem and standard mode (WIN /S) resets the X470 (2026-10-24; QEMU: stopped at
+rem the logo or restarted the VM). WINREAL, only in the DIAG submenu, runs it.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto plain
+set UWIN=WIN.COM
+if exist C:\WINDOWS\WIN30.COM set UWIN=WIN30.COM
+echo USOS>C:\USOSW3\WINRUN.ON
+echo W1AUTO %CONFIG%: %UWIN% USOSWIN=[%USOSWIN%]>>C:\USOSW3\WINRUN.LOG
 if "%CONFIG%"=="WINREAL" goto standard
-WIN.COM /R
+%UWIN% /R
 goto end
 :standard
-WIN.COM /S
+%UWIN% /S
 goto end
 :plain
 WIN.COM
@@ -99,7 +149,15 @@ goto end
 :missing
 echo Windows files are missing in C:\WINDOWS.
 :end
+set USOSWIN=
+set UWIN=
+if not exist C:\USOSW3\WINRUN.ON goto flag_off
+del C:\USOSW3\WINRUN.ON
+echo W1AUTO: Windows 3.0 returned>>C:\USOSW3\WINRUN.LOG
+:flag_off
 if "%UDIAG%"=="" goto end_msg
+if not exist C:\USOS\NUL md C:\USOS
+if not exist C:\USOS\DIAG\NUL md C:\USOS\DIAG
 echo ==== WIN returned>>C:\USOS\DIAG\%UDIAG%.TXT
 if "%UDIAG%"=="D5" goto v10_log2
 C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
@@ -107,9 +165,10 @@ C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%UDIAG%.TXT
 echo USOS %UDIAG%: log in C:\USOS\DIAG\%UDIAG%.TXT
 :end_msg
 rem Windows 3.0 (SYSTEM\DOSX.EXE): WIN typed at the DOS prompt from now on
-rem starts standard mode (C:\USOSW3\WINRUN.BAT; WIN /3, /R and other
-rem arguments unchanged). DOSKEY (about 4 KiB) only after Windows or the menu
-rem item. Windows 1.0x/2.x and Windows/386 keep their own WIN / WIN386.
+rem starts real mode like the menu default (C:\USOSW3\WINRUN.BAT; WIN /3,
+rem /S and other arguments unchanged). DOSKEY (about 4 KiB) only after
+rem Windows or the menu item. Windows 1.0x/2.x and Windows/386 keep their
+rem own WIN / WIN386.
 if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto macro_ok
 if exist C:\WIN386\WIN386.EXE goto macro_ok
 if exist C:\WINDOWS\WIN386.EXE goto macro_ok
@@ -117,5 +176,16 @@ if not exist C:\USOSW3\WINRUN.BAT goto macro_ok
 if not exist C:\DOS\DOSKEY.COM goto macro_ok
 C:\DOS\DOSKEY.COM win=C:\USOSW3\WINRUN.BAT $* >nul
 :macro_ok
+rem Windows 3.0: VBMOUSE now, after DOSKEY, so it is the last INT 33h/2Fh
+rem hook and WINRUN.BAT can unload it (VBMOUSE uninstall) for a typed WIN.
+if not "%USOSVBM%"=="1" goto vbm_lok
+set USOSVBM=
+if not exist C:\DOS\VBMOUSE.EXE goto vbm_lok
+ctty nul
+C:\DOS\VBMOUSE.EXE
+ctty con
+if not errorlevel 1 goto vbm_lok
+echo USOS: the DOS mouse driver (VBMOUSE) did not load.
+:vbm_lok
 echo.
 echo To choose the start mode again, restart the computer.

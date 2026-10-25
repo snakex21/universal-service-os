@@ -132,7 +132,7 @@ LRESULT FAR PASCAL __export events(HWND hwnd,UINT message,WPARAM wp,LPARAM lp)
 
 int PASCAL WinMain(HANDLE instance,HANDLE previous,LPSTR command,int show)
 {
-    WNDCLASS cls;FARPROC proc;MSG msg;char record[100];DWORD flags;
+    WNDCLASS cls;FARPROC proc;MSG msg;char record[100],required[16];DWORD flags;
     (void)previous;(void)command;(void)show;
     log_file=_lcreat(LOGFILE,0);
     if(log_file==HFILE_ERROR) return 1;
@@ -140,7 +140,12 @@ int PASCAL WinMain(HANDLE instance,HANDLE previous,LPSTR command,int show)
     wsprintf(record,"GetWinFlags=%lu task=%u mode=%s",flags,(UINT)GetCurrentTask(),
              flags&WF_ENHANCED?"ENHANCED":flags&WF_STANDARD?"STANDARD":"OTHER");
     line(record);
-    if(!(flags&WF_ENHANCED)) { line("FAIL enhanced mode required");_lclose(log_file);return 1; }
+    GetPrivateProfileString("test","mode","ENHANCED",required,sizeof(required),CONFIG);
+    if((!lstrcmp(required,"STANDARD") && !(flags&WF_STANDARD)) ||
+       (!lstrcmp(required,"ENHANCED") && !(flags&WF_ENHANCED)) ||
+       (lstrcmp(required,"STANDARD") && lstrcmp(required,"ENHANCED"))) {
+        line("FAIL required Windows mode");_lclose(log_file);return 1;
+    }
     memset(&cls,0,sizeof(cls));
     proc=MakeProcInstance((FARPROC)events,instance);
     cls.lpfnWndProc=(WNDPROC)proc;cls.hInstance=instance;cls.lpszClassName="USOS App Fixture";

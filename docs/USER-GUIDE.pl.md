@@ -419,6 +419,16 @@ brakujące foldery i nadpisują `README.txt`. Nic innego nie jest usuwane.
   Nazwy DOS 8.3, bez spacji i polskich znaków. Każdy program może mieć
   swój podfolder. Wymagane co najmniej 128 MiB RAM. Pliki wynikowe znikają
   po restarcie (dysk RAM).
+- **Programy DOS dla instalacji MS-DOS / Windows 1.x-3.x**:
+  `Systems\DOS\MS-DOS\Programs\`, kopiowane do `C:\PROGRAMS` (ścieżka UEFI).
+  Ikony w Windows 3.x (opcjonalnie): plik `USOSICON.TXT` w folderze
+  programu z wierszami `"Nazwa",C:\PROGRAMS\<FOLDER>\PLIK.EXE` (nazwy 8.3,
+  ASCII, plik w tym folderze; `.EXE`, `.COM`, `.PIF` albo `.BAT`) dodaje je
+  do grupy Main podczas Instalatora Windows. Opcjonalne trzecie pole to
+  najstarszy Windows, którego program wymaga: `,3.0`, `,3.1` albo `,3.11`
+  (np. `"Netscape",C:\PROGRAMS\NETSCAPE\NETSCAPE.EXE,3.1`: bez ikony
+  w 3.0). Błędne wiersze są pomijane
+  i zapisywane w logu przygotowania.
 - **Narzędzia EFI dla powłoki UEFI** (flashery BIOS/VBIOS, testery GPU):
   `Utilities\UEFI Shell\Tools\`. Po skopiowaniu nie trzeba aktualizacji.
   Uruchom: **Narzędzia -> Powłoka UEFI**, potem `ls` i nazwę narzędzia.

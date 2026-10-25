@@ -533,16 +533,19 @@ leaving Windows. Details: `docs/win3-net-2026-10-23.md`.
   current directory; a `WIN.BAT` in the PATH would lose to `WIN.COM` in
   `C:\WINDOWS`, where the prompt is after leaving Windows. `WINRUN.BAT`
   without arguments: 3.1 / 3.11 `/S /B`, WfW 3.11 `/3 /B` (enhanced only),
-  3.0 `/S` (386 enhanced mode under CSMWrap: keyboard late, no mouse);
-  with arguments unchanged (`win /3` = 386 enhanced, `win progman`).
-  Windows 1.0x / 2.x / Windows/386 keep their own WIN / WIN386 and get no
-  DOSKEY. Note: the 3.0 menu default is still `WIN /R` (item 2 `WIN /S`).
+  3.0 `/R` since 2026-10-24 (was `/S`: 3.0 standard mode resets the X470,
+  see "Windows 3.0a fixes" below; 386 enhanced mode under CSMWrap: keyboard
+  late, no mouse); with arguments unchanged (`win /3` = 386 enhanced,
+  `win progman`). Windows 1.0x / 2.x / Windows/386 keep their own WIN /
+  WIN386 and get no DOSKEY. The 3.0 menu default stays `WIN /R`; the
+  `WIN /S` item is only in the Diagnostics submenu now.
 - **Product names** (`tools/dos_win3_menu.sh` `dos_menu_names`, called by
   `dos_csmwrap_target.sh` with `DOS_WIN_SYSTEM`): "Windows 3.1 - tryb
   standardowy (domyslny)", "Windows 3.0a (domyslny)", "Windows/386 2.11
   (domyslny)", "Windows for Workgroups 3.11 - tryb rozszerzony 386
   (domyslny)"; the revision letter comes from the image or folder name
-  (`Windows 3.0a EN.iso`). Item "WIN /S" only for 3.0. The BIOS Core path
+  (`Windows 3.0a EN.iso`). Item "WIN /S" only for 3.0 (Diagnostics
+  submenu since 2026-10-24). The BIOS Core path
   keeps the generic labels.
 - **Regional settings** from the answer profile: `docs/answer-profiles.md`
   (`dos_regional`, `dos_keyb`, renderer `dos.zig`).
@@ -563,3 +566,132 @@ tested):
   falls back to Real Mode for `WIN /S` as well, QEMU only), `win /3` = 386
   Enhanced Mode (PS/2 keyboard; with the USB keyboard enhanced mode hangs in
   QEMU, the known BIOS-USB-in-V86 problem).
+
+## Windows 3.0a fixes after the X470 round (2026-10-24, B261024-183643)
+
+**A. Standard mode resets the X470.** After File > Exit Windows a typed
+`win` ran `WINRUN.BAT` -> `WIN.COM /S` (3.0 standard mode, DOSX) and the PC
+restarted. The user confirmed the cause on the X470: the boot menu item
+"Windows 3.0a - tryb standardowy" (`WIN /S`, no USOS batch involved after
+it) restarts the PC as well. Static candidates (not proven): DOSX's 286
+exit path (CMOS shutdown code 09h + triple fault, which a UEFI reset vector
+does not honour) or its 24-bit descriptors with more than 16 MiB of XMS
+(HIMEM reports 64512K). Change:
+- `WINRUN.BAT` (`windows_run.cmd`): Windows 3.0 (`C:\USOSW3\EARLY.TAG`)
+  without arguments runs `WIN.COM /R`, the menu default and the only 3.0
+  mode that passed on the X470. Explicit `win /s` is passed through as
+  typed.
+- `W1CONFIG.SYS` (`windows_early_config.sys`): the `WINREAL` item (`WIN /S`)
+  left the main menu. It is the last-but-one entry of the Diagnostics
+  submenu, labelled "Windows 3.0a - standard mode (WIN /S, restarts new
+  PCs)" (`dos.menu.early_standard`, all 27 catalogs). The main menu now has
+  only "Windows 3.0a (default)" and "MS-DOS"; the default stays `WIN /R`.
+- Windows 3.1 / 3.11 standard mode (`WIN /S /B`, menu default and typed
+  `win`) is unchanged: it passed on the X470.
+
+**B. Windows mouse dead after the DOS Prompt (3.0a real mode).** The user
+confirmed the cause on the X470 with D4 (no VBMOUSE): DOS Prompt, EXIT,
+the mouse still moves. Mechanism (static: expanded 3.0a WINOLDAP.MOD,
+VBADOS 0.67 source `mousetsr.c`): real-mode WINOLDAP calls INT 33h AX=0
+around a DOS program; VBMOUSE's reset re-registers its own INT 15h C207h
+callback, which USOSKBC /M now hands its packets to, and 3.0a MOUSE.DRV
+never registers again. Change (Windows 3.0 only, i.e. `SYSTEM\DOSX.EXE`):
+- `W1AUTO.BAT`: no VBMOUSE before WIN (all items that loaded it: default,
+  WINREAL, D1, D2). It is loaded after Windows returned, or after the DOS
+  item, at `:macro_ok`, i.e. after DOSKEY, so it is the last INT 33h /
+  INT 2Fh hook (D4/D5/D6 stay without it).
+- `WINRUN.BAT` (typed `win`, also with arguments): `VBMOUSE uninstall`
+  (VBADOS 0.67 action; it refuses when another TSR hooked INT 33h/2Fh
+  after it) before `WIN.COM`, `VBMOUSE` again afterwards only when the
+  uninstall succeeded.
+- Not changed: Windows 1.0x/2.x and Windows/386 (VBMOUSE before WIN as
+  before). Their WINOLDAP.MOD (1.01, 1.04, 2.03, 2.11) also contains
+  `xor ax,ax; int 33h`, so the same reset happens there; whether their mouse
+  driver recovers was never tested on the X470 (2.03/2.11 mouse PASS did
+  not include a DOS program). Windows 3.1/3.11/WfW use VBMOUSE.DRV, which
+  needs VBMOUSE, and passed on the X470.
+
+**D. Quiet VBMOUSE.** VBMOUSE 0.67 has no quiet switch, and its probe
+lines "Cannot find VirtualBox PCI device, err=..." / "Could not detect
+VMware, err=..." go to stderr (`mousmain.c`), which `>nul` does not catch
+and MS-DOS 6.22 COMMAND.COM cannot redirect. Every load in this flow is
+now `ctty nul` / `VBMOUSE.EXE` / `ctty con`, then on errorlevel 1 (for
+example "Cannot init PS/2 mouse BIOS") one line "USOS: the DOS mouse driver
+(VBMOUSE) did not load." (`dos.mouse.vbmouse_failed`, menu language in
+W1AUTO / W3AUTO.CSM / WINRUN; English in the install-stage AUTOEXEC that
+INSTALL.BAT writes). Places: W1AUTO.BAT, WINRUN.BAT, the install AUTOEXEC
+(`install.cmd`, also the final AUTOEXEC of an MS-DOS-only install) and
+W3AUTO.CSM (`tools/build_dos_native_support.py`). LIVE.BAT (RAM session)
+keeps its plain call: it clears the screen right after.
+
+**C. WIN typed inside Windows.** W3AUTO.BAT / W3AUTO.CSM / W1AUTO.BAT set
+`USOSWIN=1` before WIN.COM (WIN386.EXE for Windows/386) and clear it at
+`:end`; WINRUN.BAT sets it around its own WIN.COM call. A DOS window of the
+running Windows inherits that environment, so `win` typed there (the
+DOSKEY macro is resident once Windows was started by a typed `win`) only
+prints "Windows is already running - type EXIT to return."
+(`dos.run.already_running`, all catalogs; PL "Windows już działa - wpisz
+EXIT, aby wrócić."). Real-mode 3.0 answers no INT 2Fh 1600h/4680h query
+reliably, hence the environment flag. 10 bytes of the 2048-byte
+environment (`SHELL=... /E:2048`).
+
+**E. Program Manager icons for staged programs (Windows 3.0 / 3.1 / 3.11 /
+WfW 3.11).** `tools/dos_win3_menu.sh` `dos_program_icons`, called by
+`dos_csmwrap_target.sh` right after `DATA\Systems\DOS\MS-DOS\Programs` was
+copied to `C:\USOSDOS\PROGRAMS` (INSTALL.BAT then copies it to
+`C:\PROGRAMS`). Each `PROGRAMS\<FOLDER>\USOSICON.TXT` (any case) may hold
+lines `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE`; blank lines and `;` comments
+are ignored. A line is used when the name is 1-40 printable ASCII
+characters without `" , ( ) [ ]` (Setup passes it in a Program Manager DDE
+command), the folder and every path part are 8.3 names, the path stays
+inside its own folder (at most 64 characters), the file ends in
+`.EXE/.COM/.PIF/.BAT`, it was staged, and SETUP.INF does not list it yet;
+at most 30 icons. Every skipped line gets one prep-log line ("Program icons:
+<FOLDER>\USOSICON.TXT line N skipped: <reason>"). Good lines are appended
+to the end of the Main group section in Setup's own shape (`"Name",
+C:\...\FILE.EXE`, the same shape as `"File Manager", WINFILE.EXE` and the
+QEMU-proven Winsock icon): Windows 3.0 lists the group as `Main,1` ->
+section `[Main]`; 3.1 / 3.11 / WfW 3.11 as `group3=<name>,1` -> `[group3]`
+(`dos_main_group`, shared with `dos_winsock_apply`; checked against the
+3.0a EN, 3.1 PL, 3.11 EN and WfW 3.11 PL INFs). Windows 1.x/2.x have no
+Program Manager group: one log line, SETUP.INF unchanged. Test:
+`tools/tests/test_win3_program_icons.py` (host shell; the micro-Linux
+BusyBox awk is not run by it). Not yet run through a real Setup: 3.0 Setup
+with a full path in a `[Main]` entry is unverified (QEMU or X470 check).
+
+**C, round 2 (X470 B261024-201426: FAIL).** In the DOS Prompt of Windows
+3.0a, `win` started a second Windows (then no mouse) instead of the hint.
+Cause, from the scripts: `WINRUN.BAT` was never reached. The DOSKEY macro
+`win=` is loaded only at `:macro_ok`, i.e. after the first Windows started
+from the boot menu has returned, so in that first session the DOS Prompt
+has no macro; its current directory is `C:\WINDOWS`, where COMMAND.COM finds
+`WIN.COM` before any PATH entry, so a WIN.BAT elsewhere in the PATH would
+not help either. (Checked and not the cause: environment space, `SHELL=
+C:\COMMAND.COM C:\ /E:2048 /P` in W1CONFIG; the default item sets USOSWIN
+like WINREAL. Windows 3.0 sets no `windir`; WINOLDAP.MOD only reads COMSPEC,
+so whether its shell sees USOSWIN at all is unproven.) Fix, independent of
+DOSKEY and the environment, Windows 3.0 only:
+- W1AUTO.BAT at every start: `C:\WINDOWS\WIN.COM` is renamed to `WIN30.COM`
+  (a WIN.COM written again by Windows Setup replaces it) and
+  `C:\USOSW3\WIN.BAT` (helper `W30WIN.BAT`, `windows_win30.cmd`, staged by
+  INSTALL.BAT) is copied to `C:\WINDOWS\WIN.BAT`, which calls WINRUN.BAT. So
+  `win` typed anywhere, in any session, reaches WINRUN. The menu items and
+  WINRUN start `WIN30.COM` (WIN.COM when it is not there); WINMENU.BAT and
+  W3START.BAT accept WIN30.COM as "installed".
+- Flag file `C:\USOSW3\WINRUN.ON`: written right before Windows 3.0 starts
+  (W1AUTO, WINRUN), deleted when it returns and at every boot (a reset
+  leaves it). WINRUN shows the hint when the file exists or USOSWIN=1.
+- Silent log `C:\USOSW3\WINRUN.LOG`: one line per WINRUN call (arguments,
+  USOSWIN value), the branch taken (WINRUN.ON / USOSWIN hint, mode,
+  WIN30.COM or WIN.COM, VBMOUSE unloaded or not), "returned"; W1AUTO logs
+  the rename, its start (item, program, USOSWIN) and the return.
+
+**E, round 2.** X470: the Netscape/Opera icons appeared on 3.0a, and
+starting them reports that they need a newer Windows (expected). A
+`USOSICON.TXT` line may now end in an optional third field, the oldest
+Windows the program runs on: `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE,3.1`
+(values `3.0`, `3.1`, `3.11`; any other value skips the line). The target
+script passes the installed version (`windows-3-0` = 3.0, `windows-3-1` =
+3.1, `windows-3-11` / `windows-wfw-3-11` = 3.11); an older Windows skips
+the line with "needs Windows 3.1, this is Windows 3.0". Lines without the
+field behave as before; the field never reaches SETUP.INF.

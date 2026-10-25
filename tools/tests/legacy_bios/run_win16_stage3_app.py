@@ -93,12 +93,16 @@ def main():
     parser.add_argument('--build-root', type=Path, required=True)
     parser.add_argument('--qemu', type=Path, required=True)
     parser.add_argument('--seconds', type=int, default=120)
+    parser.add_argument('--windows-mode', choices=('standard', 'enhanced'), default='enhanced')
+    parser.add_argument('--packet-shim', type=Path, help='External control-only packet shim, loaded before Windows')
     args = parser.parse_args()
     args.out = stage.guarded(args.out); args.out.mkdir(parents=True, exist_ok=True)
     commands, copies, data, collected = load_plan(args.plan)
     if 'NET/WIN16/APPCTL.INI' in data or 'NET/WIN16/APPCTL.EXE' in data or 'WINDOWS/WINSOCK.DLL' in data:
         raise ValueError('Plan cannot replace fixture or provider')
-    config='[test]\r\ncommand1=' + commands[0] + '\r\ncommand2=' + commands[1] + '\r\n'
+    required_mode = args.windows_mode.upper()
+    mode_switch = 'S' if args.windows_mode == 'standard' else '3'
+    config='[test]\r\nmode=' + required_mode + '\r\ncommand1=' + commands[0] + '\r\ncommand2=' + commands[1] + '\r\n'
     for i,action in enumerate(json.loads(args.plan.read_text(encoding='utf-8')).get('actions',[]),1):
         config+='dialog%d=%s\r\nbutton%d=%s\r\n'%(i,action['dialog'],i,action['button'])
     data['NET/WIN16/APPCTL.INI'] = config.encode('ascii')
@@ -108,6 +112,11 @@ def main():
         data['NET/WIN16/APITEST.EXE'] = args.api_test.read_bytes()
     data['NET/WIN16/WINSOCK.DLL'] = args.provider.read_bytes()
     data['WINDOWS/WINSOCK.DLL'] = args.provider.read_bytes()
+    if args.packet_shim:
+        shim = args.packet_shim.resolve(strict=True)
+        if not shim.is_relative_to(LIBRARY.resolve()) or not shim.is_file():
+            raise ValueError('Control packet shim must come from the external application library')
+        data['NET/WIN16/WINPKT.COM'] = shim.read_bytes()
     input_events=[(entry['at_seconds'],entry['key']) for entry in json.loads(args.plan.read_text(encoding='utf-8')).get('keys',[])]
     if any(delay>=args.seconds for delay,_ in input_events): raise ValueError('Keyboard input must precede final capture')
     disk = stage.make_overlay(args.out, args.base, args.tag, args.qemu)
@@ -123,12 +132,14 @@ def main():
                    'cp /ws/' + source + ' ' + shlex.quote(dest)]
     script += ["rm -f /target/NET/MTCP.CFG /target/NET/DHCP.LOG /target/NET/USOSPKT.LOG",
                "grep -q '^WIN.COM /[S3] /B' /target/AUTOEXEC.BAT",
-               "sed -i 's@^WIN.COM /[S3] /B.*@WIN.COM /3 /B C:\\\\NET\\\\WIN16\\\\APPCTL.EXE\\r@' /target/AUTOEXEC.BAT"]
+               "sed -i 's@^WIN.COM /[S3] /B.*@WIN.COM /" + mode_switch + " /B C:\\\\NET\\\\WIN16\\\\APPCTL.EXE\\r@' /target/AUTOEXEC.BAT"]
+    if args.packet_shim:
+        script += ["sed -i '/^WIN.COM /i C:\\\\NET\\\\WIN16\\\\WINPKT.COM 0x60\\r' /target/AUTOEXEC.BAT"]
     stage.flow.ws.linux(vm, disk, args.tag+'-stage', '\n'.join(script)+'\n', files)
     stage.receipt(args.out/(args.tag+'-inputs.json'), {
         'plan': json.loads(args.plan.read_text(encoding='utf-8')), 'applications': copies,
         'injected_sha256': {k: hashlib.sha256(v).hexdigest() for k,v in data.items()},
-        'normal_base_preserved': True, 'required_mode': 'ENHANCED', 'run_seconds': args.seconds})
+        'normal_base_preserved': True, 'required_mode': required_mode, 'run_seconds': args.seconds})
     stage.boot(vm, disk, args.tag+'-run', args.seconds)
     names = ['NET/WIN16/APPCTL.LOG', 'NET/WIN16/WINSOCK.LOG', 'NET/WIN16/WSDIAG.LOG',
              'NET/MTCP.CFG', 'NET/DHCP.LOG', 'NET/USOSPKT.LOG'] + collected
@@ -139,11 +150,12 @@ def main():
     log = dumped.get('NET/WIN16/APPCTL.LOG', b'')
     stage.receipt(args.out/(args.tag+'-verdict.json'), {
         'qemu_only': True, 'actual_enhanced_mode': b'mode=ENHANCED' in log,
+        'required_mode': required_mode, 'actual_required_mode': ('mode=' + required_mode).encode('ascii') in log,
         'one_inventory_completed': b'APPCTL inventory complete' in log,
         'application_pass': None, 'requires_final_screenshot_and_closed_pcap_review': True,
         'files': {k: {'bytes':len(v), 'sha256':hashlib.sha256(v).hexdigest()} for k,v in dumped.items()}})
     print(log.decode('ascii', 'backslashreplace'))
-    return 0 if b'mode=ENHANCED' in log else 1
+    return 0 if ('mode=' + required_mode).encode('ascii') in log else 1
 
 
 if __name__ == '__main__': raise SystemExit(main())

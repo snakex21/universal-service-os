@@ -4,7 +4,7 @@ A. WIN typed at the DOS prompt behaves like the start menu: W3AUTO.BAT /
    W1AUTO.BAT load the DOSKEY macro win=C:\\USOSW3\\WINRUN.BAT $* after
    Windows or the menu item (a macro wins over WIN.COM in the current
    directory); WINRUN.BAT without arguments uses the default item's mode
-   (3.1: /S /B, WfW: /3 /B, 3.0: /S) and passes arguments through.
+   (3.1: /S /B, WfW: /3 /B, 3.0: /R) and passes arguments through.
 B. The start menus name the installed product (tools/dos_win3_menu.sh
    dos_win_name / dos_menu_names, run here under the host's POSIX shell).
 C. DOS.INI (src/flow/answer/dos.zig) -> COUNTRY / DISPLAY.SYS / MODE CON
@@ -48,7 +48,11 @@ class WinMacro(unittest.TestCase):
         self.assertIn('if not "%1"=="" goto pass', lines)
         self.assertIn('C:\\WINDOWS\\WIN.COM /S /B', lines)
         self.assertIn('C:\\WINDOWS\\WIN.COM /3 /B', lines)
-        self.assertIn('C:\\WINDOWS\\WIN.COM /S', lines)
+        # Windows 3.0: real mode like the menu default; its standard mode
+        # (WIN /S) resets the X470 (2026-10-24).
+        # (UWIN = WIN30.COM once W1AUTO.BAT renamed WIN.COM, else WIN.COM)
+        self.assertIn('C:\\WINDOWS\\%UWIN% /R', lines)
+        self.assertNotIn('C:\\WINDOWS\\WIN.COM /S', lines)
         self.assertIn('C:\\WINDOWS\\WIN.COM %1 %2 %3 %4 %5 %6 %7 %8 %9', lines)
         # The same choice as W3AUTO.BAT: WfW only in 386 enhanced mode.
         self.assertIn('if exist C:\\WINSETUP\\WFWSETUP.DL_ goto enhanced', lines)
@@ -137,7 +141,11 @@ class MenuLib(unittest.TestCase):
         self.assertIn(b'menuitem=WIN386,Windows for Workgroups 3.11 - tryb 386 z SMARTDRV\n', wfw)
         w30 = self.menu('windows-3-0', 'Windows 3.0a EN.iso')['W1CONFIG.SYS']
         self.assertIn(b'menuitem=WINSTD,Windows 3.0a (domyslny)\n', w30)
-        self.assertIn(b'menuitem=WINREAL,Windows 3.0a - tryb standardowy (WIN /S, test)\n', w30)
+        # WIN /S only in the DIAG submenu, labelled (it resets the X470).
+        self.assertIn(b'menuitem=WINREAL,Windows 3.0a - tryb standardowy (WIN /S, restartuje nowe PC)\n', w30)
+        main_menu, diag = w30.split(b'[menu]')[1].split(b'\n[')[0], w30.split(b'[DIAG]')[1].split(b'\n[')[0]
+        self.assertNotIn(b'menuitem=WINREAL', main_menu)
+        self.assertIn(b'menuitem=WINREAL,', diag)
         en = self.menu('windows-wfw-3-11', 'WfW.iso', 'en')['W3CONFIG.SYS']
         self.assertIn(b'menuitem=WINSTD,Windows for Workgroups 3.11 - 386 enhanced mode (default)\n', en)
         self.assertIn(b'menuitem=WIN386,Windows for Workgroups 3.11 - 386 mode with SMARTDRV\n', en)

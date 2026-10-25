@@ -104,6 +104,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/W3CONFIG.SYS`, `EFI/USOS/dos-native/msdos/W3CONFIG.SYS`},
 	{`zig-out/dos-native/msdos/W3AUTO.BAT`, `EFI/USOS/dos-native/msdos/W3AUTO.BAT`},
 	{`zig-out/dos-native/msdos/WINRUN.BAT`, `EFI/USOS/dos-native/msdos/WINRUN.BAT`},
+	{`zig-out/dos-native/msdos/W30WIN.BAT`, `EFI/USOS/dos-native/msdos/W30WIN.BAT`},
 	{`zig-out/dos-native/msdos/REBOOT.COM`, `EFI/USOS/dos-native/msdos/REBOOT.COM`},
 	{`zig-out/dos-native/msdos/W3CONFIG.CSM`, `EFI/USOS/dos-native/msdos/W3CONFIG.CSM`},
 	{`zig-out/dos-native/msdos/W3AUTO.CSM`, `EFI/USOS/dos-native/msdos/W3AUTO.CSM`},

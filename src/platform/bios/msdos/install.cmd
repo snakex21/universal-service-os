@@ -55,7 +55,7 @@ copy %USRC%\HIMEMSRC.ZIP C:\DOS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\LICENSE.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
-md C:\TEMP
+if not exist C:\TEMP\NUL md C:\TEMP
 rem SETVER first, as MS-DOS Setup writes it (programs that ask for an older
 rem DOS version); the same driver the X470-proven Windows 1.x-3.0 menu loads.
 rem No SMARTDRV and no EMM386 (EMM386 breaks the USOSPKT MMIO fallback).
@@ -100,11 +100,16 @@ if not exist %USRC%\USOSWHER.COM goto where_done
 copy %USRC%\USOSWHER.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :where_done
+rem CTTY NUL around VBMOUSE: its VirtualBox/VMware probe lines go to
+rem stderr, which COMMAND.COM cannot redirect; a failure is still reported.
+echo ctty nul>>C:\AUTOEXEC.BAT
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+echo ctty con>>C:\AUTOEXEC.BAT
+echo if errorlevel 1 echo USOS: the DOS mouse driver (VBMOUSE) did not load.>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
 if not exist %USRC%\PROGRAMS\nul goto programs_done
-md C:\PROGRAMS
+if not exist C:\PROGRAMS\NUL md C:\PROGRAMS
 C:\DOS\XCOPY.EXE %USRC%\PROGRAMS\*.* C:\PROGRAMS /s /e /v >nul
 if errorlevel 2 goto failed
 :programs_done
@@ -127,7 +132,7 @@ if exist %USRC%\WINSETUP\SETUP.EXE goto net_done
 echo call C:\NET\NETSTART.BAT>>C:\AUTOEXEC.BAT
 :net_done
 if not exist %USRC%\WINSETUP\SETUP.EXE goto dos_done
-md C:\WINSETUP
+if not exist C:\WINSETUP\NUL md C:\WINSETUP
 C:\DOS\XCOPY.EXE %USRC%\WINSETUP\*.* C:\WINSETUP /s /e /v >nul
 if errorlevel 1 goto failed
 if not exist C:\WINSETUP\SETUP.EXE goto failed
@@ -142,7 +147,7 @@ copy C:\WINSETUP\SETUP.NEW C:\WINSETUP\SETUP.INF /y >nul
 if errorlevel 1 goto failed
 del C:\WINSETUP\SETUP.NEW
 :inf_done
-md C:\USOSW3
+if not exist C:\USOSW3\NUL md C:\USOSW3
 rem Setup answers for USOSKBC (dos_csmwrap_target.sh picks the script).
 if not exist %USRC%\SETUP.KEY goto setup_key_done
 copy %USRC%\SETUP.KEY C:\USOSW3 /y >nul
@@ -183,6 +188,11 @@ copy %USRC%\EARLY.TAG C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1SETUP.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+rem Windows 3.0: W1AUTO.BAT puts it into C:\WINDOWS as WIN.BAT (WIN.COM -> WIN30.COM).
+if not exist %USRC%\W30WIN.BAT goto w30win_done
+copy %USRC%\W30WIN.BAT C:\USOSW3\WIN.BAT /y >nul
+if errorlevel 1 goto failed
+:w30win_done
 copy %USRC%\W1CONFIG.SYS C:\USOSW3\W3CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1AUTO.BAT C:\USOSW3\W3AUTO.BAT /y >nul
@@ -285,6 +295,8 @@ rem disks; a batch outside it removes it (this one is read line by line).
 if exist C:\WINSETUP\SETUP.EXE goto finreboot
 if not exist C:\DOS\DELTREE.EXE goto finreboot
 if not exist C:\DOS\REBOOT.COM goto finreboot
+if not exist C:\TEMP\NUL md C:\TEMP
+if not exist C:\TEMP\NUL goto finreboot
 echo @echo off>C:\TEMP\USOSFIN.BAT
 echo C:\DOS\DELTREE.EXE /Y C:\USOSDOS>>C:\TEMP\USOSFIN.BAT
 echo C:\DOS\REBOOT.COM>>C:\TEMP\USOSFIN.BAT

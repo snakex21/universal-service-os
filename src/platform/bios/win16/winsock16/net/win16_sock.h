@@ -67,6 +67,9 @@ int  usos_sock_ready(void);
 
 int  usos_sock_open(int type);   /* slot >= 0, or USOS_SOCK_EMFILE */
 int  usos_sock_close(int slot);
+/* Dead Win16 owner: discard local state only, without transport, callbacks,
+ * clock/idle calls or touching another task's selector/window. */
+void usos_sock_forget(int slot);
 /* Abortive close: one best-effort RST for an active TCP endpoint, no FIN,
  * idle, ARP wait or retransmission. Always releases a valid slot and its
  * unaccepted listener children, even on error. Accepted children survive.

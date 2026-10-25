@@ -469,7 +469,10 @@ give byte-identical `WINNT.SIF` and accounts script.
   staged by `stageWin9x` as `\EFI\USOS\answer\DOS.INI` for every DOS-based
   system (the profile is offered for `ms-dos` and `windows-1-01` ...
   `windows-wfw-3-11`; the group `windows` includes them, `windows-9x` does
-  not). Table: the MS-DOS 6.22 COUNTRY.TXT country list (Estonian,
+  not). These systems have no Unattended folder: the UEFI answer screen
+  opens for them with "No answer", their profiles and "+ Add" only, for an
+  ISO and a floppy disk set (`answer_screen.entryFor`; before 2026-10-24
+  it was skipped for them, X470). Table: the MS-DOS 6.22 COUNTRY.TXT country list (Estonian,
   Latvian, Lithuanian, Ukrainian: no country, nothing written; far east:
   COUNTRY with 437 only). micro-Linux (`tools/dos_win3_menu.sh`
   `dos_regional_apply`) writes `COUNTRY=` + `DISPLAY.SYS CON=(EGA,,1)` and

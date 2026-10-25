@@ -68,6 +68,9 @@ class WinsockApply(unittest.TestCase):
         (self.u / 'WINMENU.BAT').write_bytes(crlf('windows_menu.cmd'))
         (self.u / 'NETSTART.BAT').write_bytes(crlf('network_start.cmd'))
         (self.u / 'INSTALL.BAT').write_bytes(crlf('install.cmd'))
+        (self.u / 'W3CONFIG.SYS').write_bytes(crlf('windows_config.sys'))
+        (self.u / 'W3CONFIG.CSM').write_bytes(crlf('windows_config.sys'))
+        (self.u / 'WINRUN.BAT').write_bytes(crlf('windows_run.cmd'))
         (self.u / 'WINSETUP/SETUP.INF').write_bytes(SETUP_INF)
         for name in PAYLOAD:
             (self.src / name).write_bytes(b'payload ' + name.encode())
@@ -76,13 +79,16 @@ class WinsockApply(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run_apply(self, ini: bytes | None) -> subprocess.CompletedProcess:
+    def run_apply(self, ini: bytes | None, system: str = '', names: bool = False) -> subprocess.CompletedProcess:
         path = self.tmp / 'DOS.INI'
         if ini is not None:
             path.write_bytes(ini)
-        script = f'. "{LIB.as_posix()}"; dos_winsock_apply "$1" "$2" "$3" "$4"'
+        script = f'. "{LIB.as_posix()}"; '
+        if names:
+            script += 'dos_menu_names "$1" "$5" ""; '
+        script += 'dos_winsock_apply "$1" "$2" "$3" "$4" "$5"'
         return subprocess.run([SH, '-c', script, 'sh', self.u.as_posix(), path.as_posix(),
-                               self.src.as_posix(), self.c.as_posix()],
+                               self.src.as_posix(), self.c.as_posix(), system],
                               capture_output=True, text=True, timeout=60)
 
     def test_off_is_byte_identical(self):
@@ -121,13 +127,28 @@ class WinsockApply(unittest.TestCase):
             self.assertEqual('\n'.join(lines).encode('ascii'), lf(crlf('windows_auto.cmd')))
         menu = lf((self.u / 'WINMENU.BAT').read_bytes()).decode('ascii').split('\n')
         at = menu.index(':ini_done')
-        self.assertEqual(menu[at + 1:at + 4], [
-            'if exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG',
-            'if not exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG',
-            'if not exist C:\\WINDOWS\\WINSOCK.DLL copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul'])
+        # No IF with a redirection (COMMAND.COM opens the target even when
+        # the condition is false), the log directory made first.
+        added = [
+            'if not exist C:\\NET\\NUL md C:\\NET',
+            'if not exist C:\\NET\\WIN16\\NUL md C:\\NET\\WIN16',
+            'if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_copy',
+            'echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG',
+            'goto wsk_done',
+            ':wsk_copy',
+            'copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul',
+            'if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_fail',
+            'echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG',
+            'goto wsk_done',
+            ':wsk_fail',
+            'echo WINSOCK.DLL: copy to C:\\WINDOWS failed>>C:\\NET\\WIN16\\STAGE.LOG',
+            ':wsk_done']
+        self.assertEqual(menu[at + 1:at + 1 + len(added)], added)
         for line in menu:
             self.assertLessEqual(len(line), 127)
-        del menu[at + 1:at + 4]
+        labels = [l[1:9].lower() for l in menu if l.startswith(':')]
+        self.assertEqual(len(labels), len(set(labels)), labels)
+        del menu[at + 1:at + 1 + len(added)]
         self.assertEqual('\n'.join(menu).encode('ascii'), lf(crlf('windows_menu.cmd')))
         inf = lf((self.u / 'WINSETUP/SETUP.INF').read_bytes()).decode('latin-1')
         # Setup ignores new groups: the icon goes into the Main group (",1",
@@ -139,6 +160,49 @@ class WinsockApply(unittest.TestCase):
                          lf(SETUP_INF).decode('latin-1'))
         # INSTALL.BAT itself is never edited.
         self.assertEqual((self.u / 'INSTALL.BAT').read_bytes(), crlf('install.cmd'))
+        # No system given (and WfW 3.11): start menu and WINRUN unchanged.
+        for name, src in (('W3CONFIG.SYS', 'windows_config.sys'), ('W3CONFIG.CSM', 'windows_config.sys'),
+                          ('WINRUN.BAT', 'windows_run.cmd')):
+            self.assertEqual(lf((self.u / name).read_bytes()), lf(crlf(src)), name)
+        self.assertNotIn('386 enhanced mode is the default', r.stdout)
+
+    def test_on_wfw_keeps_menu(self):
+        r = self.run_apply(b'[dos]\r\nwinsock=yes\r\n', 'windows-wfw-3-11')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(lf((self.u / 'WINRUN.BAT').read_bytes()), lf(crlf('windows_run.cmd')))
+        self.assertIn(b'menudefault=WINSTD,8', (self.u / 'W3CONFIG.SYS').read_bytes())
+
+    def test_on_win31_enhanced_default(self):
+        # X470 2026-10-24: Netscape 3.04 / Opera 3.62 GPF in standard mode
+        # only, so the Winsock profile starts 3.1 / 3.11 in 386 enhanced mode.
+        for system, product in (('windows-3-1', 'Windows 3.1'), ('windows-3-11', 'Windows 3.11')):
+            with self.subTest(system=system):
+                self.tearDown()
+                self.setUp()
+                r = self.run_apply(b'[dos]\r\nwinsock=yes\r\n', system, names=True)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('386 enhanced mode is the default start mode', r.stdout)
+                want = lf(crlf('windows_config.sys')).decode('ascii').split('\n')
+                for name in ('W3CONFIG.SYS', 'W3CONFIG.CSM'):
+                    menu = lf((self.u / name).read_bytes()).decode('ascii').split('\n')
+                    self.assertIn(f'menuitem=WINSTD,{product} - standard mode (alternative)', menu, name)
+                    self.assertIn(f'menuitem=WIN386,{product} - 386 enhanced mode (default)', menu, name)
+                    self.assertIn('menudefault=WIN386,8', menu, name)
+                    # Only the two items, the default and the product name in the
+                    # WINSET item (dos_menu_names) change ([WIN386]
+                    # keeps SMARTDRV, the item tested on the X470).
+                    self.assertEqual(len(menu), len(want))
+                    diff = [i for i, (a, b) in enumerate(zip(menu, want)) if a != b]
+                    self.assertEqual([want[i].split(',')[0] for i in diff],
+                                     ['menuitem=WINSTD', 'menuitem=WIN386', 'menuitem=WINSET', 'menudefault=WINSTD'], name)
+                run = lf((self.u / 'WINRUN.BAT').read_bytes()).decode('ascii').split('\n')
+                wfw = run.index('if exist C:\\WINSETUP\\WFWSETUP.DL_ goto enhanced')
+                self.assertEqual(run[wfw - 1], 'goto enhanced')
+                # WIN with arguments (WIN /S) and Windows 3.0 are decided first.
+                self.assertLess(run.index('if not "%1"=="" goto pass'), wfw - 2)
+                self.assertLess(run.index('if exist C:\\USOSW3\\EARLY.TAG goto early'), wfw - 2)
+                del run[wfw - 2:wfw]
+                self.assertEqual('\n'.join(run).encode('ascii'), lf(crlf('windows_run.cmd')))
 
     def test_on_without_files_fails_cleanly(self):
         (self.src / 'USOSPKTQ.COM').unlink()
@@ -222,6 +286,26 @@ class Wiring(unittest.TestCase):
             self.assertIn('GETHTTP', data['boot.profile.help.dos_winsock'], f.name)
         self.assertEqual(json.loads((ROOT / 'installer/internal/i18n/locales/pl.json').read_text(encoding='utf-8'))
                          ['boot.profile.field.dos_winsock'], 'Winsock (eksperymentalny)')
+
+    def test_answer_screen_opens_for_dos_systems(self):
+        # X470 2026-10-24: the answer screen never opened for MS-DOS /
+        # Windows 1.x-3.x (no Unattended folder), so no DOS profile could be
+        # chosen. manual_app enters it through answer_screen.entryFor
+        # (zig tests there: Win 3.1 ISO + floppy set, 3.11, WfW, MS-DOS), the
+        # manager lists no files without a folder, and the win9x_uefi start
+        # stages the chosen profile as DOS.INI (stageWin9x).
+        app = (ROOT / 'src/platform/uefi/manual_app.zig').read_text(encoding='utf-8')
+        self.assertIn('usos.flow.answer_screen.entryFor(entry, image.kind, method, firmware,', app)
+        self.assertIn('if (!screen.enter) return manual_summary.show(', app)
+        self.assertNotIn('entry.unattended_directory == null or', app)
+        manager = (ROOT / 'src/platform/uefi/manual_unattended.zig').read_text(encoding='utf-8')
+        self.assertNotIn('system.unattended_directory orelse return .{}', manager)
+        self.assertIn('if (directory == null and !context.profiles_allowed) return .{};', manager)
+        summary = (ROOT / 'src/platform/uefi/manual_summary.zig').read_text(encoding='utf-8')
+        win9x = summary[summary.index('// Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on'):]
+        self.assertIn('answer_profiles.stageWin9x(root, p)', win9x[:1500])
+        profiles = (ROOT / 'src/platform/uefi/answer_profiles.zig').read_text(encoding='utf-8')
+        self.assertIn('for (answer.dos.staged) |entry| {', profiles)
 
 
 if __name__ == '__main__':

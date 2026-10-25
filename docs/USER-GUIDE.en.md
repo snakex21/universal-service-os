@@ -416,6 +416,15 @@ overwrite `README.txt`. Nothing else is deleted.
   DOS 8.3 names, no spaces, no non-ASCII characters. Each program may have
   its own subfolder. At least 128 MiB RAM is needed. Output files are gone
   after a restart (RAM disk).
+- **DOS programs for MS-DOS / Windows 1.x-3.x installs**:
+  `Systems\DOS\MS-DOS\Programs\`, copied to `C:\PROGRAMS` (UEFI flow).
+  Windows 3.x icons (optional): a `USOSICON.TXT` in a program's folder with
+  lines `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE` (8.3 names, ASCII, the file
+  inside that folder; `.EXE`, `.COM`, `.PIF` or `.BAT`) adds them to the
+  Main group when Windows Setup runs. Optional third field, the oldest
+  Windows the program needs: `,3.0`, `,3.1` or `,3.11` (for example
+  `"Netscape",C:\PROGRAMS\NETSCAPE\NETSCAPE.EXE,3.1`: no icon on 3.0). Bad lines are skipped and logged in
+  the preparation log.
 - **EFI tools for the UEFI Shell** (BIOS/VBIOS flashers, GPU testers):
   `Utilities\UEFI Shell\Tools\`. No update is needed after copying. Start
   **Utilities -> UEFI Shell**, then `ls` and the tool's name. DATA is

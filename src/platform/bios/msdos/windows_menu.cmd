@@ -1,5 +1,7 @@
 @echo off
 if exist C:\WINDOWS\WIN.COM goto have_win
+rem Windows 3.0 after W1AUTO.BAT renamed WIN.COM (C:\WINDOWS\WIN.BAT).
+if exist C:\WINDOWS\WIN30.COM goto have_win
 if exist C:\WIN386\WIN386.EXE goto have_win
 if exist C:\WINDOWS\WIN386.EXE goto have_win
 goto missing

@@ -26,7 +26,7 @@ Code pages (the text-mode font of the screen the line is shown on):
         (Cyrillic, Greek) has no 437 section and stays English.
   native  the code page of the language's MS-DOS 6.22 country (852 Central
         European, 850 Western, 866 Russian, 855 Bulgarian, 869 Greek, 857
-        Turkish): only for the start-menu batch files (W3AUTO / W1AUTO),
+        Turkish): only for the start-menu batch files (W3AUTO / W1AUTO, WINRUN),
         whose lines run after MODE CON CODEPAGE SELECT, and only when the
         profile's DOS.INI switches to that code page.
 Batch-special characters (< > | %) are refused in translations.
@@ -66,6 +66,11 @@ MENU_KEYS = ('dos.menu.',)
 # 'Windows for Workgroups 3.11 - ' + text must fit the 70 columns of an
 # MS-DOS menu item.
 WFW_KEYS = ('dos.menu.wfw_enhanced', 'dos.menu.wfw_smartdrv')
+# Windows 3.1 / 3.11 with the Winsock profile (dos_winsock_apply): the
+# standard-mode item becomes the alternative; 'Windows 3.11 - ' + text.
+WINSOCK_KEYS = ('dos.menu.winsock_standard',)
+# Keys only the shell script writes (no line of the English sources).
+SCRIPT_KEYS = WFW_KEYS + WINSOCK_KEYS
 PATH = re.compile(r'[A-Z]:\\[A-Z0-9_\\.*%]*')
 
 
@@ -101,6 +106,8 @@ def check(cat: dict[str, dict[str, str]]) -> None:
                 raise ValueError(where + ': menu text longer than 60')
             if key in WFW_KEYS and len('Windows for Workgroups 3.11 - ' + text) > 70:
                 raise ValueError(where + ': WfW menu text too long')
+            if key in WINSOCK_KEYS and len('Windows 3.11 - ' + text) > 70:
+                raise ValueError(where + ': Windows 3.11 menu text too long')
 
 
 def encode(text: str, codepage: int) -> bytes | None:

@@ -10,6 +10,8 @@ if "%CONFIG%"=="WINSET" goto settings
 if not exist C:\WINDOWS\WIN.COM goto missing
 C:
 cd \WINDOWS
+rem USOSWIN=1 while Windows runs (WINRUN.BAT: WIN in its DOS window).
+set USOSWIN=1
 if "%CONFIG%"=="WIN386" goto enhanced
 rem Windows for Workgroups 3.11 runs in 386 enhanced mode only.
 if exist C:\WINSETUP\WFWSETUP.DL_ goto enhanced
@@ -53,6 +55,7 @@ goto end
 :missing
 echo Windows files are missing in C:\WINDOWS.
 :end
+set USOSWIN=
 rem WIN typed at the DOS prompt from now on: the mode of the default menu item
 rem (C:\USOSW3\WINRUN.BAT; WIN /3 and other arguments unchanged). DOSKEY
 rem (about 4 KiB conventional memory) only after Windows or the menu item, so

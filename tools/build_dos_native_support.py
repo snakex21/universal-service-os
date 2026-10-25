@@ -51,7 +51,8 @@ def build(root: Path):
                          ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT'),
                          ('windows_early_config.sys', 'W1CONFIG.SYS'), ('windows_early_auto.cmd', 'W1AUTO.BAT'),
                          ('windows_early_setup.cmd', 'W1SETUP.BAT'),
-                         ('windows_run.cmd', 'WINRUN.BAT')]:
+                         ('windows_run.cmd', 'WINRUN.BAT'),
+                         ('windows_win30.cmd', 'W30WIN.BAT')]:
         text = (root / 'src/platform/bios/msdos' / source).read_text(encoding='ascii')
         # COMMAND.COM expands arguments before applying its 127-byte line
         # limit. Long FOR lists can silently lose the final loop variable.
@@ -123,7 +124,12 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     temp = 'set TEMP=C:\\TEMP\n'
     if auto.count(temp) != 1:
         raise ValueError('windows_auto.cmd: TEMP line not found once')
-    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
+    # CTTY NUL around VBMOUSE: its VirtualBox/VMware probe lines go to
+    # stderr, which COMMAND.COM cannot redirect; a failure is reported
+    # (errorlevel, text in the menu language via dos_i18n_apply).
+    vbmouse = ('ctty nul\nC:\\DOS\\VBMOUSE.EXE\nctty con\nif not errorlevel 1 goto vbm_done\n'
+               'echo USOS: the DOS mouse driver (VBMOUSE) did not load.\n:vbm_done\n')
+    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + vbmouse + 'C:\\DOS\\USOSKEY.COM\n')))
     # Windows 1.0x-3.0 start menu (INSTALL.BAT, EARLY.TAG): HIMEM /M:2 in every
     # menu block that loads HIMEM (the diagnostic items D4/D5 load none).
     early_config = (msdos / 'windows_early_config.sys').read_text(encoding='ascii')

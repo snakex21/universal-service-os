@@ -633,6 +633,15 @@ int usos_sock_abort(int slot)
     usos_zero(sk,sizeof(*sk));
     return rc;
 }
+void usos_sock_forget(int slot)
+{
+    usos_sock_st *sk=usos_slot(slot); int i;
+    if(!sk) return;
+    if(sk->listening) for(i=0;i<USOS_MAX_SOCKETS;i++)
+        if(usos_socks[i]->used && usos_socks[i]->parent==slot)
+            usos_zero(usos_socks[i],sizeof(usos_sock_st));
+    usos_zero(sk,sizeof(*sk));
+}
 int usos_sock_close(int slot)
 {
     usos_sock_st *sk=usos_slot(slot); usos_u32 now,started; usos_u16 n; int i,cancelled=0;

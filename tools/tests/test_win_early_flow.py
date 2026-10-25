@@ -110,30 +110,46 @@ class Heading(unittest.TestCase):
         self.assertIn('" usos.heading="', prep)
 
 
-def run_early_auto(config):
+def quiet(ran):
+    r"""The commands without the silent log / flag lines (C:\USOSW3\WINRUN.LOG,
+    WINRUN.ON) and the WIN.COM -> WIN30.COM shadow steps."""
+    return [r for r in ran if 'WINRUN.LOG' not in r and 'WINRUN.ON' not in r]
+
+
+WIN30_FILES = (r'C:\WINDOWS\SYSTEM\DOSX.EXE', r'C:\USOSW3\WINRUN.BAT', r'C:\DOS\DOSKEY.COM')
+
+
+def run_early_auto(config, extra=(), name='windows_early_auto.cmd', args=(), env=None, absent=()):
     r"""Walk W1AUTO.BAT for one CONFIG value (files in C:\DOS present, Windows
-    2.x installed): the commands that run, in order, without the comments."""
-    lines = [l.strip() for l in (MSDOS / 'windows_early_auto.cmd').read_text(encoding='ascii').splitlines()]
-    env = {'CONFIG': config}
+    2.x installed; extra=WIN30_FILES: Windows 3.0): the commands that run, in
+    order, without the comments. Every program exits with errorlevel 0."""
+    lines = [l.strip() for l in (MSDOS / name).read_text(encoding='ascii').splitlines()]
+    env = dict(env or {}, CONFIG=config)
+    for n, a in enumerate(args, 1):
+        env[str(n)] = a
     exists = {r'C:\DOS\VBMOUSE.EXE', r'C:\DOS\USOSKBC.COM', r'C:\DOS\USOSWHER.COM', r'C:\DOS\USOSV10.COM',
-              r'C:\WINDOWS\WIN.COM'}
+              r'C:\WINDOWS\WIN.COM', *extra}
+    exists -= set(absent)
     labels = {l[1:].lower()[:8]: i for i, l in reversed(list(enumerate(lines))) if l.startswith(':')}
     ran, i = [], 0
-    expand = lambda s: re.sub(r'%(\w+)%', lambda m: env.get(m.group(1), ''), s)
+    expand = lambda s: re.sub(r'%(\d)', lambda m: env.get(m.group(1), ''),
+                              re.sub(r'%(\w+)%', lambda m: env.get(m.group(1), ''), s))
     while i < len(lines):
         line = lines[i]
         i += 1
         if not line or line.lower().startswith(('rem', '@echo', ':')):
             continue
-        cond = re.match(r'if (not )?(?:"([^"]*)"=="([^"]*)"|exist (\S+)) (.*)$', line, re.I)
+        cond = re.match(r'if (not )?(?:"([^"]*)"=="([^"]*)"|exist (\S+)|errorlevel (\d+)) (.*)$', line, re.I)
         if cond:
-            if cond.group(4):
+            if cond.group(5):
+                value = int(cond.group(5)) <= 0
+            elif cond.group(4):
                 value = cond.group(4) in exists or cond.group(4).upper().endswith(r'\NUL')
             else:
                 value = expand('"%s"' % cond.group(2)) == '"%s"' % cond.group(3)
             if bool(cond.group(1)) == value:
                 continue
-            line = cond.group(5)
+            line = cond.group(6)
         jump = re.match(r'goto (\S+)$', line, re.I)
         if jump:
             i = labels[jump.group(1).lower()[:8]] + 1
@@ -142,7 +158,19 @@ def run_early_auto(config):
         if setting:
             env[setting.group(1)] = expand(setting.group(2))
             continue
-        ran.append(expand(line))
+        line = expand(line)
+        ran.append(line)
+        # files the batch itself creates, deletes or renames
+        made = re.match(r'echo [^>]*[^>]>(\S+)$', line, re.I)
+        if made:
+            exists.add(made.group(1))
+        gone = re.match(r'del (\S+)$', line, re.I)
+        if gone:
+            exists.discard(gone.group(1))
+        moved = re.match(r'ren (\S+) (\S+)$', line, re.I)
+        if moved and moved.group(1) in exists:
+            exists.discard(moved.group(1))
+            exists.add(moved.group(1).rsplit('\\', 1)[0] + '\\' + moved.group(2))
     return ran
 
 
@@ -164,7 +192,9 @@ class DiagnosticMenu(unittest.TestCase):
     def test_menu(self):
         self.assertIn('submenu=DIAG,', '\n'.join(self.blocks['menu']))
         items = [l.split('=', 1)[1].split(',')[0] for l in self.blocks['DIAG'] if l.startswith('menuitem=')]
-        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'D6V10', 'DOSONLY'])
+        # WINREAL (Windows 3.0 WIN /S) resets the X470: only here, not in [menu].
+        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'D6V10', 'WINREAL', 'DOSONLY'])
+        self.assertNotIn('WINREAL', '\n'.join(self.blocks['menu']))
         self.assertLessEqual(len(items), 9)
         for item in items:
             self.assertIn(item, self.blocks)
@@ -205,6 +235,111 @@ class DiagnosticMenu(unittest.TestCase):
                 self.assertIn(r'C:\DOS\USOSKBC.COM /R /M', ran)
             if 'USOSWHER.COM' in programs:
                 self.assertIn(r'C:\DOS\USOSWHER.COM /G', ran)
+
+    def test_win30_vbmouse_after_windows(self):
+        # Windows 3.0 (X470 2026-10-24): real-mode WINOLDAP resets INT 33h and
+        # VBMOUSE took the C207h callback from MOUSE.DRV (dead mouse after the
+        # DOS prompt). No VBMOUSE before WIN; loaded after DOSKEY (last hook,
+        # so WINRUN.BAT can unload it), also for the DOS item.
+        for config in ('WINSTD', 'WINREAL', 'D1WHERE', 'D2NOKBC', 'DOSONLY'):
+            ran = run_early_auto(config, WIN30_FILES)
+            names = [r.split()[0].split('\\')[-1] for r in ran]
+            self.assertEqual(names.count('VBMOUSE.EXE'), 1, config)
+            vbm = names.index('VBMOUSE.EXE')
+            if 'WIN.COM' in names:
+                self.assertLess(names.index('WIN.COM'), vbm, config)
+            self.assertLess(names.index('DOSKEY.COM'), vbm, config)
+            self.assertEqual(ran[vbm - 1:vbm + 2], ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'], config)
+        for config in ('D4CLEAN', 'D5MIN', 'D6V10'):
+            self.assertNotIn(r'C:\DOS\VBMOUSE.EXE', run_early_auto(config, WIN30_FILES), config)
+        # Windows 1.0x/2.x (and Windows/386): before WIN as before, quiet.
+        ran = run_early_auto('WINSTD')
+        self.assertEqual(ran[ran.index(r'C:\DOS\VBMOUSE.EXE') - 1:ran.index(r'C:\DOS\VBMOUSE.EXE') + 2],
+                         ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'])
+        self.assertLess(ran.index(r'C:\DOS\VBMOUSE.EXE'), ran.index('WIN.COM'))
+        # Every ctty nul is undone right after one program.
+        for name in ('windows_early_auto.cmd', 'windows_run.cmd'):
+            lines = batch_lines(MSDOS / name)
+            for n, line in enumerate(lines):
+                if line.lower() == 'ctty nul':
+                    self.assertEqual(lines[n + 2].lower(), 'ctty con', name)
+                    self.assertIn('VBMOUSE.EXE', lines[n + 1], name)
+
+    def test_winrun_win30(self):
+        early = (r'C:\USOSW3\EARLY.TAG', r'C:\DOS\VBMOUSE.EXE')
+        for wincom in ('WIN.COM', 'WIN30.COM'):
+            files = early + ((r'C:\WINDOWS\WIN30.COM',) if wincom == 'WIN30.COM' else ())
+            for args, win in (((), r'C:\WINDOWS\%s /R' % wincom), (('/3',), r'C:\WINDOWS\%s /3' % wincom)):
+                full = run_early_auto('', files, 'windows_run.cmd', args)
+                ran = quiet(full)
+                self.assertEqual(ran[:3], ['ctty nul', r'C:\DOS\VBMOUSE.EXE uninstall', 'ctty con'], args)
+                self.assertEqual(ran[3].rstrip(), win, args)
+                self.assertEqual(ran[4:7], ['ctty nul', r'C:\DOS\VBMOUSE.EXE', 'ctty con'], args)
+                # WINRUN.ON exists exactly while Windows 3.0 runs
+                on, off = full.index(r'echo USOS>C:\USOSW3\WINRUN.ON'), full.index(r'del C:\USOSW3\WINRUN.ON')
+                self.assertLess(on, full.index(ran[3]))
+                self.assertLess(full.index(ran[3]), off)
+                self.assertTrue(full[0].startswith('echo WINRUN [') and full[0].endswith(r'>>C:\USOSW3\WINRUN.LOG'))
+        # Windows 3.1 / 3.11 (no EARLY.TAG): VBMOUSE stays (VBMOUSE.DRV uses it).
+        ran = run_early_auto('', (r'C:\DOS\VBMOUSE.EXE',), 'windows_run.cmd')
+        self.assertFalse(any('VBMOUSE' in r for r in ran))
+        self.assertIn(r'C:\WINDOWS\WIN.COM /S /B', ran)
+        self.assertFalse(any('WINRUN.ON' in r for r in ran))
+
+    def test_win30_win_bat_shadow(self):
+        # WIN typed in the DOS window of a Windows 3.0 started from the menu
+        # (no DOSKEY macro yet, C:\WINDOWS current) must reach WINRUN.BAT:
+        # WIN.COM -> WIN30.COM, C:\USOSW3\WIN.BAT -> C:\WINDOWS\WIN.BAT.
+        files = WIN30_FILES + (r'C:\USOSW3\WIN.BAT',)
+        ran = run_early_auto('WINSTD', files)
+        ren = ran.index(r'ren C:\WINDOWS\WIN.COM WIN30.COM')
+        self.assertLess(ren, ran.index(r'copy C:\USOSW3\WIN.BAT C:\WINDOWS\WIN.BAT /y >nul'))
+        # a WINRUN.ON left by a reset is removed before anything else
+        stale = run_early_auto('WINSTD', files + (r'C:\USOSW3\WINRUN.ON',))
+        self.assertLess(stale.index(r'del C:\USOSW3\WINRUN.ON'), stale.index(r'ren C:\WINDOWS\WIN.COM WIN30.COM'))
+        # already renamed (WIN30.COM there, no WIN.COM): only the batch is refreshed
+        ran = run_early_auto('WINSTD', files + (r'C:\WINDOWS\WIN30.COM',), absent=(r'C:\WINDOWS\WIN.COM',))
+        self.assertFalse(any(r.startswith('ren ') for r in ran))
+        self.assertIn(r'copy C:\USOSW3\WIN.BAT C:\WINDOWS\WIN.BAT /y >nul', ran)
+        win = ran.index('WIN30.COM /R')
+        self.assertLess(ran.index(r'echo USOS>C:\USOSW3\WINRUN.ON'), win)
+        self.assertLess(win, ran.index(r'del C:\USOSW3\WINRUN.ON', win))
+        # Windows 1.x/2.x: untouched
+        self.assertFalse(any('WIN30' in r or 'WIN.BAT' in r for r in run_early_auto('WINSTD', (r'C:\USOSW3\WIN.BAT',))))
+        # staged: helper W30WIN.BAT -> C:\USOSW3\WIN.BAT, payload, WINMENU/W3START accept WIN30.COM
+        self.assertIn(r'copy %USRC%\W30WIN.BAT C:\USOSW3\WIN.BAT /y >nul', batch_lines(MSDOS / 'install.cmd'))
+        self.assertIn("('windows_win30.cmd', 'W30WIN.BAT')", (ROOT / 'tools/build_dos_native_support.py').read_text())
+        self.assertIn('EFI/USOS/dos-native/msdos/W30WIN.BAT', (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text())
+        self.assertIn(r'C:\USOSW3\WINRUN.BAT %1 %2 %3 %4 %5 %6 %7 %8 %9', batch_lines(MSDOS / 'windows_win30.cmd'))
+        for name, label in (('windows_menu.cmd', 'have_win'), ('windows_start.cmd', 'installed')):
+            self.assertIn(r'if exist C:\WINDOWS\WIN30.COM goto ' + label, batch_lines(MSDOS / name))
+
+    def test_usoswin_guard(self):
+        # WIN typed in a DOS window of the running Windows: one hint, no WIN.COM.
+        # Windows 3.0: the WINRUN.ON file (X470 2026-10-24: the environment
+        # flag alone did not stop a second Windows); USOSWIN=1 as well.
+        hint = ['echo Windows is already running - type EXIT to return.']
+        for extra in ((), (r'C:\USOSW3\EARLY.TAG', r'C:\DOS\VBMOUSE.EXE')):
+            ran = run_early_auto('', extra, 'windows_run.cmd', env={'USOSWIN': '1'})
+            self.assertEqual(quiet(ran), hint, extra)
+            self.assertIn('USOSWIN=1', ran[1])
+            ran = run_early_auto('', extra + (r'C:\USOSW3\WINRUN.ON',), 'windows_run.cmd')
+            self.assertEqual(quiet(ran), hint, extra)
+            self.assertIn('WINRUN.ON present', ran[1])
+        # Otherwise WINRUN sets it for WIN.COM and clears it afterwards.
+        lines = batch_lines(MSDOS / 'windows_run.cmd')
+        code = [l for l in lines if l and not l.lower().startswith(('rem', '@echo', 'echo winrun'))]
+        self.assertEqual(code[:6], [r'if not exist C:\USOSW3\WINRUN.ON goto no_flag', 'goto running', ':no_flag',
+                                    'if not "%USOSWIN%"=="1" goto start', 'goto running', ':start'])
+        self.assertEqual(code[6], 'set USOSWIN=1')
+        self.assertLess(lines.index(':end'), lines.index('set USOSWIN='))
+        self.assertLess(lines.index('set USOSWIN='), lines.index(':running'))
+        # The start files: set before WIN.COM, cleared at :end.
+        for name in ('windows_early_auto.cmd', 'windows_auto.cmd'):
+            lines = batch_lines(MSDOS / name)
+            first_win = min(n for n, l in enumerate(lines) if l.upper().startswith(('WIN.COM', 'WIN386.EXE')))
+            self.assertLess(lines.index('set USOSWIN=1'), first_win, name)
+            self.assertEqual(lines[lines.index(':end') + 1], 'set USOSWIN=', name)
 
     def test_default_items(self):
         # X470 PASS 2026-10-09 (Windows 2.03 via D6): every default item loads

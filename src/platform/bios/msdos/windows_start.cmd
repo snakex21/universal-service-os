@@ -1,5 +1,6 @@
 @echo off
 if exist C:\WINDOWS\WIN.COM goto installed
+if exist C:\WINDOWS\WIN30.COM goto installed
 rem Windows/386 2.x installs WIN386.EXE (default folder C:\WIN386).
 if exist C:\WIN386\WIN386.EXE goto installed
 if exist C:\WINDOWS\WIN386.EXE goto installed
@@ -25,6 +26,7 @@ goto setup_done
 call C:\USOSW3\W1SETUP.BAT
 :setup_done
 if exist C:\WINDOWS\WIN.COM goto installed
+if exist C:\WINDOWS\WIN30.COM goto installed
 if exist C:\WIN386\WIN386.EXE goto installed
 if exist C:\WINDOWS\WIN386.EXE goto installed
 echo Windows Setup has not finished. Restart to retry Setup.

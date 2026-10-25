@@ -11,7 +11,7 @@
 #                                  messages) in the profile / USOS menu
 #                                  language (after dos_regional_apply,
 #                                  before dos_menu_names)
-#   dos_winsock_apply DIR INI SRC C  Windows 3.1 / 3.11 / WfW only, DOS.INI
+#   dos_winsock_apply DIR INI SRC C [SYSTEM]  Windows 3.1 / 3.11 / WfW only, DOS.INI
 #                                  winsock=yes: the opt-in Winsock set (SRC =
 #                                  EFI\USOS\dos-native\winsock16) into C:\NET
 #                                  (C = mounted target root), queue lines in
@@ -156,6 +156,9 @@ dos_regional_apply() {
 #   WINMENU.BAT     after Setup: WINSOCK.DLL into C:\WINDOWS unless one is
 #                   there already (logged in STAGE.LOG)
 #   SETUP.INF       icon "USOS Winsock test (GETHTTP)" in the Main group
+#   SYSTEM ($5)     windows-3-1 / windows-3-11: 386 enhanced mode becomes
+#                   the default start mode (dos_winsock_enhanced); WfW
+#                   3.11 starts every item in 386 enhanced mode already
 dos_winsock_apply() {
     [ -f "$2" ] || return 0
     [ "$(dos_ini_value "$2" winsock)" = yes ] || return 0
@@ -176,10 +179,22 @@ dos_winsock_apply() {
         awk '!done && /^if exist C:\\NET\\NETSTART\.BAT call / { printf "set USOSPKT_QUEUE=1\r\n"; done = 1 } { print }' "$dwf" > "$dwf.new" && mv "$dwf.new" "$dwf" || return 1
         grep -q '^set USOSPKT_QUEUE=1' "$dwf" || { echo "Winsock: no NETSTART call in $(basename "$dwf")" >&2; return 1; }
     done
+    # No IF with a redirection (COMMAND.COM opens the file even when the
+    # condition is false), and the log directory is made first.
     awk '{ print } !done && /^:ini_done/ {
-        printf "if exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
-        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
-        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul\r\n"
+        printf "if not exist C:\\NET\\NUL md C:\\NET\r\n"
+        printf "if not exist C:\\NET\\WIN16\\NUL md C:\\NET\\WIN16\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_copy\r\n"
+        printf "echo WINSOCK.DLL: C:\\WINDOWS has one already, kept>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "goto wsk_done\r\n"
+        printf ":wsk_copy\r\n"
+        printf "copy C:\\NET\\WIN16\\WINSOCK.DLL C:\\WINDOWS >nul\r\n"
+        printf "if not exist C:\\WINDOWS\\WINSOCK.DLL goto wsk_fail\r\n"
+        printf "echo WINSOCK.DLL: copied to C:\\WINDOWS>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf "goto wsk_done\r\n"
+        printf ":wsk_fail\r\n"
+        printf "echo WINSOCK.DLL: copy to C:\\WINDOWS failed>>C:\\NET\\WIN16\\STAGE.LOG\r\n"
+        printf ":wsk_done\r\n"
         done = 1 }' "$1/WINMENU.BAT" > "$1/WINMENU.NEW" && mv "$1/WINMENU.NEW" "$1/WINMENU.BAT" || return 1
     grep -q 'WIN16\\WINSOCK.DLL C:\\WINDOWS' "$1/WINMENU.BAT" || { echo 'Winsock: no :ini_done in WINMENU.BAT' >&2; return 1; }
     dwi="$1/WINSETUP/SETUP.INF"
@@ -187,12 +202,7 @@ dos_winsock_apply() {
     # is ignored, QEMU 3.1 PL 2026-10-24), so the icon goes into the Main
     # group: the [progman.groups] entry marked ",1" (maximized), group3 in
     # 3.1 / 3.11 / WfW 3.11.
-    dwm=''
-    # Byte-safe: group names are code page text (852 in the Polish INF);
-    # BusyBox awk counts them as UTF-8 (length/substr/regex go wrong), so
-    # only index() is used on the name part.
-    [ -f "$dwi" ] && dwm=$(awk '{ sub(/\r$/, "") } /^\[/ { s = tolower($0) == "[progman.groups]"; next }
-        s && index($0, "=") > 1 && index($0, ",1") > index($0, "=") { k = substr($0, 1, index($0, "=") - 1); if (k ~ /^[A-Za-z0-9]+$/) { print k; exit } }' "$dwi")
+    dwm=$(dos_main_group "$dwi")
     if [ -n "$dwm" ] && grep -qi "^\[$dwm\]" "$dwi" && ! grep -q 'WIN16\\GETHTTP.EXE' "$dwi"; then
         awk -v h="[$dwm]" '{ print } !done { l = $0; sub(/\r$/, "", l) } !done && tolower(l) == tolower(h) {
             printf "\"USOS Winsock test (GETHTTP)\", C:\\NET\\WIN16\\GETHTTP.EXE\r\n"; done = 1 }' "$dwi" > "$dwi.new" && mv "$dwi.new" "$dwi" || return 1
@@ -200,7 +210,218 @@ dos_winsock_apply() {
     else
         dwg='no Main group in SETUP.INF: File > Run C:\NET\WIN16\GETHTTP.EXE'
     fi
-    printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg"
+    dwe=''
+    case "${5:-}" in
+        windows-3-1|windows-3-11)
+            dos_winsock_enhanced "$1" || return 1
+            dwe=', 386 enhanced mode is the default start mode' ;;
+    esac
+    printf '%s\n' "Winsock (experimental): C:\NET\WIN16 staged, NETSTART queue driver (USOSPKTQ /Q), $dwg$dwe"
+}
+
+# Windows 3.1 / 3.11 with the Winsock profile: 386 enhanced mode (WIN /3 /B,
+# the existing WIN386 item) becomes the default of the start menu and of
+# WIN typed at the DOS prompt; standard mode stays as a menu item and as
+# WIN /S. Why: on the X470 (2026-10-24, Windows 3.1 PL, B261024-210648)
+# GETHTTP passes in standard mode, but Netscape 3.04 (GPF 002A:A404 in its
+# MFC handle map, then a hard freeze) and Opera 3.62 (GPF 000D:4D50) fail
+# in standard mode only; in 386 enhanced mode Netscape works. The root cause
+# in standard mode (KRNL286/DOSX with 32-bit browser code, or the DLL's
+# async path under DOSX) is still being investigated
+# (docs/winsock-etap1-5-2026-10-24.md). After dos_menu_names and
+# dos_i18n_apply: the menu texts are rewritten in the 437 section of the
+# menu language (dos_text), the product name in front of " - " is kept.
+dos_winsock_enhanced() {
+    dwe_enh=$(dos_text dos.menu.wfw_enhanced)
+    dwe_std=$(dos_text dos.menu.winsock_standard)
+    [ -n "$dwe_enh" ] || dwe_enh='386 enhanced mode (default)'
+    [ -n "$dwe_std" ] || dwe_std='standard mode (alternative)'
+    for dwf in "$1/W3CONFIG.SYS" "$1/W3CONFIG.CSM"; do
+        [ -f "$dwf" ] || continue
+        # Only index()/substr() on the ASCII start of a line (the product
+        # name); the texts come from ENVIRON as code page bytes.
+        DWE_ENH="$dwe_enh" DWE_STD="$dwe_std" awk '{ l = $0; cr = (index(l, "\r") > 0) ? "\r" : ""
+            k = ""
+            if (index(l, "menuitem=WINSTD,") == 1) k = "WINSTD"
+            if (index(l, "menuitem=WIN386,") == 1) k = "WIN386"
+            if (k != "" && index(l, " - ") > 17) {
+                n = substr(l, 17, index(l, " - ") - 17)
+                printf "menuitem=%s,%s - %s%s\n", k, n, ENVIRON[k == "WINSTD" ? "DWE_STD" : "DWE_ENH"], cr; next }
+            if (index(l, "menudefault=WINSTD,") == 1) { sub(/^menudefault=WINSTD,/, "menudefault=WIN386,", l); printf "%s\n", l; next }
+            print }' "$dwf" > "$dwf.new" && mv "$dwf.new" "$dwf" || return 1
+        grep -q '^menudefault=WIN386,' "$dwf" || { echo "Winsock: no menudefault=WINSTD in $(basename "$dwf")" >&2; return 1; }
+    done
+    # WIN typed at the DOS prompt (WINRUN.BAT without arguments): 386
+    # enhanced mode, as the WfW branch; WIN /S still starts standard mode.
+    dwr="$1/WINRUN.BAT"
+    [ -f "$dwr" ] || return 0
+    awk '!done && /^if exist C:\\WINSETUP\\WFWSETUP\.DL_ goto enhanced/ {
+        printf "rem USOS Winsock profile (Windows 3.1 / 3.11): 386 enhanced mode by default.\r\n"
+        printf "goto enhanced\r\n"; done = 1 } { print }' "$dwr" > "$dwr.new" && mv "$dwr.new" "$dwr" || return 1
+    grep -q '^goto enhanced' "$dwr" || { echo 'Winsock: no WfW line in WINRUN.BAT' >&2; return 1; }
+}
+
+# The section name of the Program Manager Main group in a Windows 3.x
+# SETUP.INF: the [progman.groups] entry marked ",1" (maximized). Windows
+# 3.1 / 3.11 / WfW 3.11: "group3=<name>,1" -> [group3]; Windows 3.0:
+# "Main,1" -> [Main]. Nothing when there is none (Windows 1.x/2.x have no
+# Program Manager). Byte-safe: group names are code page text (852 in the
+# Polish INF); BusyBox awk counts them as UTF-8 (length/substr/regex go
+# wrong), so only index() is used before the name part, and a section name
+# must be ASCII letters and digits.
+dos_main_group() {
+    [ -f "$1" ] || return 0
+    awk '{ sub(/\r$/, "") } /^\[/ { s = tolower($0) == "[progman.groups]"; next } /^[ \t]*;/ { next }
+        s && index($0, ",1") > 1 {
+            e = index($0, "="); c = index($0, ",")
+            k = ""
+            if (e > 1 && e < index($0, ",1")) k = substr($0, 1, e - 1)
+            else if (e == 0) k = substr($0, 1, c - 1)
+            gsub(/[ \t]/, "", k)
+            if (k ~ /^[A-Za-z0-9]+$/) { print k; exit } }' "$1"
+}
+
+# Case-insensitive path below BASE: dos_ci_find BASE COMPONENT... prints the
+# real path (FAT names from DATA keep their case) or fails.
+dos_ci_find() {
+    dcf=$1; shift
+    for dcc in "$@"; do
+        dcn=''
+        for dce in "$dcf"/*; do
+            [ -e "$dce" ] || continue
+            if [ "$(basename "$dce" | tr 'a-z' 'A-Z')" = "$dcc" ]; then dcn=$dce; break; fi
+        done
+        [ -n "$dcn" ] || return 1
+        dcf=$dcn
+    done
+    printf '%s\n' "$dcf"
+}
+
+# Program Manager icons for the staged DOS programs (DATA
+# Systems\DOS\MS-DOS\Programs -> DIR/PROGRAMS -> C:\PROGRAMS by INSTALL.BAT).
+# Each PROGRAMS\<FOLDER>\USOSICON.TXT may hold lines
+#   "Name",C:\PROGRAMS\<FOLDER>\FILE.EXE[,MIN]
+# (blank lines and ";" comments ignored). MIN (optional): the oldest Windows
+# the program runs on, 3.0, 3.1 or 3.11; when VERSION (dos_program_icons DIR
+# VERSION: the installed Windows, same values) is older, the line is skipped
+# with a log line (Netscape/Opera need 3.1). No VERSION: MIN only checked
+# for its form. A line is used when the name is
+# 1-40 printable ASCII characters without " , ( ) [ ] (Setup quotes the name
+# and passes it in a Program Manager DDE command), the path stays in its own
+# folder, every part is an 8.3 name, the file is .EXE/.COM/.PIF/.BAT, it was
+# staged, and SETUP.INF does not list it yet; anything else is skipped with
+# a log line. At most 30 icons. They go to the end of the Main group of
+# DIR/WINSETUP/SETUP.INF (dos_main_group: Windows 3.0, 3.1, 3.11, WfW 3.11),
+# in the shape of Setup's own entries ("File Manager", WINFILE.EXE), so
+# Setup creates them; a new group would be ignored (QEMU 3.1 PL 2026-10-24).
+# No Main group (Windows 1.x/2.x): logged, nothing written.
+dos_program_icons() {
+    [ -d "$1/PROGRAMS" ] || return 0
+    dpi="$1/WINSETUP/SETUP.INF"
+    dpl="$1/USOSICON.LST"
+    dpk="$1/USOSICON.CHK"
+    dpt=$(printf '\t')
+    dpn=0
+    : > "$dpl" || return 1
+    for dpd in "$1"/PROGRAMS/*; do
+        [ -d "$dpd" ] || continue
+        dpf=$(dos_ci_find "$dpd" USOSICON.TXT) || continue
+        dpu=$(basename "$dpd" | tr 'a-z' 'A-Z')
+        if ! printf '%s\n' "$dpu" | awk '{ b = $0; x = ""; i = index($0, ".")
+                if (i) { b = substr($0, 1, i - 1); x = substr($0, i + 1) }
+                ok = $0 ~ /^[A-Z0-9_~$!#&@-]+(\.[A-Z0-9_~$!#&@-]+)?$/ && length(b) <= 8 && length(x) <= 3
+                exit !ok }'; then
+            echo "Program icons: folder $(basename "$dpd") is not an 8.3 name, its USOSICON.TXT is skipped"
+            continue
+        fi
+        awk -v dir="$dpu" -v have="${2:-}" '
+            function ver(v) { return v == "3.0" ? 300 : v == "3.1" ? 310 : v == "3.11" ? 311 : 0 }
+            function part(p, ext,   b, x) {
+                if (p !~ /^[A-Z0-9_~$!#&@-]+(\.[A-Z0-9_~$!#&@-]+)?$/) return 0
+                b = p; x = ""
+                if (index(p, ".")) { b = substr(p, 1, index(p, ".") - 1); x = substr(p, index(p, ".") + 1) }
+                if (length(b) > 8 || length(x) > 3) return 0
+                if (ext && x != "EXE" && x != "COM" && x != "PIF" && x != "BAT") return 0
+                return 1
+            }
+            { sub(/\r$/, "") }
+            /^[ \t]*$/ || /^[ \t]*;/ { next }
+            {
+                if ($0 !~ /^[ -~\t]*$/) { print "SKIP\t" NR "\tnot plain ASCII"; next }
+                if (!match($0, /^[ \t]*"[^"]*"[ \t]*,[ \t]*/)) { print "SKIP\t" NR "\tnot in the shape \"Name\",C:\\PROGRAMS\\" dir "\\FILE.EXE"; next }
+                name = substr($0, 1, RLENGTH); path = substr($0, RLENGTH + 1)
+                sub(/^[ \t]*"/, "", name); sub(/"[ \t]*,[ \t]*$/, "", name)
+                sub(/^ +/, "", name); sub(/ +$/, "", name); sub(/[ \t]+$/, "", path)
+                min = ""
+                if (index(path, ",")) {
+                    min = substr(path, index(path, ",") + 1); path = substr(path, 1, index(path, ",") - 1)
+                    gsub(/[ \t]/, "", min); sub(/[ \t]+$/, "", path)
+                    if (!ver(min)) { print "SKIP\t" NR "\tminimum Windows version must be 3.0, 3.1 or 3.11"; next }
+                }
+                if (name == "" || length(name) > 40 || name ~ /[",()\[\]\t]/) { print "SKIP\t" NR "\tbad name (1-40 characters, no \" , ( ) [ ])"; next }
+                up = toupper(path)
+                head = "C:\\PROGRAMS\\" dir "\\"
+                if (substr(up, 1, length(head)) != head || length(up) > 64) { print "SKIP\t" NR "\tpath must be C:\\PROGRAMS\\" dir "\\... (at most 64 characters)"; next }
+                # [\\]: a lone backslash is no valid separator regex in BusyBox awk
+                n = split(substr(up, length("C:\\PROGRAMS\\") + 1), c, "[\\\\]")
+                ok = n >= 2; list = ""
+                for (i = 1; i <= n && ok; i++) { ok = part(c[i], i == n); list = list (i > 1 ? " " : "") c[i] }
+                if (!ok) { print "SKIP\t" NR "\tnot an 8.3 path to an .EXE, .COM, .PIF or .BAT file"; next }
+                if (min != "" && ver(have) && ver(have) < ver(min)) { print "SKIP\t" NR "\tneeds Windows " min ", this is Windows " have; next }
+                print "OK\t" NR "\t" name "\t" up "\t" list
+            }' "$dpf" > "$dpk" || return 1
+        while IFS="$dpt" read -r dps dpno dpa dpb dpc; do
+            if [ "$dps" != OK ]; then
+                echo "Program icons: $dpu\\USOSICON.TXT line $dpno skipped: $dpa"
+                continue
+            fi
+            # shellcheck disable=SC2086 # dpc: 8.3 parts separated by spaces
+            if ! dos_ci_find "$1/PROGRAMS" $dpc > /dev/null; then
+                echo "Program icons: $dpu\\USOSICON.TXT line $dpno skipped: $dpb was not staged"
+                continue
+            fi
+            if [ -f "$dpi" ] && tr 'a-z' 'A-Z' < "$dpi" | grep -qF "$dpb"; then
+                echo "Program icons: $dpu\\USOSICON.TXT line $dpno skipped: $dpb is in SETUP.INF already"
+                continue
+            fi
+            if grep -qF "$dpb" "$dpl"; then
+                echo "Program icons: $dpu\\USOSICON.TXT line $dpno skipped: $dpb listed twice"
+                continue
+            fi
+            if [ "$dpn" -ge 30 ]; then
+                echo "Program icons: $dpu\\USOSICON.TXT line $dpno skipped: more than 30 icons"
+                continue
+            fi
+            printf '"%s", %s\n' "$dpa" "$dpb" >> "$dpl" || return 1
+            dpn=$((dpn + 1))
+            echo "Program icons: \"$dpa\" -> $dpb"
+        done < "$dpk"
+    done
+    rm -f "$dpk"
+    if [ "$dpn" -eq 0 ]; then
+        rm -f "$dpl"
+        return 0
+    fi
+    dpm=$(dos_main_group "$dpi")
+    if [ -z "$dpm" ] || ! grep -qi "^\[$dpm\]" "$dpi"; then
+        rm -f "$dpl"
+        echo "Program icons: no Program Manager Main group in SETUP.INF (Windows 1.x/2.x), $dpn icon(s) not added"
+        return 0
+    fi
+    # The icons after the last entry of the Main section (blank lines kept
+    # in front of the next section header).
+    awk -v h="[$dpm]" -v f="$dpl" '
+        function icons(   l) { while ((getline l < f) > 0) printf "%s\r\n", l; close(f); done = 1 }
+        function blanks(   i) { for (i = 0; i < nb; i++) print bl[i]; nb = 0 }
+        { l = $0; sub(/\r$/, "", l) }
+        sec && !done && substr(l, 1, 1) == "[" { icons(); blanks(); sec = 0 }
+        sec && !done && l == "" { bl[nb++] = $0; next }
+        sec && !done && nb > 0 { blanks() }
+        { print }
+        !done && !sec && tolower(l) == tolower(h) { sec = 1 }
+        END { if (sec && !done) { icons(); blanks() } }' "$dpi" > "$dpi.new" && mv "$dpi.new" "$dpi" || return 1
+    rm -f "$dpl"
+    echo "Program icons: $dpn added to the Main group ($dpm) of SETUP.INF"
 }
 
 # DOS-side texts in the profile / USOS menu language (tools/build_dos_i18n.py
@@ -214,7 +435,7 @@ dos_winsock_apply() {
 # LANGUAGE: a catalog or locale tag (pl, pl-PL, pt-BR, sr-Latn-RS); CODEPAGE:
 # the one DOS.INI switches the console to (437 when none). Files shown before
 # that switch (CONFIG.SYS menu, INSTALL / WINMENU / NETSTART) take the 437
-# section, the start-menu batch files W3AUTO / W1AUTO the CODEPAGE one; no
+# section, the start-menu batch files W3AUTO / W1AUTO and WINRUN the CODEPAGE one; no
 # section for the language (Cyrillic or Greek in 437, Ukrainian): English.
 DOS_I18N_TEXT=''
 DOS_I18N_437=''
@@ -301,7 +522,8 @@ dos_i18n_apply() {
     for dif in W3CONFIG.SYS W3CONFIG.CSM W1CONFIG.SYS W1CONFIG.CSM INSTALL.BAT WINMENU.BAT W3START.BAT W1SETUP.BAT NETSTART.BAT; do
         dos_i18n_file "$1/$dif" "$DOS_I18N_437" || return 1
     done
-    for dif in W3AUTO.BAT W3AUTO.CSM W1AUTO.BAT W1AUTO.CSM; do
+    # WINRUN.BAT (typed WIN) runs after the start file switched the code page.
+    for dif in W3AUTO.BAT W3AUTO.CSM W1AUTO.BAT W1AUTO.CSM WINRUN.BAT; do
         dos_i18n_file "$1/$dif" "$DOS_I18N_CP" || return 1
     done
     echo "DOS texts: ${3:-en} (menus ${DOS_I18N_437:-English 437}, start files ${DOS_I18N_CP:-English 437})"

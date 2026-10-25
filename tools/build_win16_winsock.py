@@ -201,7 +201,7 @@ def build_testload(watcom: Path, verbose: bool, stem: str = 'testload') -> Path:
         'name %s' % artifact,
         'file %s' % obj,
         'library %s' % (libs / 'windows.lib'),
-        *(['library %s' % (libs / 'winsock.lib')] if stem == 'apitest' else []),
+        *(['library %s' % (libs / 'winsock.lib')] if stem in ('apitest', 'reaptest') else []),
         'library %s' % (libs / 'clibl.lib'),
     ]
     response = OBJ_DIR / (stem + '.lnk')
@@ -275,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--keep-objects', action='store_true', help='keep .obj files')
     parser.add_argument('--stage2-tests', action='store_true', help='also build ASYNCTEST and MOSRUN Win16 test controllers')
     parser.add_argument('--stage3-tests', action='store_true', help='also build APITEST and APPCTL Win16 test controllers')
+    parser.add_argument('--stdmode-tests', action='store_true', help='also build the real-task abandonment regression client')
     args = parser.parse_args(argv)
 
     watcom = find_watcom()
@@ -301,6 +302,9 @@ def main(argv: list[str] | None = None) -> int:
         for stem in ('apitest', 'appctl'):
             exe = build_testload(watcom, args.verbose, stem)
             print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
+    if args.stdmode_tests:
+        exe = build_testload(watcom, args.verbose, 'reaptest')
+        print('OK: %s (%d bytes)' % (exe.relative_to(ROOT), exe.stat().st_size))
     if not args.keep_objects:
         shutil.rmtree(OBJ_DIR, ignore_errors=True)
     return 0
