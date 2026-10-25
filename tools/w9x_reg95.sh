@@ -359,8 +359,51 @@ EOF
 # Original 950 first-GUI Network PnP removes the early static protocol and
 # client classes (R111). Reapply just networking once the original
 # RunOnce\Setup subtree is gone. No timer, desktop helper or forced reboot.
+#
+# 950 PnP also gives a card it installs itself 950's own default network:
+# NetBEUI + IPX/SPX, Client for Microsoft Networks twice (VREDIR\0000 on
+# NetBEUI, \0001 on IPX) and the NetWare client (X470 950 PL, 2026-10-25).
+# USOS defaults are TCP/IP + Client for Microsoft Networks only. 950's
+# real-mode REGEDIT has no /D (only import, /C, /E: its usage text) and its
+# import cannot delete, so NETCLN.REG queues NETCLEAN.INF in the machine
+# RunOnce: setupx DelReg removes those components and the card's bindings to
+# them in that Windows session (effective from the next start; TCP/IP on
+# MSTCP\0009 works already). Nothing USOS imports (the 0009 instances) is
+# touched; names of absent keys / values are a no-op for DelReg.
+w9x_reg95_netclean_write() {
+    devnode=$(tr -d '\r' < "$1/NET/NET95.REG" 2>/dev/null | sed -n 's/^\[HKEY_LOCAL_MACHINE\\\(Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
+    [ -n "$devnode" ] || return 1
+    sed 's/$/\r/' > "$1/NET/NETCLEAN.INF" <<EOF || return 1
+; USOS: 950 default network components USOS does not use (tools/w9x_reg95.sh)
+[Version]
+Signature="\$CHICAGO\$"
+
+[DefaultInstall]
+DelReg=USOS.NetClean
+
+[USOS.NetClean]
+HKLM,"Enum\\Network\\NETBEUI"
+HKLM,"Enum\\Network\\NWLINK"
+HKLM,"Enum\\Network\\NWREDIR"
+HKLM,"Enum\\Network\\VREDIR\\0000"
+HKLM,"Enum\\Network\\VREDIR\\0001"
+HKLM,"$devnode\\Bindings","NETBEUI\\0000"
+HKLM,"$devnode\\Bindings","NWLINK\\0000"
+HKLM,"System\\CurrentControlSet\\control\\NetworkProvider\\Order","NWNP32"
+HKLM,"System\\CurrentControlSet\\control\\ServiceProvider\\Order\\ProviderOrder","NWREDIR"
+EOF
+    sed 's/$/\r/' > "$1/NET/NETCLN.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce]
+"USOSNetClean"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\NET\\NETCLEAN.INF"
+
+EOF
+}
+
 w9x_reg95_netlate_write() {
     [ -d "$1/NET" ] || return 1
+    w9x_reg95_netclean_write "$1" || return 1
     sed 's/$/\r/' > "$1/NET/NET95L.BAT" <<'EOF'
 @ECHO OFF
 IF EXIST C:\USOS9X\NET\NLATE.ERR GOTO FAIL
@@ -370,6 +413,8 @@ IF NOT EXIST C:\USOS9X\REG95.OK GOTO END
 IF NOT EXIST C:\USOS9X\NET\NFILES.OK GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\NET95.REG GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\TCP95.REG GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\NETCLN.REG GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\NETCLEAN.INF GOTO FAIL
 IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO FAIL
 IF NOT EXIST C:\WINDOWS\COMMAND\ATTRIB.EXE GOTO FAIL
 IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO FAIL
@@ -416,6 +461,8 @@ C:\WINDOWS\COMMAND\FIND.EXE "NetTrans\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
 C:\WINDOWS\COMMAND\FIND.EXE "NetClient\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
+REM 950's default protocols / clients go in this Windows session.
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\NET\NETCLN.REG
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
 ECHO complete> C:\USOS9X\NET\NLATE.OK

@@ -13,6 +13,7 @@ class LateNetwork(unittest.TestCase):
   if network:net.write_bytes(b'REGEDIT4\r\n[HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00]\r\n"Driver"="Net\\\\0009"\r\n')
   rc,so,err=sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" "" "" "{net.as_posix() if network else ""}" "{version}"\n')
   self.assertEqual(rc,0,so+err)
+  self.out=out
   child=out/'NET/NET95L.BAT'
   return (out/'REG95.BAT').read_bytes(),child.read_bytes() if child.exists() else None
 
@@ -44,11 +45,35 @@ class LateNetwork(unittest.TestCase):
  def test_only_network_files_imported_once_then_verified_and_restored(self):
   _,child=self.create();s=child.decode('ascii')
   imports=re.findall(r'^REGEDIT /L:SYSTEM.DAT /R:USER.DAT (?!/E)(.*)\r?$',s,re.M)
-  self.assertEqual([x.rstrip('\r') for x in imports],[r'C:\USOS9X\NET\NET95.REG',r'C:\USOS9X\NET\TCP95.REG'])
+  self.assertEqual([x.rstrip('\r') for x in imports],[r'C:\USOS9X\NET\NET95.REG',r'C:\USOS9X\NET\TCP95.REG',r'C:\USOS9X\NET\NETCLN.REG'])
+  # The cleanup is queued only after the checks of the network import.
+  self.assertLess(s.index('"NetClient\\\\0009"'),s.index('NET\\NETCLN.REG\r\n'))
   self.assertLess(s.index('"NetClient\\\\0009"'),s.index('ECHO complete>'))
   self.assertLess(s.index('ATTRIB.EXE +S +R +H SYSTEM.DAT'),s.index('ECHO complete>'))
   self.assertIn(':RESTORE\r\nC:\\WINDOWS\\COMMAND\\ATTRIB.EXE +S +R +H SYSTEM.DAT',s)
   for name in ['REG95.REG','WIN.COM','SHUTDOWN','APPDATA']:self.assertNotIn(name,s)
+
+ def test_950_default_network_cleanup(self):
+  # X470 950 PL (2026-10-25): PnP gave the card NetBEUI + IPX/SPX, two MS
+  # clients and the NetWare client; 950 REGEDIT has no /D: setupx DelReg.
+  self.create()
+  net=self.out/'NET'
+  inf=(net/'NETCLEAN.INF').read_bytes();self.assertEqual(inf.count(b'\n'),inf.count(b'\r\n'))
+  text=inf.decode('ascii')
+  self.assertIn('Signature="$CHICAGO$"\r\n',text);self.assertIn('[DefaultInstall]\r\nDelReg=USOS.NetClean\r\n',text)
+  for line in ('HKLM,"Enum\\Network\\NETBEUI"','HKLM,"Enum\\Network\\NWLINK"','HKLM,"Enum\\Network\\NWREDIR"',
+               'HKLM,"Enum\\Network\\VREDIR\\0000"','HKLM,"Enum\\Network\\VREDIR\\0001"',
+               'HKLM,"Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00\\Bindings","NETBEUI\\0000"',
+               'HKLM,"Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00\\Bindings","NWLINK\\0000"',
+               'HKLM,"System\\CurrentControlSet\\control\\NetworkProvider\\Order","NWNP32"',
+               'HKLM,"System\\CurrentControlSet\\control\\ServiceProvider\\Order\\ProviderOrder","NWREDIR"'):
+   self.assertIn(line+'\r\n',text)
+  # USOS's own instances (0009) are never removed.
+  self.assertNotIn('0009',text);self.assertNotIn('MSTCP',text)
+  reg=(net/'NETCLN.REG').read_bytes()
+  self.assertTrue(reg.startswith(b'REGEDIT4\r\n'))
+  self.assertIn(b'[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce]\r\n'
+                b'"USOSNetClean"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\NET\\\\NETCLEAN.INF"\r\n',reg)
 
  def test_original_dos_line_limits_and_complete_unique_labels(self):
   for batch in self.create():
