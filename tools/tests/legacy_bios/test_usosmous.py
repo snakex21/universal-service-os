@@ -266,6 +266,8 @@ class MeBridge(unittest.TestCase):
         self.assertLess(knock.index('if (!want) return;'), knock.index('bios15('))
         wanted = self.body(self.mouse, 'wheel_wanted')
         self.assertIn('LOBYTE(dos) >= 10', wanted)                       # DOS 7.10+: 98 and later
+        # 95 RTM / OSR1 (DOS 7.00): only under Windows 95 (INT 2Fh 160Ah), X470 950 2026-10-25
+        self.assertIn('(LOBYTE(dos) >= 10 || windows_95())', wanted)
         self.assertIn('"usosmous", "Wheel", 1', wanted)
         on = self.body(self.mouse, 'bios_on')
         self.assertLess(on.index('bios15(0xC205'), on.index('knock()'))  # C205h resets the device ID

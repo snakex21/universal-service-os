@@ -71,10 +71,11 @@ def load_ne(data: bytes):
 
 
 class Emu:
-    def __init__(self, drv: bytes, dos_version: int, bios_id: int, bridge=True, fail=None):
+    def __init__(self, drv: bytes, dos_version: int, bios_id: int, bridge=True, fail=None, win_version=None):
         self.u = u = Uc(UC_ARCH_X86, UC_MODE_16)
         u.mem_map(0, 0x100000)
         self.dos_version, self.bios_id, self.bridge = dos_version, bios_id, bridge
+        self.win_version = win_version       # INT 2Fh 160Ah BX (None: not answered)
         self.fail = fail                     # (AX, BX, AH): that BIOS call fails with CF and AH
         self.bios_calls, self.events, self.timer_proc = [], [], None
         segs, self.names, self.ents = load_ne(drv)
@@ -157,6 +158,10 @@ class Emu:
 
     def on_int(self, u, intno, _):
         if intno == 0x2F:
+            if self.win_version is not None and u.reg_read(UC_X86_REG_AX) == 0x160A:
+                u.reg_write(UC_X86_REG_AX, 0)
+                u.reg_write(UC_X86_REG_BX, self.win_version)
+                return
             if self.bridge and u.reg_read(UC_X86_REG_AX) == 0xD700:
                 u.reg_write(UC_X86_REG_AX, 0xD7FF)
                 u.reg_write(UC_X86_REG_BX, SHARED_SEG)
@@ -229,8 +234,8 @@ class WheelEmu(unittest.TestCase):
         work.mkdir(parents=True, exist_ok=True)
         cls.drv = build_mouse_driver(work, work).read_bytes()
 
-    def start(self, dos_version, bios_id, bridge=True):
-        e = Emu(self.drv, dos_version, bios_id, bridge)
+    def start(self, dos_version, bios_id, bridge=True, win_version=None):
+        e = Emu(self.drv, dos_version, bios_id, bridge, win_version=win_version)
         info = e.export('INQUIRE', (0, MOUSEINFO_SEG))        # MOUSEINFO FAR * (offset, segment)
         exists = e.u.mem_read(MOUSEINFO_SEG * 16, 1)[0]
         self.assertEqual(info, 16)
@@ -289,9 +294,31 @@ class WheelEmu(unittest.TestCase):
         knock = [(0xC202, 0x0600), (0xC202, 0x0500), (0xC202, 0x0400), (0xC204, 0)]
         self.assertEqual(e.bios_calls[on:], [(0xC205, 0x0300)] + knock + knock + [(0xC207, 0x0400), (0xC200, 0x0100)])
 
-    def test_win95_and_win3_never_knock(self):
-        for dos in (0x0700, 0x0616):
-            e, exists = self.start(dos, 3)
+    def test_win95_counts_notches_without_user_wheel(self):
+        # 95 RTM 4.00.950 / OSR1 (DOS 7.00) and OSR2 (DOS 7.10), both INT 2Fh
+        # 160Ah BX 0400h: knock and notch counter (USOSKEY.DRV scrolls), but
+        # no AX=0800h event and no msExists 4Bh (95 USER has no wheel).
+        # X470 95 RTM 2026-10-25: the DOS 7.10 gate kept the wheel off on 950.
+        for dos in (0x0700, 0x070A):
+            e, exists = self.start(dos, 3, win_version=0x0400)
+            self.assertEqual(exists, 1, hex(dos))
+            calls = [c[0] for c in e.bios_calls]
+            self.assertIn(0xC202, calls, hex(dos))
+            self.assertLess(calls.index(0xC202), calls.index(0xC204))
+            info = e.wheel_info()
+            self.assertEqual(info[:4], (2, 2, 1, 3), hex(dos))
+            e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'')
+            e.push_packets([(0x08, 0, 0, 0xFF), (0x08, 0, 0, 0xFF)])
+            e.poll()
+            self.assertEqual(e.events, [], hex(dos))               # no USER wheel call on 95
+            self.assertEqual(e.wheel_info()[8], 2, hex(dos))       # two notches up counted
+            raw = bytes(e.u.mem_read(DATA_SEG * 16 + e.u.reg_read(UC_X86_REG_AX), 15))
+            self.assertEqual(raw[14], 0, hex(dos))                 # winfo.user_wheel
+
+    def test_win3_and_unknown_dos7_never_knock(self):
+        # Windows 3.x (DOS 6.22; or BX 030Ah) and DOS 7.00 without a 95 answer.
+        for dos, win in ((0x0616, None), (0x0616, 0x030A), (0x0700, None), (0x0700, 0x030A)):
+            e, exists = self.start(dos, 3, win_version=win)
             self.assertEqual(exists, 1)
             self.assertNotIn(0xC202, [c[0] for c in e.bios_calls])
             e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'\x12')
@@ -317,7 +344,7 @@ class WheelEmu(unittest.TestCase):
         # older CSMWrap: the knock is answered with 0AAh, and sent once more (v4)
         e, _ = self.start(0x070A, 0xAA)
         self.assertEqual(e.wheel_info(), (2, 2, 0, 0xAA, 0, 4, 0, 0, 0))
-        # Windows 95: not wanted, no knock
+        # DOS 7.00 without the 95 answer (INT 2Fh 160Ah): not wanted, no knock
         e, _ = self.start(0x0700, 3)
         self.assertEqual(e.wheel_info()[:6], (2, 1, 0, 0xFF, 0, 0))
         # the second sample rate refused (AH=03h) / C204h refused (AH=86h)

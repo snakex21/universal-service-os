@@ -71,7 +71,7 @@
  *     WM_MOUSEWHEEL for the focus window as for its own wheel mice (USER
  *     drops button flags in a wheel call, so it is a call of its own).
  * Without the knock answered (older CSMWrap, wheel-less mouse, Windows
- * 3.x / 95, SYSTEM.INI [usosmous] Wheel=0) nothing changes.
+ * 3.x, SYSTEM.INI [usosmous] Wheel=0) nothing changes.
  * Wheel v4 (2026-10-19, Me on the X470 with CSMWrap usos14: the knock was
  * answered with ID 0, the BIOS saw a later reset and rates 10, 40 from
  * another INT 15h client): CSMWrap 3.1.2-usos15 (patch 0020) passes the
@@ -372,10 +372,12 @@ static int windows_95(void)
     return ax_after == 0 && HIBYTE(wver) == 4 && LOBYTE(wver) < 10;
 }
 
-/* DOS 7.10+ in GetVersion's high word (95 OSR2, 98, 98 SE; Me 8.00) and
- * not switched off with SYSTEM.INI [usosmous] Wheel=0: the notch counter
- * runs. USER gets the wheel event only on 98 / Me (user_wheel); 95 USER
- * has no wheel message. */
+/* DOS 7.10+ in GetVersion's high word (95 OSR2, 98, 98 SE; Me 8.00), or
+ * DOS 7.00 under Windows 95 (95 RTM 4.00.950 / OSR1: INT 2Fh 160Ah BX
+ * 0400h; 2026-10-25, the 7.10 gate predates the 95 path and kept the
+ * wheel off on 950), and not switched off with SYSTEM.INI [usosmous]
+ * Wheel=0: the notch counter runs. USER gets the wheel event only on
+ * 98 / Me (user_wheel); 95 USER has no wheel message. */
 static int wheel_wanted(void)
 {
     WORD dos;
@@ -383,7 +385,7 @@ static int wheel_wanted(void)
         dos = HIWORD(GetVersion());
         wheel_pref = 1;
         user_wheel = 0;
-        if (HIBYTE(dos) > 7 || (HIBYTE(dos) == 7 && LOBYTE(dos) >= 10))
+        if (HIBYTE(dos) > 7 || (HIBYTE(dos) == 7 && (LOBYTE(dos) >= 10 || windows_95())))
             if (GetPrivateProfileInt("usosmous", "Wheel", 1, "SYSTEM.INI")) {
                 wheel_pref = 2;
                 user_wheel = (BYTE)!windows_95();
