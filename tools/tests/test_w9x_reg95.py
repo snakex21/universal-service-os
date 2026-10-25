@@ -225,6 +225,85 @@ class Reg95Escaping(unittest.TestCase):
                     self.assertIsNone(re.search(r'(?<!\\)\\(?![\\"])', re.sub(r'\\\\', '', line)), line)
 
 
+class Late950(unittest.TestCase):
+    r"""950: IE's Start Page / First Home Page and the Internet icon command
+    (-> IEXPLORE.EXE, absent until the add-ons install IE) leave REG95.REG,
+    which lands before Setup's first GUI boot (that boot hung in GRPCONV on
+    the X470, 2026-10-25), for R95LATE.REG after RunOnce\Setup."""
+    def write(self, version, answer=ANSWER_95):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-r95late-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'MSBATCH.INF').write_bytes(answer.encode('ascii'))
+        (tmp / 'out/NET').mkdir(parents=True)
+        rc, so, err = sh(f'. "{REG95}"\nw9x_reg95_write "{(tmp / "out").as_posix()}" "{(tmp / "MSBATCH.INF").as_posix()}" '
+                         f'"" "C:\\USOS9X\\USOSVMD.INF" "" "$V"', {'V': version})
+        self.assertEqual(rc, 0, err)
+        return tmp / 'out'
+
+    def test_950_moves_the_ie_values_out_of_reg95(self):
+        answer = ANSWER_95.replace('"Start Page",,"about:blank"\r\n',
+                                   '"Start Page",,"about:blank"\r\nHKCU,"Software\\Microsoft\\Internet Explorer\\Main","First Home Page",,"about:blank"\r\n'
+                                   'HKCU,"Software\\Microsoft\\Internet Explorer\\Main","Search Page",,"x"\r\n')
+        out = self.write('4 0 0 950', answer)
+        reg = (out / 'REG95.REG').read_bytes()
+        for gone in (b'Start Page', b'First Home Page', b'FBF23B42', b'IEXPLORE'):
+            self.assertNotIn(gone, reg)
+        self.assertIn(b'"Search Page"="x"\r\n', reg)                        # other IE values stay
+        self.assertIn(b'Internet Connection Wizard]\r\n"Completed"=hex:01,00,00,00', reg)
+        late = (out / 'R95LATE.REG').read_bytes()
+        self.assertEqual(late, b'REGEDIT4\r\n\r\n'
+                         b'[HKEY_USERS\\.Default\\Software\\Microsoft\\Internet Explorer\\Main]\r\n'
+                         b'"Start Page"="file://C:\\\\USOS9X\\\\START.HTM"\r\n'
+                         b'"First Home Page"="file://C:\\\\USOS9X\\\\START.HTM"\r\n\r\n'
+                         b'[HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\{FBF23B42-E3F0-101B-8488-00AA003E56F8}\\Shell\\Open\\Command]\r\n'
+                         b'@="\\"C:\\\\Program Files\\\\Internet Explorer\\\\IEXPLORE.EXE\\""\r\n\r\n')
+        self.assertTrue((out / 'START.HTM').exists())
+        self.assertFalse((out / 'R95LATE.NEW').exists())
+        bat = (out / 'REG95.BAT').read_bytes().decode('ascii')
+        self.assertIn('\r\nCALL C:\\USOS9X\\VMDLATE.BAT\r\nCALL C:\\USOS9X\\R95LATE.BAT\r\n', bat)
+        self.assertLess(bat.index('R95LATE.BAT'), bat.index('REG95.OK GOTO END'))
+
+    def test_other_versions_keep_them_in_reg95(self):
+        for version in ('4 0 0 1111', '4 0 0 1212', ''):
+            out = self.write(version)
+            reg = (out / 'REG95.REG').read_bytes()
+            self.assertIn(b'"Start Page"="file://C:\\\\USOS9X\\\\START.HTM"', reg, version)
+            self.assertIn(b'FBF23B42', reg, version)
+            self.assertFalse((out / 'R95LATE.REG').exists(), version)
+            self.assertFalse((out / 'R95LATE.BAT').exists(), version)
+            self.assertNotIn(b'R95LATE', (out / 'REG95.BAT').read_bytes(), version)
+
+    def test_950_without_ie_values_has_no_late_step(self):
+        answer = ANSWER_95.replace('HKCU,"Software\\Microsoft\\Internet Connection Wizard",Completed,1,01,00,00,00\r\n', '')
+        answer = answer.replace('"Start Page",,"about:blank"', '"Other",,"x"')
+        self.assertNotIn('Completed', answer)
+        out = self.write('4 0 0 950', answer)
+        self.assertFalse((out / 'R95LATE.REG').exists())
+        self.assertFalse((out / 'R95LATE.NEW').exists())
+        self.assertNotIn(b'R95LATE', (out / 'REG95.BAT').read_bytes())
+
+    def test_batch_waits_for_setup_imports_once_and_checks(self):
+        data = (self.write('4 0 0 950') / 'R95LATE.BAT').read_bytes()
+        self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
+        self.assertLessEqual(max(map(len, data.split(b'\r\n'))), 125)
+        text = data.decode('ascii')
+        labels = re.findall(r'^:([A-Z0-9]+)\r?$', text, re.M)
+        self.assertEqual(len(labels), len(set(labels)))
+        imp = text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\R95LATE.REG')
+        for before in ('R95LATE.OK GOTO END', 'R95LATE.ERR GOTO END', 'NOT EXIST C:\\USOS9X\\REG95.OK GOTO END',
+                       'IF EXIST C:\\USOS9X\\R95LATE.RUN GOTO FAIL', '"REGEDIT4" C:\\USOS9X\\RL1.REG',
+                       '"\\RunOnce\\Setup]" C:\\USOS9X\\RL1.REG > NUL\r\nIF ERRORLEVEL 2 GOTO FAIL\r\nIF NOT ERRORLEVEL 1 GOTO PENDING',
+                       'ECHO run> C:\\USOS9X\\R95LATE.RUN', 'ATTRIB.EXE -S -R -H SYSTEM.DAT', 'ATTRIB.EXE -S -R -H USER.DAT'):
+            self.assertLess(text.index(before), imp, before)
+        for after in ('ATTRIB.EXE +S +R +H USER.DAT', '/E C:\\USOS9X\\RL2.REG HKEY_USERS\\.Default\\Software\\Microsoft\r\n',
+                      '/I "Start Page" C:\\USOS9X\\RL2.REG', '/E C:\\USOS9X\\RL3.REG HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\r\n',
+                      '/I "IEXPLORE.EXE" C:\\USOS9X\\RL3.REG', 'ECHO ok> C:\\USOS9X\\R95LATE.OK', ':FAIL'):
+            self.assertGreater(text.index(after), imp, after)
+        failed = text[text.index(':FAIL'):text.index(':PENDING')]
+        self.assertIn('>> C:\\USOS9X\\USOSLOG.TXT', failed)
+        self.assertNotIn('PAUSE', text)
+
+
 class Vmdlate950(unittest.TestCase):
     r"""950: Setup's first GUI boot rebuilds machine RunOnce; VMDLATE.BAT queues
     USOSVMD.INF again after RunOnce\Setup is gone when SYSTEM.INI lacks it."""

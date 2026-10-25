@@ -68,7 +68,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_LATE_FILE=${6:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -122,15 +122,24 @@ w9x_reg95_convert() {
         name = tolower(name)
         return name == "usoslog" ? 0 : name == "usosdisplay" ? 2 : name == "usosaddons" ? 3 : name == "usoslan" ? 4 : 1
     }
+    # 950 (late file set): values for R95LATE.REG, imported after RunOnce\Setup.
+    function late_emit(key, name, data) {
+        if (key != llast) { printf "\r\n[%s]\r\n", key > late; llast = key }
+        printf "%s=%s\r\n", (name == "" ? "@" : "\"" esc(name) "\""), data > late
+    }
     function value(key, name, data) {
         if (tolower(key) == tolower(runkey)) { nrun++; runname[nrun] = name; rundata[nrun] = data; return }
         if (tolower(key) ~ /\\currentversion\\winlogon$/ && tolower(name) == "defaultusername" && data != "\"\"") logon_user = data
-        if (tolower(key) ~ /\\internet explorer\\main$/ && tolower(name) ~ /^(start page|first home page)$/ && tolower(data) == "\"about:blank\"")
-            data = "\"" esc(home) "\""
+        if (tolower(key) ~ /\\internet explorer\\main$/ && tolower(name) ~ /^(start page|first home page)$/) {
+            if (tolower(data) == "\"about:blank\"") data = "\"" esc(home) "\""
+            if (late != "") { late_emit(key, name, data); return }
+        }
         emit(key, name, data)
     }
     BEGIN {
         usoslog = ENVIRON["W9X_REG95_LOG"]; vmd = ENVIRON["W9X_REG95_VMD"]; vmdlate = ENVIRON["W9X_REG95_VMD_LATE"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
+        late = ENVIRON["W9X_REG95_LATE_FILE"]
+        if (late != "") printf "REGEDIT4\r\n" > late
         runkey = "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
     }
     { sub(/\r$/, "") }
@@ -214,7 +223,12 @@ w9x_reg95_convert() {
         if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
-        if (icw) emit("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command", "", "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\"")
+        if (icw) {
+            ckey = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command"
+            cdata = "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\""
+            if (late != "") late_emit(ckey, "", cdata); else emit(ckey, "", cdata)
+        }
+        if (late != "") { printf "\r\n" > late; close(late) }
         # Windows Logon as the primary logon (REG95.BAT deletes Network\Logon
         # first: 95 Setup leaves PrimaryProvider "Microsoft Network" there
         # although MSBATCH says PrimaryLogon=Windows), with the Winlogon
@@ -574,6 +588,85 @@ CD \
 EOF
 }
 
+# w9x_reg95_late_write DIR: 950 only. REG95.REG is imported before Setup's
+# first GUI boot, and that boot hung in RunOnce\Setup's GRPCONV step with IE's
+# Start Page / First Home Page and the Internet icon command
+# (CLSID\{FBF23B42-...}\Shell\Open\Command -> IEXPLORE.EXE, which 950 has
+# only once the add-ons install IE) already in the registry (X470 95 RTM PL,
+# 2026-10-25; suspected, removed together with the summer-time switch).
+# R95LATE.BAT, called by REG95.BAT before every Windows start, imports
+# R95LATE.REG (those values) once RunOnce\Setup is gone, then reads them back
+# with REGEDIT /E + FIND. Journal: R95LATE.RUN (import started), R95LATE.OK,
+# R95LATE.ERR (logged to USOSLOG.TXT, Windows starts anyway).
+w9x_reg95_late_write() {
+    lreg=$(tr -d '\r' < "$1/R95LATE.REG")
+    checks=''
+    ie=$(printf '%s\n' "$lreg" | sed -n 's/^\[\(.*\\Internet Explorer\\Main\)\]$/\1/p' | head -n 1)
+    if [ -n "$ie" ]; then
+        # The parent key: no space on the real-mode REGEDIT command line.
+        checks="IF EXIST C:\\USOS9X\\RL2.REG DEL C:\\USOS9X\\RL2.REG > NUL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\RL2.REG ${ie%%\\Internet Explorer\\Main}
+IF NOT EXIST C:\\USOS9X\\RL2.REG GOTO FAIL
+C:\\WINDOWS\\COMMAND\\FIND.EXE /I \"Start Page\" C:\\USOS9X\\RL2.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL"
+    fi
+    # Classes\CLSID itself: the full command key makes a line over DOS's 127.
+    cmd=$(printf '%s\n' "$lreg" | sed -n 's/^\[\(.*\\CLSID\)\\[^]\\]*\\Shell\\Open\\Command\]$/\1/p' | head -n 1)
+    if [ -n "$cmd" ]; then
+        checks="$checks${checks:+
+}IF EXIST C:\\USOS9X\\RL3.REG DEL C:\\USOS9X\\RL3.REG > NUL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\RL3.REG $cmd
+IF NOT EXIST C:\\USOS9X\\RL3.REG GOTO FAIL
+C:\\WINDOWS\\COMMAND\\FIND.EXE /I \"IEXPLORE.EXE\" C:\\USOS9X\\RL3.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL"
+    fi
+    [ -n "$checks" ] || return 1
+    sed 's/$/\r/' > "$1/R95LATE.BAT" <<EOF
+@ECHO OFF
+REM USOS: 950 IE start page and Internet icon after Setup (tools/w9x_reg95.sh).
+IF EXIST C:\\USOS9X\\R95LATE.OK GOTO END
+IF EXIST C:\\USOS9X\\R95LATE.ERR GOTO END
+IF NOT EXIST C:\\USOS9X\\REG95.OK GOTO END
+REM One attempt: an import cut short is never repeated.
+IF EXIST C:\\USOS9X\\R95LATE.RUN GOTO FAIL
+IF NOT EXIST C:\\USOS9X\\R95LATE.REG GOTO FAIL
+IF NOT EXIST C:\\WINDOWS\\REGEDIT.EXE GOTO FAIL
+IF NOT EXIST C:\\WINDOWS\\SYSTEM.DAT GOTO FAIL
+IF NOT EXIST C:\\WINDOWS\\USER.DAT GOTO FAIL
+IF NOT EXIST C:\\WINDOWS\\COMMAND\\FIND.EXE GOTO FAIL
+IF NOT EXIST C:\\WINDOWS\\COMMAND\\ATTRIB.EXE GOTO FAIL
+C:
+CD \\WINDOWS
+IF EXIST C:\\USOS9X\\RL1.REG DEL C:\\USOS9X\\RL1.REG > NUL
+IF EXIST C:\\USOS9X\\RL1.REG GOTO FAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\RL1.REG HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce
+IF NOT EXIST C:\\USOS9X\\RL1.REG GOTO FAIL
+C:\\WINDOWS\\COMMAND\\FIND.EXE "REGEDIT4" C:\\USOS9X\\RL1.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+C:\\WINDOWS\\COMMAND\\FIND.EXE /I "\\RunOnce\\Setup]" C:\\USOS9X\\RL1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+ECHO run> C:\\USOS9X\\R95LATE.RUN
+IF NOT EXIST C:\\USOS9X\\R95LATE.RUN GOTO FAIL
+C:\\WINDOWS\\COMMAND\\ATTRIB.EXE -S -R -H SYSTEM.DAT
+C:\\WINDOWS\\COMMAND\\ATTRIB.EXE -S -R -H USER.DAT
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\R95LATE.REG
+C:\\WINDOWS\\COMMAND\\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\\WINDOWS\\COMMAND\\ATTRIB.EXE +S +R +H USER.DAT
+$checks
+ECHO ok> C:\\USOS9X\\R95LATE.OK
+DEL C:\\USOS9X\\R95LATE.RUN > NUL
+GOTO PENDING
+:FAIL
+ECHO 950 post-Setup IE values failed> C:\\USOS9X\\R95LATE.ERR
+ECHO R95LATE: 950 IE values after Setup failed, see C:\USOS9X\RL*.REG; Windows started>> C:\USOS9X\USOSLOG.TXT
+:PENDING
+C:
+CD \\
+:END
+EOF
+}
+
 # w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
@@ -588,9 +681,20 @@ w9x_reg95_write() {
     if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_identity=1; fi
     # 950: USOSVmd only through VMDLATE.BAT (after RunOnce\Setup), never REG95.REG.
     if [ -n "$vmd" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_vmdlate=1; fi
-    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" "$reg95_vmdlate" >"$dir/REG95.REG" || return 1
-    grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
-    if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
+    # 950: IE start page values and the Internet icon command after Setup.
+    reg95_late='' r95late='REM -'
+    rm -f "$dir/R95LATE.BAT" "$dir/R95LATE.REG" "$dir/R95LATE.NEW"
+    if [ "$source_version" = '4 0 0 950' ]; then reg95_late="$dir/R95LATE.NEW"; fi
+    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" "$reg95_vmdlate" "$reg95_late" >"$dir/REG95.REG" || return 1
+    grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG" "$dir/R95LATE.NEW"; return 1; }
+    if [ -n "$reg95_late" ]; then
+        if grep -q '^\[HKEY_' "$reg95_late"; then
+            mv "$reg95_late" "$dir/R95LATE.REG" && w9x_reg95_late_write "$dir" || return 1
+            r95late='CALL C:\USOS9X\R95LATE.BAT'
+        else rm -f "$reg95_late"
+        fi
+    fi
+    if grep -q 'START\.HTM' "$dir/REG95.REG" "$dir/R95LATE.REG" 2>/dev/null; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
     A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
     F='C:\WINDOWS\COMMAND\FIND.EXE'
@@ -660,6 +764,7 @@ $neterrjump
 REM USOS: Windows 95 answer registry (tools/w9x_reg95.sh): 95 Setup ignores
 REM MSBATCH.INF [Install] AddReg. Runs from AUTOEXEC.BAT, imports once.
 $vmdlate
+$r95late
 $netguard
 $netlate
 IF EXIST ${U}REG95.OK GOTO END
