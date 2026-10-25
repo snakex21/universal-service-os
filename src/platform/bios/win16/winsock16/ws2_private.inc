@@ -112,11 +112,13 @@ static void usos_reap_app(usos_app_context FAR *app)
 {
     /* No usos_app()/error macros here: this is called from the slot search.
      * A stale HWND can already have been reused by a different live task. */
-    USOS_TRACE("reap task",NULL,app->task);
+    /* Diag value: PDB in the high word, HTASK in the low word. */
+    USOS_TRACE("reap task",NULL,((unsigned long)app->pdb << 16) | (unsigned int)app->task);
     usos_async_cleanup_owner(app, 0);
     usos_global_startups -= app->startups;
     app->startups = 0;
     app->task = NULL;
+    app->pdb = 0;
 }
 
 static void usos_async_class_cleanup(void)

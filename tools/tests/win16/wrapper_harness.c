@@ -34,6 +34,10 @@ static unsigned int windows=1;
 DWORD GetTickCount(void) { return now++; }
 HTASK GetCurrentTask(void) { return current_task; }
 BOOL IsTask(HTASK task) { return task>0 && task<64 && !dead_tasks[task]; }
+/* PSP selector per task; a non-zero override models a new task instance
+ * that Windows started under a recycled HTASK value. */
+static UINT task_pdb[64];
+UINT GetCurrentPDB(void) { return task_pdb[current_task]?task_pdb[current_task]:0x1000U+current_task; }
 HGLOBAL GlobalAlloc(UINT flags,DWORD bytes) { (void)flags;return calloc(1,bytes); }
 void *GlobalLock(HGLOBAL h) { return h; }
 BOOL GlobalUnlock(HGLOBAL h) { (void)h;return TRUE; }
@@ -350,6 +354,39 @@ static void case_abandoned_wep(void)
     CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
     printf("wep_checks_task=1 recycled_hwnd_survives=1 all_context_memory_freed=1\n");
 }
+static BOOL stale_hook(void) { CHECK(0);return FALSE; }
+static void case_reused_task_handle(void)
+{
+    WSADATA data;SOCKET leaked,fresh;HWND stale;usos_app_context *old_app,*app;
+    FARPROC original;int saved_head,saved_idle;usos_u32 saved_clock;
+    /* Same task, same PDB: every call resolves to the same context. */
+    current_task=2;CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
+    old_app=usos_app();CHECK(usos_app()==old_app && old_app->task==2);
+    CHECK(WSAStartup(MAKEWORD(1,1),&data)==0 && usos_app()==old_app && old_app->startups==2);
+    leaked=socket(AF_INET,SOCK_DGRAM,17);CHECK(leaked!=INVALID_SOCKET);
+    CHECK(WSAAsyncSelect(leaked,1,WM_NET,FD_READ)==0);
+    original=WSASetBlockingHook((FARPROC)stale_hook);CHECK(original!=NULL);
+    WSASetLastError(4242);stale=usos_poll_window;CHECK(stale!=NULL);
+    CHECK(usos_global_startups==3);
+    /* Task 2 exits and a new task gets HTASK 2 again before any Winsock
+     * call by another task: IsTask(2) stays TRUE, only the PDB differs. */
+    task_pdb[2]=0x2345U;tasks[stale]=1;timers[stale]=0;
+    saved_head=head;saved_idle=idles;saved_clock=now;
+    CHECK(WSAGetLastError()==0);
+    app=usos_app();CHECK(app->task==2 && app->pdb==0x2345U && app->startups==0);
+    CHECK(app->hook==NULL && app->poll_window==NULL && !app->blocking);
+    CHECK(usos_global_startups==1 && usos_sock_kind(leaked)==USOS_SOCK_ENOTSOCK);
+    CHECK(IsWindow(stale) && head==saved_head && idles==saved_idle && now==saved_clock);
+    CHECK(WSAStartup(MAKEWORD(1,1),&data)==0 && usos_global_startups==2 && usos_app()==app);
+    CHECK(WSASetBlockingHook((FARPROC)reentry_hook)==original);
+    CHECK(WSAUnhookBlockingHook()==0);
+    fresh=socket(AF_INET,SOCK_DGRAM,17);CHECK(fresh!=INVALID_SOCKET && usos_socket_owners[fresh]==2);
+    /* The new instance dies too; the ordinary dead-task reap still works. */
+    dead_tasks[2]=1;current_task=1;CHECK(WSAGetLastError()==0);
+    CHECK(usos_global_startups==1 && usos_sock_kind(fresh)==USOS_SOCK_ENOTSOCK && app->task==NULL);
+    dead_tasks[2]=0;task_pdb[2]=0;
+    printf("reused_htask_fresh_context=1 same_task_same_context=1 stale_hook_dropped=1 dead_reap=1\n");
+}
 int main(int argc,char **argv)
 {
     WSADATA data;
@@ -361,6 +398,7 @@ int main(int argc,char **argv)
     else if(!strcmp(argv[1],"nested")) case_nested_tasks();else if(!strcmp(argv[1],"cancel")) case_select_dns_cancel();
     else if(!strcmp(argv[1],"contexts")) case_context_limits_and_refs();else if(!strcmp(argv[1],"linger")) case_linger();
     else if(!strcmp(argv[1],"abandoned")) case_abandoned_tasks();
-    else if(!strcmp(argv[1],"wep")) case_abandoned_wep();else return 2;
+    else if(!strcmp(argv[1],"wep")) case_abandoned_wep();
+    else if(!strcmp(argv[1],"reuse")) case_reused_task_handle();else return 2;
     CHECK(WSACleanup()==0);printf("failures=%d\n",failures);return failures?1:0;
 }

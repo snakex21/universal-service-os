@@ -41,6 +41,7 @@ def wrapper_bridge(tmp_path_factory):
     ("linger", "linger_zero_abort=1 positive_linger_explicit=1 freed_handle=1"),
     ("abandoned", "abandoned_tasks=24 reclaimed_refs=48 no_dead_window_or_io=1 survivor_transport=1"),
     ("wep", "wep_checks_task=1 recycled_hwnd_survives=1 all_context_memory_freed=1"),
+    ("reuse", "reused_htask_fresh_context=1 same_task_same_context=1 stale_hook_dropped=1 dead_reap=1"),
 ])
 def test_real_wrapper_with_fake_windows(wrapper_bridge, case, marker):
     result = subprocess.run([str(wrapper_bridge), case], capture_output=True, text=True, timeout=15)
