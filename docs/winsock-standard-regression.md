@@ -14,7 +14,8 @@ to ENHANCED. Browser binaries stay in the external application library.
 
 Preserve the baseline diagnostic provider before changing the implementation.
 Compare the same browser, configuration, base, machine and network with the
-USOS provider and the user's original Trumpet 3.0 control distribution.
+USOS provider and the user's Trumpet 2.0b control distribution (the user's
+Trumpet 3.0 copy stopped at "demo expired").
 Trumpet is an external runtime control, never an implementation input.
 An unconfigured or non-networking control is not a successful comparison.
 
