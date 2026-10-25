@@ -431,7 +431,23 @@ usos_net_w95_stage() {
             m = $0; sub(/^[^=]*=[ \t]*/, "", m); sub(/[ \t]*,.*/, "", m); sect = m }
         END { print ((want in str) ? str[want] : "USOS usosnet Ethernet") "|" sect }' "$_un_driver/USOSNET.INF")
     _un_sect=${_un_desc##*|}; _un_desc=${_un_desc%|*}
+    # 95 RTM (NDIS 3 driver): the card's firmware BAR0 as UsosBootBar0 (hex,
+    # sysfs resource line 1, low 4 bits off). 950's config manager may move
+    # the relocatable BAR0 into RAM hidden above MaxPhysPage (X470 NDISLOG
+    # 2026-10-25: registers read back x86 code); the driver restores it only
+    # when its MMIO probe fails (tools/nt/usosnet/README.md).
+    _un_bar0=''
+    if [ "${_un_ndis:-04}" = 03 ] && [ -r "$_un_pci/resource" ]; then
+        _un_bar0=$(sed -n '1s/^0x0*\([0-9a-fA-F]*\)[0-9a-fA-F] .*/\1/p' "$_un_pci/resource" | tr 'a-f' 'A-F')
+        case "$_un_bar0" in ''|*[!0-9A-F]*) _un_bar0='' ;; *) _un_bar0="${_un_bar0}0" ;; esac
+        [ "$_un_bar0" != 0 ] && [ "${#_un_bar0}" -le 8 ] || _un_bar0=''   # 32-bit BAR only
+    fi
     if usos_net_w95_reg "$_un_hwid" "$_un_inst" "$_un_desc" "$_un_sect" "${_un_ndis:-04}" > "$_un_driver/NET95.REG"; then
+        if [ -n "$_un_bar0" ]; then
+            tr -d '\r' < "$_un_driver/NET95.REG" | sed "/^\"DebugPort\"=\"0\"\$/a \"UsosBootBar0\"=\"$_un_bar0\"" | sed 's/$/\r/' > "$_un_driver/NET95.NEW" &&
+                mv "$_un_driver/NET95.NEW" "$_un_driver/NET95.REG" || { rm -f "$_un_driver/NET95.REG"; return 1; }
+            usos_net_log "usosnet4 (95 RTM): UsosBootBar0=$_un_bar0 (firmware BAR0)"
+        fi
         usos_net_log "usosnet4: NET95.REG staged: Enum\\$_un_hwid\\$_un_inst -> Net\\0009, TCP/IP NetTrans\\0009 (DHCP), client NetClient\\0009; path $_un_dev"
     else
         rm -f "$_un_driver/NET95.REG"; usos_net_log 'usosnet4: NET95.REG not written (PnP + USOSNET.INF)'

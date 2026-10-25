@@ -143,6 +143,7 @@ class Stage(unittest.TestCase):
         self.assertIn('Enum\\PCI\\VEN_8086&DEV_1539\\0008020B00]', text)
         self.assertIn('"DriverDesc"="Intel(R) I211 Gigabit Network Connection (USOS usosnet)"', text)
         self.assertIn('"InfSection"="USOSNETI211.ndi"', text)
+        self.assertNotIn('UsosBootBar0', text)   # OSR2 NDIS 4 driver: none
         self.assertTrue((self.target / 'USOS9X/NET/USOSNET.INF').exists())   # PnP fallback stays
         log = (self.target / 'USOS9X/LOGS/NETSETUP.TXT').read_text()
         self.assertIn('0008020B00', log)
@@ -153,6 +154,8 @@ class Stage(unittest.TestCase):
         (self.lib / 'network/win95-rtm').mkdir()
         (self.lib / 'network/win95-rtm/usosnet4.sys').write_bytes(b'own NDIS 3 test fixture, not a driver')
         self.card('0000-04-00.0')
+        (self.pci / '0000-04-00.0/resource').write_text('0x00000000fc900000 0x00000000fc91ffff 0x0000000000040200\n'
+                                                        '0x0000000000000000 0x0000000000000000 0x0000000000000000\n')
         env = {'USOS_NET_W95_PATH': '/sys/devices/pci0000:00/0000:00:01.3/0000:01:00.2/0000:02:01.0/0000:04:00.0',
                'USOS_NET_W95_VERSION': '4 0 0 950'}
         rc, out, err = run('usos_net_stage ' + ' '.join("'%s'" % p.as_posix() for p in (self.cfg, self.target, self.lib, self.pci)), env)
@@ -162,6 +165,10 @@ class Stage(unittest.TestCase):
         self.assertIn(dev + ']\r\n', text)
         self.assertIn(dev + '\\Bindings]\r\n"MSTCP\\\\0009"=""', text)
         self.assertNotIn('0008020B00', text)
+        # Firmware BAR0 for the NDIS 3 driver's restore (only after a failed MMIO probe).
+        self.assertIn('"DebugPort"="0"\r\n"UsosBootBar0"="FC900000"\r\n', text)
+        self.assertEqual(text.count('UsosBootBar0'), 1)
+        self.assertIn('UsosBootBar0=FC900000', (self.target / 'USOS9X/LOGS/NETSETUP.TXT').read_text())
         self.assertIn('"MajorNdisVersion"=hex:03', text)
 
     def test_no_pci_path_keeps_pnp_and_inf(self):
