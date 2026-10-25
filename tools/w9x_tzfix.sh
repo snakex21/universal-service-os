@@ -3,7 +3,7 @@
 # 2026-09-30.md section 4e). Sourced by tools/w9x_csmwrap_target.sh.
 #
 # w9x_tzfix_write <9x zone key> <C:\USOS9X folder> [local "YYYY-MM-DD HH:MM"]
-# writes TZFIX.BAT, TZFIX.REG and TZRO1.REG / TZRO2.REG there; AUTOEXEC.BAT
+# writes TZFIX.BAT, TZFIX.REG, TZDST.REG and TZRO1.REG / TZRO2.REG there; AUTOEXEC.BAT
 # (src/platform/bios/dos_startup.cmd) calls TZFIX.BAT before every Windows
 # start. TZFIX.BAT acts once, in real-mode DOS, when the registry exists:
 #   1. backs up SYSTEM.DAT / USER.DAT (C:\USOS9X\SYSTEM.TB / USER.TB),
@@ -14,6 +14,11 @@
 #   3. checks the zone with REGEDIT /E + FIND; on a failed import it restores
 #      the backup (TZFIX.RUN: one attempt, never repeated after a crash).
 #      Result in C:\USOS9X\TZFIX.OK or TZFIX.BAD.
+#   4. TZFIX.REG leaves automatic summer time off (DisableAutoDaylightTimeSet
+#      1) for Setup's first GUI boots; after a good import (TZDST.PND) a later
+#      start, once RunOnce\Setup is gone, imports TZDST.REG (0 = on) and
+#      checks it: TZDST.OK, or TZDST.ERR + a USOSLOG.TXT line (Windows starts
+#      either way). Same on 95 / 98 / 98 SE: every version gets the deferral.
 # Proven by hand on the X470 (98 SE PL OEM, 2026-10-06, TZFIX.OK ok-deleted).
 #
 # Zone data (TZI) from the Windows 98 SE CD's TIMEZONE.INF (Time Zones\<key>
@@ -173,7 +178,8 @@ w9x_tzfix_write() {
     active=$bias
     if w9x_tzfix_is_dst "$when" "$std" "$dlt"; then active=$((bias + dbias)); fi
     key='HKEY_LOCAL_MACHINE\System\CurrentControlSet\control\TimeZoneInformation'
-    run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup'
+    runonce='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce'
+    run="$runonce\\Setup"
     harmless='RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL'
     {
         printf 'REGEDIT4\r\n\r\n[%s]\r\n' "$key"
@@ -182,15 +188,21 @@ w9x_tzfix_write() {
         printf '"Bias"=hex:%s\r\n"StandardBias"=hex:00,00,00,00\r\n"DaylightBias"=hex:%s\r\n' "$(w9x_tzfix_hex4 "$bias")" "$(w9x_tzfix_hex4 "$dbias")"
         printf '"StandardStart"=hex:%s\r\n"DaylightStart"=hex:%s\r\n' "$std" "$dlt"
         printf '"ActiveTimeBias"=hex:%s\r\n' "$(w9x_tzfix_hex4 "$active")"
-        # Automatic summer time on: Setup's first-boot placeholder leaves -1
-        # (TZFIX replaces the Date/Time step that would clear it; OSR2 has -1
-        # too) and 950's KERNEL32 treats -1 as off.
-        printf '"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n\r\n'
+        # Automatic summer time stays OFF (1) while Setup's first GUI boots
+        # run (RunOnce\Setup). Suspected cause, not proven: with it on (0)
+        # the X470 950 first GUI boots on 2026-10-25 (the EU summer-time
+        # end day) hung in RunOnce\Setup's GRPCONV step; the passing run
+        # before had Setup's own placeholder (-1, off on 950). ActiveTimeBias
+        # above already fits the local time. After Setup TZFIX.BAT :LATE
+        # imports TZDST.REG (0 = on; 950's KERNEL32 treats -1 as off and
+        # TZFIX replaces the Date/Time step that would set it).
+        printf '"DisableAutoDaylightTimeSet"=hex:01,00,00,00\r\n\r\n'
         # 44-byte TZI (Bias, StandardBias, DaylightBias, StandardDate,
         # DaylightDate), wrapped like REGEDIT's own export.
         [ -z "$tzi" ] || printf '[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Time Zones\\%s]\r\n"TZI"=hex:%s,\\\r\n  %s,\\\r\n  %s\r\n\r\n' \
             "$zone" "$(printf '%s' "$tzi" | cut -d, -f1-12)" "$(printf '%s' "$tzi" | cut -d, -f13-28)" "$(printf '%s' "$tzi" | cut -d, -f29-44)"
     } > "$dir/TZFIX.REG" || return 1
+    printf 'REGEDIT4\r\n\r\n[%s]\r\n"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n\r\n' "$key" > "$dir/TZDST.REG" || return 1
     printf 'REGEDIT4\r\n\r\n[%s]\r\n"Strefa czasowa"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZRO1.REG" || return 1
     printf 'REGEDIT4\r\n\r\n[%s]\r\n"Time Zone"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZRO2.REG" || return 1
     U='C:\USOS9X\'
@@ -219,7 +231,8 @@ GOTO ATTR
 REM USOS: first-boot time zone step (tools/w9x_tzfix.sh), zone "$zone".
 REM Runs from AUTOEXEC.BAT before Windows starts, at most once.
 REM Undo: copy ${U}SYSTEM.TB / USER.TB back over C:\WINDOWS\*.DAT.
-IF EXIST ${U}TZFIX.OK GOTO END
+REM After Setup (RunOnce\Setup gone) the LATE part switches automatic summer time on.
+IF EXIST ${U}TZFIX.OK GOTO LATE
 IF EXIST ${U}TZFIX.BAD GOTO END
 IF EXIST ${U}TZFIX.RUN GOTO END
 IF NOT EXIST ${U}TZFIX.REG GOTO END
@@ -249,6 +262,7 @@ $R /E TZ1.CHK $key
 IF NOT EXIST TZ1.CHK GOTO BAD
 $F "$check" TZ1.CHK > NUL
 IF ERRORLEVEL 1 GOTO BAD
+ECHO pending> ${U}TZDST.PND
 $F "Strefa czasowa" TZ0.CHK > NUL
 IF NOT ERRORLEVEL 1 $R ${U}TZRO1.REG
 $F /I "Time Zone" TZ0.CHK > NUL
@@ -269,11 +283,53 @@ ECHO USOS: time zone registry change failed, restoring the registry backup.
 COPY /Y ${U}SYSTEM.TB SYSTEM.DAT > NUL
 COPY /Y ${U}USER.TB USER.DAT > NUL
 ECHO bad> ${U}TZFIX.BAD
+IF EXIST ${U}TZDST.PND DEL ${U}TZDST.PND
 REM SYSTEM.DAT / USER.DAT stay as Setup left them otherwise.
 :ATTR
 FOR %%F IN (TZ0 TZ1 TZ2) DO IF EXIST %%F.CHK DEL %%F.CHK
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
+CD \\
+GOTO END
+REM Once, only after this step imported TZFIX.REG, never while RunOnce\Setup exists.
+:LATE
+IF NOT EXIST ${U}TZDST.PND GOTO END
+IF EXIST ${U}TZDST.OK GOTO END
+IF EXIST ${U}TZDST.ERR GOTO END
+IF NOT EXIST ${U}TZDST.REG GOTO DSTERR
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO DSTERR
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO DSTERR
+IF NOT EXIST $F GOTO DSTERR
+IF NOT EXIST $A GOTO DSTERR
+C:
+CD \WINDOWS
+FOR %%F IN (TZ3 TZ4) DO IF EXIST %%F.CHK DEL %%F.CHK
+$R /E TZ3.CHK $runonce
+IF NOT EXIST TZ3.CHK GOTO DSTERR
+$F "REGEDIT4" TZ3.CHK > NUL
+IF ERRORLEVEL 1 GOTO DSTERR
+$F /I "\RunOnce\Setup]" TZ3.CHK > NUL
+IF ERRORLEVEL 2 GOTO DSTERR
+IF NOT ERRORLEVEL 1 GOTO DSTWAIT
+$A -S -R -H SYSTEM.DAT
+$A -S -R -H USER.DAT
+$R ${U}TZDST.REG
+$R /E TZ4.CHK $key
+$A +S +R +H SYSTEM.DAT
+$A +S +R +H USER.DAT
+IF NOT EXIST TZ4.CHK GOTO DSTERR
+$F /I "DisableAutoDaylightTimeSet" TZ4.CHK > NUL
+IF ERRORLEVEL 1 GOTO DSTERR
+$F /I "hex:01,00,00,00" TZ4.CHK > NUL
+IF NOT ERRORLEVEL 1 GOTO DSTERR
+ECHO ok> ${U}TZDST.OK
+GOTO DSTWAIT
+:DSTERR
+ECHO automatic summer time step failed> ${U}TZDST.ERR
+ECHO TZFIX: automatic summer time not switched on after Setup (TZDST.ERR); Windows started>> ${U}USOSLOG.TXT
+:DSTWAIT
+FOR %%F IN (TZ3 TZ4) DO IF EXIST C:\WINDOWS\%%F.CHK DEL C:\WINDOWS\%%F.CHK
+C:
 CD \\
 :END
 EOF

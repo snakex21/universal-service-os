@@ -14,7 +14,7 @@ from test_w9x_phase1_qemu import sh
 
 ROOT = Path(__file__).resolve().parents[2]
 TZFIX = (ROOT / 'tools/w9x_tzfix.sh').as_posix()
-NAMES = ('TZFIX.BAT', 'TZFIX.REG', 'TZRO1.REG', 'TZRO2.REG')
+NAMES = ('TZFIX.BAT', 'TZFIX.REG', 'TZDST.REG', 'TZRO1.REG', 'TZRO2.REG')
 # Time Zones\Central European / Eastern of the Windows 98 SE PL OEM CD
 # (TIMEZONE.INF, read back from the installed X470 registry): TZI fields.
 CE_TZI = ('c4,ff,ff,ff', 'c4,ff,ff,ff', '00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00',
@@ -47,7 +47,7 @@ class Tzfix(unittest.TestCase):
         self.check_tzi(reg, CE_TZI)
         self.assertIn('"StandardName"="Europa Środkowa (czas stand.)"\r\n'.encode('cp1250'), reg)
         self.assertIn(b'"ActiveTimeBias"=hex:88,ff,ff,ff\r\n', reg)   # 15 July, summer: -120
-        self.assertIn(b'"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n', reg)
+        self.assertIn(b'"DisableAutoDaylightTimeSet"=hex:01,00,00,00\r\n', reg)   # off during Setup
         self.assertNotIn(b'[-', reg)                                   # no key is deleted
         self.assertIn(b'"Strefa czasowa"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n', files['TZRO1.REG'])
         self.assertIn(b'"Time Zone"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n', files['TZRO2.REG'])
@@ -78,7 +78,7 @@ class Tzfix(unittest.TestCase):
         self.assertLess(text.index('FIND.EXE /I "TIMEDATE" TZ0.CHK'), text.index('ECHO run>'))
         self.assertLess(text.index('ECHO run>'), text.index('COPY /Y SYSTEM.DAT'))
         self.assertLess(text.index('COPY /Y USER.DAT'), text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZFIX.REG'))
-        for marker in ('TZFIX.OK GOTO END', 'TZFIX.BAD GOTO END', 'TZFIX.RUN GOTO END'):
+        for marker in ('TZFIX.OK GOTO LATE', 'TZFIX.BAD GOTO END', 'TZFIX.RUN GOTO END'):
             self.assertIn(marker, text)
         bad = text[text.index(':BAD'):]
         self.assertIn('COPY /Y C:\\USOS9X\\SYSTEM.TB SYSTEM.DAT', bad)
@@ -189,8 +189,8 @@ def windows_rule(st, year):
 
 class TzfixDaylight(unittest.TestCase):
     """ActiveTimeBias from the local date and time under the zone's own rule
-    (last / n-th Sunday incl. the hour) and DisableAutoDaylightTimeSet=0
-    (950 KERNEL32 reads Setup's -1 as off; X470 950 PL, 2026-10-25)."""
+    (last / n-th Sunday incl. the hour); DisableAutoDaylightTimeSet=1 (off)
+    for Setup's boots, TZDST.REG's 0 after them (TzdstLate)."""
     ZONES = (('Lisbon Warsaw', '950'), ('Central European', ''), ('Warsaw', ''), ('Eastern', ''), ('Eastern', '950'))
 
     def active(self, zone, src, when):
@@ -200,7 +200,7 @@ class TzfixDaylight(unittest.TestCase):
                           {'Z': zone, 'W': when, 'S': src})
         self.assertEqual(rc, 0, (zone, src, when, err))
         values = decode_reg((tmp / 'TZFIX.REG').read_bytes())
-        self.assertEqual(values['DisableAutoDaylightTimeSet'], b'\0\0\0\0', zone)
+        self.assertEqual(values['DisableAutoDaylightTimeSet'], b'\1\0\0\0', zone)
         return values, struct.unpack('<i', values['ActiveTimeBias'])[0]
 
     def test_central_europe_switch_hours(self):
@@ -242,6 +242,61 @@ class TzfixDaylight(unittest.TestCase):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn("tz_when=$(date '+%Y-%m-%d %H:%M' 2>/dev/null || :)", text)
         self.assertIn('w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when"', text)
+
+
+class TzdstLate(unittest.TestCase):
+    """Automatic summer time: off (1) in TZFIX.REG for Setup's first GUI boots
+    (the X470 950 first GUI boots on the 2026-10-25 summer-time end day hung
+    in GRPCONV with it on: suspected cause), on (0) through TZDST.REG once
+    RunOnce\\Setup is gone. The same for 95 / 98 / 98 SE."""
+    CASES = (('Lisbon Warsaw', '950'), ('Central European', ''), ('Eastern', ''))
+
+    def write(self, zone, src):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzlate-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        rc, out, err = sh(f'. "{TZFIX}"\nw9x_tzfix_write "$Z" "{tmp.as_posix()}" "2026-10-25 16:25" "$S" PL', {'Z': zone, 'S': src})
+        self.assertEqual(rc, 0, err)
+        return {p.name: p.read_bytes() for p in tmp.iterdir()}
+
+    def test_late_reg_sets_only_the_switch(self):
+        for zone, src in self.CASES:
+            files = self.write(zone, src)
+            self.assertEqual(files['TZDST.REG'], b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\control\\'
+                             b'TimeZoneInformation]\r\n"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n\r\n')
+            self.assertEqual(decode_reg(files['TZFIX.REG'])['DisableAutoDaylightTimeSet'], b'\1\0\0\0')
+
+    def test_late_step_waits_for_setup_and_runs_once(self):
+        for zone, src in self.CASES:
+            bat = self.write(zone, src)['TZFIX.BAT']
+            self.assertEqual(bat.count(b'\n'), bat.count(b'\r\n'))
+            text = bat.decode('ascii')
+            self.assertLessEqual(max(len(line) for line in text.split('\r\n')), 127)
+            labels = [line[1:] for line in text.split('\r\n') if line.startswith(':')]
+            self.assertEqual(len(labels), len(set(labels)))
+            # The first-boot import marks the late step only after the zone check.
+            first = text[:text.index(':LATE')]
+            self.assertLess(first.index('FIND.EXE "00,00,'), first.index('ECHO pending> C:\\USOS9X\\TZDST.PND'))
+            self.assertLess(first.index('TZDST.PND'), first.index('/E TZ2.CHK'))
+            self.assertIn('IF EXIST C:\\USOS9X\\TZDST.PND DEL C:\\USOS9X\\TZDST.PND', first[first.index(':BAD'):])
+            self.assertTrue(first.endswith('GOTO END\r\nREM Once, only after this step imported TZFIX.REG, never while RunOnce\\Setup exists.\r\n'))
+            self.assertNotIn('TZDST.REG', first)
+            late = text[text.index(':LATE'):]
+            order = ['IF NOT EXIST C:\\USOS9X\\TZDST.PND GOTO END', 'IF EXIST C:\\USOS9X\\TZDST.OK GOTO END',
+                     'IF EXIST C:\\USOS9X\\TZDST.ERR GOTO END',
+                     'REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E TZ3.CHK HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\r\n',
+                     'FIND.EXE "REGEDIT4" TZ3.CHK', 'FIND.EXE /I "\\RunOnce\\Setup]" TZ3.CHK',
+                     'IF ERRORLEVEL 2 GOTO DSTERR\r\nIF NOT ERRORLEVEL 1 GOTO DSTWAIT',
+                     'ATTRIB.EXE -S -R -H SYSTEM.DAT', 'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZDST.REG',
+                     '/E TZ4.CHK HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\control\\TimeZoneInformation',
+                     'ATTRIB.EXE +S +R +H SYSTEM.DAT', 'ATTRIB.EXE +S +R +H USER.DAT',
+                     'FIND.EXE /I "DisableAutoDaylightTimeSet" TZ4.CHK',
+                     'FIND.EXE /I "hex:01,00,00,00" TZ4.CHK > NUL\r\nIF NOT ERRORLEVEL 1 GOTO DSTERR',
+                     'ECHO ok> C:\\USOS9X\\TZDST.OK', ':DSTERR', '>> C:\\USOS9X\\USOSLOG.TXT', ':DSTWAIT', ':END']
+            at = [late.index(o) for o in order]
+            self.assertEqual(at, sorted(at), (zone, src))
+            # No backup copy, no PAUSE; a failure is logged and Windows starts.
+            self.assertNotIn('PAUSE', text)
+            self.assertNotIn('COPY', late)
 
 
 class Wiring(unittest.TestCase):

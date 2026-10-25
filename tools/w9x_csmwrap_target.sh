@@ -603,7 +603,7 @@ case "$SYSTEM_TAG:$TIME_ZONE" in
         if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when" "${tz_source:-}" "$tz_lang"; then
             log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step, local time ${tz_when:-unknown})"
         else
-            rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG" "$work/c/USOS9X/TZPR1.REG" "$work/c/USOS9X/TZPR2.REG"
+            rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG" "$work/c/USOS9X/TZDST.REG" "$work/c/USOS9X/TZPR1.REG" "$work/c/USOS9X/TZPR2.REG"
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
         fi ;;
 esac
