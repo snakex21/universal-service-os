@@ -163,6 +163,21 @@ class Tzfix950(unittest.TestCase):
         self.assertNotIn('TZPR1.REG', files)
         self.assertNotIn(b'Drukarki', files['TZFIX.BAT'])
 
+    def test_grpconv_is_wrapped_before_import_only_for_source950(self):
+        for language in ('PL','EN'):
+            _,files=self.write('Lisbon Warsaw',950,language)
+            text=files['TZFIX.BAT'].decode('ascii')
+            self.assertIn('VESBIND.EXE WRAPGRP TZ0.CHK C:\\USOS9X\\TZGRP.REG',text)
+            self.assertLess(text.index('COPY /Y USER.DAT'),text.index('VESBIND.EXE WRAPGRP'))
+            self.assertLess(text.index('VESBIND.EXE WRAPGRP'),text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZFIX.REG'))
+            self.assertIn('IF NOT EXIST C:\\USOS9X\\USOSGRPW.EXE GOTO BAD',text)
+            self.assertIn('IF EXIST C:\\USOS9X\\TZGRP.REG IF ERRORLEVEL 1 GOTO BAD',text)
+            self.assertLessEqual(max(map(len,text.split('\r\n'))),125)
+        for p in self.tmp.iterdir():p.unlink()
+        _,files=self.write('Warsaw','')
+        self.assertNotIn(b'USOSGRPW',files['TZFIX.BAT'])
+        self.assertNotIn(b'WRAPGRP',files['TZFIX.BAT'])
+
 
 def decode_reg(data):
     """TimeZoneInformation values of a TZFIX.REG: name -> bytes (hex) or str."""

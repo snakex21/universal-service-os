@@ -112,7 +112,7 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT',
           'USOSVMD.VXD')
 # Everything on the stick (the payload list and the release check use it).
-STAGED = FILES + ('VESBIND.EXE', 'MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
+STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
                    'CREGFIX.TXT') + (
     # Hardware diagnostics: on the stick, so the UEFI path's target writer
     # (tools/w9x_csmwrap_target.sh) puts them into C:\USOS9X; nothing runs
@@ -529,6 +529,8 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     build_usosdbg(out, work)
     build_usoslog(out, work)
     build_vesbind(out, work)
+    from build_usosgrpw import build as build_grpwatch
+    build_grpwatch(out)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:

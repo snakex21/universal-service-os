@@ -86,6 +86,7 @@ var payloadFiles = []payloadFile{
 	// Windows 95 RTM (4.00.950): VESA95.BAT binds the display with it
 	// (tools/w9x_vesa95.sh requires it for the 950 source).
 	{`zig-out/dos-native/win9x/VESBIND.EXE`, `EFI/USOS/dos-native/win9x/VESBIND.EXE`},
+	{`zig-out/dos-native/win9x/USOSGRPW.EXE`, `EFI/USOS/dos-native/win9x/USOSGRPW.EXE`},
 	// LAN helper: the Legacy Core copies it to the RAM disk (dos_native_iso.zig win9x_helpers).
 	{`zig-out/dos-native/win9x/USOSLAN.EXE`, `EFI/USOS/dos-native/win9x/USOSLAN.EXE`},
 	{`zig-out/dos-native/win9x/USOSVMD.VXD`, `EFI/USOS/dos-native/win9x/USOSVMD.VXD`},

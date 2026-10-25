@@ -211,8 +211,23 @@ w9x_tzfix_write() {
     A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
     check=${std%,00,00,00,00,00,00,00}
     rm -f "$dir/TZPR1.REG" "$dir/TZPR2.REG"
-    printer='REM -' printer_check='REM -'
+    printer='REM -' printer_check='REM -' grpwrap='REM -' grpcheck='REM -'
     if [ "$src" = 950 ]; then
+        grpwrap="REM 950: wrap the real GRPCONV command, preserving its localized name.
+IF EXIST ${U}TZGRP.REG DEL ${U}TZGRP.REG > NUL
+IF EXIST ${U}TZGRP.REG GOTO BAD
+$F /I \"grpconv\" TZ0.CHK > NUL
+IF ERRORLEVEL 2 GOTO BAD
+IF ERRORLEVEL 1 GOTO GRPDONE
+IF NOT EXIST ${U}USOSGRPW.EXE GOTO BAD
+IF NOT EXIST ${U}VESBIND.EXE GOTO BAD
+${U}VESBIND.EXE WRAPGRP TZ0.CHK ${U}TZGRP.REG
+IF ERRORLEVEL 2 GOTO BAD
+IF ERRORLEVEL 1 GOTO GRPDONE
+$R ${U}TZGRP.REG
+:GRPDONE"
+        grpcheck="IF EXIST ${U}TZGRP.REG $F /I \"USOSGRPW.EXE\" TZ2.CHK > NUL
+IF EXIST ${U}TZGRP.REG IF ERRORLEVEL 1 GOTO BAD"
         printf 'REGEDIT4\r\n\r\n[%s]\r\n"Drukarki"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR1.REG" || return 1
         printf 'REGEDIT4\r\n\r\n[%s]\r\n"Set up printer"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR2.REG" || return 1
         printer="REM 950: MSPRINT.DLL's Add Printer wizard step goes too.
@@ -257,6 +272,7 @@ COPY /Y SYSTEM.DAT ${U}SYSTEM.TB > NUL
 COPY /Y USER.DAT ${U}USER.TB > NUL
 IF NOT EXIST ${U}SYSTEM.TB GOTO ATTR
 IF NOT EXIST ${U}USER.TB GOTO ATTR
+$grpwrap
 $R ${U}TZFIX.REG
 $R /E TZ1.CHK $key
 IF NOT EXIST TZ1.CHK GOTO BAD
@@ -270,6 +286,7 @@ IF NOT ERRORLEVEL 1 $R ${U}TZRO2.REG
 $printer
 $R /E TZ2.CHK $run
 IF NOT EXIST TZ2.CHK GOTO BAD
+$grpcheck
 $F /I "TIMEDATE" TZ2.CHK > NUL
 IF ERRORLEVEL 1 GOTO OKSTEP
 ECHO ok-zone-only> ${U}TZFIX.OK

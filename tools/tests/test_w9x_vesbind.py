@@ -434,6 +434,35 @@ class DelKey(unittest.TestCase):
         self.assertGreaterEqual(sums_ok(after), 3)
 
 
+class WrapGrp(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):cls.binary=host_binary()
+    def setUp(self):
+        self.tmp=scratch('grpstep-');self.addCleanup(shutil.rmtree,self.tmp,ignore_errors=True)
+    def run_wrap(self,data):
+        source=self.tmp/'TZ0.CHK';out=self.tmp/'TZGRP.REG';source.write_bytes(data)
+        if out.exists():out.unlink()
+        result=subprocess.run([str(self.binary),'WRAPGRP',str(source),str(out)],capture_output=True)
+        self.assertFalse(result.stdout+result.stderr)
+        return result.returncode,out.read_bytes() if out.exists() else None
+    def test_original_pl_en_and_other_names_matched_only_by_exact_command(self):
+        key=r'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup'
+        for name in ('Programy w menu Start','Programs on the Start menu','Anderer Name'):
+            with self.subTest(name=name):
+                data=reg([(key,'"'+name+'"="C:\\\\WINDOWS\\\\grpconv.exe -s"')])
+                code,out=self.run_wrap(data);self.assertEqual(code,0)
+                self.assertEqual(out,reg([(key,'"'+name+'"="C:\\\\USOS9X\\\\USOSGRPW.EXE -s"')]))
+    def test_unrelated_commands_keys_and_non_setup_values_stay_untouched(self):
+        key=r'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup'
+        for command in ('other.exe -s','evilgrpconv.exe -s','grpconv.exe -other','grpconv.exe -s extra'):
+            self.assertEqual(self.run_wrap(reg([(key,'"Same name"="'+command+'"')])),(1,None))
+        self.assertEqual(self.run_wrap(reg([(key.rsplit('\\',1)[0],'"Step"="grpconv.exe -s"')])),(1,None))
+    def test_duplicate_matching_steps_and_malformed_export_fail_without_output(self):
+        key=r'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup'
+        duplicate=reg([(key,'"First"="grpconv.exe -s"\r\n"Second"="grpconv.exe -s"')])
+        self.assertEqual(self.run_wrap(duplicate),(2,None))
+        self.assertEqual(self.run_wrap(b'not REGEDIT4\r\n'),(2,None))
+
 class Generator(unittest.TestCase):
     def create(self,version='4 0 0 950'):
         tmp=scratch('vesalate-');self.addCleanup(shutil.rmtree,tmp,ignore_errors=True)

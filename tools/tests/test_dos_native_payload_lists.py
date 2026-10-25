@@ -71,6 +71,13 @@ class DosNativePayloadListTest(unittest.TestCase):
         self.assertTrue('win9x/VESBIND.EXE' in PACKED, 'VESBIND.EXE not packed')
         self.assertIn("'EFI/USOS/dos-native/win9x/VESBIND.EXE'", PS1)
 
+    def test_grpconv_watchdog_is_built_packed_and_release_checked(self):
+        self.assertIn('USOSGRPW.EXE',build_win9x_support.STAGED)
+        self.assertIn('win9x/USOSGRPW.EXE',PACKED)
+        self.assertIn("'EFI/USOS/dos-native/win9x/USOSGRPW.EXE'",PS1)
+        build=(ROOT/'tools/build_win9x_support.py').read_text(encoding='utf-8')
+        self.assertIn('build_grpwatch(out)',build)
+
     def test_legacy_core_win9x_helpers_are_packed(self):
         zig = (ROOT / 'src/platform/bios/dos_native_iso.zig').read_text(encoding='utf-8')
         block = re.search(r'const win9x_helpers = \[_\]\[\]const u8\{([^}]*)\}', zig).group(1)

@@ -233,6 +233,38 @@ static unsigned long slot_pos[SLOTS][256];
 static int slot_blk[SLOTS], slot_next;
 static unsigned char io[512];
 static const char *del_reason = "not-started";
+/* WRAPGRP uses the real exported command, never a localized value name. */
+#define SETUPKEY "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup"
+static char grp_name[256];
+static unsigned grp_count;
+static int grp_line(const char *line,int header) {
+    const char *p,*start,*base;char command[512],program[256];unsigned n=0,left;
+    if(header || !ieq(key,SETUPKEY) || line[0]!='\"') return 1;
+    p=line+1;
+    while(*p && *p!='\"'){if(*p=='\\'&&p[1])p++;p++;}
+    if(*p!='\"' || p[1]!='=' || p[2]!='\"')return 1;
+    left=(unsigned)(p-line)+1;if(left>=sizeof(grp_name))return 0;
+    p+=3;
+    while(*p && *p!='\"'){
+        char c=*p++;
+        if(c=='\\'){c=*p++;if(c!='\\'&&c!='\"')return 0;}
+        if((unsigned char)c<32 || n+1>=sizeof(command))return 0;
+        command[n++]=c;
+    }
+    if(*p!='\"' || p[1])return 0;command[n]=0;p=command;
+    while(*p==' '||*p=='\t')p++;
+    start=p;n=0;
+    if(*p=='\"'){start=++p;while(*p&&*p!='\"')p++;}
+    else while(*p&&*p!=' '&&*p!='\t')p++;
+    n=(unsigned)(p-start);if(!n||n>=sizeof(program))return 1;
+    memcpy(program,start,n);program[n]=0;
+    if(*p=='\"')p++;while(*p==' '||*p=='\t')p++;
+    if(!ieq(p,"-s"))return 1;
+    base=program;for(start=program;*start;start++)if(*start=='\\'||*start=='/')base=start+1;
+    if(!ieq(base,"grpconv.exe"))return 1;
+    if(++grp_count!=1)return 0;
+    memcpy(grp_name,line,left);grp_name[left]=0;return 1;
+}
 #ifdef __WATCOMC__
 static unsigned hive = 0xffff;
 static int hopen(const char *path) { hive = dos_open_rw(path); return hive != 0xffff; }
@@ -489,6 +521,14 @@ int main(int argc,char **argv) {
     root_chosen[0]=root_driver[0]=0;
     profile[0]=bits[0]=resolution[0]=actual_bits[0]=actual_resolution[0]=profile_key[0]=0;
     current_class=-1;default_section=valid_device=candidate_pci=0;
+    if(argc==4 && ieq(argv[1],"WRAPGRP")){
+        grp_count=0;grp_name[0]=0;
+        if(!scan(argv[2],grp_line))return 2;
+        if(!grp_count)return 1;
+        out=fopen(argv[3],"wb");if(!out)return 2;
+        failed=fprintf(out,"REGEDIT4\r\n\r\n[" SETUPKEY "]\r\n%s=\"C:\\\\USOS9X\\\\USOSGRPW.EXE -s\"\r\n",grp_name)<0;
+        if(fclose(out))failed=1;return failed?2:0;
+    }
     if ((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) {
         static const char *codes[] = {"0", "1", "2", "3"};
         failed=delkey(argv[2],argv[3]);
