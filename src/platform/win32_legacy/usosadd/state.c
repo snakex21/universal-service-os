@@ -73,6 +73,12 @@ int ua_resume_decision(int tries, int has_check, int check_true) {
     return 2;
 }
 
+int ua_after_run(int ok, int reboot, int pending_reboot, int tries) {
+    if (ok) return reboot == UA_REBOOT_NOW ? UA_AFTER_RESTART : reboot == UA_REBOOT_END ? UA_AFTER_PENDING : UA_AFTER_CONTINUE;
+    if (tries < 2 && (pending_reboot || reboot != UA_REBOOT_NO)) return UA_AFTER_RETRY;
+    return UA_AFTER_CONTINUE;
+}
+
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
                  const ua_system *s, int pkg, char *unmet, int cap) {
     char item[48];

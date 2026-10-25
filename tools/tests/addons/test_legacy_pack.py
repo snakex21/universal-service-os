@@ -168,6 +168,20 @@ def test_presets(m: lm.Manifest) -> None:
             want = [w for w in want if w != '<hfnt>'] + [p.id for p in m.packages if p.id.startswith('hfnt-')]
         if [x for x in got] != sorted(want, key=got.index) or set(got) != set(want):
             fail(f'full pack {os_} {lang} sp{sp}: got {got}')
+    # Windows 95: install -> one restart -> desktop (no reboot=now package in
+    # the full pack or the retro preset, for every 95 release and language)
+    retro = lm.list_items(m.get('preset:retro', 'options') or '')
+    for os_ in ('95RTM', '95OSR1', '95OSR2', '95OSR21', '95OSR25'):
+        for lang in ('PL', 'EN'):
+            for full, opts in ((True, []), (False, retro)):
+                plan = lm.resolve(m, os_, lang, '', full, opts)
+                now = [i for i in plan.order if (m.find(i).get('reboot') or '') == 'now']
+                if now or not plan.order:
+                    fail(f'{os_} {lang} full={full}: restart mid-chain after {now} (plan {plan.order})')
+    # Q810847 may run before IE 5.5 SP2's restart: it needs ie:5.5 only
+    q = m.find('ie55sp2-q810847-pl')
+    if q.needs != ['ie:5.5'] or m.find('ie55sp2-pl').get('reboot') != 'end':
+        fail(f'Q810847/IE 5.5 restart batching: needs={q.needs} ie55 reboot={m.find("ie55sp2-pl").get("reboot")}')
     # an option pulls in what it needs; an option for another system stays out
     plan = lm.resolve(m, '98SE', 'PL', '', False, ['dsclient9x'])
     if plan.order != ['msi20-9x', 'dsclient9x']:

@@ -319,8 +319,13 @@ its C library (own entry point, no CRT), PE subsystem 4.0, i386: loads on
    `running` twice = failed, move on;
 5. `reboot=now` â†’ keep its `HKLM\...\Run` value, restart
    (`ExitWindowsEx(EWX_REBOOT)`, on NT after `SeShutdownPrivilege`);
-   `reboot=end` restarts are collected and done once before the next
-   `now` package or at the end;
+   `reboot=end` restarts are collected and done once at the end (no
+   restart before a `now` package only because one is pending); a package
+   that fails while a restart is pending, or whose own `check` needs its
+   restart, stays `running` and is retried once after a restart
+   (`ua_after_run`). The Windows 95 plans contain no `now` package: the
+   pack is install -> one restart -> desktop (reasons per package in the
+   manifest comments);
 6. fault tolerance: a failing package is marked `failed` with its reason
    (exit code, "not installed" when its check stays false, "interrupted
    twice") and the chain goes on; packages that need what it provides are

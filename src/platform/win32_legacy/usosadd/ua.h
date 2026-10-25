@@ -189,6 +189,15 @@ const char *ua_state_name(int st);
  * PC itself or the runner was killed): 1 = done (check true), 2 = run again,
  * 3 = failed (second time). */
 int ua_resume_decision(int tries, int has_check, int check_true);
+/* Decision after a package's commands ran (ok = its check or exit code
+ * passed; tries counts this run). Restarts are batched: only reboot=now
+ * restarts at once, reboot=end only marks one as pending for the final
+ * restart, and nothing restarts before a package merely because a restart
+ * is pending. A package that failed while a restart is pending (another
+ * package's, or its own reboot=now/end kind, whose check may only turn true
+ * after it) gets one more try after that restart instead of failing. */
+enum { UA_AFTER_CONTINUE, UA_AFTER_PENDING, UA_AFTER_RESTART, UA_AFTER_RETRY };
+int ua_after_run(int ok, int reboot, int pending_reboot, int tries);
 /* Runtime need check: satisfied by the OS or by a provider in state
  * DONE/PRESENT. Writes the first unmet capability into unmet. */
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,

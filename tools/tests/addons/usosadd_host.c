@@ -185,6 +185,20 @@ static int selftest(void) {
     CHECK(ua_resume_decision(1, 0, 0) == 2);
     CHECK(ua_resume_decision(2, 1, 0) == 3);
     CHECK(ua_resume_decision(1, 1, 0) == 2);
+    /* restarts are batched: only reboot=now restarts at once */
+    CHECK(ua_after_run(1, UA_REBOOT_NOW, 0, 1) == UA_AFTER_RESTART);
+    CHECK(ua_after_run(1, UA_REBOOT_NOW, 1, 1) == UA_AFTER_RESTART);
+    CHECK(ua_after_run(1, UA_REBOOT_END, 1, 1) == UA_AFTER_PENDING);
+    CHECK(ua_after_run(1, UA_REBOOT_NO, 1, 1) == UA_AFTER_CONTINUE);
+    /* a failure with a restart pending (or of a package that needs its own
+     * restart) is retried once after a restart, then it stands */
+    CHECK(ua_after_run(0, UA_REBOOT_NO, 1, 1) == UA_AFTER_RETRY);
+    CHECK(ua_after_run(0, UA_REBOOT_END, 0, 1) == UA_AFTER_RETRY);
+    CHECK(ua_after_run(0, UA_REBOOT_NOW, 0, 1) == UA_AFTER_RETRY);
+    CHECK(ua_after_run(0, UA_REBOOT_NO, 0, 1) == UA_AFTER_CONTINUE);
+    CHECK(ua_after_run(0, UA_REBOOT_END, 1, 2) == UA_AFTER_CONTINUE);
+    /* the retried package resumes as running: check true = done, else runs again */
+    CHECK(ua_resume_decision(1, 1, 1) == 1 && ua_resume_decision(1, 1, 0) == 2);
 
     /* runtime needs: b needs msi (a done) and ie:5.01 (not there) */
     {
@@ -193,6 +207,11 @@ static int selftest(void) {
         CHECK(!ua_needs_met(&ini, &pk, &st2, &s, 1, unmet, sizeof unmet) && strcmp(unmet, "ie:5.01") == 0);
         st2.st[0] = UA_ST_NEW;
         CHECK(!ua_needs_met(&ini, &pk, &st2, &s, 1, unmet, sizeof unmet) && strcmp(unmet, "msi:2.0") == 0);
+        /* a provider done in this session counts before its restart (IE 5.5
+         * SP2 -> Q810847 on 95): pending_reboot does not hide it */
+        st2.st[0] = UA_ST_DONE; st2.pending_reboot = 1;
+        strcpy(s.os, "NT4"); /* no OS-provided ie: only a's msi:2.0 is asked */
+        CHECK(!ua_needs_met(&ini, &pk, &st2, &s, 1, unmet, sizeof unmet) && strcmp(unmet, "ie:5.01") == 0);
     }
     printf(failures ? "selftest: %d failure(s)\n" : "selftest: ok\n", failures);
     return failures ? 1 : 0;

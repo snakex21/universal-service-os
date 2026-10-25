@@ -703,7 +703,7 @@ static void run_chain(void) {
     const char *name_key = g_pl ? "name_pl" : "name_en";
     int pos;
     for (pos = 0; pos < g_plan.count; pos++) {
-        int x = g_plan.idx[pos], ok, k, check;
+        int x = g_plan.idx[pos], ok, k, check, after;
         const ua_pkg *p = &g_p.pkg[x];
         const char *name = ua_ini_get(&g_m, p->section, name_key);
         int st = g_state.st[x];
@@ -730,7 +730,10 @@ static void run_chain(void) {
             continue;
         }
         if (!files_present(p)) { set_why(x, UA_ST_SKIPPED, g_pl ? "brak pliku" : "file missing", 0); continue; }
-        if (p->reboot == UA_REBOOT_NOW && g_state.pending_reboot) restart();
+        /* No restart here merely because one is pending: restarts are batched
+         * into the final one (95 RTM: install -> one restart -> desktop);
+         * ua_after_run retries a package once after a restart when the
+         * pending one was in its way. */
         line[0] = 0;
         ua_append(line, sizeof line, g_pl ? "USOS: instalowanie dodatk\363w (" : "USOS: installing add-ons (");
         ua_itoa(num, sizeof num, pos + 1);
@@ -761,6 +764,13 @@ static void run_chain(void) {
         }
         check = run_check(p);
         if (check >= 0) ok = check;
+        after = ua_after_run(ok, p->reboot, g_state.pending_reboot, g_state.tries[x]);
+        if (after == UA_AFTER_RETRY) {
+            /* stays "running": after the restart its check decides, else it runs once more */
+            ua_itoa(num, sizeof num, (int)g_last_code);
+            log2("  not installed yet, a restart is pending: retry after the restart, exit code ", num);
+            restart();
+        }
         if (ok) {
             set_state(x, UA_ST_DONE);
         } else {
@@ -768,8 +778,8 @@ static void run_chain(void) {
             set_why(x, UA_ST_FAILED, check == 0 ? (g_pl ? "nie zainstalowano, kod " : "not installed, exit code ")
                                                  : (g_pl ? "b\263\271d, kod " : "error, exit code "), num);
         }
-        if (ok && p->reboot == UA_REBOOT_NOW) restart();
-        if (ok && p->reboot == UA_REBOOT_END) { g_state.pending_reboot = 1; save_state(); }
+        if (after == UA_AFTER_RESTART) restart();
+        if (after == UA_AFTER_PENDING) { g_state.pending_reboot = 1; save_state(); }
     }
 }
 
@@ -936,6 +946,7 @@ void __cdecl ua_start(void) {
     g_state.pending_reboot = 0; /* we are running after the restart */
     save_state();
     window_open();
+    status(g_pl ? "USOS: instalowanie dodatk\363w..." : "USOS: installing add-ons...");
     run_chain();
     finish();
     ExitProcess(0);
