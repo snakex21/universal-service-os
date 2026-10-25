@@ -86,6 +86,81 @@ class Tzfix(unittest.TestCase):
         self.assertNotIn('ATTRIB.EXE -R -H', text)
 
 
+class Tzfix950(unittest.TestCase):
+    """95 RTM / OSR1 (4.00.950) PL and EN CDs: TIMEZONE.INF keys, the
+    pre-1996 EU rule of "Lisbon Warsaw" and MSPRINT.DLL's printer step."""
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tz950-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def run_sh(self, code, env=None):
+        rc, out, err = sh(f'. "{TZFIX}"\n' + code, env or {})
+        return rc, out
+
+    def test_950_keys(self):
+        for osr2, want in (('Warsaw', 'Lisbon Warsaw'), ('Central European', 'Lisbon Warsaw'),
+                           ('Prague Bratislava', 'Czech'), ('Beijing', 'China'), ('AUS Eastern', 'Sydney'),
+                           ('Bangkok', 'Bangkok'), ('Saudi Arabia', 'Saudi Arabia'), ('Eastern', 'Eastern'),
+                           ('GTB', 'GFT'), ('E. Australia', ''), ('Pacific SA', '')):
+            rc, out = self.run_sh('w9x_tz950_key "$Z"', {'Z': osr2})
+            self.assertEqual(out, want, osr2)
+
+    def test_msbatch_rewrite(self):
+        inf = self.tmp / 'MSBATCH.INF'
+        for zone, want in (('Warsaw', b'TimeZone="Lisbon Warsaw"\r\n'), ('E. Australia', None)):
+            inf.write_bytes(b'[Setup]\r\nExpress=1\r\nTimeZone="%s"\r\nVRC=1\r\n' % zone.encode())
+            rc, _ = self.run_sh(f'w9x_msbatch_tz950 "{inf.as_posix()}"')
+            data = inf.read_bytes()
+            self.assertEqual(rc, 0)
+            self.assertIn(b'Express=1\r\n', data)
+            self.assertIn(b'VRC=1\r\n', data)
+            if want:
+                self.assertIn(want, data)
+            else:
+                self.assertNotIn(b'TimeZone', data)
+
+    def write(self, zone, src, lang='PL'):
+        rc, _ = self.run_sh(f'w9x_tzfix_write "$Z" "{self.tmp.as_posix()}" 10 {src} {lang}', {'Z': zone})
+        return rc, {p.name: p.read_bytes() for p in self.tmp.iterdir()}
+
+    def test_lisbon_warsaw_gets_the_eu_rule_and_list_tzi(self):
+        rc, files = self.write('Lisbon Warsaw', 950)
+        self.assertEqual(rc, 0)
+        reg = files['TZFIX.REG']
+        self.assertIn(b'"StandardStart"=hex:00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00\r\n', reg)
+        self.assertIn(b'"StandardName"="Lizbona/Warszawa - czas zimowy"\r\n', reg)
+        self.assertIn(b'[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Time Zones\\Lisbon Warsaw]\r\n'
+                      b'"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\\\r\n'
+                      b'  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\\\r\n'
+                      b'  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00\r\n', reg)
+        _, en = self.write('Lisbon Warsaw', 950, 'EN')
+        self.assertIn(b'"StandardName"="Lisbon Warsaw Standard Time"\r\n', en['TZFIX.REG'])
+        # Only 950 has the key; OSR2 / 98 never get it.
+        for p in self.tmp.iterdir():
+            p.unlink()
+        rc, files = self.write('Lisbon Warsaw', '')
+        self.assertEqual((rc, files), (1, {}))
+
+    def test_printer_step_and_case_insensitive_step_names(self):
+        _, files = self.write('Lisbon Warsaw', 950)
+        harmless = b'"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n'
+        self.assertIn(b'"Drukarki' + harmless, files['TZPR1.REG'])
+        self.assertIn(b'"Set up printer' + harmless, files['TZPR2.REG'])
+        text = files['TZFIX.BAT'].decode('ascii')
+        self.assertIn('FIND.EXE /I "Time Zone" TZ0.CHK', text)        # EN 950: "Time zone"
+        self.assertIn('FIND.EXE /I "Drukarki" TZ0.CHK > NUL\r\nIF NOT ERRORLEVEL 1 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZPR1.REG', text)
+        self.assertIn('FIND.EXE /I "Set up printer" TZ0.CHK > NUL\r\nIF NOT ERRORLEVEL 1 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZPR2.REG', text)
+        self.assertLess(text.index('TZPR2.REG'), text.index('/E TZ2.CHK'))
+        self.assertIn('ECHO ok-printer-left>', text)
+        self.assertLessEqual(max(len(line) for line in text.split('\r\n')), 127)
+        # OSR2 / 98: no printer files, no printer lines.
+        for p in self.tmp.iterdir():
+            p.unlink()
+        _, files = self.write('Warsaw', '')
+        self.assertNotIn('TZPR1.REG', files)
+        self.assertNotIn(b'Drukarki', files['TZFIX.BAT'])
+
+
 class Wiring(unittest.TestCase):
     def test_prepare_guards_the_msbatch_zone_and_passes_it_on(self):
         text = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
@@ -120,6 +195,28 @@ class Wiring(unittest.TestCase):
             self.assertEqual(rc, 0, err)
             self.assertEqual((tmp / 'c/USOS9X/TZFIX.BAT').exists(), expected, (tag, zone, out))
             self.assertEqual((tmp / 'c/USOS9X/TZFIX.REG').exists(), expected, (tag, zone))
+
+    def test_target_answer_zone_950_and_profile_runs(self):
+        text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        start = text.index('cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF"')
+        block = text[start:text.index('# The pinned MIT VESA driver', start)]
+        for tag, version, given, zone, want in (('95', '4 0 0 950', '', 'Warsaw', 'Lisbon Warsaw'),
+                                                ('95', '4 0 0 950', 'Warsaw', 'Warsaw', 'Lisbon Warsaw'),
+                                                ('95', '4 0 0 1111', '', 'Warsaw', 'Warsaw'),
+                                                ('98SE', '', '', 'Central European', 'Central European'),
+                                                ('98SE', '', 'Eastern', 'Central European', 'Eastern')):
+            tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzans-'))
+            self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+            (tmp / 'c/USOS9X').mkdir(parents=True)
+            (tmp / 'A.INF').write_bytes(b'[Setup]\r\nTimeZone="%s"\r\n' % zone.encode())
+            script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { exit 9; }\n'
+                      f'SYSTEM_TAG={tag}\nsetup_version="$V"\nTIME_ZONE="$G"\nANSWER_INF="{(tmp / "A.INF").as_posix()}"\n'
+                      f'LIB="{(ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block + '\nprintf "%s" "$TIME_ZONE"')
+            rc, out, err = sh(script, {'V': version, 'G': given})
+            self.assertEqual(rc, 0, err)
+            self.assertTrue(out.endswith(want), (tag, version, given, out))
+            if version == '4 0 0 950':
+                self.assertIn(b'TimeZone="Lisbon Warsaw"\r\n', (tmp / 'c/USOS9X/MSBATCH.INF').read_bytes())
 
     def test_autoexec_calls_tzfix_after_u9fix_in_csm_mode(self):
         lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()

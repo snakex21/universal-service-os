@@ -39,9 +39,10 @@ SIZE_GIB=${W9X_SIZE_GIB:-32}
 # 1: Setup phase 1 runs in a VM on this machine (tools/w9x_phase1_qemu.sh):
 # U9ENV.BAT gets U9VM=1 (Setup /P I) and USOSVESA.INF this PC's display IDs.
 VM_PHASE1=${W9X_VM_PHASE1:-0}
-# The 9x zone key of MSBATCH.INF [Setup] TimeZone (USOS default answer only):
-# 95 / 98 / 98 SE also get C:\USOS9X\TZFIX.BAT for the first-boot Date/Time
-# step (95: the key as Windows 95 names it, e.g. Warsaw).
+# The 9x zone key of MSBATCH.INF [Setup] TimeZone (USOS default answer; a
+# profile run takes the answer's own TimeZone below): 95 / 98 / 98 SE also
+# get C:\USOS9X\TZFIX.BAT for the first-boot Date/Time step (95: the key as
+# Windows 95 names it, e.g. Warsaw on OSR2.1, Lisbon Warsaw on 950).
 TIME_ZONE=${W9X_TIME_ZONE:-}
 PCI_ROOT=${W9X_PCI_ROOT:-/sys/bus/pci/devices}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
@@ -281,6 +282,20 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# Time zone: 950's TIMEZONE.INF names zones differently from OSR2.1 (the menu
+# and profiles render OSR2.1 keys): the [Setup] TimeZone becomes the 950 key.
+# A profile run has no W9X_TIME_ZONE: TZFIX takes the answer's TimeZone.
+[ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" || fail 'missing time zone helper'
+tz_source=''
+if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    tz_source=950
+    w9x_msbatch_tz950 "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot map the time zone to the 950 key'
+    TIME_ZONE=''
+fi
+if [ -z "$TIME_ZONE" ]; then
+    TIME_ZONE=$(sed -n 's/^TimeZone="\([^"]*\)".*$/\1/p' "$work/c/USOS9X/MSBATCH.INF" | head -n 1)
+fi
+log "time zone: answer TimeZone=${TIME_ZONE:-none}${tz_source:+ (950 key)}"
 # The pinned MIT VESA driver's unregister call stalls RTM shutdown. Patch
 # only this newly staged target copy for the exact 950 source, never OSR2.
 if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
@@ -545,10 +560,11 @@ fi
 
 case "$SYSTEM_TAG:$TIME_ZONE" in
     98SE:?*|98:?*|95:?*)
-        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X"; then
+        tz_lang=PL; [ "${addon_lang:-}" != EN ] || tz_lang=EN
+        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" '' "${tz_source:-}" "$tz_lang"; then
             log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step)"
         else
-            rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG"
+            rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG" "$work/c/USOS9X/TZPR1.REG" "$work/c/USOS9X/TZPR2.REG"
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
         fi ;;
 esac
