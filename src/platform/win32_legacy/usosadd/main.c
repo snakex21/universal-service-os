@@ -55,6 +55,7 @@ static char g_root[UA_PATH];     /* folder of USOSADD.EXE */
 static char g_log[UA_PATH];
 static char g_win[UA_PATH], g_sysdir[UA_PATH], g_pf[UA_PATH];
 static int g_pl;                 /* Polish messages */
+static int g_setup_mode;         /* source950 ordinary RunOnce, before tray */
 static HWND g_wnd, g_text;
 static DWORD g_last_code;       /* exit code of the last command */
 
@@ -558,11 +559,11 @@ static int setup_busy(void) {
     HKEY k;
     DWORD values = 0;
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY "\\Setup", 0, KEY_READ, &k) == ERROR_SUCCESS) {
-        if (RegQueryInfoKeyA(k, 0, 0, 0, 0, 0, 0, &values, 0, 0, 0, 0) != ERROR_SUCCESS) values = 0;
+        if (RegQueryInfoKeyA(k, 0, 0, 0, 0, 0, 0, &values, 0, 0, 0, 0) != ERROR_SUCCESS) values = g_setup_mode ? 1 : 0;
         RegCloseKey(k);
         if (values) return 1;
     }
-    return FindWindowA("Shell_TrayWnd", 0) == 0;
+    return !g_setup_mode && FindWindowA("Shell_TrayWnd", 0) == 0;
 }
 
 /* Wait for first-session readiness notifications, with a fixed deadline. */
@@ -621,6 +622,10 @@ static void auto_logon(void) {
 static void restart(void) {
     g_state.pending_reboot = 1;
     save_state();
+    if (g_setup_mode) {
+        log_line("USOSADD setup: package needs a restart before the chain can finish; caller owns restart");
+        ExitProcess(1001);
+    }
     register_run();
     lan_defaults(0);
     auto_logon();
@@ -790,7 +795,7 @@ static void finish(void) {
     int i, done = 0, failed = 0, skipped = 0, listed = 0;
     char num[8];
     const char *name_key = g_pl ? "name_pl" : "name_en";
-    if (g_state.pending_reboot) restart();
+    if (!g_setup_mode && g_state.pending_reboot) restart();
     for (i = 0; i < g_plan.count; i++) {
         int st = g_state.st[g_plan.idx[i]];
         if (g_p.pkg[g_plan.idx[i]].tier == UA_TIER_GROUP) continue;
@@ -826,6 +831,13 @@ static void finish(void) {
     }
     ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
     ua_append(text, sizeof text, g_log);
+    if (g_setup_mode) {
+        lan_defaults(0);
+        unregister();
+        if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
+        log_line("USOSADD setup: chain returned without restarting or showing a summary dialog");
+        ExitProcess(failed || skipped ? 2 : g_state.pending_reboot ? 3010 : 0);
+    }
     lan_defaults(1);
     unregister();
     if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
@@ -838,6 +850,13 @@ static int has_switch(const char *cmdline, const char *sw) {
     const char *p = cmdline;
     int n = ua_len(sw);
     for (; *p; p++) if ((p[0] == '/' || p[0] == '-') && ua_ieqn(p + 1, sw, n)) return 1;
+    return 0;
+}
+
+static int exact_switch(const char *cmd,const char *name) {
+    const char *p=cmd;int n=ua_len(name);
+    for(;*p;p++)if((p==cmd||p[-1]==' '||p[-1]=='\t')&&(p[0]=='/'||p[0]=='-')&&
+        ua_ieqn(p+1,name,n)&&(p[n+1]==0||p[n+1]==' '||p[n+1]=='\t'))return 1;
     return 0;
 }
 
@@ -886,6 +905,9 @@ void __cdecl ua_start(void) {
     else ua_state_load(&g_state, 0, &g_p);
 
     detect();
+    g_setup_mode=exact_switch(cmdline,"setup");
+    if(g_setup_mode && (g_facts.nt||g_facts.major!=4||g_facts.minor!=0||(g_facts.build&0xffff)!=950||!exists("C:\\USOS9X\\VLATE.OK"))){
+        log_line("USOSADD setup: source950 late display boundary missing; nothing installed");ExitProcess(2);}
     /* Locale/keyboard can differ from the installation media's language.
      * Stage selects packages by the latter; retain that language on resume. */
     if (!dry) {
@@ -923,9 +945,24 @@ void __cdecl ua_start(void) {
     if (g_state.starts == 0 || dry) log_plan();
     if (dry) ExitProcess(0);
 
+    if(g_setup_mode && exact_switch(cmdline,"check")){
+        int failed=0;
+        for(i=0;i<g_plan.count;i++){
+            int x=g_plan.idx[i],check;
+            const ua_pkg *p=&g_p.pkg[x];
+            if(p->tier==UA_TIER_GROUP)continue;
+            check=run_check(p);
+            if(check==0||(check<0&&g_state.st[x]!=UA_ST_DONE&&g_state.st[x]!=UA_ST_PRESENT)){
+                failed++;log2("USOSADD setup final check failed: ",p->id);}
+        }
+        if(!failed){g_state.pending_reboot=0;save_state();unregister();}
+        log_line(failed?"USOSADD setup final check incomplete":"USOSADD setup final checks complete");
+        ExitProcess(failed?2:0);
+    }
+
     /* Started from Run after the shell; still wait while Setup finishes
      * (an older RunOnce entry, or a slow first boot). */
-    register_run();
+    if(!g_setup_mode)register_run();else unregister();
     if (ua_ieq(g_sys.os,"NT4") && virtual_machine()) {
         log_line("USOSADD: VM deferred; Run retained for the first hardware desktop");
         ExitProcess(0);
