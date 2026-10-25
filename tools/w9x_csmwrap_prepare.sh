@@ -736,6 +736,16 @@ usos_w9x_csmwrap_prepare() {
             sync
             w9x_csmwrap_log "NVME $nvme_msg"
         fi
+        # SETUP 4.0.0.950 only (tools/w9x_950_post.sh): no Program Manager
+        # DDE step in GRPCONV, DDC monitor not capped at 1600x1200.
+        if [ "$W9X_VM_95_SETUP950" = 1 ] && [ -r /usr/lib/usos/w9x_950_post.sh ] &&
+            . /usr/lib/usos/w9x_950_post.sh && post_loop=$(losetup -f) &&
+            losetup -o 1048576 "$post_loop" "$TARGET_DEVICE"; then
+            post_msg=$(MTOOLS_SKIP_CHECK=1 w9x_950_post_inject "$post_loop") || post_msg="FAILED: $post_msg"
+            losetup -d "$post_loop" 2>/dev/null || true
+            sync
+            w9x_csmwrap_log "$post_msg"
+        fi
     fi
     # How to log on afterwards (logon.ini from the menu; nothing for 9x/DOS/images).
     usos_logon_take /mnt/esp "$system" || true
