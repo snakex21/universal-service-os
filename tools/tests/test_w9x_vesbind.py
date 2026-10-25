@@ -91,31 +91,48 @@ class Parser(unittest.TestCase):
         (PCI950 + r'\LogConfig', '"0000"=hex:00,04,00,00'),
         (r'HKEY_LOCAL_MACHINE\Enum\PCI\VEN_8086&DEV_1539\BUS_04&DEV_00&FUNC_00', '"Class"="Net"\r\n"Driver"="Net\\\\0009"')])
 
-    def test_950_pnp_vesa_binding_next_to_the_legacy_device_writes_the_mode_only(self):
+    # The export after VESALATE's REGEDIT /D Enum\Root\*PNP0900 (exit 3 path):
+    # no legacy display devnode any more.
+    def without_legacy(self, enum=None):
+        enum = self.ENUM950 if enum is None else enum
+        start = enum.index(b'[HKEY_LOCAL_MACHINE\\Enum\\Root\\*PNP0900]')
+        end = enum.index(b'[HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_1002&DEV_67EF]')
+        return enum[:start] + enum[end:]
+
+    def test_950_pnp_vesa_binding_next_to_the_legacy_device_writes_the_mode_and_drops_the_legacy(self):
         rc, out = self.run_parser(classes=self.CLASSES950, enum=self.ENUM950)
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 3)  # plan written + the batch deletes Enum\Root\*PNP0900
         self.assertEqual(out, reg([(CLS + r'\0001\DEFAULT', '"Mode"="16,1024,768"'),
             (CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')]))
         self.assertNotIn(b'"Driver"', out)
         config = reg([(CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')])
-        self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950, config=config)[0], 0)
-        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950,
+        alone = self.without_legacy()
+        self.assertNotIn(b'PNP0900', alone)
+        self.assertIn(self.PCI950.encode(), alone)
+        self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=alone, config=config)[0], 0)
+        # REGEDIT /D left the legacy display: CHECK fails -> rollback.
+        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950, config=config)[0], 0)
+        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=alone,
             config=config.replace(b'1024,768', b'640,480'))[0], 0)
+        # Without the legacy devnode PLAN is a plain mode plan again.
+        self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=alone)[0], 0)
 
     def test_950_pci_on_the_early_vesa_class_writes_the_profile_only(self):
         enum = self.ENUM950.replace(b'DISPLAY\\\\0001', b'Display\\\\0000')
         rc, out = self.run_parser(classes=self.CLASSES950, enum=enum)
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 3)
         self.assertEqual(out, reg([(CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')]))
+        self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=self.without_legacy(enum))[0], 0)
 
-    def test_legacy_device_next_to_a_pci_display_that_needs_rebinding_fails(self):
+    def test_legacy_device_next_to_a_pci_display_on_msdisp_is_rebound_and_dropped(self):
         msdisp = self.CLASSES950.replace(b'"InfPath"="USOSVESA.INF"\r\n"InfSection"="VESA"\r\n"DriverDesc"="vesa',
                                          b'"InfPath"="MSDISP.INF"\r\n"InfSection"="VGA"\r\n"DriverDesc"="vesa')
         msdisp = msdisp.replace(b'"drv"="vesamini.drv"\r\n"minivdd"="vesamini.vxd"\r\n"Mode"="16,640,480"', b'"drv"="vga.drv"')
         self.assertIn(b'MSDISP.INF', msdisp)
         rc, out = self.run_parser(classes=msdisp, enum=self.ENUM950)
-        self.assertNotEqual(rc, 0)
-        self.assertIsNone(out)
+        self.assertEqual(rc, 3)
+        self.assertIn(b'[' + self.PCI950.encode() + b']\r\n"Driver"="Display\\\\0000"\r\n', out)
+        self.assertNotIn(b'PNP0900', out)
         # Without the legacy device the MSDISP one is rebound as before.
         alone = self.ENUM950.replace(b'"Class"="Display"\r\n"HardwareID"="*PNP0900"', b'"Class"="Other"\r\n"HardwareID"="*PNP0900"')
         rc, out = self.run_parser(classes=msdisp, enum=alone)
@@ -158,6 +175,16 @@ class Generator(unittest.TestCase):
             self.assertLessEqual(max(map(len,b.split(b'\r\n'))),125)
             labels=re.findall(rb'^:([A-Z0-9]+)\r?$',b,re.M);self.assertEqual(len(labels),len(set(labels)))
         self.assertIn('VLATE.RUN GOTO FAIL',text)
+        # PLAN exit 3: flag, then REGEDIT /D of the legacy devnode after the
+        # import and before the CHECK exports; exit 4+ and 1/2 still fail.
+        plan=text.index('VESBIND.EXE PLAN')
+        self.assertLess(plan,text.index('IF ERRORLEVEL 4 GOTO FAIL'))
+        self.assertLess(text.index('IF ERRORLEVEL 3 GOTO VLDEL'),text.index('IF ERRORLEVEL 1 GOTO FAIL',plan))
+        dele=text.index(r'/D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900'+'\r\n')
+        self.assertLess(text.index(r'C:\USOS9X\VLATE.REG'+'\r\n'),dele)
+        self.assertLess(text.index(r'/D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900\0000\LogConfig'),dele)
+        self.assertLess(dele,text.index('/E C:\\USOS9X\\VL5.REG'))
+        self.assertLess(text.index('DEL C:\\USOS9X\\VLDEL.FLG'),plan)
         self.assertIn('VESBIND.EXE CHECK',text)
         self.assertIn(':ROLLBACK',text)
         for version in ['4 0 0 1068','4 0 0 1111','']:

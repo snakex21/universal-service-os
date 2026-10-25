@@ -6,9 +6,14 @@
  * Root\*PNP0900 device. A PCI display that 950 PnP already installed from
  * USOSVESA.INF (vesamini, its own class key) needs no rebinding: only the
  * mode is written, and the legacy *PNP0900 that detection left next to it
- * is ignored (X470 950 PL, 2026-10-25: Display\0000 = *PNP0900 on the early
- * VESA import, Display\0001 = the RX 560 on USOSVESA.INF). A PCI display on
- * MSDISP.INF next to a *PNP0900 still fails: both would share Display\0000.
+ * is removed (X470 950 PL, 2026-10-25: Display\0000 = *PNP0900 on the early
+ * VESA import, Display\0001 = the RX 560 on USOSVESA.INF; 950 kept both as
+ * two adapters, OSR2 drops the legacy devnode by itself; the X470 run with
+ * the legacy devnode deleted by hand had the RX 560 working alone). A PCI
+ * display on MSDISP.INF next to a *PNP0900 is rebound to Display\0000.
+ * PLAN exit: 0 = plan written; 3 = plan written and the batch must delete
+ * HKLM\Enum\Root\*PNP0900 (REGEDIT /D); 2 = refused. CHECK fails while a
+ * legacy *PNP0900 display is still next to the PCI display.
  */
 #ifdef __WATCOMC__
 #include "vesbind_dos.h"
@@ -211,11 +216,10 @@ int main(int argc,char **argv) {
     bound=old==vesa || vesa_like(old);
     if (!bound && (!ieq(classes[old].inf,"MSDISP.INF") ||
         (!ieq(classes[old].drv,"vga.drv") && !ieq(classes[old].drv,"supervga.drv")))) return 2;
-    /* A legacy *PNP0900 next to the PCI display: only when nothing is rebound. */
-    if (pci_displays && root_displays && !bound) return 2;
     sprintf(profile_key,"HKEY_LOCAL_MACHINE\\Config\\%s\\Display\\Settings",profile);
     if (ieq(argv[1],"CHECK")) {
-        if (!bound || !scan(argv[5],config_line)) return 2;
+        /* One adapter: no legacy *PNP0900 display may stay next to the PCI one. */
+        if (!bound || (pci_displays && root_displays) || !scan(argv[5],config_line)) return 2;
         return strcmp(bits,actual_bits) || strcmp(resolution,actual_resolution) ? 2 : 0;
     }
     out=fopen(argv[5],"wb");if(!out) return 2;
@@ -228,7 +232,9 @@ int main(int argc,char **argv) {
     else failed=fprintf(out,"REGEDIT4\r\n\r\n[%s]\r\n\"BitsPerPixel\"=\"%s\"\r\n\"Resolution\"=\"%s\"\r\n",
         profile_key,bits,resolution)<0;
     if (fclose(out)) failed=1;
-    return failed ? 2 : 0;
+    if (failed) return 2;
+    /* The PCI display takes over; the batch deletes Enum\Root\*PNP0900. */
+    return pci_displays && root_displays ? 3 : 0;
 }
 #ifdef __WATCOMC__
 int dos_entry(void) {
