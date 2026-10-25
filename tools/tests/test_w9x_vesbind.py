@@ -17,12 +17,21 @@ CLASSES=reg([(CLS+r'\0000','"InfPath"="USOSVESA.INF"'),
 ENUM=reg([(DEVICE,'"Class"="Display"\r\n"Driver"="Display\\\\0001"')])
 IDCONFIG=reg([(ID,'"CurrentConfig"="0001"')])
 
+def host_binary():
+    """USOS_VESBIND_HOST_EXE, else a native build with gcc / cc from PATH."""
+    value=os.environ.get('USOS_VESBIND_HOST_EXE')
+    if value:
+        binary=Path(value).resolve();assert binary.is_file();return binary
+    compiler=shutil.which('gcc') or shutil.which('cc')
+    if not compiler:raise unittest.SkipTest('Set USOS_VESBIND_HOST_EXE to a native build of vesbind.c (no gcc / cc)')
+    out=scratch('vesbind-host-')/('vesbind'+('.exe' if os.name=='nt' else ''))
+    subprocess.run([compiler,'-O1','-Wall','-Werror','-o',str(out),str(ROOT/'src/platform/bios/win9x/vesbind.c')],check=True)
+    return out
+
 class Parser(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        value=os.environ.get('USOS_VESBIND_HOST_EXE')
-        if not value:raise unittest.SkipTest('Set USOS_VESBIND_HOST_EXE to a native build of vesbind.c')
-        cls.binary=Path(value).resolve();assert cls.binary.is_file()
+        cls.binary=host_binary()
     def setUp(self):
         self.tmp=scratch('vesbind-');self.addCleanup(shutil.rmtree,self.tmp,ignore_errors=True)
     def run_parser(self,classes=CLASSES,enum=ENUM,idconfig=IDCONFIG,config=None):
@@ -91,7 +100,7 @@ class Parser(unittest.TestCase):
         (PCI950 + r'\LogConfig', '"0000"=hex:00,04,00,00'),
         (r'HKEY_LOCAL_MACHINE\Enum\PCI\VEN_8086&DEV_1539\BUS_04&DEV_00&FUNC_00', '"Class"="Net"\r\n"Driver"="Net\\\\0009"')])
 
-    # The export after VESALATE's REGEDIT /D Enum\Root\*PNP0900 (exit 3 path):
+    # The export after VESALATE's VESBIND DELKEY Enum\Root\*PNP0900 (exit 3 path):
     # no legacy display devnode any more.
     def without_legacy(self, enum=None):
         enum = self.ENUM950 if enum is None else enum
@@ -110,7 +119,7 @@ class Parser(unittest.TestCase):
         self.assertNotIn(b'PNP0900', alone)
         self.assertIn(self.PCI950.encode(), alone)
         self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=alone, config=config)[0], 0)
-        # REGEDIT /D left the legacy display: CHECK fails -> rollback.
+        # The legacy display still there: CHECK fails -> rollback.
         self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950, config=config)[0], 0)
         self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=alone,
             config=config.replace(b'1024,768', b'640,480'))[0], 0)
@@ -149,6 +158,258 @@ class Parser(unittest.TestCase):
         two = self.ENUM950 + reg([(self.ROOT950.replace('\\0000', '\\0001'), '"Class"="Display"\r\n"Driver"="Display\\\\0000"')]).split(b'\r\n\r\n', 1)[1]
         self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=two)[0], 0)
 
+# --- DELKEY: synthetic Windows 95 CREG hives (own builder, no MS data) ---
+import struct
+from w9x_creg import Hive, NONE
+
+
+def creg(tree, per_block=6, checksums=True, slack=0):
+    """tree: {name: (values, subtree)}; values: [(name, type, bytes)].
+    Entries 1Ch bytes from RGKN+20h, never across a 4 KB page; per_block
+    records to a block, each block ending in one free record (as on 950)."""
+    entries, recs = [], []          # entry: [parent, child, next, id, blk]
+
+    def add(name, values, parent):
+        entries.append([parent, None, None, 0, 0]); recs.append((name, values)); return len(entries) - 1
+
+    def walk(sub, parent):
+        prev = None
+        for name, (values, kids) in sub.items():
+            i = add(name, values, parent)
+            if prev is None: entries[parent][1] = i
+            else: entries[prev][2] = i
+            prev = i; walk(kids, i)
+    add('', [], None); walk(tree, 0)
+    rel, pos = [], 0x20
+    for _ in entries:
+        if (pos & 0xfff) + 0x1c > 0x1000: pos = (pos | 0xfff) + 1
+        rel.append(pos); pos += 0x1c
+    kn_size = (pos + 0x40 + 0xfff) & ~0xfff
+    rgkn = bytearray(kn_size)
+    flags = 0x0d if checksums else 0x0b
+    struct.pack_into('<4sIIIII', rgkn, 0, b'RGKN', kn_size, 0x20, pos, flags, 0)
+    struct.pack_into('<III', rgkn, pos, 0x80000000, kn_size - pos, NONE)
+    blocks = [[] for _ in range((len(recs) + per_block - 1) // per_block)]
+    for i, (name, values) in enumerate(recs):
+        b, kid = divmod(i, per_block); entries[i][3] = kid; entries[i][4] = b
+        body = b''.join(struct.pack('<IIHH', t, 0, len(n), len(d)) + n.encode('cp1250') + d for n, t, d in values)
+        raw = name.encode('cp1250')
+        used = 0x14 + len(raw) + len(body)
+        blocks[b].append(struct.pack('<IHHIHHI', used + slack, kid, b, used, len(raw), len(values), 0)
+                         + raw + body + b'\0' * slack)
+    z = lambda v: NONE if v is None else rel[v]
+    for i, e in enumerate(entries):
+        struct.pack_into('<IIIIIIHH', rgkn, rel[i], 0, sum(recs[i][0].upper().encode()), NONE,
+                         z(e[0]), z(e[1]), z(e[2]), e[3], e[4])
+
+    def fix(buf, at):
+        if checksums:
+            total = sum(struct.unpack('<%dI' % (len(buf) // 4), bytes(buf))) & 0xffffffff
+            struct.pack_into('<I', buf, at, (-total) & 0xffffffff)
+    fix(rgkn, 0x14)
+    out = []
+    for b, items in enumerate(blocks):
+        data = b''.join(items)
+        size = (0x20 + len(data) + 0x40 + 3) & ~3
+        blk = bytearray(size)
+        free_at = 0x20 + len(data)
+        struct.pack_into('<4sIIHHIHHII', blk, 0, b'RGDB', size, size - free_at, flags, b, free_at,
+                         len(items) - 1, len(items), 0, 0)
+        blk[0x20:free_at] = data
+        struct.pack_into('<IHHI', blk, free_at, size - free_at, 0xffff, 0xffff, NONE)
+        fix(blk, 0x1c); out.append(bytes(blk))
+    head = bytearray(0x20)
+    struct.pack_into('<4sIIIHH', head, 0, b'CREG', 0x10000, 0x20 + kn_size, 0, len(out), 5 if checksums else 1)
+    fix(head, 0x0c)
+    return bytes(head) + bytes(rgkn) + b''.join(out)
+
+
+def dump(data):
+    """Every key path (lower case) -> its values; a key reached twice fails."""
+    hive, out, seen = Hive(data), {}, set()
+
+    def walk(rel, path):
+        for name, child in hive.children(rel):
+            assert child not in seen; seen.add(child)
+            p = path + '\\' + name
+            out[p.lower()] = hive._record(child)[1]
+            walk(child, p)
+    walk(hive.root, '')
+    return out
+
+
+def sums_ok(data):
+    """Every section with flag bit 2 sums to 0; returns how many have one."""
+    def total(b): return sum(struct.unpack('<%dI' % (len(b) // 4), b)) & 0xffffffff
+    n = 0
+    if struct.unpack_from('<H', data, 0x12)[0] & 4:
+        assert total(data[:0x20]) == 0, 'CREG'; n += 1
+    size = struct.unpack_from('<I', data, 0x24)[0]
+    if struct.unpack_from('<H', data, 0x30)[0] & 4:
+        assert total(data[0x20:0x20 + size]) == 0, 'RGKN'; n += 1
+    off = 0x20 + size
+    for b in range(struct.unpack_from('<H', data, 0x10)[0]):
+        bs = struct.unpack_from('<I', data, off + 4)[0]
+        if struct.unpack_from('<H', data, off + 0x0c)[0] & 4:
+            assert total(data[off:off + bs]) == 0, b; n += 1
+        off += bs
+    return n
+
+
+def free_lists(data):
+    """RGKN free chunks (offset, size) in list order; per block (header free
+    bytes, header first free, [(pos, size) of the free records])."""
+    size, _root, first = struct.unpack_from('<III', data, 0x24)
+    chunks, cur = [], first
+    while cur != NONE:
+        flag, csize, nxt = struct.unpack_from('<III', data, 0x20 + cur)
+        assert flag == 0x80000000; chunks.append((cur, csize)); cur = nxt
+    blocks, off = [], 0x20 + size
+    for _ in range(struct.unpack_from('<H', data, 0x10)[0]):
+        bs, fb, _f, _n, ff = struct.unpack_from('<IIHHI', data, off + 4)
+        pos, frees = 0x20, []
+        while pos < bs:
+            rs, kid, blk, used = struct.unpack_from('<IHHI', data, off + pos)
+            assert 0x14 <= rs <= bs - pos
+            if kid == 0xffff:
+                assert (blk, used) == (0xffff, NONE); frees.append((pos, rs))
+            pos += rs
+        assert pos == bs
+        blocks.append((fb, ff, frees)); off += bs
+    return chunks, blocks
+
+
+def SZ(s): return (s + '\0').encode('cp1250')
+
+
+TREE = {
+    'Enum': ([], {
+        'Monitor': ([('Class', 1, SZ('Monitor'))],
+                    {'Default_Monitor': ([], {'0001': ([('Driver', 1, SZ('Monitor\\0000'))], {})})}),
+        'Root': ([], {
+            '*PNP0A03': ([('Class', 1, SZ('System'))], {'0000': ([], {})}),
+            '*PNP0900': ([], {'0000': ([('Class', 1, SZ('Display')), ('Driver', 1, SZ('Display\\0000')),
+                                        ('ConfigFlags', 3, b'\0\0\0\0')],
+                                       {'LogConfig': ([('0', 3, bytes(range(40)))], {})})}),
+            '*PNP0F0E': ([('Class', 1, SZ('Mouse'))], {})}),
+        'PCI': ([], {'VEN_1002&DEV_67EF': ([], {'BUS_0A&DEV_00&FUNC_00': ([('Class', 1, SZ('DISPLAY'))], {})})})}),
+    'System': ([], {'CurrentControlSet': ([], {'Services': ([('x', 1, SZ('y'))], {})})}),
+}
+LEGACY = 'Enum\\Root\\*PNP0900'
+
+
+class DelKey(unittest.TestCase):
+    """VESBIND DELKEY: VESALATE's replacement for REGEDIT /D, which the 950
+    real-mode REGEDIT does not have."""
+    @classmethod
+    def setUpClass(cls):
+        cls.binary = host_binary()
+
+    def setUp(self):
+        self.tmp = scratch('delkey-'); self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def run_del(self, data, key):
+        hive = self.tmp / 'SYSTEM.DAT'; hive.write_bytes(data)
+        result = subprocess.run([str(self.binary), 'DELKEY', str(hive), key], capture_output=True)
+        self.assertFalse(result.stdout + result.stderr)
+        return result.returncode, hive.read_bytes()
+
+    def check_deleted(self, data, key, gone):
+        before = dump(data); sums_ok(data)
+        rc, after = self.run_del(data, key)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(after), len(data))
+        new = dump(after)
+        removed = {k for k in before if k == gone or k.startswith(gone + '\\')}
+        self.assertTrue(removed)
+        self.assertEqual(set(new), set(before) - removed)
+        for k in new:
+            self.assertEqual(new[k], before[k], k)      # parents, siblings, values intact
+        sums_ok(after); free_lists(after)
+        return before, after, removed
+
+    def test_deletes_a_middle_sibling_and_its_subtree(self):
+        data = creg(TREE)
+        _, after, removed = self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
+        self.assertEqual(len(removed), 3)
+        chunks, blocks = free_lists(after)
+        old_chunks, old_blocks = free_lists(data)
+        self.assertEqual(sums_ok(after), 2 + len(blocks))
+        # Three freed entries, sorted, in front of the old tail chunk.
+        self.assertEqual([c[1] for c in chunks[:-1]], [0x1c] * 3)
+        self.assertEqual(chunks[-1], old_chunks[-1])
+        self.assertEqual([c[0] for c in chunks], sorted(c[0] for c in chunks))
+        self.assertGreater(sum(b[0] for b in blocks), sum(b[0] for b in old_blocks))
+        for fb, ff, frees in blocks:
+            self.assertEqual(fb, sum(r[1] for r in frees))
+            self.assertEqual(ff, min(r[0] for r in frees))
+            for (a, n), (b, _) in zip(frees, frees[1:]):
+                self.assertNotEqual(a + n, b)           # neighbours merged
+        self.assertEqual(self.run_del(after, LEGACY), (1, after))
+
+    def test_first_last_and_top_level_keys(self):
+        data = creg(TREE)
+        _, after, _ = self.check_deleted(data, 'Enum\\Monitor', '\\enum\\monitor')
+        self.check_deleted(after, 'Enum\\PCI', '\\enum\\pci')
+        self.check_deleted(data, 'Enum\\Root\\*PNP0F0E', '\\enum\\root\\*pnp0f0e')
+        self.check_deleted(data, 'System', '\\system')
+        self.check_deleted(data, 'Enum', '\\enum')
+
+    def test_prefix_case_and_records_across_blocks(self):
+        data = creg(TREE, per_block=2, slack=3)          # odd record sizes: unaligned fields
+        self.assertGreater(len(free_lists(data)[1]), 6)
+        self.check_deleted(data, 'HKEY_LOCAL_MACHINE\\enum\\ROOT\\*pnp0900', '\\enum\\root\\*pnp0900')
+
+    def test_neighbouring_freed_records_merge(self):
+        data = creg(TREE, per_block=64)
+        _, after, _ = self.check_deleted(data, 'Enum\\Root', '\\enum\\root')
+        (_fb, _ff, frees), = free_lists(after)[1]
+        self.assertEqual(len(frees), 2)                  # the Root run and the old tail
+
+    def test_hive_without_checksums(self):
+        data = creg(TREE, checksums=False)
+        self.assertEqual(sums_ok(data), 0)
+        _, after, _ = self.check_deleted(data, LEGACY + '\\0000\\LogConfig', '\\enum\\root\\*pnp0900\\0000\\logconfig')
+        self.assertEqual(after[0x34:0x38], data[0x34:0x38])
+
+    def test_many_pages_of_entries(self):
+        tree = {'Enum': ([], {'Root': ([], {'*PNP%04X' % i: ([('Class', 1, SZ('Other'))], {'0000': ([], {})})
+                                            for i in range(300)})})}
+        tree['Enum'][1]['Root'][1]['*PNP0900'] = TREE['Enum'][1]['Root'][1]['*PNP0900']
+        data = creg(tree, per_block=200)
+        self.assertGreater(struct.unpack_from('<I', data, 0x24)[0], 0x4000)
+        self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
+        self.check_deleted(data, 'Enum\\Root\\*PNP0001', '\\enum\\root\\*pnp0001')
+
+    def test_missing_key_and_refusals_leave_the_file_alone(self):
+        data = creg(TREE)
+        for key in ['Enum\\Root\\*PNP0901', 'Enum\\Nothing\\X', 'Enum\\Root\\*PNP09']:
+            self.assertEqual(self.run_del(data, key), (1, data), key)
+        for key in ['\\', 'HKEY_LOCAL_MACHINE\\', 'Enum\\\\Root']:
+            self.assertEqual(self.run_del(data, key), (2, data), key)
+        bad = bytearray(data); bad[0x200] ^= 1                          # RGKN checksum wrong
+        self.assertEqual(self.run_del(bytes(bad), LEGACY), (2, bytes(bad)))
+        bad = bytearray(data); bad[-0x30] ^= 1                          # last RGDB block
+        self.assertEqual(self.run_del(bytes(bad), LEGACY), (2, bytes(bad)))
+        for bad in [b'', data[:0x40], b'REGF' + data[4:], data[:-4]]:
+            self.assertEqual(self.run_del(bad, LEGACY)[0], 2)
+        result = subprocess.run([str(self.binary), 'DELKEY', str(self.tmp / 'none.dat'), 'Enum'], capture_output=True)
+        self.assertEqual(result.returncode, 2)
+
+    def test_real_950_hive_copy(self):
+        """Optional, local only: USOS_W95_SYSTEM_HIVE = a copy of a 950
+        SYSTEM.DAT (for example the X470 C:\\USOS9X\\SYSTEM.VL). Never committed."""
+        source = os.environ.get('USOS_W95_SYSTEM_HIVE')
+        if not source:
+            self.skipTest('set USOS_W95_SYSTEM_HIVE to a local 950 SYSTEM.DAT copy')
+        data = Path(source).read_bytes()
+        if Hive(data).key(LEGACY) is None:
+            self.skipTest('no Enum\\Root\\*PNP0900 in that hive')
+        _, after, removed = self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
+        self.assertIn('\\enum\\root\\*pnp0900\\0000\\logconfig', removed)
+        self.assertGreaterEqual(sums_ok(after), 3)
+
+
 class Generator(unittest.TestCase):
     def create(self,version='4 0 0 950'):
         tmp=scratch('vesalate-');self.addCleanup(shutil.rmtree,tmp,ignore_errors=True)
@@ -175,15 +436,23 @@ class Generator(unittest.TestCase):
             self.assertLessEqual(max(map(len,b.split(b'\r\n'))),125)
             labels=re.findall(rb'^:([A-Z0-9]+)\r?$',b,re.M);self.assertEqual(len(labels),len(set(labels)))
         self.assertIn('VLATE.RUN GOTO FAIL',text)
-        # PLAN exit 3: flag, then REGEDIT /D of the legacy devnode after the
-        # import and before the CHECK exports; exit 4+ and 1/2 still fail.
+        # PLAN exit 3: flag, then VESBIND DELKEY of the legacy devnode after
+        # the import and before the CHECK exports; exit 4+ and 1/2 still fail.
         plan=text.index('VESBIND.EXE PLAN')
         self.assertLess(plan,text.index('IF ERRORLEVEL 4 GOTO FAIL'))
         self.assertLess(text.index('IF ERRORLEVEL 3 GOTO VLDEL'),text.index('IF ERRORLEVEL 1 GOTO FAIL',plan))
-        dele=text.index(r'/D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900'+'\r\n')
+        # 950's real-mode REGEDIT has no /D: never used for the deletion.
+        self.assertNotIn(' /D ',text)
+        dele=text.index('C:\\USOS9X\\VESBIND.EXE DELKEY C:\\WINDOWS\\SYSTEM.DAT HKEY_LOCAL_MACHINE\\Enum\\Root\\*PNP0900\r\n')
         self.assertLess(text.index(r'C:\USOS9X\VLATE.REG'+'\r\n'),dele)
-        self.assertLess(text.index(r'/D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900\0000\LogConfig'),dele)
+        self.assertLess(text.index('IF NOT EXIST C:\\USOS9X\\VLDEL.FLG GOTO VLEXP'),dele)
+        after=text[dele:text.index(':VLEXP\r\n')]
+        # Exit 3 (write failed) and 2 (refused) roll back, both logged; exit 1 is logged only.
+        self.assertLess(after.index('IF ERRORLEVEL 3 GOTO ROLLBACK'),after.index('IF ERRORLEVEL 2 GOTO ROLLBACK'))
+        self.assertEqual(after.count('>> C:\\USOS9X\\USOSLOG.TXT'),3)
+        self.assertNotIn('IF ERRORLEVEL 1 GOTO',after)
         self.assertLess(dele,text.index('/E C:\\USOS9X\\VL5.REG'))
+        self.assertLess(text.index(':VLEXP'),text.index('/E C:\\USOS9X\\VL5.REG'))
         self.assertLess(text.index('DEL C:\\USOS9X\\VLDEL.FLG'),plan)
         self.assertIn('VESBIND.EXE CHECK',text)
         self.assertIn(':ROLLBACK',text)

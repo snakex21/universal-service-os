@@ -8,6 +8,11 @@ typedef struct { unsigned handle, pos, used, error; char data[256]; } FILE;
 static FILE own_file;
 unsigned dos_open(const char *path);
 #pragma aux dos_open = "mov ax,3d00h" "int 21h" "jnc ok" "mov ax,0ffffh" "ok:" parm [dx] value [ax] modify [ax];
+unsigned dos_open_rw(const char *path);
+#pragma aux dos_open_rw = "mov ax,3d02h" "int 21h" "jnc ok" "mov ax,0ffffh" "ok:" parm [dx] value [ax] modify [ax];
+/* 0 = moved, nonzero = DOS error (carry). */
+unsigned dos_seek(unsigned handle,unsigned high,unsigned low);
+#pragma aux dos_seek = "mov ax,4200h" "int 21h" "sbb ax,ax" parm [bx] [cx] [dx] value [ax] modify [ax dx];
 unsigned dos_create(const char *path);
 #pragma aux dos_create = "xor cx,cx" "mov ah,3ch" "int 21h" "jnc ok" "mov ax,0ffffh" "ok:" parm [dx] value [ax] modify [ax cx];
 unsigned dos_read(unsigned handle,char *data,unsigned count);

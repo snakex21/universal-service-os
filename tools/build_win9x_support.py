@@ -13,8 +13,9 @@
                 tools/vendor/vmdisp9x, checked against manifest.json)
   VMDISP9X.TXT  their SOURCES.txt + MIT licence
   VMDISP9X.TGZ  the vmdisp9x source archive
-  VESBIND.EXE   own DOS parser of original REGEDIT exports, used by source950
-                post-Setup VESALATE.BAT; no compiler runtime linked
+  VESBIND.EXE   own DOS parser of original REGEDIT exports and CREG key
+                delete (DELKEY), used by source950 post-Setup VESALATE.BAT;
+                no compiler runtime linked
   USOSKEY.COM, USOSKEY.DRV, USOSMOUS.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
                 the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
                 and 98 mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
@@ -492,7 +493,8 @@ def stage_usosusb(out: Path, source: Path = USOSUSB) -> None:
 
 
 def build_vesbind(out: Path, work: Path, ow: Path | None = None) -> Path:
-    """16-bit DOS parser of REGEDIT exports; no hive parsing or modification."""
+    """16-bit DOS parser of REGEDIT exports (PLAN / CHECK) and the in-place
+    CREG key delete (DELKEY) that 950's real-mode REGEDIT lacks."""
     if ow is None:
         from build_win3_usb_keyboard import openwatcom
         ow = openwatcom()

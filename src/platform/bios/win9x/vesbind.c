@@ -1,5 +1,6 @@
 /* USOS, GPL-3.0-or-later. Plan/check a 950 late display binding using only
- * fresh original REGEDIT4 exports. Never reads/writes registry hives.
+ * fresh original REGEDIT4 exports (PLAN / CHECK never read hive bytes), and
+ * DELKEY: one key deleted from SYSTEM.DAT (see delkey() below).
  * PLAN classes enum idconfig output.reg; CHECK classes enum idconfig config
  * Reject ambiguous displays, custom drivers, malformed/duplicate data.
  * The display is the one PCI display device, else the one legacy
@@ -12,7 +13,7 @@
  * the legacy devnode deleted by hand had the RX 560 working alone). A PCI
  * display on MSDISP.INF next to a *PNP0900 is rebound to Display\0000.
  * PLAN exit: 0 = plan written; 3 = plan written and the batch must delete
- * HKLM\Enum\Root\*PNP0900 (REGEDIT /D); 2 = refused. CHECK fails while a
+ * HKLM\Enum\Root\*PNP0900 (VESBIND DELKEY); 2 = refused. CHECK fails while a
  * legacy *PNP0900 display is still next to the PCI display.
  */
 #ifdef __WATCOMC__
@@ -194,6 +195,274 @@ static int mode(const char *text) {
     for(i=0;resolution[i];i++) if(resolution[i]!=',' && !isdigit((unsigned char)resolution[i])) return 0;
     return atoi(resolution)>=320 && atoi(resolution)<=8192 && atoi(second+1)>=200 && atoi(second+1)<=8192;
 }
+/* DELKEY <hive> <key path>: remove one key and its whole subtree from a
+ * Windows 95 CREG hive (SYSTEM.DAT) in place, streaming (the hive is never
+ * loaded whole): the 950 real-mode REGEDIT has no /D. Layout as read from
+ * 950 hives (X470 950 PL SYSTEM.1ST / SYSTEM.VL / SYSTEM.DAT, 2026-10-25):
+ *   CREG header 0x20: +04 version 10000h, +08 RGDB offset, +0C checksum,
+ *     +10 WORD block count, +12 WORD flags.
+ *   RGKN at 0x20: +04 size, +08 root entry, +0C first free chunk, +10
+ *     flags, +14 checksum. Key entries (1Ch bytes, never across a 4 KB
+ *     page): +00 0 = in use, +04 hash, +08 -1, +0C parent, +10 first child,
+ *     +14 next sibling, +18 WORD id, +1A WORD RGDB block (offsets relative
+ *     to RGKN, -1 = none). Free chunk: +00 80000000h, +04 size, +08 next.
+ *   RGDB blocks: +04 size, +08 free bytes, +0C WORD flags, +0E WORD number,
+ *     +10 first free record (-1 = none), +1C checksum; records from +20:
+ *     +00 size, +04 WORD id, +06 WORD block, +08 bytes used, +0C WORD name
+ *     length, +14 name. Free record: id, block and bytes used all -1.
+ * Flags bit 2 = checksum present: the section's DWORDs sum to 0.
+ * The key is unlinked from its parent / sibling chain, its entries become
+ * free chunks (free list kept sorted by offset), its records free records
+ * (neighbouring free records merged); the touched checksums are corrected
+ * and summed again. Exit 0 = deleted, 1 = no such key (file untouched),
+ * 2 = refused (file untouched), 3 = failed while writing (restore the
+ * backup). Every structure on the way is checked before the first write.
+ */
+#define NONE 0xFFFFFFFFUL
+#define MASK32 0xFFFFFFFFUL
+#define MAXBLK 256
+#define MAXDEL 1024
+#define SLOTS 4
+static unsigned long blk_off[MAXBLK], blk_size[MAXBLK], delta[MAXBLK + 1];
+static unsigned blk_flags[MAXBLK], blk_count, rgkn_flags;
+static unsigned char touched[MAXBLK + 1];
+static unsigned long kn_size, kn_root, kn_free;
+static unsigned long del_list[MAXDEL];
+static unsigned del_count;
+static unsigned long slot_pos[SLOTS][256];
+static int slot_blk[SLOTS], slot_next;
+static unsigned char io[512];
+#ifdef __WATCOMC__
+static unsigned hive = 0xffff;
+static int hopen(const char *path) { hive = dos_open_rw(path); return hive != 0xffff; }
+static int hclose(void) { return !dos_close(hive); }
+static int hread(unsigned long off, void *buf, unsigned n) {
+    return !dos_seek(hive, (unsigned)(off >> 16), (unsigned)(off & 0xffff)) && dos_read(hive, buf, n) == n;
+}
+static int hwrite(unsigned long off, const void *buf, unsigned n) {
+    return !dos_seek(hive, (unsigned)(off >> 16), (unsigned)(off & 0xffff)) && dos_write(hive, buf, n) == n;
+}
+#else
+static FILE *hive;
+static int hopen(const char *path) { hive = fopen(path, "r+b"); return hive != NULL; }
+static int hclose(void) { return !fclose(hive); }
+static int hread(unsigned long off, void *buf, unsigned n) {
+    return !fseek(hive, (long)off, SEEK_SET) && fread(buf, 1, n, hive) == n;
+}
+static int hwrite(unsigned long off, const void *buf, unsigned n) {
+    return !fseek(hive, (long)off, SEEK_SET) && fwrite(buf, 1, n, hive) == n && !fflush(hive);
+}
+#endif
+static unsigned long g32(const unsigned char *p) {
+    return (unsigned long)p[0] | ((unsigned long)p[1] << 8) | ((unsigned long)p[2] << 16) | ((unsigned long)p[3] << 24);
+}
+static unsigned g16(const unsigned char *p) { return (unsigned)p[0] | ((unsigned)p[1] << 8); }
+static void p32(unsigned char *p, unsigned long v) {
+    p[0] = (unsigned char)v; p[1] = (unsigned char)(v >> 8); p[2] = (unsigned char)(v >> 16); p[3] = (unsigned char)(v >> 24);
+}
+static int same(const unsigned char *a, const char *b, unsigned n) {
+    while (n--) if (*a++ != (unsigned char)*b++) return 0;
+    return 1;
+}
+/* Section 0 = RGKN, 1 + b = RGDB block b. */
+static unsigned long sec_base(unsigned sec) { return sec ? blk_off[sec - 1] : 0x20UL; }
+static int sec_sum(unsigned sec, unsigned long *sum) {
+    unsigned long base = sec_base(sec), size = sec ? blk_size[sec - 1] : kn_size, done = 0, s = 0;
+    unsigned n, i;
+    while (done < size) {
+        n = size - done > sizeof(io) ? (unsigned)sizeof(io) : (unsigned)(size - done);
+        if (!hread(base + done, io, n)) return 0;
+        for (i = 0; i < n; i += 4) s = (s + g32(io + i)) & MASK32;
+        done += n;
+    }
+    *sum = s;
+    return 1;
+}
+/* Write bytes inside a section; the change of its DWORD sum is kept. */
+static int put(unsigned sec, unsigned long off, const unsigned char *data, unsigned n) {
+    unsigned char old[0x1c]; unsigned i, shift;
+    if (n > sizeof(old) || !hread(off, old, n)) return 0;
+    for (i = 0; i < n; i++) {
+        shift = (unsigned)((off + i - sec_base(sec)) & 3) * 8;
+        delta[sec] = (delta[sec] + ((unsigned long)data[i] << shift) - ((unsigned long)old[i] << shift)) & MASK32;
+    }
+    touched[sec] = 1;
+    return hwrite(off, data, n);
+}
+static int put32(unsigned sec, unsigned long off, unsigned long v) {
+    unsigned char b[4]; p32(b, v); return put(sec, off, b, 4);
+}
+/* A key entry: in use, inside RGKN, within one 4 KB page. */
+static int entry(unsigned long rel, unsigned char *e) {
+    if (rel == NONE || rel < 0x20 || rel + 0x1c > kn_size || (rel & 0xfffUL) + 0x1c > 0x1000) return 0;
+    return hread(0x20 + rel, e, 0x1c) && g32(e) == 0;
+}
+/* Record positions of one block by id (a few blocks cached). */
+static int block_index(unsigned blk) {
+    unsigned long pos, end, rs; unsigned char r[8]; unsigned id, i; int s;
+    for (s = 0; s < SLOTS; s++) if (slot_blk[s] == (int)blk) return s;
+    if (blk >= blk_count) return -1;
+    s = slot_next; slot_next = (slot_next + 1) % SLOTS; slot_blk[s] = -1;
+    for (i = 0; i < 256; i++) slot_pos[s][i] = NONE;
+    pos = 0x20; end = blk_size[blk];
+    while (pos < end) {
+        if (end - pos < 0x14 || !hread(blk_off[blk] + pos, r, 8)) return -1;
+        rs = g32(r);
+        if (rs < 0x14 || rs > end - pos) return -1;
+        id = g16(r + 4);
+        if (id == 0xffff) { if (g16(r + 6) != 0xffff) return -1; }
+        else {
+            if (id > 255 || g16(r + 6) != blk || slot_pos[s][id] != NONE) return -1;
+            slot_pos[s][id] = pos;
+        }
+        pos += rs;
+    }
+    slot_blk[s] = (int)blk;
+    return s;
+}
+/* The record of an entry: block-relative position, NONE without one. */
+static int record(const unsigned char *e, unsigned *blk, unsigned long *pos) {
+    unsigned id = g16(e + 0x18); int s;
+    *blk = g16(e + 0x1a);
+    if (*blk == 0xffff) { *pos = NONE; return 1; }
+    if (id > 255 || (s = block_index(*blk)) < 0) return 0;
+    *pos = slot_pos[s][id];
+    return *pos != NONE;
+}
+static int name_is(const unsigned char *e, const char *name, unsigned len, int *match) {
+    unsigned char r[0x14], text[256]; unsigned blk, i; unsigned long pos;
+    *match = 0;
+    if (!record(e, &blk, &pos)) return 0;
+    if (pos == NONE) return 1;
+    if (!hread(blk_off[blk] + pos, r, 0x14)) return 0;
+    if (g16(r + 0xc) != len) return 1;
+    if (!hread(blk_off[blk] + pos + 0x14, text, len)) return 0;
+    for (i = 0; i < len; i++) if (tolower(text[i]) != tolower((unsigned char)name[i])) return 1;
+    *match = 1;
+    return 1;
+}
+static int free_insert(unsigned long rel) {
+    unsigned long prev = NONE, cur = kn_free; unsigned char c[12], e[0x1c]; unsigned n = 0;
+    while (cur != NONE && cur < rel) {
+        if (++n > 60000U || cur + 12 > kn_size || !hread(0x20 + cur, c, 12) || g32(c) != 0x80000000UL) return 0;
+        prev = cur; cur = g32(c + 8);
+    }
+    if (cur == rel) return 0;
+    memset(e, 0, sizeof(e)); p32(e, 0x80000000UL); p32(e + 4, 0x1c); p32(e + 8, cur);
+    if (!put(0, 0x20 + rel, e, sizeof(e))) return 0;
+    if (prev == NONE) { kn_free = rel; return put32(0, 0x20 + 0x0c, rel); }
+    return put32(0, 0x20 + prev + 8, rel);
+}
+static int free_record(unsigned blk, unsigned long pos) {
+    unsigned char h[0x14], ff[8]; unsigned long base = blk_off[blk];
+    if (!hread(base, h, 0x14) || !hread(base + pos, ff, 4)) return 0;
+    if (!put32(1 + blk, base + 8, (g32(h + 8) + g32(ff)) & MASK32)) return 0;
+    if ((g32(h + 0x10) == NONE || g32(h + 0x10) > pos) && !put32(1 + blk, base + 0x10, pos)) return 0;
+    memset(ff, 0xff, sizeof(ff));
+    return put(1 + blk, base + pos + 4, ff, 8);
+}
+/* Neighbouring free records become one. */
+static int merge_free(unsigned blk) {
+    unsigned long pos = 0x20, prev = NONE, prev_size = 0, rs, base = blk_off[blk]; unsigned char r[8];
+    while (pos < blk_size[blk]) {
+        if (!hread(base + pos, r, 8)) return 0;
+        rs = g32(r);
+        if (rs < 0x14 || rs > blk_size[blk] - pos) return 0;
+        if (g16(r + 4) == 0xffff) {
+            if (prev != NONE) { prev_size += rs; if (!put32(1 + blk, base + prev, prev_size)) return 0; }
+            else { prev = pos; prev_size = rs; }
+        } else prev = NONE;
+        pos += rs;
+    }
+    return 1;
+}
+static int delkey(const char *path, const char *key) {
+    unsigned char h[0x20], e[0x1c], p[0x1c]; unsigned long off, cur, target, parent, sum, ck, rel, pos;
+    unsigned i, len, blk; int match, failed; const char *name, *end;
+    if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
+    if (!*key || *key == '\\') return 2;
+    for (i = 0; i <= MAXBLK; i++) { delta[i] = 0; touched[i] = 0; }
+    for (i = 0; i < SLOTS; i++) slot_blk[i] = -1;
+    slot_next = 0; del_count = 0;
+    if (!hopen(path)) return 2;
+    failed = 2;
+    if (!hread(0, h, 0x20) || !same(h, "CREG", 4) || g32(h + 4) != 0x10000UL) goto done;
+    off = g32(h + 8); blk_count = g16(h + 0x10);
+    if (!blk_count || blk_count > MAXBLK) goto done;
+    if (g16(h + 0x12) & 4) {
+        for (sum = 0, i = 0; i < 0x20; i += 4) sum = (sum + g32(h + i)) & MASK32;
+        if (sum) goto done;
+    }
+    if (!hread(0x20, h, 0x20) || !same(h, "RGKN", 4)) goto done;
+    kn_size = g32(h + 4); kn_root = g32(h + 8); kn_free = g32(h + 0x0c); rgkn_flags = g16(h + 0x10);
+    if (kn_size < 0x3c || (kn_size & 3) || off != 0x20 + kn_size) goto done;
+    for (i = 0; i < blk_count; i++) {
+        if (!hread(off, h, 0x20) || !same(h, "RGDB", 4) || g16(h + 0x0e) != i) goto done;
+        blk_off[i] = off; blk_size[i] = g32(h + 4); blk_flags[i] = g16(h + 0x0c);
+        if (blk_size[i] < 0x20 || (blk_size[i] & 3)) goto done;
+        off += blk_size[i];
+    }
+    /* Checksums as found: a hive this tool does not understand is refused. */
+    if ((rgkn_flags & 4) && (!sec_sum(0, &sum) || sum)) goto done;
+    for (i = 0; i < blk_count; i++) if ((blk_flags[i] & 4) && (!sec_sum(1 + i, &sum) || sum)) goto done;
+    /* Walk the path from the root entry. */
+    if (!entry(kn_root, e)) goto done;
+    target = kn_root; name = key;
+    while (*name) {
+        end = strchr(name, '\\'); len = end ? (unsigned)(end - name) : (unsigned)strlen(name);
+        if (!len || len > 255) goto done;
+        cur = g32(e + 0x10); match = 0;
+        for (i = 0; cur != NONE; i++) {
+            if (i > 60000U || !entry(cur, e) || g32(e + 0x0c) != target || !name_is(e, name, len, &match)) goto done;
+            if (match) break;
+            cur = g32(e + 0x14);
+        }
+        if (!match) { failed = 1; goto done; }
+        target = cur; name += len; if (*name) name++;
+    }
+    /* The subtree, breadth first; every entry and record must be sound. */
+    del_list[del_count++] = target;
+    for (i = 0; i < del_count; i++) {
+        if (!entry(del_list[i], e) || !record(e, &blk, &pos)) goto done;
+        cur = g32(e + 0x10);
+        while (cur != NONE) {
+            if (del_count == MAXDEL || !entry(cur, p) || g32(p + 0x0c) != del_list[i]) goto done;
+            del_list[del_count++] = cur; cur = g32(p + 0x14);
+        }
+    }
+    if (!entry(target, e)) goto done;
+    parent = g32(e + 0x0c);
+    if (!entry(parent, p)) goto done;
+    /* From here on the file changes. */
+    failed = 3;
+    if (g32(p + 0x10) == target) { if (!put32(0, 0x20 + parent + 0x10, g32(e + 0x14))) goto done; }
+    else {
+        cur = g32(p + 0x10);
+        for (i = 0;; i++) {
+            if (cur == NONE || i > 60000U || !entry(cur, p)) goto done;
+            if (g32(p + 0x14) == target) break;
+            cur = g32(p + 0x14);
+        }
+        if (!put32(0, 0x20 + cur + 0x14, g32(e + 0x14))) goto done;
+    }
+    for (i = 0; i < del_count; i++) {
+        if (!entry(del_list[i], e) || !record(e, &blk, &pos)) goto done;
+        if (pos != NONE && !free_record(blk, pos)) goto done;
+        if (!free_insert(del_list[i])) goto done;
+    }
+    for (i = 0; i < blk_count; i++) if (touched[1 + i] && !merge_free(i)) goto done;
+    for (i = 0; i <= blk_count; i++) {
+        if (!touched[i] || !((i ? blk_flags[i - 1] : rgkn_flags) & 4)) continue;
+        rel = sec_base(i) + (i ? 0x1c : 0x14);
+        if (!hread(rel, h, 4)) goto done;
+        ck = (g32(h) - delta[i]) & MASK32; p32(h, ck);
+        if (!hwrite(rel, h, 4) || !sec_sum(i, &sum) || sum) goto done;
+    }
+    failed = 0;
+done:
+    if (!hclose() && failed != 1 && failed != 2) failed = 3;
+    return failed;
+}
 int main(int argc,char **argv) {
     int vesa,old,bound;FILE *out;int failed;
     memset(classes,0,sizeof(classes));class_count=pci_displays=root_displays=0;
@@ -201,6 +470,7 @@ int main(int argc,char **argv) {
     root_chosen[0]=root_driver[0]=0;
     profile[0]=bits[0]=resolution[0]=actual_bits[0]=actual_resolution[0]=profile_key[0]=0;
     current_class=-1;default_section=valid_device=candidate_pci=0;
+    if (argc==4 && ieq(argv[1],"DELKEY")) return delkey(argv[2],argv[3]);
     if (argc!=6 || (!ieq(argv[1],"PLAN") && !ieq(argv[1],"CHECK"))) return 2;
     if (!scan(argv[2],class_line) || !scan(argv[3],device_line) || !flush_device() ||
         pci_displays+root_displays==0 || !scan(argv[4],id_line) || !id4(profile) ||

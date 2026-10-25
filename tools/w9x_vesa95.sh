@@ -32,6 +32,7 @@
 # Source950 exception: GUI Setup can enumerate a PCI display later and bind
 # it to another VGA class. VESALATE.BAT resolves that existing device after
 # RunOnce\Setup is gone, before the early step's old completion guard.
+# VESALATE.BAT also removes the legacy *PNP0900 devnode with VESBIND DELKEY.
 
 W9X_VESA95_MODES='640,480 800,600 1024,768 1152,864 1280,720 1280,800 1280,960 1280,1024 1400,1050 1600,900 1600,1200 1680,1050 1920,1080 1920,1200'
 
@@ -147,10 +148,13 @@ EOF
 # device to the existing VESA class. VESBIND reads exports, never hive bytes.
 # A PCI display next to the legacy Root\*PNP0900 (950 keeps both as two
 # adapters; OSR2 drops the legacy one itself): VESBIND PLAN exits 3, the
-# batch writes VLDEL.FLG and deletes Enum\Root\*PNP0900 with REGEDIT /D right
-# after the import, while the hive is still small (real-mode REGEDIT fails on
-# the ~2 MB hive the add-ons leave). CHECK refuses a *PNP0900 display that
-# is still there -> rollback to SYSTEM.VL.
+# batch writes VLDEL.FLG and, right after the import, deletes
+# Enum\Root\*PNP0900 with its subtree through VESBIND DELKEY (an in-place
+# CREG edit of SYSTEM.DAT: 950's real-mode REGEDIT has no /D, its usage text
+# lists only import, /C and /E, so the earlier REGEDIT /D lines did nothing).
+# DELKEY exit 2 / 3 -> rollback to SYSTEM.VL; exit 1 (no such key) is logged
+# and left to CHECK, which refuses a *PNP0900 display that is still there ->
+# rollback.
 w9x_vesa950_late_write() {
     sed 's/$/\r/' > "$1/VESALATE.BAT" <<'EOF'
 @ECHO OFF
@@ -207,10 +211,16 @@ IF ERRORLEVEL 1 GOTO ATTRFAIL
 COPY /Y USER.DAT C:\USOS9X\USER.VL > NUL
 IF ERRORLEVEL 1 GOTO ATTRFAIL
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\VLATE.REG
-REM One adapter as on OSR2: the legacy VGA devnode goes, deepest key first.
-IF EXIST C:\USOS9X\VLDEL.FLG REGEDIT /L:SYSTEM.DAT /R:USER.DAT /D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900\0000\LogConfig
-IF EXIST C:\USOS9X\VLDEL.FLG REGEDIT /L:SYSTEM.DAT /R:USER.DAT /D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900\0000
-IF EXIST C:\USOS9X\VLDEL.FLG REGEDIT /L:SYSTEM.DAT /R:USER.DAT /D HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900
+REM One adapter as on OSR2: the legacy VGA devnode and its subtree go.
+REM 950's real-mode REGEDIT has no /D: VESBIND DELKEY edits SYSTEM.DAT.
+IF NOT EXIST C:\USOS9X\VLDEL.FLG GOTO VLEXP
+C:\USOS9X\VESBIND.EXE DELKEY C:\WINDOWS\SYSTEM.DAT HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900
+IF ERRORLEVEL 3 ECHO VESALATE: DELKEY failed while writing SYSTEM.DAT, backup restored>> C:\USOS9X\USOSLOG.TXT
+IF ERRORLEVEL 3 GOTO ROLLBACK
+IF ERRORLEVEL 2 ECHO VESALATE: DELKEY refused SYSTEM.DAT, backup restored>> C:\USOS9X\USOSLOG.TXT
+IF ERRORLEVEL 2 GOTO ROLLBACK
+IF ERRORLEVEL 1 ECHO VESALATE: DELKEY found no Enum\Root\*PNP0900>> C:\USOS9X\USOSLOG.TXT
+:VLEXP
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL5.REG HKEY_LOCAL_MACHINE\Enum
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VL6.REG HKEY_LOCAL_MACHINE\Config
 IF NOT EXIST C:\USOS9X\VL5.REG GOTO ROLLBACK
