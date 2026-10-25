@@ -328,6 +328,23 @@ class DelKey(unittest.TestCase):
         sums_ok(after); free_lists(after)
         return before, after, removed
 
+    def test_optional_log_distinguishes_open_header_missing_key_and_success(self):
+        hive=self.tmp/'SYSTEM.DAT';log=self.tmp/'VLDEL.LOG'
+        valid=creg(TREE)
+        for data,key,code,reason in ((None,'Enum',2,'hive-open'),
+                                    (b'not a hive','Enum',2,'creg-header'),
+                                    (valid,'DoesNotExist',1,'not-found'),
+                                    (valid,r'Enum\Root\*PNP0900',0,'complete')):
+            with self.subTest(reason=reason):
+                if hive.exists():hive.unlink()
+                if data is not None:hive.write_bytes(data)
+                result=subprocess.run([str(self.binary),'DELKEY',str(hive),key,str(log)],capture_output=True)
+                self.assertEqual(result.returncode,code)
+                self.assertFalse(result.stdout+result.stderr)
+                self.assertEqual(log.read_bytes(),f'version=1\r\nexit={code}\r\nreason={reason}\r\n'.encode('ascii'))
+                if data is not None and code:self.assertEqual(hive.read_bytes(),data)
+                if code==0:self.assertNotIn(r'\enum\root\*pnp0900',dump(hive.read_bytes()))
+
     def test_deletes_a_middle_sibling_and_its_subtree(self):
         data = creg(TREE)
         _, after, removed = self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
@@ -405,7 +422,14 @@ class DelKey(unittest.TestCase):
         data = Path(source).read_bytes()
         if Hive(data).key(LEGACY) is None:
             self.skipTest('no Enum\\Root\\*PNP0900 in that hive')
-        _, after, removed = self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
+        # Original hives must never be copied into repo scratch, even when
+        # ignored. Keep this real-data fixture beside its private source.
+        import tempfile
+        previous=self.tmp
+        self.tmp=Path(tempfile.mkdtemp(prefix='vesbind-real-',dir=Path(source).resolve().parent))
+        try:
+            _, after, removed = self.check_deleted(data, LEGACY, '\\enum\\root\\*pnp0900')
+        finally:self.tmp=previous
         self.assertIn('\\enum\\root\\*pnp0900\\0000\\logconfig', removed)
         self.assertGreaterEqual(sums_ok(after), 3)
 
@@ -436,16 +460,16 @@ class Generator(unittest.TestCase):
             self.assertLessEqual(max(map(len,b.split(b'\r\n'))),125)
             labels=re.findall(rb'^:([A-Z0-9]+)\r?$',b,re.M);self.assertEqual(len(labels),len(set(labels)))
         self.assertIn('VLATE.RUN GOTO FAIL',text)
-        # PLAN exit 3: flag, then VESBIND DELKEY of the legacy devnode after
-        # the import and before the CHECK exports; exit 4+ and 1/2 still fail.
+        # REGEDIT restores R/S/H. Delete the legacy devnode while the
+        # backup source is writable, then import and check the actual hive.
         plan=text.index('VESBIND.EXE PLAN')
         self.assertLess(plan,text.index('IF ERRORLEVEL 4 GOTO FAIL'))
         self.assertLess(text.index('IF ERRORLEVEL 3 GOTO VLDEL'),text.index('IF ERRORLEVEL 1 GOTO FAIL',plan))
         # 950's real-mode REGEDIT has no /D: never used for the deletion.
         self.assertNotIn(' /D ',text)
-        dele=text.index('C:\\USOS9X\\VESBIND.EXE DELKEY C:\\WINDOWS\\SYSTEM.DAT HKEY_LOCAL_MACHINE\\Enum\\Root\\*PNP0900\r\n')
-        self.assertLess(text.index(r'C:\USOS9X\VLATE.REG'+'\r\n'),dele)
-        self.assertLess(text.index('IF NOT EXIST C:\\USOS9X\\VLDEL.FLG GOTO VLEXP'),dele)
+        dele=text.index('C:\\USOS9X\\VESBIND.EXE DELKEY C:\\WINDOWS\\SYSTEM.DAT HKEY_LOCAL_MACHINE\\Enum\\Root\\*PNP0900 C:\\USOS9X\\VLDEL.LOG\r\n')
+        self.assertLess(dele,text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\VLATE.REG\r\n'))
+        self.assertLess(text.index('IF NOT EXIST C:\\USOS9X\\VLDEL.FLG GOTO VLIMPORT'),dele)
         after=text[dele:text.index(':VLEXP\r\n')]
         # Exit 3 (write failed) and 2 (refused) roll back, both logged; exit 1 is logged only.
         self.assertLess(after.index('IF ERRORLEVEL 3 GOTO ROLLBACK'),after.index('IF ERRORLEVEL 2 GOTO ROLLBACK'))
@@ -456,6 +480,11 @@ class Generator(unittest.TestCase):
         self.assertLess(text.index('DEL C:\\USOS9X\\VLDEL.FLG'),plan)
         self.assertIn('VESBIND.EXE CHECK',text)
         self.assertIn(':ROLLBACK',text)
+        rollback=text.split(':ROLLBACK\r\n',1)[1].split(':ATTRFAIL\r\n',1)[0]
+        self.assertLess(rollback.index('ATTRIB.EXE -S -R -H SYSTEM.DAT'),rollback.index('COPY /Y C:\\USOS9X\\SYSTEM.VL SYSTEM.DAT'))
+        failure=text.split(':FAIL\r\n',1)[1]
+        self.assertLess(failure.index('VLATE.ERR'),failure.index('DEL C:\\USOS9X\\VLATE.RUN'))
+        self.assertIn('TYPE C:\\USOS9X\\VLDEL.LOG',failure)
         for version in ['4 0 0 1068','4 0 0 1111','']:
             other=self.create(version)
             self.assertFalse((other/'VESALATE.BAT').exists())

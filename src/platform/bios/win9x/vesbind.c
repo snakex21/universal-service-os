@@ -232,6 +232,7 @@ static unsigned del_count;
 static unsigned long slot_pos[SLOTS][256];
 static int slot_blk[SLOTS], slot_next;
 static unsigned char io[512];
+static const char *del_reason = "not-started";
 #ifdef __WATCOMC__
 static unsigned hive = 0xffff;
 static int hopen(const char *path) { hive = dos_open_rw(path); return hive != 0xffff; }
@@ -379,23 +380,31 @@ static int merge_free(unsigned blk) {
 static int delkey(const char *path, const char *key) {
     unsigned char h[0x20], e[0x1c], p[0x1c]; unsigned long off, cur, target, parent, sum, ck, rel, pos;
     unsigned i, len, blk; int match, failed; const char *name, *end;
+    del_reason = "argument";
     if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
     if (!*key || *key == '\\') return 2;
     for (i = 0; i <= MAXBLK; i++) { delta[i] = 0; touched[i] = 0; }
     for (i = 0; i < SLOTS; i++) slot_blk[i] = -1;
     slot_next = 0; del_count = 0;
+    del_reason = "hive-open";
     if (!hopen(path)) return 2;
     failed = 2;
+    del_reason = "creg-header";
     if (!hread(0, h, 0x20) || !same(h, "CREG", 4) || g32(h + 4) != 0x10000UL) goto done;
     off = g32(h + 8); blk_count = g16(h + 0x10);
+    del_reason = "rgdb-count";
     if (!blk_count || blk_count > MAXBLK) goto done;
     if (g16(h + 0x12) & 4) {
+        del_reason = "creg-checksum";
         for (sum = 0, i = 0; i < 0x20; i += 4) sum = (sum + g32(h + i)) & MASK32;
         if (sum) goto done;
     }
+    del_reason = "rgkn-header";
     if (!hread(0x20, h, 0x20) || !same(h, "RGKN", 4)) goto done;
     kn_size = g32(h + 4); kn_root = g32(h + 8); kn_free = g32(h + 0x0c); rgkn_flags = g16(h + 0x10);
+    del_reason = "rgkn-layout";
     if (kn_size < 0x3c || (kn_size & 3) || off != 0x20 + kn_size) goto done;
+    del_reason = "rgdb-layout";
     for (i = 0; i < blk_count; i++) {
         if (!hread(off, h, 0x20) || !same(h, "RGDB", 4) || g16(h + 0x0e) != i) goto done;
         blk_off[i] = off; blk_size[i] = g32(h + 4); blk_flags[i] = g16(h + 0x0c);
@@ -403,12 +412,16 @@ static int delkey(const char *path, const char *key) {
         off += blk_size[i];
     }
     /* Checksums as found: a hive this tool does not understand is refused. */
+    del_reason = "rgkn-checksum";
     if ((rgkn_flags & 4) && (!sec_sum(0, &sum) || sum)) goto done;
+    del_reason = "rgdb-checksum";
     for (i = 0; i < blk_count; i++) if ((blk_flags[i] & 4) && (!sec_sum(1 + i, &sum) || sum)) goto done;
     /* Walk the path from the root entry. */
+    del_reason = "root-entry";
     if (!entry(kn_root, e)) goto done;
     target = kn_root; name = key;
     while (*name) {
+        del_reason = "path-entry";
         end = strchr(name, '\\'); len = end ? (unsigned)(end - name) : (unsigned)strlen(name);
         if (!len || len > 255) goto done;
         cur = g32(e + 0x10); match = 0;
@@ -417,10 +430,11 @@ static int delkey(const char *path, const char *key) {
             if (match) break;
             cur = g32(e + 0x14);
         }
-        if (!match) { failed = 1; goto done; }
+        if (!match) { failed = 1; del_reason = "not-found"; goto done; }
         target = cur; name += len; if (*name) name++;
     }
     /* The subtree, breadth first; every entry and record must be sound. */
+    del_reason = "subtree";
     del_list[del_count++] = target;
     for (i = 0; i < del_count; i++) {
         if (!entry(del_list[i], e) || !record(e, &blk, &pos)) goto done;
@@ -430,11 +444,13 @@ static int delkey(const char *path, const char *key) {
             del_list[del_count++] = cur; cur = g32(p + 0x14);
         }
     }
+    del_reason = "parent-entry";
     if (!entry(target, e)) goto done;
     parent = g32(e + 0x0c);
     if (!entry(parent, p)) goto done;
     /* From here on the file changes. */
     failed = 3;
+    del_reason = "write-unlink";
     if (g32(p + 0x10) == target) { if (!put32(0, 0x20 + parent + 0x10, g32(e + 0x14))) goto done; }
     else {
         cur = g32(p + 0x10);
@@ -445,12 +461,15 @@ static int delkey(const char *path, const char *key) {
         }
         if (!put32(0, 0x20 + cur + 0x14, g32(e + 0x14))) goto done;
     }
+    del_reason = "write-free";
     for (i = 0; i < del_count; i++) {
         if (!entry(del_list[i], e) || !record(e, &blk, &pos)) goto done;
         if (pos != NONE && !free_record(blk, pos)) goto done;
         if (!free_insert(del_list[i])) goto done;
     }
+    del_reason = "write-merge";
     for (i = 0; i < blk_count; i++) if (touched[1 + i] && !merge_free(i)) goto done;
+    del_reason = "write-checksum";
     for (i = 0; i <= blk_count; i++) {
         if (!touched[i] || !((i ? blk_flags[i - 1] : rgkn_flags) & 4)) continue;
         rel = sec_base(i) + (i ? 0x1c : 0x14);
@@ -458,9 +477,9 @@ static int delkey(const char *path, const char *key) {
         ck = (g32(h) - delta[i]) & MASK32; p32(h, ck);
         if (!hwrite(rel, h, 4) || !sec_sum(i, &sum) || sum) goto done;
     }
-    failed = 0;
+    failed = 0; del_reason = "complete";
 done:
-    if (!hclose() && failed != 1 && failed != 2) failed = 3;
+    if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
     return failed;
 }
 int main(int argc,char **argv) {
@@ -470,7 +489,19 @@ int main(int argc,char **argv) {
     root_chosen[0]=root_driver[0]=0;
     profile[0]=bits[0]=resolution[0]=actual_bits[0]=actual_resolution[0]=profile_key[0]=0;
     current_class=-1;default_section=valid_device=candidate_pci=0;
-    if (argc==4 && ieq(argv[1],"DELKEY")) return delkey(argv[2],argv[3]);
+    if ((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) {
+        static const char *codes[] = {"0", "1", "2", "3"};
+        failed=delkey(argv[2],argv[3]);
+        if (argc==5) {
+            out=fopen(argv[4],"wb");
+            if (!out) return 3;
+            if (fprintf(out,"version=1\r\nexit=%s\r\nreason=%s\r\n",codes[failed],del_reason)<0) {
+                fclose(out); return 3;
+            }
+            if (fclose(out)) return 3;
+        }
+        return failed;
+    }
     if (argc!=6 || (!ieq(argv[1],"PLAN") && !ieq(argv[1],"CHECK"))) return 2;
     if (!scan(argv[2],class_line) || !scan(argv[3],device_line) || !flush_device() ||
         pci_displays+root_displays==0 || !scan(argv[4],id_line) || !id4(profile) ||
