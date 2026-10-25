@@ -139,7 +139,31 @@ Each round, 10 dwords per entry:
 | `USN1` 0x55534E31 | seconds, flags (bits 1:0 PollMode, 2 link, 3 full duplex, 15:8 event 0 periodic / 1 IRQ watchdog / 2 TX stall / 3 link, 31:16 Mb/s), ISR calls, ISR claimed, DPCs, RX indicated, RX found by the timer, TX queued, TX completed (DD) |
 | `USN2` 0x55534E32 | seconds, TX errors, TX ring full, RX errors, chip TPR, GPRC, GPTC, MPC, RNBC (summed clear-on-read counters) |
 | `USN3` 0x55534E33 | seconds, STATUS, IMS, RDH, RDT, TDH, TDT, PCI command/status dword (bit 19 = INTx pending), RCTL |
-| `USN4` 0x55534E34 (first round) | IRQ level << 16 \| vector, RX ring PA, TX ring PA, CTRL, TCTL, RXDCTL, TXDCTL, CRCERRS, version |
+| `USN4` 0x55534E34 (first round; not 95 RTM) | IRQ level << 16 \| vector, RX ring PA, TX ring PA, CTRL, TCTL, RXDCTL, TXDCTL, CRCERRS, version |
+
+Windows 95 RTM / OSR1 build (`USOSNET_W95RTM`, 2026-10-25): an init round
+of four entries at 30 s (the first four of a fresh budget window, written
+before any event round), the USN1 / USN2 / USN3 / USN5 round at 65 s and
+every 5 min. Events in the quiet time no longer use up a round (the X470 950
+run lost USN4 to the IRQ watchdog round at 5 s). The "first memory range of
+>= 128 KiB" fallback is not in this build: without a BAR0 match config
+BAR0 is mapped.
+
+| tag | values after the tag |
+|---|---|
+| `USN6` 0x55534E36 | config BAR0 at init, config BAR0 now, mapped PA, mapped VA, `NdisMQueryAdapterResources` status, resource info (bits 7:0 descriptors, 14:8 memory descriptors, 15 legacy scan, 23:16 MmioHow: 1 resource = BAR0, 3 config BAR0, 4 boot BAR0 restored), first memory descriptor of >= 128 KiB (else the first) start, its length, IRQ level << 16 \| vector |
+| `USN7` 0x55534E37 | MMIO probe after the map, after the boot BAR0 restore (0 = not tried, FFFFFFFF = map failed), at the reset (1 = an igb answers; 0x80000000 \| IMS after IMS=LSC << 16 \| IMS after IMC = RAM or no decode), UsosBootBar0, config BAR0 replaced by it (0 = none), CTRL after reset, STATUS after PHY setup, PHY ID, PLL tries \| MAC source << 16 |
+| `USN8` 0x55534E38 | TDBAL, TDBAH, TDLEN, RDBAL, RDBAH, RDLEN as read back, TX ring PA, RX ring PA (driver), TX ring VA |
+| `USN4` 0x55534E34 (95 RTM) | CTRL, TCTL, RXDCTL, TXDCTL, GPIE, EIMS, IVAR0, `NdisMRegisterInterrupt` status, PCI 0x3C line / pin << 16 \| version |
+
+95 RTM: the probe failing with config BAR0 = mapped PA and the first
+memory descriptor = BAR0 means the card does not decode that address (BAR0
+relocated: compare UsosBootBar0); the first memory descriptor != BAR0 means
+the resource list and the BAR disagree. `UsosBootBar0` (adapter key,
+string of hex digits, e.g. `"FC900000"`, written by the prep environment
+from the firmware BAR0) lets the driver put the firmware BAR0 back when the
+probe fails and config BAR0 differs (MmioHow 4, then USN7 probe 2 says
+whether the card answers there).
 
 Reading: TPR / GPRC > 0 but RX indicated = 0 -> RX DMA / filter problem;
 GPRC > 0, RX found by the timer > 0, ISR claimed 0 -> interrupt not

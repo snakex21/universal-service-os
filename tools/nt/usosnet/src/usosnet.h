@@ -155,7 +155,12 @@ typedef struct _USOSNET_CHIP_OPS {
 
 /* Diag() snapshot order */
 enum { DR_STATUS, DR_CTRL, DR_IMS, DR_RCTL, DR_TCTL, DR_RDH, DR_RDT, DR_TDH, DR_TDT,
-       DR_RXDCTL, DR_TXDCTL, DR_RXCSUM, DIAG_REGS };
+       DR_RXDCTL, DR_TXDCTL, DR_RXCSUM,
+#if USOSNET_W95RTM
+       /* 95 RTM init log (USN4 / USN8): ring bases as read back, INTx setup */
+       DR_TDBAL, DR_TDBAH, DR_TDLEN, DR_RDBAL, DR_RDBAH, DR_RDLEN, DR_GPIE, DR_EIMS, DR_IVAR0,
+#endif
+       DIAG_REGS };
 
 typedef struct _USOSNET_CHIP {
     USHORT Vendor;
@@ -252,6 +257,19 @@ typedef struct _ADAPTER {
     BOOLEAN Legacy;             /* NT4: found by the bus scan, no PnP resources */
     ULONG AssignStatus;         /* NT4: NdisMPciAssignResources status */
     ULONG IrqStatus;            /* NdisMRegisterInterrupt status (NDIS 4 build: failure -> polling) */
+#if USOSNET_W95RTM
+    /* 95 RTM init log (USN6 / USN7, README.md); only this build, so the
+     * NDIS 4 / 5 binaries keep their layout */
+    ULONG Bar0Init;             /* config BAR0 as found at init */
+    ULONG BootBar0;             /* registry UsosBootBar0 (prep env: firmware BAR0), 0 = none */
+    ULONG OldBar0;              /* config BAR0 replaced by BootBar0, 0 = not restored */
+    ULONG ResStatus;            /* NdisMQueryAdapterResources status */
+    ULONG ResInfo;              /* descriptors | memory descriptors << 8 | Legacy << 15 */
+    ULONG ResMemStart, ResMemLen; /* first memory descriptor of >= 128 KiB, else the first one */
+    ULONG MmioHow;              /* 1 resource = BAR0, 3 config BAR0, 4 boot BAR0 restored */
+    ULONG ProbeMap, ProbeRestore, ProbeReset; /* IgbMmioProbe: 1 = chip answers */
+    BOOLEAN InitLogged;
+#endif
 } ADAPTER, *PADAPTER;
 
 /* register access (MMIO through volatile pointers, no HAL import) */
@@ -274,5 +292,8 @@ void UsIndicateRxComplete(PADAPTER A);
 void UsRxDropped(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
 
 extern const USOSNET_CHIP_OPS IgbOps;
+#if USOSNET_W95RTM
+ULONG IgbMmioProbe(PADAPTER A);
+#endif
 
 #endif

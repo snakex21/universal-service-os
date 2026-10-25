@@ -152,4 +152,121 @@ a.TimerInit=0;sequence=0;TimerFn(0,&a,0,0);if(arms!=1)return 2;return 0;}
         subprocess.run([r'C:\msys64\mingw64\bin\gcc.exe','-Wall','-Werror',str(c),'-o',str(exe)],check=True,capture_output=True)
         subprocess.run([str(exe)],check=True,capture_output=True)
 
+class InitDiagnostics(unittest.TestCase):
+    """X470 950 run (2026-10-25): the mapped range answered like RAM (STATUS =
+    x86 code, IMS kept after IMC), USN4 was lost in the quiet time. 95 RTM
+    only: init log round, no non-BAR0 fallback, MMIO probe, UsosBootBar0."""
+    SRC=ROOT/'tools/nt/usosnet/src'
+
+    def source(self):
+        return (self.SRC/'usosnet.c').read_text(encoding='latin-1')
+
+    def test_init_round_has_the_four_records_before_any_event_round(self):
+        src=self.source()
+        init=re.search(r'static void InitLog\(PADAPTER A\)\r?\n\{(.*?)\r?\n\}',src,re.S).group(1)
+        self.assertEqual(re.findall(r'LOG10\((0x55534E3\d)UL',init),
+            ['0x55534E36','0x55534E37','0x55534E38','0x55534E34'])
+        second=re.search(r'static void TimerSecond\(PADAPTER A\)\r?\n\{(.*?)\r?\n\}',src,re.S).group(1)
+        self.assertLess(second.index('InitLog(A)'),second.index('CheckLink(A)'))
+        self.assertLess(second.index('InitLog(A)'),second.index('DiagLog('))
+
+    def test_quiet_time_does_not_use_up_a_round(self):
+        diag=re.search(r'static void DiagLog\(PADAPTER A, ULONG Event, ULONG Sec\)\r?\n\{(.*?)\r?\n\}',
+            self.source(),re.S).group(1)
+        quiet=diag.index('if (A->TimerCount < LOG_QUIET_SEC * TICKS_PER_SEC) return;')
+        self.assertLess(quiet,diag.index('A->LogCount++'))
+        self.assertLess(diag.index('#if !USOSNET_W95RTM'),diag.index('if (A->LogCount == 1)'))
+
+    def test_rtm_has_no_non_bar0_memory_fallback(self):
+        src=self.source()
+        block=src[src.index('A->ResInfo |= res->Count & 0xFF;'):]
+        self.assertLess(block.index('#else'),block.index('for (i = 0; !memFound && i < res->Count; i++)'))
+        init=src[src.index('static NDIS_STATUS MpInitialize('):]
+        self.assertLess(init.index('NdisMMapIoSpace((PVOID *)&A->Mmio'),init.index('A->ProbeMap = IgbMmioProbe(A);'))
+        self.assertLess(init.index('A->ProbeMap = IgbMmioProbe(A);'),init.index('A->Chip->Ops->Reset(A)'))
+
+    def compile_run(self,name,code):
+        cc=shutil.which('gcc') or r'C:\msys64\mingw64\bin\gcc.exe'
+        if not os.path.exists(cc) and not shutil.which('gcc'):
+            self.skipTest('no host C compiler')
+        OUT.mkdir(parents=True,exist_ok=True)
+        c=OUT/(name+'.c');exe=OUT/(name+'.exe');c.write_text(code)
+        r=subprocess.run([cc,'-Wall','-Werror',str(c),'-o',str(exe)],capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        r=subprocess.run([str(exe)],capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stdout)
+
+    def test_boot_bar_string_parser_host_compiled(self):
+        fn=re.search(r'static ULONG CfgHexString\(NDIS_HANDLE Cfg, NDIS_STRING \*Key\)\r?\n\{.*?\r?\n\}',
+            self.source(),re.S).group(0)
+        harness=r'''#include <string.h>
+typedef unsigned long ULONG; typedef unsigned char UCHAR; typedef unsigned short USHORT;
+typedef int NDIS_STATUS; typedef void *NDIS_HANDLE;
+#define NDIS_STATUS_SUCCESS 0
+enum { NdisParameterInteger, NdisParameterHexInteger, NdisParameterString };
+typedef struct { USHORT Length, MaximumLength; void *Buffer; } NDIS_STRING;
+typedef struct { int ParameterType; union { ULONG IntegerData; NDIS_STRING StringData; } ParameterData; }
+    NDIS_CONFIGURATION_PARAMETER, *PNDIS_CONFIGURATION_PARAMETER;
+static NDIS_CONFIGURATION_PARAMETER str, hex; static int have_str, have_hex;
+static void NdisReadConfiguration(NDIS_STATUS *st, PNDIS_CONFIGURATION_PARAMETER *p, NDIS_HANDLE c,
+    NDIS_STRING *k, int type)
+{
+    (void)c; (void)k;
+    if (type == NdisParameterString && have_str) { *p = &str; *st = 0; return; }
+    if (type == NdisParameterHexInteger && have_hex) { *p = &hex; *st = 0; return; }
+    *p = 0; *st = 1;
+}
+'''+fn+r'''
+static ULONG ansi(const char *s) { have_str = 1; have_hex = 0; str.ParameterType = NdisParameterString;
+    str.ParameterData.StringData.Buffer = (void *)s; str.ParameterData.StringData.Length = (USHORT)strlen(s);
+    return CfgHexString(0, 0); }
+static ULONG wide(const char *s) { static unsigned short w[32]; int i, n = (int)strlen(s);
+    for (i = 0; i < n; i++) w[i] = (unsigned char)s[i];
+    have_str = 1; have_hex = 0; str.ParameterType = NdisParameterString;
+    str.ParameterData.StringData.Buffer = w; str.ParameterData.StringData.Length = (USHORT)(2 * n);
+    return CfgHexString(0, 0); }
+int main(void)
+{
+    if (ansi("FC900000") != 0xFC900000UL) return 1;
+    if (wide("FC900000") != 0xFC900000UL) return 2;
+    if (ansi("0xfc900000") != 0xFC900000UL) return 3;
+    if (ansi(" FC900000") != 0xFC900000UL) return 4;
+    if (ansi("1FC900000") != 0) return 5;            /* more than 32 bits */
+    if (ansi("zz") != 0) return 6;
+    have_str = 0; have_hex = 1; hex.ParameterType = NdisParameterHexInteger;
+    hex.ParameterData.IntegerData = 0xFC900000UL;
+    if (CfgHexString(0, 0) != 0xFC900000UL) return 7;  /* DWORD value */
+    have_hex = 0;
+    if (CfgHexString(0, 0) != 0) return 8;             /* absent */
+    return 0;
+}
+'''
+        self.compile_run('bootbar',harness)
+
+    def test_mmio_probe_tells_chip_from_ram_host_compiled(self):
+        igb=(self.SRC/'usosnet_igb.c').read_text(encoding='latin-1')
+        fn=re.search(r'ULONG IgbMmioProbe\(PADAPTER A\)\r?\n\{.*?\r?\n\}',igb,re.S).group(0)
+        harness=r'''typedef unsigned long ULONG;
+#define IMS 0x00D0
+#define IMC 0x00D8
+#define ICR_LSC (1UL << 2)
+typedef struct { int chip; ULONG ram[0x40], ims; } ADAPTER, *PADAPTER;
+static void WR32(PADAPTER A, ULONG r, ULONG v)
+{
+    if (!A->chip) { A->ram[r / 4] = v; return; }
+    if (r == IMS) A->ims |= v; else if (r == IMC) A->ims &= ~v;
+}
+static ULONG RD32(PADAPTER A, ULONG r) { return A->chip ? (r == IMS ? A->ims : 0) : A->ram[r / 4]; }
+'''+fn+r'''
+int main(void)
+{
+    ADAPTER chip = {1, {0}, 0xDC}, ram = {0, {0}, 0};
+    ram.ram[IMS / 4] = 0xDC;
+    if (IgbMmioProbe(&chip) != 1 || chip.ims != 0) return 1;
+    if (IgbMmioProbe(&ram) != (0x80000000UL | (ICR_LSC << 16) | ICR_LSC)) return 2;
+    return 0;
+}
+'''
+        self.compile_run('mmioprobe',harness)
+
 if __name__=='__main__': unittest.main()

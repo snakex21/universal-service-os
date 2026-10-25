@@ -50,6 +50,7 @@
 #define IMC         0x00D8
 #define IAM         0x00E0
 #define GPIE        0x1514
+#define EIMS        0x1524
 #define EIMC        0x1528
 #define EIMC_ALL    0xFFFFFFFFUL
 #define EIAC        0x152C
@@ -202,9 +203,31 @@ static ULONG IgbIrqRead(PADAPTER A)
     return icr;
 }
 
+#if USOSNET_W95RTM
+/* Does the mapped range reach an igb at all? IMS is set by IMS writes and
+ * cleared by IMC writes (another offset): after IMS = LSC, IMC = all the
+ * chip reads IMS 0; plain RAM behind the mapping still holds LSC (95 RTM
+ * X470 run: STATUS read back x86 code, IMS kept 0xDC after IMC).
+ * 1 = chip, else 0x80000000 | IMS after the set << 16 | IMS after the clear. */
+ULONG IgbMmioProbe(PADAPTER A)
+{
+    ULONG a, b;
+    WR32(A, IMC, 0xFFFFFFFF);
+    WR32(A, IMS, ICR_LSC);
+    a = RD32(A, IMS);
+    WR32(A, IMC, 0xFFFFFFFF);
+    b = RD32(A, IMS);
+    if (a == ICR_LSC && b == 0) return 1;
+    return 0x80000000UL | ((a & 0x7FFF) << 16) | (b & 0xFFFF);
+}
+#endif
+
 static NDIS_STATUS IgbReset(PADAPTER A)
 {
     ULONG i;
+#if USOSNET_W95RTM
+    A->ProbeReset = IgbMmioProbe(A);          /* recorded only (USN7) */
+#endif
     IgbIrqDisable(A);
     WR32(A, RCTL, 0);
     WR32(A, TCTL, TCTL_PSP);
@@ -622,6 +645,17 @@ static void IgbDiag(PADAPTER A, ULONG *R)
     R[DR_RXDCTL] = RD32(A, RXDCTL0);
     R[DR_TXDCTL] = RD32(A, TXDCTL0);
     R[DR_RXCSUM] = RD32(A, RXCSUM);
+#if USOSNET_W95RTM
+    R[DR_TDBAL] = RD32(A, TDBAL0);
+    R[DR_TDBAH] = RD32(A, TDBAH0);
+    R[DR_TDLEN] = RD32(A, TDLEN0);
+    R[DR_RDBAL] = RD32(A, RDBAL0);
+    R[DR_RDBAH] = RD32(A, RDBAH0);
+    R[DR_RDLEN] = RD32(A, RDLEN0);
+    R[DR_GPIE] = RD32(A, GPIE);
+    R[DR_EIMS] = RD32(A, EIMS);
+    R[DR_IVAR0] = RD32(A, IVAR0);
+#endif
 }
 
 const USOSNET_CHIP_OPS IgbOps = {

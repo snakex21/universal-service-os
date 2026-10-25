@@ -214,6 +214,42 @@ static ULONG CfgInt(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG Def)
     return Def;
 }
 
+#if USOSNET_W95RTM
+/* UsosBootBar0: hex digits as a registry string ("FC900000", optional 0x;
+ * ANSI or UTF-16, the high bytes are skipped), else a DWORD read as
+ * NdisParameterHexInteger. 0 = absent / unparsable. */
+static ULONG CfgHexString(NDIS_HANDLE Cfg, NDIS_STRING *Key)
+{
+    NDIS_STATUS st;
+    PNDIS_CONFIGURATION_PARAMETER p = NULL;
+    ULONG v = 0, n = 0, i, d;
+    const UCHAR *c;
+    NdisReadConfiguration(&st, &p, Cfg, Key, NdisParameterString);
+    if (st == NDIS_STATUS_SUCCESS && p && p->ParameterType == NdisParameterString &&
+        p->ParameterData.StringData.Buffer) {
+        c = (const UCHAR *)p->ParameterData.StringData.Buffer;
+        for (i = 0; i < p->ParameterData.StringData.Length; i++) {
+            if (!c[i]) continue;
+            if (!n && c[i] == ' ') continue;
+            if ((c[i] == 'x' || c[i] == 'X') && n == 1 && v == 0) { n = 0; continue; }
+            if (c[i] >= '0' && c[i] <= '9') d = c[i] - '0';
+            else if (c[i] >= 'A' && c[i] <= 'F') d = c[i] - 'A' + 10;
+            else if (c[i] >= 'a' && c[i] <= 'f') d = c[i] - 'a' + 10;
+            else break;
+            if (n == 8) return 0;               /* more than 32 bits */
+            v = (v << 4) | d;
+            n++;
+        }
+        if (n) return v;
+    }
+    NdisReadConfiguration(&st, &p, Cfg, Key, NdisParameterHexInteger);
+    if (st == NDIS_STATUS_SUCCESS && p &&
+        (p->ParameterType == NdisParameterHexInteger || p->ParameterType == NdisParameterInteger))
+        return p->ParameterData.IntegerData;
+    return 0;
+}
+#endif
+
 #if !USOSNET_NDIS3
 static void CfgPut(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG V)
 {
@@ -443,6 +479,11 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
     UsLog(A, "diag rx %x tx %x", A->RxOk, A->TxOk);
 #else
     ULONG r[DIAG_REGS], pci = 0;
+#if USOSNET_W95RTM
+    /* nothing is written in the quiet time: do not use up a round (the X470
+     * 95 RTM run lost the one-time USN4 to the IRQ watchdog round at 5 s) */
+    if (A->TimerCount < LOG_QUIET_SEC * TICKS_PER_SEC) return;
+#endif
     if (Event == EV_REQUEST) {
         if (A->ForcedLogs >= LOG_FORCED_MAX) return;
         A->ForcedLogs++;
@@ -458,10 +499,12 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
           A->HwMpc, A->HwRnbc);
     LOG10(0x55534E33UL, Sec, r[DR_STATUS], r[DR_IMS], r[DR_RDH], r[DR_RDT], r[DR_TDH], r[DR_TDT],
           pci, r[DR_RCTL]);
+#if !USOSNET_W95RTM
     if (A->LogCount == 1)
         LOG10(0x55534E34UL, (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF), A->RxRing.Pa, A->TxRing.Pa,
               r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], A->HwCrc,
               (USOSNET_MAJOR << 16) | USOSNET_MINOR);
+#endif
     if (A->Stats) {
         /* USN5: RX UDP, RX DNS, RX TCP, RX ICMP, TX UDP, TX DNS, UDP with L4E,
          * TransferData without a frame being indicated (the budget skips it
@@ -472,6 +515,30 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
     }
 #endif
 }
+
+#if USOSNET_W95RTM
+/* 95 RTM: one init round at the end of the quiet time, the first four
+ * entries of a fresh budget window, so none is skipped (README.md):
+ * USN6 mapping / resources, USN7 MMIO probes / chip identity, USN8 ring
+ * bases as read back, USN4 queue / interrupt setup. */
+static void InitLog(PADAPTER A)
+{
+    ULONG r[DIAG_REGS], b0 = 0, il = 0;
+    A->InitLogged = TRUE;
+    A->Chip->Ops->Diag(A, r);
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0x10, &b0, 4);
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, 0x3C, &il, 4);
+    LOG10(0x55534E36UL, A->Bar0Init, b0, NdisGetPhysicalAddressLow(A->MmioPa), (ULONG)(ULONG_PTR)A->Mmio,
+          A->ResStatus, A->ResInfo | (A->MmioHow << 16), A->ResMemStart, A->ResMemLen,
+          (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF));
+    LOG10(0x55534E37UL, A->ProbeMap, A->ProbeRestore, A->ProbeReset, A->BootBar0, A->OldBar0,
+          A->CtrlAtInit, A->StatusAtInit, A->PhyId, A->PllTries | (A->MacSource << 16));
+    LOG10(0x55534E38UL, r[DR_TDBAL], r[DR_TDBAH], r[DR_TDLEN], r[DR_RDBAL], r[DR_RDBAH], r[DR_RDLEN],
+          A->TxRing.Pa, A->RxRing.Pa, (ULONG)(ULONG_PTR)A->TxRing.Va);
+    LOG10(0x55534E34UL, r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], r[DR_GPIE], r[DR_EIMS],
+          r[DR_IVAR0], A->IrqStatus, ((il & 0xFFFF) << 16) | (USOSNET_MAJOR << 8) | USOSNET_MINOR);
+}
+#endif
 
 /* once a second: the core counters into the statistics page */
 static void StatsSecond(PADAPTER A, ULONG Sec)
@@ -517,7 +584,11 @@ static void StatsDump(UCHAR *Dst, ULONG *DstLen, const UCHAR *Frame, ULONG Len)
 static void TimerSecond(PADAPTER A)
 {
     ULONG sec = A->TimerCount / TICKS_PER_SEC;
-    BOOLEAN linkChanged = CheckLink(A);
+    BOOLEAN linkChanged;
+#if USOSNET_W95RTM
+    if (!A->InitLogged && sec >= LOG_QUIET_SEC) InitLog(A);   /* before any event round */
+#endif
+    linkChanged = CheckLink(A);
 
     A->Chip->Ops->Stats(A);
     if (!A->PollMode && UsosnetIrqBroken(sec, A->IsrCount, A->RxByTimer, A->LinkUp)) {
@@ -545,6 +616,9 @@ static void TimerSecond(PADAPTER A)
     /* first round after the quiet time, then one per budget window */
 #if USOSNET_NDIS3
     if (Usosnet351PeriodicLog(sec))
+#elif USOSNET_W95RTM
+    /* 30 s carries the init round (InitLog); the counters follow in the next window */
+    if (sec == LOG_QUIET_SEC + LOG_WINDOW_SEC + 4 || (sec && sec % 300 == 0))
 #else
     if (sec == LOG_QUIET_SEC || sec == LOG_QUIET_SEC + LOG_WINDOW_SEC + 4 || (sec && sec % 300 == 0))
 #endif
@@ -701,6 +775,47 @@ static BOOLEAN ConfiguredFind35(PADAPTER A, NDIS_HANDLE Cfg)
 }
 #endif
 
+#if USOSNET_W95RTM
+/* X470 950 run (NDISLOG 2026-10-25): the mapped "registers" were RAM with
+ * x86 code (STATUS 0x1C24448B = mov eax,[esp+1Ch], IMS kept after IMC,
+ * TDH never moved) while link / MAC / rings were "programmed". The I211
+ * BAR0 is fully relocatable (LogConfig MEM_RANGE align 128 KiB, min 0, max
+ * FFFFFFFF), and the 950 CONFIGMG may place it in address space it takes
+ * for free: the RAM hidden above MaxPhysPage (1E000 = 480 MiB), which the
+ * memory controller answers instead of the card (behind the bus-4 bridge
+ * such an address is outside the bridge window as well). The prep
+ * environment records the firmware BAR0 as UsosBootBar0. When the assigned
+ * range does not answer like an igb (IgbMmioProbe) and config BAR0 differs
+ * from the firmware one: put the firmware address back (memory decode off
+ * meanwhile), map it, probe again. All of it is recorded (USN6 / USN7); a
+ * failed probe still carries on as before, so the log gets written. */
+static void MmioRemap(PADAPTER A, ULONG Bar0)
+{
+    ULONG cmd = 0, off, nb = A->BootBar0;
+    NDIS_PHYSICAL_ADDRESS pa;
+    PVOID va = NULL;
+    NDIS_STATUS st;
+    A->OldBar0 = Bar0;
+    NdisReadPciSlotInformation(A->Handle, A->PciSlot, 4, &cmd, 4);
+    cmd &= 0xFFFF;
+    off = cmd & ~0x0002UL;
+    NdisWritePciSlotInformation(A->Handle, A->PciSlot, 4, &off, 2);
+    NdisWritePciSlotInformation(A->Handle, A->PciSlot, 0x10, &nb, 4);
+    NdisWritePciSlotInformation(A->Handle, A->PciSlot, 4, &cmd, 2);
+    NdisSetPhysicalAddressHigh(pa, 0);
+    NdisSetPhysicalAddressLow(pa, nb);
+    st = NdisMMapIoSpace(&va, A->Handle, pa, 0x20000);
+    if (st != NDIS_STATUS_SUCCESS || !va) { A->ProbeRestore = 0xFFFFFFFF; return; }
+    NdisMUnmapIoSpace(A->Handle, (PVOID)A->Mmio, A->MmioLen);
+    A->Mmio = (volatile UCHAR *)va;
+    A->MmioPa = pa;
+    A->MmioLen = 0x20000;
+    A->MmioHow = 4;
+    A->ProbeRestore = IgbMmioProbe(A);
+    UsLog(A, "boot bar0 %x probe %x", nb, A->ProbeRestore);
+}
+#endif
+
 /* ------------------------------------------------------------------ */
 /* miniport handlers                                                   */
 
@@ -724,6 +839,9 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NDIS_STRING kPoll = NDIS_STRING_CONST("PollMode");
     NDIS_STRING kDbg = NDIS_STRING_CONST("DebugPort");
     NDIS_STRING kSkipPhy = NDIS_STRING_CONST("SkipPhy");
+#if USOSNET_W95RTM
+    NDIS_STRING kBootBar = NDIS_STRING_CONST("UsosBootBar0");
+#endif
 
     UNREFERENCED_PARAMETER(OpenErrorStatus);
 
@@ -748,6 +866,9 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         A->PollMode = CfgInt(cfg, &kPoll, 0);
         A->DebugPort = CfgInt(cfg, &kDbg, 0) & 0xFFFF;
         A->SkipPhy = CfgInt(cfg, &kSkipPhy, 0);
+#if USOSNET_W95RTM
+        A->BootBar0 = CfgHexString(cfg, &kBootBar) & ~0xFUL;
+#endif
     }
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
@@ -779,6 +900,9 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #if USOSNET_NDIS3
     UsLog(A, "resources status %x bytes %x", st, resLen);
 #endif
+#if USOSNET_W95RTM
+    A->ResStatus = st;
+#endif
     if (st == NDIS_STATUS_SUCCESS) {
         rl = res;
     } else {
@@ -807,6 +931,9 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     cfg32 &= ~0x0400UL;
     NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x10, &bar0, 4);
+#if USOSNET_W95RTM
+    A->Bar0Init = bar0;
+#endif
     A->Stage = ST_PCI;
 
     /* BAR0 (CSR, 128 KiB) from config space; a 64-bit BAR has its high half at 0x14 */
@@ -833,7 +960,23 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
                 A->IrqLevel = d->u.Interrupt.Level;
                 A->IrqVector = d->u.Interrupt.Vector;
             }
+#if USOSNET_W95RTM
+            if (d->Type == CmResourceTypeMemory) {
+                if ((A->ResInfo & 0x7F00) < 0x7F00) A->ResInfo += 0x100;
+                if (!A->ResMemLen || (A->ResMemLen < 0x20000 && d->u.Memory.Length >= 0x20000)) {
+                    A->ResMemStart = NdisGetPhysicalAddressLow(d->u.Memory.Start);
+                    A->ResMemLen = d->u.Memory.Length;
+                }
+            }
+#endif
         }
+#if USOSNET_W95RTM
+        /* no "first memory range of >= 128 KiB" fallback here: on the X470
+         * 950 run the mapped range was not the card (RAM, see MmioRemap);
+         * without a BAR0 match config BAR0 is used below (MmioHow 3) */
+        A->ResInfo |= res->Count & 0xFF;
+        if (memFound) A->MmioHow = 1;
+#else
         for (i = 0; !memFound && i < res->Count; i++) {
             PCM_PARTIAL_RESOURCE_DESCRIPTOR d = &res->PartialDescriptors[i];
             if (d->Type == CmResourceTypeMemory && d->u.Memory.Length >= 0x20000) {
@@ -842,12 +985,19 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
                 memFound = TRUE;
             }
         }
+#endif
     }
+#if USOSNET_W95RTM
+    if (A->Legacy) A->ResInfo |= 0x8000;
+#endif
     if (!memFound && (bar0 & ~0xFUL) && !(bar0 & 1)) {
         /* no list (should not happen with PnP): BAR0 from config space */
         NdisSetPhysicalAddressHigh(A->MmioPa, bar0hi);
         NdisSetPhysicalAddressLow(A->MmioPa, bar0 & ~0xFUL);
         A->MmioLen = 0x20000;
+#if USOSNET_W95RTM
+        A->MmioHow = 3;
+#endif
     }
     if (!A->IrqLevel && !A->IrqVector) {
         NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x3C, &cfg32, 4);
@@ -866,6 +1016,10 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 
     st = NdisMMapIoSpace((PVOID *)&A->Mmio, MiniportAdapterHandle, A->MmioPa, A->MmioLen);
     if (st != NDIS_STATUS_SUCCESS || !A->Mmio) { A->Mmio = NULL; st = NDIS_STATUS_RESOURCES; goto fail; }
+#if USOSNET_W95RTM
+    A->ProbeMap = IgbMmioProbe(A);
+    if (A->ProbeMap != 1 && A->BootBar0 && (bar0 & ~0xFUL) != A->BootBar0) MmioRemap(A, bar0);
+#endif
     A->Stage = ST_MMIO;
 
     st = A->Chip->Ops->Reset(A);
