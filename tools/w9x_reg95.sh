@@ -601,11 +601,11 @@ EOF
 w9x_reg95_late_write() {
     lreg=$(tr -d '\r' < "$1/R95LATE.REG")
     checks=''
-    ie=$(printf '%s\n' "$lreg" | sed -n 's/^\[\(.*\\Internet Explorer\\Main\)\]$/\1/p' | head -n 1)
+    ie=$(printf '%s\n' "$lreg" | sed -n 's/^\[\(.*\)\\Internet Explorer\\Main\]$/\1/p' | head -n 1)
     if [ -n "$ie" ]; then
         # The parent key: no space on the real-mode REGEDIT command line.
         checks="IF EXIST C:\\USOS9X\\RL2.REG DEL C:\\USOS9X\\RL2.REG > NUL
-REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\RL2.REG ${ie%%\\Internet Explorer\\Main}
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\RL2.REG $ie
 IF NOT EXIST C:\\USOS9X\\RL2.REG GOTO FAIL
 C:\\WINDOWS\\COMMAND\\FIND.EXE /I \"Start Page\" C:\\USOS9X\\RL2.REG > NUL
 IF ERRORLEVEL 1 GOTO FAIL"
