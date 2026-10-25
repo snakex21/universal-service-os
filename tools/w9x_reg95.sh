@@ -105,7 +105,11 @@ w9x_reg95_convert() {
         }
         return v
     }
-    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return s }
+    # "&&" doubles each backslash in every awk. "\\\\" did so only in gawk:
+    # BusyBox / POSIX awk wrote one, so 9x REGEDIT dropped each value with a
+    # path (X470 950 PL REG95CHK.REG: no USOSLog / USOSDisplay / USOSLan,
+    # no USOSVmd RunOnce).
+    function esc(s) { gsub(/\\/, "&&", s); gsub(/"/, "\\\"", s); return s }
     function emit(key, name, data) {
         if (key != last) { printf "\r\n[%s]\r\n", key; last = key }
         printf "%s=%s\r\n", (name == "" ? "@" : "\"" esc(name) "\""), data
@@ -479,6 +483,81 @@ CD \
 EOF
 }
 
+# w9x_reg95_vmdlate_write DIR VMDINF: 950 only. Its first GUI boot rebuilds
+# machine RunOnce, so the USOSVmd value of REG95.REG may never run (X470 950
+# PL, 2026-10-25: SYSTEM.INI without the device= lines). VMDLATE.BAT, called
+# by REG95.BAT before every Windows start, checks SYSTEM.INI with FIND once
+# RunOnce\Setup is gone; without USOSVMD.VXD it imports VMDRO.REG (the same
+# RunOnce value) once, the next Windows start runs USOSVMD.INF, and the start
+# after it loads the VxD. Journal: VMDLATE.RUN (queued), VMDLATE.OK (lines
+# present), VMDLATE.ERR (queued value ran but SYSTEM.INI still lacks them,
+# or a tool is missing; logged to USOSLOG.TXT, Windows starts anyway).
+# Deleting USOSVMD.ON (the user's off switch) stops it.
+w9x_reg95_vmdlate_write() {
+    case "$2" in *[!A-Za-z0-9:\\._]*|'') return 1 ;; esac
+    printf 'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce]\r\n"USOSVmd"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 %s"\r\n\r\n' \
+        "$(printf '%s' "$2" | sed 's/\\/\\\\/g')" > "$1/VMDRO.REG" || return 1
+    sed 's/$/\r/' > "$1/VMDLATE.BAT" <<'EOF'
+@ECHO OFF
+REM USOS: 950 DOS-box mouse fallback (tools/w9x_reg95.sh w9x_reg95_vmdlate_write).
+IF EXIST C:\USOS9X\VMDLATE.ERR GOTO END
+IF EXIST C:\USOS9X\VMDLATE.OK GOTO END
+IF NOT EXIST C:\USOS9X\USOSVMD.ON GOTO END
+IF NOT EXIST C:\USOS9X\REG95.OK GOTO END
+IF NOT EXIST C:\USOS9X\VMDRO.REG GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM.INI GOTO FAIL
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO FAIL
+IF NOT EXIST C:\WINDOWS\USER.DAT GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO FAIL
+IF NOT EXIST C:\WINDOWS\COMMAND\ATTRIB.EXE GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "USOSVMD.VXD" C:\WINDOWS\SYSTEM.INI > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO DONE
+C:
+CD \WINDOWS
+IF EXIST C:\USOS9X\VM1.REG DEL C:\USOS9X\VM1.REG > NUL
+IF EXIST C:\USOS9X\VM1.REG GOTO FAIL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VM1.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
+IF NOT EXIST C:\USOS9X\VM1.REG GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce]" C:\USOS9X\VM1.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce\Setup]" C:\USOS9X\VM1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+C:\WINDOWS\COMMAND\FIND.EXE /I "USOSVMD.INF" C:\USOS9X\VM1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+REM Queued once already and Windows ran it: the INF did not write SYSTEM.INI.
+IF EXIST C:\USOS9X\VMDLATE.RUN GOTO FAIL
+ECHO run> C:\USOS9X\VMDLATE.RUN
+IF NOT EXIST C:\USOS9X\VMDLATE.RUN GOTO FAIL
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H USER.DAT
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\VMDRO.REG
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
+C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
+IF EXIST C:\USOS9X\VM2.REG DEL C:\USOS9X\VM2.REG > NUL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VM2.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
+IF NOT EXIST C:\USOS9X\VM2.REG GOTO FAIL
+C:\WINDOWS\COMMAND\FIND.EXE /I "USOSVMD.INF" C:\USOS9X\VM2.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+ECHO VMDLATE: USOSVmd RunOnce queued again (SYSTEM.INI had no USOSVMD.VXD)>> C:\USOS9X\USOSLOG.TXT
+GOTO PENDING
+:DONE
+ECHO ok> C:\USOS9X\VMDLATE.OK
+IF EXIST C:\USOS9X\VMDLATE.RUN DEL C:\USOS9X\VMDLATE.RUN > NUL
+GOTO PENDING
+:FAIL
+ECHO DOS-box mouse fallback failed> C:\USOS9X\VMDLATE.ERR
+ECHO VMDLATE: 950 DOS-box mouse fallback failed, see C:\USOS9X\VM*.REG; Windows started>> C:\USOS9X\USOSLOG.TXT
+:PENDING
+C:
+CD \
+:END
+EOF
+}
+
 # w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
@@ -501,6 +580,12 @@ w9x_reg95_write() {
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
     netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND tcp95='' netlate=''
     run_guard="IF EXIST ${U}REG95.RUN GOTO END"
+    vmdlate='REM -'
+    rm -f "$dir/VMDLATE.BAT" "$dir/VMDRO.REG"
+    if [ -n "$vmd" ] && [ "$source_version" = '4 0 0 950' ]; then
+        w9x_reg95_vmdlate_write "$dir" "$vmd" || return 1
+        vmdlate="CALL ${U}VMDLATE.BAT"
+    fi
     if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then
         w9x_reg95_netfiles_write "$dir" || return 1
         w9x_reg95_tcp_write "$dir" || return 1
@@ -556,6 +641,7 @@ $neterrjump
 @ECHO OFF
 REM USOS: Windows 95 answer registry (tools/w9x_reg95.sh): 95 Setup ignores
 REM MSBATCH.INF [Install] AddReg. Runs from AUTOEXEC.BAT, imports once.
+$vmdlate
 $netguard
 $netlate
 IF EXIST ${U}REG95.OK GOTO END

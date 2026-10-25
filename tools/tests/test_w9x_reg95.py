@@ -200,6 +200,88 @@ class Reg95(unittest.TestCase):
         self.assertIn('/E C:\\USOS9X\\REG95CHK.REG ' + RUN, text)    # evidence for the next read-back
 
 
+class Reg95Escaping(unittest.TestCase):
+    """REGEDIT4 strings need doubled backslashes. The micro-Linux awk is not
+    gawk: its gsub wrote one backslash for "\\\\", and 950's real-mode
+    REGEDIT dropped every value with a path (X470 95 RTM PL, 2026-10-25:
+    REG95CHK.REG without USOSLog / USOSDisplay / USOSLan, no USOSVmd)."""
+    def test_posix_awk_doubles_backslashes(self):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-reg95esc-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'MSBATCH.INF').write_bytes(ANSWER_95.encode('ascii'))
+        (tmp / 'out').mkdir()
+        for wrapper in ('', 'awk() { command awk --posix "$@"; }\n'):
+            rc, so, err = sh(wrapper + f'. "{REG95}"\nw9x_reg95_write "{(tmp / "out").as_posix()}" '
+                             f'"{(tmp / "MSBATCH.INF").as_posix()}" \'C:\\USOS9X\\USOSLOG.EXE\' \'C:\\USOS9X\\USOSVMD.INF\'', {})
+            self.assertEqual(rc, 0, err)
+            reg = (tmp / 'out/REG95.REG').read_bytes().decode('ascii')
+            self.assertIn('"USOSLog"="C:\\\\USOS9X\\\\USOSLOG.EXE"\r\n', reg, wrapper)
+            self.assertIn('"USOSLan"="C:\\\\USOS9X\\\\USOSLAN.EXE"\r\n', reg, wrapper)
+            self.assertIn('DefaultInstall 4 C:\\\\USOS9X\\\\USOSVMD.INF"\r\n', reg, wrapper)
+            self.assertIn('@="\\"C:\\\\Program Files\\\\Internet Explorer\\\\IEXPLORE.EXE\\""\r\n', reg, wrapper)
+            # Every string value: a backslash only as \\ or \" (what 9x REGEDIT reads).
+            for line in reg.split('\r\n'):
+                if '="' in line:
+                    self.assertIsNone(re.search(r'(?<!\\)\\(?![\\"])', re.sub(r'\\\\', '', line)), line)
+
+
+class Vmdlate950(unittest.TestCase):
+    r"""950: Setup's first GUI boot rebuilds machine RunOnce; VMDLATE.BAT queues
+    USOSVMD.INF again after RunOnce\Setup is gone when SYSTEM.INI lacks it."""
+    def write(self, version, vmd='C:\\USOS9X\\USOSVMD.INF'):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-vmdlate-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'MSBATCH.INF').write_bytes(ANSWER_95.encode('ascii'))
+        (tmp / 'out').mkdir()
+        (tmp / 'out/NET').mkdir()
+        rc, so, err = sh(f'. "{REG95}"\nw9x_reg95_write "{(tmp / "out").as_posix()}" "{(tmp / "MSBATCH.INF").as_posix()}" '
+                         f'"" "$VMD" "" "$V"', {'VMD': vmd, 'V': version})
+        self.assertEqual(rc, 0, err)
+        return tmp / 'out'
+
+    def test_950_gets_the_fallback_others_do_not(self):
+        out = self.write('4 0 0 950')
+        bat = (out / 'REG95.BAT').read_bytes().decode('ascii')
+        self.assertIn('\r\nCALL C:\\USOS9X\\VMDLATE.BAT\r\n', bat)
+        self.assertLess(bat.index('VMDLATE.BAT'), bat.index('REG95.OK GOTO END'))
+        self.assertEqual((out / 'VMDRO.REG').read_bytes(),
+                         b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce]\r\n'
+                         b'"USOSVmd"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\USOSVMD.INF"\r\n\r\n')
+        for version, vmd in (('4 0 0 1111', 'C:\\USOS9X\\USOSVMD.INF'), ('', 'C:\\USOS9X\\USOSVMD.INF'), ('4 0 0 950', '')):
+            other = self.write(version, vmd)
+            self.assertNotIn(b'VMDLATE', (other / 'REG95.BAT').read_bytes(), version)
+            self.assertFalse((other / 'VMDLATE.BAT').exists(), version)
+            self.assertFalse((other / 'VMDRO.REG').exists(), version)
+
+    def test_batch_gates_journal_and_dos_limits(self):
+        data = (self.write('4 0 0 950') / 'VMDLATE.BAT').read_bytes()
+        self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
+        self.assertLessEqual(max(map(len, data.split(b'\r\n'))), 125)
+        text = data.decode('ascii')
+        labels = re.findall(r'^:([A-Z0-9]+)\r?$', text, re.M)
+        self.assertEqual(len(labels), len(set(labels)))
+        for guard in ('VMDLATE.ERR GOTO END', 'VMDLATE.OK GOTO END', 'NOT EXIST C:\\USOS9X\\USOSVMD.ON GOTO END',
+                      'NOT EXIST C:\\USOS9X\\REG95.OK GOTO END'):
+            self.assertLess(text.index(guard), text.index('FIND.EXE /I "USOSVMD.VXD"'))
+        # SYSTEM.INI already has the line: done, nothing imported.
+        sysini = text.index('FIND.EXE /I "USOSVMD.VXD" C:\\WINDOWS\\SYSTEM.INI')
+        self.assertTrue(text[sysini:].split('\r\n')[2] == 'IF NOT ERRORLEVEL 1 GOTO DONE')
+        # Only after RunOnce\Setup is gone, only when the value is not queued,
+        # at most once (VMDLATE.RUN), then read back.
+        imp = text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\VMDRO.REG')
+        for before in ('"\\RunOnce\\Setup]" C:\\USOS9X\\VM1.REG', '"USOSVMD.INF" C:\\USOS9X\\VM1.REG',
+                       'IF EXIST C:\\USOS9X\\VMDLATE.RUN GOTO FAIL', 'ECHO run> C:\\USOS9X\\VMDLATE.RUN',
+                       'ATTRIB.EXE -S -R -H SYSTEM.DAT'):
+            self.assertLess(text.index(before), imp, before)
+        self.assertGreater(text.index('"USOSVMD.INF" C:\\USOS9X\\VM2.REG'), imp)
+        self.assertGreater(text.index('ATTRIB.EXE +S +R +H SYSTEM.DAT'), imp)
+        fail = text[text.index(':FAIL\r\n'):text.index(':PENDING\r\n')]
+        self.assertIn('>> C:\\USOS9X\\USOSLOG.TXT', fail)
+        self.assertNotIn('PAUSE', text)
+        self.assertNotIn('SYSTEM.INI\r\n', text.replace('C:\\WINDOWS\\SYSTEM.INI GOTO FAIL', ''))  # never rewritten
+        self.assertNotIn('>C:\\WINDOWS\\SYSTEM.INI', text.replace(' ', ''))
+
+
 def target_block(start, end):
     text = TARGET.read_text(encoding='utf-8')
     return text[text.index(start):text.index(end)]
