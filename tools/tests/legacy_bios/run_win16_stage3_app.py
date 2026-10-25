@@ -94,6 +94,7 @@ def main():
     parser.add_argument('--qemu', type=Path, required=True)
     parser.add_argument('--seconds', type=int, default=120)
     parser.add_argument('--windows-mode', choices=('standard', 'enhanced'), default='enhanced')
+    parser.add_argument('--packet-shim', type=Path, help='External control-only packet shim, loaded before Windows')
     args = parser.parse_args()
     args.out = stage.guarded(args.out); args.out.mkdir(parents=True, exist_ok=True)
     commands, copies, data, collected = load_plan(args.plan)
@@ -111,6 +112,11 @@ def main():
         data['NET/WIN16/APITEST.EXE'] = args.api_test.read_bytes()
     data['NET/WIN16/WINSOCK.DLL'] = args.provider.read_bytes()
     data['WINDOWS/WINSOCK.DLL'] = args.provider.read_bytes()
+    if args.packet_shim:
+        shim = args.packet_shim.resolve(strict=True)
+        if not shim.is_relative_to(LIBRARY.resolve()) or not shim.is_file():
+            raise ValueError('Control packet shim must come from the external application library')
+        data['NET/WIN16/WINPKT.COM'] = shim.read_bytes()
     input_events=[(entry['at_seconds'],entry['key']) for entry in json.loads(args.plan.read_text(encoding='utf-8')).get('keys',[])]
     if any(delay>=args.seconds for delay,_ in input_events): raise ValueError('Keyboard input must precede final capture')
     disk = stage.make_overlay(args.out, args.base, args.tag, args.qemu)
@@ -127,6 +133,8 @@ def main():
     script += ["rm -f /target/NET/MTCP.CFG /target/NET/DHCP.LOG /target/NET/USOSPKT.LOG",
                "grep -q '^WIN.COM /[S3] /B' /target/AUTOEXEC.BAT",
                "sed -i 's@^WIN.COM /[S3] /B.*@WIN.COM /" + mode_switch + " /B C:\\\\NET\\\\WIN16\\\\APPCTL.EXE\\r@' /target/AUTOEXEC.BAT"]
+    if args.packet_shim:
+        script += ["sed -i '/^WIN.COM /i C:\\\\NET\\\\WIN16\\\\WINPKT.COM 0x60\\r' /target/AUTOEXEC.BAT"]
     stage.flow.ws.linux(vm, disk, args.tag+'-stage', '\n'.join(script)+'\n', files)
     stage.receipt(args.out/(args.tag+'-inputs.json'), {
         'plan': json.loads(args.plan.read_text(encoding='utf-8')), 'applications': copies,
