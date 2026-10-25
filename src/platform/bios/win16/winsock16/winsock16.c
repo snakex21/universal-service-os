@@ -916,8 +916,9 @@ int __far __pascal __export WEP(int nExitType)
     int i, transport_active = usos_sock_ready();
     (void)nExitType;
     for (i = 0; i < USOS_APP_CONTEXTS; i++) if (usos_apps[i] != NULL) {
-        if (usos_apps[i]->task != NULL && IsTask(usos_apps[i]->task))
-            usos_async_cleanup(usos_apps[i]);
+        /* NULL task: never used or already reaped, nothing owned. */
+        if (usos_apps[i]->task == NULL) {}
+        else if (IsTask(usos_apps[i]->task)) usos_async_cleanup(usos_apps[i]);
         else usos_reap_app(usos_apps[i]);
         GlobalUnlock(usos_app_memory[i]);
         GlobalFree(usos_app_memory[i]);
