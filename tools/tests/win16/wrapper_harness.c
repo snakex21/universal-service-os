@@ -26,12 +26,14 @@ static LPARAM last_name_result;
 static WPARAM last_name_handle;
 static unsigned int names_by_task[9];
 static int alive[64],timers[64];
+static int dead_tasks[64];
 static HTASK tasks[64],current_task=1;
 static WNDPROC procedures[64],registered;
 static unsigned int windows=1;
 
 DWORD GetTickCount(void) { return now++; }
 HTASK GetCurrentTask(void) { return current_task; }
+BOOL IsTask(HTASK task) { return task>0 && task<64 && !dead_tasks[task]; }
 HGLOBAL GlobalAlloc(UINT flags,DWORD bytes) { (void)flags;return calloc(1,bytes); }
 void *GlobalLock(HGLOBAL h) { return h; }
 BOOL GlobalUnlock(HGLOBAL h) { (void)h;return TRUE; }
@@ -310,6 +312,44 @@ static void case_context_limits_and_refs(void)
     CHECK(closesocket(held)==0);
     printf("eight_context_limit=1 freed_context_reuse=1 startup_reference_counts=1 remaining_app_survives=1\n");
 }
+static void case_abandoned_tasks(void)
+{
+    WSADATA data;HTASK task;SOCKET survivor,leaked;HWND stale;
+    int saved_head,saved_idle;usos_u32 saved_clock;u_long mode=1;char byte;
+    survivor=socket(AF_INET,SOCK_DGRAM,17);CHECK(survivor!=INVALID_SOCKET);
+    for(task=2;task<=25;task++) {
+        current_task=task;
+        CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
+        CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
+        leaked=socket(AF_INET,SOCK_DGRAM,17);CHECK(leaked!=INVALID_SOCKET);
+        CHECK(WSAAsyncSelect(leaked,1,WM_NET,FD_READ)==0);
+        stale=usos_poll_window;
+        dead_tasks[task]=1;
+        /* Simulate Windows already recycling the numeric HWND. */
+        tasks[stale]=1;timers[stale]=0;
+        saved_head=head;saved_idle=idles;saved_clock=now;
+        current_task=1;CHECK(WSAGetLastError()==0);
+        CHECK(usos_global_startups==1 && usos_sock_kind(leaked)==USOS_SOCK_ENOTSOCK);
+        CHECK(IsWindow(stale) && head==saved_head && idles==saved_idle && now==saved_clock);
+    }
+    CHECK(ioctlsocket(survivor,FIONBIO,&mode)==0);
+    CHECK(recv(survivor,&byte,1,0)==SOCKET_ERROR && WSAGetLastError()==WSAEWOULDBLOCK);
+    CHECK(closesocket(survivor)==0);
+    printf("abandoned_tasks=24 reclaimed_refs=48 no_dead_window_or_io=1 survivor_transport=1\n");
+}
+static void case_abandoned_wep(void)
+{
+    WSADATA data;SOCKET leaked;HWND recycled;int i;
+    current_task=2;CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
+    leaked=socket(AF_INET,SOCK_DGRAM,17);CHECK(leaked!=INVALID_SOCKET);
+    CHECK(WSAAsyncSelect(leaked,1,WM_NET,FD_READ)==0);
+    recycled=usos_poll_window;dead_tasks[2]=1;tasks[recycled]=1;timers[recycled]=0;
+    current_task=1;CHECK(WEP(1)==1);
+    CHECK(IsWindow(recycled) && usos_global_startups==0 && !usos_sock_ready());
+    for(i=0;i<USOS_APP_CONTEXTS;i++) CHECK(usos_apps[i]==NULL && usos_app_memory[i]==NULL);
+    CHECK(WSAStartup(MAKEWORD(1,1),&data)==0);
+    printf("wep_checks_task=1 recycled_hwnd_survives=1 all_context_memory_freed=1\n");
+}
 int main(int argc,char **argv)
 {
     WSADATA data;
@@ -319,6 +359,8 @@ int main(int argc,char **argv)
     else if(!strcmp(argv[1],"name")) case_name_cancel_and_pack();else if(!strcmp(argv[1],"error")) case_so_error();
     else if(!strcmp(argv[1],"blocking")) case_blocking_reentry();else if(!strcmp(argv[1],"tasks")) case_tasks_and_ownership();
     else if(!strcmp(argv[1],"nested")) case_nested_tasks();else if(!strcmp(argv[1],"cancel")) case_select_dns_cancel();
-    else if(!strcmp(argv[1],"contexts")) case_context_limits_and_refs();else if(!strcmp(argv[1],"linger")) case_linger();else return 2;
+    else if(!strcmp(argv[1],"contexts")) case_context_limits_and_refs();else if(!strcmp(argv[1],"linger")) case_linger();
+    else if(!strcmp(argv[1],"abandoned")) case_abandoned_tasks();
+    else if(!strcmp(argv[1],"wep")) case_abandoned_wep();else return 2;
     CHECK(WSACleanup()==0);printf("failures=%d\n",failures);return failures?1:0;
 }

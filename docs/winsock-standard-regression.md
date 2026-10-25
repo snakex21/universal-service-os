@@ -25,3 +25,15 @@ Commits follow completed pieces. Retain every image and evidence file until
 the final report and the user's subsequent cleanup acceptance.
 
 Final report: `RAPORT-WINSOCK-STDMODE.md`, then STOP.
+
+Task cleanup fix: the context search reaps owners for which `IsTask` is false,
+subtracts their outstanding startup references and discards their socket/job
+state locally. It does not send packets, run hooks or destroy a stale window
+handle. WEP also checks each owner before normal window/socket cleanup; the
+shared transport is released once during unload. This is independently needed
+hardening, not a demonstrated fix for the X470 browser crash.
+
+Host regression: 24 abandoned contexts / 48 startup references, surviving
+application transport, recycled HWND and WEP cleanup; 145 Win16 suite tests
+passed before the real-task QEMU gate. `--stdmode-tests` builds REAPTEST.EXE
+for the 16 real child tasks that deliberately omit WSACleanup.

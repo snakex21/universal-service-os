@@ -913,16 +913,18 @@ int __far __pascal LibMain(HANDLE hInstance, WORD wDataSeg, WORD wHeapSize, LPST
 
 int __far __pascal __export WEP(int nExitType)
 {
-    int i;
+    int i, transport_active = usos_sock_ready();
     (void)nExitType;
     for (i = 0; i < USOS_APP_CONTEXTS; i++) if (usos_apps[i] != NULL) {
-        usos_async_cleanup(usos_apps[i]);
+        if (usos_apps[i]->task != NULL && IsTask(usos_apps[i]->task))
+            usos_async_cleanup(usos_apps[i]);
+        else usos_reap_app(usos_apps[i]);
         GlobalUnlock(usos_app_memory[i]);
         GlobalFree(usos_app_memory[i]);
         usos_apps[i] = NULL; usos_app_memory[i] = NULL;
     }
     usos_async_class_cleanup();
-    if (usos_global_startups != 0) usos_sock_shutdown();
+    if (transport_active) usos_sock_shutdown();
     usos_global_startups = 0;
     return 1;
 }

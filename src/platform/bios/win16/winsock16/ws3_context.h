@@ -54,11 +54,18 @@ static FARPROC usos_poll_proc;
 static int usos_class_registered;
 static unsigned int usos_next_async;
 static void FAR *usos_far_zero(void FAR *, unsigned int);
+static void usos_reap_app(usos_app_context FAR *);
 
 static usos_app_context FAR *usos_app(void)
 {
     HTASK task = GetCurrentTask();
     int i, free_slot = -1;
+    for (i = 0; i < USOS_APP_CONTEXTS; i++) {
+        /* Windows destroys a terminated task's windows, but not our shared
+         * DLL bookkeeping. Reap before matching/searching a reusable slot. */
+        if (usos_apps[i] != NULL && usos_apps[i]->task != NULL &&
+            !IsTask(usos_apps[i]->task)) usos_reap_app(usos_apps[i]);
+    }
     for (i = 0; i < USOS_APP_CONTEXTS; i++) {
         if (usos_apps[i] != NULL && usos_apps[i]->task == task) return usos_apps[i];
         if (free_slot < 0 && (usos_apps[i] == NULL ||

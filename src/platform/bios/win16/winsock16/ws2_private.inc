@@ -74,29 +74,49 @@ static int usos_async_start(void)
     return 1;
 }
 
-static void usos_async_cleanup(usos_app_context FAR *app)
+static void usos_async_cleanup_owner(usos_app_context FAR *app, int task_alive)
 {
     int i;
-    if (app->poll_window != NULL && IsWindow(app->poll_window)) {
+    if (task_alive && app->poll_window != NULL && IsWindow(app->poll_window)) {
         KillTimer(app->poll_window, 1);
         DestroyWindow(app->poll_window);
     }
     app->poll_window = NULL;
     for (i = 0; i < USOS_ASYNC_JOBS; i++) {
         if (app->jobs[i].active && app->jobs[i].socket_id >= 0) {
-            usos_sock_nonblocking(app->jobs[i].socket_id, 1);
-            usos_sock_close(app->jobs[i].socket_id);
+            if (task_alive) {
+                usos_sock_nonblocking(app->jobs[i].socket_id, 1);
+                usos_sock_close(app->jobs[i].socket_id);
+            } else usos_sock_forget(app->jobs[i].socket_id);
         }
         app->jobs[i].active = 0;
     }
     for (i = 0; i < USOS_MAX_SOCKETS; i++) if (usos_socket_owners[i] == app->task) {
-        usos_sock_nonblocking(i, 1);
-        usos_sock_close(i);
+        if (task_alive) {
+            usos_sock_nonblocking(i, 1);
+            usos_sock_close(i);
+        } else usos_sock_forget(i);
         usos_socket_owners[i] = NULL;
         usos_socket_defaults((SOCKET)i);
     }
     app->hook = NULL;
     app->blocking = app->cancelled = app->in_pump = 0;
+}
+
+static void usos_async_cleanup(usos_app_context FAR *app)
+{
+    usos_async_cleanup_owner(app, 1);
+}
+
+static void usos_reap_app(usos_app_context FAR *app)
+{
+    /* No usos_app()/error macros here: this is called from the slot search.
+     * A stale HWND can already have been reused by a different live task. */
+    USOS_TRACE("reap task",NULL,app->task);
+    usos_async_cleanup_owner(app, 0);
+    usos_global_startups -= app->startups;
+    app->startups = 0;
+    app->task = NULL;
 }
 
 static void usos_async_class_cleanup(void)
