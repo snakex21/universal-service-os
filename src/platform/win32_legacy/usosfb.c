@@ -59,17 +59,34 @@ static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;ch
     GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);return code;}
 static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Enum\\Root\\*PNP0900",0,KEY_READ,&key);
     if(code==ERROR_SUCCESS)RegCloseKey(key);return code==ERROR_FILE_NOT_FOUND;}
+static int mouse_configured(void){HANDLE f;DWORD n=0;
+    if(!exists("USOSVMD.ON"))return 1;
+    f=CreateFileA("C:\\WINDOWS\\SYSTEM.INI",GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+    if(f==INVALID_HANDLE_VALUE)return 0;
+    if(!ReadFile(f,text,sizeof text-1,&n,0)){CloseHandle(f);return 0;}CloseHandle(f);text[n]=0;
+    return contains(text,"device=C:\\USOS9X\\USOSVMD.VXD");}
+static void finish_mouse(void){HKEY key;LONG code;
+    if(mouse_configured())return;
+    /* Original950 REGEDIT preserves an existing value's position. A B0
+     * coordinator can therefore precede the VMDLATE value added in B1.
+     * Complete only our known queued INF command before other prerequisites;
+     * do not execute arbitrary remaining RunOnce commands or expose a tray. */
+    if(!exists("VMDLATE.RUN")||exists("VMDLATE.ERR")||!exists("USOSVMD.INF")||!exists("USOSVMD.VXD"))
+        fail("selected DOS-box mouse has no valid queued late command");
+    if(child("C:\\WINDOWS\\rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSVMD.INF")!=0)
+        fail("queued DOS-box mouse INF failed");
+    WritePrivateProfileStringA(0,0,0,"C:\\WINDOWS\\SYSTEM.INI");
+    if(!mouse_configured())fail("queued DOS-box mouse INF did not update SYSTEM.INI");
+    code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_SET_VALUE,&key);
+    if(code==ERROR_SUCCESS){code=RegDeleteValueA(key,"USOSVmd");RegCloseKey(key);}
+    if(code!=ERROR_SUCCESS&&code!=ERROR_FILE_NOT_FOUND)fail("cannot retire completed DOS-box mouse RunOnce value");
+    log_line("queued DOS-box mouse INF completed before packages; driver starts at final restart");}
 static int late_ready(void){
     if(!exists("VLATE.OK")||!exists("TZDST.OK")||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
     if(exists("R95LATE.REG")&&!exists("R95LATE.OK")){log_line("late: IE registry import missing");return 0;}
     if(exists("VLATE.ERR")||exists("TZFIX.BAD")||exists("R95LATE.ERR")||exists("VMDLATE.ERR")){log_line("late: real-mode error marker present");return 0;}
     if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
-    if(exists("USOSVMD.ON")){
-        HANDLE f;DWORD n=0;f=CreateFileA("C:\\WINDOWS\\SYSTEM.INI",GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
-        if(f==INVALID_HANDLE_VALUE)return 0;
-        if(!ReadFile(f,text,sizeof text-1,&n,0)){CloseHandle(f);return 0;}CloseHandle(f);text[n]=0;
-        if(!contains(text,"device=C:\\USOS9X\\USOSVMD.VXD")){log_line("late: selected DOS-box mouse missing in SYSTEM.INI");return 0;}
-    }
+    if(!mouse_configured()){log_line("late: selected DOS-box mouse missing in SYSTEM.INI");return 0;}
     if(!legacy_absent()){log_line("late: legacy display still present");return 0;}return 1;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32];DWORD code;HKEY key;
     local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
@@ -86,6 +103,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32];DWORD code;HKE
     if(!exists("VLATE.OK")||!exists("TZDST.OK")){
         if(phase[0])fail("late real-mode preparation did not complete after Setup transition");
         reboot("late\r\n","restart: Setup transition before late DOS preparation");}
+    finish_mouse();
     if(!late_ready())fail("late prerequisites or single display check failed");
     if(!lstrcmpA(phase,"reboot\r\n")){
         if(exists("VMDLATE.BAT")&&!exists("VMDLATE.OK"))fail("DOS mouse final restart check failed");
