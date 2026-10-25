@@ -34,6 +34,7 @@ static HMODULE display_user;
 static DWORD display_flags;
 static int permission_failure;
 static unsigned test_count,test_failed;
+static int setup_mode;
 static const char run_key[] = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 #ifndef USOSRES_9X
 static SERVICE_STATUS service_status;
@@ -287,7 +288,7 @@ static int finish(const char *reason) {
     /* The 9x shell starts Run values inside its RegEnumValue(index) loop:
        an early delete shifts the next value onto this index and the shell
        skips it (95 X470 2026-10-20, USOSLan hid USOSDisplay). */
-    Sleep(15000);
+    if(!setup_mode)Sleep(15000);
 #endif
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,run_key,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS) {
         RegDeleteValueA(key,"USOSDisplay"); RegCloseKey(key);
@@ -377,6 +378,17 @@ static void run(void) {
     while(length && directory[length-1]!='\\') length--;
     if(!length) leave(1); directory[length]=0;
     if(length>MAX_PATH-32)leave(1);
+#ifdef USOSRES_9X
+    { const char *arg=GetCommandLineA();DWORD version=GetVersion();
+      while(*arg){if(*arg==' '&&!lstrcmpiA(arg+1,"/setup"))setup_mode=1;arg++;}
+      if(setup_mode){
+          if(!(version&0x80000000UL)||(version&0xffff)!=4||((version>>16)&0x7fff)!=950)leave(2);
+          file_path("PHASE1.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
+          file_path("VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
+          file_path("FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
+      }
+    }
+#endif
     file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) { forget_user_run(); leave(0); }
     file_path("DISPLAY.TXT"); input=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
     if(input==INVALID_HANDLE_VALUE) leave(0); /* absent profile = unchanged */
@@ -401,7 +413,7 @@ static void run(void) {
       } }
 #endif
     if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); CloseHandle(log_file); leave(1); }
-    if(vm()) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
+    if(vm()&&!setup_mode) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
 #ifndef USOSRES_9X
     if(!request.width) registry_native(&request);
 #endif

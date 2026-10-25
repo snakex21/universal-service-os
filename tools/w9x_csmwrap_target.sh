@@ -655,6 +655,12 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         fi
     fi
 fi
+if [ "$ANSWER_KIND" != USER ] &&
+   [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    [ -r "$LIB/w9x_firstboot.sh" ] && . "$LIB/w9x_firstboot.sh" &&
+        w9x_firstboot_write "$work/c/USOS9X" "$setup_version" || fail 'cannot stage source950 first-desktop coordinator'
+    log 'first desktop: source950 ordinary RunOnce coordinator, one final post-addons restart'
+fi
 # Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
 # 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand
 # (REG_SZ, "yes"/"no", the value its own checkbox writes); 98 SE is not

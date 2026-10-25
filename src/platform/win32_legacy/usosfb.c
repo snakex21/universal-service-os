@@ -1,0 +1,108 @@
+/* Source950 first-desktop coordinator. USOS, GPL-3.0-or-later.
+ * Ordinary RunOnce is synchronous before Shell_TrayWnd on Windows95.
+ * Its persistent phase belongs beside the program, never in a user profile.
+ */
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+static const char root[]="C:\\USOS9X\\";
+static const char once[]="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce";
+static HANDLE journal=INVALID_HANDLE_VALUE;
+static char path[MAX_PATH],text[8192];
+void *memset(void *p,int v,unsigned n){BYTE*b=p;while(n--)*b++=(BYTE)v;return p;}
+static unsigned length(const char*s){unsigned n=0;while(s[n])n++;return n;}
+static void local(const char*leaf){lstrcpyA(path,root);lstrcatA(path,leaf);}
+static int exists(const char*leaf){local(leaf);return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES;}
+static void log_line(const char*s){DWORD n;char line[512];
+    wsprintfA(line,"FIRSTBOOT tick=%lu tray=%u %s\r\n",GetTickCount(),FindWindowA("Shell_TrayWnd",0)!=0,s);
+    if(journal!=INVALID_HANDLE_VALUE){WriteFile(journal,line,length(line),&n,0);FlushFileBuffers(journal);}}
+static int save(const char*leaf,const char*value){HANDLE f;DWORD n,w;int ok;local(leaf);
+    f=CreateFileA(path,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+    if(f==INVALID_HANDLE_VALUE)return 0;n=length(value);w=0;
+    ok=WriteFile(f,value,n,&w,0)&&w==n&&FlushFileBuffers(f);CloseHandle(f);return ok;}
+static int read_local(const char*leaf,char*out,DWORD cap){HANDLE f;DWORD n=0;int ok;local(leaf);
+    f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return 0;
+    ok=GetFileSize(f,0)<cap&&ReadFile(f,out,cap-1,&n,0);CloseHandle(f);out[n]=0;return ok;}
+static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
+    for(a=s,b=word;*a&&*b;a++,b++){char x=*a,y=*b;if(x>='A'&&x<='Z')x+='a'-'A';if(y>='A'&&y<='Z')y+='a'-'A';if(x!=y)break;}
+    if(!*b)return 1;}return 0;}
+static LRESULT CALLBACK holding(HWND w,UINT m,WPARAM a,LPARAM b){
+    if(m==WM_CLOSE)return 0;return DefWindowProcA(w,m,a,b);}
+static void fail(const char*reason){WNDCLASSA wc;HWND window;MSG message;
+    log_line(reason);save("FIRSTBT.ERR",reason);
+    memset(&wc,0,sizeof wc);wc.lpfnWndProc=holding;wc.hInstance=GetModuleHandleA(0);
+    wc.lpszClassName="USOSFirstBootHold";wc.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);RegisterClassA(&wc);
+    window=CreateWindowExA(WS_EX_TOPMOST,wc.lpszClassName,"USOS first boot requires repair",WS_POPUP|WS_VISIBLE,0,0,
+        GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN),0,0,wc.hInstance,0);
+    if(window){CreateWindowExA(0,"STATIC","USOS ko\361czy instalacj\352...\r\n\r\nWymagana naprawa. Szczeg\363\263y: C:\\USOS9X\\FIRSTBT.LOG",WS_CHILD|WS_VISIBLE|SS_CENTER,
+        0,GetSystemMetrics(SM_CYSCREEN)/3,GetSystemMetrics(SM_CXSCREEN),150,window,0,wc.hInstance,0);UpdateWindow(window);}
+    while(GetMessageA(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageA(&message);}ExitProcess(2);}
+static int setup_done(void){HKEY key;DWORD keys=0,values=0;LONG code;
+    code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&key);
+    if(code==ERROR_FILE_NOT_FOUND)return 1;if(code!=ERROR_SUCCESS)return 0;
+    code=RegQueryInfoKeyA(key,0,0,0,&keys,0,0,&values,0,0,0,0);RegCloseKey(key);
+    return code==ERROR_SUCCESS&&!keys&&!values;}
+static int arm(void){HKEY key;const char command[]="C:\\USOS9X\\USOSFB.EXE";LONG code;
+    if(RegCreateKeyExA(HKEY_LOCAL_MACHINE,once,0,0,0,KEY_WRITE,0,&key,0)!=ERROR_SUCCESS)return 0;
+    code=RegSetValueExA(key,"USOSFirstBoot",0,REG_SZ,(const BYTE*)command,sizeof command);RegCloseKey(key);return code==ERROR_SUCCESS;}
+static void reboot(const char*phase,const char*reason){
+    if(!arm()||!save("FIRSTBT.STA",phase))fail("cannot persist/arm restart boundary");log_line(reason);
+    if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))fail("restart request rejected");
+    /* Never return to Explorer while shutdown messages are being dispatched. */
+    {MSG message;while(GetMessageA(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageA(&message);}}
+    fail("restart returned without ending this session");}
+static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[512];DWORD code=999,wait;MSG message;
+    log_line(command);lstrcpyA(cmd,command);memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
+    if(!CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi))return code;CloseHandle(pi.hThread);
+    for(;;){wait=MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,INFINITE,QS_ALLINPUT);
+        if(wait==WAIT_OBJECT_0)break;if(wait==WAIT_FAILED){CloseHandle(pi.hProcess);return code;}
+        while(PeekMessageA(&message,0,0,0,PM_REMOVE)){if(message.message!=WM_QUIT){TranslateMessage(&message);DispatchMessageA(&message);}}}
+    GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);return code;}
+static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Enum\\Root\\*PNP0900",0,KEY_READ,&key);
+    if(code==ERROR_SUCCESS)RegCloseKey(key);return code==ERROR_FILE_NOT_FOUND;}
+static int late_ready(void){
+    if(!exists("VLATE.OK")||!exists("TZDST.OK")||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
+    if(exists("R95LATE.REG")&&!exists("R95LATE.OK")){log_line("late: IE registry import missing");return 0;}
+    if(exists("VLATE.ERR")||exists("TZFIX.BAD")||exists("R95LATE.ERR")||exists("VMDLATE.ERR")){log_line("late: real-mode error marker present");return 0;}
+    if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
+    if(exists("USOSVMD.ON")){
+        HANDLE f;DWORD n=0;f=CreateFileA("C:\\WINDOWS\\SYSTEM.INI",GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+        if(f==INVALID_HANDLE_VALUE)return 0;
+        if(!ReadFile(f,text,sizeof text-1,&n,0)){CloseHandle(f);return 0;}CloseHandle(f);text[n]=0;
+        if(!contains(text,"device=C:\\USOS9X\\USOSVMD.VXD")){log_line("late: selected DOS-box mouse missing in SYSTEM.INI");return 0;}
+    }
+    if(!legacy_absent()){log_line("late: legacy display still present");return 0;}return 1;}
+void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32];DWORD code;HKEY key;
+    local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+    if(journal==INVALID_HANDLE_VALUE)ExitProcess(2);SetFilePointer(journal,0,0,FILE_END);
+    memset(&version,0,sizeof version);version.dwOSVersionInfoSize=sizeof version;
+    if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
+       version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))fail("source950/phase1 scope refused");
+    if(exists("FIRSTBT.OK")){log_line("already complete");ExitProcess(0);}
+    if(exists("FIRSTBT.ERR"))fail("previous firstboot failure; automatic retry refused");
+    log_line("coordinator entered before desktop");
+    if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
+    if(!setup_done())fail("original RunOnce Setup has not completed");
+    phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))fail("cannot read phase journal");
+    if(!exists("VLATE.OK")||!exists("TZDST.OK")){
+        if(phase[0])fail("late real-mode preparation did not complete after Setup transition");
+        reboot("late\r\n","restart: Setup transition before late DOS preparation");}
+    if(!late_ready())fail("late prerequisites or single display check failed");
+    if(!lstrcmpA(phase,"reboot\r\n")){
+        if(exists("VMDLATE.BAT")&&!exists("VMDLATE.OK"))fail("DOS mouse final restart check failed");
+        if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES&&
+           child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup /check")!=0)fail("final package checks incomplete");
+        if(exists("NETCFG.INI")&&child("C:\\USOS9X\\USOSLAN.EXE /setup /refresh")!=0)fail("final IE/network defaults incomplete");
+        if(!save("FIRSTBT.OK","complete; final_post_addons_restarts=1\r\n"))fail("cannot save completion");
+        if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS){RegDeleteValueA(key,"USOSFirstBoot");RegCloseKey(key);}
+        log_line("complete: releasing first desktop; final_post_addons_restarts=1");CloseHandle(journal);ExitProcess(0);
+    }
+    if(phase[0]&&lstrcmpA(phase,"late\r\n"))fail("unknown phase; automatic retry refused");
+    if(!save("FIRSTBT.STA","install\r\n"))fail("cannot journal package boundary");
+    if(exists("USOSRES.EXE")){
+        if(child("C:\\USOS9X\\USOSRES.EXE /setup")!=0||!read_local("DISPLAY.DONE",text,sizeof text)||
+           (!contains(text,"DISPLAY applied")&&!contains(text,"DISPLAY saved; restart required")&&!contains(text,"DISPLAY already at the selected mode")))fail("display request not applied before packages");}
+    if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES){
+        code=child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup");
+        if(code!=0&&code!=3010)fail("packages did not finish before final restart");}
+    reboot("reboot\r\n","restart: sole final post-addons restart");
+}

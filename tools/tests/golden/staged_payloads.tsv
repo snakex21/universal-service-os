@@ -723,6 +723,7 @@ payload_zip	EFI/USOS/dos-native/win9x/VESAMINI.DRV
 payload_zip	EFI/USOS/dos-native/win9x/VESAMINI.VXD
 payload_zip	EFI/USOS/dos-native/win9x/VESBIND.EXE
 payload_zip	EFI/USOS/dos-native/win9x/USOSGRPW.EXE
+payload_zip	EFI/USOS/dos-native/win9x/USOSFB.EXE
 payload_zip	EFI/USOS/dos-native/win9x/VMDISP9X.DLL
 payload_zip	EFI/USOS/dos-native/win9x/VMDISP9X.TGZ
 payload_zip	EFI/USOS/dos-native/win9x/VMDISP9X.TXT

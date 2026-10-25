@@ -148,6 +148,7 @@ try {
         'EFI/USOS/dos-native/win9x/USOSLOG.EXE',
         'EFI/USOS/dos-native/win9x/VESBIND.EXE',
         'EFI/USOS/dos-native/win9x/USOSGRPW.EXE',
+        'EFI/USOS/dos-native/win9x/USOSFB.EXE',
         'EFI/USOS/dos-native/win9x/USOSLAN.EXE',
         'EFI/USOS/systemd-bootx64.efi',
         'EFI/USOS/touchi2c_x64.efi',

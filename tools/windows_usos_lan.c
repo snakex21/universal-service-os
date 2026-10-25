@@ -20,6 +20,7 @@ void *memcpy(void *d,const void *s,size_t n){volatile BYTE *a=d;const BYTE *b=s;
 static char dir[MAX_PATH],ini[MAX_PATH],path[MAX_PATH],home[201],system_id[8];
 static HANDLE log_handle=INVALID_HANDLE_VALUE;
 static unsigned failures;
+static int setup_mode;
 static UsosLanState state;
 static DWORD len(const char *s){DWORD n=0;while(s[n])n++;return n;}
 static int eq(const char *a,const char *b){return lstrcmpiA(a,b)==0;}
@@ -88,7 +89,22 @@ static int favorite(const char *folder){char file[MAX_PATH];HANDLE f;DWORD wrote
   if(!WriteFile(f,data,sizeof(data)-1,&wrote,0)||wrote!=sizeof(data)-1){CloseHandle(f);return 0;}
   FlushFileBuffers(f);CloseHandle(f);return 1;}
 static int user_favorite(HKEY root){char folder[MAX_PATH],expanded[MAX_PATH];
-  if(!query(root,"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders","Favorites",folder,sizeof(folder)))return 0;
+  const char *shell="Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders";
+  if(!query(root,shell,"Favorites",folder,sizeof(folder))){
+#ifndef USOS_LAN_NT
+    /* Original950 without IE has no Favorites value yet. Only the explicit
+     * source950 setup handoff may establish the OS default before Explorer;
+     * existing user paths and every ordinary desktop run stay unchanged. */
+    DWORD n;
+    if(!setup_mode||root!=HKEY_CURRENT_USER)return 0;
+    n=GetWindowsDirectoryA(folder,sizeof folder);if(!n||n>sizeof(folder)-12)return 0;
+    lstrcatA(folder,"\\Favorites");if(!favorite(folder))return 0;
+    set(root,shell,"Favorites",REG_SZ,folder,len(folder)+1);
+    log_line("LAN setup: initialized missing source950 OS Favorites folder");return failures==0;
+#else
+    return 0;
+#endif
+  }
   if(!ExpandEnvironmentStringsA(folder,expanded,sizeof(expanded)))return 0;
   return favorite(expanded);}
 
@@ -302,7 +318,7 @@ static int read_config(void){static char raw[4097];char *line,*end;HANDLE f;DWOR
 #define USOS_RUN_DELETE_DELAY 15000
 static void unregister(void){HKEY k;
 #ifndef USOS_LAN_NT
-  Sleep(USOS_RUN_DELETE_DELAY);
+  if(!setup_mode)Sleep(USOS_RUN_DELETE_DELAY);
 #endif
   if(!RegOpenKeyExA(HKEY_LOCAL_MACHINE,run,0,KEY_SET_VALUE,&k)){RegDeleteValueA(k,"USOSLan");RegCloseKey(k);}}
 
@@ -370,6 +386,14 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
   log_handle=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,0,0);if(log_handle==INVALID_HANDLE_VALUE)ExitProcess(1);
   SetFilePointer(log_handle,0,0,FILE_END);
 #ifndef USOS_LAN_NT
+  {const char *arg=GetCommandLineA();while(*arg){
+    if(*arg==' '&&len(arg)>=7&&!memcmp(arg+1,"/setup",6)&&(arg[7]==0||arg[7]==' '))setup_mode=1;arg++;}
+   if(setup_mode){
+     /* native95_handoff also checks the exact phase1 marker and original
+      * Setup key absence after read_config supplies the selected OS. */
+     local(path,"VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)ExitProcess(2);
+     local(path,"FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)ExitProcess(2);
+   }}
   /* Never while 9x Setup's RunOnce\Setup list is not empty (950 first GUI boot froze in GRPCONV, X470 2026-10-25). */
   /* RegQueryInfoKeyA resolved at run time: the static imports stay the verified NT4 RTM list. */
   {HKEY setup;DWORD keys=0,values=0;HMODULE adv;
@@ -380,6 +404,9 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
    if(keys||values){log_line("LAN deferred: Windows Setup still running (RunOnce\\Setup); Run retained");CloseHandle(log_handle);ExitProcess(0);}}
 #endif
   if(!read_config()){log_line("LAN gave up: invalid/missing NETCFG and no valid DOS-native metadata");unregister();CloseHandle(log_handle);ExitProcess(1);}
+#ifndef USOS_LAN_NT
+  if(setup_mode&&!native95_handoff()){log_line("LAN setup: source950 handoff refused");CloseHandle(log_handle);ExitProcess(2);}
+#endif
   if(vm()){
 #ifndef USOS_LAN_NT
     if(!native95_handoff()){
@@ -391,8 +418,10 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
 #endif
   }
   mutex=CreateMutexA(0,FALSE,"USOSLAN-first-desktop");if(!mutex||GetLastError()==ERROR_ALREADY_EXISTS)ExitProcess(0);
-  if(!desktop())log_line("LAN waiting for desktop readiness notifications (bounded, no polling)");
-  if(!usos_wait_desktop(desktop,300000)){log_line("LAN desktop deadline reached; Run retained");CloseHandle(log_handle);ExitProcess(0);}
+  if(!setup_mode){
+    if(!desktop())log_line("LAN waiting for desktop readiness notifications (bounded, no polling)");
+    if(!usos_wait_desktop(desktop,300000)){log_line("LAN desktop deadline reached; Run retained");CloseHandle(log_handle);ExitProcess(0);}
+  }
 #ifndef USOS_LAN_NT
   /* Recheck the completion boundary after the readiness notification. */
   if(vm()&&!native95_handoff()){log_line("LAN deferred: source950 handoff changed; Run retained");CloseHandle(log_handle);ExitProcess(0);}

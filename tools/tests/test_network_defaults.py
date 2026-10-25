@@ -187,7 +187,13 @@ class Builds(unittest.TestCase):
             imports=pe(file)[1]
             self.assertEqual({m.lower() for m,_ in imports},{'kernel32.dll','advapi32.dll'})
             for dll,symbol in imports:
-                self.assertIn(symbol,table.get(dll.lower(),set()),(name,dll,symbol))
+                allowed=table.get(dll.lower(),set())
+                # Source950 /setup calls this original95 export for the OS
+                # Favorites default (native coordinator-contract-r3 load
+                # and call PASS). NT still uses its pinned RTM list only.
+                if name=='USOSLAN9X.EXE' and dll.lower()=='kernel32.dll':
+                    allowed=allowed|{'GetWindowsDirectoryA'}
+                self.assertIn(symbol,allowed,(name,dll,symbol))
             if '9X' in name:
                 self.assertFalse({'RegLoadKeyA','OpenProcessToken','AdjustTokenPrivileges'} & {n for _,n in imports})
     def test_stage_real_driver_copies_bytes_only(self):

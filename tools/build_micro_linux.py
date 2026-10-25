@@ -588,6 +588,7 @@ def main() -> int:
             ("tools/w9x_vesa950.sh", "usr/lib/usos/w9x_vesa950.sh"),
             ("tools/w9x_950_post.sh", "usr/lib/usos/w9x_950_post.sh"),
             ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
+            ("tools/w9x_firstboot.sh", "usr/lib/usos/w9x_firstboot.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/w9x_95_ui.sh", "usr/lib/usos/w9x_95_ui.sh"),

@@ -197,6 +197,8 @@ REM Windows 95: C:\USOS9X\REG95.BAT (tools/w9x_reg95.sh) imports the answer's
 REM [Install] AddReg values once (95 Setup ignores them): after VESA95.BAT,
 REM whose failure path restores its registry backup, before the first desktop.
 ECHO @IF EXIST C:\USOS9X\REG95.BAT CALL C:\USOS9X\REG95.BAT>>C:\AUTOEXEC.BAT
+REM Source950 only: ordinary RunOnce blocks the first desktop until complete.
+ECHO @IF EXIST C:\USOS9X\FIRSTBT.BAT CALL C:\USOS9X\FIRSTBT.BAT>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
