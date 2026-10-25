@@ -437,9 +437,32 @@ class TargetVmParts(unittest.TestCase):
         self.assertEqual(out.split(), ['1002:67ff', '10de:1c82'])
         self.assertEqual((tmp / 'out.inf').read_bytes(),
                          b'[Manufacturer]\r\n%Mfg%=Mfg.VM\r\n\r\n[Mfg.VM]\r\n'
-                         b'"vesa (vmdisp9x) 1002:67ff"=VESA, PCI\\VEN_1002&DEV_67ff\r\n'
+                         b'"AMD Radeon RX 550/560 (VESA)"=VESA, PCI\\VEN_1002&DEV_67ff\r\n'
                          b'"vesa (vmdisp9x) 10de:1c82"=VESA, PCI\\VEN_10de&DEV_1c82\r\n'
                          b'%VESAPCI.DeviceDesc%=VESA, PCI\\CC_0300\r\n')
+
+    def test_display_names_are_readable_without_pci_ids(self):
+        cases = [('1002:67ef', 'PL', 'AMD Radeon RX 460/560 (VESA)'), ('10de:1c82', 'EN', 'NVIDIA GeForce GTX 1050 Ti (VESA)'),
+                 ('1234:1111', 'PL', 'Karta graficzna VESA'), ('1234:1111', 'EN', 'VESA Display Adapter'),
+                 ('1234:1111', '', 'VESA Display Adapter'), ('1234:1111', 'XX', 'VESA Display Adapter')]
+        for ident, lang, want in cases:
+            rc, out, err = sh(self.helpers() + f'\nw9x_display_name {ident} "{lang}"')
+            self.assertEqual((rc, out), (0, want), err)
+        tmp = scratch('usos-w9x-name-')
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        inf = tmp / 'USOSVESA.INF'
+        inf.write_bytes(b'[Mfg.VM]\r\n%VESAPCI.DeviceDesc%=VESA, PCI\\CC_0300\r\n')
+        out_inf = tmp / 'out.inf'
+        rc, out, err = sh(self.helpers() + f'\nids=$(printf "1002:67ef\\n1234:1111")\n'
+                          f'w9x_add_display_ids "$ids" PL < "{inf.as_posix()}" > "{out_inf.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out_inf.read_bytes(), b'[Mfg.VM]\r\n"AMD Radeon RX 460/560 (VESA)"=VESA, PCI\\VEN_1002&DEV_67ef\r\n'
+                         b'"Karta graficzna VESA"=VESA, PCI\\VEN_1234&DEV_1111\r\n%VESAPCI.DeviceDesc%=VESA, PCI\\CC_0300\r\n')
+        self.assertNotIn(b'vmdisp9x', out_inf.read_bytes())
+        text = TARGET.read_text(encoding='utf-8')
+        call = 'w9x_add_display_ids "$ids" "${addon_lang:-}"'
+        self.assertIn(call, text)
+        self.assertLess(text.index('addon_lang=XX'), text.index(call))
 
     def test_target_writer_sets_u9vm_only_in_vm_mode(self):
         text = TARGET.read_text(encoding='utf-8')

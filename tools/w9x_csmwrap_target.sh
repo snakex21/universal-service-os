@@ -119,10 +119,45 @@ w9x_display_ids() {
         printf '%s:%s\n' "$(sed 's/^0x//' "$device/vendor")" "$(sed 's/^0x//' "$device/device")"
     done | tr 'ABCDEF' 'abcdef' | sort -u
 }
+# Device Manager name for a display id vendor:device (lower-case hex) and
+# the CD language ($2: PL, else English): "<model> (VESA)" for common cards,
+# else the plain VESA adapter name. No raw PCI ids (user request 2026-10-25).
+w9x_display_name() {
+    case "$1" in
+        1002:67df) printf 'AMD Radeon RX 470/480/570/580 (VESA)' ;;
+        1002:67ef) printf 'AMD Radeon RX 460/560 (VESA)' ;;
+        1002:67ff) printf 'AMD Radeon RX 550/560 (VESA)' ;;
+        1002:699f) printf 'AMD Radeon RX 550 (VESA)' ;;
+        1002:687f) printf 'AMD Radeon RX Vega (VESA)' ;;
+        1002:7340) printf 'AMD Radeon RX 5500 (VESA)' ;;
+        1002:731f) printf 'AMD Radeon RX 5600/5700 (VESA)' ;;
+        10de:128b) printf 'NVIDIA GeForce GT 710 (VESA)' ;;
+        10de:1d01) printf 'NVIDIA GeForce GT 1030 (VESA)' ;;
+        10de:1401) printf 'NVIDIA GeForce GTX 960 (VESA)' ;;
+        10de:13c2) printf 'NVIDIA GeForce GTX 970 (VESA)' ;;
+        10de:13c0) printf 'NVIDIA GeForce GTX 980 (VESA)' ;;
+        10de:1c81) printf 'NVIDIA GeForce GTX 1050 (VESA)' ;;
+        10de:1c82) printf 'NVIDIA GeForce GTX 1050 Ti (VESA)' ;;
+        10de:1c02|10de:1c03) printf 'NVIDIA GeForce GTX 1060 (VESA)' ;;
+        10de:1b81) printf 'NVIDIA GeForce GTX 1070 (VESA)' ;;
+        10de:1b80) printf 'NVIDIA GeForce GTX 1080 (VESA)' ;;
+        10de:1b06) printf 'NVIDIA GeForce GTX 1080 Ti (VESA)' ;;
+        10de:1f82) printf 'NVIDIA GeForce GTX 1650 (VESA)' ;;
+        10de:2184) printf 'NVIDIA GeForce GTX 1660 (VESA)' ;;
+        10de:2182) printf 'NVIDIA GeForce GTX 1660 Ti (VESA)' ;;
+        10de:21c4) printf 'NVIDIA GeForce GTX 1660 SUPER (VESA)' ;;
+        *) if [ "${2:-}" = PL ]; then printf 'Karta graficzna VESA'; else printf 'VESA Display Adapter'; fi ;;
+    esac
+}
 # USOSVESA.INF (stdin -> stdout) with one U9FIX-style hardware ID line per
-# id of $1 right after [Mfg.VM]; ids already listed are skipped.
+# id of $1 right after [Mfg.VM]; ids already listed are skipped. $2 = CD
+# language for the device name (w9x_display_name).
 w9x_add_display_ids() {
-    awk -v ids="$1" '
+    _wd_names=''
+    for _wd_id in $1; do _wd_names="$_wd_names$_wd_id=$(w9x_display_name "$_wd_id" "${2:-}")
+"; done
+    awk -v ids="$1" -v names="$_wd_names" '
+        BEGIN { m = split(names, nl, "\n"); for (k = 1; k <= m; k++) if (nl[k] != "") { e = index(nl[k], "="); name[substr(nl[k], 1, e - 1)] = substr(nl[k], e + 1) } }
         { sub(/\r$/, ""); lines[++count] = $0; text = text "\n" tolower($0) }
         END {
             n = split(ids, list, "\n"); bs = sprintf("%c", 92)
@@ -132,7 +167,7 @@ w9x_add_display_ids() {
                 for (j = 1; j <= n; j++) {
                     split(list[j], v, ":")
                     if (index(text, "pci" bs "ven_" v[1] "&dev_" v[2])) continue
-                    printf "\"vesa (vmdisp9x) %s\"=VESA, PCI%sVEN_%s&DEV_%s\r\n", list[j], bs, v[1], v[2]
+                    printf "\"%s\"=VESA, PCI%sVEN_%s&DEV_%s\r\n", name[list[j]], bs, v[1], v[2]
                 }
             }
         }'
@@ -399,7 +434,7 @@ if [ "$VM_PHASE1" = 1 ]; then
     # U9FIX's form, so the VESA driver also binds them on the real machine.
     ids=$(w9x_display_ids "$PCI_ROOT")
     if [ -n "$ids" ] && [ -f "$work/c/USOS9X/USOSVESA.INF" ]; then
-        w9x_add_display_ids "$ids" < "$work/c/USOS9X/USOSVESA.INF" > "$work/USOSVESA.INF" &&
+        w9x_add_display_ids "$ids" "${addon_lang:-}" < "$work/c/USOS9X/USOSVESA.INF" > "$work/USOSVESA.INF" &&
             cp "$work/USOSVESA.INF" "$work/c/USOS9X/USOSVESA.INF" || fail 'cannot add the display IDs to USOSVESA.INF'
     fi
     log "vm phase 1: U9VM=1, display ids: $(printf '%s' "$ids" | tr '\n' ' ')"
