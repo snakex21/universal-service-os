@@ -184,7 +184,7 @@ file1=SETUP.EXE|demo.bin|HASH|SIZE
   self.assertIn('exclude=dun-test',(self.target/'USOS/ADDONS/SELECT.INI').read_text())
  def test_language_uses_document_not_english_setup_stub(self):
   f=self.root/'SETUP.TXT'
-  for text,want in (('{\\rtf1\\deflang1045 test}','PL'),('Plik README dla Instalatora','PL'),('README for Setup','EN'),('unknown language','XX')):
+  for text,want in (('{\\rtf1\\deflang1045 test}','PL'),('Plik README dla Instalatora','PL'),('      Microsoft Windows 95 - informacje na temat instalacji\r\n','PL'),('Microsoft Windows 95 README for Setup','EN'),('README for Setup','EN'),('unknown language','XX')):
    f.write_text(text);r=subprocess.run([str(self.exe),'language',str(f)],capture_output=True);self.assertEqual(r.stdout.strip().decode(),want)
 
 class Render(unittest.TestCase):

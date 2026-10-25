@@ -43,6 +43,9 @@ static int language(const char *path){char buf[65537],*p;FILE *f=fopen(path,"rb"
   * document language; never infer the OS language from menu or filename. */
  p=strstr(buf,"\\deflang");if(p){int id=atoi(p+8);if((id&0x3ff)==0x15){puts("PL");return 0;}if((id&0x3ff)==9){puts("EN");return 0;}}
  if(strstr(buf,"Plik README dla Instalatora")){puts("PL");return 0;}
+ /* 95 RTM PL (4.00.950) WIN95\SETUP.TXT is plain DOS text (CP852): its
+  * ASCII title line. 950 OSR1 EN has "README for Setup" (below). */
+ if(strstr(buf,"Microsoft Windows 95 - informacje na temat instalacji")){puts("PL");return 0;}
  if(strstr(buf,"README for Setup")){puts("EN");return 0;}
  puts("XX");return 0;}
 int main(int argc,char **argv){int n;
