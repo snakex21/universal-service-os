@@ -68,6 +68,70 @@ class Parser(unittest.TestCase):
         self.assertNotEqual(self.run_parser(enum=active,config=config.replace(b'1024,768',b'640,480'))[0],0)
         self.assertNotEqual(self.run_parser(enum=active,config=config.replace(b'"BitsPerPixel"',b'"Other"'))[0],0)
 
+    # The X470 950 PL state (2026-10-25, synthetic minimal copy of VL2/VL3):
+    # the early import put the legacy *PNP0900 on Display\0000 (USOSVESA),
+    # GUI PnP then installed the RX 560 from USOSVESA.INF as its own
+    # Display\0001 (16,640,480 default) and kept *PNP0900.
+    PCI950 = r'HKEY_LOCAL_MACHINE\Enum\PCI\VEN_1002&DEV_67EF\BUS_0A&DEV_00&FUNC_00'
+    ROOT950 = r'HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900\0000'
+    CLASSES950 = reg([(CLS, '@="Karty graficzne"\r\n"Installer"="SetupX.Dll, Display_ClassInstaller"'),
+        (CLS + r'\0000', '"Ver"="4.0"\r\n"DevLoader"="*vdd"\r\n"InfPath"="USOSVESA.INF"\r\n"InfSection"="VESA"'),
+        (CLS + r'\0000\DEFAULT', '"Mode"="16,1024,768"\r\n"drv"="vesamini.drv"\r\n"vdd"="*vdd"\r\n"minivdd"="vesamini.vxd"'),
+        (CLS + r'\0000\MODES\16\1024,768', ''),
+        (CLS + r'\0001', '"InfPath"="USOSVESA.INF"\r\n"InfSection"="VESA"\r\n"DriverDesc"="vesa (vmdisp9x) 1002:67ef"'),
+        (CLS + r'\0001\DEFAULT', '"drv"="vesamini.drv"\r\n"minivdd"="vesamini.vxd"\r\n"Mode"="16,640,480"'),
+        (CLS + r'\0001\MODES\4\640,480', '"drv"="vga.drv"')])
+    ENUM950 = reg([(r'HKEY_LOCAL_MACHINE\Enum\Monitor\Default_Monitor\0001', '"Class"="Monitor"\r\n"Driver"="Monitor\\\\0000"'),
+        (r'HKEY_LOCAL_MACHINE\Enum\Root\*PNP0900', ''),
+        (ROOT950, '"InfName"="MSDISP.INF"\r\n"Class"="Display"\r\n"HardwareID"="*PNP0900"\r\n"Driver"="Display\\\\0000"'),
+        (ROOT950 + r'\LogConfig', '"0"=hex:00,04,00,00'),
+        (r'HKEY_LOCAL_MACHINE\Enum\PCI\VEN_1002&DEV_67EF', ''),
+        (PCI950, '"CompatibleIDs"="PCI\\\\CC_0300"\r\n"Class"="DISPLAY"\r\n"Driver"="DISPLAY\\\\0001"\r\n'
+                 '"Mfg"="JHRobotics (vmdisp9x, via USOS)"'),
+        (PCI950 + r'\LogConfig', '"0000"=hex:00,04,00,00'),
+        (r'HKEY_LOCAL_MACHINE\Enum\PCI\VEN_8086&DEV_1539\BUS_04&DEV_00&FUNC_00', '"Class"="Net"\r\n"Driver"="Net\\\\0009"')])
+
+    def test_950_pnp_vesa_binding_next_to_the_legacy_device_writes_the_mode_only(self):
+        rc, out = self.run_parser(classes=self.CLASSES950, enum=self.ENUM950)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, reg([(CLS + r'\0001\DEFAULT', '"Mode"="16,1024,768"'),
+            (CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')]))
+        self.assertNotIn(b'"Driver"', out)
+        config = reg([(CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')])
+        self.assertEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950, config=config)[0], 0)
+        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=self.ENUM950,
+            config=config.replace(b'1024,768', b'640,480'))[0], 0)
+
+    def test_950_pci_on_the_early_vesa_class_writes_the_profile_only(self):
+        enum = self.ENUM950.replace(b'DISPLAY\\\\0001', b'Display\\\\0000')
+        rc, out = self.run_parser(classes=self.CLASSES950, enum=enum)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, reg([(CONFIG, '"BitsPerPixel"="16"\r\n"Resolution"="1024,768"')]))
+
+    def test_legacy_device_next_to_a_pci_display_that_needs_rebinding_fails(self):
+        msdisp = self.CLASSES950.replace(b'"InfPath"="USOSVESA.INF"\r\n"InfSection"="VESA"\r\n"DriverDesc"="vesa',
+                                         b'"InfPath"="MSDISP.INF"\r\n"InfSection"="VGA"\r\n"DriverDesc"="vesa')
+        msdisp = msdisp.replace(b'"drv"="vesamini.drv"\r\n"minivdd"="vesamini.vxd"\r\n"Mode"="16,640,480"', b'"drv"="vga.drv"')
+        self.assertIn(b'MSDISP.INF', msdisp)
+        rc, out = self.run_parser(classes=msdisp, enum=self.ENUM950)
+        self.assertNotEqual(rc, 0)
+        self.assertIsNone(out)
+        # Without the legacy device the MSDISP one is rebound as before.
+        alone = self.ENUM950.replace(b'"Class"="Display"\r\n"HardwareID"="*PNP0900"', b'"Class"="Other"\r\n"HardwareID"="*PNP0900"')
+        rc, out = self.run_parser(classes=msdisp, enum=alone)
+        self.assertEqual(rc, 0)
+        self.assertIn(b'[' + self.PCI950.encode() + b']\r\n"Driver"="Display\\\\0000"\r\n', out)
+        # A custom driver on the PCI display still fails.
+        custom = self.CLASSES950.replace(b'"Mode"="16,640,480"', b'"Mode"="16,640,480"').replace(
+            b'"DriverDesc"="vesa (vmdisp9x) 1002:67ef"', b'"DriverDesc"="x"').replace(
+            b'\\0001\\DEFAULT]\r\n"drv"="vesamini.drv"', b'\\0001\\DEFAULT]\r\n"drv"="atidrv.drv"')
+        self.assertNotEqual(self.run_parser(classes=custom, enum=self.ENUM950)[0], 0)
+        # Two PCI displays or two legacy ones stay ambiguous.
+        two = self.ENUM950 + reg([(self.PCI950.replace('BUS_0A', 'BUS_0B'), '"Class"="Display"\r\n"Driver"="Display\\\\0001"')]).split(b'\r\n\r\n', 1)[1]
+        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=two)[0], 0)
+        two = self.ENUM950 + reg([(self.ROOT950.replace('\\0000', '\\0001'), '"Class"="Display"\r\n"Driver"="Display\\\\0000"')]).split(b'\r\n\r\n', 1)[1]
+        self.assertNotEqual(self.run_parser(classes=self.CLASSES950, enum=two)[0], 0)
+
 class Generator(unittest.TestCase):
     def create(self,version='4 0 0 950'):
         tmp=scratch('vesalate-');self.addCleanup(shutil.rmtree,tmp,ignore_errors=True)

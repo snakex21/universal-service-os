@@ -2,6 +2,13 @@
  * fresh original REGEDIT4 exports. Never reads/writes registry hives.
  * PLAN classes enum idconfig output.reg; CHECK classes enum idconfig config
  * Reject ambiguous displays, custom drivers, malformed/duplicate data.
+ * The display is the one PCI display device, else the one legacy
+ * Root\*PNP0900 device. A PCI display that 950 PnP already installed from
+ * USOSVESA.INF (vesamini, its own class key) needs no rebinding: only the
+ * mode is written, and the legacy *PNP0900 that detection left next to it
+ * is ignored (X470 950 PL, 2026-10-25: Display\0000 = *PNP0900 on the early
+ * VESA import, Display\0001 = the RX 560 on USOSVESA.INF). A PCI display on
+ * MSDISP.INF next to a *PNP0900 still fails: both would share Display\0000.
  */
 #ifdef __WATCOMC__
 #include "vesbind_dos.h"
@@ -23,11 +30,12 @@
 
 typedef struct { char id[5], inf[40], drv[40], mini[40], mode[40]; } DisplayClass;
 static DisplayClass classes[MAXCLASS];
-static unsigned class_count, displays;
+static unsigned class_count, pci_displays, root_displays;
 static char key[MAXKEY], candidate[MAXKEY], device_class[40], driver[40];
 static char chosen[MAXKEY], chosen_driver[40], profile[5], bits[4], resolution[24];
+static char root_chosen[MAXKEY], root_driver[40];
 static char actual_bits[4], actual_resolution[24], profile_key[MAXKEY];
-static int current_class = -1, default_section, valid_device;
+static int current_class = -1, default_section, valid_device, candidate_pci;
 
 static int ieq(const char *a, const char *b) {
     while (*a && *b) {
@@ -120,17 +128,28 @@ static int class_line(const char *line,int header) {
 }
 static int flush_device(void) {
     if (valid_device && ieq(device_class,"Display")) {
-        if (++displays!=1) return 0;
-        strcpy(chosen,candidate);strcpy(chosen_driver,driver);
+        if (candidate_pci) {
+            if (++pci_displays!=1) return 0;
+            strcpy(chosen,candidate);strcpy(chosen_driver,driver);
+        } else {
+            if (++root_displays!=1) return 0;
+            strcpy(root_chosen,candidate);strcpy(root_driver,driver);
+        }
     }
     return 1;
+}
+/* A class key with USOSVESA.INF [VESA]'s driver (early import or 950 PnP). */
+static int vesa_like(int i) {
+    return ieq(classes[i].inf,"USOSVESA.INF") && ieq(classes[i].drv,"vesamini.drv") &&
+        ieq(classes[i].mini,"vesamini.vxd");
 }
 static int device_line(const char *line,int header) {
     if (header) {
         const char *s=0;unsigned i;
         if (!flush_device()) return 0;
         valid_device=0;device_class[0]=0;driver[0]=0;
-        if (prefix(key,ENUMPCI)) {
+        candidate_pci=prefix(key,ENUMPCI);
+        if (candidate_pci) {
             s=key+strlen(ENUMPCI);
             if (!prefix(s,"VEN_") || strlen(s)<17 || !prefix(s+8,"&DEV_")) return 1;
             for(i=4;i<8;i++) if(!isxdigit((unsigned char)s[i])) return 1;
@@ -171,14 +190,17 @@ static int mode(const char *text) {
     return atoi(resolution)>=320 && atoi(resolution)<=8192 && atoi(second+1)>=200 && atoi(second+1)<=8192;
 }
 int main(int argc,char **argv) {
-    int vesa,old;FILE *out;int failed;
-    memset(classes,0,sizeof(classes));class_count=displays=0;
+    int vesa,old,bound;FILE *out;int failed;
+    memset(classes,0,sizeof(classes));class_count=pci_displays=root_displays=0;
     key[0]=candidate[0]=device_class[0]=driver[0]=chosen[0]=chosen_driver[0]=0;
+    root_chosen[0]=root_driver[0]=0;
     profile[0]=bits[0]=resolution[0]=actual_bits[0]=actual_resolution[0]=profile_key[0]=0;
-    current_class=-1;default_section=valid_device=0;
+    current_class=-1;default_section=valid_device=candidate_pci=0;
     if (argc!=6 || (!ieq(argv[1],"PLAN") && !ieq(argv[1],"CHECK"))) return 2;
     if (!scan(argv[2],class_line) || !scan(argv[3],device_line) || !flush_device() ||
-        displays!=1 || !scan(argv[4],id_line) || !id4(profile) || !strcmp(profile,"0000")) return 2;
+        pci_displays+root_displays==0 || !scan(argv[4],id_line) || !id4(profile) ||
+        !strcmp(profile,"0000")) return 2;
+    if (!pci_displays) { strcpy(chosen,root_chosen);strcpy(chosen_driver,root_driver); }
     vesa=find_class("0000");
     if (vesa<0 || !ieq(classes[vesa].inf,"USOSVESA.INF") ||
         !ieq(classes[vesa].drv,"vesamini.drv") || !ieq(classes[vesa].mini,"vesamini.vxd") ||
@@ -186,17 +208,25 @@ int main(int argc,char **argv) {
     if (!prefix(chosen_driver,"Display\\") || !id4(chosen_driver+8)) return 2;
     old=find_class(chosen_driver+8);
     if (old<0) return 2;
-    if (old!=vesa && (!ieq(classes[old].inf,"MSDISP.INF") ||
+    bound=old==vesa || vesa_like(old);
+    if (!bound && (!ieq(classes[old].inf,"MSDISP.INF") ||
         (!ieq(classes[old].drv,"vga.drv") && !ieq(classes[old].drv,"supervga.drv")))) return 2;
+    /* A legacy *PNP0900 next to the PCI display: only when nothing is rebound. */
+    if (pci_displays && root_displays && !bound) return 2;
     sprintf(profile_key,"HKEY_LOCAL_MACHINE\\Config\\%s\\Display\\Settings",profile);
     if (ieq(argv[1],"CHECK")) {
-        if (old!=vesa || !scan(argv[5],config_line)) return 2;
+        if (!bound || !scan(argv[5],config_line)) return 2;
         return strcmp(bits,actual_bits) || strcmp(resolution,actual_resolution) ? 2 : 0;
     }
     out=fopen(argv[5],"wb");if(!out) return 2;
-    failed=fprintf(out,"REGEDIT4\r\n\r\n[%s]\r\n\"Driver\"=\"Display\\\\0000\"\r\n\r\n"
+    if (!bound) failed=fprintf(out,"REGEDIT4\r\n\r\n[%s]\r\n\"Driver\"=\"Display\\\\0000\"\r\n\r\n"
         "[%s]\r\n\"BitsPerPixel\"=\"%s\"\r\n\"Resolution\"=\"%s\"\r\n",
         chosen,profile_key,bits,resolution)<0;
+    else if (old!=vesa) failed=fprintf(out,"REGEDIT4\r\n\r\n[" CLS "%s\\DEFAULT]\r\n\"Mode\"=\"%s,%s\"\r\n\r\n"
+        "[%s]\r\n\"BitsPerPixel\"=\"%s\"\r\n\"Resolution\"=\"%s\"\r\n",
+        classes[old].id,bits,resolution,profile_key,bits,resolution)<0;
+    else failed=fprintf(out,"REGEDIT4\r\n\r\n[%s]\r\n\"BitsPerPixel\"=\"%s\"\r\n\"Resolution\"=\"%s\"\r\n",
+        profile_key,bits,resolution)<0;
     if (fclose(out)) failed=1;
     return failed ? 2 : 0;
 }
