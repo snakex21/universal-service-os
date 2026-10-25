@@ -173,14 +173,20 @@ usos_net_run_reg() {
 # read-only): I211 at 00:01.3 > 02:00.2 > 03:01.0 > 08:00.0 = 0008020B00,
 # the NVMe beside it 0020020B00, the GPU under 00:03.1 = 001900, root-bus
 # devices BUS_00&DEV_18&FUNC_03. Fails (no output) without a PCI chain.
+# Arg 2 = 03 (Windows 95 RTM/OSR1 4.00.950, NDIS 3 driver): that PCI
+# enumerator names every devnode BUS_bb&DEV_dd&FUNC_ff from the card's own
+# bus/device/function, behind bridges too. X470 950 PL registry
+# (w95rtm-micron, 2026-10-25): I211 at 00:01.3 > 01:00.2 > 02:01.0 >
+# 04:00.0 = BUS_04&DEV_00&FUNC_00; NET95.REG with the chained OSR2 name
+# made a second, card-less devnode and TCP/IP never reached the I211.
 usos_net_w95_instance() {
-    printf '%s\n' "$1" | awk -F/ '
+    printf '%s\n' "$1" | USOS_W95_MAJOR="${2:-04}" awk -F/ '
       function hex(h) { return (index("0123456789abcdef", substr(h, 1, 1)) - 1) * 16 + index("0123456789abcdef", substr(h, 2, 1)) - 1 }
       { for (i = 1; i <= NF; i++) { c = tolower($i)
           if (c ~ /^pci[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]$/) { root = substr(c, 9, 2); n = 0 }
           else if (c ~ /^[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]$/) comp[++n] = c } }
       END { if (root == "" || n < 1) exit 1
-        if (n == 1) { printf "BUS_%02X&DEV_%02X&FUNC_%02X\n", hex(substr(comp[1], 6, 2)), hex(substr(comp[1], 9, 2)), substr(comp[1], 12, 1) + 0; exit }
+        if (n == 1 || ENVIRON["USOS_W95_MAJOR"] == "03") { printf "BUS_%02X&DEV_%02X&FUNC_%02X\n", hex(substr(comp[n], 6, 2)), hex(substr(comp[n], 9, 2)), substr(comp[n], 12, 1) + 0; exit }
         for (i = n; i >= 1; i--) printf "%02X", hex(substr(comp[i], 9, 2)) * 8 + substr(comp[i], 12, 1)
         printf "%02X\n", hex(root) }'
 }
@@ -414,7 +420,7 @@ usos_net_w95_stage() {
         break
     done
     [ -z "${USOS_NET_W95_PATH:-}" ] || _un_dev=$USOS_NET_W95_PATH
-    if ! _un_inst=$(usos_net_w95_instance "$_un_dev"); then
+    if ! _un_inst=$(usos_net_w95_instance "$_un_dev" "${_un_ndis:-04}"); then
         usos_net_log "usosnet4: no PCI path for $_un_hwid ($_un_dev); no NET95.REG (PnP + USOSNET.INF)"; return 0
     fi
     # The card's DeviceDesc from USOSNET.INF ([Strings] of its model line).

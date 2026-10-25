@@ -46,6 +46,22 @@ class Instance(unittest.TestCase):
         self.assertEqual(self.inst('/sys/devices/pci0000:00/0000:00:18.3'), 'BUS_00&DEV_18&FUNC_03')
         self.assertEqual(self.inst('/sys/devices/pci0000:00/0000:00:14.0'), 'BUS_00&DEV_14&FUNC_00')
 
+    def test_950_bus_dev_func_instances(self):
+        # 95 RTM PL (4.00.950) on the X470 (w95rtm-micron SYSTEM.DAT,
+        # 2026-10-25): Enum\PCI\VEN_8086&DEV_1539\BUS_04&DEV_00&FUNC_00 for
+        # the I211 at 04:00.0 behind three bridges; NVMe BUS_07&DEV_00&FUNC_00.
+        rtm = '/sys/devices/pci0000:00/0000:00:01.3/0000:01:00.2/0000:02:01.0/0000:04:00.0'
+        rc, out, _ = run(f"usos_net_w95_instance '{rtm}' 03")
+        self.assertEqual((rc, out.strip()), (0, 'BUS_04&DEV_00&FUNC_00'))
+        rc, out, _ = run("usos_net_w95_instance '/sys/devices/pci0000:00/0000:00:01.1/0000:07:00.0' 03")
+        self.assertEqual(out.strip(), 'BUS_07&DEV_00&FUNC_00')
+        rc, out, _ = run("usos_net_w95_instance '/sys/devices/pci0000:00/0000:00:14.3' 03")
+        self.assertEqual(out.strip(), 'BUS_00&DEV_14&FUNC_03')
+        rc, out, _ = run(f"usos_net_w95_instance '{rtm}' 04")
+        self.assertEqual(out.strip(), '0008020B00')   # OSR2 naming unchanged
+        rc, out, _ = run("usos_net_w95_instance '' 03")
+        self.assertNotEqual(rc, 0)
+
     def test_no_pci_chain(self):
         self.assertIsNone(self.inst('/tmp/pci/0000-08-00.0'))
         self.assertIsNone(self.inst(''))
@@ -130,6 +146,23 @@ class Stage(unittest.TestCase):
         self.assertTrue((self.target / 'USOS9X/NET/USOSNET.INF').exists())   # PnP fallback stays
         log = (self.target / 'USOS9X/LOGS/NETSETUP.TXT').read_text()
         self.assertIn('0008020B00', log)
+
+    def test_950_card_gets_bus_dev_func_devnode(self):
+        # 95 RTM (4.00.950): BUS_bb&DEV_dd&FUNC_ff devnode, NDIS 3 driver.
+        shutil.copyfile(ROOT / 'tools/nt/usosnet/inf/usosnet95rtm.inf', self.lib / 'network/usosnet95rtm.inf')
+        (self.lib / 'network/win95-rtm').mkdir()
+        (self.lib / 'network/win95-rtm/usosnet4.sys').write_bytes(b'own NDIS 3 test fixture, not a driver')
+        self.card('0000-04-00.0')
+        env = {'USOS_NET_W95_PATH': '/sys/devices/pci0000:00/0000:00:01.3/0000:01:00.2/0000:02:01.0/0000:04:00.0',
+               'USOS_NET_W95_VERSION': '4 0 0 950'}
+        rc, out, err = run('usos_net_stage ' + ' '.join("'%s'" % p.as_posix() for p in (self.cfg, self.target, self.lib, self.pci)), env)
+        self.assertEqual(rc, 0, out + err)
+        text = (self.target / 'USOS9X/NET/NET95.REG').read_bytes().decode('ascii')
+        dev = '[HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_8086&DEV_1539\\BUS_04&DEV_00&FUNC_00'
+        self.assertIn(dev + ']\r\n', text)
+        self.assertIn(dev + '\\Bindings]\r\n"MSTCP\\\\0009"=""', text)
+        self.assertNotIn('0008020B00', text)
+        self.assertIn('"MajorNdisVersion"=hex:03', text)
 
     def test_no_pci_path_keeps_pnp_and_inf(self):
         self.card('0000-08-00.0')
