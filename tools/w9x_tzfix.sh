@@ -2,7 +2,7 @@
 # line of defence next to MSBATCH.INF [Setup] TimeZone (docs/win9x-modern-
 # 2026-09-30.md section 4e). Sourced by tools/w9x_csmwrap_target.sh.
 #
-# w9x_tzfix_write <9x zone key> <C:\USOS9X folder> [month 1-12]
+# w9x_tzfix_write <9x zone key> <C:\USOS9X folder> [local "YYYY-MM-DD HH:MM"]
 # writes TZFIX.BAT, TZFIX.REG and TZRO1.REG / TZRO2.REG there; AUTOEXEC.BAT
 # (src/platform/bios/dos_startup.cmd) calls TZFIX.BAT before every Windows
 # start. TZFIX.BAT acts once, in real-mode DOS, when the registry exists:
@@ -77,9 +77,72 @@ w9x_tzfix_hex4() {
     printf '%02x,%02x,%02x,%02x' $((v & 255)) $(((v >> 8) & 255)) $(((v >> 16) & 255)) $(((v >> 24) & 255))
 }
 
+# w9x_tzfix_dec N: the number without leading zeros (shell arithmetic reads
+# 08 / 09 as bad octal). Helpers use tz_* names only: the callers source
+# this file into their own shell.
+w9x_tzfix_dec() {
+    tz_v=$1
+    while [ "${#tz_v}" -gt 1 ] && [ "${tz_v#0}" != "$tz_v" ]; do tz_v=${tz_v#0}; done
+    printf '%s' "$tz_v"
+}
+
+# w9x_tzfix_rule_day YEAR MONTH DAYOFWEEK WEEK: the day of the month of a
+# TIME_ZONE_INFORMATION rule date (week 1-4 = the n-th such weekday, 5 = the
+# last one; day of week 0 = Sunday).
+w9x_tzfix_rule_day() {
+    tz_y=$1 tz_m=$2 tz_wd=$3 tz_wk=$4
+    case "$tz_m" in 1|5) tz_t=0 ;; 2|6) tz_t=3 ;; 3) tz_t=2 ;; 4|7) tz_t=5 ;; 8) tz_t=1 ;; 9) tz_t=4 ;; 10) tz_t=6 ;; 11) tz_t=2 ;; *) tz_t=4 ;; esac
+    tz_yy=$tz_y; [ "$tz_m" -ge 3 ] || tz_yy=$((tz_y - 1))
+    tz_first=$(( (tz_yy + tz_yy / 4 - tz_yy / 100 + tz_yy / 400 + tz_t + 1) % 7 ))
+    case "$tz_m" in
+        4|6|9|11) tz_last=30 ;;
+        2) tz_last=28
+           if [ $((tz_y % 4)) -eq 0 ] && { [ $((tz_y % 100)) -ne 0 ] || [ $((tz_y % 400)) -eq 0 ]; }; then tz_last=29; fi ;;
+        *) tz_last=31 ;;
+    esac
+    tz_d=$(( 1 + (tz_wd - tz_first + 7) % 7 + 7 * (tz_wk - 1) ))
+    while [ "$tz_d" -gt "$tz_last" ]; do tz_d=$((tz_d - 7)); done
+    printf '%s' "$tz_d"
+}
+
+# w9x_tzfix_rule_key YEAR SYSTEMTIME-HEX: MMDDhhmm of that rule's switch in
+# the year, in the local wall time before the switch (as Windows stores it).
+w9x_tzfix_rule_key() {
+    set -- "$1" $(printf '%s' "$2" | tr ',' ' ')
+    tz_m=$(printf '%d' "0x$4") tz_wd=$(printf '%d' "0x$6") tz_wk=$(printf '%d' "0x$8")
+    tz_hr=$(printf '%d' "0x${10}") tz_mi=$(printf '%d' "0x${12}")
+    tz_d=$(w9x_tzfix_rule_day "$1" "$tz_m" "$tz_wd" "$tz_wk")
+    printf '%s' $(( ((tz_m * 100 + tz_d) * 100 + tz_hr) * 100 + tz_mi ))
+}
+
+# w9x_tzfix_is_dst "YYYY-MM-DD HH:MM" STANDARDSTART DAYLIGHTSTART: exit 0
+# when that local time is summer time under the zone's own rule, hour and
+# minute included. The repeated hour at the autumn switch counts as summer
+# time (the clock has not gone back yet). Southern zones (summer time over
+# the new year) wrap around. A malformed time counts as standard time.
+w9x_tzfix_is_dst() {
+    case "$1" in
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][' 'T][0-9][0-9]:[0-9][0-9]*) ;;
+        *) return 1 ;;
+    esac
+    tz_y=$(w9x_tzfix_dec "$(printf '%s' "$1" | cut -c1-4)")
+    tz_mo=$(w9x_tzfix_dec "$(printf '%s' "$1" | cut -c6-7)") tz_dy=$(w9x_tzfix_dec "$(printf '%s' "$1" | cut -c9-10)")
+    tz_hr=$(w9x_tzfix_dec "$(printf '%s' "$1" | cut -c12-13)") tz_mi=$(w9x_tzfix_dec "$(printf '%s' "$1" | cut -c15-16)")
+    tz_now=$(( ((tz_mo * 100 + tz_dy) * 100 + tz_hr) * 100 + tz_mi ))
+    tz_s=$(w9x_tzfix_rule_key "$tz_y" "$2") tz_l=$(w9x_tzfix_rule_key "$tz_y" "$3")
+    if [ "$tz_l" -lt "$tz_s" ]; then [ "$tz_now" -ge "$tz_l" ] && [ "$tz_now" -lt "$tz_s" ]
+    else [ "$tz_now" -ge "$tz_l" ] || [ "$tz_now" -lt "$tz_s" ]
+    fi
+}
+
+# Argument 3 is the local wall time of the first boot. Empty: the prep
+# environment's own clock. Its kernel reads the RTC as UTC and nothing sets
+# TZ, while these PCs (and QEMU -rtc base=localtime) keep local time in the
+# RTC, so plain `date` prints the local wall time. BETA_CLOCK only changes
+# QEMU's RTC argument (host_rtc=unchanged), never this clock.
 w9x_tzfix_write() {
-    zone=$1 dir=$2 month=${3:-$(date +%m 2>/dev/null || echo 1)} src=${4:-} lang=${5:-PL}
-    month=${month#0} tzi=''
+    zone=$1 dir=$2 when=${3:-$(date '+%Y-%m-%d %H:%M' 2>/dev/null)} src=${4:-} lang=${5:-PL}
+    tzi=''
     # bias (minutes, UTC = local + bias), daylight bias, StandardStart,
     # DaylightStart (SYSTEMTIME: month, day-of-week, week 1-5, hour), names
     # (Windows-1250 bytes; cosmetic, Date/Time shows the zone list's text).
@@ -89,7 +152,7 @@ w9x_tzfix_write() {
             std='00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00'
             dlt='00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00'
             sname='Europa \214rodkowa (czas stand.)' dname='Europa \214rodkowa (czas letni)'
-            dst_from=4 dst_to=10 ;;
+            ;;
         'Lisbon Warsaw')
             [ "$src" = 950 ] || return 1
             bias=-60 dbias=-60
@@ -98,17 +161,17 @@ w9x_tzfix_write() {
             if [ "$lang" = EN ]; then sname='Lisbon Warsaw Standard Time' dname='Lisbon Warsaw Daylight Time'
             else sname='Lizbona/Warszawa - czas zimowy' dname='Lizbona/Warszawa - czas letni'; fi
             tzi="c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,$std,$dlt"
-            dst_from=4 dst_to=10 ;;
+            ;;
         Eastern)
             bias=300 dbias=-60
             std='00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00'
             dlt='00,00,04,00,00,00,01,00,02,00,00,00,00,00,00,00'
             sname='Eastern Standard Time' dname='Eastern Daylight Time'
-            dst_from=4 dst_to=10 ;;
+            ;;
         *) return 1 ;;
     esac
     active=$bias
-    if [ "$month" -ge "$dst_from" ] && [ "$month" -le "$dst_to" ]; then active=$((bias + dbias)); fi
+    if w9x_tzfix_is_dst "$when" "$std" "$dlt"; then active=$((bias + dbias)); fi
     key='HKEY_LOCAL_MACHINE\System\CurrentControlSet\control\TimeZoneInformation'
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup'
     harmless='RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL'
@@ -118,7 +181,11 @@ w9x_tzfix_write() {
         printf '"DaylightName"="'; printf "$dname"; printf '"\r\n'
         printf '"Bias"=hex:%s\r\n"StandardBias"=hex:00,00,00,00\r\n"DaylightBias"=hex:%s\r\n' "$(w9x_tzfix_hex4 "$bias")" "$(w9x_tzfix_hex4 "$dbias")"
         printf '"StandardStart"=hex:%s\r\n"DaylightStart"=hex:%s\r\n' "$std" "$dlt"
-        printf '"ActiveTimeBias"=hex:%s\r\n\r\n' "$(w9x_tzfix_hex4 "$active")"
+        printf '"ActiveTimeBias"=hex:%s\r\n' "$(w9x_tzfix_hex4 "$active")"
+        # Automatic summer time on: Setup's first-boot placeholder leaves -1
+        # (TZFIX replaces the Date/Time step that would clear it; OSR2 has -1
+        # too) and 950's KERNEL32 treats -1 as off.
+        printf '"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n\r\n'
         # 44-byte TZI (Bias, StandardBias, DaylightBias, StandardDate,
         # DaylightDate), wrapped like REGEDIT's own export.
         [ -z "$tzi" ] || printf '[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Time Zones\\%s]\r\n"TZI"=hex:%s,\\\r\n  %s,\\\r\n  %s\r\n\r\n' \

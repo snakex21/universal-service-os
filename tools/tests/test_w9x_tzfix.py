@@ -2,7 +2,9 @@
 and the MSBATCH TimeZone guard of tools/w9x_csmwrap_prepare.sh. Host only (Git sh);
 the same output under the micro-Linux BusyBox was compared byte for byte."""
 from pathlib import Path
+import datetime
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
@@ -26,8 +28,8 @@ class Tzfix(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzfix-'))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
-    def write(self, zone, month):
-        rc, out, err = sh(f'. "{TZFIX}"\nw9x_tzfix_write "$Z" "{self.tmp.as_posix()}" {month}', {'Z': zone})
+    def write(self, zone, when):
+        rc, out, err = sh(f'. "{TZFIX}"\nw9x_tzfix_write "$Z" "{self.tmp.as_posix()}" "$W"', {'Z': zone, 'W': when})
         return rc, {name: (self.tmp / name).read_bytes() for name in NAMES if (self.tmp / name).exists()}
 
     def check_tzi(self, reg, tzi):
@@ -38,20 +40,21 @@ class Tzfix(unittest.TestCase):
         self.assertIn(f'"DaylightStart"=hex:{dlt}\r\n'.encode(), reg)
 
     def test_central_european_matches_the_hardware_proven_file(self):
-        rc, files = self.write('Central European', 10)
+        rc, files = self.write('Central European', '2026-07-15 12:00')
         self.assertEqual(rc, 0)
         reg = files['TZFIX.REG']
         self.assertTrue(reg.startswith(b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\control\\TimeZoneInformation]\r\n'))
         self.check_tzi(reg, CE_TZI)
         self.assertIn('"StandardName"="Europa Środkowa (czas stand.)"\r\n'.encode('cp1250'), reg)
-        self.assertIn(b'"ActiveTimeBias"=hex:88,ff,ff,ff\r\n', reg)   # summer: -120
+        self.assertIn(b'"ActiveTimeBias"=hex:88,ff,ff,ff\r\n', reg)   # 15 July, summer: -120
+        self.assertIn(b'"DisableAutoDaylightTimeSet"=hex:00,00,00,00\r\n', reg)
         self.assertNotIn(b'[-', reg)                                   # no key is deleted
         self.assertIn(b'"Strefa czasowa"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n', files['TZRO1.REG'])
         self.assertIn(b'"Time Zone"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n', files['TZRO2.REG'])
         self.assertIn(b'FIND.EXE "00,00,0a,00,00,00,05,00,03" TZ1.CHK', files['TZFIX.BAT'])
 
     def test_eastern_winter(self):
-        rc, files = self.write('Eastern', 1)
+        rc, files = self.write('Eastern', '2026-01-15 12:00')
         self.assertEqual(rc, 0)
         self.check_tzi(files['TZFIX.REG'], EASTERN_TZI)
         self.assertIn(b'"ActiveTimeBias"=hex:2c,01,00,00\r\n', files['TZFIX.REG'])
@@ -59,12 +62,12 @@ class Tzfix(unittest.TestCase):
 
     def test_other_zones_get_nothing(self):
         for zone in ('Pacific', 'W. Europe', ''):
-            rc, files = self.write(zone, 5)
+            rc, files = self.write(zone, '2026-05-15 12:00')
             self.assertEqual(rc, 1, zone)
             self.assertEqual(files, {}, zone)
 
     def test_batch_is_dos_safe_and_acts_once(self):
-        _, files = self.write('Central European', 7)
+        _, files = self.write('Central European', '2026-07-15 12:00')
         bat = files['TZFIX.BAT']
         lines = bat.split(b'\r\n')
         self.assertEqual(bat.count(b'\n'), bat.count(b'\r\n'))
@@ -120,7 +123,7 @@ class Tzfix950(unittest.TestCase):
                 self.assertNotIn(b'TimeZone', data)
 
     def write(self, zone, src, lang='PL'):
-        rc, _ = self.run_sh(f'w9x_tzfix_write "$Z" "{self.tmp.as_posix()}" 10 {src} {lang}', {'Z': zone})
+        rc, _ = self.run_sh(f'w9x_tzfix_write "$Z" "{self.tmp.as_posix()}" "2026-10-10 12:00" {src} {lang}', {'Z': zone})
         return rc, {p.name: p.read_bytes() for p in self.tmp.iterdir()}
 
     def test_lisbon_warsaw_gets_the_eu_rule_and_list_tzi(self):
@@ -159,6 +162,86 @@ class Tzfix950(unittest.TestCase):
         _, files = self.write('Warsaw', '')
         self.assertNotIn('TZPR1.REG', files)
         self.assertNotIn(b'Drukarki', files['TZFIX.BAT'])
+
+
+def decode_reg(data):
+    """TimeZoneInformation values of a TZFIX.REG: name -> bytes (hex) or str."""
+    text = data.decode('cp1250').replace('\\\r\n  ', '')
+    key = '[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\control\\TimeZoneInformation]\r\n'
+    body = text[text.index(key) + len(key):].split('\r\n\r\n', 1)[0]
+    values = {}
+    for line in body.split('\r\n'):
+        name, _, value = line.partition('=')
+        name = name.strip('"')
+        values[name] = bytes.fromhex(value[4:].replace(',', '')) if value.startswith('hex:') else value.strip('"')
+    return values
+
+
+def windows_rule(st, year):
+    """Independent reference: a SYSTEMTIME rule date (week 5 = last) in YEAR."""
+    _, month, dow, week, hour, minute, _, _ = struct.unpack('<8H', st)
+    day = datetime.date(year, month, 1)
+    day += datetime.timedelta((dow - (day.weekday() + 1) % 7) % 7 + 7 * (week - 1))
+    while day.month != month:
+        day -= datetime.timedelta(7)
+    return datetime.datetime(day.year, day.month, day.day, hour, minute)
+
+
+class TzfixDaylight(unittest.TestCase):
+    """ActiveTimeBias from the local date and time under the zone's own rule
+    (last / n-th Sunday incl. the hour) and DisableAutoDaylightTimeSet=0
+    (950 KERNEL32 reads Setup's -1 as off; X470 950 PL, 2026-10-25)."""
+    ZONES = (('Lisbon Warsaw', '950'), ('Central European', ''), ('Warsaw', ''), ('Eastern', ''), ('Eastern', '950'))
+
+    def active(self, zone, src, when):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzdst-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        rc, out, err = sh(f'. "{TZFIX}"\nw9x_tzfix_write "$Z" "{tmp.as_posix()}" "$W" "$S" PL',
+                          {'Z': zone, 'W': when, 'S': src})
+        self.assertEqual(rc, 0, (zone, src, when, err))
+        values = decode_reg((tmp / 'TZFIX.REG').read_bytes())
+        self.assertEqual(values['DisableAutoDaylightTimeSet'], b'\0\0\0\0', zone)
+        return values, struct.unpack('<i', values['ActiveTimeBias'])[0]
+
+    def test_central_europe_switch_hours(self):
+        for zone, src in self.ZONES[:3]:
+            for when, want in (('2026-10-25 16:25', -60), ('2026-10-25 02:30', -120), ('2026-10-25 03:00', -60),
+                               ('2026-10-24 23:59', -120), ('2026-03-29 01:59', -60), ('2026-03-29 03:00', -120),
+                               ('2026-03-28 12:00', -60), ('2026-01-01 00:00', -60), ('2026-12-31 23:59', -60),
+                               ('2026-07-01 12:00', -120), ('2026-10-01 12:00', -120), ('2026-04-01 12:00', -120),
+                               ('2027-10-31 02:59', -120), ('2027-10-31 03:00', -60)):
+                self.assertEqual(self.active(zone, src, when)[1], want, (zone, when))
+        values, _ = self.active('Lisbon Warsaw', '950', '2026-10-25 16:25')
+        self.assertEqual(values['ActiveTimeBias'], bytes.fromhex('c4ffffff'))
+
+    def test_eastern_switch_hours(self):
+        # Eastern's 9x TZI is the old US rule: first Sunday of April and last
+        # Sunday of October, 02:00 (Windows applies the zone's own data).
+        for zone, src in self.ZONES[3:]:
+            for when, want in (('2026-04-05 01:59', 300), ('2026-04-05 02:00', 240), ('2026-10-25 01:59', 240),
+                               ('2026-10-25 02:00', 300), ('2026-11-01 12:00', 300), ('2026-03-20 12:00', 300),
+                               ('2026-07-04 12:00', 240)):
+                self.assertEqual(self.active(zone, src, when)[1], want, (zone, when))
+
+    def test_matches_an_independent_rule_over_years(self):
+        for zone, src in (('Lisbon Warsaw', '950'), ('Eastern', '')):
+            for year in (2024, 2025, 2027, 2028, 2100):
+                values, _ = self.active(zone, src, f'{year}-06-01 00:00')
+                std, dlt = windows_rule(values['StandardStart'], year), windows_rule(values['DaylightStart'], year)
+                bias = struct.unpack('<i', values['Bias'])[0]
+                daylight = struct.unpack('<i', values['DaylightBias'])[0]
+                for moment in (dlt - datetime.timedelta(minutes=1), dlt, std - datetime.timedelta(minutes=1), std):
+                    want = bias + (daylight if dlt <= moment < std else 0)
+                    self.assertEqual(self.active(zone, src, moment.strftime('%Y-%m-%d %H:%M'))[1], want, (zone, moment))
+
+    def test_unusable_time_is_standard_time(self):
+        for when in ('garbage', '2026-07'):
+            self.assertEqual(self.active('Central European', '', when)[1], -60, when)
+
+    def test_target_passes_the_local_wall_time(self):
+        text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn("tz_when=$(date '+%Y-%m-%d %H:%M' 2>/dev/null || :)", text)
+        self.assertIn('w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when"', text)
 
 
 class Wiring(unittest.TestCase):

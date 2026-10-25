@@ -561,8 +561,12 @@ fi
 case "$SYSTEM_TAG:$TIME_ZONE" in
     98SE:?*|98:?*|95:?*)
         tz_lang=PL; [ "${addon_lang:-}" != EN ] || tz_lang=EN
-        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" '' "${tz_source:-}" "$tz_lang"; then
-            log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step)"
+        # Local wall time: the RTC keeps local time and the prep kernel reads
+        # it as UTC with no TZ set, so `date` shows the local clock
+        # (tools/w9x_tzfix.sh). It decides the first boot's ActiveTimeBias.
+        tz_when=$(date '+%Y-%m-%d %H:%M' 2>/dev/null || :)
+        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when" "${tz_source:-}" "$tz_lang"; then
+            log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step, local time ${tz_when:-unknown})"
         else
             rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG" "$work/c/USOS9X/TZPR1.REG" "$work/c/USOS9X/TZPR2.REG"
             log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
