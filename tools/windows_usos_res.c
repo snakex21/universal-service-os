@@ -386,6 +386,20 @@ static void run(void) {
     file_path("USOSRES.LOG"); log_file=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
     if(log_file==INVALID_HANDLE_VALUE) leave(1); /* never change without logging */
     SetFilePointer(log_file,0,NULL,FILE_END);
+#ifdef USOSRES_9X
+    /* Never while 9x Setup's RunOnce\Setup list is not empty (950 first GUI
+       boot froze in GRPCONV, X470 2026-10-25; an empty key does not count,
+       as in USOSADD's setup_busy): the request and the Run value stay. */
+    { HKEY setup; DWORD keys=0,values=0;
+      if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&setup)==ERROR_SUCCESS) {
+          if(RegQueryInfoKeyA(setup,NULL,NULL,NULL,&keys,NULL,NULL,&values,NULL,NULL,NULL,NULL)!=ERROR_SUCCESS) keys=values=1;
+          RegCloseKey(setup);
+      }
+      if(keys||values) {
+          say("DISPLAY deferred: Windows Setup still running (RunOnce\\Setup); request retained\r\n");
+          CloseHandle(log_file); leave(0);
+      } }
+#endif
     if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); CloseHandle(log_file); leave(1); }
     if(vm()) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
 #ifndef USOSRES_9X

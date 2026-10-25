@@ -369,6 +369,16 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
 #endif
   log_handle=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,0,0);if(log_handle==INVALID_HANDLE_VALUE)ExitProcess(1);
   SetFilePointer(log_handle,0,0,FILE_END);
+#ifndef USOS_LAN_NT
+  /* Never while 9x Setup's RunOnce\Setup list is not empty (950 first GUI boot froze in GRPCONV, X470 2026-10-25). */
+  /* RegQueryInfoKeyA resolved at run time: the static imports stay the verified NT4 RTM list. */
+  {HKEY setup;DWORD keys=0,values=0;HMODULE adv;
+   LONG(WINAPI *info)(HKEY,LPSTR,LPDWORD,LPDWORD,LPDWORD,LPDWORD,LPDWORD,LPDWORD,LPDWORD,LPDWORD,LPDWORD,PFILETIME);
+   if(!RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&setup)){
+     adv=LoadLibraryA("advapi32.dll");info=adv?(void*)GetProcAddress(adv,"RegQueryInfoKeyA"):0;
+     if(!info||info(setup,0,0,0,&keys,0,0,&values,0,0,0,0))keys=values=1;RegCloseKey(setup);}
+   if(keys||values){log_line("LAN deferred: Windows Setup still running (RunOnce\\Setup); Run retained");CloseHandle(log_handle);ExitProcess(0);}}
+#endif
   if(!read_config()){log_line("LAN gave up: invalid/missing NETCFG and no valid DOS-native metadata");unregister();CloseHandle(log_handle);ExitProcess(1);}
   if(vm()){
 #ifndef USOS_LAN_NT

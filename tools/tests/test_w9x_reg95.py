@@ -253,6 +253,20 @@ class Vmdlate950(unittest.TestCase):
             self.assertFalse((other / 'VMDLATE.BAT').exists(), version)
             self.assertFalse((other / 'VMDRO.REG').exists(), version)
 
+    def test_950_reg95_has_no_runonce_vmd(self):
+        # X470 95 RTM PL 2026-10-25: USOSVmd queued by REG95.REG before the
+        # first GUI boot froze Setup inside RunOnce\Setup (GRPCONV).
+        reg = (self.write('4 0 0 950') / 'REG95.REG').read_bytes()
+        self.assertNotIn(b'USOSVmd', reg)
+        self.assertNotIn(b'USOSVMD.INF', reg)
+        self.assertNotIn(b'CurrentVersion\\RunOnce]', reg)
+        self.assertIn(b'[HKEY_LOCAL_MACHINE\\Config\\0001\\Enum\\Root\\*PNP0F0E\\0000]\r\n"CSConfigFlags"=hex:06,00,00,00\r\n', reg)
+        # OSR2 and an unknown version keep it (no VMDLATE there).
+        for version in ('4 0 0 1111', ''):
+            reg = (self.write(version) / 'REG95.REG').read_bytes()
+            self.assertIn(b'"USOSVmd"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\USOSVMD.INF"\r\n', reg, version)
+            self.assertIn(b'CSConfigFlags', reg, version)
+
     def test_batch_gates_journal_and_dos_limits(self):
         data = (self.write('4 0 0 950') / 'VMDLATE.BAT').read_bytes()
         self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
@@ -275,6 +289,16 @@ class Vmdlate950(unittest.TestCase):
             self.assertLess(text.index(before), imp, before)
         self.assertGreater(text.index('"USOSVMD.INF" C:\\USOS9X\\VM2.REG'), imp)
         self.assertGreater(text.index('ATTRIB.EXE +S +R +H SYSTEM.DAT'), imp)
+        # RunOnce\Setup present: PENDING, checked first in the export; a
+        # missing RunOnce key queues only with REGEDIT's REGEDIT4 header.
+        setup = text.index('"\\RunOnce\\Setup]" C:\\USOS9X\\VM1.REG')
+        self.assertEqual(text[setup:].split('\r\n')[1:3], ['IF ERRORLEVEL 2 GOTO FAIL', 'IF NOT ERRORLEVEL 1 GOTO PENDING'])
+        self.assertLess(setup, text.index('"\\RunOnce]" C:\\USOS9X\\VM1.REG'))
+        nokey = text[text.index(':NOKEY\r\n'):text.index(':QUEUE\r\n')]
+        self.assertIn('"REGEDIT4" C:\\USOS9X\\VM1.REG', nokey)
+        self.assertIn('IF ERRORLEVEL 1 GOTO FAIL', nokey)
+        self.assertLess(setup, text.index(':NOKEY\r\n'))
+        self.assertLess(text.index(':QUEUE\r\n'), imp)
         fail = text[text.index(':FAIL\r\n'):text.index(':PENDING\r\n')]
         self.assertIn('>> C:\\USOS9X\\USOSLOG.TXT', fail)
         self.assertNotIn('PAUSE', text)

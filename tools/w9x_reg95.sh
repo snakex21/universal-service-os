@@ -31,7 +31,9 @@
 #     need. (a) The machine RunOnce value USOSVmd that runs the INF (rundll
 #     setupx InstallHinfSection, UpdateInis: SYSTEM.INI [386Enh]
 #     device=*vmouse and device=C:\USOS9X\USOSVMD.VXD); INSTALL.BAT's
-#     [USOS.CsmReg] line for it is lost on 95 like every AddReg. (b)
+#     [USOS.CsmReg] line for it is lost on 95 like every AddReg. Not on
+#     950: VMDLATE.BAT queues it after RunOnce\Setup instead (see
+#     w9x_reg95_vmdlate_write). (b)
 #     CSConfigFlags 6 (do not create, do not start) in hardware profile 0001
 #     for Root\*PNP0F0E\0000, the PS/2 port mouse that 95 Setup's detection
 #     adds with Class\Mouse DevLoader *vmouse, MouseType PS2. 98 SE has the
@@ -66,7 +68,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -128,7 +130,7 @@ w9x_reg95_convert() {
         emit(key, name, data)
     }
     BEGIN {
-        usoslog = ENVIRON["W9X_REG95_LOG"]; vmd = ENVIRON["W9X_REG95_VMD"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
+        usoslog = ENVIRON["W9X_REG95_LOG"]; vmd = ENVIRON["W9X_REG95_VMD"]; vmdlate = ENVIRON["W9X_REG95_VMD_LATE"]; clsid = ENVIRON["W9X_REG95_CLSID"]; home = ENVIRON["W9X_REG95_HOME"]
         runkey = "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
     }
     { sub(/\r$/, "") }
@@ -222,8 +224,13 @@ w9x_reg95_convert() {
         if (logon_user != "") emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "username", logon_user)
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
         if (vmd != "") {
-            emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", "USOSVmd",
-                 "\"" esc("rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 " vmd) "\"")
+            # 950 (vmdlate): no USOSVmd here. REG95.REG is imported before the
+            # first GUI boot of 950 Setup, and that boot froze inside the
+            # RunOnce\Setup GRPCONV step with it queued (X470 95 RTM PL,
+            # 2026-10-25). VMDLATE.BAT queues it once RunOnce\Setup is gone.
+            if (vmdlate == "")
+                emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", "USOSVmd",
+                     "\"" esc("rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 " vmd) "\"")
             emit("HKEY_LOCAL_MACHINE\\Config\\0001\\Enum\\Root\\*PNP0F0E\\0000", "CSConfigFlags", "hex:06,00,00,00")
         }
         printf "\r\n"
@@ -483,13 +490,16 @@ CD \
 EOF
 }
 
-# w9x_reg95_vmdlate_write DIR VMDINF: 950 only. Its first GUI boot rebuilds
-# machine RunOnce, so the USOSVmd value of REG95.REG may never run (X470 950
-# PL, 2026-10-25: SYSTEM.INI without the device= lines). VMDLATE.BAT, called
-# by REG95.BAT before every Windows start, checks SYSTEM.INI with FIND once
-# RunOnce\Setup is gone; without USOSVMD.VXD it imports VMDRO.REG (the same
+# w9x_reg95_vmdlate_write DIR VMDINF: 950 only, and the only source of the
+# USOSVmd RunOnce value on 950. In REG95.REG (imported before Setup's first
+# GUI boot) it was first dropped (that boot rebuilds machine RunOnce), and
+# once it landed that boot froze inside RunOnce\Setup's GRPCONV step (X470
+# 95 RTM PL, 2026-10-25). VMDLATE.BAT, called by REG95.BAT before every
+# Windows start, checks SYSTEM.INI with FIND once RunOnce\Setup is gone
+# (never while it exists); without USOSVMD.VXD it imports VMDRO.REG (the
 # RunOnce value) once, the next Windows start runs USOSVMD.INF, and the start
-# after it loads the VxD. Journal: VMDLATE.RUN (queued), VMDLATE.OK (lines
+# after it loads the VxD. An export without a RunOnce key (no Setup, nothing
+# queued) also queues it, provided REGEDIT wrote the REGEDIT4 header. Journal: VMDLATE.RUN (queued), VMDLATE.OK (lines
 # present), VMDLATE.ERR (queued value ran but SYSTEM.INI still lacks them,
 # or a tool is missing; logged to USOSLOG.TXT, Windows starts anyway).
 # Deleting USOSVMD.ON (the user's off switch) stops it.
@@ -520,14 +530,20 @@ IF EXIST C:\USOS9X\VM1.REG DEL C:\USOS9X\VM1.REG > NUL
 IF EXIST C:\USOS9X\VM1.REG GOTO FAIL
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VM1.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
 IF NOT EXIST C:\USOS9X\VM1.REG GOTO FAIL
-C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce]" C:\USOS9X\VM1.REG > NUL
-IF ERRORLEVEL 1 GOTO FAIL
 C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce\Setup]" C:\USOS9X\VM1.REG > NUL
 IF ERRORLEVEL 2 GOTO FAIL
 IF NOT ERRORLEVEL 1 GOTO PENDING
+C:\WINDOWS\COMMAND\FIND.EXE /I "\RunOnce]" C:\USOS9X\VM1.REG > NUL
+IF ERRORLEVEL 2 GOTO FAIL
+IF ERRORLEVEL 1 GOTO NOKEY
 C:\WINDOWS\COMMAND\FIND.EXE /I "USOSVMD.INF" C:\USOS9X\VM1.REG > NUL
 IF ERRORLEVEL 2 GOTO FAIL
 IF NOT ERRORLEVEL 1 GOTO PENDING
+GOTO QUEUE
+:NOKEY
+C:\WINDOWS\COMMAND\FIND.EXE "REGEDIT4" C:\USOS9X\VM1.REG > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+:QUEUE
 REM Queued once already and Windows ran it: the INF did not write SYSTEM.INI.
 IF EXIST C:\USOS9X\VMDLATE.RUN GOTO FAIL
 ECHO run> C:\USOS9X\VMDLATE.RUN
@@ -542,7 +558,7 @@ REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\VM2.REG HKEY_LOCAL_MACHINE\Softwa
 IF NOT EXIST C:\USOS9X\VM2.REG GOTO FAIL
 C:\WINDOWS\COMMAND\FIND.EXE /I "USOSVMD.INF" C:\USOS9X\VM2.REG > NUL
 IF ERRORLEVEL 1 GOTO FAIL
-ECHO VMDLATE: USOSVmd RunOnce queued again (SYSTEM.INI had no USOSVMD.VXD)>> C:\USOS9X\USOSLOG.TXT
+ECHO VMDLATE: USOSVmd RunOnce queued after Setup (SYSTEM.INI had no USOSVMD.VXD)>> C:\USOS9X\USOSLOG.TXT
 GOTO PENDING
 :DONE
 ECHO ok> C:\USOS9X\VMDLATE.OK
@@ -568,9 +584,11 @@ w9x_reg95_write() {
     dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
-    reg95_identity=''
+    reg95_identity='' reg95_vmdlate=''
     if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_identity=1; fi
-    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" >"$dir/REG95.REG" || return 1
+    # 950: USOSVmd only through VMDLATE.BAT (after RunOnce\Setup), never REG95.REG.
+    if [ -n "$vmd" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_vmdlate=1; fi
+    w9x_reg95_convert "$inf" "$usoslog" "$vmd" "$reg95_identity" "$reg95_vmdlate" >"$dir/REG95.REG" || return 1
     grep -q '^\[HKEY_' "$dir/REG95.REG" || { rm -f "$dir/REG95.REG"; return 1; }
     if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
