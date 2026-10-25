@@ -48,6 +48,10 @@ w9x_95_event_run() {
     W9X_VM_STALLED=0
     start=$(date +%s)
     written0=$(w9x_vm_written "$target")
+    # The 5/5 "stage 1 in the background" screen at once; tick events below
+    # keep it current.
+    command -v w9x_phase1_progress >/dev/null 2>&1 && w9x_phase1_progress 0 0
+    last_sectors=$written0 idle_since=$start last_shot=$start shot_pending=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $(w9x_vm_args "$target" "$accel")
@@ -63,6 +67,18 @@ EOF
         printf 'exit %s\n' "$child_rc"
     ) > "$W9X_VM_RUN/events" &
     supervisor=$!
+    # A tick line every W9X_VM_95_TICK seconds on the same FIFO. The loop
+    # holds it open read-write (fd 8), so the open never blocks; one short
+    # printf per line stays below PIPE_BUF and never splits another writer's
+    # line. sleep gets no FIFO descriptor: a killed ticker leaves none open.
+    (
+        while :; do
+            sleep "${W9X_VM_95_TICK:-5}" < /dev/null > /dev/null 2>&1
+            printf 'tick
+' || exit 0
+        done
+    ) > "$W9X_VM_RUN/events" 2> /dev/null &
+    ticker=$!
     vm='' result='' rc=2
     while IFS=' ' read -r event value <&8; do
         case "$event" in
@@ -89,9 +105,39 @@ EOF
                 break
                 ;;
             exit) rc=$value; break ;;
+            tick)
+                now=$(date +%s)
+                sectors=$(w9x_vm_written "$target")
+                command -v w9x_phase1_progress >/dev/null 2>&1 &&
+                    w9x_phase1_progress "$((now - start))" "$(( (sectors - written0) / 2048 ))"
+                if [ "$sectors" != "$last_sectors" ]; then
+                    last_sectors=$sectors idle_since=$now
+                elif [ $((now - idle_since)) -ge "${W9X_VM_STALL:-1800}" ]; then
+                    W9X_VM_STALLED=$((now - idle_since))
+                    printf 'stalled: no disk write for %ss
+' "$W9X_VM_STALLED" >> "$W9X_VM_RUN/command.txt"
+                    [ "$key_on_screen" = 1 ] || w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
+                    sleep 3
+                    result=3
+                    break
+                fi
+                # A power-off mid-run still leaves the last screen and the
+                # logs on the stick: dump now, copy on the next tick (QEMU
+                # writes the dump asynchronously).
+                if [ "$shot_pending" = 1 ]; then
+                    shot_pending=0
+                    [ -z "${W9X_LOG:-}" ] || ! command -v w9x_phase1_keep_logs >/dev/null 2>&1 ||
+                        w9x_phase1_keep_logs "$W9X_LOG/phase1"
+                elif [ $((now - last_shot)) -ge "${W9X_VM_SCREEN_EVERY:-60}" ]; then
+                    last_shot=$now shot_pending=1
+                    [ "$key_on_screen" = 1 ] || w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
+                fi
+                ;;
             *) result=2; break ;;
         esac
     done
+    kill "$ticker" 2>/dev/null || true
+    wait "$ticker" 2>/dev/null || true
     if [ -n "$result" ] && [ -n "$vm" ]; then kill "$vm" 2>/dev/null || true; fi
     wait "$supervisor" || true
     kill "$watcher" 2>/dev/null || true
