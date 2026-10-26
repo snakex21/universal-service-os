@@ -39,20 +39,31 @@ class NetworkFiles(unittest.TestCase):
 
     def test_existing_files_are_skipped_and_core_is_preserved(self):
         _,files=self.create();s=files.decode('ascii')
-        extracts=re.findall(r'^C:\\WIN95\\EXTRACT.EXE .*$',s,re.M)
-        self.assertGreater(len(extracts),40)
+        extracts=re.findall(r'^EXTRACT.EXE .*$',s,re.M)
+        self.assertGreater(len(extracts),1)
+        self.assertLessEqual(len(extracts),15, 'Do not scan all cabinets once per missing file')
+        extracted=[]
         for line in extracts:
-            match=re.search(r'/L (\S+) C:\\WIN95\\(\S+) (\S+) >>',line)
+            match=re.search(r'/Y C:\\WIN95\\(\S+) (.+) >>',line)
             self.assertIsNotNone(match,line)
-            dest,cab,name=match.groups()
-            self.assertRegex(s,rf'IF EXIST {re.escape(dest)}\\{re.escape(name)} GOTO F[0-9]+\r\n{re.escape(line)}')
+            cab,names=match.groups();extracted.extend(names.split())
+            self.assertTrue(cab in ('PRECOPY1.CAB','WIN95_02.CAB'))
+        self.assertEqual(len(extracted),51)
+        self.assertEqual(len(extracted),len(set(extracted)))
+        copies=re.findall(r'^COPY /Y ([^ \\]+) (C:\\WINDOWS(?:\\SYSTEM|\\HELP)?\\[^ ]+) > NUL\r?$',s,re.M)
+        self.assertEqual(len(copies),51)
+        for name,dest in copies:
+            self.assertIn(name,extracted)
+            self.assertRegex(s,rf'IF EXIST {re.escape(dest)} GOTO F[0-9]+\r\nIF NOT EXIST {re.escape(name)} GOTO FAIL\r\nCOPY /Y {re.escape(name)} {re.escape(dest)} > NUL')
+        self.assertIn('CD \\USOS9X\\NET\\NF\r\n',s)
+        self.assertTrue(s.endswith(':END\r\nC:\r\nCD \\WINDOWS\r\n'))
         self.assertNotIn('ndis.vxd',s.lower())
         self.assertNotIn('vmm32.vxd',s.lower())
         self.assertIn(r'COPY /Y C:\USOS9X\NET\USOSNET.SYS C:\WINDOWS\SYSTEM\USOSNET.SYS > NUL',s)
         self.assertIn(r'COPY /Y C:\USOS9X\NET\USOSNET.INF C:\WINDOWS\INF\USOSNET.INF > NUL',s)
         self.assertIn(r'C:\WIN95\PRECOPY1.CAB netapi.dll',s)
         for name in ('vredir.vxd','msnp32.dll','vdhcp.386','vtcp.386','winsock.dll'):
-            self.assertIn('C:\\WIN95\\WIN95_02.CAB '+name,s)
+            self.assertIn(name,extracted)
 
     def test_dos_syntax_and_all_jump_targets(self):
         for batch in self.create():

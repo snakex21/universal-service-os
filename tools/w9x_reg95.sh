@@ -276,6 +276,29 @@ EOF
 # copy groups. NETAPI.DLL is in PRECOPY, the other files in WIN95_*.CAB.
 # Use this target's original EXTRACT and cabinets; keep existing inbox
 # files (including patched ones). Copy the selected own driver separately.
+# /A scans the full cabinet chain even after finding a file. Batch several
+# names into a private cache, then copy only missing destinations. Original
+# 950 EXTRACT accepts multiple names (actual DOS probe, 2026-10-26). Keep
+# COMMAND.COM's complete command lines within 125 bytes.
+w9x_reg95_netfiles_group() {
+    nfgdest=$1 nfgcab=$2
+    shift 2
+    nfgroup=$((nfgroup + 1))
+    for nfgname do
+        printf 'IF NOT EXIST %s\\%s GOTO G%02d\n' "$nfgdest" "$nfgname" "$nfgroup"
+    done
+    printf 'GOTO H%02d\n:G%02d\n' "$nfgroup" "$nfgroup"
+    printf 'EXTRACT.EXE /A /Y C:\\WIN95\\%s %s >> ..\\NFILES.LOG\n' "$nfgcab" "$*"
+    printf 'IF ERRORLEVEL 1 GOTO FAIL\n'
+    for nfgname do
+        nfindex=$((nfindex + 1))
+        printf 'IF EXIST %s\\%s GOTO F%02d\n' "$nfgdest" "$nfgname" "$nfindex"
+        printf 'IF NOT EXIST %s GOTO FAIL\nCOPY /Y %s %s\\%s > NUL\n' "$nfgname" "$nfgname" "$nfgdest" "$nfgname"
+        printf 'IF ERRORLEVEL 1 GOTO FAIL\nIF NOT EXIST %s\\%s GOTO FAIL\n:F%02d\n' "$nfgdest" "$nfgname" "$nfindex"
+    done
+    printf ':H%02d\n' "$nfgroup"
+}
+
 w9x_reg95_netfiles_write() {
     nfdir=$1
     [ -d "$nfdir/NET" ] || return 1
@@ -303,15 +326,27 @@ IF ERRORLEVEL 1 GOTO FAIL
 IF NOT EXIST C:\WINDOWS\INF\USOSNET.INF GOTO FAIL
 IF NOT EXIST C:\WINDOWS\HELP\NUL MD C:\WINDOWS\HELP
 IF NOT EXIST C:\WINDOWS\HELP\NUL GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\NF\NUL MD C:\USOS9X\NET\NF
+IF NOT EXIST C:\USOS9X\NET\NF\NUL GOTO FAIL
+COPY /Y C:\WIN95\EXTRACT.EXE C:\USOS9X\NET\NF\EXTRACT.EXE > NUL
+IF ERRORLEVEL 1 GOTO FAIL
+C:
+CD \USOS9X\NET\NF
 EOF
-        n=0
+        nfgroup=0 nfindex=0
         while read -r dest cab names; do
+            nfargs=
             for name in $names; do
-                n=$((n + 1))
-                printf 'IF EXIST %s\\%s GOTO F%02d\n' "$dest" "$name" "$n"
-                printf 'C:\\WIN95\\EXTRACT.EXE /A /Y /L %s C:\\WIN95\\%s %s >> C:\\USOS9X\\NET\\NFILES.LOG\n' "$dest" "$cab" "$name"
-                printf 'IF ERRORLEVEL 1 GOTO FAIL\nIF NOT EXIST %s\\%s GOTO FAIL\n:F%02d\n' "$dest" "$name" "$n"
+                # Slashes have the same byte length; avoid escaping $cab in
+                # this length-only candidate (the emitted path uses DOS \).
+                nfline="EXTRACT.EXE /A /Y C:/WIN95/$cab${nfargs:+ $nfargs} $name >> ../NFILES.LOG"
+                if [ "${#nfline}" -gt 125 ] && [ -n "$nfargs" ]; then
+                    w9x_reg95_netfiles_group "$dest" "$cab" $nfargs
+                    nfargs=
+                fi
+                nfargs="${nfargs:+$nfargs }$name"
             done
+            [ -z "$nfargs" ] || w9x_reg95_netfiles_group "$dest" "$cab" $nfargs
         done <<'EOF'
 C:\WINDOWS\SYSTEM PRECOPY1.CAB netapi.dll
 C:\WINDOWS\SYSTEM WIN95_02.CAB vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd
@@ -328,6 +363,8 @@ GOTO END
 :FAIL
 ECHO original network file preparation failed> C:\USOS9X\NET\NFILES.ERR
 :END
+C:
+CD \WINDOWS
 EOF
     } | sed 's/$/\r/' > "$nfdir/NET/NFILES.BAT"
 }
