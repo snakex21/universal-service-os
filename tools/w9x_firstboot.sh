@@ -7,6 +7,13 @@
 # first (SYSTEM.LGN backup restored if it fails while writing). The
 # first-logon password-list prompt stays: Windows 95 lists differ from the
 # Me list that tools/w9x_logon.sh seeds, and USOS has no verified 95 list.
+# The RunOnce import stays on every boot: it is the only first arm, and
+# USOSFB's Retry reboots without arm(). It is never fatal: a failure only
+# logs to USOSLOG.TXT and writes FIRSTBT.DER (not FIRSTBT.ERR, which would
+# stop a coordinator that its own arm() queued), then Windows boots. No
+# /E read-back: 950 real-mode REGEDIT /E fails on a ~2 MB hive although
+# the key exists (X470 95 RTM after DX8/IE, 2026-10-26), and the old
+# :FAILWAIT loop then hung the boot at a blinking cursor.
 w9x_firstboot_write() {
     [ "$2" = '4 0 0 950' ] || return 1
     [ -f "$1/USOSFB.EXE" ] || return 1
@@ -47,20 +54,13 @@ ECHO FIRSTBT: Network\Logon not replaced, see LGNDEL.LOG>> C:\USOS9X\USOSLOG.TXT
 :LGNEND
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG
 IF ERRORLEVEL 1 GOTO FAIL
-IF EXIST C:\USOS9X\FIRSTRO.REG DEL C:\USOS9X\FIRSTRO.REG > NUL
-REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\FIRSTRO.REG HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce
-IF ERRORLEVEL 1 GOTO FAIL
-C:\WINDOWS\COMMAND\FIND.EXE "USOSFB.EXE" C:\USOS9X\FIRSTRO.REG > NUL
-IF ERRORLEVEL 1 GOTO FAIL
-C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
-C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
-GOTO END
+GOTO LOCK
 :FAIL
-ECHO FIRSTBOOT RunOnce import failed> C:\USOS9X\FIRSTBT.ERR
+ECHO FIRSTBT: RunOnce import failed, Windows started anyway>> C:\USOS9X\USOSLOG.TXT
+ECHO RunOnce import failed in real mode> C:\USOS9X\FIRSTBT.DER
+:LOCK
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
-:FAILWAIT
-GOTO FAILWAIT
 :END
 EOF
 }

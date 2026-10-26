@@ -24,7 +24,27 @@ class FirstBoot(unittest.TestCase):
         self.assertLessEqual(max(map(len,batch.splitlines())),127)
         self.assertEqual(batch.count(b'\n'),batch.count(b'\r\n'))
         self.assertIn(b'PHASE1.OK',batch)
-        self.assertIn(b':FAILWAIT\r\nGOTO FAILWAIT',batch)
+        self.assertNotIn(b'FAILWAIT',batch)
+    def test_failures_never_hang_and_never_block_the_coordinator(self):
+        folder,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
+        lines=(folder/'FIRSTBT.BAT').read_bytes().split(b'\r\n')
+        # X470 95 RTM: ':FAILWAIT / GOTO FAILWAIT' hung the boot at a cursor.
+        # Every GOTO jumps forward, so the batch always reaches :END.
+        for i,l in enumerate(lines):
+            if b'GOTO ' in l:self.assertGreater(lines.index(b':'+l.rsplit(b'GOTO ',1)[1]),i,l)
+        # 950 real-mode REGEDIT /E fails on ~2 MB hives: no export read-back
+        self.assertFalse([l for l in lines if l.startswith(b'REGEDIT') and b' /E ' in l])
+        self.assertNotIn(b'FIRSTRO',b'\n'.join(lines))
+        # a failure logs, writes the non-blocking DER marker (never FIRSTBT.ERR,
+        # which USOSFB treats as "stop"), relocks the hives and ends
+        fail=lines.index(b':FAIL');lock=lines.index(b':LOCK');body=b'\n'.join(lines[fail:lock])
+        self.assertIn(rb'>> C:\USOS9X\USOSLOG.TXT',body)
+        self.assertIn(rb'> C:\USOS9X\FIRSTBT.DER',body)
+        self.assertNotIn(b'FIRSTBT.ERR',b'\n'.join(lines))
+        self.assertEqual(lines[lock+1:lock+4],[rb'C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT',
+                                               rb'C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT',b':END'])
+        arm=lines.index(rb'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG')
+        self.assertEqual(lines[arm+1:arm+3],[b'IF ERRORLEVEL 1 GOTO FAIL',b'GOTO LOCK'])
     def test_logon_key_replaced_before_runonce_import_every_boot(self):
         folder,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
         lines=(folder/'FIRSTBT.BAT').read_bytes().split(b'\r\n')
