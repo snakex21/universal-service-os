@@ -4,11 +4,11 @@
 #include <windows.h>
 static DWORD test_os_version=0x08ae5a04UL;
 static DWORD WINAPI test_version(void){return test_os_version;}
-static DWORD test_build_number=0x040003b6UL,test_platform=VER_PLATFORM_WIN32_WINDOWS;
+static DWORD test_build_number=0x040003b6UL,test_platform=VER_PLATFORM_WIN32_WINDOWS,test_minor;
 static BOOL test_version_available=TRUE;
 static BOOL WINAPI test_version_ex(LPOSVERSIONINFOA version){
   if(!test_version_available)return FALSE;
-  version->dwPlatformId=test_platform;version->dwMajorVersion=4;version->dwMinorVersion=0;version->dwBuildNumber=test_build_number;return TRUE;}
+  version->dwPlatformId=test_platform;version->dwMajorVersion=4;version->dwMinorVersion=test_minor;version->dwBuildNumber=test_build_number;return TRUE;}
 static LONG test_setup_status=ERROR_FILE_NOT_FOUND;
 static unsigned test_setup_opens,test_setup_closes;
 static const char *test_ie_version;
@@ -66,7 +66,7 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   test_build_number=1111;CHECK(!native95_handoff());test_build_number=0x040003b6UL;
   test_platform=VER_PLATFORM_WIN32_NT;CHECK(!native95_handoff());test_platform=VER_PLATFORM_WIN32_WINDOWS;
   test_version_available=FALSE;CHECK(!native95_handoff());test_version_available=TRUE;
-  test_os_version=0x08ae5a04UL;local(path,"PHASE1.OK");DeleteFileA(path);
+  test_os_version=0x80005a04UL;test_minor=90;test_build_number=0x045a0bb8UL;local(path,"PHASE1.OK");DeleteFileA(path);
   copy(system_id,"95");lstrcpyA(home,"about:blank");fixture("START.HTM","own local legacy page");
   CHECK(!memcmp(start_page(),"file://",7));
   test_ie_version="4.70.1158";CHECK(!memcmp(start_page(),"file://",7));
@@ -79,6 +79,27 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   local(path,"START.HTM");DeleteFileA(path);
   local(ini,"NETCFG.INI");DeleteFileA(ini);fixture("MSBATCH.INF","[Install]\r\n;USOS-NETWORK=on\r\n;USOS-HOME=http://example.test/?a=1&b=2\r\n");
   CHECK(read_config()&&eq(system_id,"ME")&&eq(home,"http://example.test/?a=1&b=2"));
+  /* The simulated GetVersion high word carries only the Win9x flag.
+     GetVersionEx carries the build in LOWORD (the high word is nonzero).
+     Exercise the production config writer and source950 gate for all six. */
+  { static const struct {DWORD legacy,minor,build;const char *id;} cases[]={
+      {0x80000004UL,0,0x040003b6UL,"95"}, /* 95 RTM 950 */
+      {0x80000004UL,0,0x040003b6UL,"95"}, /* OSR1 950a */
+      {0x80000004UL,0,0x04000457UL,"95"}, /* OSR2 1111 */
+      {0x80000a04UL,10,0x040a07ceUL,"98"}, /* FE 1998 */
+      {0x80000a04UL,10,0x040a08aeUL,"98SE"}, /* SE 2222 */
+      {0x80005a04UL,90,0x045a0bb8UL,"ME"} /* ME 3000 */
+    };
+    fixture("PHASE1.OK","phase1=qemu elapsed=123\r\n");
+    for(i=0;i<sizeof(cases)/sizeof(cases[0]);i++){
+      DeleteFileA(ini);test_os_version=cases[i].legacy;test_minor=cases[i].minor;test_build_number=cases[i].build;
+      CHECK(read_config()&&eq(system_id,cases[i].id));CHECK(native95_handoff()==(i<2));
+    }
+    DeleteFileA(ini);test_version_available=FALSE;CHECK(!read_config()&&GetFileAttributesA(ini)==INVALID_FILE_ATTRIBUTES);test_version_available=TRUE;
+    test_platform=VER_PLATFORM_WIN32_NT;CHECK(!read_config());test_platform=VER_PLATFORM_WIN32_WINDOWS;
+    test_minor=1;CHECK(!read_config());test_minor=90;CHECK(read_config());
+    local(path,"PHASE1.OK");DeleteFileA(path);
+  }
   local(path,"NETSTATE.DAT");DeleteFileA(path);CHECK(load_state(0));CHECK(usos_lan_attempt(&state));state.done=USOS_LAN_IE;CHECK(save_state());
   state.tries=99;CHECK(load_state(0)&&state.tries==1&&state.done==USOS_LAN_IE);
   fixture("NETSTATE.DAT","broken");CHECK(!load_state(0)&&load_state(1));

@@ -59,16 +59,7 @@ static void forget_user_run(void) {
 static void forget_user_run(void) {}
 #endif
 
-__attribute__((noreturn)) static void leave(DWORD code) {
-#ifndef USOSRES_9X
-    if (service_handle) {
-        service_status.dwCurrentState=SERVICE_STOPPED;
-        service_status.dwWin32ExitCode=code;
-        SetServiceStatus(service_handle,&service_status);
-    }
-#endif
-    ExitProcess(code);
-}
+__attribute__((noreturn)) static void leave(DWORD code);
 
 static void zero(void *p, unsigned n) { volatile BYTE *b = (volatile BYTE *)p; while (n--) *b++ = 0; }
 static void file_path(const char *name) { lstrcpyA(path, directory); lstrcatA(path, name); }
@@ -81,6 +72,29 @@ static void number(unsigned long n) {
     do { reverse[i++]=(char)('0'+n%10); n/=10; } while(n);
     while(i) out[j++]=reverse[--i]; out[j]=0; lstrcatA(line,out);
 }
+static int open_log(void) {
+    if(log_file!=INVALID_HANDLE_VALUE)return 1;
+    file_path("USOSRES.LOG");
+    log_file=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(log_file==INVALID_HANDLE_VALUE)return 0;
+    SetFilePointer(log_file,0,NULL,FILE_END);
+    return 1;
+}
+__attribute__((noreturn)) static void leave(DWORD code) {
+    if(setup_mode) {
+        lstrcpyA(line,"DISPLAY /setup exit=");number(code);lstrcatA(line,"\r\n");say(line);
+    }
+    if(log_file!=INVALID_HANDLE_VALUE) {CloseHandle(log_file);log_file=INVALID_HANDLE_VALUE;}
+#ifndef USOSRES_9X
+    if (service_handle) {
+        service_status.dwCurrentState=SERVICE_STOPPED;
+        service_status.dwWin32ExitCode=code;
+        SetServiceStatus(service_handle,&service_status);
+    }
+#endif
+    ExitProcess(code);
+}
+
 static void signed_number(long n) {
     if(n<0) {lstrcatA(line,"-");number(0UL-(unsigned long)n);} else number((unsigned long)n);
 }
@@ -379,25 +393,34 @@ static void run(void) {
     if(!length) leave(1); directory[length]=0;
     if(length>MAX_PATH-32)leave(1);
 #ifdef USOSRES_9X
-    { const char *arg=GetCommandLineA();DWORD version=GetVersion();
+    { const char *arg=GetCommandLineA();
       while(*arg){if(*arg==' '&&!lstrcmpiA(arg+1,"/setup"))setup_mode=1;arg++;}
       if(setup_mode){
-          if(!(version&0x80000000UL)||(version&0xffff)!=4||((version>>16)&0x7fff)!=950)leave(2);
-          file_path("PHASE1.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
-          file_path("VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
-          file_path("FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)leave(2);
+          OSVERSIONINFOA version;
+          /* Log before every setup guard, including refusal (exit 2).
+             Win9x GetVersion's high word is NOT its build number. */
+          if(!open_log())leave(1); /* never change without logging */
+          say("DISPLAY /setup begin\r\n");
+          zero(&version,sizeof version);version.dwOSVersionInfoSize=sizeof version;
+          if(!GetVersionExA(&version)){say("DISPLAY refused: GetVersionExA failed\r\n");leave(2);}
+          lstrcpyA(line,"DISPLAY OS platform=");number(version.dwPlatformId);
+          lstrcatA(line," version=");number(version.dwMajorVersion);lstrcatA(line,".");number(version.dwMinorVersion);
+          lstrcatA(line," build=");number(version.dwBuildNumber&0xffff);lstrcatA(line,"\r\n");say(line);
+          if(version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
+             version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950){say("DISPLAY refused: /setup requires source950\r\n");leave(2);}
+          file_path("PHASE1.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: PHASE1.OK absent\r\n");leave(2);}
+          file_path("VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: VLATE.OK absent\r\n");leave(2);}
+          file_path("FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: FIRSTBT.ON absent\r\n");leave(2);}
       }
     }
 #endif
-    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) { forget_user_run(); leave(0); }
+    file_path("DISPLAY.DONE"); if(GetFileAttributesA(path)!=0xFFFFFFFF) { say("DISPLAY already completed\r\n");forget_user_run(); leave(0); }
     file_path("DISPLAY.TXT"); input=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    if(input==INVALID_HANDLE_VALUE) leave(0); /* absent profile = unchanged */
+    if(input==INVALID_HANDLE_VALUE) {say("DISPLAY request absent or unreadable; unchanged\r\n");leave(0);} /* absent profile = unchanged */
     zero(text,sizeof text);
-    if(!ReadFile(input,text,sizeof(text)-1,&bytes,NULL) || !bytes || bytes>=sizeof(text)-1) { CloseHandle(input); leave(1); }
+    if(!ReadFile(input,text,sizeof(text)-1,&bytes,NULL) || !bytes || bytes>=sizeof(text)-1) { CloseHandle(input);say("DISPLAY request read failed or invalid length; unchanged\r\n");leave(1); }
     CloseHandle(input);
-    file_path("USOSRES.LOG"); log_file=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
-    if(log_file==INVALID_HANDLE_VALUE) leave(1); /* never change without logging */
-    SetFilePointer(log_file,0,NULL,FILE_END);
+    if(!open_log()) leave(1); /* never change without logging */
 #ifdef USOSRES_9X
     /* Never while 9x Setup's RunOnce\Setup list is not empty (950 first GUI
        boot froze in GRPCONV, X470 2026-10-25; an empty key does not count,
@@ -409,16 +432,16 @@ static void run(void) {
       }
       if(keys||values) {
           say("DISPLAY deferred: Windows Setup still running (RunOnce\\Setup); request retained\r\n");
-          CloseHandle(log_file); leave(0);
+          leave(0);
       } }
 #endif
-    if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); CloseHandle(log_file); leave(1); }
-    if(vm()&&!setup_mode) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); CloseHandle(log_file); leave(0); }
+    if(!usos_display_parse(text,&request)) { finish("DISPLAY invalid request; unchanged"); leave(1); }
+    if(vm()&&!setup_mode) { say("DISPLAY deferred: virtual machine; hardware request retained\r\n"); leave(0); }
 #ifndef USOSRES_9X
     if(!request.width) registry_native(&request);
 #endif
 #ifdef USOSRES_9X
-    if(!prepare_vbe()) { say("DISPLAY no fresh VBE/INF memory evidence; unchanged\r\n"); CloseHandle(log_file); leave(1); }
+    if(!prepare_vbe()) { say("DISPLAY no fresh VBE/INF memory evidence; unchanged\r\n"); leave(1); }
 #endif
     user=LoadLibraryA("user32.dll");
     enumerate=user ? (EnumModes)GetProcAddress(user,"EnumDisplaySettingsA") : NULL;
@@ -429,7 +452,7 @@ static void run(void) {
 #else
         say("DISPLAY no display API; unchanged\r\n");
 #endif
-        CloseHandle(log_file); leave(0);
+        leave(0);
     }
     display_user=user;
 #ifndef USOSRES_9X
@@ -438,8 +461,8 @@ static void run(void) {
         say(ready>0?"DISPLAY input desktop ready\r\n":ready==0?"DISPLAY input desktop not ready after 120 s\r\n":"DISPLAY input desktop check unavailable\r\n");
     }
 #endif
-    if(!usos_display_current(enumerate,GetVersion(),current_caps,&current)) { say("DISPLAY no current mode for rollback; request retained\r\n"); CloseHandle(log_file); leave(1); }
-    if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
+    if(!usos_display_current(enumerate,GetVersion(),current_caps,&current)) { say("DISPLAY no current mode for rollback; request retained\r\n"); leave(1); }
+    if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");leave(0);}
 #ifndef USOSRES_9X
     /* CDS_GLOBAL on NT5 only (display_compat.h usos_display_flags). */
     display_flags=usos_display_flags(GetVersion());
@@ -485,17 +508,17 @@ static void run(void) {
         if(usos_display_already(modes,count,&request,DISPLAY_BUFFERS,current.dmPelsWidth,current.dmPelsHeight,current.dmBitsPerPel,&chosen)>=0) {
             lstrcpyA(line,"DISPLAY current=");describe(&modes[chosen.index]);lstrcatA(line," reason=");
             lstrcatA(line,chosen.reason);lstrcatA(line,"\r\n");say(line);
-            finish("DISPLAY already at the selected mode; unchanged");CloseHandle(log_file);leave(0);
+            finish("DISPLAY already at the selected mode; unchanged");leave(0);
         }
     }
     transaction=usos_display_execute(modes,count,&request,DISPLAY_BUFFERS,&actions);
     if(usos_display_retry(current.dmBitsPerPel,transaction.state,transaction.apply_result,permission_failure)) {
-        say("DISPLAY permissions prevent saving; request retained\r\n");CloseHandle(log_file);leave(1);
+        say("DISPLAY permissions prevent saving; request retained\r\n");leave(1);
     }
 #ifndef USOSRES_9X
     if(usos_display_desktop_retry(GetVersion(),transaction.state,test_count,test_failed)) {
         say("DISPLAY every test failed (-1): not the input desktop; request retained for the next sign-in\r\n");
-        CloseHandle(log_file);leave(1);
+        leave(1);
     }
 #endif
     if(transaction.state==4) say("DISPLAY cannot save rollback mode; unchanged\r\n");
@@ -504,7 +527,7 @@ static void run(void) {
         lstrcatA(line,"\r\n");say(line);
         finish(transaction.rollback_result==0 ? "DISPLAY previous mode restored" : "DISPLAY rollback failed; inspect DISPLAY.BAK");
     } else finish(transaction.state==1 ? "DISPLAY applied" : transaction.state==2 ? "DISPLAY saved; restart required" : "DISPLAY no tested mode; current retained");
-    CloseHandle(log_file);leave(transaction.state>=3?1:0);
+    leave(transaction.state>=3?1:0);
 }
 
 #ifndef USOSRES_9X

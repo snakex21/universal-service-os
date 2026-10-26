@@ -265,7 +265,7 @@ static int desktop(void){HMODULE u=LoadLibraryA("user32.dll");HWND(WINAPI *find)
 int memcmp(const void *a,const void *b,size_t n){const BYTE *x=a,*y=b;while(n--){if(*x!=*y)return *x-*y;x++;y++;}return 0;}
 #ifndef USOS_LAN_NT
 static int native_config(void){
-  static char raw[65537];char *line,*end;char data[512];DWORD n,w;int enabled=0;HANDLE f;DWORD version;
+  static char raw[65537];char *line,*end;char data[512];DWORD n,w;int enabled=0;HANDLE f;OSVERSIONINFOA version={0};
   local(path,"MSBATCH.INF");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
   if(f==INVALID_HANDLE_VALUE)return 0;
   if(!ReadFile(f,raw,sizeof(raw)-1,&n,0)||n>=sizeof(raw)-1){CloseHandle(f);return 0;}CloseHandle(f);raw[n]=0;
@@ -275,8 +275,11 @@ static int native_config(void){
     if(n>=11&&!memcmp(line,";USOS-HOME=",11)){if(len(line+11)>200)return 0;lstrcpyA(home,line+11);}
   }
   if(enabled!=1)return 0;
-  version=GetVersion();
-  lstrcpyA(system_id,((version>>8)&255)==90?"ME":((version>>8)&255)==0?"95":((version>>16)&0x7fff)>=2222?"98SE":"98");
+  version.dwOSVersionInfoSize=sizeof version;
+  if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
+     (version.dwMinorVersion!=0&&version.dwMinorVersion!=10&&version.dwMinorVersion!=90))return 0;
+  /* GetVersion's high word cannot distinguish 98 FE from SE on Win9x. */
+  lstrcpyA(system_id,version.dwMinorVersion==90?"ME":version.dwMinorVersion==0?"95":(version.dwBuildNumber&0xffff)>=2222?"98SE":"98");
   lstrcpyA(data,"system=");lstrcatA(data,system_id);lstrcatA(data,"\r\nnetwork=on\r\nhome_page=");lstrcatA(data,home);lstrcatA(data,"\r\ndriver=dos-native-not-staged\r\n");
   f=CreateFileA(ini,GENERIC_WRITE,0,0,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,0);if(f==INVALID_HANDLE_VALUE)return 0;
   n=len(data);w=0;enabled=WriteFile(f,data,n,&w,0)&&w==n&&FlushFileBuffers(f);CloseHandle(f);
