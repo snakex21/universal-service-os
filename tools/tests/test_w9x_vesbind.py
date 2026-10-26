@@ -256,25 +256,55 @@ def sums_ok(data):
     return n
 
 
+def rgdb_problems(data):
+    """Per RGDB block the free-list faults the 950 VMM trips over: the list
+    from header +10 (next at record +08, -1 ends it) must reach every free
+    record exactly once, only free records, and header +08 must be their
+    total. {block: [fault, ...]}; empty = consistent."""
+    size = struct.unpack_from('<I', data, 0x24)[0]
+    off, faults = 0x20 + size, {}
+    for b in range(struct.unpack_from('<H', data, 0x10)[0]):
+        bs, fb, _f, _n, ff = struct.unpack_from('<IIHHI', data, off + 4)
+        pos, frees, bad = 0x20, {}, []
+        while pos < bs:
+            rs, kid, blk = struct.unpack_from('<IHH', data, off + pos)
+            assert 0x14 <= rs <= bs - pos
+            if kid == 0xffff:
+                assert blk == 0xffff; frees[pos] = rs
+            pos += rs
+        assert pos == bs
+        chain, q = [], ff
+        while q != NONE:
+            if q in chain: bad.append('loop at %#x' % q); break
+            if q not in frees: bad.append('list -> %#x, not a free record' % q); break
+            chain.append(q); q = struct.unpack_from('<I', data, off + q + 8)[0]
+        if not bad and set(chain) != set(frees):
+            bad.append('free records not on the list: %s' % sorted(set(frees) - set(chain)))
+        if fb != sum(frees.values()):
+            bad.append('header free %#x != %#x' % (fb, sum(frees.values())))
+        if bad: faults[b] = bad
+        off += bs
+    return faults
+
+
 def free_lists(data):
     """RGKN free chunks (offset, size) in list order; per block (header free
-    bytes, header first free, [(pos, size) of the free records])."""
+    bytes, header first free, [(pos, size) of the free records in list
+    order]). Every block's free list must be consistent (rgdb_problems)."""
     size, _root, first = struct.unpack_from('<III', data, 0x24)
     chunks, cur = [], first
     while cur != NONE:
         flag, csize, nxt = struct.unpack_from('<III', data, 0x20 + cur)
         assert flag == 0x80000000; chunks.append((cur, csize)); cur = nxt
+    assert not rgdb_problems(data), rgdb_problems(data)
     blocks, off = [], 0x20 + size
     for _ in range(struct.unpack_from('<H', data, 0x10)[0]):
         bs, fb, _f, _n, ff = struct.unpack_from('<IIHHI', data, off + 4)
-        pos, frees = 0x20, []
-        while pos < bs:
-            rs, kid, blk, used = struct.unpack_from('<IHHI', data, off + pos)
-            assert 0x14 <= rs <= bs - pos
-            if kid == 0xffff:
-                assert (blk, used) == (0xffff, NONE); frees.append((pos, rs))
-            pos += rs
-        assert pos == bs
+        frees, q = [], ff
+        while q != NONE:
+            rs, ids, q2 = struct.unpack_from('<III', data, off + q)
+            assert ids == NONE              # +04: id and block both -1; +08: next
+            frees.append((q, rs)); q = q2
         blocks.append((fb, ff, frees)); off += bs
     return chunks, blocks
 
@@ -383,6 +413,41 @@ class DelKey(unittest.TestCase):
         (_fb, _ff, frees), = free_lists(after)[1]
         self.assertEqual(len(frees), 2)                  # the Root run and the old tail
 
+    def test_freed_record_keeps_the_existing_free_tail_on_the_list(self):
+        """The X470 950 BSOD: the freed record became the list head and its
+        +08 was set to -1, so the block's free tail fell off the list and VMM
+        page-faulted looking for it (VMM obj6 602235)."""
+        data = creg(TREE, per_block=64)
+        (_fb, _ff, old), = free_lists(data)[1]
+        self.assertEqual(len(old), 1)                    # one free tail record
+        _, after, _ = self.check_deleted(data, 'Enum\\Monitor\\Default_Monitor\\0001',
+                                         '\\enum\\monitor\\default_monitor\\0001')
+        (fb, ff, frees), = free_lists(after)[1]
+        self.assertEqual(len(frees), 2)
+        self.assertEqual(frees[-1], old[0])               # the tail is still reachable
+        self.assertEqual(ff, frees[0][0]); self.assertLess(frees[0][0], old[0][0])
+        self.assertEqual(fb, sum(r[1] for r in frees))
+
+    def test_two_deletes_in_one_block_keep_every_free_record_listed(self):
+        data = creg(TREE, per_block=64)
+        _, after, _ = self.check_deleted(data, 'Enum\\Monitor\\Default_Monitor\\0001',
+                                         '\\enum\\monitor\\default_monitor\\0001')
+        _, after, _ = self.check_deleted(after, 'Enum\\Root\\*PNP0F0E', '\\enum\\root\\*pnp0f0e')
+        (fb, _ff, frees), = free_lists(after)[1]
+        self.assertEqual(len(frees), 3)
+        self.assertEqual([r[0] for r in frees], sorted(r[0] for r in frees))
+        self.assertEqual(fb, sum(r[1] for r in frees))
+
+    def test_delete_next_to_an_already_free_record_merges(self):
+        data = creg(TREE, per_block=64)
+        _, first, _ = self.check_deleted(data, 'Enum\\Root\\*PNP0A03', '\\enum\\root\\*pnp0a03')
+        (_fb, _ff, one), = free_lists(first)[1]
+        _, after, _ = self.check_deleted(first, LEGACY, '\\enum\\root\\*pnp0900')
+        (fb, _ff, frees), = free_lists(after)[1]
+        self.assertEqual(len(frees), len(one))            # *PNP0900 grew the *PNP0A03 run
+        self.assertEqual(frees[0][0], one[0][0]); self.assertGreater(frees[0][1], one[0][1])
+        self.assertEqual(fb, sum(r[1] for r in frees))
+
     def test_hive_without_checksums(self):
         data = creg(TREE, checksums=False)
         self.assertEqual(sums_ok(data), 0)
@@ -432,6 +497,102 @@ class DelKey(unittest.TestCase):
         finally:self.tmp=previous
         self.assertIn('\\enum\\root\\*pnp0900\\0000\\logconfig', removed)
         self.assertGreaterEqual(sums_ok(after), 3)
+
+
+def set_block32(data, blk, at, value):
+    """data with DWORD block+at = value; the block checksum (flag bit 2) kept."""
+    out = bytearray(data); off = 0x20 + struct.unpack_from('<I', out, 0x24)[0]
+    for _ in range(blk): off += struct.unpack_from('<I', out, off + 4)[0]
+    size, _fb, flags = struct.unpack_from('<IIH', out, off + 4)
+    struct.pack_into('<I', out, off + at, value)
+    if flags & 4:
+        struct.pack_into('<I', out, off + 0x1c, 0)
+        total = sum(struct.unpack_from('<%dI' % (size // 4), out, off)) & 0xffffffff
+        struct.pack_into('<I', out, off + 0x1c, (-total) & 0xffffffff)
+    return bytes(out)
+
+
+class FixFree(unittest.TestCase):
+    """VESBIND FIXFREE: rebuilds the RGDB free lists an older DELKEY broke."""
+    @classmethod
+    def setUpClass(cls):
+        cls.binary = host_binary()
+
+    def setUp(self):
+        self.tmp = scratch('fixfree-'); self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def run_fix(self, data):
+        hive, log = self.tmp / 'SYSTEM.DAT', self.tmp / 'FIXFREE.LOG'
+        if hive.exists(): hive.unlink()
+        if data is not None: hive.write_bytes(data)
+        result = subprocess.run([str(self.binary), 'FIXFREE', str(hive), str(log)], capture_output=True)
+        self.assertFalse(result.stdout + result.stderr)
+        text = log.read_bytes().decode('ascii')
+        self.assertEqual(text, 'version=1\r\nexit=%d\r\n%s' % (result.returncode, text.split('\r\n', 2)[2]))
+        return result.returncode, text.split('reason=')[1].strip(), hive.read_bytes() if data is not None else None
+
+    def broken(self, checksums=True):
+        """The old DELKEY pattern: a freed record at the list head with -1 at
+        +08, the block's existing free records unreachable, header +08 still
+        counting them (X470 950 PL SYSTEM.DAT, 2026-10-26, blocks 16 and 55)."""
+        data = creg(TREE, per_block=4, checksums=checksums)
+        hive = self.tmp / 'SYSTEM.DAT'; hive.write_bytes(data)
+        subprocess.run([str(self.binary), 'DELKEY', str(hive), 'Enum\\Monitor\\Default_Monitor\\0001'], check=True)
+        good = hive.read_bytes()
+        blocks = free_lists(good)[1]
+        hit = [b for b, (_fb, _ff, frees) in enumerate(blocks) if len(frees) > 1]
+        self.assertTrue(hit)
+        b = hit[0]; head = blocks[b][1]
+        bad = set_block32(good, b, head + 8, NONE)
+        self.assertIn(b, rgdb_problems(bad)); sums_ok(bad)
+        return good, bad
+
+    def test_repairs_the_old_delkey_pattern(self):
+        for checksums in (True, False):
+            with self.subTest(checksums=checksums):
+                good, bad = self.broken(checksums)
+                rc, reason, fixed = self.run_fix(bad)
+                self.assertEqual((rc, reason), (0, 'complete'))
+                self.assertEqual(fixed, good)            # address order, as DELKEY now leaves it
+                self.assertFalse(rgdb_problems(fixed)); sums_ok(fixed)
+                self.assertEqual(dump(fixed), dump(bad))
+                self.assertEqual(self.run_fix(fixed), (1, 'consistent', fixed))
+
+    def test_wrong_free_count_unlisted_records_and_loops(self):
+        good, _ = self.broken()
+        b, (fb, ff, frees) = [(i, x) for i, x in enumerate(free_lists(good)[1]) if len(x[2]) > 1][0]
+        cases = {'count': set_block32(good, b, 8, fb + 4),
+                 'head-skips-first': set_block32(good, b, 0x10, frees[1][0]),
+                 'empty-list': set_block32(good, b, 0x10, NONE),
+                 'loop': set_block32(good, b, frees[-1][0] + 8, frees[0][0])}
+        for name, bad in cases.items():
+            with self.subTest(name):
+                self.assertTrue(rgdb_problems(bad))
+                rc, _, fixed = self.run_fix(bad)
+                self.assertEqual(rc, 0)
+                self.assertEqual(fixed, good)
+
+    def test_consistent_lifo_list_is_left_alone(self):
+        """VMM frees onto the list head, so a valid list need not be sorted."""
+        good, _ = self.broken()
+        b, (fb, ff, frees) = [(i, x) for i, x in enumerate(free_lists(good)[1]) if len(x[2]) > 1][0]
+        self.assertEqual(len(frees), 2)
+        lifo = set_block32(good, b, 0x10, frees[1][0])
+        lifo = set_block32(lifo, b, frees[1][0] + 8, frees[0][0])
+        lifo = set_block32(lifo, b, frees[0][0] + 8, NONE)
+        self.assertFalse(rgdb_problems(lifo))
+        self.assertEqual(self.run_fix(lifo), (1, 'consistent', lifo))
+
+    def test_clean_hive_untouched_and_refusals(self):
+        data = creg(TREE)
+        self.assertEqual(self.run_fix(data), (1, 'consistent', data))
+        self.assertEqual(self.run_fix(None)[:2], (2, 'hive-open'))
+        self.assertEqual(self.run_fix(b'not a hive'), (2, 'creg-header', b'not a hive'))
+        bad = bytearray(data); bad[-0x30] ^= 1                          # last RGDB checksum
+        self.assertEqual(self.run_fix(bytes(bad)), (2, 'rgdb-checksum', bytes(bad)))
+        _, broken = self.broken(checksums=False)
+        tiled = set_block32(broken, 0, 0x20, 0x13)                     # record size below 14h
+        self.assertEqual(self.run_fix(tiled), (2, 'rgdb-records', tiled))
 
 
 class WrapGrp(unittest.TestCase):

@@ -206,17 +206,30 @@ static int mode(const char *text) {
  *     page): +00 0 = in use, +04 hash, +08 -1, +0C parent, +10 first child,
  *     +14 next sibling, +18 WORD id, +1A WORD RGDB block (offsets relative
  *     to RGKN, -1 = none). Free chunk: +00 80000000h, +04 size, +08 next.
- *   RGDB blocks: +04 size, +08 free bytes, +0C WORD flags, +0E WORD number,
- *     +10 first free record (-1 = none), +1C checksum; records from +20:
- *     +00 size, +04 WORD id, +06 WORD block, +08 bytes used, +0C WORD name
- *     length, +14 name. Free record: id, block and bytes used all -1.
+ *   RGDB blocks: +04 size, +08 free bytes (sum of the free record sizes),
+ *     +0C WORD flags, +0E WORD number, +10 first free record (-1 = none),
+ *     +1C checksum; records from +20: +00 size, +04 WORD id, +06 WORD
+ *     block, +08 bytes used, +0C WORD name length, +14 name. Free record:
+ *     +04 DWORD -1 (id and block), +08 the next free record of the block
+ *     (block relative, -1 ends the list). Every free record must be on the
+ *     list: VMM, growing a record into the free record behind it, looks for
+ *     that record's predecessor on the list without an end check (950 VMM
+ *     obj6 60222B..60223D) and page-faults when it is not there.
  * Flags bit 2 = checksum present: the section's DWORDs sum to 0.
  * The key is unlinked from its parent / sibling chain, its entries become
  * free chunks (free list kept sorted by offset), its records free records
- * (neighbouring free records merged); the touched checksums are corrected
- * and summed again. Exit 0 = deleted, 1 = no such key (file untouched),
- * 2 = refused (file untouched), 3 = failed while writing (restore the
- * backup). Every structure on the way is checked before the first write.
+ * (neighbouring free records merged, each touched block's free list then
+ * rebuilt in address order); the touched checksums are corrected and summed
+ * again. Exit 0 = deleted, 1 = no such key (file untouched), 2 = refused
+ * (file untouched), 3 = failed while writing (restore the backup). Every
+ * structure on the way is checked before the first write.
+ * FIXFREE <hive>: repair for systems whose SYSTEM.DAT an older DELKEY left
+ * with free records missing from their block's free list (it wrote -1 over
+ * the link): every block whose list does not hold exactly its free records,
+ * or whose free byte count is not their total, gets its list rebuilt in
+ * address order. Records are not moved or merged. Exit 0 = repaired, 1 =
+ * every list already consistent (file untouched), 2 = refused (file
+ * untouched), 3 = failed while writing.
  */
 #define NONE 0xFFFFFFFFUL
 #define MASK32 0xFFFFFFFFUL
@@ -386,68 +399,145 @@ static int free_insert(unsigned long rel) {
     if (prev == NONE) { kn_free = rel; return put32(0, 0x20 + 0x0c, rel); }
     return put32(0, 0x20 + prev + 8, rel);
 }
-static int free_record(unsigned blk, unsigned long pos) {
-    unsigned char h[0x14], ff[8]; unsigned long base = blk_off[blk];
-    if (!hread(base, h, 0x14) || !hread(base + pos, ff, 4)) return 0;
-    if (!put32(1 + blk, base + 8, (g32(h + 8) + g32(ff)) & MASK32)) return 0;
-    if ((g32(h + 0x10) == NONE || g32(h + 0x10) > pos) && !put32(1 + blk, base + 0x10, pos)) return 0;
-    memset(ff, 0xff, sizeof(ff));
-    return put(1 + blk, base + pos + 4, ff, 8);
+/* A DWORD written only when it changes: an unchanged block stays untouched. */
+static int set32(unsigned sec, unsigned long off, unsigned long v) {
+    unsigned char b[4];
+    if (!hread(off, b, 4)) return 0;
+    return g32(b) == v ? 1 : put32(sec, off, v);
 }
-/* Neighbouring free records become one. */
-static int merge_free(unsigned blk) {
-    unsigned long pos = 0x20, prev = NONE, prev_size = 0, rs, base = blk_off[blk]; unsigned char r[8];
+/* The record becomes free and goes on the head of its block's free list,
+ * as the 950 VMM frees one (obj6 602179: rec+4 = -1, rec+8 = old head,
+ * head = rec); the free byte count grows by its size. */
+static int free_record(unsigned blk, unsigned long pos) {
+    unsigned char h[0x14], r[4]; unsigned long base = blk_off[blk];
+    if (!hread(base, h, 0x14) || !hread(base + pos, r, 4)) return 0;
+    return put32(1 + blk, base + pos + 4, NONE) && put32(1 + blk, base + pos + 8, g32(h + 0x10)) &&
+        put32(1 + blk, base + 0x10, pos) && put32(1 + blk, base + 8, (g32(h + 8) + g32(r)) & MASK32);
+}
+/* The free list of a block in address order, the rule the 950 VMM uses when
+ * it rebuilds a block (obj6 603641..603671): header +10 = first free record,
+ * each +08 = the next, the last -1, header +08 = their total size. With
+ * merge, neighbouring free records first become one. */
+static int rebuild_free(unsigned blk, int merge) {
+    unsigned long pos = 0x20, last = NONE, last_size = 0, total = 0, rs, base = blk_off[blk];
+    unsigned long link = base + 0x10; unsigned char r[8]; int prev_free = 0;
     while (pos < blk_size[blk]) {
-        if (!hread(base + pos, r, 8)) return 0;
+        if (blk_size[blk] - pos < 0x14 || !hread(base + pos, r, 8)) return 0;
         rs = g32(r);
         if (rs < 0x14 || rs > blk_size[blk] - pos) return 0;
         if (g16(r + 4) == 0xffff) {
-            if (prev != NONE) { prev_size += rs; if (!put32(1 + blk, base + prev, prev_size)) return 0; }
-            else { prev = pos; prev_size = rs; }
-        } else prev = NONE;
+            total = (total + rs) & MASK32;
+            if (merge && prev_free) {
+                last_size += rs;
+                if (!set32(1 + blk, base + last, last_size)) return 0;
+            } else {
+                if (!set32(1 + blk, link, pos)) return 0;
+                link = base + pos + 8; last = pos; last_size = rs;
+            }
+            prev_free = 1;
+        } else prev_free = 0;
         pos += rs;
     }
-    return 1;
+    return set32(1 + blk, link, NONE) && set32(1 + blk, base + 8, total);
 }
-static int delkey(const char *path, const char *key) {
-    unsigned char h[0x20], e[0x1c], p[0x1c]; unsigned long off, cur, target, parent, sum, ck, rel, pos;
-    unsigned i, len, blk; int match, failed; const char *name, *end;
-    del_reason = "argument";
-    if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
-    if (!*key || *key == '\\') return 2;
+/* 1 = the block's free list holds exactly its free records (any order, each
+ * once) and header +08 is their total; 0 = not (or more than MAXFREE). */
+#define MAXFREE 64
+static unsigned long free_seen[MAXFREE];
+static int list_ok(unsigned blk) {
+    unsigned long base = blk_off[blk], size = blk_size[blk], q, pos, rs, total = 0;
+    unsigned char h[0x14], r[12]; unsigned n = 0, i, found = 0;
+    if (!hread(base, h, 0x14)) return 0;
+    for (q = g32(h + 0x10); q != NONE; q = g32(r + 8)) {
+        if (n == MAXFREE || q < 0x20 || q >= size || size - q < 0x14 || !hread(base + q, r, 12) ||
+            g32(r + 4) != NONE) return 0;
+        for (i = 0; i < n; i++) if (free_seen[i] == q) return 0;
+        free_seen[n++] = q;
+    }
+    for (pos = 0x20; pos < size; pos += rs) {
+        if (!hread(base + pos, r, 8) || (rs = g32(r)) < 0x14 || rs > size - pos) return 0;
+        if (g16(r + 4) != 0xffff) continue;
+        for (i = 0; i < n && free_seen[i] != pos; i++) ;
+        if (i == n) return 0;
+        found++; total = (total + rs) & MASK32;
+    }
+    return found == n && total == g32(h + 8);
+}
+/* Opened hive: CREG, RGKN and every RGDB header and checksum as expected. */
+static int hive_check(void) {
+    unsigned char h[0x20]; unsigned long off, sum; unsigned i;
     for (i = 0; i <= MAXBLK; i++) { delta[i] = 0; touched[i] = 0; }
     for (i = 0; i < SLOTS; i++) slot_blk[i] = -1;
     slot_next = 0; del_count = 0;
-    del_reason = "hive-open";
-    if (!hopen(path)) return 2;
-    failed = 2;
     del_reason = "creg-header";
-    if (!hread(0, h, 0x20) || !same(h, "CREG", 4) || g32(h + 4) != 0x10000UL) goto done;
+    if (!hread(0, h, 0x20) || !same(h, "CREG", 4) || g32(h + 4) != 0x10000UL) return 0;
     off = g32(h + 8); blk_count = g16(h + 0x10);
     del_reason = "rgdb-count";
-    if (!blk_count || blk_count > MAXBLK) goto done;
+    if (!blk_count || blk_count > MAXBLK) return 0;
     if (g16(h + 0x12) & 4) {
         del_reason = "creg-checksum";
         for (sum = 0, i = 0; i < 0x20; i += 4) sum = (sum + g32(h + i)) & MASK32;
-        if (sum) goto done;
+        if (sum) return 0;
     }
     del_reason = "rgkn-header";
-    if (!hread(0x20, h, 0x20) || !same(h, "RGKN", 4)) goto done;
+    if (!hread(0x20, h, 0x20) || !same(h, "RGKN", 4)) return 0;
     kn_size = g32(h + 4); kn_root = g32(h + 8); kn_free = g32(h + 0x0c); rgkn_flags = g16(h + 0x10);
     del_reason = "rgkn-layout";
-    if (kn_size < 0x3c || (kn_size & 3) || off != 0x20 + kn_size) goto done;
+    if (kn_size < 0x3c || (kn_size & 3) || off != 0x20 + kn_size) return 0;
     del_reason = "rgdb-layout";
     for (i = 0; i < blk_count; i++) {
-        if (!hread(off, h, 0x20) || !same(h, "RGDB", 4) || g16(h + 0x0e) != i) goto done;
+        if (!hread(off, h, 0x20) || !same(h, "RGDB", 4) || g16(h + 0x0e) != i) return 0;
         blk_off[i] = off; blk_size[i] = g32(h + 4); blk_flags[i] = g16(h + 0x0c);
-        if (blk_size[i] < 0x20 || (blk_size[i] & 3)) goto done;
+        if (blk_size[i] < 0x20 || (blk_size[i] & 3)) return 0;
         off += blk_size[i];
     }
     /* Checksums as found: a hive this tool does not understand is refused. */
     del_reason = "rgkn-checksum";
-    if ((rgkn_flags & 4) && (!sec_sum(0, &sum) || sum)) goto done;
+    if ((rgkn_flags & 4) && (!sec_sum(0, &sum) || sum)) return 0;
     del_reason = "rgdb-checksum";
-    for (i = 0; i < blk_count; i++) if ((blk_flags[i] & 4) && (!sec_sum(1 + i, &sum) || sum)) goto done;
+    for (i = 0; i < blk_count; i++) if ((blk_flags[i] & 4) && (!sec_sum(1 + i, &sum) || sum)) return 0;
+    return 1;
+}
+/* Every touched section with a checksum: corrected, then summed again. */
+static int fix_sums(void) {
+    unsigned char h[4]; unsigned long rel, sum; unsigned i;
+    del_reason = "write-checksum";
+    for (i = 0; i <= blk_count; i++) {
+        if (!touched[i] || !((i ? blk_flags[i - 1] : rgkn_flags) & 4)) continue;
+        rel = sec_base(i) + (i ? 0x1c : 0x14);
+        if (!hread(rel, h, 4)) return 0;
+        p32(h, (g32(h) - delta[i]) & MASK32);
+        if (!hwrite(rel, h, 4) || !sec_sum(i, &sum) || sum) return 0;
+    }
+    return 1;
+}
+static int fixfree(const char *path) {
+    unsigned i; int failed;
+    del_reason = "hive-open";
+    if (!hopen(path)) return 2;
+    failed = 2;
+    if (!hive_check()) goto done;
+    del_reason = "rgdb-records";
+    for (i = 0; i < blk_count; i++) if (block_index(i) < 0) goto done;
+    failed = 3; del_reason = "write-free";
+    for (i = 0; i < blk_count; i++) if (!list_ok(i) && !rebuild_free(i, 0)) goto done;
+    if (!fix_sums()) goto done;
+    failed = 1; del_reason = "consistent";
+    for (i = 1; i <= blk_count; i++) if (touched[i]) { failed = 0; del_reason = "complete"; }
+done:
+    if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
+    return failed;
+}
+static int delkey(const char *path, const char *key) {
+    unsigned char e[0x1c], p[0x1c]; unsigned long cur, target, parent, pos;
+    unsigned i, len, blk; int match, failed; const char *name, *end;
+    del_reason = "argument";
+    if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
+    if (!*key || *key == '\\') return 2;
+    del_reason = "hive-open";
+    if (!hopen(path)) return 2;
+    failed = 2;
+    if (!hive_check()) goto done;
     /* Walk the path from the root entry. */
     del_reason = "root-entry";
     if (!entry(kn_root, e)) goto done;
@@ -500,15 +590,8 @@ static int delkey(const char *path, const char *key) {
         if (!free_insert(del_list[i])) goto done;
     }
     del_reason = "write-merge";
-    for (i = 0; i < blk_count; i++) if (touched[1 + i] && !merge_free(i)) goto done;
-    del_reason = "write-checksum";
-    for (i = 0; i <= blk_count; i++) {
-        if (!touched[i] || !((i ? blk_flags[i - 1] : rgkn_flags) & 4)) continue;
-        rel = sec_base(i) + (i ? 0x1c : 0x14);
-        if (!hread(rel, h, 4)) goto done;
-        ck = (g32(h) - delta[i]) & MASK32; p32(h, ck);
-        if (!hwrite(rel, h, 4) || !sec_sum(i, &sum) || sum) goto done;
-    }
+    for (i = 0; i < blk_count; i++) if (touched[1 + i] && !rebuild_free(i, 1)) goto done;
+    if (!fix_sums()) goto done;
     failed = 0; del_reason = "complete";
 done:
     if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
@@ -625,11 +708,12 @@ int main(int argc,char **argv) {
         failed=fprintf(out,"REGEDIT4\r\n\r\n[" SETUPKEY "]\r\n%s=\"C:\\\\USOS9X\\\\USOSGRPW.EXE -s\"\r\n",grp_name)<0;
         if(fclose(out))failed=1;return failed?2:0;
     }
-    if ((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) {
+    if (((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) || ((argc==3 || argc==4) && ieq(argv[1],"FIXFREE"))) {
         static const char *codes[] = {"0", "1", "2", "3"};
-        failed=delkey(argv[2],argv[3]);
-        if (argc==5) {
-            out=fopen(argv[4],"wb");
+        int fix=ieq(argv[1],"FIXFREE");
+        failed=fix?fixfree(argv[2]):delkey(argv[2],argv[3]);
+        if (argc==5-fix) {
+            out=fopen(argv[4-fix],"wb");
             if (!out) return 3;
             if (fprintf(out,"version=1\r\nexit=%s\r\nreason=%s\r\n",codes[failed],del_reason)<0) {
                 fclose(out); return 3;
