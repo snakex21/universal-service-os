@@ -273,7 +273,7 @@ fn traceText(field: *const Field, out: *[16]u8) []const u8 {
     const value = field.text.?.slice();
     if (value.len == 0) return "";
     if (field.secret) return "(secret)";
-    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.key_symbols }) catch "(key)";
+    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.keySymbolLimit(value) }) catch "(key)";
     return value;
 }
 
@@ -736,6 +736,8 @@ test "the trace never shows a product key or a password" {
     try std.testing.expect(std.mem.indexOf(u8, shown, "ABCDE") == null);
     key.set("ABCDE-12");
     try std.testing.expectEqualStrings("(key 7/25)", traceText(&key_field, &out));
+    key.set("12345-OEM-00");
+    try std.testing.expectEqualStrings("(key 10/20)", traceText(&key_field, &out));
     var password = TextValue{};
     password.set(secret);
     const password_field = Field{ .kind = .text, .label = "Password", .text = &password, .secret = true };

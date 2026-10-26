@@ -628,15 +628,33 @@ pub fn keySymbolCount(value: []const u8) usize {
     return keySymbols(value, &symbols).len;
 }
 
+/// Letters and digits in a Windows 95 OEM ID (ddddd-OEM-ddddddd-ddddd).
+pub const oem_key_symbols = 20;
+
+/// Symbols that read as (the start of) a Windows 95 OEM ID: "OEM" from the
+/// sixth symbol on. A 5x5 key never has it (no O or E in its alphabet).
+fn oemShaped(symbols: []const u8) bool {
+    return symbols.len > 5 and std.mem.startsWith(u8, "OEM", symbols[5..@min(8, symbols.len)]);
+}
+
+/// How many letters and digits the key in `value` can have (the "/25" of
+/// the hint): 20 once it reads as a Windows 95 OEM ID, else 25.
+pub fn keySymbolLimit(value: []const u8) usize {
+    var symbols: [key_symbols]u8 = undefined;
+    return if (oemShaped(keySymbols(value, &symbols))) oem_key_symbols else key_symbols;
+}
+
 /// One character typed (or pasted) into a key being edited in
 /// `buf[0..len]` (`buf.len` >= 29): a letter or digit is added in capitals
-/// (up to 25), anything else is ignored; the dashes follow on their own.
+/// (up to 25; up to 20 for a Windows 95 OEM ID, so nothing can follow its
+/// last group), anything else is ignored; the dashes follow on their own.
 /// Returns the new length.
 pub fn keyTyped(buf: []u8, len: usize, c: u8) usize {
     std.debug.assert(buf.len >= 29);
     var symbols: [key_symbols]u8 = undefined;
     const have = keySymbols(buf[0..len], &symbols);
-    if (!std.ascii.isAlphanumeric(c) or have.len == key_symbols) return len;
+    const limit: usize = if (oemShaped(have)) oem_key_symbols else key_symbols;
+    if (!std.ascii.isAlphanumeric(c) or have.len >= limit) return len;
     symbols[have.len] = std.ascii.toUpper(c);
     return rewrite(buf, symbols[0 .. have.len + 1]);
 }
@@ -1405,6 +1423,44 @@ test "product key: normalised from any case, with or without dashes and spaces" 
     try std.testing.expect(checkKey("123-456789") == .bad_key_format);
     try std.testing.expect(checkKey("123-4567890") == null);
     try std.testing.expectEqual(@as(usize, 12), keySymbolCount("ABCDE-12345-XY"));
+}
+
+test "product key: a Windows 95 OEM ID stops at 20 symbols, a 5x5 key at 25" {
+    var buf: [64]u8 = undefined;
+    var len: usize = 0;
+    // Made-up test IDs in the documented formats (not real keys).
+    for ("12345") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    for ("oem0000007") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolLimit(buf[0..len]));
+    for ("54321") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expect(checkKey(buf[0..len]) == null);
+    // X470 2026-10-26: an extra "-1234" was accepted; now refused.
+    for ("-1234") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolCount(buf[0..len]));
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape(buf[0..len]).?);
+    len = keyBackspace(&buf, len);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-5432", buf[0..len]);
+    len = keyTyped(&buf, len, '9');
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54329", buf[0..len]);
+    // Back to five digits: no longer OEM-shaped, a 5x5 key types to 25.
+    while (keySymbolCount(buf[0..len]) > 5) len = keyBackspace(&buf, len);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    len = 0;
+    for ("BCDFG-HJKMP-QRTVW-XY234-6789B") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    try std.testing.expectEqual(KeyShape.five_by_five, keyShape(buf[0..len]).?);
+    len = keyTyped(&buf, len, 'C');
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
+    // Retail 95 (ddd-ddddddd) still types and normalizes.
+    len = 0;
+    for ("1234567890") |c| len = keyTyped(&buf, len, c);
+    var out: [29]u8 = undefined;
+    try std.testing.expectEqualStrings("123-4567890", normalizeKey(buf[0..len], &out));
 }
 
 test "product key: typing inserts the dashes, backspace over a dash removes the character before it" {

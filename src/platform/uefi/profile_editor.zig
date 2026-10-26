@@ -552,7 +552,7 @@ fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
             help_lines[1] = problemText(problem);
             // A key being typed: how far it is (the count, never the key).
             if (id == .key and problem == .bad_key_format) {
-                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.key_symbols }) catch help_lines[1];
+                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimit(key_text.slice()) }) catch help_lines[1];
             }
             n = 2;
         }
