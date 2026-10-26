@@ -86,8 +86,14 @@ static void finish_mouse(void){HKEY key;LONG code;
     if(code==ERROR_SUCCESS){code=RegDeleteValueA(key,"USOSVmd");RegCloseKey(key);}
     if(code!=ERROR_SUCCESS&&code!=ERROR_FILE_NOT_FOUND)fail("cannot retire completed DOS-box mouse RunOnce value");
     log_line("queued DOS-box mouse INF completed before packages; driver starts at final restart");}
+/* TZFIX.BAT (tools/w9x_tzfix.sh): TZDST.OK after its late summer-time
+ * step; nothing deferred (TZFIX.OK without TZDST.PND, e.g. an older
+ * not-pending TZFIX that wrote no TZDST.OK) or no TZFIX staged is ready too. */
+static int tz_ready(void){
+    if(exists("TZDST.OK")||!exists("TZFIX.BAT"))return 1;
+    return exists("TZFIX.OK")&&!exists("TZDST.PND");}
 static int late_ready(void){
-    if(!exists("VLATE.OK")||!exists("TZDST.OK")||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
+    if(!exists("VLATE.OK")||!tz_ready()||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
     if(exists("R95LATE.REG")&&!exists("R95LATE.OK")){log_line("late: IE registry import missing");return 0;}
     if(exists("VLATE.ERR")||exists("TZFIX.BAD")||exists("R95LATE.ERR")||exists("VMDLATE.ERR")){log_line("late: real-mode error marker present");return 0;}
     if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
@@ -143,7 +149,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
     if(!setup_done())fail("original RunOnce Setup has not completed");
     phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))fail("cannot read phase journal");
-    if(!exists("VLATE.OK")||!exists("TZDST.OK")){
+    if(!exists("VLATE.OK")||!tz_ready()){
         if(phase[0])fail("late real-mode preparation did not complete after Setup transition");
         reboot("late\r\n","restart: Setup transition before late DOS preparation");}
     finish_mouse();

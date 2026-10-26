@@ -95,6 +95,18 @@ class AddonsFixes(unittest.TestCase):
         self.assertLess(tail.index('finish_runonceex();'), tail.index('USOSADD.EXE /setup'))
         self.assertLess(tail.index('}else{'), tail.index('USOSRES.EXE /setup'))
 
+    def test_coordinator_time_zone_ready_without_deferral(self):
+        # X470 95 RTM native (2026-10-26): TZFIX.OK not-pending and no
+        # TZDST.OK stopped the chain ("late real-mode preparation did not
+        # complete"). Ready: TZDST.OK, or TZFIX.OK without TZDST.PND, or no TZFIX.
+        src = (ROOT/'src/platform/win32_legacy/usosfb.c').read_text()
+        body = src[src.index('static int tz_ready('):src.index('static int late_ready(')]
+        self.assertIn('if(exists("TZDST.OK")||!exists("TZFIX.BAT"))return 1;', body)
+        self.assertIn('return exists("TZFIX.OK")&&!exists("TZDST.PND");', body)
+        self.assertEqual(src.count('!tz_ready()'), 2)
+        self.assertNotIn('!exists("TZDST.OK")', src)
+        self.assertIn('exists("TZFIX.BAD")', src[src.index('static int late_ready('):])
+
     def test_coordinator_failure_is_closable(self):
         src = (ROOT/'src/platform/win32_legacy/usosfb.c').read_text()
         body = src[src.index('static void fail('):src.index('static int setup_done(')]

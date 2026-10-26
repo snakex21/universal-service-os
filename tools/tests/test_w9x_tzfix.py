@@ -163,6 +163,51 @@ class Tzfix950(unittest.TestCase):
         self.assertNotIn('TZPR1.REG', files)
         self.assertNotIn(b'Drukarki', files['TZFIX.BAT'])
 
+    def test_plain_runonce_zone_step_and_printer_alone_are_pending_on_950(self):
+        # X470 95 RTM PL native (2026-10-26): with MSBATCH loaded, SUWIN put
+        # "Strefa czasowa"="...TIMEDATE.CPL,,/Z Lisbon Warsaw" in the plain
+        # RunOnce; RunOnce\Setup had no TIMEDATE but MSPRINT's printer step.
+        for language in ('PL', 'EN'):
+            _, files = self.write('Lisbon Warsaw', 950, language)
+            text = files['TZFIX.BAT'].decode('ascii')
+            lines = text.split('\r\n')
+            run = 'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'
+            plain = lines.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E TZ5.CHK ' + run)
+            setup = lines.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E TZ0.CHK ' + run + '\\Setup')
+            self.assertLess(setup, plain)
+            first = lines.index('C:\\WINDOWS\\COMMAND\\FIND.EXE /I "TIMEDATE" TZ0.CHK > NUL')
+            zone = lines.index('IF EXIST TZ5.CHK C:\\WINDOWS\\COMMAND\\FIND.EXE /I "TIMEDATE" TZ5.CHK > NUL')
+            printer = lines.index('C:\\WINDOWS\\COMMAND\\FIND.EXE /I "InstallDevice_Rundll" TZ0.CHK > NUL')
+            done = lines.index('ECHO not-pending> C:\\USOS9X\\TZFIX.OK')
+            self.assertLess(plain, first)
+            self.assertTrue(first < zone < printer < done)
+            for at in (first, zone, printer):
+                self.assertEqual(lines[at + 1], 'IF NOT ERRORLEVEL 1 GOTO PENDING')
+            self.assertLess(done, lines.index(':PENDING'))
+            # The /Z step is left alone: TZRO1 / TZRO2 still only touch RunOnce\Setup.
+            self.assertTrue(files['TZRO1.REG'].endswith(b'RunOnce\\Setup]\r\n"Strefa czasowa"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n\r\n'))
+            self.assertNotIn('TZ5.CHK', text[text.index(':PENDING'):text.index(':ATTR')])
+            self.assertIn('FOR %%F IN (TZ0 TZ1 TZ2 TZ5) DO IF EXIST %%F.CHK DEL %%F.CHK', text)
+            self.assertLessEqual(max(map(len, lines)), 125)
+            for p in self.tmp.iterdir():
+                p.unlink()
+        # OSR2 / 98: RunOnce\Setup TIMEDATE only, as proven on the X470.
+        _, files = self.write('Warsaw', '')
+        text = files['TZFIX.BAT'].decode('ascii')
+        self.assertNotIn('TZ5.CHK /', text)
+        self.assertNotIn('InstallDevice_Rundll', text)
+
+    def test_nothing_pending_writes_tzdst_ok(self):
+        # USOSFB (late_ready) waits for TZDST.OK; nothing deferred means done.
+        for zone, src in (('Lisbon Warsaw', 950), ('Warsaw', ''), ('Eastern', '')):
+            _, files = self.write(zone, src)
+            lines = files['TZFIX.BAT'].decode('ascii').split('\r\n')
+            at = lines.index('ECHO not-pending> C:\\USOS9X\\TZFIX.OK')
+            self.assertEqual(lines[at + 1:at + 3], ['ECHO not-needed> C:\\USOS9X\\TZDST.OK', 'GOTO ATTR'])
+            self.assertNotIn('ECHO pending> C:\\USOS9X\\TZDST.PND', lines[:at])
+            for p in self.tmp.iterdir():
+                p.unlink()
+
     def test_grpconv_is_wrapped_before_import_only_for_source950(self):
         for language in ('PL','EN'):
             _,files=self.write('Lisbon Warsaw',950,language)

@@ -13,7 +13,10 @@
 #      language: "Strefa czasowa" on Polish CDs, "Time Zone" on English ones),
 #   3. checks the zone with REGEDIT /E + FIND; on a failed import it restores
 #      the backup (TZFIX.RUN: one attempt, never repeated after a crash).
-#      Result in C:\USOS9X\TZFIX.OK or TZFIX.BAD.
+#      Result in C:\USOS9X\TZFIX.OK or TZFIX.BAD. Nothing pending:
+#      TZFIX.OK not-pending and TZDST.OK not-needed (no deferral to undo).
+#      950 also counts as pending with TIMEDATE.CPL /Z in the plain RunOnce
+#      (MSBATCH TimeZone) or with MSPRINT's printer step alone (see below).
 #   4. TZFIX.REG leaves automatic summer time off (DisableAutoDaylightTimeSet
 #      1) for Setup's first GUI boots; after a good import (TZDST.PND) a later
 #      start, once RunOnce\Setup is gone, imports TZDST.REG (0 = on) and
@@ -212,7 +215,23 @@ w9x_tzfix_write() {
     check=${std%,00,00,00,00,00,00,00}
     rm -f "$dir/TZPR1.REG" "$dir/TZPR2.REG"
     printer='REM -' printer_check='REM -' grpwrap='REM -' grpcheck='REM -'
+    plain_export='REM -' plain_check='REM -'
     if [ "$src" = 950 ]; then
+        # With MSBATCH.INF loaded (TimeZone set), 950 SUWIN queues its zone
+        # step in the plain machine RunOnce instead: "Strefa czasowa" =
+        # "RUNDLL32.EXE SHELL32.DLL,Control_RunDLL TIMEDATE.CPL,,/Z Lisbon
+        # Warsaw" (X470 95 RTM PL native, 2026-10-26, NL1.REG / RL1.REG),
+        # and RunOnce\Setup has no TIMEDATE. /Z sets the zone from the
+        # registry's Time Zones\<key> TZI, i.e. the pre-1996 rule unless
+        # TZFIX.REG rewrote it first, so that case is pending too; the /Z
+        # step itself stays (it only applies the answer's zone). The printer
+        # step is pending on its own: MSPRINT.DLL queues it either way.
+        plain_export="$R /E TZ5.CHK $runonce"
+        plain_check="REM 950: zone step in the plain RunOnce, or only the printer step.
+IF EXIST TZ5.CHK $F /I \"TIMEDATE\" TZ5.CHK > NUL
+IF NOT ERRORLEVEL 1 GOTO PENDING
+$F /I \"InstallDevice_Rundll\" TZ0.CHK > NUL
+IF NOT ERRORLEVEL 1 GOTO PENDING"
         grpwrap="REM 950: wrap the real GRPCONV command, preserving its localized name.
 IF EXIST ${U}TZGRP.REG DEL ${U}TZGRP.REG > NUL
 IF EXIST ${U}TZGRP.REG GOTO BAD
@@ -260,10 +279,14 @@ CD \WINDOWS
 $A -S -R -H SYSTEM.DAT
 $A -S -R -H USER.DAT
 $R /E TZ0.CHK $run
+$plain_export
 IF NOT EXIST TZ0.CHK GOTO ATTR
 $F /I "TIMEDATE" TZ0.CHK > NUL
 IF NOT ERRORLEVEL 1 GOTO PENDING
+$plain_check
+REM Nothing to change: no summer-time deferral either (TZDST.OK for USOSFB).
 ECHO not-pending> ${U}TZFIX.OK
+ECHO not-needed> ${U}TZDST.OK
 GOTO ATTR
 REM One attempt only: a crash in the middle never repeats it.
 :PENDING
@@ -303,7 +326,7 @@ ECHO bad> ${U}TZFIX.BAD
 IF EXIST ${U}TZDST.PND DEL ${U}TZDST.PND
 REM SYSTEM.DAT / USER.DAT stay as Setup left them otherwise.
 :ATTR
-FOR %%F IN (TZ0 TZ1 TZ2) DO IF EXIST %%F.CHK DEL %%F.CHK
+FOR %%F IN (TZ0 TZ1 TZ2 TZ5) DO IF EXIST %%F.CHK DEL %%F.CHK
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 CD \\
