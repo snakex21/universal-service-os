@@ -237,6 +237,10 @@ w9x_reg95_convert() {
         emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "LMLogon", "hex:00,00,00,00")
         if (logon_user != "") emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "username", logon_user)
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
+        # No "DHCP client was unable to obtain an IP network address" popup
+        # with the cable unplugged (the 95 VDHCP VxD reads PopupFlag; one
+        # byte 00 = do not show). Every 95 install, network or not.
+        emit("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\DHCP", "PopupFlag", "hex:00")
         if (vmd != "") {
             # 950 (vmdlate): no USOSVmd here. REG95.REG is imported before the
             # first GUI boot of 950 Setup, and that boot froze inside the

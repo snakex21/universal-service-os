@@ -28,10 +28,12 @@ class AddonsFixes(unittest.TestCase):
         scoped = {p.id: (p.get('reboot_setup'), p.get('check_setup')) for p in m.packages
                   if p.get('reboot_setup') or p.get('check_setup')}
         self.assertEqual(scoped, {
+            'dcom95': ('now', ''),
             'ie55sp2-pl': ('now', ''),
             'ie55sp2-q810847-pl': ('', r'file:%SYS%\MSHTML.DLL>=5.50.4923.2500')})
         # ordinary reboot=/check= unchanged: OSR2 and later restart once at the end
         self.assertEqual(m.find('ie55sp2-pl').get('reboot'), 'end')
+        self.assertEqual(m.find('dcom95').get('reboot'), 'end')
         self.assertEqual(m.find('ie55sp2-q810847-pl').get('check'), '')
         for os_ in ('95OSR2', '95OSR21', '95OSR25', '98FE', '98SE', 'ME'):
             plan = lm.resolve(m, os_, 'PL', '', True, [])
@@ -40,12 +42,26 @@ class AddonsFixes(unittest.TestCase):
                 self.assertEqual(now, [], os_)
             else:  # 98 / Me plans carry no coordinator-only value at all
                 self.assertFalse([i for i in plan.order if i in scoped], os_)
-        # 950: dcom95, ws2-95, IE -> restart -> the rest -> final restart
-        order = lm.resolve(m, '95RTM', 'PL', '', True, []).order
-        cut = order.index('ie55sp2-pl') + 1
-        self.assertEqual(order[:cut], ['dcom95', 'ws2-95', 'ie55sp2-pl'])
-        self.assertEqual(order[cut:], ['ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
-                                       'vcredist6sp6', 'mslu'])
+        # 950 / OSR1: dcom95 -> restart -> IE -> restart -> the rest -> final restart
+        rest = ['ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6', 'vcredist6sp6', 'mslu']
+        for os_ in ('95RTM', '95OSR1'):
+            plan = lm.resolve(m, os_, 'PL', '', True, [])
+            self.assertEqual(plan.order, ['dcom95', 'ie55sp2-pl'] + rest, os_)
+            self.assertNotIn('ws2-95', plan.why, os_)
+            # still selectable through addons_options
+            _, full, options, exclude = lm.selection(m, {'options': 'ws2-95'})
+            plan = lm.resolve(m, os_, 'PL', '', full, options, exclude)
+            self.assertEqual(plan.order, ['dcom95', 'ws2-95', 'ie55sp2-pl'] + rest, os_)
+            self.assertEqual(plan.why['ws2-95'], 'option', os_)
+        # 95 EN: DUN 1.4 needs ws2:2 and still pulls it in
+        self.assertEqual(lm.resolve(m, '95RTM', 'EN', '', True, []).why.get('ws2-95'), 'needed')
+        # OSR2 and later 95 keep it in the full pack
+        for os_ in ('95OSR2', '95OSR21', '95OSR25'):
+            self.assertEqual(lm.resolve(m, os_, 'PL', '', True, []).why.get('ws2-95'), 'full', os_)
+        self.assertEqual(m.find('ws2-95').get('answer1'), 'Winsock2 Setup|1')
+        bad = lm.Manifest.load()
+        bad.find('ws2-95').keys['option_os'] = '95XYZ'
+        self.assertTrue(any('unknown option_os 95XYZ' in e for e in lm.validate(bad)))
         bad = lm.Manifest.load()
         bad.find('msi20-9x').keys['reboot_setup'] = 'now'  # os=9X: also 98 / Me
         self.assertTrue(any('reboot_setup/check_setup only for Windows 95' in e for e in lm.validate(bad)))
@@ -66,7 +82,9 @@ class AddonsFixes(unittest.TestCase):
         self.assertTrue(src.isascii())
         self.assertIn('if(code==1001){', src)
         self.assertIn('wsprintfA(next,"mid%d\\r\\n",mid+1)', src)
-        self.assertIn('if(mid>=3)fail(', src)
+        # 950: DCOM95 + IE restarts, a Q810847 retry and one spare
+        self.assertIn('if(mid>=4)fail(', src)
+        self.assertIn("phase[3]<='4'", src)
         self.assertIn('rundll32.exe C:\\\\WINDOWS\\\\SYSTEM\\\\iernonce.dll,RunOnceExProcess', src)
         self.assertIn('RegDeleteValueA(key,"PrimaryProvider")', src)
         final = src[src.index('if(!lstrcmpA(phase,"reboot\\r\\n")){'):src.index('mid=mid_phase(phase);')]

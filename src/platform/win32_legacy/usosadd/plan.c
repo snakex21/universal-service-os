@@ -153,6 +153,8 @@ static void select_candidates(const ua_ini *m, const ua_pkgs *p, const ua_system
     for (i = 0; i < p->count; i++) {
         const ua_pkg *q = &p->pkg[i];
         int wanted = (full && (q->tier == UA_TIER_FULL || q->tier == UA_TIER_GROUP)) ? UA_WHY_FULL : 0;
+        /* option_os=: on these systems a tier=full package is only an option */
+        if (wanted && ua_os_match(m, ua_ini_get(m, q->section, "option_os"), s->os)) wanted = 0;
         if (ua_list_has(exclude, q->id)) continue;
         if (!wanted && ua_list_has(options, q->id)) wanted = UA_WHY_OPTION;
         if (!wanted) continue;

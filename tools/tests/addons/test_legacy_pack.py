@@ -92,7 +92,7 @@ def test_validate(m: lm.Manifest) -> None:
 
 def test_cross_check(exe: Path, m: lm.Manifest) -> int:
     options_sets = [[], [p.id for p in m.packages if p.tier == 'option'], ['kernelex', 'rdp51-pl', 'nosuch-id'],
-                    ['dotnet20-pl'], ['hf98-q831167']]
+                    ['dotnet20-pl'], ['hf98-q831167'], ['ws2-95']]
     options_sets += [lm.selection(m, {'preset': pr})[2] for pr in lm.list_items(m.get('presets', 'order'))]
     exclude_sets = [[], ['msi20-9x', 'ie6sp1-pl-9x', 'msi20-nt4']]
     n = 0
@@ -128,6 +128,9 @@ EXPECTED_FULL = {
                        'wmp9-pl', 'dotnet20', 'dotnet20-pl'],
     ('95OSR21', 'PL', ''): ['dcom95', 'ws2-95', 'ie55sp2-pl', 'ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
                             'vcredist6sp6', 'mslu'],
+    # 95 RTM: ws2-95 only by choice (option_os=95RTM,95OSR1)
+    ('95RTM', 'PL', ''): ['dcom95', 'ie55sp2-pl', 'ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
+                          'vcredist6sp6', 'mslu'],
     ('NT4', 'PL', '3'): ['nt4-sp6a-pl', 'nt4-srp-pl', 'ie6sp1-pl-nt4', 'msi20-nt4', 'mdac28sp1-pl', 'vbrun6sp6',
                          'vcredist6sp6', 'dotnet11', 'dotnet11-pl', 'dotnet11-sp1', 'hotfixes-nt4-pl']
                         + ['<hfnt>'],

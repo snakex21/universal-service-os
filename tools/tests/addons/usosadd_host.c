@@ -116,6 +116,29 @@ static int selftest(void) {
         CHECK(op.pkg[2].reboot == UA_REBOOT_END && strcmp(op.pkg[2].check, "file:X") == 0);
         CHECK(ua_after_run(1, op.pkg[0].reboot, 1, 1) == UA_AFTER_RESTART);
     }
+    {
+        /* option_os=: tier=full except there (options= / needs= still bring it in) */
+        static ua_ini wi;
+        static ua_pkgs wp;
+        static ua_plan wpl;
+        ua_system ws;
+        char wtext[] =
+            "[pack]\r\ngroup_95=95RTM,95OSR1,95OSR2\r\n"
+            "[pkg:ws2]\r\ntier=full\r\noption_os=95RTM,95OSR1\r\nos=95\r\nlang=*\r\norder=1\r\nprovides=ws2:2\r\n"
+            "[pkg:dun]\r\ntier=option\r\nos=95\r\nlang=EN\r\norder=2\r\nneeds=ws2:2\r\n";
+        memset(&ws, 0, sizeof ws);
+        ua_ini_parse(&wi, wtext, (int)strlen(wtext));
+        CHECK(ua_load_pkgs(&wi, &wp) == 2);
+        strcpy(ws.lang, "PL");
+        strcpy(ws.os, "95OSR2"); ua_resolve(&wi, &wp, &ws, 1, "", "", &wpl);
+        CHECK(wpl.count == 1 && wpl.why[0] == UA_WHY_FULL);
+        strcpy(ws.os, "95RTM"); ua_resolve(&wi, &wp, &ws, 1, "", "", &wpl);
+        CHECK(wpl.count == 0 && wpl.why[0] == 0);
+        ua_resolve(&wi, &wp, &ws, 1, "ws2", "", &wpl);
+        CHECK(wpl.count == 1 && wpl.why[0] == UA_WHY_OPTION);
+        strcpy(ws.lang, "EN"); ua_resolve(&wi, &wp, &ws, 1, "dun", "", &wpl);
+        CHECK(wpl.count == 2 && wpl.why[0] == UA_WHY_NEEDED && wpl.idx[0] == 0);
+    }
 
     /* plan: b needs msi (a, earlier) and ie 5.01 (98 SE has only 5.0) */
     strcpy(s.os, "98SE"); strcpy(s.lang, "PL"); s.ntsp[0] = 0;

@@ -119,10 +119,12 @@ static void windows_logon(void){HKEY key;LONG code;char line[96];
     if(code==ERROR_SUCCESS)lstrcpyA(line,"Network\\Logon PrimaryProvider removed");
     else wsprintfA(line,"Network\\Logon PrimaryProvider not removed (code %ld)",code);
     log_line(line);}
-/* FIRSTBT.STA phases: late, install, mid1..mid3 (USOSADD exit 1001: a package
- * restart the chain asked for), resume1..resume3, reboot (the final one). */
+/* FIRSTBT.STA phases: late, install, mid1..mid4 (USOSADD exit 1001: a package
+ * restart the chain asked for), resume1..resume4, reboot (the final one).
+ * 950: DCOM95 and IE 5.5 SP2 restart (reboot_setup=now), one more for a
+ * package retried after a restart (Q810847 check_setup), one spare. */
 static int mid_phase(const char*phase){
-    if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]<='3'&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
+    if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]<='4'&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
     return 0;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[64];DWORD code;HKEY key;int mid;
     local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
@@ -168,10 +170,10 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES){
         code=child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup");
         if(code==1001){
-            /* The chain asked for a restart (IE 5.5 SP2 reboot_setup=now, or
+            /* The chain asked for a restart (DCOM95 / IE 5.5 SP2 reboot_setup=now, or
              * a retry after a restart): restart, keep holding the desktop,
              * resume the chain from STATE.INI. */
-            if(mid>=3)fail("more than three package restarts before the desktop");
+            if(mid>=4)fail("more than four package restarts before the desktop");
             wsprintfA(next,"mid%d\r\n",mid+1);wsprintfA(note,"restart: package restart %d before the desktop",mid+1);
             reboot(next,note);}
         if(code!=0&&code!=3010)fail("packages did not finish before final restart");}

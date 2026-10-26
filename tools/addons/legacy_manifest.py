@@ -258,6 +258,8 @@ def resolve(m: Manifest, os: str, lang: str, ntsp: str = '', full: bool = True, 
             if p.id.lower() in exclude_l:
                 continue
             wanted = 'full' if full and p.tier in ('full', 'group') else ''
+            if wanted and m.os_match(p.get('option_os'), os):  # option_os=: only an option there
+                wanted = ''
             if not wanted and p.id.lower() in options:
                 wanted = 'option'
             if not wanted:
@@ -354,6 +356,11 @@ def validate(m: Manifest) -> list[str]:
         for item in list_items(p.get('os')):
             if item.lower() not in tokens and item.lower() not in groups:
                 errors.append(f'{where}: unknown os {item}')
+        for item in list_items(p.get('option_os')):
+            if item.lower() not in tokens and item.lower() not in groups:
+                errors.append(f'{where}: unknown option_os {item}')
+        if p.get('option_os') and p.tier != 'full':
+            errors.append(f'{where}: option_os= only for tier=full')
         if p.get('ntsp') and not re.fullmatch(r'<?\d+a?\+?', p.get('ntsp')):
             errors.append(f'{where}: ntsp {p.get("ntsp")!r}')
         if p.get('status') not in STATUSES:
