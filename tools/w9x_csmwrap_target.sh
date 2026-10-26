@@ -339,6 +339,27 @@ if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
     w9x_vesa950_prepare "$work/c/USOS9X" "$setup_version" || fail 'cannot prepare the pinned 950 VESA compatibility driver'
     log 'display: pinned MIT VESA 950 unregister workaround, target copy only'
 fi
+# Windows 95 with a native phase 1: SUWIN drops the whole MSBATCH.INF when
+# [Setup] ProductID has 18 or more characters (an OEM ID overwrites the batch
+# file path; tools/w9x_pid95.sh). Source950: the OEM ID is split between the
+# /U: template of this target's WINSETUP.BIN copy and a 17-character
+# ProductID; other long IDs go (Setup then asks for the key). The VM phase 1
+# keeps its answer as it is (its page controller types the key). A user's
+# own answer file stays 1:1. The key itself is never logged.
+if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
+    [ -r "$LIB/w9x_pid95.sh" ] && . "$LIB/w9x_pid95.sh" || fail 'missing Windows 95 product ID helper'
+    if [ "$ANSWER_KIND" = USER ]; then
+        pid_value=$(w9x_pid95_value "$work/c/USOS9X/MSBATCH.INF")
+        [ "${#pid_value}" -le 17 ] || log 'warning: the answer file ProductID has 18+ characters; Windows 95 Setup will ignore the whole file'
+        pid_value=
+    else
+        pid_mode=
+        [ "${setup_version:-}" != '4 0 0 950' ] || pid_mode=split
+        pid_result=$(w9x_pid95_prepare "$work/c/USOS9X/MSBATCH.INF" "$work/c/$SETUP_FOLDER/WINSETUP.BIN" $pid_mode) ||
+            fail 'cannot prepare the Windows 95 product ID'
+        log "product id: $pid_result (MSBATCH.INF stays readable for Windows 95 Setup)"
+    fi
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.

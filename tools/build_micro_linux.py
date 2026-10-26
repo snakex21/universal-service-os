@@ -586,6 +586,7 @@ def main() -> int:
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
             ("tools/w9x_vesa950.sh", "usr/lib/usos/w9x_vesa950.sh"),
+            ("tools/w9x_pid95.sh", "usr/lib/usos/w9x_pid95.sh"),
             ("tools/w9x_950_post.sh", "usr/lib/usos/w9x_950_post.sh"),
             ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
             ("tools/w9x_firstboot.sh", "usr/lib/usos/w9x_firstboot.sh"),
