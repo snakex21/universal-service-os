@@ -28,6 +28,12 @@ pub fn main(init: std.process.Init) !u8 {
         if (std.mem.eql(u8, arg, "--win3x-display")) {
             return usos.win3x.display_run.run(init.io, init.gpa, args.next() orelse return 2);
         }
+        // tools/w9x_csmwrap_target.sh: Windows 9x Setup's MINI.CAB (VGA.DRV
+        // latch fix, USB keyboard/mouse bridge for its mini-Windows; no UI).
+        if (std.mem.eql(u8, arg, "--w9x-setup-mini")) {
+            const setup_dir = args.next() orelse return 2;
+            return usos.win3x.w9x_mini.run(init.io, init.gpa, setup_dir, args.next() orelse return 2);
+        }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
             const bcd = @import("bcd_lowmem.zig");
