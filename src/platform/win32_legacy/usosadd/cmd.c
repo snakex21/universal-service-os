@@ -46,6 +46,16 @@ static const char *token(const char *s, char *tok, int cap) {
     return s;
 }
 
+unsigned long ua_command_exit(const char *command, unsigned long code) {
+    char exe[UA_LINE];
+    const char *base, *p;
+    if (code != 1) return code;
+    token(command, exe, sizeof exe);
+    base = exe;
+    for (p = exe; *p; p++) if (*p == '\\' || *p == '/') base = p + 1;
+    return ua_ieq(base, "DXSETUP.EXE") ? 3010 : code;
+}
+
 void ua_parse_cmd(const char *line, ua_cmd *out) {
     char verb[16];
     const char *rest = token(line, verb, sizeof verb);

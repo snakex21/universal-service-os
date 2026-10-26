@@ -197,6 +197,31 @@ static int selftest(void) {
     CHECK(ua_after_run(0, UA_REBOOT_NOW, 0, 1) == UA_AFTER_RETRY);
     CHECK(ua_after_run(0, UA_REBOOT_NO, 0, 1) == UA_AFTER_CONTINUE);
     CHECK(ua_after_run(0, UA_REBOOT_END, 1, 2) == UA_AFTER_CONTINUE);
+    CHECK(ua_command_exit("C:\\TMP\\DXSETUP.EXE /silent",1)==3010);
+    CHECK(ua_command_exit("\"C:\\A B\\dxsetup.exe\" /silent",1)==3010);
+    CHECK(ua_command_exit("dxsetup.exe /silent",3010)==3010);
+    CHECK(ua_command_exit("dxsetup.exe /silent",0)==0);
+    CHECK(ua_command_exit("dxsetup.exe /silent",2)==2);
+    CHECK(ua_command_exit("DX80POL.EXE /C",1)==1);
+    CHECK(ua_command_exit("OTHER.EXE DXSETUP.EXE",1)==1);
+    CHECK(ua_command_exit("DXSETUP.EXE.other /silent",1)==1);
+    CHECK(ua_after_run(ua_command_exit("DXSETUP.EXE /silent",1)==3010,UA_REBOOT_END,0,1)==UA_AFTER_PENDING);
+    {
+        ua_plan repair_plan;
+        ua_system repair_system;
+        ua_pkgs repair_pkgs;
+        ua_state repair_state;
+        memset(&repair_plan,0,sizeof repair_plan);memset(&repair_pkgs,0,sizeof repair_pkgs);
+        memset(&repair_state,0,sizeof repair_state);memset(&repair_system,0,sizeof repair_system);
+        repair_plan.count=1;repair_pkgs.pkg[0].id="ws2-95";strcpy(repair_system.os,"95RTM");
+        CHECK(!ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+        repair_state.tries[0]=1;CHECK(ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+        strcpy(repair_system.os,"95OSR1");CHECK(ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+        strcpy(repair_system.os,"98SE");CHECK(!ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+        strcpy(repair_system.os,"NT4");CHECK(!ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+        strcpy(repair_system.os,"95RTM");repair_pkgs.pkg[0].id="other";
+        CHECK(!ua_ndis_repair_needed(&repair_pkgs,&repair_plan,&repair_state,&repair_system));
+    }
     /* the retried package resumes as running: check true = done, else runs again */
     CHECK(ua_resume_decision(1, 1, 1) == 1 && ua_resume_decision(1, 1, 0) == 2);
 

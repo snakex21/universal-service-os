@@ -79,6 +79,17 @@ int ua_after_run(int ok, int reboot, int pending_reboot, int tries) {
     return UA_AFTER_CONTINUE;
 }
 
+int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
+                           const ua_state *state, const ua_system *system) {
+    int i;
+    if (!ua_starts(system->os, "95")) return 0;
+    for (i = 0; i < plan->count; i++) {
+        int x = plan->idx[i];
+        if (ua_ieq(p->pkg[x].id, "ws2-95") && state->tries[x] > 0) return 1;
+    }
+    return 0;
+}
+
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
                  const ua_system *s, int pkg, char *unmet, int cap) {
     char item[48];

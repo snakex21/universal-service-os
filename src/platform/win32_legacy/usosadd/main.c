@@ -15,6 +15,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "ua.h"
+#include "ndis_repair.h"
 #include "../../../../tools/legacy_desktop_wait.h"
 
 #define MANIFEST_CAP (256 * 1024)
@@ -492,8 +493,12 @@ static int run_one(const ua_pkg *p, const char *raw) {
     }
     ua_itoa(num, sizeof num, (int)code);
     log2("    exit code ", num);
-    g_last_code = code;
-    return code_ok(p, code);
+    g_last_code = ua_command_exit(cmd, code);
+    if(g_last_code!=code) {
+        log_line("    DXSETUP success with restart: exit 1 treated as 3010");
+        g_state.pending_reboot=1;
+    }
+    return code_ok(p, g_last_code);
 }
 
 /* ---- state, restart ------------------------------------------------------------ */
@@ -619,7 +624,16 @@ static void auto_logon(void) {
     RegCloseKey(k);
 }
 
+static void repair_ndis_before_restart(void) {
+    int result;
+    if(!ua_ndis_repair_needed(&g_p,&g_plan,&g_state,&g_sys))return;
+    result=ua_ndis_repair(g_win,g_sysdir,g_root,log_line);
+    if(!result)ExitProcess(2); /* coordinator holds before its final restart */
+    if(result==2){g_state.pending_reboot=1;save_state();}
+}
+
 static void restart(void) {
+    repair_ndis_before_restart();
     g_state.pending_reboot = 1;
     save_state();
     if (g_setup_mode) {
@@ -795,6 +809,7 @@ static void finish(void) {
     int i, done = 0, failed = 0, skipped = 0, listed = 0;
     char num[8];
     const char *name_key = g_pl ? "name_pl" : "name_en";
+    repair_ndis_before_restart();
     if (!g_setup_mode && g_state.pending_reboot) restart();
     for (i = 0; i < g_plan.count; i++) {
         int st = g_state.st[g_plan.idx[i]];

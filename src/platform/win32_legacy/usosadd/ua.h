@@ -159,6 +159,9 @@ typedef struct {
 } ua_cmd;
 /* Classifies an expanded command line. */
 void ua_parse_cmd(const char *line, ua_cmd *out);
+/* DXSETUP's success-with-restart value 1 uses the common 3010 policy.
+ * Other executables' value 1 remains an error. */
+unsigned long ua_command_exit(const char *command, unsigned long code);
 
 /* Checks: file:, regver:, reg:, regdw:, ntsp: */
 enum { UA_CHK_NONE, UA_CHK_FILE, UA_CHK_REGVER, UA_CHK_REG, UA_CHK_REGDW, UA_CHK_NTSP };
@@ -198,6 +201,9 @@ int ua_resume_decision(int tries, int has_check, int check_true);
  * after it) gets one more try after that restart instead of failing. */
 enum { UA_AFTER_CONTINUE, UA_AFTER_PENDING, UA_AFTER_RESTART, UA_AFTER_RETRY };
 int ua_after_run(int ok, int reboot, int pending_reboot, int tries);
+/* Recheck NDIS only after an attempted Winsock2 install on Windows 95. */
+int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
+                           const ua_state *state, const ua_system *system);
 /* Runtime need check: satisfied by the OS or by a provider in state
  * DONE/PRESENT. Writes the first unmet capability into unmet. */
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
