@@ -404,6 +404,35 @@ REGEDIT4
 EOF
 }
 
+# usos_net_w950_msbatch MSBATCH.INF: 95 RTM / OSR1 (4.00.950) only. The
+# answer's [Network] Clients=VREDIR / Protocols=MSTCP with no adapter (no
+# NetCards=; 950 Setup's detection does not find the I211) made NETDI show
+# NETGEN.INF's "Select Device" adapter picker twice (X470 95 RTM PL native,
+# 2026-10-26, first run with MSBATCH.INF loaded). Setup then installs no
+# network: Clients= / Protocols= / Services= empty (NETDI's [Network] keys:
+# NetCards, Protocols, Services, Clients, RemoveBinding, Display,
+# IgnoreDetectedNetcards; 950 NETDI.DLL strings), as before MSBATCH.INF
+# loaded, when the network worked. USOS's own adapter, TCP/IP (DHCP) and
+# client come from NET95.REG / TCP95.REG / NFILES / NET95L.BAT
+# (tools/w9x_reg95.sh). ComputerName / Workgroup / Description stay (REG95's
+# VNETSUP identity reads them). The file stays CR LF. A missing key is added.
+usos_net_w950_msbatch() {
+    awk '
+        { sub(/\r$/, "") }
+        /^\[/ { if (net) flush(); net = (tolower($0) == "[network]"); print $0 "\r"; next }
+        net && tolower($0) ~ /^[ \t]*(clients|protocols|services)[ \t]*=/ {
+            k = tolower($0); sub(/[ \t]*=.*/, "", k); sub(/^[ \t]*/, "", k); seen[k] = 1
+            n = $0; sub(/[ \t]*=.*/, "", n); sub(/^[ \t]*/, "", n); print n "=\r"; next }
+        net && $0 == "" { flush(); net = 0 }
+        { print $0 "\r" }
+        function flush(  i, k) {
+            split("Clients Protocols Services", names, " ")
+            for (i = 1; i <= 3; i++) { k = tolower(names[i]); if (!(k in seen)) print names[i] "=\r" }
+            flushed = 1
+        }
+        END { if (net) flush() }' "$1" > "$1.n95" && mv "$1.n95" "$1"
+}
+
 # 95, after USOSNET.INF / USOSNET.SYS were staged: NET95.REG for exactly
 # one matched card whose PCI path gives a 95 devnode instance; otherwise
 # PnP + USOSNET.INF only (95's New Hardware step). Logged either way.

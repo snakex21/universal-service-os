@@ -287,6 +287,54 @@ class Reg95Merge(unittest.TestCase):
         self.assertLess(bat.index('NET\\C1.REG'), bat.index('ATTRIB.EXE +S +R +H SYSTEM.DAT'))
 
 
+class Msbatch950(unittest.TestCase):
+    # X470 95 RTM PL native (2026-10-26): Clients=VREDIR / Protocols=MSTCP
+    # without an adapter -> NETDI's NETGEN.INF adapter picker, twice.
+    GOLDEN = ROOT / 'src/flow/answer/testdata/golden/options.windows-95.x86.inf'
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-net950-msbatch-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def clear(self, data):
+        inf = self.tmp / 'MSBATCH.INF'
+        inf.write_bytes(data)
+        rc, out, err = run(f"usos_net_w950_msbatch '{inf.as_posix()}'")
+        self.assertEqual(rc, 0, out + err)
+        return inf.read_bytes()
+
+    def test_rendered_answer_gets_no_setup_network_components(self):
+        before = self.GOLDEN.read_bytes()
+        self.assertIn(b'Clients=VREDIR\r\nProtocols=MSTCP\r\n', before)
+        after = self.clear(before)
+        net = after[after.index(b'[Network]\r\n'):]
+        net = net[:net.index(b'\r\n\r\n') + 4]
+        self.assertEqual(net, b'[Network]\r\nComputerName="USOS-9X"\r\nWorkgroup="USOSLAB"\r\nDescription="Tester"\r\nDisplay=0\r\n'
+                              b'PrimaryLogon=Windows\r\nClients=\r\nProtocols=\r\nServices=\r\n\r\n')
+        self.assertEqual(after.count(b'\n'), after.count(b'\r\n'))
+        # Everything outside the three [Network] lines is byte for byte the same.
+        self.assertEqual(after.replace(b'Clients=\r\nProtocols=\r\n', b'Clients=VREDIR\r\nProtocols=MSTCP\r\n'), before)
+        self.assertEqual(self.clear(after), after)                  # idempotent
+
+    def test_missing_keys_added_other_sections_untouched(self):
+        data = (b'[Setup]\r\nExpress=1\r\n\r\n[Network]\r\nComputerName="X"\r\nClients=VREDIR,NWREDIR\r\n\r\n'
+                b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nProtocols=MSTCP\r\n')
+        after = self.clear(data)
+        self.assertEqual(after, b'[Setup]\r\nExpress=1\r\n\r\n[Network]\r\nComputerName="X"\r\nClients=\r\nProtocols=\r\nServices=\r\n\r\n'
+                                b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nProtocols=MSTCP\r\n')
+        # [Network] as the last section, without a blank line after it.
+        self.assertEqual(self.clear(b'[Network]\r\nProtocols=MSTCP\r\n'), b'[Network]\r\nProtocols=\r\nClients=\r\nServices=\r\n')
+
+    def test_target_clears_only_950_usos_answers(self):
+        text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        at = text.index('usos_net_w950_msbatch "$work/c/USOS9X/MSBATCH.INF"')
+        block = text[text.rindex('\nif ', 0, at):at]
+        self.assertIn('[ "$ANSWER_KIND" != USER ]', block)
+        self.assertIn('[ "$SYSTEM_TAG:${setup_version:-}" = \'95:4 0 0 950\' ]', block)
+        self.assertLess(text.index('usos_net_stage "$work/network.ini"'), at)
+        self.assertLess(at, text.index('w9x_reg95_write "$work/c/USOS9X"'))
+
+
 class TargetWiring(unittest.TestCase):
     def test_net95_passed_to_reg95(self):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
