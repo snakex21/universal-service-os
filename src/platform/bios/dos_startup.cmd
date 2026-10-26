@@ -341,8 +341,28 @@ REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
 IF "%U9SYS%"=="95" GOTO VMSWOK
 IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I
 :VMSWOK
+REM U9MINI=1 (tools/w9x_csmwrap_target.sh, phase 1 on this PC under
+REM CSMWrap): Setup's own mini-Windows (MINI.CAB, standard mode, no VxD)
+REM got USOSKEY.DRV (drivers=) and VBMOUSE.DRV (mouse.drv=); their DOS
+REM halves stay resident until Setup restarts the PC, as in the Windows 3.1
+REM standard-mode flow (W3AUTO.CSM). USOSKEY.COM and VBMOUSE.EXE refuse a
+REM second copy, so RESUME.BAT loads them too.
+IF NOT "%U9MINI%"=="1" GOTO MINIDONE
+ECHO bridge for Setup mini-Windows: VBMOUSE.EXE USOSKEY.COM>>C:\USOS9X\INSTALL.LOG
+CTTY NUL
+C:\USOS9X\VBMOUSE.EXE
+CTTY CON
+IF ERRORLEVEL 1 ECHO VBMOUSE.EXE did not load>>C:\USOS9X\INSTALL.LOG
+C:\USOS9X\USOSKEY.COM
+:MINIDONE
 REM Resume hook: C:\AUTOEXEC.BAT calls it while C:\WINDOWS\WIN.COM is missing.
 ECHO @ECHO OFF>C:\USOS9X\RESUME.BAT
+IF NOT "%U9MINI%"=="1" GOTO MINIRES
+ECHO CTTY NUL>>C:\USOS9X\RESUME.BAT
+ECHO C:\USOS9X\VBMOUSE.EXE>>C:\USOS9X\RESUME.BAT
+ECHO CTTY CON>>C:\USOS9X\RESUME.BAT
+ECHO C:\USOS9X\USOSKEY.COM>>C:\USOS9X\RESUME.BAT
+:MINIRES
 ECHO ECHO Wznawianie Instalatora Windows %U9SYS%...>>C:\USOS9X\RESUME.BAT
 ECHO C:>>C:\USOS9X\RESUME.BAT
 ECHO CD \%U9SRC%>>C:\USOS9X\RESUME.BAT

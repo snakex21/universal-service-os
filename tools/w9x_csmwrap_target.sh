@@ -440,6 +440,40 @@ if [ "$VM_PHASE1" = 1 ]; then
     log "vm phase 1: U9VM=1, display ids: $(printf '%s' "$ids" | tr '\n' ' ')"
 fi
 
+# Setup's own mini-Windows on this PC (native phase 1): SETUP unpacks
+# MINI.CAB into C:\WININST0.400 and runs it in standard mode (DOSX +
+# KRNL386, no VxD) for its licence, key and wizard pages. Its VGA.DRV is the
+# Windows 3.1 driver, so the RX 560 latch fault breaks its drawing like
+# Windows 3.1's (docs/win3x-vga-redraw-2026-10-23.md), and its KEYBOARD.DRV /
+# MSMOUS31.DRV read only i8042 ports, which CSMWrap does not emulate.
+# usos-fb-ui --w9x-setup-mini (src/compat/win3x/w9x_mini.zig) patches VGA.DRV
+# in the cabinet (the 3.1 plan, 94 sites) and adds the Windows 3.1
+# standard-mode USB bridge: USOSKEY.DRV (drivers=) + VBMOUSE.DRV
+# (mouse.drv=); INSTALL.BAT (U9MINI=1) loads USOSKEY.COM and VBMOUSE.EXE
+# before SETUP. The VM phase 1 (QEMU VGA and PS/2) keeps MINI.CAB as it is;
+# win9x/setup-mini-off.flag on the stick ESP switches the step off.
+SETUP_MINI_OFF_FLAG=${W9X_SETUP_MINI_OFF_FLAG:-$ESP_DIR/win9x/setup-mini-off.flag}
+mini_bridge=0
+if [ "$VM_PHASE1" = 1 ]; then
+    log 'setup mini-Windows: phase 1 in the VM, MINI.CAB unchanged'
+elif [ -e "$SETUP_MINI_OFF_FLAG" ]; then
+    log 'setup mini-Windows: off (win9x/setup-mini-off.flag), MINI.CAB unchanged'
+elif [ ! -f "$work/c/$SETUP_FOLDER/MINI.CAB" ]; then
+    log "setup mini-Windows: no $SETUP_FOLDER\\MINI.CAB"
+elif ! command -v usos-fb-ui >/dev/null 2>&1; then
+    log 'setup mini-Windows: usos-fb-ui missing, MINI.CAB unchanged'
+else
+    usos-fb-ui --w9x-setup-mini "$work/c/$SETUP_FOLDER" "$work/c/USOS9X" 2>&1 | while IFS= read -r line; do log "$line"; done
+    if tr -d '\r' < "$work/c/USOS9X/USOSMINI.TXT" 2>/dev/null | grep -qx 'bridge=on' &&
+        [ -f "$work/c/USOS9X/USOSKEY.COM" ] && [ -f "$work/c/USOS9X/VBMOUSE.EXE" ]; then
+        mini_bridge=1
+    fi
+fi
+if [ "$mini_bridge" = 1 ]; then
+    printf 'SET U9MINI=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+    log 'setup mini-Windows: U9MINI=1 (USOSKEY.COM + VBMOUSE.EXE before SETUP)'
+fi
+
 # NVMe target: usosnvme.mpd + USOSNVME.INF stay in C:\USOS9X only when chosen
 # and the disk passes the check; INSTALL.BAT (U9NVME=1) puts them next to
 # Setup, tools/w9x_csmwrap_prepare.sh into C:\WINDOWS after the VM phase 1.
