@@ -167,9 +167,14 @@ class Reg95(unittest.TestCase):
         # No Welcome window (NoWelcome's RunOnce cannot run on 95).
         self.assertIn('[HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips]\r\n"Show"=hex:00,00,00,00\r\n', reg)
         self.assertNotIn('USOSLog', reg)                               # no logger argument
-        dhcp = '[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\DHCP]\r\n"PopupFlag"=hex:00\r\n'
-        # No DHCP error popup with the cable unplugged (VDHCP PopupFlag, 1 byte).
+        dhcp = ('[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\DHCP]\r\n'
+                '"Version"=hex:01,00,00,00\r\n"PopupFlag"=hex:00,00,00,00\r\n')
+        # No DHCP error popup with the cable unplugged (VDHCP PopupFlag), and
+        # Version=1 in the same key: VDHCP.386 refuses to load when VxD\DHCP
+        # exists without Version (X470 95 RTM, no DHCP lease).
         self.assertEqual(reg.count(dhcp), 1)
+        self.assertEqual(reg.count('Services\\VxD\\DHCP]'), 1)
+        self.assertNotIn('"PopupFlag"=hex:00\r\n', reg)
         self.assertLess(reg.index(dhcp), reg.index('; USOS: not converted') if '; USOS: not converted' in reg else len(reg))
         no_lan = re.sub(r'\[USOS\.Lan\].*?\r\n\r\n', '[USOS.Lan]\r\n\r\n', ANSWER_95, flags=re.S)
         _, files, _ = self.write(no_lan)

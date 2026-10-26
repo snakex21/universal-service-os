@@ -238,9 +238,17 @@ w9x_reg95_convert() {
         if (logon_user != "") emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "username", logon_user)
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
         # No "DHCP client was unable to obtain an IP network address" popup
-        # with the cable unplugged (the 95 VDHCP VxD reads PopupFlag; one
-        # byte 00 = do not show). Every 95 install, network or not.
-        emit("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\DHCP", "PopupFlag", "hex:00")
+        # with the cable unplugged (the 95 VDHCP VxD reads PopupFlag, 4 bytes,
+        # 0 = do not show). Every 95 install, network or not.
+        # Version=1 must come with it: VDHCP.386 (950 and OSR2) Device_Init
+        # opens VxD\DHCP and, when the key exists, queries Version; a missing
+        # Version fails the init ("Dynamic init failed VDHCP ... Device
+        # refused to load") and no DHCP lease is ever requested (X470 95 RTM
+        # native install 2026-10-26: PopupFlag alone -> no network). An absent
+        # key or Version=1 loads. Both values in the form VDHCP writes them.
+        dhcpkey = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\DHCP"
+        emit(dhcpkey, "Version", "hex:01,00,00,00")
+        emit(dhcpkey, "PopupFlag", "hex:00,00,00,00")
         if (vmd != "") {
             # 950 (vmdlate): no USOSVmd here. REG95.REG is imported before the
             # first GUI boot of 950 Setup, and that boot froze inside the
