@@ -134,6 +134,7 @@ try {
         'EFI/USOS/dos-native/win9x/VBADOS.TXT',
         'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT',
         'EFI/USOS/dos-native/win9x/INWIN.COM',
+        'EFI/USOS/dos-native/win9x/U9V10STK.COM',
         'EFI/USOS/dos-native/win9x/XHCI98.SYS',
         'EFI/USOS/dos-native/win9x/XHCI98.INF',
         'EFI/USOS/dos-native/win9x/XHCI98.TXT',
@@ -244,6 +245,7 @@ try {
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBADOS.TXT'); Target = 'EFI/USOS/dos-native/win9x/VBADOS.TXT' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\DOSMOUSE.BAT'); Target = 'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\INWIN.COM'); Target = 'EFI/USOS/dos-native/win9x/INWIN.COM' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\U9V10STK.COM'); Target = 'EFI/USOS/dos-native/win9x/U9V10STK.COM' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'); Target = 'EFI/USOS/micro-linux/vmlinuz-virt' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'); Target = 'EFI/USOS/systemd-bootx64.efi' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'); Target = 'EFI/USOS/ntfs_x64.efi' }

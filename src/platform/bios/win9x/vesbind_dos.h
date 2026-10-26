@@ -4,8 +4,9 @@
 #include <stdarg.h>
 #define NULL ((void *)0)
 typedef unsigned size_t;
-typedef struct { unsigned handle, pos, used, error; char data[256]; } FILE;
-static FILE own_file;
+typedef struct { unsigned handle, pos, used, error, open; char data[256]; } FILE;
+/* Two at once: PMDROP / MAXRES read one file while writing another. */
+static FILE own_files[2];
 unsigned dos_open(const char *path);
 #pragma aux dos_open = "mov ax,3d00h" "int 21h" "jnc ok" "mov ax,0ffffh" "ok:" parm [dx] value [ax] modify [ax];
 unsigned dos_open_rw(const char *path);
@@ -29,6 +30,11 @@ void *memset(void *to,int v,size_t n) { char*d=to;while(n--)*d++=(char)v;return 
 char *strcpy(char *to,const char *from) { char*d=to;do{*d++=*from;}while(*from++);return to; }
 int strcmp(const char*a,const char*b) { while(*a&&*a==*b){a++;b++;}return (unsigned char)*a-(unsigned char)*b; }
 char *strchr(const char*s,int c) { while(*s&&(unsigned char)*s!=(unsigned char)c)s++;return *s==(char)c?(char*)s:NULL; }
+char *strstr(const char*s,const char*w) {
+    unsigned n=strlen(w);
+    for(;*s;s++){unsigned i=0;while(i<n&&s[i]==w[i])i++;if(i==n)return (char*)s;}
+    return n?NULL:(char*)s;
+}
 int tolower(int c) { return c>='A'&&c<='Z'?c+32:c; }
 int isdigit(int c) { return c>='0'&&c<='9'; }
 int isxdigit(int c) { return isdigit(c)||(tolower(c)>='a'&&tolower(c)<='f'); }
@@ -46,9 +52,11 @@ int sprintf(char*out,const char*fmt,...) {
     va_list ap;unsigned n;va_start(ap,fmt);n=format(out,fmt,ap);va_end(ap);return (int)n;
 }
 FILE *fopen(const char*path,const char*mode) {
-    unsigned h=mode[0]=='r'?dos_open(path):dos_create(path);
+    FILE *f=own_files[0].open?&own_files[1]:&own_files[0];unsigned h;
+    if(f->open)return NULL;
+    h=mode[0]=='r'?dos_open(path):dos_create(path);
     if(h==0xffff)return NULL;
-    own_file.handle=h;own_file.pos=own_file.used=own_file.error=0;return &own_file;
+    f->handle=h;f->pos=f->used=f->error=0;f->open=1;return f;
 }
 char *fgets(char*out,unsigned size,FILE*f) {
     unsigned n=0;char c;
@@ -62,7 +70,7 @@ char *fgets(char*out,unsigned size,FILE*f) {
     out[n]=0;return n?out:NULL;
 }
 int ferror(FILE*f) { return f->error!=0; }
-int fclose(FILE*f) { return dos_close(f->handle)?-1:0; }
+int fclose(FILE*f) { f->open=0;return dos_close(f->handle)?-1:0; }
 int fprintf(FILE*f,const char*fmt,...) {
     char data[768];va_list ap;unsigned n;
     va_start(ap,fmt);n=format(data,fmt,ap);va_end(ap);

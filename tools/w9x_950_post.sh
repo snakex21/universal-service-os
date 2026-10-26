@@ -81,3 +81,72 @@ w9x_950_post_inject() {
     printf '950 post-phase1:%s\n' "${wp_msg#;}"
     return $wp_rc
 }
+
+# Native phase 1 (no VM; EFI/USOS/win9x/phase1-native.flag or no VM on this
+# PC): no prep system runs between Setup's file copy and the first GUI start,
+# so tools/w9x_csmwrap_target.sh stages this DOS twin of w9x_950_post_inject
+# instead. AUTOEXEC.BAT (INSTALL.BAT, src/platform/bios/dos_startup.cmd)
+# calls it before FIRSTBT.BAT; once Setup's files are on C: (WIN.COM and
+# SYSTEM.DAT, i.e. the first start after phase 1) it runs VESBIND PMDROP /
+# MAXRES (the same bytes as the awk filters above), checks each result by
+# running the filter again, logs to C:\USOS9X\W950POST.LOG and writes
+# PHASE1.OK, the marker the VM path writes and FIRSTBT.BAT waits for. The
+# originals stay as C:\USOS9X\SETUPINI.ORG / MONINF.ORG. Display binding
+# (VESA95 / VESALATE) is left alone: the native run ends with one adapter.
+# w9x_950_post_dos_write <C:\USOS9X staging dir>
+w9x_950_post_dos_write() {
+    [ -f "$1/VESBIND.EXE" ] || return 1
+    sed 's/$/\r/' > "$1/W950POST.BAT" <<'EOF'
+@ECHO OFF
+REM USOS (tools/w9x_950_post.sh): SETUP 4.0.0.950 after a native phase 1.
+IF EXIST C:\USOS9X\PHASE1.OK GOTO END
+IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
+IF NOT EXIST C:\USOS9X\VESBIND.EXE GOTO NOVB
+IF NOT EXIST C:\WINDOWS\SETUP.INI GOTO PMMISS
+C:\USOS9X\VESBIND.EXE PMDROP C:\WINDOWS\SETUP.INI C:\USOS9X\SETUPINI.NEW
+IF ERRORLEVEL 2 GOTO PMBAD
+IF ERRORLEVEL 1 GOTO PMNONE
+COPY /Y C:\WINDOWS\SETUP.INI C:\USOS9X\SETUPINI.ORG > NUL
+COPY /Y C:\USOS9X\SETUPINI.NEW C:\WINDOWS\SETUP.INI > NUL
+C:\USOS9X\VESBIND.EXE PMDROP C:\WINDOWS\SETUP.INI C:\USOS9X\SETUPINI.CHK
+IF ERRORLEVEL 2 GOTO PMBAD
+IF NOT ERRORLEVEL 1 GOTO PMBAD
+ECHO SETUP.INI: progman.only removed>> C:\USOS9X\W950POST.LOG
+GOTO MON
+:PMMISS
+ECHO SETUP.INI missing (unchanged)>> C:\USOS9X\W950POST.LOG
+GOTO MON
+:PMNONE
+ECHO SETUP.INI nothing to change (unchanged)>> C:\USOS9X\W950POST.LOG
+GOTO MON
+:PMBAD
+ECHO SETUP.INI: FAILED>> C:\USOS9X\W950POST.LOG
+:MON
+IF NOT EXIST C:\WINDOWS\INF\MONITOR.INF GOTO MNMISS
+C:\USOS9X\VESBIND.EXE MAXRES C:\WINDOWS\INF\MONITOR.INF C:\USOS9X\MONINF.NEW
+IF ERRORLEVEL 2 GOTO MNBAD
+IF ERRORLEVEL 1 GOTO MNNONE
+COPY /Y C:\WINDOWS\INF\MONITOR.INF C:\USOS9X\MONINF.ORG > NUL
+COPY /Y C:\USOS9X\MONINF.NEW C:\WINDOWS\INF\MONITOR.INF > NUL
+C:\USOS9X\VESBIND.EXE MAXRES C:\WINDOWS\INF\MONITOR.INF C:\USOS9X\MONINF.CHK
+IF ERRORLEVEL 2 GOTO MNBAD
+IF NOT ERRORLEVEL 1 GOTO MNBAD
+ECHO INF\MONITOR.INF: VESADDC MaxResolution 1920,1200>> C:\USOS9X\W950POST.LOG
+GOTO MARK
+:MNMISS
+ECHO INF\MONITOR.INF missing (unchanged)>> C:\USOS9X\W950POST.LOG
+GOTO MARK
+:MNNONE
+ECHO INF\MONITOR.INF nothing to change (unchanged)>> C:\USOS9X\W950POST.LOG
+GOTO MARK
+:MNBAD
+ECHO INF\MONITOR.INF: FAILED>> C:\USOS9X\W950POST.LOG
+GOTO MARK
+:NOVB
+ECHO VESBIND.EXE missing: no 950 post fixes>> C:\USOS9X\W950POST.LOG
+:MARK
+ECHO phase1=native> C:\USOS9X\PHASE1.OK
+:END
+EOF
+}

@@ -661,6 +661,16 @@ if [ "$ANSWER_KIND" != USER ] &&
         w9x_firstboot_write "$work/c/USOS9X" "$setup_version" || fail 'cannot stage source950 first-desktop coordinator'
     log 'first desktop: source950 ordinary RunOnce coordinator, one final post-addons restart'
 fi
+# Source950 with a native phase 1: the VM path's post-phase-1 steps
+# (w9x_csmwrap_prepare.sh: w9x_950_post_inject, PHASE1.OK) need the files
+# Setup copies, after the prep system is gone: W950POST.BAT does them DOS-side
+# before the first GUI start (tools/w9x_950_post.sh). The VM path keeps its own.
+rm -f "$work/c/USOS9X/W950POST.BAT"
+if [ "${VM_PHASE1:-0}" != 1 ] && [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+    [ -r "$LIB/w9x_950_post.sh" ] && . "$LIB/w9x_950_post.sh" &&
+        w9x_950_post_dos_write "$work/c/USOS9X" || fail 'cannot stage the 950 native post-phase-1 fixes'
+    log 'native phase 1: W950POST.BAT (SETUP.INI progman.only, MONITOR.INF VESADDC MaxRes, PHASE1.OK) before the first GUI start'
+fi
 # Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
 # 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand
 # (REG_SZ, "yes"/"no", the value its own checkbox writes); 98 SE is not

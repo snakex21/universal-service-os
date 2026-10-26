@@ -75,6 +75,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/win9x/VBADOS.TXT`, `EFI/USOS/dos-native/win9x/VBADOS.TXT`},
 	{`zig-out/dos-native/win9x/DOSMOUSE.BAT`, `EFI/USOS/dos-native/win9x/DOSMOUSE.BAT`},
 	{`zig-out/dos-native/win9x/INWIN.COM`, `EFI/USOS/dos-native/win9x/INWIN.COM`},
+	{`zig-out/dos-native/win9x/U9V10STK.COM`, `EFI/USOS/dos-native/win9x/U9V10STK.COM`},
 	{`zig-out/dos-native/win9x/XHCI98.SYS`, `EFI/USOS/dos-native/win9x/XHCI98.SYS`},
 	{`zig-out/dos-native/win9x/XHCI98.INF`, `EFI/USOS/dos-native/win9x/XHCI98.INF`},
 	{`zig-out/dos-native/win9x/XHCI98.TXT`, `EFI/USOS/dos-native/win9x/XHCI98.TXT`},

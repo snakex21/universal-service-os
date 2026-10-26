@@ -25,7 +25,7 @@ def host_binary():
     compiler=shutil.which('gcc') or shutil.which('cc')
     if not compiler:raise unittest.SkipTest('Set USOS_VESBIND_HOST_EXE to a native build of vesbind.c (no gcc / cc)')
     out=scratch('vesbind-host-')/('vesbind'+('.exe' if os.name=='nt' else ''))
-    subprocess.run([compiler,'-O1','-Wall','-Werror','-o',str(out),str(ROOT/'src/platform/bios/win9x/vesbind.c')],check=True)
+    subprocess.run([compiler,'-O1','-Wall','-Werror','-Wno-misleading-indentation','-o',str(out),str(ROOT/'src/platform/bios/win9x/vesbind.c')],check=True)
     return out
 
 class Parser(unittest.TestCase):

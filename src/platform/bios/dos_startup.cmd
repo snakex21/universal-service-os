@@ -197,6 +197,10 @@ REM Windows 95: C:\USOS9X\REG95.BAT (tools/w9x_reg95.sh) imports the answer's
 REM [Install] AddReg values once (95 Setup ignores them): after VESA95.BAT,
 REM whose failure path restores its registry backup, before the first desktop.
 ECHO @IF EXIST C:\USOS9X\REG95.BAT CALL C:\USOS9X\REG95.BAT>>C:\AUTOEXEC.BAT
+REM Source950 with a native phase 1 (no VM): W950POST.BAT (tools/w9x_950_post.sh)
+REM does the VM path's post-phase-1 fixes once Setup's files are there, before
+REM the first GUI start, and writes PHASE1.OK, which FIRSTBT.BAT waits for.
+ECHO @IF EXIST C:\USOS9X\W950POST.BAT CALL C:\USOS9X\W950POST.BAT>>C:\AUTOEXEC.BAT
 REM Source950 only: ordinary RunOnce blocks the first desktop until complete.
 ECHO @IF EXIST C:\USOS9X\FIRSTBT.BAT CALL C:\USOS9X\FIRSTBT.BAT>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
@@ -342,10 +346,17 @@ ECHO @ECHO OFF>C:\USOS9X\RESUME.BAT
 ECHO ECHO Wznawianie Instalatora Windows %U9SYS%...>>C:\USOS9X\RESUME.BAT
 ECHO C:>>C:\USOS9X\RESUME.BAT
 ECHO CD \%U9SRC%>>C:\USOS9X\RESUME.BAT
+ECHO IF EXIST C:\USOS9X\U9V10STK.COM C:\USOS9X\U9V10STK.COM>>C:\USOS9X\RESUME.BAT
 ECHO C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF %U9SW%>>C:\USOS9X\RESUME.BAT
 C:
 CD \%U9SRC%
 ECHO Uruchamianie Instalatora Windows %U9SYS%...
+REM U9V10STK.COM (src/platform/bios/win9x/u9v10stk.S): INT 10h on its own 2 KiB
+REM stack. SETUP.EXE's stub sets text mode and its font on a 128-byte stack;
+REM a current VBIOS under CSMWrap (X470 RX 560) needs more and overwrote it:
+REM 95 RTM Setup hung before its mini-Windows. Every 9x of the UEFI disk mode
+REM (also in the VM); the Legacy Core RAM disk carries no copy (IF EXIST).
+IF EXIST %U9T%\U9V10STK.COM %U9T%\U9V10STK.COM
 ECHO SETUP start %U9SW%>>C:\USOS9X\INSTALL.LOG
 C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF %U9SW%
 ECHO SETUP returned>>C:\USOS9X\INSTALL.LOG

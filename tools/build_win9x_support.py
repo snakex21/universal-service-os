@@ -58,6 +58,15 @@
                 (tools/w9x_csmwrap_target.sh fills in the class instance;
                 otherwise removed from C:\\USOS9X)
 
+  U9V10STK.COM  TSR: INT 10h on a private 2 KiB stack, loaded by INSTALL.BAT
+                and RESUME.BAT right before SETUP.EXE (every 9x, UEFI disk
+                mode; the Legacy Core RAM disk has no copy; Windows 95
+                RTM SETUP.EXE's 128-byte stack vs the RX 560 VBIOS under
+                CSMWrap, X470 2026-10-26; src/platform/bios/win9x/u9v10stk.S)
+  W950POST.BAT  (written by tools/w9x_950_post.sh, not here) the DOS-side
+                950 post-phase-1 fixes for a native phase 1 (VESBIND
+                PMDROP / MAXRES), PHASE1.OK for FIRSTBT.BAT
+
 Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
 nothing runs them unless EFI/USOS/win9x/diag.flag exists):
   USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
@@ -123,7 +132,10 @@ STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'USOSFB.EXE', 'MSBATCH.INF', 'V
     # USB sticks (default; DATA usb-storage-off.txt turns them off, tools/w9x_csmwrap_target.sh).
     'USOSUSB.MPD', 'USOSUSB.INF', 'USOSUSB.REG') + (
     # CSMWrap flow: mouse in MS-DOS boxes (98/98 SE/Me) and the silent logger.
-    'USOSVMD.VXD', 'USOSLOG.EXE')
+    'USOSVMD.VXD', 'USOSLOG.EXE') + (
+    # INT 10h stack for SETUP.EXE (INSTALL.BAT / RESUME.BAT, the UEFI disk
+    # mode; not in the Legacy Core RAM disk list: its 4096-byte headroom).
+    'U9V10STK.COM',)
 USOSNVME = ROOT / 'tools/nt/usosnvme'
 USOSUSB = ROOT / 'tools/nt/usosusb9x'
 USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
@@ -255,6 +267,22 @@ def build_usosv10(out: Path, work: Path) -> Path:
     data = com.read_bytes()
     if not 2048 < len(data) <= 4096 or data[0] != 0xE9 or b'USOSV10A' not in data:
         raise ValueError('unexpected USOSV10.COM layout')
+    return com
+
+
+def build_u9v10stk(out: Path, work: Path) -> Path:
+    """U9V10STK.COM: INT 10h on a private stack for 9x SETUP.EXE."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, com = work / 'U9V10STK.o', work / 'U9V10STK.elf', out / 'U9V10STK.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(SOURCE / 'u9v10stk.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    if not 2048 < len(data) <= 4096 or data[0] != 0xE9 or data[3:11] != b'U9V10STK':
+        raise ValueError('unexpected U9V10STK.COM layout')
     return com
 
 
@@ -524,6 +552,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     work.mkdir(parents=True, exist_ok=True)
     build_u9fix(out, work)
     build_inwin(out, work)
+    build_u9v10stk(out, work)
     dosmouse_bat(out)
     build_diag(out, work)
     build_usosdbg(out, work)

@@ -514,8 +514,104 @@ done:
     if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
     return failed;
 }
+/* PMDROP setup.ini out / MAXRES monitor.inf out: the two SETUP 4.0.0.950
+ * post-phase-1 text fixes of tools/w9x_950_post.sh (w9x_950_setupini_filter,
+ * w9x_950_monitorinf_filter) for a native phase 1, where no prep system runs
+ * after Setup: W950POST.BAT calls them from AUTOEXEC.BAT before the first
+ * GUI start. Same output bytes as the awk filters (tools/tests compare them).
+ * PMDROP: [progman.only] keeps its header, comments and blank lines, loses
+ * its entries (GRPCONV's Program Manager DDE step). MAXRES: the AddReg line
+ * of [VESADDC.Install] names [USOS.MaxRes] instead of [1600], which is
+ * appended (MaxResolution 1920,1200). Exit 0 = out written, 1 = nothing to
+ * change (no entries / no single 1600 / already done; out may be partial,
+ * the batch ignores it), 2 = error. */
+static char tl[MAXLINE];
+static unsigned tlen;
+static int tcr;
+static int tnext(FILE *f) {
+    if (!fgets(tl,sizeof(tl),f)) return 0;
+    tlen=(unsigned)strlen(tl);
+    if (tlen==sizeof(tl)-1 && tl[tlen-1]!='\n') return -1;
+    if (tlen && tl[tlen-1]=='\n') tl[--tlen]=0;
+    tcr=tlen && tl[tlen-1]=='\r';
+    if (tcr) tl[--tlen]=0;
+    return 1;
+}
+static int blank(char c) { return c==' '||c=='\t'; }
+/* awk: line ~ /^[ \t]*\[/, then lower case without blanks == want */
+static int section_is(const char *want, int *header) {
+    const char *p=tl;
+    *header=0;
+    while (blank(*p)) p++;
+    if (*p!='[') return 0;
+    *header=1;
+    for (p=tl;*p;p++) {
+        if (blank(*p)) continue;
+        if (tolower((unsigned char)*p)!=*want) return 0;
+        want++;
+    }
+    return *want==0;
+}
+static int tput(FILE *out, const char *s) { return fprintf(out,"%s",s)>=0; }
+static int text_fix(const char *in_path, const char *out_path, int maxres) {
+    FILE *in, *out; int r, inside=0, header, done=0, ok=1;
+    in=fopen(in_path,"rb"); if (!in) return 2;
+    if (maxres) {
+        while ((r=tnext(in))>0) if (strstr(tl,"USOS (tools/w9x_950_post.sh)")) break;
+        fclose(in);
+        if (r<0) return 2;
+        if (r>0) return 1;
+        in=fopen(in_path,"rb"); if (!in) return 2;
+    }
+    out=fopen(out_path,"wb"); if (!out) { fclose(in); return 2; }
+    while (ok && (r=tnext(in))>0) {
+        int sec=section_is(maxres?"[vesaddc.install]":"[progman.only]",&header);
+        if (header) inside=sec;
+        if (!maxres && !header && inside) {
+            const char *p=tl; while (blank(*p)) p++;
+            if (*p && *p!=';') { done++; continue; }
+        }
+        if (maxres && !header && inside) {
+            char low[8]; unsigned i;
+            for (i=0;i<6 && tl[i];i++) low[i]=(char)tolower((unsigned char)tl[i]);
+            low[i]=0;
+            if (!strcmp(low,"addreg")) {
+                const char *p=tl+6; while (blank(*p)) p++;
+                if (*p=='=') {
+                    /* awk split(substr(line, index(line, "=") + 1), part, ",") */
+                    const char *v=strchr(tl,'=')+1; char part[MAXLINE]; unsigned n; int first=1;
+                    ok=tput(out,"AddReg=");
+                    while (ok && *v) {
+                        const char *e=v; while (*e && *e!=',') e++;
+                        while (v<e && blank(*v)) v++;
+                        n=(unsigned)(e-v); while (n && blank(v[n-1])) n--;
+                        memcpy(part,v,n); part[n]=0;
+                        if (!strcmp(part,"1600")) { strcpy(part,"USOS.MaxRes"); done++; }
+                        ok=(first || tput(out,", ")) && tput(out,part);
+                        first=0;
+                        v=*e?e+1:e;
+                        if (*e && !*v) ok=ok && tput(out,", ");
+                    }
+                    ok=ok && tput(out,tcr?"\r\n":"\n");
+                    continue;
+                }
+            }
+        }
+        ok=tput(out,tl) && tput(out,tcr?"\r\n":"\n");
+    }
+    if (r<0 || ferror(in)) ok=0;
+    if (fclose(in)) ok=0;
+    if (ok && maxres && done==1)
+        ok=tput(out,"\r\n; USOS (tools/w9x_950_post.sh): DDC monitors up to the largest VESA mode.\r\n") &&
+           tput(out,"[USOS.MaxRes]\r\nHKR,,MaxResolution,,\"1920,1200\"\r\nHKR,\"MODES\\1920,1200\"\r\n");
+    if (fclose(out)) ok=0;
+    if (!ok) return 2;
+    return (maxres ? done==1 : done>0) ? 0 : 1;
+}
 int main(int argc,char **argv) {
     int vesa,old,bound;FILE *out;int failed;
+    if(argc==4 && (ieq(argv[1],"PMDROP") || ieq(argv[1],"MAXRES")))
+        return text_fix(argv[2],argv[3],ieq(argv[1],"MAXRES"));
     memset(classes,0,sizeof(classes));class_count=pci_displays=root_displays=0;
     key[0]=candidate[0]=device_class[0]=driver[0]=chosen[0]=chosen_driver[0]=0;
     root_chosen[0]=root_driver[0]=0;
