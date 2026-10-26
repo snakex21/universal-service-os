@@ -1,7 +1,8 @@
 # Source950 only: ordinary RunOnce coordinator, after original Setup.
 # It never creates RunOnce\Setup, which would block the real-mode guards.
-# Until FIRSTBT.OK, every boot also replaces HKLM\Network\Logon with the
-# REG95LGN.REG export of REG95.BAT: 950 Setup writes PrimaryProvider
+# Until FIRSTBT.OK, every boot also replaces HKLM\Network\Logon with
+# REG95LGN.REG (tools/w9x_reg95.sh writes it at prep time from REG95.REG,
+# never with a PrimaryProvider value): 950 Setup writes PrimaryProvider
 # "Microsoft Network" after REG95 (X470 95 RTM PL fresh, 2026-10-26) and
 # 950's real-mode REGEDIT has no /D, so VESBIND DELKEY removes the key
 # first (SYSTEM.LGN backup restored if it fails while writing). The

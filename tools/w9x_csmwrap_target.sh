@@ -680,7 +680,7 @@ if [ "$SYSTEM_TAG" = 95 ]; then
     # USOSRES / USOSLAN / USOSLOG Run value, no IE/ICW defaults): REG95.BAT
     # (tools/w9x_reg95.sh) imports the same values once before the first
     # desktop. A user's own answer file gets none (as on 98, 1:1).
-    rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+    rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG" "$work/c/USOS9X/REG95LGN.REG"
     if [ "$ANSWER_KIND" = USER ]; then
         log "answer registry: none for the user's own answer file"
         [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || log 'usosnet4: NET95.REG unused (no REG95); the card comes from PnP + USOSNET.INF'
@@ -700,7 +700,7 @@ if [ "$SYSTEM_TAG" = 95 ]; then
             if [ -n "$reg95_net" ] && [ "${setup_version:-}" = '4 0 0 950' ]; then
                 fail 'RTM/OSR1 network files and registry helpers could not be prepared; target start withheld'
             fi
-            rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
+            rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG" "$work/c/USOS9X/REG95LGN.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
             if [ "$vmd_ok" = 1 ]; then
                 vmd_ok=0

@@ -208,14 +208,14 @@ class Reg95Merge(unittest.TestCase):
         (self.tmp / 'out/NET').mkdir(parents=True)
         (self.tmp / 'MSBATCH.INF').write_bytes(ANSWER_95.encode('ascii'))
 
-    def write(self, net=True, answer=None):
+    def write(self, net=True, answer=None, version=''):
         if answer:
             (self.tmp / 'MSBATCH.INF').write_bytes(answer.encode('ascii'))
         out = (self.tmp / 'out').as_posix()
         netreg = (self.tmp / 'out/NET/NET95.REG').as_posix()
         code = (f". \"{REG95}\"\n"
                 + (f"usos_net_w95_reg 'PCI\\VEN_8086&DEV_1539' 0008020B00 'I211' USOSNETI211.ndi > '{netreg}'\n" if net else '')
-                + f"w9x_reg95_write '{out}' '{(self.tmp / 'MSBATCH.INF').as_posix()}' '' '' {repr(netreg) if net else ''}\n")
+                + f"w9x_reg95_write '{out}' '{(self.tmp / 'MSBATCH.INF').as_posix()}' '' '' {repr(netreg) if net else repr('')} '{version}'\n")
         rc, so, err = run(code)
         self.assertEqual(rc, 0, so + err)
         return ((self.tmp / 'out/REG95.REG').read_bytes().decode('ascii'),
@@ -229,11 +229,46 @@ class Reg95Merge(unittest.TestCase):
         self.assertNotIn('"username"', reg)                 # ANSWER_95 has no DefaultUserName
         imp = bat.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\REG95.REG')
         self.assertLess(bat.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT /D HKEY_LOCAL_MACHINE\\Network\\Logon'), imp)
-        self.assertGreater(bat.index('/E C:\\USOS9X\\REG95LGN.REG HKEY_LOCAL_MACHINE\\Network\\Logon'), imp)
+        # REG95LGN.REG is written at prep time, never exported after the import
+        # (the export kept Setup's PrimaryProvider "Microsoft Network").
+        self.assertNotIn('REG95LGN', bat)
         self.assertNotIn('NET95', bat)
+        self.assertEqual(self.lgn(), b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Network\\Logon]\r\n'
+                                     b'"ProcessLoginScript"=hex:01\r\n"LMLogon"=hex:00,00,00,00\r\n\r\n')
         reg, _ = self.write(net=False, answer=ANSWER_95.replace(
             'DefaultPassword,,""', 'DefaultUserName,,"USOS"\r\nHKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Winlogon",DefaultPassword,,""'))
         self.assertIn('"LMLogon"=hex:00,00,00,00\r\n"username"="USOS"\r\n', reg)
+        self.assertEqual(self.lgn(), b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Network\\Logon]\r\n'
+                                     b'"ProcessLoginScript"=hex:01\r\n"LMLogon"=hex:00,00,00,00\r\n"username"="USOS"\r\n\r\n')
+
+    def lgn(self):
+        return (self.tmp / 'out/REG95LGN.REG').read_bytes()
+
+    def test_950_logon_no_primary_provider_and_delkey(self):
+        # An answer's own PrimaryProvider line never reaches REG95LGN.REG.
+        answer = ANSWER_95.replace('DefaultPassword,,""', 'DefaultPassword,,""\r\n'
+                                   'HKLM,"Network\\Logon",PrimaryProvider,,"Microsoft Network"')
+        reg, bat = self.write(net=False, answer=answer, version='4 0 0 950')
+        lgn = self.lgn()
+        self.assertTrue(lgn.startswith(b'REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Network\\Logon]\r\n'))
+        self.assertNotIn(b'PrimaryProvider', lgn)
+        self.assertNotIn(b'Microsoft Network', lgn)
+        self.assertEqual(lgn.count(b'['), 1)
+        self.assertIn(b'"ProcessLoginScript"=hex:01\r\n', lgn)
+        # 950 real-mode REGEDIT has no /D: VESBIND DELKEY with a backup.
+        self.assertFalse([l for l in bat.split('\r\n') if l.startswith('REGEDIT') and ' /D ' in l])
+        lines = bat.split('\r\n')
+        delkey = lines.index('C:\\USOS9X\\VESBIND.EXE DELKEY C:\\WINDOWS\\SYSTEM.DAT HKEY_LOCAL_MACHINE\\Network\\Logon C:\\USOS9X\\R95DEL.LOG')
+        self.assertLess(lines.index('C:\\WINDOWS\\COMMAND\\ATTRIB.EXE -S -R -H SYSTEM.DAT'), delkey)
+        self.assertLess(lines.index('COPY /Y SYSTEM.DAT C:\\USOS9X\\SYSTEM.R95 > NUL'), delkey)
+        self.assertEqual(lines[delkey + 1], 'IF ERRORLEVEL 3 COPY /Y C:\\USOS9X\\SYSTEM.R95 SYSTEM.DAT > NUL')
+        self.assertLess(delkey, lines.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\REG95.REG'))
+        self.assertLess(lines.index(':LGNSKIP'), lines.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\REG95.REG'))
+        self.assertIn('IF NOT EXIST C:\\USOS9X\\VESBIND.EXE GOTO LGNSKIP', lines)
+        self.assertNotIn('REG95LGN', bat)
+        self.assertLessEqual(max(len(line) for line in lines), 125)
+        # FIRSTBT.BAT's guard still finds the key in the prep-time file.
+        self.assertIn(b'Network\\Logon]', lgn)
 
     def test_net95_merged_before_comments_and_checked(self):
         reg, bat = self.write()

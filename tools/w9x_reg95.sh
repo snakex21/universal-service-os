@@ -232,7 +232,9 @@ w9x_reg95_convert() {
         # Windows Logon as the primary logon (REG95.BAT deletes Network\Logon
         # first: 95 Setup leaves PrimaryProvider "Microsoft Network" there
         # although MSBATCH says PrimaryLogon=Windows), with the Winlogon
-        # DefaultUserName of the answer as the preset name.
+        # DefaultUserName of the answer as the preset name. No PrimaryProvider
+        # value at all is the Windows Logon. w9x_reg95_write copies this key
+        # into REG95LGN.REG, which FIRSTBT.BAT re-imports on 950.
         emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "ProcessLoginScript", "hex:01")
         emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "LMLogon", "hex:00,00,00,00")
         if (logon_user != "") emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "username", logon_user)
@@ -751,6 +753,37 @@ w9x_reg95_write() {
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
     netbat='' netprep='' netguard='' netfail='' neterrjump='' net_findfail=NETEND tcp95='' netlate=''
     run_guard="IF EXIST ${U}REG95.RUN GOTO END"
+    # Network\Logon, the Windows Logon: deleted, then REG95.REG brings back
+    # its own values. 950's real-mode REGEDIT has no /D (its usage text: only
+    # import, /C, /E), so on 950 VESBIND DELKEY deletes the key in place
+    # (tools/w9x_firstboot.sh does the same each boot until FIRSTBT.OK),
+    # with SYSTEM.R95 as the backup for a failure while writing. Fail-soft:
+    # refused / absent key / no VESBIND only log, the import still runs.
+    lgndel="$R /D HKEY_LOCAL_MACHINE\\Network\\Logon"
+    if [ "$source_version" = '4 0 0 950' ]; then
+        lgndel="REM 950: no REGEDIT /D, VESBIND DELKEY (backup SYSTEM.R95).
+IF NOT EXIST ${U}VESBIND.EXE GOTO LGNSKIP
+IF EXIST ${U}SYSTEM.R95 DEL ${U}SYSTEM.R95
+COPY /Y SYSTEM.DAT ${U}SYSTEM.R95 > NUL
+IF NOT EXIST ${U}SYSTEM.R95 GOTO LGNSKIP
+${U}VESBIND.EXE DELKEY C:\\WINDOWS\\SYSTEM.DAT HKEY_LOCAL_MACHINE\\Network\\Logon ${U}R95DEL.LOG
+IF ERRORLEVEL 3 COPY /Y ${U}SYSTEM.R95 SYSTEM.DAT > NUL
+IF ERRORLEVEL 2 ECHO REG95: Network\\Logon not deleted, see R95DEL.LOG>> ${U}USOSLOG.TXT
+:LGNSKIP"
+    fi
+    # REG95LGN.REG: the Network\Logon values of REG95.REG only, written
+    # here. The former REGEDIT /E export after the import also kept the
+    # PrimaryProvider that the delete had missed (X470 95 RTM PL native,
+    # 2026-10-26: "Microsoft Network" in REG95LGN.REG, which FIRSTBT.BAT
+    # re-imports every boot: the Microsoft Networking logon and the
+    # password prompts). A PrimaryProvider line is never copied.
+    rm -f "$dir/REG95LGN.REG"
+    { printf 'REGEDIT4\r\n'
+      tr -d '\r' < "$dir/REG95.REG" | awk '
+          /^\[/ { on = (tolower($0) == "[hkey_local_machine\\network\\logon]"); if (on && !seen++) printf "\r\n%s\r\n", $0; next }
+          on && $0 != "" && tolower($0) !~ /^"primaryprovider"=/ { printf "%s\r\n", $0 }'
+      printf '\r\n'; } > "$dir/REG95LGN.REG" || return 1
+    grep -q '^"' "$dir/REG95LGN.REG" || rm -f "$dir/REG95LGN.REG"
     vmdlate='REM -'
     rm -f "$dir/VMDLATE.BAT" "$dir/VMDRO.REG"
     if [ -n "$vmd" ] && [ "$source_version" = '4 0 0 950' ]; then
@@ -829,10 +862,9 @@ C:
 CD \WINDOWS
 $A -S -R -H SYSTEM.DAT
 $A -S -R -H USER.DAT
-$R /D HKEY_LOCAL_MACHINE\\Network\\Logon
+$lgndel
 $R ${U}REG95.REG
 $R /E ${U}REG95CHK.REG $run
-$R /E ${U}REG95LGN.REG HKEY_LOCAL_MACHINE\\Network\\Logon
 $netbat
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
