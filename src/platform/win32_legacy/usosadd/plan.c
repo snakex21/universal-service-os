@@ -41,6 +41,21 @@ int ua_load_pkgs(const ua_ini *m, ua_pkgs *out) {
     return out->count;
 }
 
+int ua_setup_overrides(const ua_ini *m, ua_pkgs *p) {
+    int i, n = 0;
+    for (i = 0; i < p->count; i++) {
+        ua_pkg *k = &p->pkg[i];
+        const char *v = ua_ini_get(m, k->section, "reboot_setup");
+        if (v && *v) {
+            k->reboot = ua_ieq(v, "now") ? UA_REBOOT_NOW : ua_ieq(v, "end") ? UA_REBOOT_END : UA_REBOOT_NO;
+            n++;
+        }
+        v = ua_ini_get(m, k->section, "check_setup");
+        if (v && *v) { k->check = v; n++; }
+    }
+    return n;
+}
+
 int ua_pkg_find(const ua_pkgs *p, const char *id) {
     int i;
     for (i = 0; i < p->count; i++) if (ua_ieq(p->pkg[i].id, id)) return i;

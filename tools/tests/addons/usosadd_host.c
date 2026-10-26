@@ -95,6 +95,27 @@ static int selftest(void) {
     CHECK(ua_load_pkgs(&ini, &pk) == 4);
     CHECK(pk.pkg[0].reboot == UA_REBOOT_NOW && pk.pkg[1].reboot == UA_REBOOT_NO);
     CHECK(ua_os_match(&ini, "95", "95RTM") && !ua_os_match(&ini, "95", "98SE"));
+    /* without reboot_setup/check_setup the 950 coordinator changes nothing */
+    CHECK(ua_setup_overrides(&ini, &pk) == 0);
+    CHECK(pk.pkg[0].reboot == UA_REBOOT_NOW && pk.pkg[1].reboot == UA_REBOOT_NO && !*pk.pkg[1].check);
+    {
+        static ua_ini oi;
+        static ua_pkgs op;
+        char otext[] =
+            "[pkg:ie]\r\ntier=full\r\nos=95\r\nlang=PL\r\norder=1\r\ncheck=reg:HKLM\\A\r\nreboot=end\r\nreboot_setup=now\r\n"
+            "[pkg:q]\r\ntier=full\r\nos=95\r\nlang=PL\r\norder=2\r\nreboot=end\r\n"
+            "check_setup=file:%SYS%\\MSHTML.DLL>=5.50.4923.2500\r\n"
+            "[pkg:o]\r\ntier=full\r\nos=98SE\r\nlang=*\r\norder=3\r\nreboot=end\r\ncheck=file:X\r\n";
+        ua_ini_parse(&oi, otext, (int)strlen(otext));
+        CHECK(ua_load_pkgs(&oi, &op) == 3);
+        /* the ordinary Run flow (OSR2 and later, 98, Me) keeps reboot=/check= */
+        CHECK(op.pkg[0].reboot == UA_REBOOT_END && op.pkg[1].reboot == UA_REBOOT_END && !*op.pkg[1].check);
+        CHECK(ua_setup_overrides(&oi, &op) == 2);
+        CHECK(op.pkg[0].reboot == UA_REBOOT_NOW && strcmp(op.pkg[0].check, "reg:HKLM\\A") == 0);
+        CHECK(op.pkg[1].reboot == UA_REBOOT_END && strcmp(op.pkg[1].check, "file:%SYS%\\MSHTML.DLL>=5.50.4923.2500") == 0);
+        CHECK(op.pkg[2].reboot == UA_REBOOT_END && strcmp(op.pkg[2].check, "file:X") == 0);
+        CHECK(ua_after_run(1, op.pkg[0].reboot, 1, 1) == UA_AFTER_RESTART);
+    }
 
     /* plan: b needs msi (a, earlier) and ie 5.01 (98 SE has only 5.0) */
     strcpy(s.os, "98SE"); strcpy(s.lang, "PL"); s.ntsp[0] = 0;

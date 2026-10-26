@@ -24,6 +24,7 @@
 /* The large tables live in memory from VirtualAlloc: statics would be
  * written into the file (no C runtime to clear a BSS). */
 #define VERBUF_CAP (64 * 1024)
+#define SEEN_CAP 24
 static struct big {
     char manifest[MANIFEST_CAP];
     char select[SMALL_CAP];
@@ -31,6 +32,7 @@ static struct big {
     char stateout[SMALL_CAP];
     char appendbuf[SMALL_CAP];
     char verbuf[VERBUF_CAP];
+    char seen[SEEN_CAP][96];     /* dialog titles logged for the running package */
     ua_ini m, sel, st;
     ua_pkgs p;
     ua_plan plan;
@@ -323,6 +325,17 @@ static void status(const char *text) {
  * "Kopiowanie plikow / Copying Files" prompt for a file from the CD). */
 static const ua_pkg *g_answer_pkg;
 static char g_source[UA_PATH];
+static int g_seen_n;             /* titles in g_big->seen, reset per package */
+static HWND g_answered;          /* last dialog answered, and when */
+static DWORD g_answered_tick;
+
+/* Diagnostics: each new dialog title once per package ("dialog seen"). */
+static void note_dialog(const char *title) {
+    int i;
+    for (i = 0; i < g_seen_n; i++) if (ua_ieq(g_big->seen[i], title)) return;
+    if (g_seen_n < SEEN_CAP) ua_copy(g_big->seen[g_seen_n++], sizeof g_big->seen[0], title);
+    log2("    dialog seen: ", title);
+}
 
 static int rule_for(const char *title, char *action, int cap) {
     char key[16], num[8], rule[200];
@@ -364,7 +377,14 @@ static BOOL CALLBACK answer_window(HWND w, LPARAM lp) {
     GetClassNameA(w, cls, sizeof cls);
     if (!ua_ieq(cls, "#32770")) return TRUE;
     GetWindowTextA(w, title, sizeof title);
-    if (!title[0] || !rule_for(title, action, sizeof action)) return TRUE;
+    if (!title[0]) return TRUE;
+    note_dialog(title);
+    if (!rule_for(title, action, sizeof action)) return TRUE;
+    /* The posted command closes the box; a box still visible on the next
+     * 250 ms poll gets the same answer again only after a second. */
+    if (w == g_answered && GetTickCount() - g_answered_tick < 1000) return TRUE;
+    g_answered = w;
+    g_answered_tick = GetTickCount();
     if (ua_ieq(action, "source")) {
         HWND field = 0;
         EnumChildWindows(w, find_field, (LPARAM)&field);
@@ -393,11 +413,20 @@ static DWORD spawn(char *cmdline, const char *cwd) {
         log2("    CreateProcess failed, error ", num);
         return (DWORD)-1;
     }
-    for (;;) {
-        DWORD r = MsgWaitForMultipleObjects(1, &pi.hProcess, FALSE, 1000, QS_ALLINPUT);
-        if (r == WAIT_OBJECT_0) break;
-        pump();
-        if (r == WAIT_TIMEOUT) EnumWindows(answer_window, 0);
+    /* Poll the dialogs on every wake-up, at most every 250 ms: a quiet
+     * second never came while a busy installer kept posting messages, so
+     * the final "Winsock2 Setup" box stayed open (X470 95 RTM, 2026-10-26). */
+    {
+        DWORD last = GetTickCount() - 250;
+        for (;;) {
+            DWORD r = MsgWaitForMultipleObjects(1, &pi.hProcess, FALSE, 250, QS_ALLINPUT);
+            if (r == WAIT_OBJECT_0) break;
+            pump();
+            if (GetTickCount() - last >= 250) {
+                last = GetTickCount();
+                EnumWindows(answer_window, 0);
+            }
+        }
     }
     GetExitCodeProcess(pi.hProcess, &code);
     CloseHandle(pi.hThread);
@@ -666,6 +695,36 @@ static void restart(void) {
 
 /* ---- the chain ------------------------------------------------------------------- */
 
+/* Diagnostics after each package: HKLM RunOnce value names and the number
+ * of RunOnceEx sections (IE's registrations wait there for iernonce). */
+static void log_runonce(void) {
+    char line[UA_LINE], name[128];
+    HKEY k;
+    DWORD i = 0, n, keys = 0;
+    line[0] = 0;
+    ua_append(line, sizeof line, "  RunOnce:");
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY, 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        for (i = 0; i < 64; i++) {
+            n = sizeof name;
+            if (RegEnumValueA(k, i, name, &n, 0, 0, 0, 0) != ERROR_SUCCESS) break;
+            ua_append(line, sizeof line, i ? ", " : " ");
+            ua_append(line, sizeof line, name[0] ? name : "(default)");
+        }
+        if (!i) ua_append(line, sizeof line, " -");
+        RegCloseKey(k);
+    } else {
+        ua_append(line, sizeof line, " (no key)");
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY "Ex", 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        if (RegQueryInfoKeyA(k, 0, 0, 0, &keys, 0, 0, 0, 0, 0, 0, 0) != ERROR_SUCCESS) keys = 0;
+        RegCloseKey(k);
+    }
+    ua_append(line, sizeof line, "; RunOnceEx sections: ");
+    ua_itoa(name, 16, (int)keys);
+    ua_append(line, sizeof line, name);
+    log_line(line);
+}
+
 static void log_plan(void) {
     char line[UA_LINE];
     int i;
@@ -771,6 +830,8 @@ static void run_chain(void) {
         ok = 1;
         g_last_code = 0;
         g_answer_pkg = p;
+        g_seen_n = 0;
+        g_answered = 0;
         for (k = 1; ok && k < 64; k++) {
             const char *cmd;
             key[0] = 0;
@@ -781,6 +842,8 @@ static void run_chain(void) {
             if (!cmd) break;
             ok = run_one(p, cmd);
         }
+        g_answer_pkg = 0;
+        log_runonce();
         check = run_check(p);
         if (check >= 0) ok = check;
         after = ua_after_run(ok, p->reboot, g_state.pending_reboot, g_state.tries[x]);
@@ -923,6 +986,9 @@ void __cdecl ua_start(void) {
     g_setup_mode=exact_switch(cmdline,"setup");
     if(g_setup_mode && (g_facts.nt||g_facts.major!=4||g_facts.minor!=0||(g_facts.build&0xffff)!=950||!exists("C:\\USOS9X\\VLATE.OK"))){
         log_line("USOSADD setup: source950 late display boundary missing; nothing installed");ExitProcess(2);}
+    /* 950 coordinator only: e.g. IE 5.5 SP2 restarts at once (reboot_setup=now)
+     * so its WININIT replacements and RunOnceEx precede the later packages. */
+    if(g_setup_mode && ua_setup_overrides(&g_m,&g_p)) log_line("USOSADD setup: reboot_setup/check_setup values applied");
     /* Locale/keyboard can differ from the installation media's language.
      * Stage selects packages by the latter; retain that language on resume. */
     if (!dry) {

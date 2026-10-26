@@ -25,4 +25,22 @@ class FirstBoot(unittest.TestCase):
         self.assertEqual(batch.count(b'\n'),batch.count(b'\r\n'))
         self.assertIn(b'PHASE1.OK',batch)
         self.assertIn(b':FAILWAIT\r\nGOTO FAILWAIT',batch)
+    def test_logon_key_replaced_before_runonce_import_every_boot(self):
+        folder,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
+        lines=(folder/'FIRSTBT.BAT').read_bytes().split(b'\r\n')
+        delkey=lines.index(rb'C:\USOS9X\VESBIND.EXE DELKEY C:\WINDOWS\SYSTEM.DAT HKEY_LOCAL_MACHINE\Network\Logon C:\USOS9X\LGNDEL.LOG')
+        imp=lines.index(rb'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\REG95LGN.REG')
+        arm=lines.index(rb'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG')
+        done=lines.index(rb'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO END')
+        unlock=lines.index(rb'C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT')
+        self.assertTrue(done<unlock<delkey<imp<arm)
+        # 950 real-mode REGEDIT has no /D; refusal/failure never stops the RunOnce arm
+        self.assertFalse([l for l in lines if l.startswith(b'REGEDIT') and b' /D ' in l])
+        self.assertEqual(lines[delkey+1:delkey+3],[b'IF ERRORLEVEL 3 GOTO LGNBACK',b'IF ERRORLEVEL 2 GOTO LGNLOG'])
+        back=lines.index(b':LGNBACK');self.assertEqual(lines[back+1],rb'COPY /Y C:\USOS9X\SYSTEM.LGN SYSTEM.DAT > NUL')
+        self.assertLess(lines.index(b':LGNEND'),arm)
+        for guard in (rb'IF NOT EXIST C:\USOS9X\REG95.OK GOTO LGNEND',rb'IF NOT EXIST C:\USOS9X\REG95LGN.REG GOTO LGNEND',
+                      rb'IF NOT EXIST C:\USOS9X\VESBIND.EXE GOTO LGNEND'):
+            self.assertLess(lines.index(guard),delkey)
+        self.assertNotIn(b'GOTO FAIL',b'\n'.join(lines[unlock:lines.index(b':LGNEND')]))
 if __name__=='__main__':unittest.main()

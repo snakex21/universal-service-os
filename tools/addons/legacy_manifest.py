@@ -373,6 +373,11 @@ def validate(m: Manifest) -> list[str]:
             continue
         if p.get('reboot') not in REBOOTS:
             errors.append(f'{where}: reboot {p.get("reboot")!r}')
+        # USOSADD /setup (Windows 95 build 950 coordinator) overrides only
+        if p.get('reboot_setup') and p.get('reboot_setup') not in REBOOTS:
+            errors.append(f'{where}: reboot_setup {p.get("reboot_setup")!r}')
+        if (p.get('reboot_setup') or p.get('check_setup')) and                 not set(i.lower() for i in list_items(p.get('os'))) <= {'95', '95rtm', '95osr1'}:
+            errors.append(f'{where}: reboot_setup/check_setup only for Windows 95 packages')
         if p.get('source') not in SOURCES:
             errors.append(f'{where}: source {p.get("source")!r}')
         if p.get('redist') not in REDIST:
@@ -410,8 +415,8 @@ def validate(m: Manifest) -> list[str]:
             verb = r.split(' ', 1)[0].lower()
             if verb in BUILTINS and verb in ('copy', 'force') and len(re.findall(r'"[^"]*"|\S+', r)) != 3:
                 errors.append(f'{where}: {verb} needs <src> <dst>: {r!r}')
-        chk = p.get('check')
-        if chk and not re.match(r'^(file:.+|ntsp:\d+a?|reg:HK(LM|CU)\\.+|regver:HK(LM|CU)\\.+,.+>=.+|regdw:HK(LM|CU)\\.+,.+>=\d+)$', chk):
+        for chk in (p.get('check'), p.get('check_setup')):
+          if chk and not re.match(r'^(file:.+|ntsp:\d+a?|reg:HK(LM|CU)\\.+|regver:HK(LM|CU)\\.+,.+>=.+|regdw:HK(LM|CU)\\.+,.+>=\d+)$', chk):
             errors.append(f'{where}: check {chk!r}')
         if p.get('bridge') and p.get('bridge') != 'yes':
             errors.append(f'{where}: bridge must be yes')

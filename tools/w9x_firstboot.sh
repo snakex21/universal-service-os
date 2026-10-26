@@ -1,5 +1,12 @@
 # Source950 only: ordinary RunOnce coordinator, after original Setup.
 # It never creates RunOnce\Setup, which would block the real-mode guards.
+# Until FIRSTBT.OK, every boot also replaces HKLM\Network\Logon with the
+# REG95LGN.REG export of REG95.BAT: 950 Setup writes PrimaryProvider
+# "Microsoft Network" after REG95 (X470 95 RTM PL fresh, 2026-10-26) and
+# 950's real-mode REGEDIT has no /D, so VESBIND DELKEY removes the key
+# first (SYSTEM.LGN backup restored if it fails while writing). The
+# first-logon password-list prompt stays: Windows 95 lists differ from the
+# Me list that tools/w9x_logon.sh seeds, and USOS has no verified 95 list.
 w9x_firstboot_write() {
     [ "$2" = '4 0 0 950' ] || return 1
     [ -f "$1/USOSFB.EXE" ] || return 1
@@ -21,6 +28,23 @@ C:
 CD \WINDOWS
 C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT
 C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H USER.DAT
+IF NOT EXIST C:\USOS9X\REG95.OK GOTO LGNEND
+IF NOT EXIST C:\USOS9X\REG95LGN.REG GOTO LGNEND
+IF NOT EXIST C:\USOS9X\VESBIND.EXE GOTO LGNEND
+C:\WINDOWS\COMMAND\FIND.EXE "Network\Logon]" C:\USOS9X\REG95LGN.REG > NUL
+IF ERRORLEVEL 1 GOTO LGNEND
+COPY /Y SYSTEM.DAT C:\USOS9X\SYSTEM.LGN > NUL
+IF ERRORLEVEL 1 GOTO LGNEND
+C:\USOS9X\VESBIND.EXE DELKEY C:\WINDOWS\SYSTEM.DAT HKEY_LOCAL_MACHINE\Network\Logon C:\USOS9X\LGNDEL.LOG
+IF ERRORLEVEL 3 GOTO LGNBACK
+IF ERRORLEVEL 2 GOTO LGNLOG
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\REG95LGN.REG
+GOTO LGNEND
+:LGNBACK
+COPY /Y C:\USOS9X\SYSTEM.LGN SYSTEM.DAT > NUL
+:LGNLOG
+ECHO FIRSTBT: Network\Logon not replaced, see LGNDEL.LOG>> C:\USOS9X\USOSLOG.TXT
+:LGNEND
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG
 IF ERRORLEVEL 1 GOTO FAIL
 IF EXIST C:\USOS9X\FIRSTRO.REG DEL C:\USOS9X\FIRSTRO.REG > NUL
