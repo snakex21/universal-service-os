@@ -95,6 +95,17 @@ class AddonsFixes(unittest.TestCase):
         self.assertLess(tail.index('finish_runonceex();'), tail.index('USOSADD.EXE /setup'))
         self.assertLess(tail.index('}else{'), tail.index('USOSRES.EXE /setup'))
 
+    def test_coordinator_failure_is_closable(self):
+        src = (ROOT/'src/platform/win32_legacy/usosfb.c').read_text()
+        body = src[src.index('static void fail('):src.index('static int setup_done(')]
+        self.assertIn('MB_RETRYCANCEL|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST', body)
+        self.assertIn('MoveFileA(path,aside)', body)
+        self.assertIn('ExitWindowsEx(EWX_REBOOT,0)', body)
+        self.assertNotIn('WS_POPUP', src)
+        self.assertNotIn('WM_CLOSE', src)
+        # an existing FIRSTBT.ERR exits quietly instead of showing the box every boot
+        self.assertNotIn('fail("previous firstboot failure', src)
+
     def test_byte_patch_matches_pinned_patcher9x(self):
         folder = ROOT/'tools/vendor/patcher9x/0.9.91'
         lock = __import__('json').loads((folder/'manifest.json').read_text())

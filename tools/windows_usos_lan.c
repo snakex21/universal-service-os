@@ -252,9 +252,13 @@ static int native95_handoff(void){char raw[96];DWORD n,i;HANDLE f;HKEY setup;LON
   local(path,"PHASE1.OK");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
   if(f==INVALID_HANDLE_VALUE)return 0;
   n=0;status=GetFileSize(f,0)<sizeof(raw)&&ReadFile(f,raw,sizeof(raw),&n,0);CloseHandle(f);
-  if(!status||n<23||memcmp(raw,"phase1=qemu elapsed=",20))return 0;
-  i=20;while(i<n&&raw[i]>='0'&&raw[i]<='9')i++;
-  if(i==20||i+2!=n||raw[i]!='\r'||raw[i+1]!='\n')return 0;
+  if(!status)return 0;
+  /* Native phase 1 (tools/w9x_950_post.sh, COMMAND.COM "ECHO phase1=native> PHASE1.OK")
+   * writes exactly "phase1=native\r\n"; QEMU phase 1 writes "phase1=qemu elapsed=N\r\n". */
+  if(n!=15||memcmp(raw,"phase1=native\r\n",15)){
+    if(n<23||memcmp(raw,"phase1=qemu elapsed=",20))return 0;
+    i=20;while(i<n&&raw[i]>='0'&&raw[i]<='9')i++;
+    if(i==20||i+2!=n||raw[i]!='\r'||raw[i+1]!='\n')return 0;}
   status=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&setup);
   if(status==ERROR_SUCCESS){RegCloseKey(setup);return 0;}
   return status==ERROR_FILE_NOT_FOUND;

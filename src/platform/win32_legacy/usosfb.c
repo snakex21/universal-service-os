@@ -25,17 +25,22 @@ static int read_local(const char*leaf,char*out,DWORD cap){HANDLE f;DWORD n=0;int
 static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
     for(a=s,b=word;*a&&*b;a++,b++){char x=*a,y=*b;if(x>='A'&&x<='Z')x+='a'-'A';if(y>='A'&&y<='Z')y+='a'-'A';if(x!=y)break;}
     if(!*b)return 1;}return 0;}
-static LRESULT CALLBACK holding(HWND w,UINT m,WPARAM a,LPARAM b){
-    if(m==WM_CLOSE)return 0;return DefWindowProcA(w,m,a,b);}
-static void fail(const char*reason){WNDCLASSA wc;HWND window;MSG message;
+/* A failure never holds the desktop hostage: one closable box, logged.
+ * Retry moves FIRSTBT.ERR aside (FIRSTBT.ER1..ER9) and restarts, so the
+ * RunOnce that FIRSTBT.BAT re-arms each boot runs the coordinator again;
+ * Cancel exits so Explorer starts (the ERR marker keeps later boots quiet). */
+static void fail(const char*reason){char aside[MAX_PATH];int i;
     log_line(reason);save("FIRSTBT.ERR",reason);
-    memset(&wc,0,sizeof wc);wc.lpfnWndProc=holding;wc.hInstance=GetModuleHandleA(0);
-    wc.lpszClassName="USOSFirstBootHold";wc.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);RegisterClassA(&wc);
-    window=CreateWindowExA(WS_EX_TOPMOST,wc.lpszClassName,"USOS first boot requires repair",WS_POPUP|WS_VISIBLE,0,0,
-        GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN),0,0,wc.hInstance,0);
-    if(window){CreateWindowExA(0,"STATIC","USOS ko\361czy instalacj\352...\r\n\r\nWymagana naprawa. Szczeg\363\263y: C:\\USOS9X\\FIRSTBT.LOG",WS_CHILD|WS_VISIBLE|SS_CENTER,
-        0,GetSystemMetrics(SM_CYSCREEN)/3,GetSystemMetrics(SM_CXSCREEN),150,window,0,wc.hInstance,0);UpdateWindow(window);}
-    while(GetMessageA(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageA(&message);}ExitProcess(2);}
+    if(MessageBoxA(0,"USOS nie m\363g\263 doko\361czy\346 instalacji.\r\nSzczeg\363\263y: C:\\USOS9X\\FIRSTBT.LOG\r\n\r\n"
+        "Pon\363w = spr\363buj ponownie po restarcie\r\nAnuluj = przejd\237 do pulpitu","USOS",
+        MB_RETRYCANCEL|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST)==IDRETRY){
+        local("FIRSTBT.ERR");for(i=1;i<=9;i++){wsprintfA(aside,"%sFIRSTBT.ER%d",root,i);
+            if(GetFileAttributesA(aside)==INVALID_FILE_ATTRIBUTES)break;}
+        if(i<=9&&MoveFileA(path,aside)){log_line("retry requested: FIRSTBT.ERR moved aside, restarting");
+            if(ExitWindowsEx(EWX_REBOOT,0))ExitProcess(2);log_line("retry restart request rejected");}
+        else log_line("retry requested but FIRSTBT.ERR could not be moved aside (ER1..ER9 used?)");}
+    else log_line("user chose desktop after failure");
+    ExitProcess(2);}
 static int setup_done(void){HKEY key;DWORD keys=0,values=0;LONG code;
     code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&key);
     if(code==ERROR_FILE_NOT_FOUND)return 1;if(code!=ERROR_SUCCESS)return 0;
@@ -133,7 +138,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
        version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))fail("source950/phase1 scope refused");
     if(exists("FIRSTBT.OK")){log_line("already complete");ExitProcess(0);}
-    if(exists("FIRSTBT.ERR"))fail("previous firstboot failure; automatic retry refused");
+    if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");ExitProcess(2);}
     log_line("coordinator entered before desktop");
     if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
     if(!setup_done())fail("original RunOnce Setup has not completed");
