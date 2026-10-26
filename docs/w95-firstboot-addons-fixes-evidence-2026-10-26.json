@@ -1,0 +1,96 @@
+{
+  "scope": "Three production fixes from user-confirmed RTM X470 full PASS; no QEMU; fresh Kingston/X470 run by Claude",
+  "branch": "codex/w95-firstboot",
+  "code_commit": "dffbcc1f2cca429b0758ce1472be972b0fc854e0",
+  "payload_commit": "ffd3f3119256e580cc6ab4108f61332ccecc376a",
+  "build": {
+    "attempt": 9,
+    "completed": true,
+    "exit_code": 0,
+    "graph_104_pass": true,
+    "zig_tests_passed": 632,
+    "release_consistency_pass": true,
+    "log": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\full-build09.log",
+    "log_sha256": "85c4f8648d8de69ca4c27e97fca7f9c3fb10af4f916b57bda4086608197f3d82",
+    "source_git_head": "dffbcc1f2cca429b0758ce1472be972b0fc854e0",
+    "build": {
+      "id": "B261026-153029-D4C616F2",
+      "version": "1.0.0",
+      "epoch": "1793028629",
+      "source_sha256": "d4c616f2c142a83169ca53021f2361cd5dc0068522d2b3b13f5eaab98490929c"
+    }
+  },
+  "host_tests": {
+    "code_commit": "dffbcc1f2cca429b0758ce1472be972b0fc854e0",
+    "host_unit_tests_passed": 27,
+    "host_note": "suite02 had 25 pass and two missing answer-tool errors; after building dependency, only the two failed Render tests rerun and both pass",
+    "pure_C_selftest_pass": true,
+    "C_Python_plan_comparisons_passed": 1404,
+    "ndis_repair_subprocess_cases": 13,
+    "target_runner_PE_i386_GUI_noCRT_bytes": 37888,
+    "logs": {
+      "addons-fixes-host02.log": {
+        "path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\addons-fixes-host02.log",
+        "sha256": "d53c38ff1fd2103cbe27274825a3cc5dea5dfcf20bead22b91786306e1086813"
+      },
+      "addons-fixes-suite02.log": {
+        "path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\addons-fixes-suite02.log",
+        "sha256": "afe1482694dc231d5385d8c66b4b69b5862082be8c95d55f30f745b6ff50139b"
+      },
+      "addons-fixes-render.log": {
+        "path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\addons-fixes-render.log",
+        "sha256": "1fa3b2ec258c6d2e527933b87369d17f10836cfd5eed9fc514ff3751630cbc96"
+      }
+    },
+    "inputs": [
+      {
+        "link": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\tools\\vendor\\windows7-nvme\\assets.zip",
+        "target": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\build-inputs\\windows7-nvme-assets.zip",
+        "sha256": "b6080e0b378cdc95ac6925b075a5691dd8be90d15527d4a2b394fb7c6c6e9cd9"
+      },
+      {
+        "link": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\media\\Systems\\Windows\\Windows 7\\Updates\\windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu",
+        "target": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\build-inputs\\windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu",
+        "sha256": "99312df792b376f02e25607d2eb3355725c47d124d8da253193195515fe90213"
+      }
+    ]
+  },
+  "payload_identity": {
+    "initramfs_runner_identity_pass": true,
+    "initramfs_manifest_PL_EN_identity_pass": true,
+    "USOSADD_EXE": {
+      "path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\zig-out\\legacy-pack\\USOSADD.EXE",
+      "bytes": 37888,
+      "sha256": "915aea13f66d14e669e7c5ff4b4f8ce13ee419efba3df62b16a691e16496b864"
+    },
+    "manifest_sha256": "c3895059201b016482c201bac83c51b40e11b0ad7d57ce6e44ffbd2a5a2a5e8a",
+    "ndis_patch_header_sha256": "6d1845c032f163fafa3ac31f7279663245452774385e89e779218c8a9c27b39b"
+  },
+  "ndis1111_readonly_proof": {
+    "read_only_sources": [
+      "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston2\\ws2cab\\ndis.vxd",
+      "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston2\\ndis\\SYSTEM_NDIS_1111_patched_candidate.VXD"
+    ],
+    "original_sha256": "fee533e48213d50adbec074c8ee75bb9784ac964cd1f5de0372b4d468dd347b2",
+    "x470_patched_candidate_sha256": "f65855aa51b19d1ed3c305e351aafa0774e6813e2b6ab3587be83c6ad1e610d6",
+    "bytes": 116301,
+    "pattern_matches": 1,
+    "located_offset_diagnostic_only": 115265,
+    "changed_span_bytes": 18,
+    "in_memory_replacement_matches_x470_candidate": true,
+    "new_raw_files_written": 0
+  },
+  "inventory": {
+    "utc": "2026-10-26T15:39:40.837279+00:00",
+    "images_count": 121,
+    "pool_allocated_bytes": 10720584260,
+    "free_k_bytes": 136264335360,
+    "deletions_count": 0,
+    "deleted": []
+  },
+  "inventory_path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\addons-fixes-retained-images.json",
+  "inventory_sha256": "234c48bccbcfc4ae6ab3a6b33325d13f4a1446e7ac765bab1a7b751b24ebef95",
+  "new_qemu": 0,
+  "physical_deployments": 0,
+  "merge_push": false
+}
