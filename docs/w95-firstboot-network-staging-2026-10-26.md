@@ -14,4 +14,6 @@ Walidacja:
 
 Wyniki DOS/WHPX nie są pomiarem czasu natywnej ścieżki CSMWrap/TCG ani PASS pierwszego pulpitu. Po pełnym buildzie poprawiony skrypt trzeba sprawdzić w tym rzeczywistym przepływie.
 
+Pełny build07 po zmianie źródła PASS:104/104,632/632, `verify_release_consistency` PASS, exit0. Build `B261026-121414-3132FCB5`, source SHA `3132fcb500045ed00dee9e2dc903f68847cae9b21d7c93cfe0efa2f9c48e56bb`, log SHA `d286253ef97b6a0c380239f252494187666726b5ba8a98b0649fb429b1793fc4`; receipt `artifacts/firstboot/full-build07.result.json`. Poprzednie zaakceptowane receipt06 zachowano. Skrypt generuje biblioteka o SHA `83b74700165ee3b6e7bf1e69607c162cf58077ac64daed4456e5bb1a416ebb7c`.
+
 Reinstalacja jest zbędna: zmiana dotyczy wyłącznie `C:\USOS9X\NET\NFILES.BAT`, wykonywanego po zapisanej, zaliczonej fazie1. Dalsza próba ma być nową nakładką tej bazy z tą jedną aktualizacją skryptu; żadnych wstępnie rozpakowanych plików sieciowych z komponentowego testu ani znaczników sukcesu. Profile, CAB, rejestry Windows, dodatki i pozostałe helpery pochodzą z zaakceptowanej bazy.
