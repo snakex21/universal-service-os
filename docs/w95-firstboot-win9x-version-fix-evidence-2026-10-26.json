@@ -1,0 +1,142 @@
+{
+  "scope": "Explicit user2026-10-26 Win32/Win9x version fix and installed-X470 hotpatch; report STOP; no full QEMU installation",
+  "branch": "codex/w95-firstboot",
+  "code_commit": "715d94ae73c3e4d90fa3cd2e0aa99ffd7212569c",
+  "payload_commit": "6b81dac2612a0631b9c6b4578b622cb726fc5e19",
+  "build": {
+    "attempt": 8,
+    "completed": true,
+    "exit_code": 0,
+    "graph_104_pass": true,
+    "zig_tests_passed": 632,
+    "release_consistency_pass": true,
+    "log": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\full-build08.log",
+    "log_sha256": "b6fcbc862141f976eef3ca0d20c6c7d471b45d41251b237752f0d38316bce0c7",
+    "source_git_head": "715d94ae73c3e4d90fa3cd2e0aa99ffd7212569c",
+    "source_sha256": {
+      "tools/windows_usos_res.c": "08c61c1dfd3a74c46ffe691aa7f81b8964a623b53db9cae96d092b3ed77ef68e",
+      "tools/windows_usos_lan.c": "0eb752e766c5415a6a5c6d5184fd7775c6c20420b42b99b3e7e6eb8d5a9b3e51"
+    },
+    "build": {
+      "id": "B261026-144334-F0539FB7",
+      "version": "1.0.0",
+      "epoch": "1793025814",
+      "source_sha256": "f0539fb76acb46487c6a70663c2f39f3f5b904fe5c4776ac0c5919e8897203d2"
+    }
+  },
+  "host_suite": {
+    "tests_passed": 54,
+    "skipped": 0,
+    "new_subprocess_cases": 19,
+    "six_os_lan_simulations": 6,
+    "log": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\version-fix-host-suite01.log",
+    "sha256": "a59486d0bb30f4369fc9e247870eed5d11ded23af3b1d6009f21c86022735ffc",
+    "negative_control": {
+      "display": {
+        "original_exit": 2,
+        "original_log_exists": false
+      },
+      "lan": {
+        "original_exit": 96,
+        "original_log_exists": false
+      }
+    }
+  },
+  "hotpatch": {
+    "created_utc": "2026-10-26T14:51:29.468770+00:00",
+    "source_commit": "715d94ae73c3e4d90fa3cd2e0aa99ffd7212569c",
+    "build": {
+      "id": "B261026-144334-F0539FB7",
+      "version": "1.0.0",
+      "epoch": "1793025814",
+      "source_sha256": "f0539fb76acb46487c6a70663c2f39f3f5b904fe5c4776ac0c5919e8897203d2"
+    },
+    "release_consistency_pass": true,
+    "payload_identity_pass": true,
+    "target": "existing Windows95 RTM PL X470 installation; both binaries are Win9x i386 GUI, no CRT",
+    "files": [
+      {
+        "name": "USOSRES.EXE",
+        "bytes": 14336,
+        "sha256": "b69dccd128e6d6c46980ddd2140bb9232ab8dd194c682c2d65df04f284a3ac17",
+        "source": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\zig-out\\windows-usos-res\\9x\\USOSRES.EXE",
+        "initramfs_member": "usr/lib/usos/w9x-display/USOSRES.EXE",
+        "installed_destination": "C:\\USOS9X\\USOSRES.EXE",
+        "machine": "i386",
+        "subsystem": "windows",
+        "static_libraries": [
+          "kernel32.dll",
+          "advapi32.dll"
+        ]
+      },
+      {
+        "name": "USOSLAN.EXE",
+        "bytes": 17408,
+        "sha256": "7db6c57bec4b0d90e6e4db1d616b45414fee9ff86b1e0f4ff3ec6f0bb641ee07",
+        "source": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\zig-out\\windows-usos-lan\\USOSLAN9X.EXE",
+        "initramfs_member": "usr/lib/usos/network/USOSLAN9X.EXE",
+        "installed_destination": "C:\\USOS9X\\USOSLAN.EXE",
+        "machine": "i386",
+        "subsystem": "windows",
+        "static_libraries": [
+          "kernel32.dll",
+          "advapi32.dll"
+        ]
+      }
+    ]
+  },
+  "x470_before_fix": {
+    "source_read_only": "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston1\\micron\\USOS9X",
+    "attribution": "X470 run by user/Claude, not this session",
+    "build": "B261026-121414-3132FCB5",
+    "files": [
+      {
+        "path": "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston1\\micron\\USOS9X\\FIRSTBT.LOG",
+        "bytes": 427,
+        "sha256": "a1ce4126d8a993b20d52400a6431d71f9d52800403519f4e2f9cbfbe3b19da39",
+        "text": "FIRSTBOOT tick=13430 tray=0 coordinator entered before desktop\r\nFIRSTBOOT tick=13431 tray=0 C:\\WINDOWS\\rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSVMD.INF\r\nFIRSTBOOT tick=13436 tray=0 queued DOS-box mouse INF completed before packages; driver starts at final restart\r\nFIRSTBOOT tick=13436 tray=0 C:\\USOS9X\\USOSRES.EXE /setup\r\nFIRSTBOOT tick=13440 tray=0 display request not applied before packages\r\n"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston1\\micron\\USOS9X\\FIRSTBT.ERR",
+        "bytes": 43,
+        "sha256": "dbf8cb0753e8c2eb2bb83df178c3b8f21f49e73e5ebe9d9345b31c83f12711ba",
+        "text": "display request not applied before packages"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston1\\micron\\USOS9X\\FIRSTBT.STA",
+        "bytes": 9,
+        "sha256": "cbd1bdb072e5144eb9041cfc6036f22b8b19582d6234522e68a50e27f94ddffb",
+        "text": "install\r\n"
+      },
+      {
+        "path": "C:\\Users\\ASRock\\AppData\\Local\\Temp\\claude\\C--Users-ASRock-Desktop-Universal-Service-OS\\c956b75c-4081-4c4f-ab0d-0fdbf29d89cd\\scratchpad\\w95rtm-kingston1\\micron\\USOS9X\\DISPLAY.TXT",
+        "bytes": 29,
+        "sha256": "972c7d810dd420ae9fcc0afae9e404b77c926bfc2cd81ece4d5a6701ef8f36d4",
+        "text": "autoxauto\r\nnative=1920x1080\r\n"
+      }
+    ],
+    "USOSRES.LOG_present": false
+  },
+  "inventory_receipt": {
+    "path": "C:\\Users\\ASRock\\usos-work\\codex-w95-firstboot\\artifacts\\firstboot\\version-fix-retained-images.json",
+    "sha256": "90707f09c593601dd9d3b62cd8ce508f189f49a1c6c3f41f1207cbb0b1d774b4",
+    "allocated_bytes": 10237535572,
+    "free_k_bytes": 144589398016,
+    "images_retained": 120,
+    "images_deleted": []
+  },
+  "changed_files": [
+    "tools/windows_usos_res.c",
+    "tools/windows_usos_lan.c",
+    "tools/tests/lan_policy_test.c",
+    "tools/tests/display_setup_test.c",
+    "tools/tests/test_w9x_version_setup.py",
+    "installer/internal/payload/legacy_boot_generated.go",
+    "docs/w95-firstboot-win9x-version-fix-2026-10-26.md",
+    "docs/w95-firstboot-win9x-version-fix-evidence-2026-10-26.json"
+  ],
+  "new_qemu_installations": 0,
+  "new_qemu_engines": 0,
+  "physical_deployments": 0,
+  "merge_push": false
+}
