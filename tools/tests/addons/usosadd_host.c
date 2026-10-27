@@ -133,6 +133,23 @@ static int selftest(void) {
         CHECK(ua_after_run(1, op.pkg[0].reboot, 1, 1) == UA_AFTER_RESTART);
     }
     {
+        /* requires= (ws2-95: TCP/IP bound, X470 95 OSR2.1 PL 2026-10-27):
+         * the first absent component, an unknown name counts as absent. */
+        static ua_ini ri;
+        static ua_pkgs rp;
+        char item[32];
+        char rtext[] = "[pkg:ws2]\r\nos=95\r\nrequires=tcpip\r\n[pkg:none]\r\nos=95\r\n"
+                       "[pkg:two]\r\nos=95\r\nrequires= TCPIP , ipx\r\n";
+        ua_ini_parse(&ri, rtext, (int)strlen(rtext));
+        CHECK(ua_load_pkgs(&ri, &rp) == 3);
+        CHECK(strcmp(rp.pkg[0].requires, "tcpip") == 0 && !*rp.pkg[1].requires);
+        CHECK(ua_requires_missing(&rp.pkg[0], 1, item, sizeof item) == 0);
+        CHECK(ua_requires_missing(&rp.pkg[0], 0, item, sizeof item) == item && strcmp(item, "tcpip") == 0);
+        CHECK(ua_requires_missing(&rp.pkg[1], 0, item, sizeof item) == 0);
+        CHECK(ua_requires_missing(&rp.pkg[2], 0, item, sizeof item) && strcmp(item, "TCPIP") == 0);
+        CHECK(ua_requires_missing(&rp.pkg[2], 1, item, sizeof item) && strcmp(item, "ipx") == 0);
+    }
+    {
         /* option_os=: tier=full except there (options= / needs= still bring it in) */
         static ua_ini wi;
         static ua_pkgs wp;

@@ -23,6 +23,7 @@ TIERS = ('full', 'option', 'group', 'none')
 REBOOTS = ('now', 'end', 'no')
 REDIST = ('yes', 'no', 'conditional', 'unknown')
 SOURCES = ('bundled', 'release', 'user')
+REQUIRES = ('tcpip',)
 DECISIONS = ('', 'maintainer-2026-09-30', 'maintainer-2026-10-20')
 STATUSES = ('', 'missing', 'needs-iss')
 LANGS = ('PL', 'EN', '*')
@@ -385,6 +386,11 @@ def validate(m: Manifest) -> list[str]:
             errors.append(f'{where}: reboot_setup {p.get("reboot_setup")!r}')
         if (p.get('reboot_setup') or p.get('check_setup')) and                 not set(i.lower() for i in list_items(p.get('os'))) <= {'95', '95rtm', '95osr1'}:
             errors.append(f'{where}: reboot_setup/check_setup only for Windows 95 packages')
+        # USOSADD requires= (run-time components, usosadd state.c
+        # ua_requires_missing): only names USOSADD can test.
+        for item in list_items(p.get('requires')):
+            if item.lower() not in REQUIRES:
+                errors.append(f'{where}: requires {item!r} (known: {", ".join(REQUIRES)})')
         if p.get('source') not in SOURCES:
             errors.append(f'{where}: source {p.get("source")!r}')
         if p.get('redist') not in REDIST:

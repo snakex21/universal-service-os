@@ -66,6 +66,58 @@ class AddonsFixes(unittest.TestCase):
         bad.find('msi20-9x').keys['reboot_setup'] = 'now'  # os=9X: also 98 / Me
         self.assertTrue(any('reboot_setup/check_setup only for Windows 95' in e for e in lm.validate(bad)))
 
+    def test_ws2_needs_tcpip_and_osr2_runs_under_the_coordinator(self):
+        # X470 95 OSR2.1 PL native (2026-10-27): no MSTCP instance after the
+        # first boot's PnP, socket 10047, W95WS2 "TCP NOT currently installed"
+        # boxes and the retry restart; MSBATCH's Run USOSAddons ran the chain
+        # under Explorer next to the first desktop.
+        m = lm.Manifest.load()
+        self.assertEqual(lm.validate(m), [])
+        self.assertEqual(m.find('ws2-95').get('requires'), 'tcpip')
+        self.assertEqual([p.id for p in m.packages if p.get('requires')], ['ws2-95'])
+        for os_ in ('95OSR2', '95OSR21', '95OSR25'):    # still in the OSR2 full pack
+            self.assertEqual(lm.resolve(m, os_, 'PL', '', True, []).why.get('ws2-95'), 'full', os_)
+        bad = lm.Manifest.load()
+        bad.find('ws2-95').keys['requires'] = 'tcpip,ipx'
+        self.assertTrue(any("requires 'ipx'" in e for e in lm.validate(bad)))
+        src = (ROOT/'src/platform/win32_legacy/usosadd/main.c').read_text()
+        probe = src[src.index('static int tcpip_present(char *how, int cap) {'):src.index('typedef DWORD (WINAPI *PFN_VSIZE)')]
+        self.assertIn('"Enum\\\\Network\\\\MSTCP"', probe)
+        self.assertIn('!ua_ieqn(drv, "NetTrans\\\\", 9)', probe)
+        self.assertIn('"System\\\\CurrentControlSet\\\\Services\\\\Class\\\\"', probe)
+        self.assertIn('reg_key_exists(HKEY_LOCAL_MACHINE, key)', probe)
+        self.assertIn('LoadLibraryA("WSOCK32.DLL")', probe)
+        self.assertIn('sock(2, 1, 6)', probe)
+        self.assertIn('FreeLibrary(w);', probe)
+        chain = src[src.index('static void run_chain(void)'):src.index('static void finish(void)')]
+        pre = chain.index('if (*p->requires) {')
+        # after the resume / installed / status / needs decisions, before files and commands
+        for before in ('check = run_check(p);', 'if (*p->status)', 'ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet'):
+            self.assertLess(chain.index(before), pre, before)
+        for after in ('if (!files_present(p))', 'g_state.tries[x]++;', 'ok = run_one(p, cmd);'):
+            self.assertLess(pre, chain.index(after), after)
+        block = chain[pre:chain.index('if (!files_present(p))')]
+        self.assertIn('"TCP/IP not installed"', block)
+        self.assertIn('set_why(x, UA_ST_SKIPPED,', block)
+        self.assertIn('continue;', block)
+        self.assertNotIn('restart()', block); self.assertNotIn('MessageBox', block)
+        start = src[src.index('void __cdecl ua_start(void) {'):]
+        self.assertIn('!coordinated_build(g_facts.build)||!display_boundary()', start)
+        self.assertNotIn('!=950', start)
+        build = src[src.index('static int coordinated_build(int build) {'):src.index('static int display_boundary(void) {')]
+        self.assertIn('build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216', build)
+        disp = src[src.index('static int display_boundary(void) {'):src.index('static int setup_busy(void)')]
+        self.assertIn('if (exists("C:\\\\USOS9X\\\\VESALATE.BAT")) return exists("C:\\\\USOS9X\\\\VLATE.OK");', disp)
+        # a Run start while USOSFB owns the chain does nothing and keeps the value
+        defer = start[start.index('if(!g_setup_mode && !g_facts.nt && exists("C:\\\\USOS9X\\\\FIRSTBT.ON")'):]
+        defer = defer[:defer.index('/* Coordinator only:')]
+        self.assertIn('!exists("C:\\\\USOS9X\\\\FIRSTBT.ERR")', defer)
+        self.assertIn('if(exists("C:\\\\USOS9X\\\\FIRSTBT.OK")){', defer)
+        self.assertEqual(defer.count('unregister();'), 1)
+        self.assertEqual(defer.count('ExitProcess(0);'), 2)
+        self.assertLess(start.index('/* Coordinator only:'), start.index('register_run();'))
+        self.assertLess(start.index(defer[:40]), start.index('window_open();'))
+
     def test_ie55_rundll_box_confirmed_and_runonce_watched(self):
         # X470 95 RTM PL (2026-10-27): ADDONS.LOG "dialog seen: RUNDLL"
         # (IEDKCS32.DLL,BrandCleanInstallStubs) during the IE 5.5 install.

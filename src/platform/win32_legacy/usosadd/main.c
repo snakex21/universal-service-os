@@ -167,6 +167,61 @@ static int reg_key_exists(HKEY hive, const char *key) {
     return 1;
 }
 
+/* TCP/IP for requires=tcpip: an Enum\Network\MSTCP instance whose Driver
+ * (NetTrans\NNNN) has its class key, or else an AF_INET stream socket
+ * opens (WSOCK32, loaded only here). X470 95 OSR2.1 PL native (2026-10-27):
+ * the first boot's PnP had left no MSTCP instance (an orphan NetTrans\0000
+ * "TCP/IP" class key), socket() failed with 10047, and W95WS2 answered
+ * "TCP NOT currently installed" in a box loop, then the retry restart. */
+typedef int (WINAPI *PFN_WSASTART)(WORD, void *);
+typedef unsigned int (WINAPI *PFN_SOCKET)(int, int, int);
+typedef int (WINAPI *PFN_CLOSESOCK)(unsigned int);
+typedef int (WINAPI *PFN_WSACLEAN)(void);
+static int tcpip_present(char *how, int cap) {
+    HKEY k;
+    char name[64], drv[64], key[160];
+    DWORD i, n, type;
+    int found = 0;
+    HMODULE w;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Enum\\Network\\MSTCP", 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        for (i = 0; !found && i < 64; i++) {
+            n = sizeof name;
+            if (RegEnumKeyExA(k, i, name, &n, 0, 0, 0, 0) != ERROR_SUCCESS) break;
+            ua_copy(key, sizeof key, "Enum\\Network\\MSTCP\\");
+            ua_append(key, sizeof key, name);
+            if (!reg_string(HKEY_LOCAL_MACHINE, key, "Driver", drv, sizeof drv, &type) || type != REG_SZ ||
+                !ua_ieqn(drv, "NetTrans\\", 9)) continue;
+            ua_copy(key, sizeof key, "System\\CurrentControlSet\\Services\\Class\\");
+            ua_append(key, sizeof key, drv);
+            if (reg_key_exists(HKEY_LOCAL_MACHINE, key)) {
+                found = 1;
+                ua_copy(how, cap, "Enum\\Network\\MSTCP\\");
+                ua_append(how, cap, name);
+                ua_append(how, cap, " -> ");
+                ua_append(how, cap, drv);
+            }
+        }
+        RegCloseKey(k);
+    }
+    if (found) return 1;
+    w = LoadLibraryA("WSOCK32.DLL");
+    if (w) {
+        static DWORD data[128]; /* WSADATA (about 400 bytes) */
+        PFN_WSASTART start = (PFN_WSASTART)GetProcAddress(w, "WSAStartup");
+        PFN_SOCKET sock = (PFN_SOCKET)GetProcAddress(w, "socket");
+        PFN_CLOSESOCK close = (PFN_CLOSESOCK)GetProcAddress(w, "closesocket");
+        PFN_WSACLEAN clean = (PFN_WSACLEAN)GetProcAddress(w, "WSACleanup");
+        if (start && sock && close && clean && start(0x0101, data) == 0) {
+            unsigned int s = sock(2, 1, 6); /* AF_INET, SOCK_STREAM, IPPROTO_TCP */
+            if (s != (unsigned int)~0U) { close(s); found = 1; ua_copy(how, cap, "AF_INET socket opened"); }
+            clean();
+        }
+        FreeLibrary(w);
+    }
+    if (!found) ua_copy(how, cap, "no MSTCP instance with a NetTrans key, no AF_INET socket");
+    return found;
+}
+
 typedef DWORD (WINAPI *PFN_VSIZE)(LPSTR, LPDWORD);
 typedef BOOL (WINAPI *PFN_VINFO)(LPSTR, DWORD, DWORD, LPVOID);
 typedef BOOL (WINAPI *PFN_VQUERY)(LPVOID, LPSTR, LPVOID *, PUINT);
@@ -885,6 +940,18 @@ static void run_chain(void) {
         if (!ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet)) {
             set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "needs ", unmet);
             continue;
+        }
+        if (*p->requires) {
+            char how[160];
+            const char *missing = ua_requires_missing(p, tcpip_present(how, sizeof how), unmet, sizeof unmet);
+            log2("  requires: ", p->requires);
+            log2("  TCP/IP: ", how);
+            if (missing) {
+                /* No dialog, no retry restart: the installer would only fail. */
+                if (ua_ieq(missing, "tcpip")) set_why(x, UA_ST_SKIPPED, g_pl ? "TCP/IP nie jest zainstalowany" : "TCP/IP not installed", 0);
+                else set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "requires ", missing);
+                continue;
+            }
         }
         if (!files_present(p)) { set_why(x, UA_ST_SKIPPED, g_pl ? "brak pliku" : "file missing", 0); continue; }
         /* No restart here merely because one is pending: restarts are batched

@@ -88,6 +88,7 @@ typedef struct {
     const char *provides;
     const char *check;
     const char *status;
+    const char *requires; /* run-time system components (requires=tcpip) */
     int tier;
     int order;
     int reboot;
@@ -210,6 +211,11 @@ int ua_after_run(int ok, int reboot, int pending_reboot, int tries);
 /* Recheck NDIS only after an attempted Winsock2 install on Windows 95. */
 int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
                            const ua_state *state, const ua_system *system);
+/* requires= (run time, before the package's commands): the first listed
+ * component that is absent, copied into item; 0 = all present. Known:
+ * tcpip (TCP/IP installed and bound, as W95WS2's setup checks). An unknown
+ * name counts as absent (fail closed: the package is skipped). */
+const char *ua_requires_missing(const ua_pkg *p, int tcpip, char *item, int cap);
 /* Runtime need check: satisfied by the OS or by a provider in state
  * DONE/PRESENT. Writes the first unmet capability into unmet. */
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,

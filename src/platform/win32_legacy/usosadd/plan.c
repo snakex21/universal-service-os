@@ -31,6 +31,7 @@ int ua_load_pkgs(const ua_ini *m, ua_pkgs *out) {
         p->provides = get(m, sec, "provides");
         p->check = get(m, sec, "check");
         p->status = get(m, sec, "status");
+        p->requires = get(m, sec, "requires");
         p->order = ua_atoi(get(m, sec, "order"));
         tier = get(m, sec, "tier");
         p->tier = ua_ieq(tier, "full") ? UA_TIER_FULL : ua_ieq(tier, "option") ? UA_TIER_OPTION

@@ -90,6 +90,15 @@ int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
     return 0;
 }
 
+const char *ua_requires_missing(const ua_pkg *p, int tcpip, char *item, int cap) {
+    int k;
+    for (k = 0; ua_list_item(p->requires, k, item, cap); k++) {
+        if (ua_ieq(item, "tcpip") && tcpip) continue;
+        return item;
+    }
+    return 0;
+}
+
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
                  const ua_system *s, int pkg, char *unmet, int cap) {
     char item[48];
