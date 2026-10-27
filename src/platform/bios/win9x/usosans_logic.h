@@ -34,7 +34,13 @@
  *     radio buttons 3317 "automatic search (recommended)" / 3318
  *   choice (98: 3301, Me: 3301): radio buttons 3315 "search for a better
  *     driver (recommended)" / 3316 "list the drivers"
- *   search places (98: 3490): check boxes 3494..3497 (shown as they are)
+ *   search places (98: 3490): check boxes 3494 floppy drives, 3495 CD-ROM
+ *     drive, 3496 "Microsoft Windows Update", 3497 a location; 3495 and
+ *     3496 are cleared before Next (X470 98 FE PL 2026-10-27: Windows
+ *     Update was checked and its box stopped the wizard), the rest stays
+ *   Windows Update offer (SYSDM.CPL STR 4200 / 4201, a message box): PL / EN
+ *     title "Microsoft Windows Update", "... register now?" Yes 6 / No 7;
+ *     after No STR 4202 / 4203 "... will not use Windows Update" with OK 1
  *   ready (98: 3300, Me: 3299): Statics 4101 "searching ... for:", 4104
  *     "driver location:" and the found file (e.g. C:\WINDOWS\INF\MONITOR.INF)
  *   finish (4120): Static 4121 icon, 4122 the device name, 4123 the result
@@ -61,6 +67,10 @@
 #define HW_LIST_ID       3316
 #define HW_PLACE1_ID     3494
 #define HW_PLACE4_ID     3497
+#define HW_PLACE_CD_ID   3495
+#define HW_PLACE_WU_ID   3496
+#define AN_YES_ID        6
+#define AN_NO_ID         7
 #define HW_READY_ID      4101
 #define HW_LOCATION_ID   4104
 #define HW_FIN_ICON_ID   4121
@@ -87,14 +97,21 @@
  * value). */
 #define AN_MAX_BOOTS     4
 #define AN_DESK_BOOTS    2
+/* While the 95 / 98 first-desktop coordinator still owns the start
+ * (C:\USOS9X\FIRSTBT.ON, neither FIRSTBT.OK nor FIRSTBT.ERR: X470 98 FE PL
+ * 2026-10-27 needed five package boots, and the value was gone at the 5th
+ * start before the desktop came) the value stays, up to this many starts. */
+#define AN_HARD_MAX_BOOTS 12
+/* Unchecks of the search places check boxes per page, then it is the user's. */
+#define AN_UNCHECK_MAX   3
 
 /* Logon dialog kinds. */
 enum { AK_NONE, AK_ENTER, AK_WELCOME, AK_SET };
 /* Actions. */
-enum { AA_NONE, AA_OK, AA_NEXT, AA_FINISH, AA_LEAVE };
+enum { AA_NONE, AA_OK, AA_NEXT, AA_FINISH, AA_LEAVE, AA_UNCHECK, AA_NO, AA_CANCEL };
 /* Why a dialog / wizard is left to the user (logged with AA_LEAVE). */
 enum { AE_NONE, AE_SHAPE, AE_TYPED, AE_NO_USER, AE_NO_BUTTON, AE_OTHER_DEVICE, AE_CHANGED,
-       AE_UNCONFIRMED, AE_NO_INF, AE_STUCK, AE_LIMIT };
+       AE_UNCONFIRMED, AE_NO_INF, AE_STUCK, AE_LIMIT, AE_PLACES };
 
 static const char *const an_enter_titles[] = {
     "Wprowad\x9f has\xb3o systemu Windows",     /* PL 98 / 98 SE / Me */
@@ -114,6 +131,9 @@ static const char *const an_set_titles[] = {
 static const char *const an_hw_titles[] = {
     "Kreator dodawania nowego sprz\xeatu",      /* PL 98 / 98 SE / Me */
     "Add New Hardware Wizard",                  /* EN (no EN 98 / Me medium here: unverified) */
+    0 };
+static const char *const an_wu_titles[] = {
+    "Microsoft Windows Update",                 /* SYSDM.CPL STR 4200 / 4202, PL 98 (the product name) */
     0 };
 static const char *const an_monitor_names[] = {
     "Monitor Plug and Play",                    /* PL MONITOR.INF *PNP09FF */
@@ -139,6 +159,7 @@ static int an_logon_kind(const char *title)
 }
 
 static int an_is_hw_frame(const char *title) { return an_in(an_hw_titles, title); }
+static int an_is_wu_box(const char *title) { return an_in(an_wu_titles, title); }
 
 /* The device name of a wizard Static: exact, blanks around it ignored. */
 static int an_is_monitor(const char *text)
@@ -245,6 +266,8 @@ typedef struct {
     unsigned char monitor_inf;  /* a Static / Edit of the page names ...\MONITOR.INF */
     unsigned char next_ready;   /* the frame's Next visible and enabled */
     unsigned char finish_ready; /* the frame's Finish visible and enabled */
+    unsigned char cd_on;        /* places: 3495 (CD-ROM drive) checked */
+    unsigned char wu_on;        /* places: 3496 (Microsoft Windows Update) checked */
 } HWPAGE;
 
 static int hw_classify(const HWPAGE *p)
@@ -271,6 +294,7 @@ typedef struct {
     unsigned char event;
     unsigned char seen;         /* HP_* kinds already logged (bit per kind) */
     unsigned char why;          /* AW_*: why this tick pressed nothing */
+    unsigned char unchecks;     /* AA_UNCHECK given on this page */
 } HWSTATE;
 
 /* Why a tick pressed nothing (usosans.c logs every change). */
@@ -289,13 +313,14 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
     if (frame != s->frame) {
         s->frame = frame; s->page = 0; s->kind = HP_NONE; s->confirmed = 0; s->ticks = 0;
         s->waited = 0; s->pressed = 0; s->gone = 0; s->stop = 0; s->event = AE_NONE; s->seen = 0;
+        s->unchecks = 0;
     }
     s->why = AW_NONE;
     if (s->stop) { s->why = AW_STOPPED; return AA_NONE; }
     s->event = AE_NONE;
     if (page != s->page || kind != s->kind) {
         s->page = page; s->kind = (unsigned char)kind; s->ticks = 0; s->waited = 0; s->pressed = 0; s->gone = 0;
-        s->stuck = 0;
+        s->stuck = 0; s->unchecks = 0;
     }
     if (s->pressed) {
         /* not final: logged once (AA_LEAVE + AE_STUCK), the next page gets its turn */
@@ -323,6 +348,14 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
         break;
     case HP_PLACES:
         if (!s->confirmed) { s->stop = 1; s->event = AE_UNCONFIRMED; return AA_LEAVE; }
+        /* Windows Update / CD-ROM cleared first (BM_SETCHECK + BN_CLICKED to
+         * the page), then the page settles again before Next */
+        if (p->wu_on || p->cd_on) {
+            if (s->unchecks >= AN_UNCHECK_MAX) { s->stop = 1; s->event = AE_PLACES; return AA_LEAVE; }
+            s->unchecks++;
+            s->ticks = 0;
+            return AA_UNCHECK;
+        }
         ok = 1; ready = p->next_ready;
         break;
     case HP_READY:
@@ -344,6 +377,39 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
     }
     s->pressed = 1;
     return kind == HP_FINISH ? AA_FINISH : AA_NEXT;
+}
+
+/* ---- the Windows Update offer of the device installer ----
+ * A visible #32770 titled "Microsoft Windows Update" while the new
+ * hardware wizard is shown: the register-now question (Yes / No) gets No,
+ * an OK + Cancel box Cancel, the notice that follows it (OK alone) OK;
+ * after AN_STABLE_TICKS, once per box, at most AN_WU_MAX per start. Any
+ * other shape, or no wizard: the box is the user's. Declining is what
+ * keeps the wizard off the network (Windows Update stays unused). */
+#define AN_WU_MAX        4
+typedef struct {
+    unsigned char yes, no, ok, cancel;  /* buttons 6 / 7 / 1 / 2 present and enabled */
+    unsigned char wizard;               /* the new hardware wizard is visible */
+} ANWUBOX;
+typedef struct {
+    unsigned long cur;
+    unsigned char ticks;
+    unsigned char done;                 /* 1 pressed, 2 left to the user */
+    unsigned char presses;              /* this start */
+} ANWUSTATE;
+
+static int an_wu_step(ANWUSTATE *s, unsigned long wnd, const ANWUBOX *v)
+{
+    if (wnd != s->cur) { s->cur = wnd; s->ticks = 0; s->done = 0; }
+    if (s->done) return AA_NONE;
+    if (!v->wizard || s->presses >= AN_WU_MAX) { s->done = 2; return AA_LEAVE; }
+    if (++s->ticks < AN_STABLE_TICKS) return AA_NONE;
+    s->done = 1;
+    if (v->yes && v->no && !v->ok) { s->presses++; return AA_NO; }
+    if (v->ok && v->cancel && !v->yes && !v->no) { s->presses++; return AA_CANCEL; }
+    if (v->ok && !v->cancel && !v->yes && !v->no) { s->presses++; return AA_OK; }
+    s->done = 2;
+    return AA_LEAVE;
 }
 
 /* ---- Windows 98's first-start Setup wizard ----
@@ -412,6 +478,30 @@ static unsigned char su_step(SUSTATE *s, unsigned long frame, PGVIEW *v)
  * never past AN_MAX_LIFETIME_MS (the first-start wizard can come late). */
 #define AN_MAX_LIFETIME_MS (30UL * 60UL * 1000UL)
 
+/* Keys of the recorder (virtual-key codes only, never text): every code
+ * except the mouse buttons (polled apart) and the left / right modifier
+ * codes 9x does not report. A character key (digits, letters, numpad,
+ * punctuation) is logged as "a character key" without its code unless Alt
+ * or Ctrl is held (an accelerator such as Alt+D for "&Dalej"): the name
+ * and product key are typed into the Setup wizard. */
+static int an_key_polled(int vk)
+{
+    if (vk < 0x08 || vk > 0xFE) return 0;
+    if (vk >= 0xA0 && vk <= 0xA5) return 0;
+    return 1;
+}
+
+static int an_key_character(int vk)
+{
+    return (vk >= 0x30 && vk <= 0x39) || (vk >= 0x41 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x6F) ||
+           (vk >= 0xBA && vk <= 0xC0) || (vk >= 0xDB && vk <= 0xDF) || vk == 0xE2 || vk == 0x20;
+}
+
+static int an_key_code_shown(int vk, int alt, int ctrl)
+{
+    return !an_key_character(vk) || alt || ctrl;
+}
+
 static int an_edge(unsigned char *prev, int down)
 {
     int press = down && !*prev;
@@ -453,9 +543,13 @@ static unsigned an_field(const char *buf, int len, const char *key)
 }
 
 /* At the start of a Windows start (boots = this start, counted). 1: the
- * value is removed now and nothing is watched. */
-static int an_remove_now(unsigned boots, unsigned desk_boots, int addons_pending)
+ * value is removed now and nothing is watched. chain_open: the first-desktop
+ * coordinator still owns the starts (FIRSTBT.ON without FIRSTBT.OK /
+ * FIRSTBT.ERR): kept up to AN_HARD_MAX_BOOTS. */
+static int an_remove_now(unsigned boots, unsigned desk_boots, int addons_pending, int chain_open)
 {
+    if (boots > AN_HARD_MAX_BOOTS) return 1;
+    if (chain_open) return 0;
     if (boots > AN_MAX_BOOTS) return 1;
     if (desk_boots >= AN_DESK_BOOTS && !addons_pending) return 1;
     return 0;

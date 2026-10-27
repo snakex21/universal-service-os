@@ -54,7 +54,8 @@ HARNESS = r'''
 /* Text arguments are hex (code page 1250 bytes survive the command line).
  * t HEX: "logon_kind hw_frame"; m HEX: an_is_monitor; i HEX:
  * an_names_monitor_inf; f HEX: "boots desk" of a state file; r B D P:
- * an_remove_now; l TICK...: an_logon_step, TICK = wnd,kind,shape,ok,user,
+ * an_remove_now B D P C; w TICK...: an_wu_step, TICK = wnd,yes,no,ok,cancel,
+ * wizard; W HEX: an_is_wu_box; k VK ALT CTRL: "polled character shown"; l TICK...: an_logon_step, TICK = wnd,kind,shape,ok,user,
  * pass,confirm (decimal), prints "action/event" per tick (ANLOGSTATE kept
  * across the ticks); h TICK...: hw_step, TICK = frame,page,name,me_auto,
  * me_auto_on,me_manual_on,search,search_on,list,list_on,places,ready,fin,
@@ -82,10 +83,25 @@ int main(int argc, char **argv)
     /* shared with USOSPG.DRV, used by usosans.c only */
     (void)pg_classify; (void)pg_move_add; (void)pg_move_due; (void)pg_move_reset;
     if (argv[1][0] == 't') { unhex(argv[2], buf, sizeof buf); printf("%d %d\n", an_logon_kind(buf), an_is_hw_frame(buf)); }
+    else if (argv[1][0] == 'W') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_is_wu_box(buf)); }
     else if (argv[1][0] == 'm') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_is_monitor(buf)); }
     else if (argv[1][0] == 'i') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_names_monitor_inf(buf)); }
     else if (argv[1][0] == 'f') { int n = unhex(argv[2], buf, sizeof buf); printf("%u %u\n", an_field(buf, n, "boots"), an_field(buf, n, "desk")); }
-    else if (argv[1][0] == 'r') printf("%d\n", an_remove_now((unsigned)atoi(argv[2]), (unsigned)atoi(argv[3]), atoi(argv[4])));
+    else if (argv[1][0] == 'r') printf("%d\n", an_remove_now((unsigned)atoi(argv[2]), (unsigned)atoi(argv[3]), atoi(argv[4]), atoi(argv[5])));
+    else if (argv[1][0] == 'k') { int vk = atoi(argv[2]); printf("%d %d %d\n", an_key_polled(vk), an_key_character(vk), an_key_code_shown(vk, atoi(argv[3]), atoi(argv[4]))); }
+    else if (argv[1][0] == 'w') {
+        ANWUSTATE s;
+        memset(&s, 0, sizeof s);
+        for (i = 2; i < argc; i++) {
+            ANWUBOX v;
+            unsigned long w; int y, n, o, c, z;
+            sscanf(argv[i], "%lu,%d,%d,%d,%d,%d", &w, &y, &n, &o, &c, &z);
+            v.yes = (unsigned char)y; v.no = (unsigned char)n; v.ok = (unsigned char)o; v.cancel = (unsigned char)c;
+            v.wizard = (unsigned char)z;
+            printf("%d ", an_wu_step(&s, w, &v));
+        }
+        printf("\n");
+    }
     else if (argv[1][0] == 'l') {
         ANLOGSTATE s;
         memset(&s, 0, sizeof s);
@@ -129,10 +145,10 @@ int main(int argc, char **argv)
         memset(&s, 0, sizeof s);
         for (i = 2; i < argc; i++) {
             HWPAGE p;
-            unsigned long f, pg; int x[15], a, j;
-            sscanf(argv[i], "%lu,%lu,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &f, &pg, &x[0], &x[1], &x[2],
-                   &x[3], &x[4], &x[5], &x[6], &x[7], &x[8], &x[9], &x[10], &x[11], &x[12], &x[13], &x[14]);
-            for (j = 0; j < 15; j++) ((unsigned char *)&p)[j] = (unsigned char)x[j];
+            unsigned long f, pg; int x[17], a, j;
+            sscanf(argv[i], "%lu,%lu,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &f, &pg, &x[0], &x[1], &x[2],
+                   &x[3], &x[4], &x[5], &x[6], &x[7], &x[8], &x[9], &x[10], &x[11], &x[12], &x[13], &x[14], &x[15], &x[16]);
+            for (j = 0; j < 17; j++) ((unsigned char *)&p)[j] = (unsigned char)x[j];
             a = hw_step(&s, f, pg, &p);
             printf("%d/%d/%d ", a, s.event, pg ? hw_classify(&p) : HP_NONE);
         }
@@ -143,9 +159,9 @@ int main(int argc, char **argv)
 '''
 
 AK_NONE, AK_ENTER, AK_WELCOME, AK_SET = 0, 1, 2, 3
-NONE, OK, NEXT, FINISH, LEAVE = 0, 1, 2, 3, 4
+NONE, OK, NEXT, FINISH, LEAVE, UNCHECK, NO, CANCEL = range(8)
 (E_NONE, E_SHAPE, E_TYPED, E_NO_USER, E_NO_BUTTON, E_OTHER, E_CHANGED, E_UNCONFIRMED, E_NO_INF, E_STUCK,
- E_LIMIT) = range(11)
+ E_LIMIT, E_PLACES) = range(12)
 HP_NONE, HP_OTHER, HP_INTRO, HP_CHOICE, HP_PLACES, HP_READY, HP_FINISH = range(7)
 (SW_NONE, SW_NO_PAGE, SW_UNKNOWN_PAGE, SW_FINISH_UNCONFIRMED, SW_SETTLING, SW_WAIT_NEXT, SW_AFTER_PRESS,
  SW_LEFT) = range(8)
@@ -168,9 +184,9 @@ def logon(wnd=1, kind=AK_ENTER, shape=1, ok=1, user=4, pw=0, confirm=0):
 
 
 def page(frame=7, pg=0, name=0, me_auto=0, me_auto_on=0, me_manual_on=0, search=0, search_on=0, lst=0, lst_on=0,
-         places=0, ready=0, fin=0, monitor=0, inf=0, nxt=1, finish=0):
+         places=0, ready=0, fin=0, monitor=0, inf=0, nxt=1, finish=0, cd_on=0, wu_on=0):
     return ','.join(str(v) for v in (frame, pg, name, me_auto, me_auto_on, me_manual_on, search, search_on, lst,
-                                     lst_on, places, ready, fin, monitor, inf, nxt, finish))
+                                     lst_on, places, ready, fin, monitor, inf, nxt, finish, cd_on, wu_on))
 
 
 INTRO = dict(pg=11, name=1, monitor=1)
@@ -337,6 +353,61 @@ class Logic(unittest.TestCase):
         self.assertEqual([(a, e) for a, e, _ in got if a == LEAVE], [(LEAVE, E_STUCK)])
         self.assertEqual(got[-1][0], NEXT)
 
+    def test_places_windows_update_unchecked_before_next(self):
+        # X470 98 FE PL 2026-10-27: 3494 and 3496 checked; the Windows Update box stopped the wizard
+        wu = dict(PLACES, wu_on=1)
+        ticks = [page(**INTRO)] * 4 + [page(**CHOICE)] * 4 + [page(**wu)] * 4 + [page(**PLACES)] * 4 + \
+                [page(**READY)] * 4 + [page(**FIN)] * 6
+        got = self.hw(*ticks)
+        self.assertEqual([a for a, _, _ in got if a != NONE], [NEXT, NEXT, UNCHECK, NEXT, NEXT, FINISH])
+        self.assertEqual(got[11][0], UNCHECK)            # after 1 s on the page
+        self.assertEqual(got[15][0], NEXT)               # settled again after the uncheck
+        # the CD-ROM drive too; both are given in one action
+        got = self.hw(*[page(**INTRO)] * 4, *[page(**CHOICE)] * 4, *[page(**dict(PLACES, cd_on=1, wu_on=1))] * 4,
+                      *[page(**PLACES)] * 4)
+        self.assertEqual([a for a, _, _ in got if a != NONE], [NEXT, NEXT, UNCHECK, NEXT])
+        # a box that will not clear: three tries, then the wizard is the user's, Next never pressed
+        got = self.hw(*[page(**INTRO)] * 4, *[page(**CHOICE)] * 4, *[page(**wu)] * 30)
+        acts = [a for a, _, _ in got]
+        self.assertEqual(acts.count(UNCHECK), 3)
+        self.assertEqual(acts.count(NEXT), 2)
+        self.assertIn((LEAVE, E_PLACES, HP_PLACES), got)
+
+    def wu(self, *ticks):
+        return [int(x) for x in self.run_exe('w', *ticks).split()]
+
+    def test_windows_update_offer(self):
+        for title, want in (('Microsoft Windows Update', '1'), ('Microsoft Windows Update ', '0'), ('Windows Update', '0'),
+                            ('Kreator dodawania nowego sprz\u0119tu', '0'), ('', '0')):
+            self.assertEqual(self.run_exe('W', hx(title)), want, title)
+        # SYSDM.CPL STR 4201 "... register now?" Yes / No over the wizard: No after 1 s, once
+        self.assertEqual(self.wu(*['5,1,1,0,0,1'] * 6), [NONE, NONE, NONE, NO, NONE, NONE])
+        # the notice after it (STR 4203, OK alone): OK; OK / Cancel: Cancel
+        self.assertEqual(self.wu(*['5,1,1,0,0,1'] * 4, *['6,0,0,1,0,1'] * 4), [NONE] * 3 + [NO] + [NONE] * 3 + [OK])
+        self.assertEqual(self.wu(*['5,0,0,1,1,1'] * 4)[-1], CANCEL)
+        # no wizard shown, or another shape: left alone
+        self.assertEqual(self.wu(*['5,1,1,0,0,0'] * 6), [LEAVE] + [NONE] * 5)
+        self.assertEqual(self.wu(*['5,1,1,1,0,1'] * 6)[3], LEAVE)
+        self.assertEqual(self.wu(*['5,0,0,0,0,1'] * 6)[3], LEAVE)
+        # at most four presses per start
+        ticks = []
+        for w in range(1, 7):
+            ticks += [f'{w},1,1,0,0,1'] * 4
+        self.assertEqual(self.wu(*ticks).count(NO), 4)
+
+    def test_recorder_keys_codes_only(self):
+        def k(vk, alt=0, ctrl=0):
+            return tuple(int(x) for x in self.run_exe('k', str(vk), str(alt), str(ctrl)).split())
+        self.assertEqual(k(0x0D), (1, 0, 1))             # Enter: code shown
+        self.assertEqual(k(0x22), (1, 0, 1))             # Page Down
+        self.assertEqual(k(0x12), (1, 0, 1))             # Alt itself
+        for vk in (0x30, 0x39, 0x41, 0x5A, 0x60, 0x6F, 0xBA, 0xC0, 0xDB, 0xDF, 0xE2, 0x20):
+            self.assertEqual(k(vk), (1, 1, 0), hex(vk))  # a character key: no code
+            self.assertEqual(k(vk, alt=1)[2], 1)         # Alt+D ("&Dalej"): code shown
+            self.assertEqual(k(vk, ctrl=1)[2], 1)
+        for vk in (0x01, 0x02, 0x04, 0x05, 0x06, 0xA0, 0xA5, 0xFF):
+            self.assertEqual(k(vk)[0], 0, hex(vk))       # mouse buttons / L-R modifiers / out of range not polled
+
     # ---- Windows 98's first-start Setup wizard (su_step over usospg_logic.h)
 
     def su(self, *ticks):
@@ -393,7 +464,13 @@ class Logic(unittest.TestCase):
         for boots, desk, pending, want in ((1, 0, 1, 0), (1, 0, 0, 0), (2, 1, 0, 0), (3, 2, 1, 0), (3, 2, 0, 1),
                                            (4, 0, 1, 0), (5, 0, 1, 1), (5, 4, 0, 1)):
             with self.subTest(boots=boots, desk=desk, pending=pending):
-                self.assertEqual(self.run_exe('r', str(boots), str(desk), str(pending)), str(want))
+                self.assertEqual(self.run_exe('r', str(boots), str(desk), str(pending), '0'), str(want))
+        # the first-desktop coordinator still owns the starts (X470 98 FE PL 2026-10-27: removed at the 5th
+        # start, five package boots before the desktop): kept, but never past the 12th start
+        for boots, desk, pending, want in ((5, 0, 1, 0), (5, 4, 0, 0), (3, 2, 0, 0), (12, 0, 1, 0), (13, 0, 1, 1),
+                                           (13, 0, 0, 1)):
+            with self.subTest(boots=boots, desk=desk, pending=pending, chain='open'):
+                self.assertEqual(self.run_exe('r', str(boots), str(desk), str(pending), '1'), str(want))
 
 
 class Sources(unittest.TestCase):
@@ -410,7 +487,18 @@ class Sources(unittest.TestCase):
         self.assertIn('press(page, PG_EULA_YES_ID);', c)
         self.assertIn('press(frame, PG_NEXT_ID);', c)
         self.assertIn('press(frame, PG_FINISH_ID);', c)
-        self.assertEqual(c.count('press('), 7)          # the definition + six calls
+        self.assertIn('press(page, ids[j]);', c)         # search places: BN_CLICKED after BM_SETCHECK unchecked
+        self.assertIn('press(w, AN_NO_ID);', c)
+        self.assertIn('press(w, AN_CANCEL_ID);', c)
+        self.assertEqual(c.count('press('), 11)         # the definition + ten calls
+        self.assertIn('SendMessageTimeoutA(box, BM_SETCHECK, BST_UNCHECKED, 0, SMTO_ABORTIFHUNG, 500, &res);', c)
+        self.assertNotIn('BST_CHECKED, 0, SMTO_ABORTIFHUNG, 500, &res);\n            press(page, ids[j]);', c)
+        # keys: virtual-key codes only; character keys without Alt / Ctrl not even as a code
+        rk = c[c.index('static void rec_key(int vk)'):c.index('static void rec_poll(void)')]
+        self.assertIn('if (an_key_code_shown(vk, alt, ctrl)) wsprintfA(what, "VK 0x%02X%s", vk, name);', rk)
+        self.assertIn('else lstrcpyA(what, "(a character key)");', rk)
+        for banned in ('ToAscii', 'MapVirtualKey', 'GetKeyNameText', 'text_of('):
+            self.assertNotIn(banned, rk)
         # Setup wizard: name and key fields only measured; the recorder reads text only via safe_text
         self.assertIn('v.filled = length_of(GetDlgItem(page, PG_NAME_ID)) > 0;', c)
         self.assertIn('if (length_of(GetDlgItem(page, PG_KEY1_ID + i)) == PG_KEY_PART_LEN) keys++;', c)
@@ -439,7 +527,7 @@ class Sources(unittest.TestCase):
             self.assertLessEqual(names, b.USOSLOG_IMPORTS[dll] | {'RegDeleteValueA', 'EnumChildWindows', 'FindWindowA',
                                                                  'GetDlgItem', 'GetParent', 'IsWindowEnabled',
                                                                  'PostMessageA', 'SendMessageTimeoutA', 'GetAsyncKeyState',
-                                                                 'GetDlgCtrlID'}, dll)
+                                                                 'GetDlgCtrlID', 'GetFileAttributesA'}, dll)
         self.assertIn('    build_usoslog(out, work)\n    build_usosans(out, work)\n', (ROOT / 'tools/build_win9x_support.py').read_text())
         self.assertIn("'EFI/USOS/dos-native/win9x/USOSANS.EXE'",
                       (ROOT / 'tools/verify_release_consistency.ps1').read_text(encoding='utf-8-sig'))
@@ -724,7 +812,7 @@ def _logic_strings():
     import re
     text = LOGIC.read_text(encoding='ascii')
     out = {}
-    for name in ('an_enter_titles', 'an_welcome_titles', 'an_set_titles', 'an_hw_titles', 'an_monitor_names'):
+    for name in ('an_enter_titles', 'an_welcome_titles', 'an_set_titles', 'an_hw_titles', 'an_monitor_names', 'an_wu_titles'):
         body = text[text.index(f'{name}[] = {{'):]
         body = body[:body.index('0 };')]
         out[name] = [bytes(re.sub(r'\\x([0-9a-f]{2})', lambda m: chr(int(m.group(1), 16)), s), 'latin1').decode('cp1250')
@@ -802,6 +890,15 @@ class Media(unittest.TestCase):
             self.assertEqual(intro, [4000])
             self.assertEqual(having(3315, 3316), [3301])
             self.assertEqual(having(3494, 3497), [3490])
+            places = pages[3490][1]
+            self.assertEqual(places[3495][0], 'Button')
+            self.assertIn('CD-ROM', places[3495][1])
+            self.assertEqual(places[3496], ('Button', '&Microsoft Windows Update'))
+            # the Windows Update offer: a message box titled with the product name
+            self.assertEqual(ne_string(nres, 4200), want['an_wu_titles'][0])
+            self.assertEqual(ne_string(nres, 4202), want['an_wu_titles'][0])
+            self.assertTrue(ne_string(nres, 4201).startswith(want['an_wu_titles'][0]))
+            self.assertTrue(ne_string(nres, 4203))
             self.assertEqual(having(4101, 4104), [3300])
         # no page is two kinds at once
         for rid, (_, items) in pages.items():

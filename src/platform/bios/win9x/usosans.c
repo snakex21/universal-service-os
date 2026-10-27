@@ -22,13 +22,16 @@
  *     for the device "Plug and Play Monitor" (MONITOR.INF *PNP09FF; 98
  *     with DDC on): Next on the intro page (that device name only), on the
  *     search choice (the recommended search still selected), on the search
- *     places (as shown), on the ready page (the found driver is
+ *     places ("CD-ROM drive" and "Microsoft Windows Update" unchecked
+ *     first, BM_SETCHECK + BN_CLICKED to the page), on the ready page (the found driver is
  *     ...\MONITOR.INF), Finish on the last page (that device name). Any
  *     other device, a changed choice, another driver file or an unknown
  *     result page: that wizard is the user's. The same steps the user did
  *     by hand on the X470 (98 FE PL, 2026-10-27). The search places page
  *     may stay 120 s; a page that stays after its press is logged once and
- *     watched, the next page of the wizard still gets its press.
+ *     watched, the next page of the wizard still gets its press. Its
+ *     Windows Update offer (a "Microsoft Windows Update" message box,
+ *     register now?) gets No, the notice after it OK.
  *  3. Windows 98's first-start Setup wizard (X470 98 FE PL run 3: user
  *     information, licence, product key and "Finish" come at the first
  *     start, not in Setup's mini-Windows): any visible dialog with the
@@ -43,8 +46,9 @@
  * page at first sight with all its controls (class, ID, Static / Button
  * text, button style and check state, Edits as their length only) and the
  * frame's buttons; why a tick pressed nothing (at every change); and while
- * a wizard is visible, every 50 ms: L / R mouse button and Enter / Tab /
- * Esc presses (GetAsyncKeyState; 9x has no low-level hooks) with the
+ * a wizard is visible, every 50 ms: L / R mouse button and key presses
+ * (virtual-key codes and modifiers only; a character key without Alt /
+ * Ctrl as "a character key"; GetAsyncKeyState, 9x has no low-level hooks) with the
  * control under the cursor, and a cursor-move summary every 5 s. After 10
  * minutes the helper goes on only while a wizard is shown (30 at most).
  * Presses are WM_COMMAND BN_CLICKED posted to the dialog / wizard frame
@@ -58,7 +62,8 @@
  * (after 15 s, so the shell's value enumeration is not shifted) once two
  * starts reached the desktop and the USOS add-on chain is over (no
  * USOSAddons Run value; on 95 that also means FIRSTBT.OK), at the latest
- * after the 4th start. Nothing is left running: one instance (a mutex),
+ * after the 4th start; while the first-desktop coordinator still owns the
+ * starts (FIRSTBT.ON, no FIRSTBT.OK / FIRSTBT.ERR) it stays, up to the 12th. Nothing is left running: one instance (a mutex),
  * it ends after 10 minutes.
  */
 #define WIN32_LEAN_AND_MEAN
@@ -71,7 +76,7 @@
 #define MAX_TOP    32
 #define TEXT_CAP   260
 
-static char g_log[MAX_PATH], g_sta[MAX_PATH];
+static char g_log[MAX_PATH], g_sta[MAX_PATH], g_dir[MAX_PATH];
 static unsigned g_boots, g_desk;
 
 static int slen(const char *s) { int n = 0; while (s[n]) n++; return n; }
@@ -130,6 +135,7 @@ static int paths(void)
     for (i = n; i && app[i - 1] != '\\' && app[i - 1] != '/'; i--) ;
     if (!i || i > MAX_PATH - 16) return 0;
     app[i] = 0;
+    lstrcpyA(g_dir, app);
     lstrcpyA(g_log, app); lstrcatA(g_log, "USOSANS.TXT");
     lstrcpyA(g_sta, app); lstrcatA(g_sta, "USOSANS.STA");
     return 1;
@@ -170,6 +176,22 @@ static int addons_pending(void)
     r = RegQueryValueExA(k, "USOSAddons", 0, &type, 0, &size);
     RegCloseKey(k);
     return r == ERROR_SUCCESS;
+}
+
+/* The 95 / 98 first-desktop coordinator (USOSFB, beside this program in
+ * C:\USOS9X) still owns the starts: FIRSTBT.ON without FIRSTBT.OK or
+ * FIRSTBT.ERR. */
+static int beside(const char *leaf)
+{
+    char path[MAX_PATH];
+    lstrcpyA(path, g_dir);
+    lstrcatA(path, leaf);
+    return GetFileAttributesA(path) != (DWORD)-1;
+}
+
+static int chain_open(void)
+{
+    return beside("FIRSTBT.ON") && !beside("FIRSTBT.OK") && !beside("FIRSTBT.ERR");
 }
 
 /* The shell enumerates RunServices by index: deleting our own value at
@@ -287,7 +309,8 @@ static ANLOGSTATE *log_slot(HWND w, int *fresh)
 static const char *const kind_name[] = { "-", "first logon", "welcome", "set password" };
 static const char *const event_name[] = { "", "unexpected controls", "a password was typed", "no user name",
     "button not enabled", "another device", "the choice was changed", "device not confirmed",
-    "the driver is not MONITOR.INF", "page stayed after the press", "press limit" };
+    "the driver is not MONITOR.INF", "page stayed after the press", "press limit",
+    "Windows Update / CD-ROM stayed checked on the search places page" };
 
 static void logon_tick(HWND w, const char *title, int kind)
 {
@@ -373,6 +396,10 @@ static void hw_tick(HWND frame)
             p.monitor_inf = (unsigned char)t.inf;
             lstrcpynA(name, t.first, sizeof name);
         }
+        if (kind == HP_PLACES) {
+            p.cd_on = (unsigned char)checked(GetDlgItem(page, HW_PLACE_CD_ID));
+            p.wu_on = (unsigned char)checked(GetDlgItem(page, HW_PLACE_WU_ID));
+        }
         p.next_ready = (unsigned char)button_ready(GetDlgItem(frame, HW_NEXT_ID));
         p.finish_ready = (unsigned char)button_ready(GetDlgItem(frame, HW_FINISH_ID));
     } else kind = HP_NONE;
@@ -387,7 +414,22 @@ static void hw_tick(HWND frame)
         dump_page(frame, page);
     }
     act = hw_step(&g_hw, (unsigned long)frame, (unsigned long)page, &p);
-    if (act == AA_NEXT) { press(frame, HW_NEXT_ID); say2("wizard: Next pressed on ", page_name[kind]); }
+    if (act == AA_UNCHECK) {
+        /* the check box cleared, then BN_CLICKED to the page: its handler
+         * reads the new state as after a click */
+        static const int ids[2] = { HW_PLACE_WU_ID, HW_PLACE_CD_ID };
+        static const char *const names[2] = { "Microsoft Windows Update (3496)", "CD-ROM drive (3495)" };
+        int j;
+        for (j = 0; j < 2; j++) {
+            HWND box = GetDlgItem(page, ids[j]);
+            DWORD res;
+            if (!checked(box)) continue;
+            SendMessageTimeoutA(box, BM_SETCHECK, BST_UNCHECKED, 0, SMTO_ABORTIFHUNG, 500, &res);
+            press(page, ids[j]);
+            say2("wizard: search places: unchecked ", names[j]);
+        }
+    }
+    else if (act == AA_NEXT) { press(frame, HW_NEXT_ID); say2("wizard: Next pressed on ", page_name[kind]); }
     else if (act == AA_FINISH) { press(frame, HW_FINISH_ID); say("wizard: Finish pressed (Plug and Play Monitor)"); }
     else if (act == AA_LEAVE && g_hw.event == AE_STUCK) say2("wizard: page stayed after the press, still watching: ", page_name[kind]);
     else if (act == AA_LEAVE) say2("wizard: left to the user: ", event_name[g_hw.event]);
@@ -618,6 +660,27 @@ static void su_tick(HWND frame)
     }
 }
 
+/* ---- the Windows Update offer (a message box over the wizard) ---- */
+
+static ANWUSTATE g_wu;
+
+static void wu_tick(HWND w)
+{
+    ANWUBOX v;
+    int act;
+    v.yes = (unsigned char)button_ready(GetDlgItem(w, AN_YES_ID));
+    v.no = (unsigned char)button_ready(GetDlgItem(w, AN_NO_ID));
+    v.ok = (unsigned char)button_ready(GetDlgItem(w, AN_OK_ID));
+    v.cancel = (unsigned char)button_ready(GetDlgItem(w, AN_CANCEL_ID));
+    v.wizard = (unsigned char)(g_hw.frame && IsWindowVisible((HWND)g_hw.frame));
+    act = an_wu_step(&g_wu, (unsigned long)w, &v);
+    if (act == AA_NO) { press(w, AN_NO_ID); say("Windows Update offer: No pressed (no registration, no Windows Update)"); }
+    else if (act == AA_CANCEL) { press(w, AN_CANCEL_ID); say("Windows Update offer: Cancel pressed"); }
+    else if (act == AA_OK) { press(w, AN_OK_ID); say("Windows Update notice: OK pressed"); }
+    else if (act == AA_LEAVE) say(v.wizard ? "Windows Update box left to the user (not Yes / No, OK / Cancel or OK alone, or press limit)"
+                                         : "Windows Update box left to the user (no new hardware wizard shown)");
+}
+
 /* ---- top-level dialogs seen (once per window) ---- */
 
 #define SEEN_SLOTS 24
@@ -637,7 +700,7 @@ static void note_dialog(HWND w, const char *title, const char *what)
 /* ---- the click recorder ---- */
 
 static HWND g_watch;                /* the wizard frame of the last scan */
-static unsigned char g_btn[2], g_keys[3];
+static unsigned char g_btn[2], g_keys[256];
 static PGMOVES g_moves;
 static POINT g_pt;
 static int g_have_pt;
@@ -671,10 +734,20 @@ static void rec_click(const char *what, POINT pt)
     rec_say(line);
 }
 
-static void rec_key(const char *what)
+/* Virtual-key code and modifiers only, never a character (an_key_code_shown). */
+static void rec_key(int vk)
 {
-    char line[400];
+    char line[400], what[64];
     POINT pt;
+    int alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0, ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    int shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+    const char *name = vk == VK_RETURN ? " Enter" : vk == VK_TAB ? " Tab" : vk == VK_ESCAPE ? " Esc"
+                     : vk == VK_MENU ? " Alt" : vk == VK_CONTROL ? " Ctrl" : vk == VK_SHIFT ? " Shift" : "";
+    if (an_key_code_shown(vk, alt, ctrl)) wsprintfA(what, "VK 0x%02X%s", vk, name);
+    else lstrcpyA(what, "(a character key)");
+    if (vk != VK_MENU && alt) lstrcatA(what, " +Alt");
+    if (vk != VK_CONTROL && ctrl) lstrcatA(what, " +Ctrl");
+    if (vk != VK_SHIFT && shift) lstrcatA(what, " +Shift");
     GetCursorPos(&pt);
     wsprintfA(line, "key %s, window under the cursor:", what);
     describe(WindowFromPoint(pt), line, sizeof line);
@@ -685,8 +758,6 @@ static void rec_poll(void)
 {
     static const int vk_btn[2] = { VK_LBUTTON, VK_RBUTTON };
     static const char *const btn_name[2] = { "click L", "click R" };
-    static const int vk_key[3] = { VK_RETURN, VK_TAB, VK_ESCAPE };
-    static const char *const key_name[3] = { "Enter", "Tab", "Esc" };
     char line[200];
     POINT pt;
     DWORD now = GetTickCount();
@@ -695,9 +766,11 @@ static void rec_poll(void)
         int down = (GetAsyncKeyState(vk_btn[i]) & 0x8000) != 0;
         if (an_edge(&g_btn[i], down) && watching) { GetCursorPos(&pt); rec_click(btn_name[i], pt); }
     }
-    for (i = 0; i < 3; i++) {
-        int down = (GetAsyncKeyState(vk_key[i]) & 0x8000) != 0;
-        if (an_edge(&g_keys[i], down) && watching) rec_key(key_name[i]);
+    for (i = 0; i < 256; i++) {
+        int down;
+        if (!an_key_polled(i)) continue;
+        down = (GetAsyncKeyState(i) & 0x8000) != 0;
+        if (an_edge(&g_keys[i], down) && watching) rec_key(i);
     }
     if (!watching) { g_have_pt = 0; pg_move_reset(&g_moves); return; }
     GetCursorPos(&pt);
@@ -726,6 +799,7 @@ static void scan(void)
         GetWindowTextA(g_top[i], title, sizeof title);
         kind = an_logon_kind(title);
         if (kind != AK_NONE) { note_dialog(g_top[i], title, "logon dialog"); logon_tick(g_top[i], title, kind); }
+        else if (an_is_wu_box(title)) { note_dialog(g_top[i], title, "Windows Update offer of the device installer"); wu_tick(g_top[i]); }
         else if (!hw_seen && an_is_hw_frame(title)) {
             note_dialog(g_top[i], title, "new hardware wizard");
             hw_seen = 1;
@@ -756,9 +830,11 @@ void __cdecl usos_entry(void)
     wsprintfA(line, "USOSANS start %u (desktop reached in %u earlier starts, add-on chain %s)",
               g_boots, g_desk, pending ? "pending" : "over");
     say(line);
-    if (an_remove_now(g_boots, g_desk, pending)) {
+    say(chain_open() ? "first-desktop coordinator still owns the starts (FIRSTBT.ON, no FIRSTBT.OK / ERR): value kept up to 12 starts"
+                     : "first-desktop coordinator not staged or finished");
+    if (an_remove_now(g_boots, g_desk, pending, chain_open())) {
         state_write();
-        remove_value(g_boots > AN_MAX_BOOTS ? "start limit" : "first starts done");
+        remove_value(g_boots > AN_HARD_MAX_BOOTS ? "hard start limit" : g_boots > AN_MAX_BOOTS ? "start limit" : "first starts done");
         ExitProcess(0);
     }
     state_write();
@@ -778,7 +854,7 @@ void __cdecl usos_entry(void)
     pending = addons_pending();
     say("USOSANS: time over (10 minutes, longer while a wizard was shown), ending");
     /* The next start would only remove the value: do it now. */
-    if (an_remove_now(g_boots + 1, g_desk, pending))
-        remove_value(g_boots + 1 > AN_MAX_BOOTS ? "start limit" : "first starts done");
+    if (an_remove_now(g_boots + 1, g_desk, pending, chain_open()))
+        remove_value(g_boots + 1 > AN_HARD_MAX_BOOTS ? "hard start limit" : g_boots + 1 > AN_MAX_BOOTS ? "start limit" : "first starts done");
     ExitProcess(0);
 }
