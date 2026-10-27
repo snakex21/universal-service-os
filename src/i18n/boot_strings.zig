@@ -336,7 +336,6 @@ pub const Key = enum(u16) {
     wait,
     wait_usb,
     win9x_key_subtitle,
-    win9x_key_subtitle_95,
     win9x_key_title,
     action_blocked,
     action_chainload,
@@ -569,7 +568,6 @@ pub const Key = enum(u16) {
     profile_help_hide_outlook_express,
     profile_help_ie_esc_off,
     profile_help_key,
-    profile_help_key_95,
     profile_help_keyboard,
     profile_help_language,
     profile_help_last_access_off,
@@ -1177,7 +1175,6 @@ pub const hashes = [_]u32{
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
     0x8382ff82, // win9x_key.subtitle
-    0x05bfeb5d, // win9x_key.subtitle_95
     0xc186cf80, // win9x_key.title
     0xb9a53ded, // action.blocked
     0x67542164, // action.chainload
@@ -1410,7 +1407,6 @@ pub const hashes = [_]u32{
     0x08ba0e0c, // profile.help.hide_outlook_express
     0xb197380d, // profile.help.ie_esc_off
     0xcca2e39e, // profile.help.key
-    0xad97c071, // profile.help.key_95
     0x10f18736, // profile.help.keyboard
     0x8e773749, // profile.help.language
     0x90ba1edc, // profile.help.last_access_off
@@ -2019,8 +2015,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    true,
-    false,
     false,
     false,
     false,
@@ -2524,7 +2518,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 336;
+pub const bios_count = 335;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2861,7 +2855,6 @@ pub const english = [_][]const u8{
     "Please wait",
     "Please wait - keep the USB drive connected",
     "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
-    "CD key xxx-xxxxxxx or OEM ID xxxxx-OEM-xxxxxxx-xxxxx. Empty: Setup asks. Not saved.",
     "Enter the {0} product key",
     "Start is not possible with these settings",
     "Prepare and chainload",
@@ -3093,8 +3086,7 @@ pub const english = [_][]const u8{
     "Turn off Fast startup (a full shutdown every time), or hibernation altogether, which also ends Fast startup.",
     "XP and Server 2003: the Outlook Express shortcuts are removed; the program itself stays.",
     "Server: Internet Explorer Enhanced Security Configuration is off for administrators and users. Less protection when browsing.",
-    "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
-    "Product key for {0}: xxx-xxxxxxx or xxxxx-OEM-xxxxxxx-xxxxx. Empty: Setup asks.",
+    "Product key for {0} ({1}). Empty: Setup asks for it or offers the edition list.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
     "NTFS does not record the last-access time of a file on every read (fewer disk writes).",
@@ -3161,7 +3153,7 @@ pub const english = [_][]const u8{
     "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
     "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",
     "It contains characters that are not allowed here.",
-    "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
+    "A product key has the form {0}.",
     "A profile with this name exists already.",
     "This field is required.",
     "A computer name cannot be only digits.",

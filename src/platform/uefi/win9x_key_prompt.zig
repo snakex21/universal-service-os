@@ -104,14 +104,17 @@ pub fn ask(system_name: []const u8, system_id: []const u8) ?[]const u8 {
     show_invalid = false;
     var label: [96]u8 = undefined;
     var title: [96]u8 = undefined;
-    fields[0] = .{ .kind = .text, .label = view.format(&label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = if (want_five_by_five) .any else .win95 };
+    // Windows 95 / NT 4.0: the label names the two shapes (the title
+    // already names the system); the subtitle says Setup's page asks.
+    const label_arg = if (want_five_by_five) system_name else answer.profile.keyFormats(.win95);
+    fields[0] = .{ .kind = .text, .label = view.format(&label, .profile_field_key, &.{label_arg}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = if (want_five_by_five) .any else .win95 };
     fields[1] = .{ .kind = .action, .label = view.t(.key_continue), .primary = true, .id = continue_id };
     fields[2] = .{ .kind = .action, .label = view.t(.profile_cancel), .id = cancel_id };
     const hooks = form.Hooks{ .context = @ptrCast(&dummy_context), .invalid = hookInvalid };
     var selected: usize = 0;
     const heading = view.format(&title, .win9x_key_title, &.{system_name});
     while (true) {
-        switch (form.run(heading, view.t(if (may_be_empty) .win9x_key_subtitle_95 else .win9x_key_subtitle), &fields, hooks, &selected)) {
+        switch (form.run(heading, view.t(.win9x_key_subtitle), &fields, hooks, &selected)) {
             .back => return null,
             .x_on, .y_on => {},
             .action => |id| {

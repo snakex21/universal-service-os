@@ -514,7 +514,7 @@ fn problemText(problem: Problem) []const u8 {
         .reserved_name => t(.profile_problem_reserved_name),
         .same_as_user => t(.profile_problem_same_as_user),
         .only_digits => t(.profile_problem_only_digits),
-        .bad_key_format => t(.profile_problem_bad_key_format),
+        .bad_key_format => view.format(&key_problem_text, .profile_problem_bad_key_format, &.{answer.profile.keyFormats(keyStyle())}),
         .duplicate => t(.profile_problem_duplicate),
         else => t(.profile_problem_bad_characters),
     };
@@ -557,23 +557,18 @@ fn helpKey(id: F) view.Key {
     };
 }
 
+var key_problem_text: [160]u8 = undefined;
+
 fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
     const id = field_ids[index];
-    help_lines[0] = if (id == .key) view.format(&help_text[0], if (keyStyle() == .win95) .profile_help_key_95 else .profile_help_key, &.{system_name}) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
+    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{ system_name, answer.profile.keyFormats(keyStyle()) }) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
     var n: usize = 1;
     if (problemOf(id)) |problem| {
         if (show_all or !isEmptyRequired(id)) {
             help_lines[1] = problemText(problem);
             // A key being typed: how far it is (the count, never the key).
             if (id == .key and problem == .bad_key_format) {
-                const count = answer.profile.keySymbolCount(key_text.slice());
-                const limit = answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle());
-                // Windows 95 / NT 4.0: the first line already names both
-                // shapes (profile_help_key_95), so only the count.
-                help_lines[1] = (if (keyStyle() == .win95)
-                    std.fmt.bufPrint(&help_text[1], "({d}/{d})", .{ count, limit })
-                else
-                    std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), count, limit })) catch help_lines[1];
+                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle()) }) catch help_lines[1];
             }
             n = 2;
         }

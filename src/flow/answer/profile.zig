@@ -684,6 +684,15 @@ pub fn keyStyleFor(system_id: []const u8) KeyStyle {
     return .any;
 }
 
+/// The key shapes a field of `style` takes, for the help and problem texts
+/// ("{1}" of boot.profile.help.key, "{0}" of ...problem.bad_key_format).
+pub fn keyFormats(style: KeyStyle) []const u8 {
+    return switch (style) {
+        .any => "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
+        .win95 => "xxx-xxxxxxx / xxxxx-OEM-xxxxxxx-xxxxx",
+    };
+}
+
 /// Digits of a Windows 95 / NT 4.0 CD key (ddd-ddddddd).
 pub const cd_key_symbols = 10;
 
