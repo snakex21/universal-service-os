@@ -289,7 +289,8 @@ class Reg95Merge(unittest.TestCase):
 
 class Msbatch950(unittest.TestCase):
     # X470 95 RTM PL native (2026-10-26): Clients=VREDIR / Protocols=MSTCP
-    # without an adapter -> NETDI's NETGEN.INF adapter picker, twice.
+    # without an adapter -> NETDI's NETGEN.INF adapter picker, twice; empty
+    # keys (2026-10-27) -> NETDI defaults and the picker once.
     GOLDEN = ROOT / 'src/flow/answer/testdata/golden/options.windows-95.x86.inf'
 
     def setUp(self):
@@ -303,27 +304,48 @@ class Msbatch950(unittest.TestCase):
         self.assertEqual(rc, 0, out + err)
         return inf.read_bytes()
 
-    def test_rendered_answer_gets_no_setup_network_components(self):
+    def test_rendered_answer_gets_no_setup_network_section(self):
+        # X470 run 2026-10-27: empty Clients= / Protocols= / Services= made
+        # 950 NETDI take its defaults (NETLOG "1Got default NWLINK,NETBEUI",
+        # "VREDIR,NWREDIR"). Without [Network] NETDI's batch CreateNetwork
+        # does not run (Batch.NetworkSectionPresent=0).
         before = self.GOLDEN.read_bytes()
-        self.assertIn(b'Clients=VREDIR\r\nProtocols=MSTCP\r\n', before)
+        self.assertIn(b'[Network]\r\n', before)
         after = self.clear(before)
-        net = after[after.index(b'[Network]\r\n'):]
+        self.assertNotIn(b'[network]', after.lower())
+        net = after[after.index(b'[USOS.Network]\r\n'):]
         net = net[:net.index(b'\r\n\r\n') + 4]
-        self.assertEqual(net, b'[Network]\r\nComputerName="USOS-9X"\r\nWorkgroup="USOSLAB"\r\nDescription="Tester"\r\nDisplay=0\r\n'
-                              b'PrimaryLogon=Windows\r\nClients=\r\nProtocols=\r\nServices=\r\n\r\n')
+        self.assertIn(b'ComputerName="USOS-9X"\r\nWorkgroup="USOSLAB"\r\nDescription="Tester"\r\n', net)
         self.assertEqual(after.count(b'\n'), after.count(b'\r\n'))
-        # Everything outside the three [Network] lines is byte for byte the same.
-        self.assertEqual(after.replace(b'Clients=\r\nProtocols=\r\n', b'Clients=VREDIR\r\nProtocols=MSTCP\r\n'), before)
+        # Only the section header differs.
+        self.assertEqual(after.replace(b'[USOS.Network]\r\n', b'[Network]\r\n'), before)
         self.assertEqual(self.clear(after), after)                  # idempotent
 
-    def test_missing_keys_added_other_sections_untouched(self):
-        data = (b'[Setup]\r\nExpress=1\r\n\r\n[Network]\r\nComputerName="X"\r\nClients=VREDIR,NWREDIR\r\n\r\n'
-                b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nProtocols=MSTCP\r\n')
-        after = self.clear(data)
-        self.assertEqual(after, b'[Setup]\r\nExpress=1\r\n\r\n[Network]\r\nComputerName="X"\r\nClients=\r\nProtocols=\r\nServices=\r\n\r\n'
-                                b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nProtocols=MSTCP\r\n')
-        # [Network] as the last section, without a blank line after it.
-        self.assertEqual(self.clear(b'[Network]\r\nProtocols=MSTCP\r\n'), b'[Network]\r\nProtocols=\r\nClients=\r\nServices=\r\n')
+    def test_only_the_network_header_is_renamed(self):
+        data = (b'[Setup]\r\nExpress=1\r\n\r\n[NETWORK] \r\nComputerName="X"\r\nClients=VREDIR\r\n\r\n'
+                b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nNetwork=1\r\n[NetworkX]\r\n')
+        self.assertEqual(self.clear(data),
+                         b'[Setup]\r\nExpress=1\r\n\r\n[USOS.Network]\r\nComputerName="X"\r\nClients=VREDIR\r\n\r\n'
+                         b'[MSTCP]\r\nDHCP=1\r\n\r\n[Other]\r\nNetwork=1\r\n[NetworkX]\r\n')
+        # LF input comes out CR LF; a file without [Network] is unchanged.
+        self.assertEqual(self.clear(b'[Network]\nProtocols=MSTCP\n'), b'[USOS.Network]\r\nProtocols=MSTCP\r\n')
+        self.assertEqual(self.clear(b'[Setup]\r\nExpress=1\r\n'), b'[Setup]\r\nExpress=1\r\n')
+
+    def test_identity_survives_in_reg95(self):
+        # REG95's VNETSUP identity reads the renamed section of the staged file.
+        out = self.tmp / 'USOS9X'
+        (out / 'NET').mkdir(parents=True)
+        inf = self.tmp / 'MSBATCH.INF'
+        inf.write_bytes(self.GOLDEN.read_bytes())
+        self.clear(inf.read_bytes())
+        reg = out / 'NET/NET95.REG'
+        rc, so, err = run(f'. "{REG95}"\n'
+                          f"usos_net_w95_reg 'PCI\\VEN_8086&DEV_10C9' 'BUS_00&DEV_03&FUNC_00' '82576' USOSNET82576.ndi 03 > '{reg.as_posix()}'\n"
+                          f"w9x_reg95_write '{out.as_posix()}' '{inf.as_posix()}' '' '' '{reg.as_posix()}' '4 0 0 950'\n")
+        self.assertEqual(rc, 0, so + err)
+        text = (out / 'REG95.REG').read_bytes().decode('ascii')
+        self.assertIn('[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\VNETSUP]\r\n'
+                      '"ComputerName"="USOS-9X"\r\n"Workgroup"="USOSLAB"\r\n"Comment"="Tester"\r\n', text)
 
     def test_target_clears_only_950_usos_answers(self):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')

@@ -404,33 +404,30 @@ REGEDIT4
 EOF
 }
 
-# usos_net_w950_msbatch MSBATCH.INF: 95 RTM / OSR1 (4.00.950) only. The
-# answer's [Network] Clients=VREDIR / Protocols=MSTCP with no adapter (no
-# NetCards=; 950 Setup's detection does not find the I211) made NETDI show
-# NETGEN.INF's "Select Device" adapter picker twice (X470 95 RTM PL native,
-# 2026-10-26, first run with MSBATCH.INF loaded). Setup then installs no
-# network: Clients= / Protocols= / Services= empty (NETDI's [Network] keys:
-# NetCards, Protocols, Services, Clients, RemoveBinding, Display,
-# IgnoreDetectedNetcards; 950 NETDI.DLL strings), as before MSBATCH.INF
-# loaded, when the network worked. USOS's own adapter, TCP/IP (DHCP) and
-# client come from NET95.REG / TCP95.REG / NFILES / NET95L.BAT
-# (tools/w9x_reg95.sh). ComputerName / Workgroup / Description stay (REG95's
-# VNETSUP identity reads them). The file stays CR LF. A missing key is added.
+# usos_net_w950_msbatch MSBATCH.INF: 95 RTM / OSR1 (4.00.950) only. 950
+# NETDI (dif_FirstTimeSetup, batch) builds a network only when MSBATCH.INF
+# has a [Network] section (NETLOG "Batch.NetworkSectionPresent"):
+# - Clients=VREDIR / Protocols=MSTCP without an adapter (no NetCards=; 950
+#   detection does not find the I211): NETGEN.INF's "Select Device" adapter
+#   picker, twice (X470 95 RTM PL native, 2026-10-26, first run with
+#   MSBATCH.INF loaded);
+# - Clients= / Protocols= / Services= empty: NETDI takes its own defaults
+#   ("1Got default NWLINK,NETBEUI" / "VREDIR,NWREDIR") and the picker came
+#   once (X470 run 2026-10-27).
+# Without the section, 950 NETDI.DLL (read-only analysis of the 950 PL CD
+# file) skips the batch identity read and CreateNetwork: it only adopts a
+# real-mode network found by NETOS (none on a fresh disk) and the Net-class
+# devices Setup detected (none here), so Setup installs no network
+# component. The section is therefore renamed to [USOS.Network], which no
+# 950 Setup part reads: REG95's VNETSUP identity (tools/w9x_reg95.sh) takes
+# ComputerName / Workgroup / Description from it. USOS's own adapter,
+# TCP/IP (DHCP) and client come from NET95.REG / TCP95.REG / NFILES /
+# NET95L.BAT after Setup. The file stays CR LF; nothing else changes.
 usos_net_w950_msbatch() {
     awk '
         { sub(/\r$/, "") }
-        /^\[/ { if (net) flush(); net = (tolower($0) == "[network]"); print $0 "\r"; next }
-        net && tolower($0) ~ /^[ \t]*(clients|protocols|services)[ \t]*=/ {
-            k = tolower($0); sub(/[ \t]*=.*/, "", k); sub(/^[ \t]*/, "", k); seen[k] = 1
-            n = $0; sub(/[ \t]*=.*/, "", n); sub(/^[ \t]*/, "", n); print n "=\r"; next }
-        net && $0 == "" { flush(); net = 0 }
-        { print $0 "\r" }
-        function flush(  i, k) {
-            split("Clients Protocols Services", names, " ")
-            for (i = 1; i <= 3; i++) { k = tolower(names[i]); if (!(k in seen)) print names[i] "=\r" }
-            flushed = 1
-        }
-        END { if (net) flush() }' "$1" > "$1.n95" && mv "$1.n95" "$1"
+        /^[ \t]*\[/ { h = tolower($0); gsub(/^[ \t]+|[ \t]+$/, "", h); if (h == "[network]") { print "[USOS.Network]\r"; next } }
+        { print $0 "\r" }' "$1" > "$1.n95" && mv "$1.n95" "$1"
 }
 
 # 95, after USOSNET.INF / USOSNET.SYS were staged: NET95.REG for exactly

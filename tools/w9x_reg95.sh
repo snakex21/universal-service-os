@@ -205,8 +205,11 @@ w9x_reg95_convert() {
         # Original RTM PnP asks for these again if only [Network] in the
         # answer carries them. Seed the actual 95 VNETSUP identity fields.
         # Enabled only by the 950 static-NET95 writer, using answer values.
+        # The staged 950 MSBATCH.INF carries them in [USOS.Network] (Setup
+        # installs no network without [Network]; usos_net_w950_msbatch in
+        # tools/network_setup.sh).
         if (ENVIRON["W9X_REG95_NET_IDENTITY"] == "1") {
-            nl = split(body["network"], lines, "\n")
+            nl = split(body["network"] != "" ? body["network"] : body["usos.network"], lines, "\n")
             for (l = 1; l <= nl; l++) {
                 eq = index(lines[l], "=")
                 if (!eq) continue

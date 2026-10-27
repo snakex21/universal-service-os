@@ -402,12 +402,13 @@ fi
 usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
 USOS_NET_W95_VERSION=$setup_version usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
-# 95 RTM / OSR1: Setup installs no network (no NETDI adapter picker); the
-# USOS LAN comes from NET95.REG after Setup (tools/network_setup.sh
-# usos_net_w950_msbatch). OSR2 / 98 / Me and a user's own file: unchanged.
+# 95 RTM / OSR1: Setup installs no network (no [Network] section: no NETDI
+# defaults, no adapter picker); the USOS LAN comes from NET95.REG after
+# Setup (tools/network_setup.sh usos_net_w950_msbatch). OSR2 / 98 / Me and a
+# user's own file: unchanged.
 if [ "$ANSWER_KIND" != USER ] && [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
     usos_net_w950_msbatch "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot clear the 950 Setup network components'
-    log 'network: 950 Setup without network components (Clients= Protocols= Services=); USOS LAN after Setup'
+    log 'network: 950 Setup without network components ([Network] staged as [USOS.Network]); USOS LAN after Setup'
 fi
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
