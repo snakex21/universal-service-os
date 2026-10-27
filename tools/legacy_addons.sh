@@ -113,7 +113,8 @@ usos_addons_stage() {
     preset=$(sed -n 's/^preset=//p' "$cfg");options=$(sed -n 's/^options=//p' "$cfg");exclude=$(sed -n 's/^exclude=//p' "$cfg");dialup=$(sed -n 's/^dialup=//p' "$cfg")
     case "$preset" in none) printf '[ADDONS] preset=none; original flow\n';return 0 ;; praca|retro|minimal) ;; *) return 1 ;; esac
     printf '%s\n' "$options" "$exclude" | awk 'length>512||/[^a-z0-9,-]/||/^,|,$|,,/ {bad=1}END{exit bad}' || return 1
-    case "$os" in 95|98FE|98SE|ME|NT4) ;; *) return 1 ;; esac
+    # 95RTM: 950 media (RTM or OSR1), planned for those two only.
+    case "$os" in 95|95RTM|98FE|98SE|ME|NT4) ;; *) return 1 ;; esac
     case "$lang" in PL|EN|XX) ;; *) return 1 ;; esac
     _ad_app=$target/USOS/ADDONS
     case "$os" in NT4) _ad_log=$target/USOS/NT4/ADDONS.LOG ;; *) _ad_log=$target/USOS9X/LOGS/ADDONS.LOG ;; esac
@@ -130,7 +131,7 @@ usos_addons_stage() {
         duns=$(awk '/^\[pkg:dun/{s=$0;sub(/^\[pkg:/,"",s);sub(/\].*/,"",s);printf "%s%s",sep,s;sep=","}' "$lib/addons/LEGACY.EN")
         exclude=${exclude:+$exclude,}$duns
     fi
-    { printf '[select]\r\npreset=%s\r\noptions=%s\r\nexclude=%s\r\nexpect=%s\r\nlang=%s\r\n' "$preset" "$options" "$exclude" "$os" "$lang"; } > "$_ad_app/SELECT.INI"
+    { printf '[select]\r\npreset=%s\r\noptions=%s\r\nexclude=%s\r\nexpect=%s\r\nlang=%s\r\n' "$preset" "$options" "$exclude" "${os%RTM}" "$lang"; } > "$_ad_app/SELECT.INI"
     source=$lib/addons/LEGACY.EN;[ "$lang" != PL ] || source=$lib/addons/LEGACY.PL
     cp "$source" "$_ad_app/LEGACY.INI" && cp "$lib/addons/USOSADD.EXE" "$_ad_app/USOSADD.EXE" || return 1
     "$_ad_tool" "$_ad_app/LEGACY.INI" "$_ad_app/SELECT.INI" "$os" "$lang" "$ntsp" > "$_ad_tmp/PLAN.RAW" || return 1

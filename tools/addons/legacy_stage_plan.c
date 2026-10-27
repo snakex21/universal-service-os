@@ -61,5 +61,8 @@ int main(int argc,char **argv){int n;
  ua_selection(&manifest,&select_ini,&choice);if(!strcmp(choice.preset,"none"))return 0;
  ua_copy(system_id.lang,sizeof system_id.lang,argv[4]);ua_copy(system_id.ntsp,sizeof system_id.ntsp,argv[5]);
  if(!strcmp(argv[3],"95")){add_plan("95OSR2");add_plan("95OSR21");add_plan("95OSR25");}
+ /* 950 media (RTM / OSR1): only what USOSADD can plan there. The OSR2 union
+  * staged ws2-95 (OSR2 full pack) for a 95 OSR1 EN install that never runs it. */
+ else if(!strcmp(argv[3],"95RTM")){add_plan("95RTM");add_plan("95OSR1");}
  else if(!strcmp(argv[3],"NT4")&&!argv[5][0]){ua_copy(system_id.ntsp,sizeof system_id.ntsp,"0");add_plan("NT4");ua_copy(system_id.ntsp,sizeof system_id.ntsp,"6a");add_plan("NT4");}
  else add_plan(argv[3]);return emit();}

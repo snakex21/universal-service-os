@@ -444,6 +444,8 @@ fi
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
 addon_os=$SYSTEM_TAG;[ "$addon_os" != 98 ] || addon_os=98FE
+# 950 media: stage only what USOSADD plans on RTM / OSR1 (not the OSR2 set).
+[ "$addon_os:${setup_version:-}" != '95:4 0 0 950' ] || addon_os=95RTM
 addon_lang=XX
 if [ -x "$LIB/addons/legacy-stage-plan" ]; then addon_lang=$("$LIB/addons/legacy-stage-plan" language "$work/c/$SETUP_FOLDER/SETUP.TXT") || addon_lang=XX; fi
 usos_addons_stage "$work/addons.ini" "$work/c" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" "$addon_os" "$addon_lang" || fail 'cannot stage legacy pack'

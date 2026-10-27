@@ -758,6 +758,30 @@ static void log_runonce(void) {
     log_line(line);
 }
 
+/* "not planned" reason for a package that does not fit: the language
+ * when only that differs (95 OSR1 EN, X470 2026-10-27: the PL IE / DX
+ * packages read "not for this system"). */
+static void system_reason(char *line, int cap, const ua_pkg *p) {
+    if (ua_os_match(&g_m, p->os, g_sys.os) && !ua_ieq(p->lang, "*") && !ua_ieq(p->lang, g_sys.lang)) {
+        ua_append(line, cap, " (language ");
+        ua_append(line, cap, p->lang);
+        ua_append(line, cap, ", system ");
+        ua_append(line, cap, g_sys.lang);
+        ua_append(line, cap, ")");
+    } else {
+        ua_append(line, cap, " (not for this system)");
+    }
+}
+
+/* Selectable only (tier=option, or option_os= for this system), fitting
+ * this system, not selected: logged so a missing package is explained. */
+static int option_only(const ua_pkg *p) {
+    if (!ua_applicable(&g_m, p, &g_sys, g_sys.ntsp)) return 0;
+    if (p->tier == UA_TIER_OPTION) return 1;
+    return (p->tier == UA_TIER_FULL || p->tier == UA_TIER_GROUP) &&
+           ua_os_match(&g_m, ua_ini_get(&g_m, p->section, "option_os"), g_sys.os);
+}
+
 static void log_plan(void) {
     char line[UA_LINE];
     int i;
@@ -770,11 +794,20 @@ static void log_plan(void) {
     }
     for (i = 0; i < g_p.count; i++) {
         int w = g_plan.why[i];
+        if (w == 0 && option_only(&g_p.pkg[i])) {
+            line[0] = 0;
+            ua_append(line, sizeof line, "  not planned: ");
+            ua_append(line, sizeof line, g_p.pkg[i].id);
+            ua_append(line, sizeof line, " (option, not selected)");
+            log_line(line);
+            continue;
+        }
         if (w < UA_OUT_SYSTEM) continue;
         line[0] = 0;
         ua_append(line, sizeof line, "  not planned: ");
         ua_append(line, sizeof line, g_p.pkg[i].id);
-        ua_append(line, sizeof line, w == UA_OUT_SYSTEM ? " (not for this system)" : w == UA_OUT_STATUS ? " (status: " : " (needs ");
+        if (w == UA_OUT_SYSTEM) system_reason(line, sizeof line, &g_p.pkg[i]);
+        else ua_append(line, sizeof line, w == UA_OUT_STATUS ? " (status: " : " (needs ");
         if (w == UA_OUT_STATUS) { ua_append(line, sizeof line, g_p.pkg[i].status); ua_append(line, sizeof line, ")"); }
         if (w == UA_OUT_NEEDS) { ua_append(line, sizeof line, g_plan.unmet[i]); ua_append(line, sizeof line, ")"); }
         log_line(line);
