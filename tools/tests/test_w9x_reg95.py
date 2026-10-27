@@ -452,7 +452,7 @@ class Wiring(unittest.TestCase):
         helper = text[text.index('w9x_98fe_channelbar_answer() {'):text.index('\nfor tool in ')]
         block = target_block('if [ "$SYSTEM_TAG" = 95 ]; then\n    vesa95_source=', '# The boot floppy runs INSTALL.BAT')
         script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { echo "FAIL $*"; exit 9; }\n' + helper + '\n'
-                  f'SYSTEM_TAG={tag}\nANSWER_KIND={kind}\nlog_ok={log_ok}\nvmd_ok={vmd_ok}\n'
+                  f'SYSTEM_TAG={tag}\nANSWER_KIND={kind}\nlog_ok={log_ok}\nvmd_ok={vmd_ok}\nSETUP_FOLDER=WIN95\nw95_net_late=\n'
                   f'LIB="{(lib or ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block)
         rc, out, err = sh(script, {})
         self.assertEqual(rc, 0, out + err)

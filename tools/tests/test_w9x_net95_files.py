@@ -158,6 +158,7 @@ class NetworkFiles(unittest.TestCase):
     def test_source_version_is_wired_and_generation_failure_is_terminal(self):
         target=(ROOT/'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('"$reg95_net" "${setup_version:-}"',target)
-        self.assertIn("fail 'RTM/OSR1 network files and registry helpers could not be prepared; target start withheld'",target)
+        self.assertIn('"$reg95_ie" "$work/c/$SETUP_FOLDER"',target)
+        self.assertIn('fail "$w95_net_late network files and registry helpers could not be prepared; target start withheld"',target)
 
 if __name__=='__main__':unittest.main()

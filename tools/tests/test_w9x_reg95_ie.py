@@ -59,7 +59,7 @@ class InternetIcon(unittest.TestCase):
 
     def test_target_passes_noie_on_950_only_without_ie(self):
         text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
-        block=text[text.index('        reg95_ie=\n'):text.index('"$reg95_ie"; then')]
+        block=text[text.index('        reg95_ie=\n'):text.index('"$reg95_ie" "$work/c/$SETUP_FOLDER"; then')]
         self.assertIn("if [ \"${setup_version:-}\" = '4 0 0 950' ]; then",block)
         self.assertIn('usos_addons_staged "$work/c" ie',block)
         self.assertIn('reg95_ie=noie',block)
