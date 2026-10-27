@@ -195,6 +195,16 @@ def test_presets(m: lm.Manifest) -> None:
     plan = lm.resolve(m, '98SE', 'PL', '', False, ['usb-nt4-ionetworks', 'speechsdk51-langpack'])
     if plan.order:
         fail(f'status/other-system options must stay out: {plan.order}')
+    # 98: one restart after the dependencies (DCOM98, IE 6 SP1), the rest
+    # batched into the final one (X470 98 FE PL 2026-10-27); the 950
+    # coordinator's DCOM95 / IE 5.5 SP2 restarts stay
+    for pid, want in (('dcom98', 'now'), ('ie6sp1-pl-9x', 'now'), ('dx9c', 'end'), ('mdac28sp1-pl', 'end'),
+                      ('wmp71-pl', 'end'), ('nusb33-pl', 'end')):
+        if m.find(pid).get('reboot') != want:
+            fail(f'{pid}: reboot={m.find(pid).get("reboot")}, want {want}')
+    for pid in ('dcom95', 'ie55sp2-pl'):
+        if m.find(pid).get('reboot_setup') != 'now':
+            fail(f'{pid}: reboot_setup={m.find(pid).get("reboot_setup")}, want now')
 
 
 def make_user_folder(tmp: Path, m: lm.Manifest, ids: list[str]) -> dict[str, bytes]:

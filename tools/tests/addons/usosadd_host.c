@@ -131,6 +131,10 @@ static int selftest(void) {
         CHECK(op.pkg[1].reboot == UA_REBOOT_END && strcmp(op.pkg[1].check, "file:%SYS%\\MSHTML.DLL>=5.50.4923.2500") == 0);
         CHECK(op.pkg[2].reboot == UA_REBOOT_END && strcmp(op.pkg[2].check, "file:X") == 0);
         CHECK(ua_after_run(1, op.pkg[0].reboot, 1, 1) == UA_AFTER_RESTART);
+        /* the 950 coordinator's reboot_setup=now (DCOM95 / IE 5.5 SP2) restarts
+         * whatever the installer's exit code: forced */
+        CHECK(ua_reboot_for_run(op.pkg[0].reboot, 0, 1) == UA_REBOOT_NOW);
+        CHECK(ua_after_run(1, ua_reboot_for_run(op.pkg[0].reboot, 0, 1), 0, 1) == UA_AFTER_RESTART);
     }
     {
         /* requires= (ws2-95: TCP/IP bound, X470 95 OSR2.1 PL 2026-10-27):
@@ -292,6 +296,17 @@ static int selftest(void) {
     CHECK(ua_command_exit("OTHER.EXE DXSETUP.EXE",1)==1);
     CHECK(ua_command_exit("DXSETUP.EXE.other /silent",1)==1);
     CHECK(ua_after_run(ua_command_exit("DXSETUP.EXE /silent",1)==3010,UA_REBOOT_END,0,1)==UA_AFTER_PENDING);
+    /* reboot=now on 9x: at once only when the installer asked (3010 / 1641,
+     * X470 98 FE PL 2026-10-27: DCOM98 and IE 6 SP1 exit 3010, MDAC exit 0) */
+    CHECK(ua_reboot_for_run(UA_REBOOT_NOW, 1, 0) == UA_REBOOT_NOW);
+    CHECK(ua_reboot_for_run(UA_REBOOT_NOW, 0, 0) == UA_REBOOT_END);
+    CHECK(ua_reboot_for_run(UA_REBOOT_NOW, 0, 1) == UA_REBOOT_NOW);
+    CHECK(ua_reboot_for_run(UA_REBOOT_END, 1, 0) == UA_REBOOT_END);
+    CHECK(ua_reboot_for_run(UA_REBOOT_NO, 1, 1) == UA_REBOOT_NO);
+    CHECK(ua_after_run(1, ua_reboot_for_run(UA_REBOOT_NOW, 0, 0), 0, 1) == UA_AFTER_PENDING);
+    CHECK(ua_after_run(1, ua_reboot_for_run(UA_REBOOT_NOW, 1, 0), 0, 1) == UA_AFTER_RESTART);
+    /* not asked and failed: still one retry after a restart */
+    CHECK(ua_after_run(0, ua_reboot_for_run(UA_REBOOT_NOW, 0, 0), 0, 1) == UA_AFTER_RETRY);
     {
         ua_plan repair_plan;
         ua_system repair_system;

@@ -208,6 +208,13 @@ int ua_resume_decision(int tries, int has_check, int check_true);
  * after it) gets one more try after that restart instead of failing. */
 enum { UA_AFTER_CONTINUE, UA_AFTER_PENDING, UA_AFTER_RESTART, UA_AFTER_RETRY };
 int ua_after_run(int ok, int reboot, int pending_reboot, int tries);
+/* reboot=now as it applies to one run (before ua_after_run): on 9x a
+ * restart at once only when the installer asked for one (asked: an exit
+ * code 3010 / 1641, DXSETUP's 1 mapped to 3010 by ua_command_exit), else
+ * it is batched like reboot=end (X470 98 FE PL 2026-10-27: MDAC 2.8 exit
+ * 0 still restarted). forced (NT, and the 95 first-desktop coordinator's
+ * reboot_setup=now for DCOM95 / IE 5.5 SP2 on 950): now stays now. */
+int ua_reboot_for_run(int reboot, int asked, int forced);
 /* Recheck NDIS only after an attempted Winsock2 install on Windows 95. */
 int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
                            const ua_state *state, const ua_system *system);

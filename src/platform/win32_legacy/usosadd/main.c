@@ -62,6 +62,7 @@ static int g_pl;                 /* Polish messages */
 static int g_setup_mode;         /* source950 ordinary RunOnce, before tray */
 static HWND g_wnd, g_text;
 static DWORD g_last_code;       /* exit code of the last command */
+static int g_restart_asked;     /* a command of this package exited 3010 / 1641 */
 
 /* ---- small helpers -------------------------------------------------------- */
 
@@ -641,6 +642,7 @@ static int run_one(const ua_pkg *p, const char *raw) {
         log_line("    DXSETUP success with restart: exit 1 treated as 3010");
         g_state.pending_reboot=1;
     }
+    if (g_last_code == 3010 || g_last_code == 1641) g_restart_asked = 1;
     return code_ok(p, g_last_code);
 }
 
@@ -915,7 +917,7 @@ static void run_chain(void) {
     const char *name_key = g_pl ? "name_pl" : "name_en";
     int pos;
     for (pos = 0; pos < g_plan.count; pos++) {
-        int x = g_plan.idx[pos], ok, k, check, after;
+        int x = g_plan.idx[pos], ok, k, check, after, reboot;
         const ua_pkg *p = &g_p.pkg[x];
         const char *name = ua_ini_get(&g_m, p->section, name_key);
         int st = g_state.st[x];
@@ -975,6 +977,7 @@ static void run_chain(void) {
         set_state(x, UA_ST_RUNNING);
         ok = 1;
         g_last_code = 0;
+        g_restart_asked = 0;
         g_answer_pkg = p;
         g_seen_n = 0;
         g_answered = 0;
@@ -993,7 +996,9 @@ static void run_chain(void) {
         log_runonce();
         check = run_check(p);
         if (check >= 0) ok = check;
-        after = ua_after_run(ok, p->reboot, g_state.pending_reboot, g_state.tries[x]);
+        reboot = ua_reboot_for_run(p->reboot, g_restart_asked, g_facts.nt || g_setup_mode);
+        if (ok && reboot != p->reboot) log_line("  reboot=now, the installer did not ask for a restart: batched into the final one");
+        after = ua_after_run(ok, reboot, g_state.pending_reboot, g_state.tries[x]);
         if (after == UA_AFTER_RETRY) {
             /* stays "running": after the restart its check decides, else it runs once more */
             ua_itoa(num, sizeof num, (int)g_last_code);

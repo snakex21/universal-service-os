@@ -79,6 +79,11 @@ int ua_after_run(int ok, int reboot, int pending_reboot, int tries) {
     return UA_AFTER_CONTINUE;
 }
 
+int ua_reboot_for_run(int reboot, int asked, int forced) {
+    if (reboot == UA_REBOOT_NOW && !asked && !forced) return UA_REBOOT_END;
+    return reboot;
+}
+
 int ua_ndis_repair_needed(const ua_pkgs *p, const ua_plan *plan,
                            const ua_state *state, const ua_system *system) {
     int i;
