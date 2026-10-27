@@ -180,4 +180,35 @@ static unsigned char pg_step(PGSTATE *s, const PGVIEW *v)
     return PA_NONE;
 }
 
+/* Lifecycle. Setup's mini-Windows sends DRV_DISABLE / DRV_ENABLE around
+ * its own work (X470 98 FE PL, 2026-10-27: DRV_DISABLE after the first
+ * two pages, the driver then stopped for good and the next pages stayed):
+ * DRV_DISABLE is a pause (timers and the hook go, this state stays: the
+ * page being watched, what was pressed, the pages left to the user),
+ * DRV_ENABLE resumes. Only the timeout and DRV_FREE / WEP end it. */
+static int pg_may_start(const PGSTATE *s)
+{
+    return !s->done;
+}
+
+static void pg_end(PGSTATE *s)
+{
+    s->done = 1;
+}
+
+/* arm(): the slot for window w among n armed windows (armed[i] 0 = free,
+ * alive[i] 0 = no longer a window, its slot reusable). *already = 1 when
+ * w holds one. -1 = no slot. */
+static int pg_arm_slot(const unsigned short *armed, const unsigned char *alive, int n,
+                       unsigned short w, int *already)
+{
+    int i, slot = -1;
+    *already = 0;
+    for (i = 0; i < n; i++) {
+        if (armed[i] == w && alive[i]) { *already = 1; return i; }
+        if (slot < 0 && (!armed[i] || !alive[i])) slot = i;
+    }
+    return slot;
+}
+
 #endif

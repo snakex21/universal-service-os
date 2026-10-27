@@ -15,8 +15,15 @@
  *   DRV_LOAD    C:\USOS9X\USOSPG.CFG must say mode=auto (the target script
  *               writes it only for a USOS answer in automatic mode); else
  *               the load fails and the driver is gone.
- *   DRV_ENABLE  a WH_CBT hook: every window that becomes active
- *               (HCBT_ACTIVATE) gets a 500 ms timer of this driver.
+ *   DRV_ENABLE  a WH_CBT hook: every wizard frame (Back / Next / Finish
+ *               0x3023..5 Buttons) that becomes active (HCBT_ACTIVATE),
+ *               and the active one at DRV_ENABLE, gets a 500 ms timer of
+ *               this driver. Other windows are not armed.
+ *   DRV_DISABLE a pause: timers killed, the hook removed, the state kept
+ *               (usospg_logic.h pg_may_start); the next DRV_ENABLE
+ *               resumes. Setup's mini-Windows sends the pair around its
+ *               own work (X470 98 FE PL, 2026-10-27: after the first two
+ *               pages, the driver stopped there for good before).
  *   timer       the active wizard frame (Back / Next / Finish 0x3023..5)
  *               and its visible page (usospg_logic.h): user information
  *               with a name -> Next; licence -> "accept" (618 checked, its
@@ -26,8 +33,8 @@
  *               frame, as the button would. A page shown with an empty
  *               field, a declined licence, Next that stays disabled or a
  *               page that does not go away: left to the user for good.
- *   stop        after 30 minutes, at DRV_DISABLE / DRV_FREE and in WEP:
- *               timers killed, the hook removed.
+ *   stop        after 30 minutes, at DRV_FREE and in WEP: timers
+ *               killed, the hook removed, never started again.
  *
  * C:\USOS9X\USOSPG.TXT gets a line per page seen (its kind and title) and
  * per action or give-up; for the key only how many fields are complete,
@@ -44,7 +51,7 @@
 #define LOG_FILE  "C:\\USOS9X\\USOSPG.TXT"
 #define PG_TIMER  0x5547
 #define TICK_MS   500
-#define MAX_ARMED 8
+#define MAX_ARMED 16
 
 /* DGROUP only: SS is not DS in a driver (-zu), so nothing on the stack is
  * handed to Windows by address. */
@@ -61,6 +68,9 @@ static PGSHAPE shape;
 static HHOOK cbt_hook;
 static DWORD started;
 static HWND armed[MAX_ARMED];
+static unsigned short armed_id[MAX_ARMED];
+static BYTE armed_alive[MAX_ARMED];
+static BYTE no_slot_logged;
 static HWND logged_page;
 static BYTE key_complete;
 static BYTE stopping;
@@ -252,18 +262,25 @@ static void log_action(unsigned char action)
     log_line();
 }
 
-static void stop_all(void)
+/* Timers killed, the hook removed; st is kept (a pause). */
+static void pause_all(void)
 {
     int i;
     if (stopping) return;
     stopping = 1;
-    st.done = 1;
     for (i = 0; i < MAX_ARMED; i++) {
         if (armed[i] && IsWindow(armed[i])) KillTimer(armed[i], PG_TIMER);
         armed[i] = 0;
     }
     if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
     stopping = 0;
+}
+
+/* For good: the timeout, DRV_FREE, WEP. */
+static void stop_all(void)
+{
+    pg_end(&st);
+    pause_all();
 }
 
 void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
@@ -307,18 +324,41 @@ void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
     }
 }
 
-/* A window became active (its own task): give it this driver's timer.
- * SetTimer with the same window and ID only restarts it. */
+/* The wizard frame of Setup: Back / Next / Finish Buttons of its own. */
+static int is_frame(HWND w)
+{
+    return class_is(GetDlgItem(w, PG_NEXT_ID), "Button") && class_is(GetDlgItem(w, PG_FINISH_ID), "Button")
+        && class_is(GetDlgItem(w, PG_BACK_ID), "Button");
+}
+
+/* A wizard frame became active (its own task): give it this driver's
+ * timer. SetTimer with the same window and ID only restarts it. Slots of
+ * windows that are gone are reused (pg_arm_slot). */
 static void arm(HWND w)
 {
-    int i, slot = -1;
-    if (!SetTimer(w, PG_TIMER, TICK_MS, (TIMERPROC)tick)) return;
+    static int already;     /* DGROUP: handed by address (SS != DS) */
+    int i, slot;
+    if (!w || !is_frame(w)) return;
     for (i = 0; i < MAX_ARMED; i++) {
-        if (armed[i] == w) return;
-        if (slot < 0 && (!armed[i] || !IsWindow(armed[i]))) slot = i;
+        armed_id[i] = (unsigned short)armed[i];
+        armed_alive[i] = (BYTE)(armed[i] && IsWindow(armed[i]));
     }
-    if (slot >= 0) armed[slot] = w;
-    else KillTimer(w, PG_TIMER);        /* no slot to kill it later: not armed */
+    slot = pg_arm_slot(armed_id, armed_alive, MAX_ARMED, (unsigned short)w, &already);
+    if (already) return;
+    if (slot < 0) {
+        if (!no_slot_logged) { no_slot_logged = 1; say("no slot, frame not armed"); }
+        return;
+    }
+    if (!SetTimer(w, PG_TIMER, TICK_MS, (TIMERPROC)tick)) { say("no timer, frame not armed"); return; }
+    armed[slot] = w;
+    GetClassName(w, cls, sizeof(cls));
+    cls[sizeof(cls) - 1] = 0;
+    lpos = 0;
+    put("USOSPG arm ");
+    put(cls);
+    put(" slot=");
+    put_num((unsigned)slot);
+    log_line();
 }
 
 LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
@@ -328,12 +368,15 @@ LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
     return r;
 }
 
+/* DRV_ENABLE: the first one starts the 30 minutes, every one (after a
+ * DRV_DISABLE pause) hooks again and arms the frame already active. */
 static int start(void)
 {
-    if (cbt_hook || st.done) return 1;
-    started = GetTickCount();
+    if (cbt_hook || !pg_may_start(&st)) return 1;
+    if (!started) started = GetTickCount();
     cbt_hook = SetWindowsHookEx(WH_CBT, (HOOKPROC)cbt_proc, GetModuleHandle("USOSPG"), 0);
-    if (!cbt_hook) { say("no CBT hook, stopped"); stop_all(); }
+    if (!cbt_hook) { say("no CBT hook, stopped"); stop_all(); return 1; }
+    arm(GetActiveWindow());
     return 1;
 }
 
@@ -345,8 +388,13 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
         if (!read_cfg()) return 0L;
         say("load mode=auto");
         return 1L;
-    case DRV_ENABLE:  return start();
+    case DRV_ENABLE:
+        if (pg_may_start(&st)) say("enable");
+        return start();
     case DRV_DISABLE:
+        if (pg_may_start(&st)) say("disable (pause)");
+        pause_all();
+        return 1L;
     case DRV_FREE:    stop_all(); return 1L;
     case DRV_OPEN:
     case DRV_CLOSE:   return 1L;

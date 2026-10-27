@@ -42,7 +42,11 @@ HARNESS = r'''
  * FLAGS = title name org eula_text eula_yes eula_no key_edits clickable
  * next_shown finish_shown (one digit each); s TICK...: pg_step, TICK =
  * expired active page kind filled accepted declined next_ready (digits;
- * page 0 = none), prints "action/event" per tick. */
+ * page 0 = none), prints "action/event" per tick; a TICK of D = DRV_DISABLE
+ * (a pause: nothing changes, prints "p"), E = DRV_ENABLE (prints "e" and
+ * pg_may_start), F = DRV_FREE (pg_end, prints "f"); a W ARMED... :
+ * pg_arm_slot for window W, ARMED = window/alive pairs ("3/1"), prints
+ * "slot already". */
 int main(int argc, char **argv)
 {
     int i;
@@ -63,6 +67,16 @@ int main(int argc, char **argv)
         p.eula_yes = f[4] - '0'; p.eula_no = f[5] - '0'; p.key_edits = f[6] - '0'; p.clickable = f[7] - '0';
         p.next_shown = f[8] - '0'; p.finish_shown = f[9] - '0';
         printf("%d\n", pg_classify(&p));
+    } else if (argv[1][0] == 'a') {
+        unsigned short armed[16];
+        unsigned char alive[16];
+        int n = 0, already, slot;
+        for (i = 3; i < argc && n < 16; i++, n++) {
+            armed[n] = (unsigned short)atoi(argv[i]);
+            alive[n] = (unsigned char)(strchr(argv[i], '/')[1] - '0');
+        }
+        slot = pg_arm_slot(armed, alive, n, (unsigned short)atoi(argv[2]), &already);
+        printf("%d %d\n", slot, already);
     } else {
         PGSTATE s;
         memset(&s, 0, sizeof(s));
@@ -70,6 +84,9 @@ int main(int argc, char **argv)
             PGVIEW v;
             const char *f = argv[i];
             unsigned char a;
+            if (f[0] == 'D') { printf("%sp", i > 2 ? " " : ""); continue; }
+            if (f[0] == 'E') { printf("%se%d", i > 2 ? " " : "", pg_may_start(&s)); continue; }
+            if (f[0] == 'F') { pg_end(&s); printf("%sf", i > 2 ? " " : ""); continue; }
             v.expired = f[0] - '0'; v.active = f[1] - '0'; v.page = (unsigned short)(f[2] - '0');
             v.kind = f[3] - '0'; v.filled = f[4] - '0'; v.accepted = f[5] - '0'; v.declined = f[6] - '0';
             v.next_ready = f[7] - '0';
@@ -206,6 +223,45 @@ class Logic(unittest.TestCase):
                          [(NONE, 0), (NONE, 0), (STOP, E_TIMEOUT), (STOP, 0)])
 
 
+    def test_disable_enable_is_a_pause(self):
+        # X470 98 FE PL 2026-10-27: DRV_DISABLE after the first two pages ended
+        # the driver; now a pause, every page after it still gets its turn
+        user = tick(1, USER, filled=1, next_ready=1)
+        eula = tick(2, EULA, filled=1, next_ready=0)
+        eula_ok = tick(2, EULA, filled=1, accepted=1, next_ready=1)
+        key = tick(3, KEY, filled=1, next_ready=1)
+        fin = tick(4, FINISH, filled=1)
+        out = self.run_exe('s', *[user] * 5, 'D', 'E', *[eula] * 5, eula_ok, 'D', 'E', 'D', 'E',
+                           *[key] * 5, 'D', 'E', *[fin] * 5).split()
+        self.assertEqual([t for t in out if t[0] in 'pe'], ['p', 'e1'] * 4)
+        acts = [int(t.split('/')[0]) for t in out if '/' in t]
+        self.assertEqual([a for a in acts if a != NONE], [NEXT, ACCEPT, NEXT, NEXT, FIN])
+        # a page pressed before the pause is not pressed again after it
+        out = self.run_exe('s', *[key] * 5, 'D', 'E', *[key] * 10).split()
+        self.assertEqual([int(t.split('/')[0]) for t in out if '/' in t].count(NEXT), 1)
+        # pages left to the user stay left after the pause
+        empty = tick(1, USER, filled=0, next_ready=1)
+        out = self.run_exe('s', *[empty] * 5, 'D', 'E', *[user] * 8).split()
+        self.assertNotIn(NEXT, [int(t.split('/')[0]) for t in out if '/' in t])
+
+    def test_free_and_timeout_end_for_good(self):
+        user = tick(1, USER, filled=1, next_ready=1)
+        self.assertEqual(self.run_exe('s', 'F', 'E', user).split(), ['f', 'e0', f'{STOP}/0'])
+        self.assertEqual(self.run_exe('s', tick(expired=1), 'D', 'E', user).split(),
+                         [f'{STOP}/{E_TIMEOUT}', 'p', 'e0', f'{STOP}/0'])
+
+    def test_arm_slots(self):
+        def arm(w, *armed):
+            slot, already = self.run_exe('a', str(w), *armed).split()
+            return int(slot), int(already)
+        self.assertEqual(arm(7, '0/0', '0/0'), (0, 0))
+        self.assertEqual(arm(7, '3/1', '7/1', '0/0'), (1, 1))
+        self.assertEqual(arm(9, '3/1', '7/1', '0/0'), (2, 0))
+        # windows that are gone give their slot back (a dead 9 is not "already")
+        self.assertEqual(arm(9, '3/1', '9/0', '5/1'), (1, 0))
+        self.assertEqual(arm(9, '3/1', '4/1', '5/1'), (-1, 0))
+
+
 class Source(unittest.TestCase):
     def test_driver_reads_and_logs(self):
         c = DRIVER.read_text(encoding='utf-8')
@@ -219,7 +275,24 @@ class Source(unittest.TestCase):
         self.assertIn('GetWindowText(GetDlgItem(page, PG_TITLE_ID), title, sizeof(title))', c)
         self.assertIn('GetWindowTextLength(GetDlgItem(c, PG_KEY1_ID + i)) == PG_KEY_PART_LEN', c)
         # the buttons go to the frame as their BN_CLICKED; the licence radio to its page
-        tick_fn = c[c.index('void FAR PASCAL __export __loadds tick('):c.index('static void arm(HWND w)')]
+        tick_fn = c[c.index('void FAR PASCAL __export __loadds tick('):c.index('static int is_frame(HWND w)')]
+        # DRV_DISABLE pauses, only DRV_FREE / the timeout / WEP stop for good
+        proc = c[c.index('LRESULT FAR PASCAL __export __loadds DriverProc('):c.index('int FAR PASCAL __export __loadds WEP(')]
+        disable = proc[proc.index('case DRV_DISABLE:'):proc.index('case DRV_FREE:')]
+        self.assertIn('pause_all();', disable)
+        self.assertNotIn('stop_all', disable)
+        self.assertIn('say("disable (pause)");', disable)
+        self.assertIn('say("enable");', proc)
+        self.assertIn('case DRV_FREE:    stop_all();', proc)
+        start_fn = c[c.index('static int start(void)'):c.index('LRESULT FAR PASCAL __export __loadds DriverProc(')]
+        self.assertNotIn('st.done', start_fn)
+        self.assertIn('if (cbt_hook || !pg_may_start(&st)) return 1;', start_fn)
+        self.assertIn('arm(GetActiveWindow());', start_fn)
+        # only wizard frames are armed, a full table is logged
+        arm_fn = c[c.index('static void arm(HWND w)'):c.index('LRESULT FAR PASCAL __export __loadds cbt_proc(')]
+        self.assertIn('if (!w || !is_frame(w)) return;', arm_fn)
+        self.assertIn('say("no slot, frame not armed");', arm_fn)
+        self.assertIn('put("USOSPG arm ");', arm_fn)
         self.assertIn('PostMessage(w, WM_COMMAND, PG_NEXT_ID, MAKELPARAM(next, BN_CLICKED));', tick_fn)
         self.assertIn('PostMessage(w, WM_COMMAND, PG_FINISH_ID, MAKELPARAM(finish, BN_CLICKED));', tick_fn)
         self.assertIn('CheckRadioButton(page, PG_EULA_YES_ID, PG_EULA_NO_ID, PG_EULA_YES_ID);', tick_fn)
