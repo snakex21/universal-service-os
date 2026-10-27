@@ -595,6 +595,184 @@ class FixFree(unittest.TestCase):
         self.assertEqual(self.run_fix(tiled), (2, 'rgdb-records', tiled))
 
 
+RUNONCE = 'Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'
+RO_VALUES = [('ClassSetup', 1, SZ('rundll.exe sysdm.cpl,DMFirstTimeSetup')), ('InitShell', 1, SZ('1')),
+             ('TapiSetup', 1, SZ('tapiini.exe')), ('USOSVmd', 1, SZ('rundll.exe setupx.dll,InstallHinfSection'))]
+
+
+def ro_tree(values=RO_VALUES):
+    tree = dict(TREE)
+    tree['Software'] = ([], {'Microsoft': ([], {'Windows': ([], {'CurrentVersion': ([('ProgramFilesDir', 1, SZ('C:\\Program Files'))], {
+        'RunOnce': (list(values), {'Setup': ([('Drukarki', 1, SZ('rundll32.exe sysdm.cpl,InstallDevice_Rundll printer,,0'))], {})}),
+        'Run': ([('USOSLog', 1, SZ('C:\\USOS9X\\USOSLOG.EXE'))], {})})})})})
+    return tree
+
+
+def record_layout(data):
+    """(block, position) -> (size, bytes used, value count) for every key
+    record, and every block's (free bytes, first free)."""
+    size = struct.unpack_from('<I', data, 0x24)[0]
+    off, recs, heads = 0x20 + size, {}, []
+    for b in range(struct.unpack_from('<H', data, 0x10)[0]):
+        bs, fb, _f, _n, ff = struct.unpack_from('<IIHHI', data, off + 4)
+        heads.append((fb, ff)); pos = 0x20
+        while pos < bs:
+            rs, kid, _blk, used, _nl, nv = struct.unpack_from('<IHHIHH', data, off + pos)
+            if kid != 0xffff:
+                recs[(b, pos)] = (rs, used, nv)
+                # bytes behind the values up to the record end: zero after DELVAL
+                recs[(b, pos, 'tail')] = data[off + pos + used:off + pos + rs]
+            pos += rs
+        off += bs
+    return recs, heads
+
+
+class DelVal(unittest.TestCase):
+    """VESBIND DELVAL: one value out of a key's record (REG95.BAT removes HKLM
+    RunOnce InitShell, the 95 Explorer's forced Welcome window)."""
+    @classmethod
+    def setUpClass(cls):
+        cls.binary = host_binary()
+
+    def setUp(self):
+        self.tmp = scratch('delval-'); self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def run_val(self, data, key, value, log=False):
+        hive = self.tmp / 'SYSTEM.DAT'
+        if hive.exists(): hive.unlink()
+        if data is not None: hive.write_bytes(data)
+        args = [str(self.binary), 'DELVAL', str(hive), key, value] + ([str(self.tmp / 'DELVAL.LOG')] if log else [])
+        result = subprocess.run(args, capture_output=True)
+        self.assertFalse(result.stdout + result.stderr)
+        return result.returncode, hive.read_bytes() if data is not None else None
+
+    def check_removed(self, data, key, value):
+        before = dump(data); sums_ok(data)
+        rc, after = self.run_val(data, key, value)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(after), len(data))
+        new = dump(after)
+        self.assertEqual(set(new), set(before))                       # no key added or lost
+        k = '\\' + key.lower().replace('hkey_local_machine\\', '', 1)
+        want = [v for v in before[k] if v[0].lower() != value.lower()]
+        self.assertEqual(len(want), len(before[k]) - 1)
+        self.assertEqual(new[k], want)                                 # order of the rest kept
+        for other in new:
+            if other != k: self.assertEqual(new[other], before[other], other)
+        sums_ok(after); self.assertFalse(rgdb_problems(after))
+        self.assertEqual(free_lists(after), free_lists(data))           # no free record / chunk changed
+        old_recs, old_heads = record_layout(data); recs, heads = record_layout(after)
+        self.assertEqual(heads, old_heads)
+        self.assertEqual(set(recs), set(old_recs))
+        shrunk = 0
+        for at, info in recs.items():
+            if len(at) == 3: continue
+            size, used, nv = info; old_size, old_used, old_nv = old_recs[at]
+            self.assertEqual(size, old_size, at)                         # record sizes unchanged
+            tail, old_tail = recs[at + ('tail',)], old_recs[at + ('tail',)]
+            if used == old_used:
+                self.assertEqual((nv, tail), (old_nv, old_tail), at)
+                continue
+            shrunk += 1                                                  # the freed bytes are zero
+            self.assertEqual((nv, tail), (old_nv - 1, b'\0' * (old_used - used) + old_tail), at)
+        self.assertEqual(shrunk, 1)
+        return after
+
+    def test_removes_initshell_and_keeps_the_rest(self):
+        data = creg(ro_tree())
+        after = self.check_removed(data, RUNONCE, 'InitShell')
+        self.assertEqual(self.run_val(after, RUNONCE, 'InitShell'), (1, after))
+        self.assertEqual(Hive(after).value(RUNONCE, 'TapiSetup'), (1, SZ('tapiini.exe')))
+        self.assertEqual(Hive(after).value(RUNONCE + '\\Setup', 'Drukarki')[0], 1)
+
+    def test_first_last_only_value_case_and_prefix(self):
+        data = creg(ro_tree())
+        self.check_removed(data, RUNONCE, 'ClassSetup')
+        self.check_removed(data, RUNONCE, 'usosvmd')
+        self.check_removed(data, 'HKEY_LOCAL_MACHINE\\' + RUNONCE.upper(), 'INITSHELL')
+        only = creg(ro_tree([('InitShell', 1, SZ('1'))]))
+        after = self.check_removed(only, RUNONCE, 'InitShell')
+        self.assertEqual(Hive(after).values(RUNONCE), [])
+
+    def test_slack_records_unaligned_fields_and_no_checksums(self):
+        for per_block, slack, checksums in ((2, 3, True), (64, 0, True), (6, 5, False)):
+            with self.subTest(per_block=per_block, slack=slack, checksums=checksums):
+                data = creg(ro_tree(), per_block=per_block, slack=slack, checksums=checksums)
+                after = self.check_removed(data, RUNONCE, 'InitShell')
+                if not checksums: self.assertEqual(sums_ok(after), 0)
+
+    def test_two_deletes_then_delkey_keep_the_hive_consistent(self):
+        data = creg(ro_tree(), per_block=4)
+        after = self.check_removed(data, RUNONCE, 'InitShell')
+        after = self.check_removed(after, RUNONCE, 'TapiSetup')
+        hive = self.tmp / 'SYSTEM.DAT'; hive.write_bytes(after)
+        subprocess.run([str(self.binary), 'DELKEY', str(hive), RUNONCE + '\\Setup'], check=True)
+        last = hive.read_bytes(); sums_ok(last); self.assertFalse(rgdb_problems(last))
+        self.assertEqual([v[0] for v in Hive(last).values(RUNONCE)], ['ClassSetup', 'USOSVmd'])
+
+    def test_missing_refused_and_logged(self):
+        data = creg(ro_tree())
+        dup = creg(ro_tree(RO_VALUES + [('initshell', 1, SZ('2'))]))
+        for blob, key, value, code, reason in ((data, RUNONCE, 'NoSuchValue', 1, 'not-found'),
+                                              (data, RUNONCE + 'X', 'InitShell', 1, 'not-found'),
+                                              (data, 'Enum\\Monitor\\Default_Monitor', 'InitShell', 1, 'not-found'),
+                                              (data, 'Enum', 'Class', 1, 'not-found'),          # key without a record value
+                                              (dup, RUNONCE, 'InitShell', 2, 'duplicate'),
+                                              (b'not a hive', RUNONCE, 'InitShell', 2, 'creg-header'),
+                                              (None, RUNONCE, 'InitShell', 2, 'hive-open'),
+                                              (data, '\\', 'InitShell', 2, 'argument'),
+                                              (data, RUNONCE, 'x' * 256, 2, 'argument'),
+                                              (data, RUNONCE, 'InitShell', 0, 'complete')):
+            with self.subTest(key=key, value=value[:20], reason=reason):
+                rc, after = self.run_val(blob, key, value, log=True)
+                self.assertEqual(rc, code)
+                self.assertEqual((self.tmp / 'DELVAL.LOG').read_bytes(),
+                                 f'version=1\r\nexit={code}\r\nreason={reason}\r\n'.encode('ascii'))
+                if code and blob is not None: self.assertEqual(after, blob)
+        bad = bytearray(data); bad[-0x30] ^= 1                          # last RGDB checksum
+        self.assertEqual(self.run_val(bytes(bad), RUNONCE, 'InitShell'), (2, bytes(bad)))
+        # A value list that overruns the record's bytes used: refused, untouched.
+        hive = Hive(data); rel = hive.key(RUNONCE); _p, _c, _s, kid, blk = hive._entry(rel)
+        off = 0x20 + struct.unpack_from('<I', data, 0x24)[0]
+        for _ in range(blk): off += struct.unpack_from('<I', data, off + 4)[0]
+        pos = 0x20
+        while struct.unpack_from('<HH', data, off + pos + 4) != (kid, blk): pos += struct.unpack_from('<I', data, off + pos)[0]
+        nv = struct.unpack_from('<H', data, off + pos + 0x0e)[0]
+        over = set_block16(data, blk, pos + 0x0e, nv + 1)
+        self.assertEqual(self.run_val(over, RUNONCE, 'USOSVmd'), (2, over))
+
+    def test_real_hive_copy(self):
+        """Optional, local only: USOS_W95_RUNONCE_HIVE = a copy of a 95
+        SYSTEM.DAT / SYSTEM.1ST with RunOnce InitShell. Never committed."""
+        source = os.environ.get('USOS_W95_RUNONCE_HIVE')
+        if not source:
+            self.skipTest('set USOS_W95_RUNONCE_HIVE to a local 95 SYSTEM.DAT copy')
+        data = Path(source).read_bytes()
+        if Hive(data).value(RUNONCE, 'InitShell') is None:
+            self.skipTest('no RunOnce InitShell in that hive')
+        import tempfile
+        previous = self.tmp
+        self.tmp = Path(tempfile.mkdtemp(prefix='delval-real-', dir=Path(source).resolve().parent))
+        try:
+            after = self.check_removed(data, RUNONCE, 'InitShell')
+        finally:
+            shutil.rmtree(self.tmp, ignore_errors=True); self.tmp = previous
+        self.assertIsNone(Hive(after).value(RUNONCE, 'InitShell'))
+
+
+def set_block16(data, blk, at, value):
+    """data with WORD block+at = value; the block checksum (flag bit 2) kept."""
+    out = bytearray(data); off = 0x20 + struct.unpack_from('<I', out, 0x24)[0]
+    for _ in range(blk): off += struct.unpack_from('<I', out, off + 4)[0]
+    size, _fb, flags = struct.unpack_from('<IIH', out, off + 4)
+    struct.pack_into('<H', out, off + at, value)
+    if flags & 4:
+        struct.pack_into('<I', out, off + 0x1c, 0)
+        total = sum(struct.unpack_from('<%dI' % (size // 4), out, off)) & 0xffffffff
+        struct.pack_into('<I', out, off + 0x1c, (-total) & 0xffffffff)
+    return bytes(out)
+
+
 class WrapGrp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):cls.binary=host_binary()

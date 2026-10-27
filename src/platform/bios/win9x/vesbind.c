@@ -1,6 +1,7 @@
 /* USOS, GPL-3.0-or-later. Plan/check a 950 late display binding using only
  * fresh original REGEDIT4 exports (PLAN / CHECK never read hive bytes), and
- * DELKEY: one key deleted from SYSTEM.DAT (see delkey() below).
+ * DELKEY: one key deleted from SYSTEM.DAT (see delkey() below), DELVAL: one
+ * value deleted from a key (delval()).
  * PLAN classes enum idconfig output.reg; CHECK classes enum idconfig config
  * Reject ambiguous displays, custom drivers, malformed/duplicate data.
  * The display is the one PCI display device, else the one legacy
@@ -528,33 +529,41 @@ done:
     if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
     return failed;
 }
+/* Opened hive: checked, then the key path walked from the root entry (no
+ * HKEY_LOCAL_MACHINE prefix). 0 = found (*target = its entry), 1 = no such
+ * key, 2 = refused. */
+static int find_key(const char *key, unsigned long *target) {
+    unsigned char e[0x1c]; unsigned long cur; unsigned i, len; int match; const char *name, *end;
+    if (!hive_check()) return 2;
+    del_reason = "root-entry";
+    if (!entry(kn_root, e)) return 2;
+    *target = kn_root; name = key;
+    while (*name) {
+        del_reason = "path-entry";
+        end = strchr(name, '\\'); len = end ? (unsigned)(end - name) : (unsigned)strlen(name);
+        if (!len || len > 255) return 2;
+        cur = g32(e + 0x10); match = 0;
+        for (i = 0; cur != NONE; i++) {
+            if (i > 60000U || !entry(cur, e) || g32(e + 0x0c) != *target || !name_is(e, name, len, &match)) return 2;
+            if (match) break;
+            cur = g32(e + 0x14);
+        }
+        if (!match) { del_reason = "not-found"; return 1; }
+        *target = cur; name += len; if (*name) name++;
+    }
+    return 0;
+}
 static int delkey(const char *path, const char *key) {
     unsigned char e[0x1c], p[0x1c]; unsigned long cur, target, parent, pos;
-    unsigned i, len, blk; int match, failed; const char *name, *end;
+    unsigned i, blk; int failed;
     del_reason = "argument";
     if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
     if (!*key || *key == '\\') return 2;
     del_reason = "hive-open";
     if (!hopen(path)) return 2;
+    failed = find_key(key, &target);
+    if (failed) goto done;
     failed = 2;
-    if (!hive_check()) goto done;
-    /* Walk the path from the root entry. */
-    del_reason = "root-entry";
-    if (!entry(kn_root, e)) goto done;
-    target = kn_root; name = key;
-    while (*name) {
-        del_reason = "path-entry";
-        end = strchr(name, '\\'); len = end ? (unsigned)(end - name) : (unsigned)strlen(name);
-        if (!len || len > 255) goto done;
-        cur = g32(e + 0x10); match = 0;
-        for (i = 0; cur != NONE; i++) {
-            if (i > 60000U || !entry(cur, e) || g32(e + 0x0c) != target || !name_is(e, name, len, &match)) goto done;
-            if (match) break;
-            cur = g32(e + 0x14);
-        }
-        if (!match) { failed = 1; del_reason = "not-found"; goto done; }
-        target = cur; name += len; if (*name) name++;
-    }
     /* The subtree, breadth first; every entry and record must be sound. */
     del_reason = "subtree";
     del_list[del_count++] = target;
@@ -591,6 +600,78 @@ static int delkey(const char *path, const char *key) {
     }
     del_reason = "write-merge";
     for (i = 0; i < blk_count; i++) if (touched[1 + i] && !rebuild_free(i, 1)) goto done;
+    if (!fix_sums()) goto done;
+    failed = 0; del_reason = "complete";
+done:
+    if (!hclose() && failed != 1 && failed != 2) { failed = 3; del_reason = "hive-close"; }
+    return failed;
+}
+/* DELVAL <hive> <key path> <value name>: one value removed from a key's
+ * RGDB record in place. The record keeps its size (a record larger than its
+ * bytes used is the ordinary 95 layout: SYSTEM.1ST of 95 OSR2.1 PL has 910
+ * of 3154 such records), so no free record, free list, free byte count or
+ * RGKN entry changes: the values behind the removed one move down, the
+ * record's bytes used (+08) and value count (+0E) shrink, the freed tail
+ * becomes zero bytes and the block checksum is corrected. Value records:
+ * +00 type, +04 0, +08 WORD name length, +0A WORD data length, name, data;
+ * they must end exactly at the record's bytes used. Names compare like key
+ * names (ASCII case-insensitive); a second value of the same name refuses.
+ * Exit 0 = deleted, 1 = no such key / value (file untouched), 2 = refused
+ * (file untouched), 3 = failed while writing (restore the backup). Used for
+ * HKLM RunOnce InitShell, which makes the 95 Explorer start the Welcome
+ * window with -f whatever Tips\Show says (REG95.BAT, tools/w9x_reg95.sh). */
+static int delval(const char *path, const char *key, const char *value) {
+    unsigned char e[0x1c], r[0x14], v[12], text[256], buf[16];
+    unsigned long target, pos, base, at, end, used, from = NONE, to = 0, tail, off;
+    unsigned blk, i, n, vlen, vnl, vdl, nvals, nlen, found = 0; int failed;
+    del_reason = "argument";
+    if (prefix(key, "HKEY_LOCAL_MACHINE\\")) key += 19;
+    vlen = (unsigned)strlen(value);
+    if (!*key || *key == '\\' || !vlen || vlen > 255) return 2;
+    del_reason = "hive-open";
+    if (!hopen(path)) return 2;
+    failed = find_key(key, &target);
+    if (failed) goto done;
+    failed = 2; del_reason = "record";
+    if (!entry(target, e) || !record(e, &blk, &pos)) goto done;
+    if (pos == NONE) { failed = 1; del_reason = "not-found"; goto done; }
+    base = blk_off[blk];
+    if (!hread(base + pos, r, 0x14)) goto done;
+    used = g32(r + 8); nlen = g16(r + 0x0c); nvals = g16(r + 0x0e);
+    if (used < 0x14UL + nlen || used > g32(r) || g32(r) > blk_size[blk] - pos) goto done;
+    end = pos + used;
+    del_reason = "values";
+    at = pos + 0x14 + nlen;
+    for (i = 0; i < nvals; i++) {
+        if (end - at < 12 || !hread(base + at, v, 12)) goto done;
+        vnl = g16(v + 8); vdl = g16(v + 10);
+        if (end - at - 12 < (unsigned long)vnl + vdl) goto done;
+        if (vnl == vlen) {
+            if (!hread(base + at + 12, text, vnl)) goto done;
+            for (n = 0; n < vnl && tolower(text[n]) == tolower((unsigned char)value[n]); n++) ;
+            if (n == vnl) {
+                if (found++) { del_reason = "duplicate"; goto done; }
+                from = at; to = at + 12 + vnl + vdl;
+            }
+        }
+        at += 12UL + vnl + vdl;
+    }
+    if (at != end) goto done;
+    if (!found) { failed = 1; del_reason = "not-found"; goto done; }
+    /* From here on the file changes. */
+    failed = 3; del_reason = "write-value";
+    tail = end - to;
+    for (off = 0; off < tail; off += n) {
+        n = tail - off > sizeof(buf) ? (unsigned)sizeof(buf) : (unsigned)(tail - off);
+        if (!hread(base + to + off, buf, n) || !put(1 + blk, base + from + off, buf, n)) goto done;
+    }
+    memset(buf, 0, sizeof(buf));
+    for (off = from + tail; off < end; off += n) {
+        n = end - off > sizeof(buf) ? (unsigned)sizeof(buf) : (unsigned)(end - off);
+        if (!put(1 + blk, base + off, buf, n)) goto done;
+    }
+    buf[0] = (unsigned char)(nvals - 1); buf[1] = (unsigned char)((nvals - 1) >> 8);
+    if (!put32(1 + blk, base + pos + 8, used - (to - from)) || !put(1 + blk, base + pos + 0x0e, buf, 2)) goto done;
     if (!fix_sums()) goto done;
     failed = 0; del_reason = "complete";
 done:
@@ -708,12 +789,13 @@ int main(int argc,char **argv) {
         failed=fprintf(out,"REGEDIT4\r\n\r\n[" SETUPKEY "]\r\n%s=\"C:\\\\USOS9X\\\\USOSGRPW.EXE -s\"\r\n",grp_name)<0;
         if(fclose(out))failed=1;return failed?2:0;
     }
-    if (((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) || ((argc==3 || argc==4) && ieq(argv[1],"FIXFREE"))) {
+    if (((argc==4 || argc==5) && ieq(argv[1],"DELKEY")) || ((argc==3 || argc==4) && ieq(argv[1],"FIXFREE")) ||
+        ((argc==5 || argc==6) && ieq(argv[1],"DELVAL"))) {
         static const char *codes[] = {"0", "1", "2", "3"};
-        int fix=ieq(argv[1],"FIXFREE");
-        failed=fix?fixfree(argv[2]):delkey(argv[2],argv[3]);
-        if (argc==5-fix) {
-            out=fopen(argv[4-fix],"wb");
+        int args=ieq(argv[1],"FIXFREE")?3:ieq(argv[1],"DELKEY")?4:5;
+        failed=args==3?fixfree(argv[2]):args==4?delkey(argv[2],argv[3]):delval(argv[2],argv[3],argv[4]);
+        if (argc==args+1) {
+            out=fopen(argv[args],"wb");
             if (!out) return 3;
             if (fprintf(out,"version=1\r\nexit=%s\r\nreason=%s\r\n",codes[failed],del_reason)<0) {
                 fclose(out); return 3;
