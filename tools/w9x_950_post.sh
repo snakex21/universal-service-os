@@ -91,8 +91,11 @@ w9x_950_post_inject() {
 # MAXRES (the same bytes as the awk filters above), checks each result by
 # running the filter again, logs to C:\USOS9X\W950POST.LOG and writes
 # PHASE1.OK, the marker the VM path writes and FIRSTBT.BAT waits for. The
-# originals stay as C:\USOS9X\SETUPINI.ORG / MONINF.ORG. Display binding
-# (VESA95 / VESALATE) is left alone: the native run ends with one adapter.
+# originals stay as C:\USOS9X\SETUPINI.ORG / MONINF.ORG. A Product ID staged
+# for Setup's own page (USOSPID.KEY, tools/w9x_pid95.sh) is deleted here at
+# the latest, once Setup's files are on C: (USOSPID.DRV deletes it earlier).
+# Display binding (VESA95 / VESALATE) is left alone: the native run ends
+# with one adapter.
 # w9x_950_post_dos_write <C:\USOS9X staging dir>
 w9x_950_post_dos_write() {
     [ -f "$1/VESBIND.EXE" ] || return 1
@@ -101,6 +104,7 @@ w9x_950_post_dos_write() {
 REM USOS (tools/w9x_950_post.sh): SETUP 4.0.0.950 after a native phase 1.
 IF EXIST C:\USOS9X\PHASE1.OK GOTO END
 IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END
+IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY
 IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
 IF NOT EXIST C:\USOS9X\VESBIND.EXE GOTO NOVB
 IF NOT EXIST C:\WINDOWS\SETUP.INI GOTO PMMISS

@@ -63,6 +63,13 @@
                 mode; the Legacy Core RAM disk has no copy; Windows 95
                 RTM SETUP.EXE's 128-byte stack vs the RX 560 VBIOS under
                 CSMWrap, X470 2026-10-26; src/platform/bios/win9x/u9v10stk.S)
+  USOSPID.DRV   Win16 installable driver for Setup's own mini-Windows
+                (src/platform/bios/win9x/usospid.c, OpenWatcom like
+                USOSKEY.DRV): types the profile's Windows 95 OEM Product ID
+                from C:\\USOS9X\\USOSPID.KEY into SUWIN's Product ID page
+                once (950 native phase 1 only; tools/w9x_pid95.sh stages the
+                key, src/compat/win3x/w9x_mini.zig the driver; otherwise
+                removed from C:\\USOS9X)
   W950POST.BAT  (written by tools/w9x_950_post.sh, not here) the DOS-side
                 950 post-phase-1 fixes for a native phase 1 (VESBIND
                 PMDROP / MAXRES), PHASE1.OK for FIRSTBT.BAT
@@ -135,7 +142,9 @@ STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'USOSFB.EXE', 'MSBATCH.INF', 'V
     'USOSVMD.VXD', 'USOSLOG.EXE') + (
     # INT 10h stack for SETUP.EXE (INSTALL.BAT / RESUME.BAT, the UEFI disk
     # mode; not in the Legacy Core RAM disk list: its 4096-byte headroom).
-    'U9V10STK.COM',)
+    'U9V10STK.COM',) + (
+    # 950 native phase 1 with an OEM ID: Setup's mini-Windows types it.
+    'USOSPID.DRV',)
 USOSNVME = ROOT / 'tools/nt/usosnvme'
 USOSUSB = ROOT / 'tools/nt/usosusb9x'
 USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
@@ -307,6 +316,37 @@ def build_usosdbg(out: Path, work: Path) -> Path:
     if 'clib' in (work / 'usosdbg.map').read_text(errors='replace').lower():
         raise ValueError('USOSDBG.EXE must not link the OpenWatcom C library')
     return exe
+
+
+# What USOSPID.DRV may import: Windows 3.1 standard-mode KERNEL / USER
+# calls, checked against Setup's mini-Windows by test_usospid.py.
+USOSPID_IMPORTS = {'KERNEL', 'USER'}
+
+
+def build_usospid(out: Path, work: Path) -> Path:
+    """USOSPID.DRV: Win16 installable driver (OpenWatcom wcc/wlink as
+    USOSKEY.DRV, no runtime) for Windows 95 Setup's mini-Windows."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import openwatcom, ne_imported_modules
+    ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{SOURCE};{ow / "h"};{ow / "h/win"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usospid.obj'
+    subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=windows', '-bd', '-ms', '-zu', '-zl', '-s', '-3', '-osi',
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usospid.c')], env=env, check=True, cwd=work)
+    drv = out / 'USOSPID.DRV'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usospid.lnk'), 'file', str(obj),
+                    'name', str(drv), 'option', 'map=' + str(work / 'usospid.map')], env=env, check=True, cwd=work)
+    data = drv.read_bytes()
+    ne = int.from_bytes(data[0x3c:0x3e], 'little')
+    if data[ne:ne + 2] != b'NE' or b'DRIVERPROC' not in data or b'USOSPID' not in data:
+        raise ValueError('USOSPID.DRV is not the expected NE driver')
+    if not set(ne_imported_modules(data)) <= USOSPID_IMPORTS:
+        raise ValueError('USOSPID.DRV may import KERNEL and USER only, not %r' % ne_imported_modules(data))
+    if 'clib' in (work / 'usospid.map').read_text(errors='replace').lower():
+        raise ValueError('USOSPID.DRV must not link the OpenWatcom C library')
+    return drv
 
 
 OW_LIB386_NT = ('kernel32.lib', 'user32.lib', 'advapi32.lib')
@@ -556,6 +596,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     dosmouse_bat(out)
     build_diag(out, work)
     build_usosdbg(out, work)
+    build_usospid(out, work)
     build_usoslog(out, work)
     build_vesbind(out, work)
     from build_usosgrpw import build as build_grpwatch
@@ -591,8 +632,15 @@ if __name__ == '__main__':
     p.add_argument('--usoslog', action='store_true',
                    help='only USOSDBG.EXE and USOSLOG.EXE (for in-place kits)')
     p.add_argument('--vesbind', action='store_true', help='only the 950 DOS late-display binding helper')
+    p.add_argument('--usospid', action='store_true', help='only the 950 Setup Product ID helper USOSPID.DRV')
     a = p.parse_args()
-    if a.vesbind:
+    if a.usospid:
+        o = a.out or ROOT / 'zig-out/dos-native/win9x'
+        w = ROOT / 'zig-out/win9x-support'
+        o.mkdir(parents=True, exist_ok=True)
+        w.mkdir(parents=True, exist_ok=True)
+        print(build_usospid(o, w))
+    elif a.vesbind:
         o = a.out or ROOT / 'zig-out/dos-native/win9x'
         w = ROOT / 'zig-out/win9x-support'
         o.mkdir(parents=True, exist_ok=True)

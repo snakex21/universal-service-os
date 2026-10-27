@@ -53,3 +53,23 @@ w9x_pid95_prepare() {
     w9x_pid95_rewrite "$pid_inf" '' || return 1
     echo dropped
 }
+
+# 950 native phase 1 with a USOS answer: the OEM ID for Setup's own Product
+# ID page (USOSPID.DRV in the mini-Windows types it once, then the page's
+# Next; src/platform/bios/win9x/usospid.c). Call before w9x_pid95_prepare.
+# w9x_pid95_stage_key MSBATCH.INF KEYFILE: prints
+#   staged     [Setup] ProductID is ddddd-OEM-ddddddd-ddddd (OEM in any
+#              case): KEYFILE gets it (OEM upper case) + CR LF
+#   none       anything else: KEYFILE is removed
+# Never prints the ID. rc 1 only on a file error.
+w9x_pid95_stage_key() {
+    rm -f "$2"
+    pid_key=$(w9x_pid95_value "$1" | tr 'oem' 'OEM')
+    case "$pid_key" in
+        [0-9][0-9][0-9][0-9][0-9]-OEM-[0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9]) ;;
+        *) pid_key=; echo none; return 0 ;;
+    esac
+    (umask 077; printf '%s\r\n' "$pid_key" > "$2") || { pid_key=; rm -f "$2"; return 1; }
+    pid_key=
+    echo staged
+}

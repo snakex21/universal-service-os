@@ -158,11 +158,88 @@ class Pid95(unittest.TestCase):
             if kind == 'USER':
                 self.assertIn('warning: the answer file ProductID has 18+ characters', out)
 
+    def test_stage_key_only_for_an_oem_id(self):
+        key = self.tmp / 'USOSPID.KEY'
+        for value, result in ((OEM_ID, 'staged'), (OEM_ID.lower(), 'staged'), (RETAIL_ID, 'none'), (None, 'none'),
+                              ('12345-OEM-0000007-5432', 'none'), ('12345-OEM-000000a-54321', 'none'), ('x' * 23, 'none')):
+            with self.subTest(value=value):
+                key.write_bytes(b'old')
+                self.stage(value)
+                rc, out, err = sh(f'. "{LIB}"\nw9x_pid95_stage_key "$I" "$K"', {'I': self.inf.as_posix(), 'K': key.as_posix()})
+                self.assertEqual((rc, out.strip()), (0, result), err)
+                self.assertNotIn(OEM_ID[6:], out + err)
+                if result == 'staged':
+                    self.assertEqual(key.read_bytes(), OEM_ID.encode() + b'\r\n')   # OEM upper case
+                else:
+                    self.assertFalse(key.exists())
+
+    def target_block(self, tag, version, vm, kind, with_driver):
+        text = TARGET.read_text()
+        block = text[text.index('# Windows 95 with a native phase 1: SUWIN'):text.index("# Display: the answer's")]
+        work = Path(tempfile.mkdtemp(prefix='usos-w9x-pidblock-'))
+        self.addCleanup(shutil.rmtree, work, ignore_errors=True)
+        (work / 'c/USOS9X').mkdir(parents=True)
+        self.stage(OEM_ID)
+        shutil.copy(self.inf, work / 'c/USOS9X/MSBATCH.INF')
+        if with_driver:
+            (work / 'c/USOS9X/USOSPID.DRV').write_bytes(b'MZ')
+        script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { exit 9; }\n'
+                  f'SYSTEM_TAG={tag}\nsetup_version="$V"\nVM_PHASE1={vm}\nANSWER_KIND={kind}\nSETUP_FOLDER=WIN95\n'
+                  f'LIB="{(ROOT / "tools").as_posix()}"\nwork="{work.as_posix()}"\n' + block)
+        rc, out, err = sh(script, {'V': version})
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn(OEM_ID[6:], out + err)                          # the key is never logged
+        return work / 'c/USOS9X', out
+
+    def test_target_block_stages_the_key_for_950_only(self):
+        # 950 native, USOS answer, USOSPID.DRV on the stick: key file, driver kept.
+        d, out = self.target_block('95', '4 0 0 950', '0', 'PROFILE', True)
+        self.assertEqual((d / 'USOSPID.KEY').read_bytes(), OEM_ID.encode() + b'\r\n')
+        self.assertTrue((d / 'USOSPID.DRV').exists())
+        self.assertIn('product id: dropped', out)
+        self.assertIn('product id: staged for the Product ID page', out)
+        rc, got, _ = sh(f'. "{LIB}"\nw9x_pid95_value "$I"', {'I': (d / 'MSBATCH.INF').as_posix()})
+        self.assertEqual(got.strip(), '')
+        # OSR2, the VM phase 1, a user's file, 98 SE, or no driver: no key, no driver.
+        for case in (('95', '4 0 0 1111', '0', 'PROFILE', True), ('95', '4 0 0 950', '1', 'PROFILE', True),
+                     ('95', '4 0 0 950', '0', 'USER', True), ('98SE', '', '0', 'PROFILE', True),
+                     ('95', '4 0 0 950', '0', 'PROFILE', False)):
+            with self.subTest(case=case):
+                d, out = self.target_block(*case)
+                self.assertFalse((d / 'USOSPID.KEY').exists())
+                self.assertFalse((d / 'USOSPID.DRV').exists())
+                self.assertNotIn('staged for the Product ID page', out)
+
+    def test_key_leaves_the_disk_without_the_mini_windows_helper(self):
+        text = TARGET.read_text()
+        a = text.index('# The staged Product ID (above) only with USOSPID.DRV')
+        block = text[a:text.index('\nfi\n', text.index("log 'product id: no mini-Windows helper")) + 4]
+        for bridge, mini, kept in (('1', 'pid=on\r\nbridge=on\r\n', True), ('1', 'pid=off\r\nbridge=on\r\n', False),
+                                   ('0', 'pid=on\r\nbridge=on\r\n', False), ('1', None, False)):
+            with self.subTest(bridge=bridge, mini=mini):
+                work = Path(tempfile.mkdtemp(prefix='usos-w9x-pidmini-'))
+                self.addCleanup(shutil.rmtree, work, ignore_errors=True)
+                d = work / 'c/USOS9X'
+                d.mkdir(parents=True)
+                (d / 'USOSPID.KEY').write_bytes(OEM_ID.encode() + b'\r\n')
+                (d / 'USOSPID.DRV').write_bytes(b'MZ')
+                if mini is not None:
+                    (d / 'USOSMINI.TXT').write_bytes(mini.encode())
+                rc, out, err = sh('log() { printf "%s\\n" "$*"; }\n' f'mini_bridge={bridge}\nwork="{work.as_posix()}"\n' + block)
+                self.assertEqual(rc, 0, err)
+                self.assertEqual((d / 'USOSPID.KEY').exists(), kept)
+                self.assertEqual((d / 'USOSPID.DRV').exists(), kept)
+                self.assertNotIn(OEM_ID[6:], out)
+
     def test_target_wiring(self):
         text = TARGET.read_text()
         self.assertIn('if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then', text)
         self.assertNotIn('pid_mode', text)
         self.assertIn('pid_result=$(w9x_pid95_prepare "$work/c/USOS9X/MSBATCH.INF") ||', text)
+        # The key is taken before the drop, the mini-Windows step comes after both.
+        self.assertLess(text.index('w9x_pid95_stage_key "$work/c/USOS9X/MSBATCH.INF"'), text.index('pid_result=$(w9x_pid95_prepare'))
+        self.assertLess(text.index('pid_result=$(w9x_pid95_prepare'), text.index('usos-fb-ui --w9x-setup-mini'))
+        self.assertLess(text.index('usos-fb-ui --w9x-setup-mini'), text.index("grep -qx 'pid=on'"))
         # After the answer copy, before INSTALL.BAT copies it next to SETUP.EXE.
         self.assertLess(text.index('cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF"'), text.index('w9x_pid95_prepare'))
         self.assertIn('("tools/w9x_pid95.sh", "usr/lib/usos/w9x_pid95.sh")', (ROOT / 'tools/build_micro_linux.py').read_text())

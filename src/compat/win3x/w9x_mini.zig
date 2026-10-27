@@ -19,6 +19,13 @@
 //!    MSMOUS31.DRV file for NOMOUSE/LMOUSE31, which no longer is the mouse
 //!    driver).
 //!
+//! 3. HELPERDIR also holding USOSPID.DRV (tools/w9x_csmwrap_target.sh
+//!    leaves it there only for a 950 native phase 1 with a staged OEM
+//!    Product ID, C:\USOS9X\USOSPID.KEY): it goes into the cabinet with the
+//!    bridge and drivers= names it after usoskey.drv; it types that ID into
+//!    SUWIN's Product ID page (src/platform/bios/win9x/usospid.c). The log
+//!    then says `pid=on` (else `pid=off`) right before the bridge line.
+//!
 //! The cabinet is written again with the original header (set ID, cabinet
 //! chain names) as one MSZIP folder of stored blocks (cab.zig) and replaces
 //! MINI.CAB only after it parsed back to exactly the intended files. Unknown
@@ -34,11 +41,12 @@ const table = @import("display_table.zig");
 pub const log_name = "USOSMINI.TXT";
 pub const key_driver = "USOSKEY.DRV";
 pub const mouse_driver = "VBMOUSE.DRV";
+pub const pid_driver = "USOSPID.DRV";
 const max_cab = 8 * 1024 * 1024;
 const max_driver = 1024 * 1024;
 
-pub const Helpers = struct { usoskey: []const u8, vbmouse: []const u8 };
-pub const Result = struct { data: ?[]u8, bridge: bool };
+pub const Helpers = struct { usoskey: []const u8, vbmouse: []const u8, usospid: ?[]const u8 = null };
+pub const Result = struct { data: ?[]u8, bridge: bool, pid: bool = false };
 
 const Log = struct {
     gpa: std.mem.Allocator,
@@ -103,6 +111,28 @@ pub fn iniHasBridge(ini: []const u8) bool {
 /// `mouse.drv=vbmouse.drv` (one is added when there is none). Line endings
 /// (CRLF in the cabinet) and every other line are kept.
 pub fn editSystemIni(gpa: std.mem.Allocator, ini: []const u8) error{ NoBootSection, OutOfMemory }![]u8 {
+    return editSystemIniWith(gpa, ini, false);
+}
+
+/// Whether [boot] drivers= of `ini` names usospid.drv.
+pub fn iniHasPid(ini: []const u8) bool {
+    var in_boot = false;
+    var it = std.mem.splitScalar(u8, ini, '\n');
+    while (it.next()) |line| {
+        if (trim(line).len > 0 and trim(line)[0] == '[') {
+            in_boot = isSection(line, "[boot]");
+            continue;
+        }
+        if (!in_boot) continue;
+        const key = keyOf(line) orelse continue;
+        const value = trim(line)[std.mem.indexOfScalar(u8, trim(line), '=').? + 1 ..];
+        if (std.ascii.eqlIgnoreCase(key, "drivers") and hasWord(value, "usospid.drv")) return true;
+    }
+    return false;
+}
+
+/// editSystemIni; `pid`: drivers= also names usospid.drv (after usoskey.drv).
+pub fn editSystemIniWith(gpa: std.mem.Allocator, ini: []const u8, pid: bool) error{ NoBootSection, OutOfMemory }![]u8 {
     // pre-scan [boot]
     var has_drivers = false;
     var has_mouse = false;
@@ -140,6 +170,7 @@ pub fn editSystemIni(gpa: std.mem.Allocator, ini: []const u8) error{ NoBootSecti
                 if (!has_drivers) {
                     if (!cr and eol.len == 2) try out.append(gpa, '\r');
                     try out.appendSlice(gpa, "\ndrivers=usoskey.drv");
+                    if (pid) try out.appendSlice(gpa, " usospid.drv");
                     if (cr) try out.append(gpa, '\r');
                 }
                 if (!has_mouse) {
@@ -159,9 +190,12 @@ pub fn editSystemIni(gpa: std.mem.Allocator, ini: []const u8) error{ NoBootSecti
             const body = if (cr) line[0 .. line.len - 1] else line;
             const value = body[std.mem.indexOfScalar(u8, body, '=').? + 1 ..];
             try out.appendSlice(gpa, std.mem.trimEnd(u8, body, " \t"));
-            if (!hasWord(value, "usoskey.drv")) {
-                if (trim(value).len != 0) try out.append(gpa, ' ');
-                try out.appendSlice(gpa, "usoskey.drv");
+            var empty = trim(value).len == 0;
+            for ([_][]const u8{ "usoskey.drv", "usospid.drv" }, [_]bool{ true, pid }) |word, wanted| {
+                if (!wanted or hasWord(value, word)) continue;
+                if (!empty) try out.append(gpa, ' ');
+                try out.appendSlice(gpa, word);
+                empty = false;
             }
             if (cr) try out.append(gpa, '\r');
         } else {
@@ -205,14 +239,15 @@ pub fn rebuild(gpa: std.mem.Allocator, raw: []const u8, helpers: ?Helpers, log: 
         }
     } else log.line("MINI.CAB has no VGA.DRV", .{});
 
-    // 2. the USB keyboard/mouse bridge
+    // 2. the USB keyboard/mouse bridge (3. with it: the Product ID helper)
     var bridge = false;
+    var pid = false;
     if (helpers) |h| bridge: {
         const ini_i = c.find("SYSTEM.INI") orelse {
             log.line("MINI.CAB has no SYSTEM.INI; bridge not added", .{});
             break :bridge;
         };
-        const new_ini = editSystemIni(gpa, c.files[ini_i].data) catch |err| {
+        const new_ini = editSystemIniWith(gpa, c.files[ini_i].data, h.usospid != null) catch |err| {
             log.line("SYSTEM.INI: {s}; bridge not added", .{@errorName(err)});
             break :bridge;
         };
@@ -224,8 +259,9 @@ pub fn rebuild(gpa: std.mem.Allocator, raw: []const u8, helpers: ?Helpers, log: 
             changed = true;
         }
         const template = c.files[ini_i];
-        for ([_]struct { []const u8, []const u8 }{ .{ key_driver, h.usoskey }, .{ mouse_driver, h.vbmouse } }) |d| {
-            const name, const data = d;
+        for ([_]struct { []const u8, ?[]const u8 }{ .{ key_driver, h.usoskey }, .{ mouse_driver, h.vbmouse }, .{ pid_driver, h.usospid } }) |d| {
+            const name, const maybe = d;
+            const data = maybe orelse continue;
             const at = for (files.items, 0..) |f, k| {
                 if (std.ascii.eqlIgnoreCase(f.name, name)) break k;
             } else null;
@@ -241,16 +277,19 @@ pub fn rebuild(gpa: std.mem.Allocator, raw: []const u8, helpers: ?Helpers, log: 
             changed = true;
         }
         bridge = true;
+        pid = h.usospid != null;
+        if (h.usospid) |b| log.line("product id helper: {s} ({d} bytes, sha256 {s}); drivers=usoskey.drv usospid.drv", .{ pid_driver, b.len, &hexOf(patch.sha256(b)) });
         log.line("bridge: {s} ({d} bytes, sha256 {s}) and {s} ({d} bytes, sha256 {s}); SYSTEM.INI [boot] drivers=usoskey.drv, mouse.drv=vbmouse.drv", .{
             key_driver, h.usoskey.len, &hexOf(patch.sha256(h.usoskey)), mouse_driver, h.vbmouse.len, &hexOf(patch.sha256(h.vbmouse)),
         });
     } else if (c.find("SYSTEM.INI")) |ini_i| {
         bridge = iniHasBridge(c.files[ini_i].data) and c.find(key_driver) != null and c.find(mouse_driver) != null;
+        pid = bridge and iniHasPid(c.files[ini_i].data) and c.find(pid_driver) != null;
     }
 
     if (!changed) {
         log.line("MINI.CAB: nothing to change", .{});
-        return .{ .data = null, .bridge = bridge };
+        return .{ .data = null, .bridge = bridge, .pid = pid };
     }
     const out = cab.build(gpa, &c, files.items) catch |err| {
         log.line("MINI.CAB: cannot write ({s}); left as is", .{@errorName(err)});
@@ -272,7 +311,7 @@ pub fn rebuild(gpa: std.mem.Allocator, raw: []const u8, helpers: ?Helpers, log: 
         return .{ .data = null, .bridge = false };
     }
     log.line("MINI.CAB: rewritten, {d} files, {d} -> {d} bytes, sha256 {s}", .{ files.items.len, raw.len, out.len, &hexOf(patch.sha256(out)) });
-    return .{ .data = out, .bridge = bridge };
+    return .{ .data = out, .bridge = bridge, .pid = pid };
 }
 
 pub fn run(io: std.Io, gpa: std.mem.Allocator, setup_path: []const u8, helper_path: []const u8) u8 {
@@ -302,18 +341,22 @@ fn runIn(io: std.Io, gpa: std.mem.Allocator, dir: std.Io.Dir, hdir: ?std.Io.Dir,
     var helpers: ?Helpers = null;
     var key_buf: ?[]u8 = null;
     var mouse_buf: ?[]u8 = null;
+    var pid_buf: ?[]u8 = null;
     defer if (key_buf) |b| gpa.free(b);
     defer if (mouse_buf) |b| gpa.free(b);
+    defer if (pid_buf) |b| gpa.free(b);
     if (hdir) |h| {
         key_buf = h.readFileAlloc(io, key_driver, gpa, .limited(max_driver)) catch null;
         mouse_buf = h.readFileAlloc(io, mouse_driver, gpa, .limited(max_driver)) catch null;
+        pid_buf = h.readFileAlloc(io, pid_driver, gpa, .limited(max_driver)) catch null;
         if (key_buf != null and mouse_buf != null) {
-            helpers = .{ .usoskey = key_buf.?, .vbmouse = mouse_buf.? };
+            helpers = .{ .usoskey = key_buf.?, .vbmouse = mouse_buf.?, .usospid = pid_buf };
         } else log.line("{s} or {s} missing in the helper folder; bridge not added", .{ key_driver, mouse_driver });
     }
     const name = "MINI.CAB";
     const raw = dir.readFileAlloc(io, name, gpa, .limited(max_cab)) catch |err| {
         log.line("{s}: {s}; nothing patched", .{ name, @errorName(err) });
+        log.line("pid=off", .{});
         log.line("bridge=off", .{});
         return if (err == error.FileNotFound) 0 else 3;
     };
@@ -321,6 +364,7 @@ fn runIn(io: std.Io, gpa: std.mem.Allocator, dir: std.Io.Dir, hdir: ?std.Io.Dir,
     const result = rebuild(gpa, raw, helpers, log);
     var status: u8 = 0;
     var bridge = result.bridge;
+    var pid = result.pid;
     if (result.data) |data| {
         defer gpa.free(data);
         const tmp = "USOSMINI.TMP";
@@ -330,13 +374,17 @@ fn runIn(io: std.Io, gpa: std.mem.Allocator, dir: std.Io.Dir, hdir: ?std.Io.Dir,
                 dir.deleteFile(io, tmp) catch {};
                 status = 3;
                 bridge = false;
+                pid = false;
             };
         } else |err| {
             log.line("{s}: write error {s}; left as is", .{ name, @errorName(err) });
             status = 3;
             bridge = false;
+            pid = false;
         }
     }
+    // pid= first: `bridge=` stays the last line (tools/w9x_csmwrap_target.sh).
+    log.line("pid={s}", .{if (pid) "on" else "off"});
     log.line("bridge={s}", .{if (bridge) "on" else "off"});
     return status;
 }
@@ -390,4 +438,67 @@ test "a cabinet with an unknown driver gets only the bridge, then nothing" {
     try std.testing.expect(again.data == null and again.bridge);
     const plain = rebuild(gpa, out, null, &log);
     try std.testing.expect(plain.data == null and plain.bridge);
+}
+
+test "the Product ID helper joins drivers= after usoskey.drv, once" {
+    const gpa = std.testing.allocator;
+    const a = try editSystemIniWith(gpa, "[boot]\r\nshell=winsetup.bin\r\nmouse.drv=msmous31.drv\r\n", true);
+    defer gpa.free(a);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=usoskey.drv usospid.drv\r\nshell=winsetup.bin\r\nmouse.drv=vbmouse.drv\r\n", a);
+    try std.testing.expect(iniHasBridge(a) and iniHasPid(a));
+    const b = try editSystemIniWith(gpa, a, true);
+    defer gpa.free(b);
+    try std.testing.expectEqualStrings(a, b);
+    const c = try editSystemIniWith(gpa, "[boot]\r\ndrivers=\r\nmouse.drv=x\r\n", true);
+    defer gpa.free(c);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=usoskey.drv usospid.drv\r\nmouse.drv=vbmouse.drv\r\n", c);
+    const d = try editSystemIniWith(gpa, "[boot]\r\ndrivers=mmsystem.dll usoskey.drv\r\nmouse.drv=vbmouse.drv\r\n", true);
+    defer gpa.free(d);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=mmsystem.dll usoskey.drv usospid.drv\r\nmouse.drv=vbmouse.drv\r\n", d);
+    // without the helper: exactly as before
+    const e = try editSystemIniWith(gpa, "[boot]\r\nmouse.drv=x\r\n", false);
+    defer gpa.free(e);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=usoskey.drv\r\nmouse.drv=vbmouse.drv\r\n", e);
+    try std.testing.expect(!iniHasPid(e));
+}
+
+test "a cabinet gets USOSPID.DRV only with the helper and the bridge" {
+    const gpa = std.testing.allocator;
+    var header: [36]u8 = @splat(0);
+    @memcpy(header[0..4], "MSCF");
+    header[24] = 3;
+    header[25] = 1;
+    header[26] = 1;
+    const like = cab.Cabinet{ .header = &header, .folder_reserve = 0, .data_reserve = 0, .folder_extra = &.{}, .compress = 1, .files = &.{}, .body = &.{} };
+    const files = [_]cab.File{
+        .{ .name = "SYSTEM.INI", .data = "[boot]\r\nmouse.drv=msmous31.drv\r\n", .date = 7, .time = 8, .attribs = 0x20 },
+    };
+    const raw = try cab.build(gpa, &like, &files);
+    defer gpa.free(raw);
+    var log = Log{ .gpa = gpa };
+    defer log.text.deinit(gpa);
+    const r = rebuild(gpa, raw, .{ .usoskey = "KEY", .vbmouse = "MOUSE", .usospid = "PID" }, &log);
+    try std.testing.expect(r.bridge and r.pid);
+    const out = r.data.?;
+    defer gpa.free(out);
+    var c = try cab.parse(gpa, out);
+    defer c.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 4), c.files.len);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=usoskey.drv usospid.drv\r\nmouse.drv=vbmouse.drv\r\n", c.files[0].data);
+    try std.testing.expectEqualStrings("USOSPID.DRV", c.files[3].name);
+    try std.testing.expectEqualStrings("PID", c.files[3].data);
+    // the log names the driver, never more
+    try std.testing.expect(std.mem.indexOf(u8, log.text.items, "product id helper: USOSPID.DRV (3 bytes") != null);
+    const again = rebuild(gpa, out, .{ .usoskey = "KEY", .vbmouse = "MOUSE", .usospid = "PID" }, &log);
+    try std.testing.expect(again.data == null and again.bridge and again.pid);
+    const plain = rebuild(gpa, out, null, &log);
+    try std.testing.expect(plain.data == null and plain.bridge and plain.pid);
+    // no helper: no USOSPID.DRV, drivers= as before
+    const none = rebuild(gpa, raw, .{ .usoskey = "KEY", .vbmouse = "MOUSE" }, &log);
+    try std.testing.expect(none.bridge and !none.pid);
+    defer gpa.free(none.data.?);
+    var n = try cab.parse(gpa, none.data.?);
+    defer n.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 3), n.files.len);
+    try std.testing.expectEqualStrings("[boot]\r\ndrivers=usoskey.drv\r\nmouse.drv=vbmouse.drv\r\n", n.files[0].data);
 }

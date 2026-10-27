@@ -346,6 +346,13 @@ fi
 # never patched. Retail IDs (11 characters) stay. The VM phase 1 keeps its
 # answer as it is (its page controller types the key). A user's own answer
 # file stays 1:1. The key itself is never logged.
+# SETUP 4.00.950 (RTM / OSR1): before the drop, an OEM ID goes to
+# C:\USOS9X\USOSPID.KEY, and USOSPID.DRV (Setup's mini-Windows, the step
+# below) types it into the Product ID page once and presses Next; the driver
+# deletes the file when it loads, W950POST.BAT after phase 1 in any case.
+# Without a staged key USOSPID.DRV leaves C:\USOS9X: the page waits for the
+# user as before.
+pid_key=none
 if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
     [ -r "$LIB/w9x_pid95.sh" ] && . "$LIB/w9x_pid95.sh" || fail 'missing Windows 95 product ID helper'
     if [ "$ANSWER_KIND" = USER ]; then
@@ -353,11 +360,17 @@ if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
         [ "${#pid_value}" -le 17 ] || log 'warning: the answer file ProductID has 18+ characters; Windows 95 Setup will ignore the whole file'
         pid_value=
     else
+        if [ "${setup_version:-}" = '4 0 0 950' ] && [ -f "$work/c/USOS9X/USOSPID.DRV" ]; then
+            pid_key=$(w9x_pid95_stage_key "$work/c/USOS9X/MSBATCH.INF" "$work/c/USOS9X/USOSPID.KEY") ||
+                fail 'cannot stage the Windows 95 product ID for Setup'
+        fi
         pid_result=$(w9x_pid95_prepare "$work/c/USOS9X/MSBATCH.INF") ||
             fail 'cannot prepare the Windows 95 product ID'
         log "product id: $pid_result (MSBATCH.INF stays readable for Windows 95 Setup)"
+        [ "$pid_key" != staged ] || log 'product id: staged for the Product ID page (USOSPID.DRV in the mini-Windows)'
     fi
 fi
+[ "$pid_key" = staged ] || rm -f "$work/c/USOS9X/USOSPID.DRV" "$work/c/USOS9X/USOSPID.KEY"
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -499,6 +512,16 @@ fi
 if [ "$mini_bridge" = 1 ]; then
     printf 'SET U9MINI=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
     log 'setup mini-Windows: U9MINI=1 (USOSKEY.COM + VBMOUSE.EXE before SETUP)'
+fi
+# The staged Product ID (above) only with USOSPID.DRV in this MINI.CAB and
+# the bridge loaded; otherwise the key leaves the disk and Setup asks.
+if [ -f "$work/c/USOS9X/USOSPID.KEY" ]; then
+    if [ "$mini_bridge" = 1 ] && tr -d '\r' < "$work/c/USOS9X/USOSMINI.TXT" 2>/dev/null | grep -qx 'pid=on'; then
+        log 'product id: USOSPID.DRV in the mini-Windows types it into the Product ID page'
+    else
+        rm -f "$work/c/USOS9X/USOSPID.KEY" "$work/c/USOS9X/USOSPID.DRV"
+        log 'product id: no mini-Windows helper; key removed, Setup asks for it'
+    fi
 fi
 
 # NVMe target: usosnvme.mpd + USOSNVME.INF stay in C:\USOS9X only when chosen

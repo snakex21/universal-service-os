@@ -140,7 +140,9 @@ class NativeTwin(unittest.TestCase):
         self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
         lines = data.decode('ascii').splitlines()
         self.assertTrue(all(len(l) < 127 for l in lines))
-        self.assertEqual(lines[2:5], [r'IF EXIST C:\USOS9X\PHASE1.OK GOTO END', r'IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END',
+        self.assertEqual(lines[2:6], [r'IF EXIST C:\USOS9X\PHASE1.OK GOTO END', r'IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END',
+                                      # a Product ID staged for Setup's page (USOSPID.KEY) goes at the latest here
+                                      r'IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY',
                                       r'IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END'])
         for verb, src, new in (('PMDROP', r'C:\WINDOWS\SETUP.INI', r'C:\USOS9X\SETUPINI'),
                                ('MAXRES', r'C:\WINDOWS\INF\MONITOR.INF', r'C:\USOS9X\MONINF')):
