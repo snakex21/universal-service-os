@@ -19,11 +19,16 @@
  *               0x3023..5 Buttons) that becomes active (HCBT_ACTIVATE),
  *               and the active one at DRV_ENABLE, gets a 500 ms timer of
  *               this driver. Other windows are not armed.
- *   DRV_DISABLE a pause: timers killed, the hook removed, the state kept
- *               (usospg_logic.h pg_may_start); the next DRV_ENABLE
- *               resumes. Setup's mini-Windows sends the pair around its
- *               own work (X470 98 FE PL, 2026-10-27: after the first two
- *               pages, the driver stopped there for good before).
+ *   DRV_DISABLE logged only: timers and hooks stay until DRV_FREE (X470
+ *               98 FE PL run 3, 2026-10-27: DRV_DISABLE came only when the
+ *               mini-Windows ended). A later DRV_ENABLE finds the hooks
+ *               in place and changes nothing.
+ *   DRV_FREE    logged, then everything stopped for good.
+ * Note (same run): the stopped pages (user information, licence, key,
+ * "Finish") are not shown in this mini-Windows at all (SETUPLOG: dialogs
+ * skipped in phase 1); they come at the first start of the installed
+ * Windows 98, where USOSANS.EXE runs. This driver stays for the phase 1
+ * pages it can see and records input there.
  *   timer       the active wizard frame (Back / Next / Finish 0x3023..5)
  *               and its visible page (usospg_logic.h): user information
  *               with a name -> Next; licence -> "accept" (618 checked, its
@@ -698,14 +703,18 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
     case DRV_ENABLE:
         if (pg_may_start(&st)) say("enable");
         return start();
+    /* X470 98 FE PL run 3 (2026-10-27): DRV_DISABLE came only when the
+     * mini-Windows ended; timers and hooks stay until DRV_FREE. */
     case DRV_DISABLE:
         if (pg_may_start(&st)) {
             if (!in_rec) { in_rec = 1; rec_moves(1); in_rec = 0; }
-            say("disable (pause)");
+            say("disable (kept running until DRV_FREE)");
         }
-        pause_all();
         return 1L;
-    case DRV_FREE:    stop_all(); return 1L;
+    case DRV_FREE:
+        if (pg_may_start(&st)) say("free, stopped");
+        stop_all();
+        return 1L;
     case DRV_OPEN:
     case DRV_CLOSE:   return 1L;
     }

@@ -370,14 +370,18 @@ class Source(unittest.TestCase):
         self.assertIn('GetWindowTextLength(GetDlgItem(c, PG_KEY1_ID + i)) == PG_KEY_PART_LEN', c)
         # the buttons go to the frame as their BN_CLICKED; the licence radio to its page
         tick_fn = c[c.index('void FAR PASCAL __export __loadds tick('):c.index('static int is_frame(HWND w)')]
-        # DRV_DISABLE pauses, only DRV_FREE / the timeout / WEP stop for good
+        # X470 98 FE run 3: DRV_DISABLE only at the mini-Windows' end: logged, timers and hooks kept;
+        # only DRV_FREE (logged) / the timeout / WEP stop
         proc = c[c.index('LRESULT FAR PASCAL __export __loadds DriverProc('):c.index('int FAR PASCAL __export __loadds WEP(')]
         disable = proc[proc.index('case DRV_DISABLE:'):proc.index('case DRV_FREE:')]
-        self.assertIn('pause_all();', disable)
+        self.assertNotIn('pause_all', disable)
         self.assertNotIn('stop_all', disable)
-        self.assertIn('say("disable (pause)");', disable)
+        self.assertNotIn('KillTimer', disable)
+        self.assertIn('say("disable (kept running until DRV_FREE)");', disable)
         self.assertIn('say("enable");', proc)
-        self.assertIn('case DRV_FREE:    stop_all();', proc)
+        free = proc[proc.index('case DRV_FREE:'):proc.index('case DRV_OPEN:')]
+        self.assertIn('say("free, stopped");', free)
+        self.assertIn('stop_all();', free)
         start_fn = c[c.index('static int start(void)'):c.index('LRESULT FAR PASCAL __export __loadds DriverProc(')]
         self.assertNotIn('st.done', start_fn)
         self.assertIn('rec_hook();', start_fn)
