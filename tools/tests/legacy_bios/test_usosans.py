@@ -58,7 +58,11 @@ HARNESS = r'''
  * pass,confirm (decimal), prints "action/event" per tick (ANLOGSTATE kept
  * across the ticks); h TICK...: hw_step, TICK = frame,page,name,me_auto,
  * me_auto_on,me_manual_on,search,search_on,list,list_on,places,ready,fin,
- * monitor,monitor_inf,next_ready,finish_ready, prints "action/event/kind". */
+ * monitor,monitor_inf,next_ready,finish_ready, prints "action/event/kind";
+ * u TICK...: su_step (the first-start Setup wizard), TICK = frame,page,kind,
+ * filled,accepted,declined,next_ready, prints "action/why/event"; e BITS:
+ * an_edge per bit; a N: an_rec_allow N + 2 times; z MS WATCHING:
+ * an_time_up. */
 static int unhex(const char *h, char *out, int cap)
 {
     int n = 0;
@@ -75,6 +79,8 @@ int main(int argc, char **argv)
 {
     char buf[512];
     int i;
+    /* shared with USOSPG.DRV, used by usosans.c only */
+    (void)pg_classify; (void)pg_move_add; (void)pg_move_due; (void)pg_move_reset;
     if (argv[1][0] == 't') { unhex(argv[2], buf, sizeof buf); printf("%d %d\n", an_logon_kind(buf), an_is_hw_frame(buf)); }
     else if (argv[1][0] == 'm') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_is_monitor(buf)); }
     else if (argv[1][0] == 'i') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_names_monitor_inf(buf)); }
@@ -93,6 +99,31 @@ int main(int argc, char **argv)
             printf("%d/%d ", a, s.event);
         }
         printf("\n");
+    } else if (argv[1][0] == 'u') {
+        SUSTATE s;
+        memset(&s, 0, sizeof s);
+        for (i = 2; i < argc; i++) {
+            PGVIEW v;
+            unsigned long f; int pg, k, fl, ac, de, nx, a;
+            sscanf(argv[i], "%lu,%d,%d,%d,%d,%d,%d", &f, &pg, &k, &fl, &ac, &de, &nx);
+            memset(&v, 0, sizeof v);
+            v.active = 1; v.page = (unsigned short)pg; v.kind = (unsigned char)k; v.filled = (unsigned char)fl;
+            v.accepted = (unsigned char)ac; v.declined = (unsigned char)de; v.next_ready = (unsigned char)nx;
+            a = su_step(&s, f, &v);
+            printf("%d/%d/%d ", a, s.why, s.pg.event);
+        }
+        printf("\n");
+    } else if (argv[1][0] == 'e') {
+        unsigned char prev = 0;
+        for (i = 0; argv[2][i]; i++) printf("%d", an_edge(&prev, argv[2][i] == '1'));
+        printf("\n");
+    } else if (argv[1][0] == 'a') {
+        unsigned lines = 0;
+        int n = atoi(argv[2]);
+        for (i = 0; i < n + 2; i++) printf("%d", an_rec_allow(&lines));
+        printf("\n");
+    } else if (argv[1][0] == 'z') {
+        printf("%d\n", an_time_up(strtoul(argv[2], 0, 10), atoi(argv[3])));
     } else if (argv[1][0] == 'h') {
         HWSTATE s;
         memset(&s, 0, sizeof s);
@@ -116,6 +147,8 @@ NONE, OK, NEXT, FINISH, LEAVE = 0, 1, 2, 3, 4
 (E_NONE, E_SHAPE, E_TYPED, E_NO_USER, E_NO_BUTTON, E_OTHER, E_CHANGED, E_UNCONFIRMED, E_NO_INF, E_STUCK,
  E_LIMIT) = range(11)
 HP_NONE, HP_OTHER, HP_INTRO, HP_CHOICE, HP_PLACES, HP_READY, HP_FINISH = range(7)
+(SW_NONE, SW_NO_PAGE, SW_UNKNOWN_PAGE, SW_FINISH_UNCONFIRMED, SW_SETTLING, SW_WAIT_NEXT, SW_AFTER_PRESS,
+ SW_LEFT) = range(8)
 
 PL_TITLES = {
     'Wprowad\u017a has\u0142o systemu Windows': AK_ENTER, 'Wprowad\u017a has\u0142o Windows': AK_ENTER,
@@ -304,6 +337,49 @@ class Logic(unittest.TestCase):
         self.assertEqual([(a, e) for a, e, _ in got if a == LEAVE], [(LEAVE, E_STUCK)])
         self.assertEqual(got[-1][0], NEXT)
 
+    # ---- Windows 98's first-start Setup wizard (su_step over usospg_logic.h)
+
+    def su(self, *ticks):
+        return [tuple(int(x) for x in t.split('/')) for t in self.run_exe('u', *ticks).split()]
+
+    def test_setup_wizard_pages(self):
+        # user information with a name: Next after 2 s (500 ms ticks); settling before
+        got = self.su(*['1,11,1,1,0,0,1'] * 6)
+        self.assertEqual([a for a, _, _ in got], [0, 0, 0, 0, 1, 0])
+        self.assertEqual(got[0][1], SW_SETTLING)
+        self.assertEqual(got[5][1], SW_AFTER_PRESS)
+        # licence: accept, then Next once 618 is checked
+        got = self.su(*['1,12,2,1,0,0,1'] * 5, *['1,12,2,1,1,0,1'] * 2)
+        self.assertEqual([a for a, _, _ in got if a], [3, 1])
+        # key with all five fields complete: Next; an empty name: left to the user, never pressed
+        self.assertEqual([a for a, _, _ in self.su(*['1,13,3,1,0,0,1'] * 5)][-1], 1)
+        got = self.su(*['1,11,1,0,0,0,1'] * 8)
+        self.assertTrue(all(a == 0 for a, _, _ in got))
+        self.assertEqual(got[4][2], 1)                   # PE_LEFT
+        self.assertEqual(got[-1][1], SW_LEFT)
+
+    def test_setup_finish_only_after_a_setup_page(self):
+        # a last page with Finish alone (another wizard?): never pressed
+        got = self.su(*['1,14,4,1,0,0,0'] * 8)
+        self.assertTrue(all(a == 0 for a, _, _ in got))
+        self.assertEqual(got[-1][1], SW_FINISH_UNCONFIRMED)
+        # after the key page of the same frame: Finish
+        got = self.su(*['1,13,3,1,0,0,1'] * 5, *['1,14,4,1,0,0,0'] * 5)
+        self.assertEqual([a for a, _, _ in got if a], [1, 2])
+        # a new frame starts unconfirmed again
+        got = self.su(*['1,13,3,1,0,0,1'] * 5, *['2,14,4,1,0,0,0'] * 6)
+        self.assertEqual([a for a, _, _ in got if a], [1])
+        # a page of another kind is only watched
+        self.assertEqual(self.su('1,15,0,1,0,0,1')[0][1], SW_UNKNOWN_PAGE)
+        self.assertEqual(self.su('1,0,0,0,0,0,1')[0][1], SW_NO_PAGE)
+
+    def test_recorder_helpers(self):
+        self.assertEqual(self.run_exe('e', '0110111001'), '0100100001')
+        self.assertEqual(self.run_exe('a', '3000'), '1' * 3000 + '20')
+        for ms, watching, want in ((599999, 0, 0), (600000, 0, 1), (600000, 1, 0), (1799999, 1, 0), (1800000, 1, 1)):
+            with self.subTest(ms=ms, watching=watching):
+                self.assertEqual(self.run_exe('z', str(ms), str(watching)), str(want))
+
     def test_new_frame_starts_over(self):
         got = self.hw(*[page(**dict(INTRO, monitor=0))] * 4, *[page(frame=8, **INTRO)] * 4)
         self.assertEqual(got[3][:2], (LEAVE, E_OTHER))
@@ -331,7 +407,20 @@ class Sources(unittest.TestCase):
         self.assertIn('press(w, AN_OK_ID);', c)
         self.assertIn('press(frame, HW_NEXT_ID);', c)
         self.assertIn('press(frame, HW_FINISH_ID);', c)
-        self.assertEqual(c.count('press('), 4)          # the definition + three calls
+        self.assertIn('press(page, PG_EULA_YES_ID);', c)
+        self.assertIn('press(frame, PG_NEXT_ID);', c)
+        self.assertIn('press(frame, PG_FINISH_ID);', c)
+        self.assertEqual(c.count('press('), 7)          # the definition + six calls
+        # Setup wizard: name and key fields only measured; the recorder reads text only via safe_text
+        self.assertIn('v.filled = length_of(GetDlgItem(page, PG_NAME_ID)) > 0;', c)
+        self.assertIn('if (length_of(GetDlgItem(page, PG_KEY1_ID + i)) == PG_KEY_PART_LEN) keys++;', c)
+        self.assertNotIn('text_of(GetDlgItem(page, PG_KEY1_ID', c)
+        self.assertNotIn('text_of(GetDlgItem(page, PG_NAME_ID', c)
+        safe = c[c.index('static int safe_text(HWND w, char *out, int cap)'):c.index('static void describe(HWND w, char *line, int cap)')]
+        self.assertIn('if (is_child(w) && !class_of(w, "Static") && !class_of(w, "Button") && !class_of(w, "#32770")) return 0;', safe)
+        desc = c[c.index('static void describe(HWND w, char *line, int cap)'):c.index('static BOOL CALLBACK dump_cb(')]
+        self.assertIn('if (!lstrcmpiA(cls, "Edit")) { wsprintfA(part, " length=%d", length_of(w));', desc)
+        self.assertNotIn('text_of(', desc)
         # password fields are only measured, never read as text
         self.assertIn('v.pass_len = length_of(GetDlgItem(w, AN_PASS_ID));', c)
         self.assertNotIn('text_of(GetDlgItem(w, AN_PASS_ID)', c)
@@ -349,7 +438,8 @@ class Sources(unittest.TestCase):
         for dll, names in b.USOSANS_IMPORTS.items():
             self.assertLessEqual(names, b.USOSLOG_IMPORTS[dll] | {'RegDeleteValueA', 'EnumChildWindows', 'FindWindowA',
                                                                  'GetDlgItem', 'GetParent', 'IsWindowEnabled',
-                                                                 'PostMessageA', 'SendMessageTimeoutA'}, dll)
+                                                                 'PostMessageA', 'SendMessageTimeoutA', 'GetAsyncKeyState',
+                                                                 'GetDlgCtrlID'}, dll)
         self.assertIn('    build_usoslog(out, work)\n    build_usosans(out, work)\n', (ROOT / 'tools/build_win9x_support.py').read_text())
         self.assertIn("'EFI/USOS/dos-native/win9x/USOSANS.EXE'",
                       (ROOT / 'tools/verify_release_consistency.ps1').read_text(encoding='utf-8-sig'))

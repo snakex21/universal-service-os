@@ -346,6 +346,93 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
     return kind == HP_FINISH ? AA_FINISH : AA_NEXT;
 }
 
+/* ---- Windows 98's first-start Setup wizard ----
+ *
+ * X470 98 FE PL run 3 (2026-10-27): the pages that stopped (user
+ * information, licence, product key, "Finish") are not shown in Setup's
+ * mini-Windows (SETUPLOG: dialogs skipped in phase 1) but at the first
+ * start of the installed Windows 98 (FRUNLOG GetUserInfo), where this
+ * helper already runs. The same SETUPX.DLL pages in the same KOMMCTRL
+ * frame as in the mini-Windows: the page rules and IDs of USOSPG.DRV
+ * (usospg_logic.h: pg_classify, pg_step) are used as they are, on 500 ms
+ * ticks (every second scan). One more rule: Finish only in a frame that
+ * showed a user / licence / key page before (another wizard's last page
+ * looks the same). The licence is accepted only because this helper runs
+ * only for a USOS answer in automatic mode. */
+#ifndef PG_PAGES_ONLY
+#define PG_PAGES_ONLY
+#endif
+#include "usospg_logic.h"
+
+/* Why a Setup wizard tick pressed nothing (logged at every change). */
+enum { SW_NONE, SW_NO_PAGE, SW_UNKNOWN_PAGE, SW_FINISH_UNCONFIRMED, SW_SETTLING, SW_WAIT_NEXT,
+       SW_AFTER_PRESS, SW_LEFT };
+
+typedef struct {
+    PGSTATE pg;
+    unsigned long frame;
+    unsigned char confirmed;    /* this frame showed a user / licence / key page */
+    unsigned char why;          /* SW_* of the last tick */
+} SUSTATE;
+
+/* One 500 ms tick for Setup frame `frame`; v as USOSPG.DRV fills it (page
+ * 0: no page with the title Static). v->page is cleared for pages that
+ * are not acted on. Returns a PA_* of usospg_logic.h. */
+static unsigned char su_step(SUSTATE *s, unsigned long frame, PGVIEW *v)
+{
+    unsigned char act;
+    if (frame != s->frame) {
+        unsigned char *b = (unsigned char *)s;
+        unsigned i;
+        for (i = 0; i < sizeof *s; i++) b[i] = 0;
+        s->frame = frame;
+    }
+    s->why = SW_NONE;
+    if (v->page && v->kind != PG_OTHER && v->kind != PG_FINISH) s->confirmed = 1;
+    if (!v->page) s->why = SW_NO_PAGE;
+    else if (v->kind == PG_OTHER) { s->why = SW_UNKNOWN_PAGE; v->page = 0; }
+    else if (v->kind == PG_FINISH && !s->confirmed) { s->why = SW_FINISH_UNCONFIRMED; v->page = 0; }
+    act = pg_step(&s->pg, v);
+    if (act == PA_NONE && s->why == SW_NONE && s->pg.event == PE_NONE) {
+        if (pg_skipped(&s->pg, v->page)) s->why = SW_LEFT;
+        else if (s->pg.acted == 2) s->why = SW_AFTER_PRESS;
+        else if (s->pg.acted == 1) s->why = SW_WAIT_NEXT;
+        else s->why = SW_SETTLING;
+    }
+    return act;
+}
+
+/* ---- the click recorder (diagnostics only) ----
+ * While a Setup or new-hardware wizard is visible: every 50 ms the mouse
+ * buttons and Enter / Tab / Esc (GetAsyncKeyState, high bit; Windows 9x has
+ * no low-level hooks) and the cursor position. A press = up -> down. */
+#define AN_POLL_MS       50
+#define AN_REC_MAX       3000           /* recorder lines per start, then one notice */
+/* After AN_LIFETIME_MS the helper goes on only while a wizard is shown,
+ * never past AN_MAX_LIFETIME_MS (the first-start wizard can come late). */
+#define AN_MAX_LIFETIME_MS (30UL * 60UL * 1000UL)
+
+static int an_edge(unsigned char *prev, int down)
+{
+    int press = down && !*prev;
+    *prev = (unsigned char)(down != 0);
+    return press;
+}
+
+/* 1 = write, 2 = write the limit notice instead (once), 0 = nothing. */
+static int an_rec_allow(unsigned *lines)
+{
+    if (*lines < AN_REC_MAX) { (*lines)++; return 1; }
+    if (*lines == AN_REC_MAX) { (*lines)++; return 2; }
+    return 0;
+}
+
+static int an_time_up(unsigned long since_start, int watching)
+{
+    if (since_start >= AN_MAX_LIFETIME_MS) return 1;
+    return since_start >= AN_LIFETIME_MS && !watching;
+}
+
 /* ---- the RunServices value's lifetime ---- */
 
 /* C:\USOS9X\USOSANS.STA: "boots=N desk=M" (decimal, any order, other text

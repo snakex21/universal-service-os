@@ -530,9 +530,9 @@ USOSANS_IMPORTS = {
         'GetLocalTime', 'GetModuleFileNameA', 'GetTickCount', 'GetVersion', 'ReadFile', 'SetFilePointer',
         'Sleep', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA'},
     'user32.dll': {
-        'EnumChildWindows', 'EnumWindows', 'FindWindowA', 'GetClassNameA', 'GetDlgItem', 'GetParent',
-        'GetWindowTextA', 'IsWindowEnabled', 'IsWindowVisible', 'PostMessageA', 'SendMessageTimeoutA',
-        'wsprintfA'},
+        'EnumChildWindows', 'EnumWindows', 'FindWindowA', 'GetAsyncKeyState', 'GetClassNameA', 'GetCursorPos',
+        'GetDlgCtrlID', 'GetDlgItem', 'GetParent', 'GetWindowLongA', 'GetWindowTextA', 'IsWindowEnabled',
+        'IsWindowVisible', 'PostMessageA', 'SendMessageTimeoutA', 'WindowFromPoint', 'wsprintfA'},
     'advapi32.dll': {'RegCloseKey', 'RegDeleteValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
 }
 
