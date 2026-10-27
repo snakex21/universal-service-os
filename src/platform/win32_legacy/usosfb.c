@@ -1,18 +1,24 @@
 /* Source950 first-desktop coordinator. USOS, GPL-3.0-or-later.
- * Ordinary RunOnce is synchronous before Shell_TrayWnd on Windows95.
+ * Ordinary RunOnce is synchronous before Shell_TrayWnd on Windows95 RTM;
+ * the first boot after Setup still starts the coordinator from it. The
+ * package boots after it run with this program as the Windows shell (see
+ * shell_set), the final boot under Explorer again.
  * Its persistent phase belongs beside the program, never in a user profile.
  */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 static const char root[]="C:\\USOS9X\\";
 static const char once[]="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce";
+static const char sysini[]="C:\\WINDOWS\\SYSTEM.INI";
+static const char fbexe[]="C:\\USOS9X\\USOSFB.EXE";
 static HANDLE journal=INVALID_HANDLE_VALUE;
 static char path[MAX_PATH],text[8192];
+static int shell_mode;
 void *memset(void *p,int v,unsigned n){BYTE*b=p;while(n--)*b++=(BYTE)v;return p;}
 static unsigned length(const char*s){unsigned n=0;while(s[n])n++;return n;}
 static void local(const char*leaf){lstrcpyA(path,root);lstrcatA(path,leaf);}
 static int exists(const char*leaf){local(leaf);return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES;}
-static void log_line(const char*s){DWORD n;char line[512];
+static void log_line(const char*s){DWORD n;char line[1100];
     wsprintfA(line,"FIRSTBOOT tick=%lu tray=%u %s\r\n",GetTickCount(),FindWindowA("Shell_TrayWnd",0)!=0,s);
     if(journal!=INVALID_HANDLE_VALUE){WriteFile(journal,line,length(line),&n,0);FlushFileBuffers(journal);}}
 static int save(const char*leaf,const char*value){HANDLE f;DWORD n,w;int ok;local(leaf);
@@ -25,6 +31,54 @@ static int read_local(const char*leaf,char*out,DWORD cap){HANDLE f;DWORD n=0;int
 static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
     for(a=s,b=word;*a&&*b;a++,b++){char x=*a,y=*b;if(x>='A'&&x<='Z')x+='a'-'A';if(y>='A'&&y<='Z')y+='a'-'A';if(x!=y)break;}
     if(!*b)return 1;}return 0;}
+static void drop(const char*leaf){local(leaf);DeleteFileA(path);}
+static DWORD child(const char*command);
+/* Package boots run with SYSTEM.INI [boot] shell=C:\USOS9X\USOSFB.EXE, so no
+ * Explorer exists and no desktop can appear however long a package takes.
+ * X470 95 OSR1 EN (SHELL32 4.00.951, 2026-10-27): Explorer stopped waiting
+ * for this RunOnce child ~6 s into the second package run (FIRSTBT.LOG
+ * tray=1); RTM never did (tray=0). The value is swapped in place by the
+ * profile API; the final restart puts shell=Explorer.exe back, so the last
+ * boot's RunOnce (InstMsi1, VC registrations, this program) runs under
+ * Explorer as before. SHELL.ON beside the program tells FIRSTBT.BAT to
+ * rebuild shell=Explorer.exe in real mode (SHELLHDR.INI + SYSTEM.INI without
+ * its [boot] line and our shell line) if this program is gone, finished or
+ * failed, or a shell boot ended without its own restart (SHELLRUN.FLG left
+ * over; that also writes SHELL.BAD, which keeps later boots under Explorer's
+ * RunOnce). Hence shell mode only for a SYSTEM.INI that starts with [boot]
+ * and holds shell=Explorer.exe, and only with SHELLHDR.INI staged. */
+static int ini_text(void){HANDLE f;DWORD n=0;int ok;
+    WritePrivateProfileStringA(0,0,0,sysini);
+    f=CreateFileA(sysini,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return 0;
+    ok=GetFileSize(f,0)<sizeof text&&ReadFile(f,text,sizeof text-1,&n,0);CloseHandle(f);text[n]=0;return ok;}
+static int usos_shell(void){char value[MAX_PATH];
+    GetPrivateProfileStringA("boot","shell","",value,sizeof value,sysini);return !lstrcmpiA(value,fbexe);}
+static int boot_first(void){const char*h="[boot]\r\n";int i;
+    for(i=0;h[i];i++){char c=text[i];if(c>='A'&&c<='Z')c+='a'-'A';if(c!=h[i])return 0;}return 1;}
+static int shell_set(int usos){char value[MAX_PATH];
+    GetPrivateProfileStringA("boot","shell","",value,sizeof value,sysini);
+    if(!usos){
+        if(!lstrcmpiA(value,fbexe)){
+            if(!WritePrivateProfileStringA("boot","shell","Explorer.exe",sysini)||!ini_text()||contains(text,"USOSFB.EXE"))return 0;
+            log_line("SYSTEM.INI [boot] shell=Explorer.exe restored");}
+        drop("SHELL.ON");return 1;}
+    if(lstrcmpiA(value,fbexe)){
+        if(lstrcmpiA(value,"Explorer.exe")){log_line("shell mode refused: SYSTEM.INI [boot] shell= is not Explorer.exe");return 0;}
+        if(!exists("SHELLHDR.INI")){log_line("shell mode refused: SHELLHDR.INI (real-mode restore) not staged");return 0;}
+        if(!ini_text()||!boot_first()){log_line("shell mode refused: SYSTEM.INI unreadable or not starting with [boot]");return 0;}
+        if(!save("SHELL.ON","SYSTEM.INI [boot] shell=C:\\USOS9X\\USOSFB.EXE until the final restart; was shell=Explorer.exe\r\n")||
+           !WritePrivateProfileStringA("boot","shell",fbexe,sysini))return 0;}
+    return ini_text()&&contains(text,"shell=C:\\USOS9X\\USOSFB.EXE");}
+/* Leave without a desktop to return to: in shell mode no Explorer runs, so
+ * put it back and restart (FIRSTBT.OK/FIRSTBT.ERR then end the next run at
+ * once); start Explorer only if the restart is refused. */
+static void leave(DWORD code){
+    if(shell_mode){
+        if(!shell_set(0))log_line("WARNING: SYSTEM.INI shell= not restored; FIRSTBT.BAT restores it in real mode");
+        drop("SHELLRUN.FLG");log_line("shell mode: restarting so that Explorer starts");
+        if(ExitWindowsEx(EWX_REBOOT,0))ExitProcess(code);
+        log_line("restart request rejected; starting Explorer");child("C:\\WINDOWS\\EXPLORER.EXE");}
+    ExitProcess(code);}
 /* A failure never holds the desktop hostage: one closable box, logged.
  * Retry moves FIRSTBT.ERR aside (FIRSTBT.ER1..ER9) and restarts, so the
  * RunOnce that FIRSTBT.BAT re-arms each boot runs the coordinator again;
@@ -38,6 +92,8 @@ static const char fail_en[]="USOS could not finish the installation.\r\nDetails:
     "Retry = try again after a restart\r\nCancel = go to the desktop";
 static void fail(const char*reason){char aside[MAX_PATH];int i;
     log_line(reason);save("FIRSTBT.ERR",reason);
+    if(!shell_set(0))log_line("WARNING: SYSTEM.INI shell= not restored; FIRSTBT.BAT restores it in real mode (FIRSTBT.ERR)");
+    drop("SHELLRUN.FLG");
     if(MessageBoxA(0,(GetSystemDefaultLangID()&0x3ff)==0x15?fail_pl:fail_en,"USOS",
         MB_RETRYCANCEL|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST)==IDRETRY){
         local("FIRSTBT.ERR");for(i=1;i<=9;i++){wsprintfA(aside,"%sFIRSTBT.ER%d",root,i);
@@ -46,7 +102,7 @@ static void fail(const char*reason){char aside[MAX_PATH];int i;
             if(ExitWindowsEx(EWX_REBOOT,0))ExitProcess(2);log_line("retry restart request rejected");}
         else log_line("retry requested but FIRSTBT.ERR could not be moved aside (ER1..ER9 used?)");}
     else log_line("user chose desktop after failure");
-    ExitProcess(2);}
+    leave(2);}
 static int setup_done(void){HKEY key;DWORD keys=0,values=0;LONG code;
     code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",0,KEY_READ,&key);
     if(code==ERROR_FILE_NOT_FOUND)return 1;if(code!=ERROR_SUCCESS)return 0;
@@ -55,17 +111,30 @@ static int setup_done(void){HKEY key;DWORD keys=0,values=0;LONG code;
 static int arm(void){HKEY key;const char command[]="C:\\USOS9X\\USOSFB.EXE";LONG code;
     if(RegCreateKeyExA(HKEY_LOCAL_MACHINE,once,0,0,0,KEY_WRITE,0,&key,0)!=ERROR_SUCCESS)return 0;
     code=RegSetValueExA(key,"USOSFirstBoot",0,REG_SZ,(const BYTE*)command,sizeof command);RegCloseKey(key);return code==ERROR_SUCCESS;}
-static void reboot(const char*phase,const char*reason){
+static void reboot(const char*phase,const char*reason){int last=!lstrcmpA(phase,"reboot\r\n");
+    if(last){
+        if(!shell_set(0))fail("cannot restore SYSTEM.INI shell=Explorer.exe before the final restart");
+        log_line("final boot: Explorer is the shell again and processes RunOnce before this coordinator");}
+    else if(!exists("SHELL.BAD")){
+        if(shell_set(1)&&save("SHELL.TRY",phase))log_line("next boot: SYSTEM.INI [boot] shell=C:\\USOS9X\\USOSFB.EXE (no Explorer, no desktop)");
+        else{save("SHELL.BAD","shell=USOSFB could not be set\r\n");shell_set(0);
+            log_line("shell mode unavailable; the next boot starts this coordinator from Explorer's RunOnce");}}
     if(!arm()||!save("FIRSTBT.STA",phase))fail("cannot persist/arm restart boundary");log_line(reason);
+    drop("SHELLRUN.FLG");
     if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))fail("restart request rejected");
     /* Never return to Explorer while shutdown messages are being dispatched. */
     {MSG message;while(GetMessageA(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageA(&message);}}
     fail("restart returned without ending this session");}
-static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[512];DWORD code=999,wait;MSG message;
-    log_line(command);lstrcpyA(cmd,command);memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
-    if(!CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi))return code;CloseHandle(pi.hThread);
-    for(;;){wait=MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,INFINITE,QS_ALLINPUT);
+/* A taskbar that appears while a child runs means Explorer no longer waits
+ * for this coordinator (OSR1 under RunOnce): logged once, with the tick. */
+static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[1024];DWORD code=999,wait;MSG message;int tray;
+    log_line(command);lstrcpynA(cmd,command,sizeof cmd);memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
+    if(!CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi)){log_line("child not started");return code;}CloseHandle(pi.hThread);
+    tray=FindWindowA("Shell_TrayWnd",0)!=0;
+    for(;;){wait=MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,500,QS_ALLINPUT);
         if(wait==WAIT_OBJECT_0)break;if(wait==WAIT_FAILED){CloseHandle(pi.hProcess);return code;}
+        if(!tray&&FindWindowA("Shell_TrayWnd",0)){tray=1;
+            log_line("WARNING: desktop taskbar (Shell_TrayWnd) appeared while this child runs: Explorer stopped waiting for the coordinator");}
         while(PeekMessageA(&message,0,0,0,PM_REMOVE)){if(message.message!=WM_QUIT){TranslateMessage(&message);DispatchMessageA(&message);}}}
     GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);return code;}
 static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Enum\\Root\\*PNP0900",0,KEY_READ,&key);
@@ -105,6 +174,35 @@ static int late_ready(void){
     if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
     if(!mouse_configured()){log_line("late: selected DOS-box mouse missing in SYSTEM.INI");return 0;}
     if(!legacy_absent()){log_line("late: legacy display still present");return 0;}return 1;}
+/* Explorer's part in a shell boot. On 95 RTM Explorer ran the values that
+ * packages queued before the next coordinator start (X470 PL 2026-10-27:
+ * after IE 5.5 its RunOnceEx value ran first, FIRSTBT.LOG "RunOnceEx:
+ * nothing pending"; DCOM95's IExpressRegOCX/GrpConv before IE): the values
+ * queued behind ours, because Explorer deletes ours and arm() appends it
+ * again at each restart. Same order here: HKLM RunOnce values in registry
+ * order, each deleted before its command starts, one at a time and waited
+ * for. Our own value is only deleted (reboot() arms it again behind what
+ * packages queue next); USOSVmd stays for finish_mouse. HKLM Run and the
+ * HKCU keys wait for the final Explorer boot, as before: the coordinator
+ * always restarted before Explorer reached them. */
+static void run_once_values(void){HKEY key;DWORD index=0,n,size,type,code;int done=0;char name[128],cmd[1024],line[300];
+    SetCurrentDirectoryA("C:\\WINDOWS");
+    while(done<64){
+        if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_READ|KEY_SET_VALUE,&key)!=ERROR_SUCCESS)break;
+        n=sizeof name;size=sizeof cmd-1;code=RegEnumValueA(key,index,name,&n,0,&type,(BYTE*)cmd,&size);
+        if(code!=ERROR_SUCCESS){RegCloseKey(key);
+            if(code!=ERROR_NO_MORE_ITEMS){wsprintfA(line,"RunOnce: value %lu unreadable (code %lu); the rest waits for the final Explorer boot",index,code);log_line(line);}
+            break;}
+        cmd[size<sizeof cmd?size:sizeof cmd-1]=0;
+        if(!lstrcmpiA(name,"USOSVmd")){RegCloseKey(key);index++;continue;}
+        code=RegDeleteValueA(key,name);RegCloseKey(key);
+        if(code!=ERROR_SUCCESS){wsprintfA(line,"RunOnce %s not deleted (code %lu); not run, the rest waits for the final Explorer boot",name,code);log_line(line);break;}
+        done++;
+        if(!lstrcmpiA(name,"USOSFirstBoot")){log_line("RunOnce USOSFirstBoot: own value deleted, armed again at the next restart");continue;}
+        if(type!=REG_SZ||!cmd[0]){wsprintfA(line,"RunOnce %s: no command, deleted",name);log_line(line);continue;}
+        wsprintfA(line,"RunOnce %s, as Explorer runs it before the desktop:",name);log_line(line);
+        code=child(cmd);wsprintfA(line,"RunOnce %s exit %lu",name,code);log_line(line);}
+    if(done>=64)log_line("RunOnce: 64 values handled, the rest waits for the next boot");}
 /* IE 5.5 SP2 leaves its DLL registrations in HKLM RunOnceEx for
  * iernonce.dll. On the X470 95 RTM fresh install (2026-10-26) no RunOnce
  * value ever ran them. After every coordinator restart, pending RunOnceEx
@@ -145,17 +243,28 @@ static int mid_phase(const char*phase){
     if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]<='4'&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
     return 0;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[64];DWORD code;HKEY key;int mid;
+    shell_mode=usos_shell();
     local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
-    if(journal==INVALID_HANDLE_VALUE)ExitProcess(2);SetFilePointer(journal,0,0,FILE_END);
+    if(journal==INVALID_HANDLE_VALUE)leave(2);SetFilePointer(journal,0,0,FILE_END);
+    if(shell_mode){save("SHELLRUN.FLG","USOSFB shell boot running; deleted before its own restart\r\n");drop("SHELL.TRY");
+        log_line("running as the Windows shell (SYSTEM.INI [boot] shell=C:\\USOS9X\\USOSFB.EXE): no Explorer, no desktop in this boot");}
+    else if(exists("SHELL.TRY")){drop("SHELL.TRY");save("SHELL.BAD","shell=USOSFB was set but Explorer started\r\n");
+        log_line("WARNING: shell=USOSFB was set for this boot but Explorer started; package boots stay under Explorer's RunOnce");}
     memset(&version,0,sizeof version);version.dwOSVersionInfoSize=sizeof version;
     if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
        version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))fail("source950/phase1 scope refused");
-    if(exists("FIRSTBT.OK")){log_line("already complete");ExitProcess(0);}
-    if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");ExitProcess(2);}
+    if(exists("FIRSTBT.OK")){log_line("already complete");leave(0);}
+    if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");leave(2);}
     log_line("coordinator entered before desktop");
     if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
     if(!setup_done())fail("original RunOnce Setup has not completed");
     phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))fail("cannot read phase journal");
+    if(shell_mode)run_once_values();
+    else if(!exists("SHELL.BAD")&&(!phase[0]||!lstrcmpA(phase,"late\r\n")||mid_phase(phase))){
+        /* Under Explorer's RunOnce (first boot after Setup, or after Retry):
+         * no package runs here; the same phase continues in a shell boot. */
+        if(shell_set(1))reboot(phase[0]?phase:"late\r\n","restart: package boots continue with USOSFB as the Windows shell");
+        save("SHELL.BAD","shell=USOSFB could not be set\r\n");log_line("shell mode unavailable; packages run under Explorer's RunOnce");}
     if(!exists("VLATE.OK")||!tz_ready()){
         if(phase[0])fail("late real-mode preparation did not complete after Setup transition");
         reboot("late\r\n","restart: Setup transition before late DOS preparation");}

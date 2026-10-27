@@ -40,7 +40,7 @@ class FirstBoot(unittest.TestCase):
         fail=lines.index(b':FAIL');lock=lines.index(b':LOCK');body=b'\n'.join(lines[fail:lock])
         self.assertIn(rb'>> C:\USOS9X\USOSLOG.TXT',body)
         self.assertIn(rb'> C:\USOS9X\FIRSTBT.DER',body)
-        self.assertNotIn(b'FIRSTBT.ERR',b'\n'.join(lines))
+        self.assertNotIn(rb'> C:\USOS9X\FIRSTBT.ERR',b'\n'.join(lines))
         self.assertEqual(lines[lock+1:lock+4],[rb'C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT',
                                                rb'C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT',b':END'])
         arm=lines.index(rb'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG')

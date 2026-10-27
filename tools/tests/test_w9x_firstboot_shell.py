@@ -1,0 +1,140 @@
+"""Source950 package boots with USOSFB as the Windows shell (host-only).
+
+X470 95 OSR1 EN (2026-10-27, SHELL32 4.00.951): Explorer stopped waiting for
+the RunOnce coordinator ~6 s into the second package run (FIRSTBT.LOG
+tray=1). Package boots now run with SYSTEM.INI [boot] shell=USOSFB.EXE, the
+final boot under Explorer again. Real Windows 95 behaviour is X470 evidence.
+"""
+from pathlib import Path
+import shutil,subprocess,tempfile,unittest
+ROOT=Path(__file__).resolve().parents[2]
+SRC=ROOT/'src/platform/win32_legacy/usosfb.c'
+OUT=ROOT/'artifacts/firstboot/host-tests';OUT.mkdir(parents=True,exist_ok=True)
+# 950 SYSTEM.INI head as Setup writes it (OSR1 EN run, 2026-10-27), shortened
+INI=('[boot]\r\nsystem.drv=system.drv\r\ndrivers=mmsystem.dll power.drv\r\nuser.exe=user.exe\r\n'
+     'comm.drv=comm.drv\r\nshell=Explorer.exe\r\nkeyboard.drv=keyboard.drv\r\n'
+     '[boot.description]\r\nkeyboard.typ=Standard 101/102-Key\r\n[386Enh]\r\nmouse=*vmouse\r\n'
+     'device=C:\\USOS9X\\USOSVMD.VXD\r\n[NonWindowsApp]\r\n')
+
+def section(src,start,end):return src[src.index(start):src.index(end,src.index(start))]
+
+class Generator(unittest.TestCase):
+    def batch(self):
+        target=Path(tempfile.mkdtemp(dir=OUT));self.addCleanup(shutil.rmtree,target)
+        (target/'USOSFB.EXE').write_bytes(b'own helper fixture')
+        script='. "$1"; w9x_firstboot_write "$2" "$3"'
+        r=subprocess.run([r'C:\Program Files\Git\bin\sh.exe','-c',script,'test',str(ROOT/'tools/w9x_firstboot.sh').replace('\\','/'),
+                          str(target).replace('\\','/'),'4 0 0 950'],capture_output=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        return target,(target/'FIRSTBT.BAT').read_bytes().decode('ascii').split('\r\n')
+
+    def test_header_and_restore_block_first(self):
+        target,lines=self.batch()
+        self.assertEqual((target/'SHELLHDR.INI').read_bytes(),b'[boot]\r\nshell=Explorer.exe\r\n')
+        done=lines.index(r'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO END')
+        self.assertEqual(lines[1],r'IF NOT EXIST C:\USOS9X\SHELL.ON GOTO SHLEND')
+        self.assertLess(lines.index(':SHLEND'),done)
+        block=lines[1:lines.index(':SHLEND')]
+        # restore when finished, failed, program gone, or a shell boot died
+        for need in (r'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO SHLFIX',r'IF EXIST C:\USOS9X\FIRSTBT.ERR GOTO SHLFIX',
+                     r'IF NOT EXIST C:\USOS9X\USOSFB.EXE GOTO SHLFIX',r'IF NOT EXIST C:\USOS9X\SHELLRUN.FLG GOTO SHLEND'):
+            self.assertIn(need,block)
+        died=block.index(r'IF NOT EXIST C:\USOS9X\SHELLRUN.FLG GOTO SHLEND')
+        self.assertEqual(block[died+1],r'ECHO USOSFB shell boot ended without its own restart> C:\USOS9X\SHELL.BAD')
+        # 950 COPY sets no reliable ERRORLEVEL: never test one after COPY
+        for i,l in enumerate(block):
+            if l.startswith('COPY '):self.assertFalse(block[i+1].startswith('IF ERRORLEVEL') or block[i+1].startswith('IF NOT ERRORLEVEL'),l)
+        # FIND reads stdin only (a file argument prints a "----------" header)
+        for l in block:
+            if 'FIND.EXE' in l:self.assertIn(' < ',l)
+        self.assertLessEqual(max(map(len,lines)),127)
+
+    def test_restore_rebuilds_explorer_shell(self):
+        """Run the block's FIND/COPY steps with DOS FIND semantics on a 950 SYSTEM.INI."""
+        target,lines=self.batch()
+        header=(target/'SHELLHDR.INI').read_bytes().decode()
+        shelled=INI.replace('shell=Explorer.exe','shell=C:\\USOS9X\\USOSFB.EXE')
+        def find_v(text,needle):
+            return ''.join(l for l in text.splitlines(True) if needle.lower() not in l.lower())
+        block='\n'.join(lines)
+        self.assertIn(r'FIND.EXE /V /I "[boot]" < C:\WINDOWS\SYSTEM.INI > C:\USOS9X\SYSTEM.SH1',block)
+        self.assertIn(r'FIND.EXE /V /I "SHELL=C:\USOS9X\USOSFB.EXE" < C:\USOS9X\SYSTEM.SH1 > C:\USOS9X\SYSTEM.SH2',block)
+        self.assertIn(r'COPY /B C:\USOS9X\SHELLHDR.INI + C:\USOS9X\SYSTEM.SH2 C:\USOS9X\SYSTEM.SHN > NUL',block)
+        rebuilt=header+find_v(find_v(shelled,'[boot]'),'SHELL=C:\\USOS9X\\USOSFB.EXE')
+        self.assertNotIn('USOSFB',rebuilt)
+        self.assertTrue(rebuilt.startswith('[boot]\r\nshell=Explorer.exe\r\nsystem.drv=system.drv\r\n'))
+        self.assertIn('[boot.description]\r\n',rebuilt)  # "[boot]" is not a substring of it
+        self.assertEqual(sorted(rebuilt.splitlines()),sorted(INI.splitlines()))
+
+class Coordinator(unittest.TestCase):
+    src=SRC.read_text()
+
+    def test_shell_mode_entry_is_guarded_and_verified(self):
+        s=self.src;self.assertTrue(s.isascii())
+        body=section(s,'static int shell_set(int usos){','static void leave(')
+        self.assertIn('if(lstrcmpiA(value,"Explorer.exe"))',body)
+        self.assertIn('if(!exists("SHELLHDR.INI"))',body)
+        self.assertIn('!ini_text()||!boot_first()',body)
+        # SHELL.ON before SYSTEM.INI changes: real mode can always undo it
+        self.assertLess(body.index('save("SHELL.ON"'),body.index('WritePrivateProfileStringA("boot","shell",fbexe,sysini)'))
+        self.assertIn('return ini_text()&&contains(text,"shell=C:\\\\USOS9X\\\\USOSFB.EXE");',body)
+        self.assertIn('WritePrivateProfileStringA("boot","shell","Explorer.exe",sysini)',body)
+        self.assertIn('drop("SHELL.ON");return 1;',body)
+        # the profile cache is flushed before the file is read
+        self.assertIn('WritePrivateProfileStringA(0,0,0,sysini);',section(s,'static int ini_text(','static int usos_shell('))
+
+    def test_final_restart_restores_explorer_and_package_restarts_keep_shell(self):
+        body=section(self.src,'static void reboot(','static DWORD child(const char*command){')
+        self.assertIn('int last=!lstrcmpA(phase,"reboot\\r\\n");',body)
+        self.assertIn('if(!shell_set(0))fail("cannot restore SYSTEM.INI shell=Explorer.exe before the final restart");',body)
+        self.assertIn('else if(!exists("SHELL.BAD")){',body)
+        self.assertIn('shell_set(1)&&save("SHELL.TRY",phase)',body)
+        # arm() after the shell choice; the run flag goes right before the restart
+        self.assertLess(body.index('shell_set(1)'),body.index('arm()'))
+        self.assertLess(body.index('drop("SHELLRUN.FLG");'),body.index('ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0)'))
+
+    def test_failure_restores_explorer_before_the_box(self):
+        body=section(self.src,'static void fail(','static int setup_done(')
+        self.assertLess(body.index('shell_set(0)'),body.index('MessageBoxA('))
+        self.assertLess(body.index('drop("SHELLRUN.FLG");'),body.index('MessageBoxA('))
+        self.assertIn('leave(2);}',body)
+        leave=section(self.src,'static void leave(','static void fail(')
+        self.assertIn('if(shell_mode){',leave)
+        self.assertIn('ExitWindowsEx(EWX_REBOOT,0)',leave)
+        self.assertIn('child("C:\\\\WINDOWS\\\\EXPLORER.EXE")',leave)
+
+    def test_start_handoff_and_runonce_order(self):
+        s=self.src;start=s[s.index('void __cdecl fb_start(void){'):]
+        self.assertLess(start.index('shell_mode=usos_shell();'),start.index('journal=CreateFileA'))
+        self.assertIn('if(journal==INVALID_HANDLE_VALUE)leave(2);',start)
+        self.assertIn('save("SHELLRUN.FLG"',start);self.assertIn('drop("SHELL.TRY");',start)
+        self.assertIn('else if(exists("SHELL.TRY")){',start)  # shell= set but Explorer came: no loop
+        self.assertIn('log_line("already complete");leave(0);',start)
+        self.assertIn('automatic retry refused (FIRSTBT.ERR present)");leave(2);',start)
+        handoff=start.index('if(shell_mode)run_once_values();')
+        self.assertLess(start.index('if(!setup_done())'),handoff)
+        self.assertLess(start.index('read_local("FIRSTBT.STA"'),handoff)
+        self.assertIn('reboot(phase[0]?phase:"late\\r\\n","restart: package boots continue with USOSFB as the Windows shell");',start)
+        # no mouse INF, display or package work before the handoff
+        for later in ('finish_mouse();','USOSRES.EXE /setup','USOSADD.EXE /setup','finish_runonceex();'):
+            self.assertLess(handoff,start.index(later),later)
+
+    def test_runonce_like_explorer(self):
+        body=section(self.src,'static void run_once_values(void){','static DWORD ex_sections(')
+        self.assertIn('RegEnumValueA(key,index,',body)
+        # each value deleted before its command, then waited for
+        self.assertLess(body.index('RegDeleteValueA(key,name)'),body.index('code=child(cmd);'))
+        self.assertIn('if(!lstrcmpiA(name,"USOSVmd")){RegCloseKey(key);index++;continue;}',body)
+        self.assertIn('if(!lstrcmpiA(name,"USOSFirstBoot")){',body)
+        self.assertIn('while(done<64){',body)
+        self.assertIn('if(code!=ERROR_SUCCESS){wsprintfA(line,"RunOnce %s not deleted',body)
+        self.assertNotIn('HKEY_CURRENT_USER',body)
+
+    def test_child_logs_a_taskbar_and_long_commands_fit(self):
+        body=section(self.src,'static DWORD child(const char*command){','static int legacy_absent(')
+        self.assertIn('MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,500,QS_ALLINPUT)',body)
+        self.assertIn('WARNING: desktop taskbar (Shell_TrayWnd) appeared while this child runs',body)
+        self.assertIn('lstrcpynA(cmd,command,sizeof cmd)',body)
+        self.assertIn('char line[1100];',section(self.src,'static void log_line(','static int save('))
+
+if __name__=='__main__':unittest.main()
