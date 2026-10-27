@@ -449,27 +449,86 @@ EOF
 # them in that Windows session (effective from the next start; TCP/IP on
 # MSTCP\0009 works already). Nothing USOS imports (the 0009 instances) is
 # touched; names of absent keys / values are a no-op for DelReg.
+#
+# X470 950 PL run 2026-10-27: the Enum keys went, but the class keys stayed
+# (NetTrans\0000..0003 NWLINK / NETBEUI twice, NetClient\0000..0003
+# VREDIR / NWREDIR twice: Setup's batch defaults plus the card's PnP), as did
+# VxD\NWLink / NETBEUI / NWREDIR, Services\NWNP32, the Real Mode Net
+# transport "*netbeui,*nwlink," and Winsock\Parameters NWREDIR. Their
+# instance numbers vary, so NET95L.BAT appends the class keys by Ndi
+# DeviceID (NETCLID.BAT, below) to [USOS.NetClean], which stays the last
+# section; Enum instances and binding names are listed for 0000..0008 (an
+# absent one is a no-op). The Real Mode Net transport gets "" (USOS loads
+# no real-mode protocol). PROTOCOL.INI's NETBEUI$ / nwlink$ sections go in
+# USOSLAN (tools/windows_usos_lan.c): setupx has no INI-section delete.
 w9x_reg95_netclean_write() {
     devnode=$(tr -d '\r' < "$1/NET/NET95.REG" 2>/dev/null | sed -n 's/^\[HKEY_LOCAL_MACHINE\\\(Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
     [ -n "$devnode" ] || return 1
-    sed 's/$/\r/' > "$1/NET/NETCLEAN.INF" <<EOF || return 1
+    {
+        cat <<EOF
 ; USOS: 950 default network components USOS does not use (tools/w9x_reg95.sh)
 [Version]
 Signature="\$CHICAGO\$"
 
 [DefaultInstall]
+AddReg=USOS.NetCleanAdd
 DelReg=USOS.NetClean
+
+[USOS.NetCleanAdd]
+HKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Network\\Real Mode Net","transport",,""
 
 [USOS.NetClean]
 HKLM,"Enum\\Network\\NETBEUI"
 HKLM,"Enum\\Network\\NWLINK"
 HKLM,"Enum\\Network\\NWREDIR"
-HKLM,"Enum\\Network\\VREDIR\\0000"
-HKLM,"Enum\\Network\\VREDIR\\0001"
-HKLM,"$devnode\\Bindings","NETBEUI\\0000"
-HKLM,"$devnode\\Bindings","NWLINK\\0000"
-HKLM,"System\\CurrentControlSet\\control\\NetworkProvider\\Order","NWNP32"
-HKLM,"System\\CurrentControlSet\\control\\ServiceProvider\\Order\\ProviderOrder","NWREDIR"
+EOF
+        for id in VREDIR MSTCP; do
+            for n in 0 1 2 3 4 5 6 7 8; do printf 'HKLM,"Enum\\Network\\%s\\000%s"\n' "$id" "$n"; done
+        done
+        for id in NETBEUI NWLINK MSTCP; do
+            for n in 0 1 2 3 4 5 6 7 8; do printf 'HKLM,"%s\\Bindings","%s\\000%s"\n' "$devnode" "$id" "$n"; done
+        done
+        for id in VREDIR NWREDIR; do
+            for n in 0 1 2 3 4 5 6 7 8; do printf 'HKLM,"Enum\\Network\\MSTCP\\0009\\Bindings","%s\\000%s"\n' "$id" "$n"; done
+        done
+        cat <<'EOF'
+HKLM,"System\CurrentControlSet\Services\VxD\NWLINK"
+HKLM,"System\CurrentControlSet\Services\VxD\NETBEUI"
+HKLM,"System\CurrentControlSet\Services\VxD\NWREDIR"
+HKLM,"System\CurrentControlSet\Services\NWNP32"
+HKLM,"System\CurrentControlSet\Services\Winsock\Parameters","NWREDIR"
+HKLM,"System\CurrentControlSet\control\NetworkProvider\Order","NWNP32"
+HKLM,"System\CurrentControlSet\control\ServiceProvider\Order\ProviderOrder","NWREDIR"
+EOF
+    } | sed 's/$/\r/' > "$1/NET/NETCLEAN.INF" || return 1
+    # NETCLID.BAT <class> <instance>: CALLed by NET95L.BAT in C:\WINDOWS (its
+    # USOSNC.REG export there keeps the REGEDIT line within 125 bytes) for
+    # each NetTrans / NetClient instance its export shows (never 0009);
+    # appends the key when its Ndi DeviceID is a 950 default or a duplicate
+    # of USOS's own (MSTCP, VREDIR), logged in NETCLID.LOG.
+    sed 's/$/\r/' > "$1/NET/NETCLID.BAT" <<'EOF' || return 1
+IF EXIST USOSNC.REG DEL USOSNC.REG > NUL
+IF EXIST C:\USOS9X\NC.ID DEL C:\USOS9X\NC.ID > NUL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E USOSNC.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\%1\%2
+IF NOT EXIST USOSNC.REG GOTO END
+C:\WINDOWS\COMMAND\FIND.EXE "DeviceID" USOSNC.REG > C:\USOS9X\NC.ID
+C:\WINDOWS\COMMAND\FIND.EXE /I "NWLINK" C:\USOS9X\NC.ID > NUL
+IF NOT ERRORLEVEL 1 GOTO DEL
+C:\WINDOWS\COMMAND\FIND.EXE /I "NETBEUI" C:\USOS9X\NC.ID > NUL
+IF NOT ERRORLEVEL 1 GOTO DEL
+C:\WINDOWS\COMMAND\FIND.EXE /I "NWREDIR" C:\USOS9X\NC.ID > NUL
+IF NOT ERRORLEVEL 1 GOTO DEL
+C:\WINDOWS\COMMAND\FIND.EXE /I "VREDIR" C:\USOS9X\NC.ID > NUL
+IF NOT ERRORLEVEL 1 GOTO DEL
+C:\WINDOWS\COMMAND\FIND.EXE /I "MSTCP" C:\USOS9X\NC.ID > NUL
+IF NOT ERRORLEVEL 1 GOTO DEL
+ECHO kept %1\%2>> C:\USOS9X\NET\NETCLID.LOG
+GOTO END
+:DEL
+ECHO HKLM,"System\CurrentControlSet\Services\Class\%1\%2">> C:\USOS9X\NET\NETCLEAN.INF
+ECHO removed %1\%2>> C:\USOS9X\NET\NETCLID.LOG
+:END
+IF EXIST USOSNC.REG DEL USOSNC.REG > NUL
 EOF
     sed 's/$/\r/' > "$1/NET/NETCLN.REG" <<'EOF'
 REGEDIT4
@@ -483,7 +542,8 @@ EOF
 w9x_reg95_netlate_write() {
     [ -d "$1/NET" ] || return 1
     w9x_reg95_netclean_write "$1" || return 1
-    sed 's/$/\r/' > "$1/NET/NET95L.BAT" <<'EOF'
+    {
+        cat <<'EOF'
 @ECHO OFF
 IF EXIST C:\USOS9X\NET\NLATE.ERR GOTO FAIL
 IF EXIST C:\USOS9X\NET\NLATE.RUN GOTO FAIL
@@ -494,6 +554,7 @@ IF NOT EXIST C:\USOS9X\NET\NET95.REG GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\TCP95.REG GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\NETCLN.REG GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\NETCLEAN.INF GOTO FAIL
+IF NOT EXIST C:\USOS9X\NET\NETCLID.BAT GOTO FAIL
 IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO FAIL
 IF NOT EXIST C:\WINDOWS\COMMAND\ATTRIB.EXE GOTO FAIL
 IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO FAIL
@@ -519,9 +580,11 @@ IF NOT EXIST C:\WINDOWS\SYSTEM\VDHCP.386 GOTO FAIL
 IF EXIST C:\USOS9X\NL2.REG DEL C:\USOS9X\NL2.REG > NUL
 IF EXIST C:\USOS9X\NL3.REG DEL C:\USOS9X\NL3.REG > NUL
 IF EXIST C:\USOS9X\NL4.REG DEL C:\USOS9X\NL4.REG > NUL
+IF EXIST C:\USOS9X\NL5.REG DEL C:\USOS9X\NL5.REG > NUL
 IF EXIST C:\USOS9X\NL2.REG GOTO FAIL
 IF EXIST C:\USOS9X\NL3.REG GOTO FAIL
 IF EXIST C:\USOS9X\NL4.REG GOTO FAIL
+IF EXIST C:\USOS9X\NL5.REG GOTO FAIL
 ECHO run> C:\USOS9X\NET\NLATE.RUN
 C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H SYSTEM.DAT
 C:\WINDOWS\COMMAND\ATTRIB.EXE -S -R -H USER.DAT
@@ -540,6 +603,18 @@ C:\WINDOWS\COMMAND\FIND.EXE "NetTrans\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
 C:\WINDOWS\COMMAND\FIND.EXE "NetClient\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
+REM 950's default protocol / client class keys, by Ndi DeviceID.
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL5.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\NetClient
+EOF
+        # Instances 0000..0008 and 0010..0015 (USOS's own is 0009); the
+        # export's key line ends in "\<instance>]" only for the key itself.
+        for klass in NetTrans:NL3 NetClient:NL5; do
+            for n in 0000 0001 0002 0003 0004 0005 0006 0007 0008 0010 0011 0012 0013 0014 0015; do
+                printf 'C:\\WINDOWS\\COMMAND\\FIND.EXE /I "%s\\%s]" C:\\USOS9X\\%s.REG > NUL\n' "${klass%:*}" "$n" "${klass#*:}"
+                printf 'IF NOT ERRORLEVEL 1 CALL C:\\USOS9X\\NET\\NETCLID.BAT %s %s\n' "${klass%:*}" "$n"
+            done
+        done
+        cat <<'EOF'
 REM 950's default protocols / clients go in this Windows session.
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\NET\NETCLN.REG
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
@@ -556,6 +631,7 @@ ECHO post-Setup network preparation failed> C:\USOS9X\NET\NLATE.ERR
 CD \
 :END
 EOF
+    } | sed 's/$/\r/' > "$1/NET/NET95L.BAT"
 }
 
 # w9x_reg95_vmdlate_write DIR VMDINF: 950 only, and the only source of the

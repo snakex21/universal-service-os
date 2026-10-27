@@ -58,22 +58,67 @@ class LateNetwork(unittest.TestCase):
   # clients and the NetWare client; 950 REGEDIT has no /D: setupx DelReg.
   self.create()
   net=self.out/'NET'
-  inf=(net/'NETCLEAN.INF').read_bytes();self.assertEqual(inf.count(b'\n'),inf.count(b'\r\n'))
+  inf=(net/'NETCLEAN.INF').read_bytes();self.assertEqual(inf.count(b'\n'),inf.count(b'\r\n'));self.assertNotIn(b'\r\r',inf)
   text=inf.decode('ascii')
-  self.assertIn('Signature="$CHICAGO$"\r\n',text);self.assertIn('[DefaultInstall]\r\nDelReg=USOS.NetClean\r\n',text)
-  for line in ('HKLM,"Enum\\Network\\NETBEUI"','HKLM,"Enum\\Network\\NWLINK"','HKLM,"Enum\\Network\\NWREDIR"',
-               'HKLM,"Enum\\Network\\VREDIR\\0000"','HKLM,"Enum\\Network\\VREDIR\\0001"',
-               'HKLM,"Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00\\Bindings","NETBEUI\\0000"',
-               'HKLM,"Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00\\Bindings","NWLINK\\0000"',
-               'HKLM,"System\\CurrentControlSet\\control\\NetworkProvider\\Order","NWNP32"',
-               'HKLM,"System\\CurrentControlSet\\control\\ServiceProvider\\Order\\ProviderOrder","NWREDIR"'):
-   self.assertIn(line+'\r\n',text)
-  # USOS's own instances (0009) are never removed.
-  self.assertNotIn('0009',text);self.assertNotIn('MSTCP',text)
+  self.assertIn('Signature="$CHICAGO$"\r\n',text)
+  self.assertIn('[DefaultInstall]\r\nAddReg=USOS.NetCleanAdd\r\nDelReg=USOS.NetClean\r\n',text)
+  self.assertIn('[USOS.NetCleanAdd]\r\nHKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Network\\Real Mode Net","transport",,""\r\n',text)
+  card='HKLM,"Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00\\Bindings",'
+  lines=['HKLM,"Enum\\Network\\NETBEUI"','HKLM,"Enum\\Network\\NWLINK"','HKLM,"Enum\\Network\\NWREDIR"',
+         'HKLM,"System\\CurrentControlSet\\Services\\VxD\\NWLINK"','HKLM,"System\\CurrentControlSet\\Services\\VxD\\NETBEUI"',
+         'HKLM,"System\\CurrentControlSet\\Services\\VxD\\NWREDIR"','HKLM,"System\\CurrentControlSet\\Services\\NWNP32"',
+         'HKLM,"System\\CurrentControlSet\\Services\\Winsock\\Parameters","NWREDIR"',
+         'HKLM,"System\\CurrentControlSet\\control\\NetworkProvider\\Order","NWNP32"',
+         'HKLM,"System\\CurrentControlSet\\control\\ServiceProvider\\Order\\ProviderOrder","NWREDIR"']
+  for n in range(9):
+   lines+=[f'HKLM,"Enum\\Network\\VREDIR\\000{n}"',f'HKLM,"Enum\\Network\\MSTCP\\000{n}"']
+   lines+=[card+f'"{i}\\000{n}"' for i in ('NETBEUI','NWLINK','MSTCP')]
+   lines+=[f'HKLM,"Enum\\Network\\MSTCP\\0009\\Bindings","{i}\\000{n}"' for i in ('VREDIR','NWREDIR')]
+  for line in lines:self.assertIn(line+'\r\n',text)
+  # [USOS.NetClean] is the last section: NET95L.BAT appends class keys.
+  self.assertEqual(text.rindex('['),text.index('[USOS.NetClean]'))
+  # USOS's own instances (0009) are never removed: no key or value name 0009.
+  for line in text.split('\r\n'):
+   if line.startswith('HKLM,'):self.assertFalse(line.endswith('\\0009"'),line)
+  self.assertNotIn('Class\\',text)
   reg=(net/'NETCLN.REG').read_bytes()
   self.assertTrue(reg.startswith(b'REGEDIT4\r\n'))
   self.assertIn(b'[HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce]\r\n'
                 b'"USOSNetClean"="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\\\USOS9X\\\\NET\\\\NETCLEAN.INF"\r\n',reg)
+
+ def test_class_keys_by_device_id(self):
+  # X470 run 2026-10-27: NetTrans\0000..0003 (NWLINK / NETBEUI twice) and
+  # NetClient\0000..0003 (VREDIR / NWREDIR twice) stayed after NETCLEAN.
+  _,child=self.create();s=child.decode('ascii')
+  clid=(self.out/'NET/NETCLID.BAT').read_bytes();self.assertEqual(clid.count(b'\n'),clid.count(b'\r\n'));self.assertNotIn(b'\r\r',clid)
+  c=clid.decode('ascii')
+  self.assertIn('REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E USOSNC.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\%1\\%2\r\n',c)
+  # Expanded for the longest class / instance, still within the DOS limit.
+  self.assertLessEqual(max(len(l.replace('%1','NetClient').replace('%2','0015')) for l in c.split('\r\n')),125)
+  self.assertTrue(c.endswith(':END\r\nIF EXIST USOSNC.REG DEL USOSNC.REG > NUL\r\n'))
+  self.assertIn('ECHO HKLM,"System\\CurrentControlSet\\Services\\Class\\%1\\%2">> C:\\USOS9X\\NET\\NETCLEAN.INF\r\n',c)
+  self.assertLess(c.index("IF NOT EXIST USOSNC.REG GOTO END"),c.index(':DEL'))
+  # Emulate FIND on the DeviceID line: the 950 defaults and USOS duplicates
+  # go, anything else stays (a third-party component is never removed).
+  ids=re.findall(r'FIND\.EXE /I "([A-Z]+)" C:\\USOS9X\\NC\.ID > NUL\r\nIF NOT ERRORLEVEL 1 GOTO DEL',c)
+  self.assertEqual(ids,['NWLINK','NETBEUI','NWREDIR','VREDIR','MSTCP'])
+  self.assertIn('C:\\WINDOWS\\COMMAND\\FIND.EXE "DeviceID" USOSNC.REG > C:\\USOS9X\\NC.ID\r\n',c)
+  def removed(device):return any(i.lower() in f'"DeviceID"="{device}"'.lower() for i in ids)
+  for device in ('NWLINK','NETBEUI','NWREDIR','VREDIR','MSTCP','nwlink'):self.assertTrue(removed(device),device)
+  for device in ('NDISWAN','DLC','USOSX','IPXODI'):self.assertFalse(removed(device),device)
+  # Main batch: NetClient export, both classes scanned, never 0009, before
+  # NETCLN.REG queues the cleanup and only after the import checks.
+  self.assertIn('IF NOT EXIST C:\\USOS9X\\NET\\NETCLID.BAT GOTO FAIL\r\n',s)
+  self.assertIn('IF EXIST C:\\USOS9X\\NL5.REG GOTO FAIL\r\n',s)
+  export=s.index('/E C:\\USOS9X\\NL5.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\NetClient\r\n')
+  calls=re.findall(r'FIND\.EXE /I "(NetTrans|NetClient)\\(\d{4})\]" C:\\USOS9X\\(NL[35])\.REG > NUL\r\nIF NOT ERRORLEVEL 1 CALL C:\\USOS9X\\NET\\NETCLID\.BAT (\w+) (\d{4})\r\n',s)
+  self.assertEqual(len(calls),30)
+  for klass,n,nl,k2,n2 in calls:
+   self.assertEqual((klass,n),(k2,n2));self.assertEqual(nl,'NL3' if klass=='NetTrans' else 'NL5');self.assertNotEqual(n,'0009')
+  for n in ('0000','0003','0008','0010','0015'):
+   self.assertIn(f'NETCLID.BAT NetTrans {n}\r\n',s);self.assertIn(f'NETCLID.BAT NetClient {n}\r\n',s)
+  self.assertLess(s.index('"NetClient\\\\0009" C:\\USOS9X\\NL4.REG'),export)
+  self.assertLess(s.index('NETCLID.BAT NetClient 0015'),s.index('NET\\NETCLN.REG\r\n'))
 
  def test_original_dos_line_limits_and_complete_unique_labels(self):
   for batch in self.create():
