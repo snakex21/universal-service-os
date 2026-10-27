@@ -347,14 +347,38 @@ class Msbatch950(unittest.TestCase):
         self.assertIn('[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\VxD\\VNETSUP]\r\n'
                       '"ComputerName"="USOS-9X"\r\n"Workgroup"="USOSLAB"\r\n"Comment"="Tester"\r\n', text)
 
-    def test_target_clears_only_950_usos_answers(self):
+    def test_target_clears_950_and_osr2_with_net95_usos_answers(self):
+        # 950 always; OSR2 only with the card's NET95.REG (X470 OSR2.1 PL
+        # native 2026-10-27: with [Network] the first boot's PnP left TCP/IP
+        # unbound); USER answers and 98 never.
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
         at = text.index('usos_net_w950_msbatch "$work/c/USOS9X/MSBATCH.INF"')
-        block = text[text.rindex('\nif ', 0, at):at]
-        self.assertIn('[ "$ANSWER_KIND" != USER ]', block)
-        self.assertIn('[ "$SYSTEM_TAG:${setup_version:-}" = \'95:4 0 0 950\' ]', block)
-        self.assertLess(text.index('usos_net_stage "$work/network.ini"'), at)
+        start = text.index("w95_net_late=''")
+        block = text[start:text.index('\nfi\n', at) + 4]
+        self.assertLess(text.index('usos_net_stage "$work/network.ini"'), start)
         self.assertLess(at, text.index('w9x_reg95_write "$work/c/USOS9X"'))
+        for tag, version, kind, net95, renamed in (('95', '4 0 0 950', 'USOS', False, True),
+                                                   ('95', '4 0 0 1111', 'USOS', True, True),
+                                                   ('95', '4 0 0 1216', 'USOS', True, True),
+                                                   ('95', '4 0 0 1111', 'USOS', False, False),
+                                                   ('95', '4 0 0 950', 'USER', True, False),
+                                                   ('95', '4 0 0 1111', 'USER', True, False),
+                                                   ('95', '', 'USOS', True, False),
+                                                   ('98SE', '', 'USOS', True, False)):
+            with self.subTest(tag=tag, version=version, kind=kind, net95=net95):
+                work = self.tmp / ('w' + str(abs(hash((tag, version, kind, net95)))))
+                (work / 'c/USOS9X/NET').mkdir(parents=True)
+                (work / 'c/USOS9X/MSBATCH.INF').write_bytes(self.GOLDEN.read_bytes())
+                if net95: (work / 'c/USOS9X/NET/NET95.REG').write_bytes(b'REGEDIT4\r\n')
+                rc, out, err = run(f'. "{(ROOT / "tools/w9x_filesystem.sh").as_posix()}"\nlog() {{ printf "%s\\n" "$*"; }}\n'
+                                   f'fail() {{ exit 9; }}\nSYSTEM_TAG={tag}\nsetup_version="{version}"\nANSWER_KIND={kind}\n'
+                                   f'work="{work.as_posix()}"\n' + block + '\nprintf "mode=%s" "$w95_net_late"')
+                self.assertEqual(rc, 0, out + err)
+                after = (work / 'c/USOS9X/MSBATCH.INF').read_bytes()
+                self.assertEqual(b'[USOS.Network]\r\n' in after, renamed)
+                self.assertEqual(b'[Network]\r\n' in after, not renamed)
+                want = {'4 0 0 950': '950'}.get(version, 'OSR2') if renamed else ''
+                self.assertTrue(out.endswith('mode=' + want), out)
 
 
 class TargetWiring(unittest.TestCase):

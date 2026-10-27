@@ -1,9 +1,10 @@
-"""Answer-derived Windows95 VNETSUP identity, limited to the 950 NET95 path."""
+"""Answer-derived Windows95 VNETSUP identity, limited to the 950 / OSR2 NET95 path."""
 from pathlib import Path
 import shutil,sys,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from test_w9x_phase1_qemu import sh,scratch
 from test_w9x_reg95 import ANSWER_95,REG95
+from test_w9x_net95_files import osr2_setup_folder
 ROOT=Path(__file__).resolve().parents[2]
 NET=(ROOT/'tools/network_setup.sh').as_posix()
 
@@ -15,7 +16,8 @@ class Identity(unittest.TestCase):
   registry=target/'NET/NET95.REG'
   script=f'. "{NET}"\n. "{REG95}"\n'
   if net:script+=f"usos_net_w95_reg 'PCI\\VEN_8086&DEV_10C9' 'BUS_00&DEV_03&FUNC_00' '82576' USOSNET82576.ndi 03 > '{registry.as_posix()}'\n"
-  script+=f"w9x_reg95_write '{target.as_posix()}' '{answer.as_posix()}' '' '' '{registry.as_posix() if net else ''}' '{version}'\n"
+  src=osr2_setup_folder(folder).as_posix() if version not in ('4 0 0 950','') else ''
+  script+=f"w9x_reg95_write '{target.as_posix()}' '{answer.as_posix()}' '' '' '{registry.as_posix() if net else ''}' '{version}' '' '{src}'\n"
   rc,out,err=sh(script,{});self.assertEqual(rc,0,out+err)
   data=(target/'REG95.REG').read_bytes();self.assertEqual(data.count(b'\n'),data.count(b'\r\n'))
   return data.decode('ascii')
@@ -25,8 +27,10 @@ class Identity(unittest.TestCase):
   for line in ('"ComputerName"="CUSTOM-PC"','"Workgroup"="CUSTOMGROUP"','"Comment"="Lab, One; Two"'):self.assertIn(line,text)
  def test_only_static_950_path_seeds_identity(self):
   answer='[Network]\nComputerName="CUSTOM-PC"\nWorkgroup="CUSTOMGROUP"\n'
-  for version,net in [('4 0 0 1068',True),('4 0 0 1111',True),('',True),('4 0 0 950',False)]:
+  for version,net in [('',True),('4 0 0 950',False),('4 0 0 1111',False)]:
    self.assertNotIn('VNETSUP',self.create(answer,version,net),(version,net))
+  for version in ('4 0 0 1068','4 0 0 1111'):
+   self.assertIn('"ComputerName"="CUSTOM-PC"',self.create(answer,version),version)
  def test_no_missing_or_empty_identity_defaults(self):
   self.assertNotIn('VNETSUP',self.create())
   text=self.create('[Network]\nComputerName=""\nWorkgroup=\nDescription=""\n')

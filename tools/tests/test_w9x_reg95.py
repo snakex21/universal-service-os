@@ -210,6 +210,46 @@ class Reg95(unittest.TestCase):
         self.assertIn('/E C:\\USOS9X\\REG95CHK.REG ' + RUN, text)    # evidence for the next read-back
 
 
+class InitShell(unittest.TestCase):
+    """Every 95 version: HKLM RunOnce InitShell (SHELL.INF, written in phase
+    1) makes the 95 Explorer start Welcome.exe -f whatever Tips\\Show says;
+    REG95.BAT removes it with VESBIND DELVAL before the first GUI start."""
+    LINE = ('C:\\USOS9X\\VESBIND.EXE DELVAL SYSTEM.DAT Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce '
+            'InitShell C:\\USOS9X\\ISDEL.LOG')
+
+    def batch(self, version):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-initshell-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'MSBATCH.INF').write_bytes(ANSWER_95.encode('ascii'))
+        (tmp / 'out/NET').mkdir(parents=True)
+        rc, so, err = sh(f'. "{REG95}"\nw9x_reg95_write "{(tmp / "out").as_posix()}" "{(tmp / "MSBATCH.INF").as_posix()}" '
+                         f'"" "" "" "$V"', {'V': version})
+        self.assertEqual(rc, 0, err)
+        return (tmp / 'out/REG95.BAT').read_bytes().decode('ascii')
+
+    def test_every_version_deletes_it_once_before_the_import(self):
+        for version in ('4 0 0 950', '4 0 0 1111', '4 0 0 1216', ''):
+            with self.subTest(version=version):
+                text = self.batch(version)
+                self.assertEqual(text.count(self.LINE + '\r\n'), 1)
+                self.assertLessEqual(len(self.LINE), 125)
+                at = text.index(self.LINE)
+                # Once (after the REG95.OK / REG95.RUN guards and the journal),
+                # with SYSTEM.DAT writable, in C:\WINDOWS, before the import.
+                self.assertLess(text.index('IF EXIST C:\\USOS9X\\REG95.OK GOTO END'), at)
+                self.assertLess(text.index('ECHO run> C:\\USOS9X\\REG95.RUN'), at)
+                self.assertLess(text.index('CD \\WINDOWS'), at)
+                self.assertLess(text.index('ATTRIB.EXE -S -R -H SYSTEM.DAT'), at)
+                self.assertLess(at, text.index('REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\REG95.REG'))
+                block = text[text.index('IF NOT EXIST C:\\USOS9X\\VESBIND.EXE GOTO ISSKIP'):text.index(':ISSKIP')]
+                self.assertIn('COPY /Y SYSTEM.DAT C:\\USOS9X\\SYSTEM.RIS > NUL\r\nIF NOT EXIST C:\\USOS9X\\SYSTEM.RIS GOTO ISSKIP\r\n'
+                              + self.LINE + '\r\nIF ERRORLEVEL 3 COPY /Y C:\\USOS9X\\SYSTEM.RIS SYSTEM.DAT > NUL\r\n'
+                              'IF ERRORLEVEL 2 ECHO REG95: RunOnce InitShell not deleted, see ISDEL.LOG>> C:\\USOS9X\\USOSLOG.TXT\r\n', block)
+                self.assertNotIn('GOTO END', block)          # fail-soft: the import always follows
+                labels = re.findall(r'^:([A-Z0-9]+)\r?$', text, re.M)
+                self.assertEqual(len(labels), len(set(labels)))
+
+
 class Reg95Escaping(unittest.TestCase):
     """REGEDIT4 strings need doubled backslashes. The micro-Linux awk is not
     gawk: its gsub wrote one backslash for "\\\\", and 950's real-mode

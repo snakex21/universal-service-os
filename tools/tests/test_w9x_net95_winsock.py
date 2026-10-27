@@ -4,6 +4,7 @@ import re,shutil,sys,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from test_w9x_phase1_qemu import sh,scratch
 from test_w9x_reg95 import ANSWER_95,REG95
+from test_w9x_net95_files import osr2_setup_folder
 ROOT=Path(__file__).resolve().parents[2]
 
 class TcpGlobals(unittest.TestCase):
@@ -14,7 +15,8 @@ class TcpGlobals(unittest.TestCase):
   net=out/'NET/NET95.REG'
   body='REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00]\r\n"Driver"="Net\\\\0009"\r\n'
   if network:net.write_bytes(body.encode('ascii'))
-  rc,so,err=sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" "" "" "{net.as_posix() if network else ""}" "{version}"\n')
+  src=osr2_setup_folder(tmp).as_posix() if version not in ('4 0 0 950','') else ''
+  rc,so,err=sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" "" "" "{net.as_posix() if network else ""}" "{version}" "" "{src}"\n')
   self.assertEqual(rc,0,so+err)
   if network:self.assertEqual(net.read_bytes(),body.encode('ascii'))
   tcp=out/'NET/TCP95.REG'
@@ -22,8 +24,12 @@ class TcpGlobals(unittest.TestCase):
 
  def test_exact_scope_keeps_other_versions_and_no_network_unchanged(self):
   self.assertIsNotNone(self.create()[0])
-  for v,n in [('4 0 0 1068',True),('4 0 0 1111',True),('',True),('4 0 0 950',False)]:
+  for v,n in [('',True),('4 0 0 950',False),('4 0 0 1111',False)]:
    tcp,merged=self.create(v,n);self.assertIsNone(tcp)
+   self.assertNotIn(b'Ancillary Function Driver for Winsock',merged)
+  # OSR2: the same companion, imported late by NET95L.BAT, not merged.
+  for v in ('4 0 0 1068','4 0 0 1111'):
+   tcp,merged=self.create(v);self.assertEqual(tcp,self.create()[0])
    self.assertNotIn(b'Ancillary Function Driver for Winsock',merged)
 
  def test_ip_socket_helper_and_provider_are_registered(self):

@@ -441,11 +441,24 @@ USOS_NET_W95_VERSION=$setup_version usos_net_stage "$work/network.ini" "$work/c"
 rm -f "$work/network.ini"
 # 95 RTM / OSR1: Setup installs no network (no [Network] section: no NETDI
 # defaults, no adapter picker); the USOS LAN comes from NET95.REG after
-# Setup (tools/network_setup.sh usos_net_w950_msbatch). OSR2 / 98 / Me and a
+# Setup (tools/network_setup.sh usos_net_w950_msbatch). 95 OSR2 the same
+# when USOS stages the card's NET95.REG: with [Network] the first GUI boot's
+# PnP (sysdm DMFirstTimeSetup reinstalling the I211 from USOSNET.INF)
+# removed Setup's TCP/IP and NETDI added NetBEUI, IPX/SPX, two Clients for
+# Microsoft Networks and the NetWare client: TCP/IP unbound, no DHCP (X470
+# 95 OSR2.1 PL native, 2026-10-27). OSR2 without NET95.REG keeps [Network]
+# (Setup's own TCP/IP and client for PnP + USOSNET.INF). 98 / Me and a
 # user's own file: unchanged.
+w95_net_late=''
 if [ "$ANSWER_KIND" != USER ] && [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
-    usos_net_w950_msbatch "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot clear the 950 Setup network components'
-    log 'network: 950 Setup without network components ([Network] staged as [USOS.Network]); USOS LAN after Setup'
+    w95_net_late=950
+elif [ "$ANSWER_KIND" != USER ] && [ "$SYSTEM_TAG" = 95 ] && usos_w9x_95_osr2 "${setup_version:-}"; then
+    if [ -f "$work/c/USOS9X/NET/NET95.REG" ]; then w95_net_late=OSR2
+    else log 'network: OSR2 without NET95.REG: [Network] stays (Setup installs TCP/IP and the client)'; fi
+fi
+if [ -n "$w95_net_late" ]; then
+    usos_net_w950_msbatch "$work/c/USOS9X/MSBATCH.INF" || fail "cannot clear the $w95_net_late Setup network components"
+    log "network: $w95_net_late Setup without network components ([Network] staged as [USOS.Network]); USOS LAN after Setup"
 fi
 . "$LIB/legacy_addons.sh"
 usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
@@ -767,12 +780,16 @@ if [ "$SYSTEM_TAG" = 95 ]; then
                 log 'answer registry: Internet icon left as 950 Setup wrote it (no IE package staged)'
             fi
         fi
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}" "$reg95_ie"; then
-            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
-            [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}" "$reg95_ie" "$work/c/$SETUP_FOLDER"; then
+            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon; RunOnce InitShell removed)"
+            if [ "$w95_net_late" = OSR2 ]; then
+                log 'usosnet4: OSR2: NFILES.BAT (cabinets from LAYOUT.INF) before the first GUI start; NET95.REG / TCP95.REG by NET95L.BAT after RunOnce\Setup (C1/C2.REG, NET95.OK, NLATE.OK)'
+            elif [ -n "$reg95_net" ]; then
+                log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
+            fi
         else
-            if [ -n "$reg95_net" ] && [ "${setup_version:-}" = '4 0 0 950' ]; then
-                fail 'RTM/OSR1 network files and registry helpers could not be prepared; target start withheld'
+            if [ -n "$reg95_net" ] && [ -n "$w95_net_late" ]; then
+                fail "$w95_net_late network files and registry helpers could not be prepared; target start withheld"
             fi
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG" "$work/c/USOS9X/REG95LGN.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'

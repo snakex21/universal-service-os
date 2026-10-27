@@ -69,6 +69,14 @@
 #     before deleting (tools/windows_usos_lan.c, tools/windows_usos_res.c).
 
 W9X_REG95_INTERNET_CLSID='{FBF23B42-E3F0-101B-8488-00AA003E56F8}'
+
+# OSR2 / OSR2.1 / OSR2.5 SETUP launchers: tools/w9x_filesystem.sh
+# usos_w9x_95_osr2 when sourced (the target script), else the same list.
+w9x_reg95_osr2() {
+    if command -v usos_w9x_95_osr2 >/dev/null 2>&1; then usos_w9x_95_osr2 "$1"; return; fi
+    case "$1" in '4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') return 0 ;; esac
+    return 1
+}
 W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
@@ -321,21 +329,90 @@ w9x_reg95_netfiles_group() {
     printf ':H%02d\n' "$nfgroup"
 }
 
+# The 950 table: "<destination> <cabinet> <files>", EXTRACT /A from that
+# cabinet (the 950 PL / EN CDs: PRECOPY1 and the WIN95_02 chain).
+W9X_REG95_NETFILES_950='C:\WINDOWS\SYSTEM PRECOPY1.CAB netapi.dll
+C:\WINDOWS\SYSTEM WIN95_02.CAB vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd
+C:\WINDOWS\SYSTEM WIN95_02.CAB msnp32.dll mspp32.dll lmscript.exe lmscript.pif filesec.vxd choosusr.dll mapi32.dll vlb32.dll
+C:\WINDOWS WIN95_02.CAB net.exe net.msg neth.msg winpopup.exe
+C:\WINDOWS\HELP WIN95_02.CAB winpopup.hlp winpopup.cnt
+C:\WINDOWS\SYSTEM WIN95_02.CAB vtdi.386 vip.386 vtcp.386 vdhcp.386 vnbt.386 icmp.dll afvxd.vxd wshtcp.vxd rpcltc3.dll rpclts3.dll wsock.vxd wsasrv.exe
+C:\WINDOWS WIN95_02.CAB ping.exe telnet.exe telnet.hlp ftp.exe hosts.sam lmhosts.sam networks protocol services inetmib1.dll arp.exe nbtstat.exe netstat.exe route.exe tracert.exe winipcfg.exe winsock.dll'
+
+# OSR2 (4.00.1068..1216): the same NETCLI.INF VREDIR.Install / NETTRANS.INF
+# MSTCP.Install file groups (identical on the OSR2.1 PL and 950 CDs) plus
+# mstcp.dll (TCP/IP's Ndi installer, PRECOPY1 on OSR2.1 PL), but the files
+# sit in other cabinets on every OSR2 CD (OSR2.1 PL LAYOUT.INF: netapi.dll in
+# PRECOPY2, the rest in WIN95_17..WIN95_18). Without [Network] (as on 950)
+# OSR2 Setup copies none of them. w9x_reg95_netfiles_layout <folder> prints
+# the table for the target's own CD from its LAYOUT*.INF ([SourceDisksFiles]
+# <file>=<cabinet number>,..., [SourceDisksNames] <number>=...,"<cabinet>",0):
+# one line per destination and cabinet, in this order. Fails (no output)
+# when a file is missing from the layout or not in a cabinet.
+W9X_REG95_NETFILES_OSR2='C:\WINDOWS\SYSTEM netapi.dll vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd msnp32.dll mspp32.dll lmscript.exe lmscript.pif filesec.vxd choosusr.dll mapi32.dll vlb32.dll mstcp.dll
+C:\WINDOWS net.exe net.msg neth.msg winpopup.exe
+C:\WINDOWS\HELP winpopup.hlp winpopup.cnt
+C:\WINDOWS\SYSTEM vtdi.386 vip.386 vtcp.386 vdhcp.386 vnbt.386 icmp.dll afvxd.vxd wshtcp.vxd rpcltc3.dll rpclts3.dll wsock.vxd wsasrv.exe
+C:\WINDOWS ping.exe telnet.exe telnet.hlp ftp.exe hosts.sam lmhosts.sam networks protocol services inetmib1.dll arp.exe nbtstat.exe netstat.exe route.exe tracert.exe winipcfg.exe winsock.dll'
+w9x_reg95_netfiles_layout() {
+    set -- "$1"/[Ll][Aa][Yy][Oo][Uu][Tt]*.[Ii][Nn][Ff]
+    [ -f "$1" ] || return 1
+    W9X_REG95_TABLE=$W9X_REG95_NETFILES_OSR2 awk '
+        { sub(/\r$/, ""); line = $0 }
+        /^[ \t]*\[/ { sec = tolower(line); gsub(/[ \t]/, "", sec); next }
+        /^[ \t]*(;|$)/ { next }
+        sec == "[sourcedisksnames]" {
+            eq = index(line, "="); if (!eq) next
+            n = line; sub(/[ \t]*=.*/, "", n); gsub(/^[ \t]+/, "", n)
+            split(substr(line, eq + 1), f, ",")
+            c = f[2]; gsub(/^[ \t"]+|[ \t"]+$/, "", c)
+            if (n ~ /^[0-9]+$/ && c ~ /^[A-Za-z0-9_]+\.[Cc][Aa][Bb]$/) cab[n + 0] = toupper(c)
+            next }
+        sec == "[sourcedisksfiles]" {
+            eq = index(line, "="); if (!eq) next
+            n = tolower(substr(line, 1, eq - 1)); gsub(/^[ \t]+|[ \t]+$/, "", n)
+            split(substr(line, eq + 1), f, ","); d = f[1]; gsub(/[ \t]/, "", d)
+            if (!(n in disk) && d ~ /^[0-9]+$/) disk[n] = d + 0 }
+        END {
+            nl = split(ENVIRON["W9X_REG95_TABLE"], rows, "\n")
+            for (r = 1; r <= nl; r++) {
+                nf = split(rows[r], w, " ")
+                for (i = 2; i <= nf; i++) {
+                    if (!(w[i] in disk) || !(disk[w[i]] in cab)) exit 1
+                    k = w[1] " " cab[disk[w[i]]]
+                    if (!(k in out)) order[++no] = k
+                    out[k] = out[k] " " w[i]
+                }
+            }
+            for (i = 1; i <= no; i++) print order[i] out[order[i]]
+        }' "$@"
+}
+
 w9x_reg95_netfiles_write() {
     nfdir=$1
     [ -d "$nfdir/NET" ] || return 1
+    if [ -n "${2:-}" ]; then
+        nftable=$(w9x_reg95_netfiles_layout "$2") && [ -n "$nftable" ] || return 1
+        nfwhat='original OSR2 network files (cabinets from the LAYOUT.INF of this CD)'
+    else
+        nftable=$W9X_REG95_NETFILES_950 nfwhat='original 950 network files'
+    fi
+    nfcabs=$(printf '%s\n' "$nftable" | awk '!seen[$2]++ { print $2 }')
     {
-        cat <<'EOF'
+        cat <<EOF
 @ECHO OFF
-REM USOS: original 950 network files before the NET95 registry import.
+REM USOS: $nfwhat before the NET95 registry import.
+EOF
+        cat <<'EOF'
 IF EXIST C:\USOS9X\NET\NFILES.RUN GOTO FAIL
 ECHO run> C:\USOS9X\NET\NFILES.RUN
 IF EXIST C:\USOS9X\NET\NFILES.OK DEL C:\USOS9X\NET\NFILES.OK > NUL
 IF EXIST C:\USOS9X\NET\NFILES.ERR DEL C:\USOS9X\NET\NFILES.ERR > NUL
 ECHO begin> C:\USOS9X\NET\NFILES.LOG
 IF NOT EXIST C:\WIN95\EXTRACT.EXE GOTO FAIL
-IF NOT EXIST C:\WIN95\PRECOPY1.CAB GOTO FAIL
-IF NOT EXIST C:\WIN95\WIN95_02.CAB GOTO FAIL
+EOF
+        for cab in $nfcabs; do printf 'IF NOT EXIST C:\\WIN95\\%s GOTO FAIL\n' "$cab"; done
+        cat <<'EOF'
 IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO FAIL
 IF NOT EXIST C:\WINDOWS\INF\NUL GOTO FAIL
 IF NOT EXIST C:\USOS9X\NET\USOSNET.SYS GOTO FAIL
@@ -369,14 +446,8 @@ EOF
                 nfargs="${nfargs:+$nfargs }$name"
             done
             [ -z "$nfargs" ] || w9x_reg95_netfiles_group "$dest" "$cab" $nfargs
-        done <<'EOF'
-C:\WINDOWS\SYSTEM PRECOPY1.CAB netapi.dll
-C:\WINDOWS\SYSTEM WIN95_02.CAB vredir.vxd vnetsup.vxd rpcltc1.dll pmspl.dll msnet32.dll msab32.dll mssp.vxd
-C:\WINDOWS\SYSTEM WIN95_02.CAB msnp32.dll mspp32.dll lmscript.exe lmscript.pif filesec.vxd choosusr.dll mapi32.dll vlb32.dll
-C:\WINDOWS WIN95_02.CAB net.exe net.msg neth.msg winpopup.exe
-C:\WINDOWS\HELP WIN95_02.CAB winpopup.hlp winpopup.cnt
-C:\WINDOWS\SYSTEM WIN95_02.CAB vtdi.386 vip.386 vtcp.386 vdhcp.386 vnbt.386 icmp.dll afvxd.vxd wshtcp.vxd rpcltc3.dll rpclts3.dll wsock.vxd wsasrv.exe
-C:\WINDOWS WIN95_02.CAB ping.exe telnet.exe telnet.hlp ftp.exe hosts.sam lmhosts.sam networks protocol services inetmib1.dll arp.exe nbtstat.exe netstat.exe route.exe tracert.exe winipcfg.exe winsock.dll
+        done <<EOF
+$nftable
 EOF
         cat <<'EOF'
 ECHO complete> C:\USOS9X\NET\NFILES.OK
@@ -544,9 +615,14 @@ REGEDIT4
 EOF
 }
 
+# w9x_reg95_netlate_write DIR [devnode]: with the card's devnode (OSR2,
+# where NET95.REG is imported only here, see w9x_reg95_write) NET95L.BAT
+# also exports the devnode and Class\Net as C1.REG / C2.REG, checks them as
+# REG95.BAT does on 950 and writes NET\NET95.OK, which USOSFB waits for.
 w9x_reg95_netlate_write() {
     [ -d "$1/NET" ] || return 1
     w9x_reg95_netclean_write "$1" || return 1
+    nldev=${2:-}
     {
         cat <<'EOF'
 @ECHO OFF
@@ -608,6 +684,22 @@ C:\WINDOWS\COMMAND\FIND.EXE "NetTrans\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
 C:\WINDOWS\COMMAND\FIND.EXE "NetClient\\0009" C:\USOS9X\NL4.REG > NUL
 IF ERRORLEVEL 1 GOTO RESTORE
+EOF
+        if [ -n "$nldev" ]; then
+            cat <<EOF
+REM OSR2: the card's devnode and its class key (C1.REG / C2.REG), NET95.OK.
+IF EXIST C:\\USOS9X\\NET\\C1.REG DEL C:\\USOS9X\\NET\\C1.REG > NUL
+IF EXIST C:\\USOS9X\\NET\\C2.REG DEL C:\\USOS9X\\NET\\C2.REG > NUL
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\NET\\C1.REG $nldev
+REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\\USOS9X\\NET\\C2.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\Net
+C:\\WINDOWS\\COMMAND\\FIND.EXE "usosnet.sys" C:\\USOS9X\\NET\\C2.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+C:\\WINDOWS\\COMMAND\\FIND.EXE "Net\\\\0009" C:\\USOS9X\\NET\\C1.REG > NUL
+IF ERRORLEVEL 1 GOTO RESTORE
+ECHO ok> C:\\USOS9X\\NET\\NET95.OK
+EOF
+        fi
+        cat <<'EOF'
 REM 950's default protocol / client class keys, by Ndi DeviceID.
 REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E C:\USOS9X\NL5.REG HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\NetClient
 EOF
@@ -802,19 +894,42 @@ CD \\
 EOF
 }
 
-# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version] [noie]
+# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version] [noie] [setup folder]
 # noie: no Internet icon command (no IE at the IE 3 path, see above).
+# setup folder (OSR2 with NET95.REG; the target's C:\WIN95 copy): its
+# LAYOUT*.INF names the cabinets of NFILES.BAT (w9x_reg95_netfiles_layout).
+# Network after Setup, as on 950 (the caller renames MSBATCH [Network] to
+# [USOS.Network], tools/network_setup.sh usos_net_w950_msbatch): NFILES.BAT,
+# TCP95.REG, NET95L.BAT, NETCLEAN, the VNETSUP identity. 950 also imports
+# NET95.REG / TCP95.REG with REG95.REG; OSR2 does not: its first GUI boot's
+# PnP (sysdm DMFirstTimeSetup reinstalling the card from USOSNET.INF) removed
+# the early TCP/IP and NETDI added NetBEUI / IPX / two VREDIR / NWREDIR
+# (X470 95 OSR2.1 PL native, 2026-10-27: TCP/IP unbound, no DHCP, socket
+# 10047), so NET95L.BAT imports them once RunOnce\Setup is gone and checks
+# C1..C3 itself.
+# Every 95 version: RunOnce InitShell goes (VESBIND DELVAL, before the first
+# GUI start): with it the 95 Explorer starts Welcome.exe -f at the first
+# desktop whatever Tips\Show says (SHELL.INF [shell.reg] writes it in phase
+# 1; X470 OSR2.1 PL SYSTEM.1ST and 950 RTM PL NL1.REG, 2026-10-26/27).
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
 # sections are appended to REG95.REG (one import) and REG95.BAT exports
 # them afterwards to DIR\NET\C1..C3.REG and checks them with FIND:
 # NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-} W9X_REG95_IE=${7:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-} W9X_REG95_IE=${7:-} setup_src=${8:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
-    reg95_identity='' reg95_vmdlate=''
-    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_identity=1; fi
+    reg95_identity='' reg95_vmdlate='' net_mode=''
+    if [ -n "$net" ]; then
+        if [ "$source_version" = '4 0 0 950' ]; then net_mode=950
+        elif w9x_reg95_osr2 "$source_version"; then
+            # NFILES.BAT extracts from C:\WIN95: only that Setup folder.
+            [ -n "$setup_src" ] && [ "$(basename "$setup_src" | tr '[:lower:]' '[:upper:]')" = WIN95 ] || return 1
+            net_mode=osr2
+        fi
+    fi
+    if [ -n "$net_mode" ]; then reg95_identity=1; fi
     # 950: USOSVmd only through VMDLATE.BAT (after RunOnce\Setup), never REG95.REG.
     if [ -n "$vmd" ] && [ "$source_version" = '4 0 0 950' ]; then reg95_vmdlate=1; fi
     # 950: IE start page values and the Internet icon command after Setup.
@@ -845,6 +960,17 @@ w9x_reg95_write() {
     # with SYSTEM.R95 as the backup for a failure while writing. Fail-soft:
     # refused / absent key / no VESBIND only log, the import still runs.
     lgndel="$R /D HKEY_LOCAL_MACHINE\\Network\\Logon"
+    # RunOnce InitShell (see above): fail-soft as the 950 Logon delete, its
+    # own backup SYSTEM.RIS; absent value (exit 1) or no VESBIND: nothing.
+    isdel="REM 95: RunOnce InitShell forces the Welcome window; VESBIND DELVAL.
+IF NOT EXIST ${U}VESBIND.EXE GOTO ISSKIP
+IF EXIST ${U}SYSTEM.RIS DEL ${U}SYSTEM.RIS
+COPY /Y SYSTEM.DAT ${U}SYSTEM.RIS > NUL
+IF NOT EXIST ${U}SYSTEM.RIS GOTO ISSKIP
+${U}VESBIND.EXE DELVAL SYSTEM.DAT Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce InitShell ${U}ISDEL.LOG
+IF ERRORLEVEL 3 COPY /Y ${U}SYSTEM.RIS SYSTEM.DAT > NUL
+IF ERRORLEVEL 2 ECHO REG95: RunOnce InitShell not deleted, see ISDEL.LOG>> ${U}USOSLOG.TXT
+:ISSKIP"
     if [ "$source_version" = '4 0 0 950' ]; then
         lgndel="REM 950: no REGEDIT /D, VESBIND DELKEY (backup SYSTEM.R95).
 IF NOT EXIST ${U}VESBIND.EXE GOTO LGNSKIP
@@ -875,11 +1001,22 @@ IF ERRORLEVEL 2 ECHO REG95: Network\\Logon not deleted, see R95DEL.LOG>> ${U}USO
         w9x_reg95_vmdlate_write "$dir" "$vmd" || return 1
         vmdlate="CALL ${U}VMDLATE.BAT"
     fi
-    if [ -n "$net" ] && [ "$source_version" = '4 0 0 950' ]; then
-        w9x_reg95_netfiles_write "$dir" || return 1
-        w9x_reg95_tcp_write "$dir" || return 1
-        w9x_reg95_netlate_write "$dir" || return 1
-        tcp95="$dir/NET/TCP95.REG"
+    devnode=''
+    if [ -n "$net" ]; then
+        devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
+        [ -n "$devnode" ] || return 1
+    fi
+    if [ -n "$net_mode" ]; then
+        if [ "$net_mode" = osr2 ]; then
+            w9x_reg95_netfiles_write "$dir" "$setup_src" || return 1
+            w9x_reg95_tcp_write "$dir" || return 1
+            w9x_reg95_netlate_write "$dir" "$devnode" || return 1
+        else
+            w9x_reg95_netfiles_write "$dir" || return 1
+            w9x_reg95_tcp_write "$dir" || return 1
+            w9x_reg95_netlate_write "$dir" || return 1
+            tcp95="$dir/NET/TCP95.REG"
+        fi
         netlate="CALL ${U}NET\\NET95L.BAT
 IF EXIST ${U}NET\\NLATE.ERR GOTO PREPERR
 IF EXIST ${U}NET\\NLATE.RUN GOTO PREPERR"
@@ -897,11 +1034,10 @@ $A +S +R +H USER.DAT
 :PREPERR
 REM Fail-soft: log to the target disk, Windows starts without the USOS network.
 ECHO USOS: network preparation failed, see C:\\USOS9X\\NET. Windows starts without it.
-ECHO REG95: 950 network preparation failed, see C:\\USOS9X\\NET; Windows started>> ${U}USOSLOG.TXT"
+ECHO REG95: $net_mode network preparation failed, see C:\\USOS9X\\NET; Windows started>> ${U}USOSLOG.TXT"
     fi
-    if [ -n "$net" ]; then
-        devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
-        [ -n "$devnode" ] || return 1
+    # OSR2: NET95.REG / TCP95.REG only through NET95L.BAT (see above).
+    if [ -n "$net" ] && [ "$net_mode" != osr2 ]; then
         # Before the "; USOS: not converted" comments, which stay last.
         # CRLF made once at the end (Git for Windows grep / sed drop the CR).
         { tr -d '\r' < "$dir/REG95.REG" | sed '/^; USOS:/d'; tr -d '\r' < "$net" | sed '1{/^REGEDIT4$/d}'
@@ -948,6 +1084,7 @@ CD \WINDOWS
 $A -S -R -H SYSTEM.DAT
 $A -S -R -H USER.DAT
 $lgndel
+$isdel
 $R ${U}REG95.REG
 $R /E ${U}REG95CHK.REG $run
 $netbat

@@ -1,9 +1,11 @@
-"""Post-Setup boundary and interrupted-import guards for the 950 DOS hook."""
+"""Post-Setup boundary and interrupted-import guards for the 950 / OSR2 DOS hook."""
 from pathlib import Path
 import re,shutil,sys,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from test_w9x_phase1_qemu import sh,scratch
 from test_w9x_reg95 import ANSWER_95,REG95
+from test_w9x_net95_files import osr2_setup_folder
+DEVNODE='HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00'
 
 class LateNetwork(unittest.TestCase):
  def create(self,version='4 0 0 950',network=True):
@@ -11,7 +13,8 @@ class LateNetwork(unittest.TestCase):
   out=tmp/'USOS9X';(out/'NET').mkdir(parents=True);inf=tmp/'MSBATCH.INF';inf.write_bytes(ANSWER_95.encode('ascii'))
   net=out/'NET/NET95.REG'
   if network:net.write_bytes(b'REGEDIT4\r\n[HKEY_LOCAL_MACHINE\\Enum\\PCI\\VEN_8086&DEV_10C9\\BUS_00&DEV_03&FUNC_00]\r\n"Driver"="Net\\\\0009"\r\n')
-  rc,so,err=sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" "" "" "{net.as_posix() if network else ""}" "{version}"\n')
+  src=osr2_setup_folder(tmp).as_posix() if version not in ('4 0 0 950','') else ''
+  rc,so,err=sh(f'. "{REG95}"\nw9x_reg95_write "{out.as_posix()}" "{inf.as_posix()}" "" "" "{net.as_posix() if network else ""}" "{version}" "" "{src}"\n')
   self.assertEqual(rc,0,so+err)
   self.out=out
   child=out/'NET/NET95L.BAT'
@@ -20,8 +23,31 @@ class LateNetwork(unittest.TestCase):
  def test_scope_and_call_precedes_early_done_marker(self):
   parent,child=self.create();self.assertIsNotNone(child)
   self.assertLess(parent.index(b'CALL C:\\USOS9X\\NET\\NET95L.BAT'),parent.index(b'IF EXIST C:\\USOS9X\\REG95.OK GOTO END'))
-  for v,n in [('4 0 0 1111',True),('4 0 0 1068',True),('',True),('4 0 0 950',False)]:
+  for v in ('4 0 0 1111','4 0 0 1068','4 0 0 1214'):
+   parent,child=self.create(v);self.assertIsNotNone(child,v)
+   self.assertLess(parent.index(b'CALL C:\\USOS9X\\NET\\NET95L.BAT'),parent.index(b'IF EXIST C:\\USOS9X\\REG95.OK GOTO END'))
+  for v,n in [('',True),('4 0 0 950',False),('4 0 0 1111',False)]:
    parent,child=self.create(v,n);self.assertIsNone(child);self.assertNotIn(b'NET95L',parent)
+
+ def test_osr2_imports_the_network_only_after_setup_and_checks_c1_c2(self):
+  """X470 95 OSR2.1 PL native (2026-10-27): the first GUI boot's PnP removed
+  the early TCP/IP; on OSR2 NET95.REG / TCP95.REG come only from NET95L."""
+  parent,child=self.create('4 0 0 1111');s=child.decode('ascii')
+  reg=(self.out/'REG95.REG').read_bytes()
+  for early in (b'usosnet.sys',b'NetTrans\\0009',b'HelperDllName',b'Enum\\PCI'):self.assertNotIn(early,reg)
+  self.assertNotIn(b'C1.REG',parent);self.assertNotIn(b'NET95.OK',parent)
+  imports=re.findall(r'^REGEDIT /L:SYSTEM.DAT /R:USER.DAT (?!/E)(.*)\r?$',s,re.M)
+  self.assertEqual([x.rstrip('\r') for x in imports],[r'C:\USOS9X\NET\NET95.REG',r'C:\USOS9X\NET\TCP95.REG',r'C:\USOS9X\NET\NETCLN.REG'])
+  self.assertIn(f'/E C:\\USOS9X\\NET\\C1.REG {DEVNODE}\r\n',s)
+  self.assertIn('/E C:\\USOS9X\\NET\\C2.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\Net\r\n',s)
+  ok=s.index('ECHO ok> C:\\USOS9X\\NET\\NET95.OK')
+  for check in ('"usosnet.sys" C:\\USOS9X\\NET\\C2.REG','"Net\\\\0009" C:\\USOS9X\\NET\\C1.REG','"NetClient\\\\0009" C:\\USOS9X\\NL4.REG'):
+   self.assertLess(s.index(check),ok,check)
+   self.assertTrue(s[s.index(check):].split('\r\n')[1]=='IF ERRORLEVEL 1 GOTO RESTORE',check)
+  self.assertLess(s.index('IF NOT ERRORLEVEL 1 GOTO PENDING'),s.index('/E C:\\USOS9X\\NET\\C1.REG'))
+  self.assertLess(ok,s.index('ECHO complete>'))
+  # 950 keeps its early import and the REG95.BAT check.
+  parent,child=self.create();self.assertNotIn(b'NET\\C1.REG',child);self.assertIn(b'NET\\C1.REG',parent)
 
  def test_setup_presence_withholds_import_and_journal_creation(self):
   _,child=self.create();s=child.decode('ascii')
@@ -121,7 +147,7 @@ class LateNetwork(unittest.TestCase):
   self.assertLess(s.index('NETCLID.BAT NetClient 0015'),s.index('NET\\NETCLN.REG\r\n'))
 
  def test_original_dos_line_limits_and_complete_unique_labels(self):
-  for batch in self.create():
+  for batch in self.create()+self.create('4 0 0 1111'):
    self.assertEqual(batch.count(b'\n'),batch.count(b'\r\n'))
    self.assertLessEqual(max(map(len,batch.split(b'\r\n'))),125)
    s=batch.decode('ascii');labels=re.findall(r'^:([A-Z0-9]+)\r?$',s,re.M)
