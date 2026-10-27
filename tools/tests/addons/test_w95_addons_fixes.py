@@ -197,7 +197,12 @@ class AddonsFixes(unittest.TestCase):
         self.assertIn(r'static const char fail_pl[]="USOS nie m\363g\263 doko', src)
         self.assertIn('MoveFileA(path,aside)', body)
         self.assertIn('ExitWindowsEx(EWX_REBOOT,0)', body)
-        self.assertNotIn('WS_POPUP', src)
+        # the box is a MessageBox, no own window; the only window is the
+        # hidden WM_ENDSESSION listener (session_window), never visible
+        self.assertNotIn('WS_POPUP', body)
+        self.assertEqual(src.count('WS_POPUP'), 1)
+        self.assertIn('"USOSFB",WS_POPUP,0,0,0,0,', src[src.index('static void session_window('):])
+        self.assertNotIn('WS_VISIBLE', src)
         self.assertNotIn('WM_CLOSE', src)
         # an existing FIRSTBT.ERR exits quietly instead of showing the box every boot
         self.assertNotIn('fail("previous firstboot failure', src)

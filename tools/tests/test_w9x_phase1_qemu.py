@@ -33,8 +33,18 @@ def shell():
 
 
 def sh(script, env=None):
-    result = subprocess.run([shell(), '-c', script], capture_output=True, text=True,
-                            env=dict(os.environ, **(env or {})))
+    # The script goes in a file, not as "-c script": Windows argv quoting
+    # (CreateProcess -> MSYS) mangles embedded quotes and backslashes of a
+    # long multi-line block ("unexpected EOF while looking for matching").
+    # Not on stdin either: a command in the script may read stdin.
+    fd, name = tempfile.mkstemp(prefix='usos-sh-', suffix='.sh')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(script)
+        result = subprocess.run([shell(), Path(name).as_posix()], capture_output=True, text=True,
+                                stdin=subprocess.DEVNULL, env=dict(os.environ, **(env or {})))
+    finally:
+        os.unlink(name)
     return result.returncode, result.stdout, result.stderr
 
 
