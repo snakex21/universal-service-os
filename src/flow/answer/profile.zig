@@ -671,6 +671,112 @@ pub fn keyTyped(buf: []u8, len: usize, c: u8) usize {
     return rewrite(buf, symbols[0 .. have.len + 1]);
 }
 
+/// How a key field types: `any` (Windows 98 and later: XXXXX-XXXXX-...,
+/// the 95 shapes only as typed in full) or `win95` (Windows 95 and NT 4.0:
+/// only the 10-digit CD key ddd-ddddddd or the OEM ID
+/// ddddd-OEM-ddddddd-ddddd; read from the 950 SETUPX.DLL PIDValidate:
+/// ProductType 1-6 take the ddd-ddddddd key, 7-9 the OEM ID).
+pub const KeyStyle = enum { any, win95 };
+
+/// The key style of a system's key field.
+pub fn keyStyleFor(system_id: []const u8) KeyStyle {
+    if (std.ascii.eqlIgnoreCase(system_id, "windows-95") or @import("nt4.zig").isNt4(system_id)) return .win95;
+    return .any;
+}
+
+/// Digits of a Windows 95 / NT 4.0 CD key (ddd-ddddddd).
+pub const cd_key_symbols = 10;
+
+/// `symbols` are the start of a Windows 95 key: up to 10 digits (CD key),
+/// or 5 digits, "OEM" and up to 12 digits (OEM ID).
+fn win95Prefix(symbols: []const u8) bool {
+    if (oemShaped(symbols)) {
+        if (symbols.len > oem_key_symbols) return false;
+        for (symbols, 0..) |c, i| {
+            if ((i < 5 or i >= 8) and !std.ascii.isDigit(c)) return false;
+        }
+        return true;
+    }
+    if (symbols.len > cd_key_symbols) return false;
+    for (symbols) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    return true;
+}
+
+/// A Windows 95 key as typed: ddd-ddddddd (the dash after the third digit)
+/// until it reads as an OEM ID (ddddd-OEM-ddddddd-ddddd). Five digits read
+/// "123-45" until the "O" of "OEM" turns them into "12345-O".
+fn renderKey95(symbols: []const u8, out: *[29]u8) []const u8 {
+    if (oemShaped(symbols) or !win95Prefix(symbols)) return renderKey(symbols, out);
+    if (symbols.len <= 3) {
+        @memcpy(out[0..symbols.len], symbols);
+        return out[0..symbols.len];
+    }
+    @memcpy(out[0..3], symbols[0..3]);
+    out[3] = '-';
+    @memcpy(out[4 .. symbols.len + 1], symbols[3..]);
+    return out[0 .. symbols.len + 1];
+}
+
+fn rewriteFor(buf: []u8, symbols: []const u8, style: KeyStyle) usize {
+    if (style == .any) return rewrite(buf, symbols);
+    var out: [29]u8 = undefined;
+    const text = renderKey95(symbols, &out);
+    @memcpy(buf[0..text.len], text);
+    return text.len;
+}
+
+/// keySymbolLimit for a key field of `style`: a Windows 95 key stops at 10
+/// digits (CD key) or 20 symbols (OEM ID).
+pub fn keySymbolLimitFor(value: []const u8, style: KeyStyle) usize {
+    if (style == .any) return keySymbolLimit(value);
+    var symbols: [key_symbols]u8 = undefined;
+    return if (oemShaped(keySymbols(value, &symbols))) oem_key_symbols else cd_key_symbols;
+}
+
+/// keyTyped for a key field of `style`. `win95`: only what keeps the key
+/// the start of a CD key or an OEM ID (digits, "OEM" after five digits).
+pub fn keyTypedFor(buf: []u8, len: usize, c: u8, style: KeyStyle) usize {
+    if (style == .any) return keyTyped(buf, len, c);
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols + 1]u8 = undefined;
+    var have_buf: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &have_buf);
+    if (!std.ascii.isAlphanumeric(c) or have.len >= key_symbols) return len;
+    @memcpy(symbols[0..have.len], have);
+    symbols[have.len] = std.ascii.toUpper(c);
+    const next = symbols[0 .. have.len + 1];
+    if (!win95Prefix(next)) return len;
+    return rewriteFor(buf, next, style);
+}
+
+/// keyBackspace for a key field of `style`.
+pub fn keyBackspaceFor(buf: []u8, len: usize, style: KeyStyle) usize {
+    if (style == .any) return keyBackspace(buf, len);
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &symbols);
+    if (have.len == 0) return 0;
+    return rewriteFor(buf, have[0 .. have.len - 1], style);
+}
+
+/// normalizeKey for a key field of `style` (a stored ddd-ddddddd or OEM ID
+/// reads the same in both).
+pub fn normalizeKeyFor(value: []const u8, out: *[29]u8, style: KeyStyle) []const u8 {
+    if (style == .any) return normalizeKey(value, out);
+    var symbols: [key_symbols]u8 = undefined;
+    return renderKey95(keySymbols(value, &symbols), out);
+}
+
+/// checkKey for a key field of `style`: `win95` takes only the CD key and
+/// the OEM ID (no 5x5 key). Empty = none (Setup asks).
+pub fn checkKeyFor(value: []const u8, style: KeyStyle) ?Problem {
+    if (style == .any or value.len == 0) return checkKey(value);
+    const shape = keyShape(value) orelse return .bad_key_format;
+    return if (shape == .five_by_five) .bad_key_format else null;
+}
+
 /// Backspace in a key being edited: removes the last letter or digit (so
 /// backspace over a dash also removes the character before it). Returns
 /// the new length.
@@ -1437,6 +1543,59 @@ test "product key: normalised from any case, with or without dashes and spaces" 
     try std.testing.expect(checkKey("123-456789") == .bad_key_format);
     try std.testing.expect(checkKey("123-4567890") == null);
     try std.testing.expectEqual(@as(usize, 12), keySymbolCount("ABCDE-12345-XY"));
+}
+
+test "product key: a Windows 95 field types the 10-digit CD key and the OEM ID" {
+    var buf: [64]u8 = undefined;
+    var len: usize = 0;
+    // Made-up test keys in the documented formats (not real keys).
+    for ("12") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12", buf[0..len]);
+    for ("3") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 10), keySymbolLimitFor(buf[0..len], .win95));
+    for ("4567890") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4567890", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == null);
+    try std.testing.expectEqual(KeyShape.win95_retail, keyShape(buf[0..len]).?);
+    // The eleventh digit and letters are refused.
+    for ("1A-") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4567890", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 10), keySymbolCount(buf[0..len]));
+    len = keyBackspaceFor(&buf, len, .win95);
+    try std.testing.expectEqualStrings("123-456789", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == .bad_key_format);
+    // OEM: five digits, then OEM.
+    len = 0;
+    for ("12345") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-45", buf[0..len]);
+    for ("oem") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12345-OEM-", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolLimitFor(buf[0..len], .win95));
+    for ("0000007543219") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == null);
+    // "OEM" only after exactly five digits; no other letters.
+    len = 0;
+    for ("1234o") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4", buf[0..len]);
+    for ("5x") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-45", buf[0..len]);
+    // Stored keys read the same; a 5x5 key is not a 95 key.
+    var out: [29]u8 = undefined;
+    try std.testing.expectEqualStrings("123-4567890", normalizeKeyFor("1234567890", &out, .win95));
+    try std.testing.expectEqualStrings("123-4567890", normalizeKeyFor("123-4567890", &out, .win95));
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", normalizeKeyFor("12345oem000000754321", &out, .win95));
+    try std.testing.expect(checkKeyFor("ABCDE-12345-FGHIJ-67890-KLMNO", .win95) == .bad_key_format);
+    try std.testing.expect(checkKeyFor("ABCDE-12345-FGHIJ-67890-KLMNO", .any) == null);
+    try std.testing.expect(checkKeyFor("", .win95) == null);
+    try std.testing.expectEqual(KeyStyle.win95, keyStyleFor("windows-95"));
+    try std.testing.expectEqual(KeyStyle.win95, keyStyleFor("windows-nt-4"));
+    try std.testing.expectEqual(KeyStyle.any, keyStyleFor("windows-98-se"));
+    // The any style is unchanged (98/Me 5x5).
+    len = 0;
+    for ("BCDFGHJKMPQRTVWXY2346789B") |c| len = keyTypedFor(&buf, len, c, .any);
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
 }
 
 test "product key: a Windows 95 OEM ID stops at 20 symbols, a 5x5 key at 25" {

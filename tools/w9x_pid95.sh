@@ -54,13 +54,19 @@ w9x_pid95_prepare() {
     echo dropped
 }
 
-# 950 or OSR2 native phase 1 with a USOS answer: the OEM ID for Setup's own
+# 950 or OSR2 native phase 1 with a USOS answer: the key for Setup's own
 # Product ID page (USOSPID.DRV in the mini-Windows types it once, 950 into
-# its one field, OSR2 into the COA page's three, then the page's Next;
+# its one field, OSR2 into the COA page's three, a CD key into a retail
+# CD's "CD Key" page, then the page's Next;
 # src/platform/bios/win9x/usospid.c). Call before w9x_pid95_prepare.
+# A CD key (11 characters) also stays in MSBATCH.INF (w9x_pid95_prepare
+# keeps IDs up to 17 characters: the batch file still loads); the page
+# reads only its own field, and USOSPID.DRV goes straight to Next when
+# the field already holds the key.
 # w9x_pid95_stage_key MSBATCH.INF KEYFILE: prints
 #   staged     [Setup] ProductID is ddddd-OEM-ddddddd-ddddd (OEM in any
-#              case): KEYFILE gets it (OEM upper case) + CR LF
+#              case) or the CD key ddd-ddddddd: KEYFILE gets it (OEM upper
+#              case) + CR LF
 #   none       anything else: KEYFILE is removed
 # Never prints the ID. rc 1 only on a file error.
 w9x_pid95_stage_key() {
@@ -68,6 +74,7 @@ w9x_pid95_stage_key() {
     pid_key=$(w9x_pid95_value "$1" | tr 'oem' 'OEM')
     case "$pid_key" in
         [0-9][0-9][0-9][0-9][0-9]-OEM-[0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9]) ;;
+        [0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
         *) pid_key=; echo none; return 0 ;;
     esac
     (umask 077; printf '%s\r\n' "$pid_key" > "$2") || { pid_key=; rm -f "$2"; return 1; }

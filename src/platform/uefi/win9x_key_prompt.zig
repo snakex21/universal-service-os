@@ -7,6 +7,15 @@
 //! staged 95.INF (removed by micro-Linux after it is copied to RAM) and is
 //! never written to a profile or traced.
 //!
+//! Windows 95 (2026-10-27): the key is optional. On the native phase 1
+//! (EFI/USOS/win9x/phase1-native.flag) Setup shows its own Product ID page
+//! and USOSPID.DRV types a staged key there; an empty key leaves that page
+//! to the user. The field takes the 10-digit CD key (ddd-ddddddd, retail
+//! CDs, SETUPPP.INF ProductType 1-6) and the OEM ID
+//! (ddddd-OEM-ddddddd-ddddd, ProductType 7-9: every local 95 RTM / OSR1 /
+//! OSR2.1 CD). The CD's ProductType sits in PRECOPY2.CAB (MSZIP; LZX on
+//! OSR2), too costly to read here, so both shapes are accepted.
+//!
 //! Windows NT 4.0 (Workstation / Server, 2026-10-07): the same prompt and
 //! key shapes; its install runs fully in the VM and GUI Setup would wait on
 //! the key page, so the key is asked the same way (staged in NT4.SIF).
@@ -68,8 +77,17 @@ pub fn withKey(base: ?*const Profile, ui_language: []const u8, system_id: []cons
 
 /// POSReady 2009 takes a 5x5 key; Windows 95 / NT 4.0 the 95 shapes.
 var want_five_by_five = false;
+/// Windows 95: an empty key goes on (Setup's own page asks).
+var may_be_empty = false;
+
+/// Windows 95 may start without a key: Setup asks on its own Product ID
+/// page. NT 4.0 (installed in the VM) and POSReady still need one.
+pub fn optional(system_id: []const u8) bool {
+    return std.ascii.eqlIgnoreCase(system_id, "windows-95");
+}
 
 fn validInput(value: []const u8) bool {
+    if (value.len == 0 and may_be_empty) return true;
     return if (want_five_by_five) answer.posready.validKey(value) else valid95(value);
 }
 
@@ -77,22 +95,23 @@ fn hookInvalid(_: *anyopaque, index: usize) bool {
     return index == 0 and show_invalid and !validInput(key_text.slice());
 }
 
-/// Asks for the key; null on Back/Cancel. The returned slice lives until
-/// the next call.
+/// Asks for the key; null on Back/Cancel, empty when an optional key
+/// (Windows 95) was left out. The returned slice lives until the next call.
 pub fn ask(system_name: []const u8, system_id: []const u8) ?[]const u8 {
     want_five_by_five = answer.posready.isPosReady(system_id);
+    may_be_empty = optional(system_id);
     key_text = .{ .max = 29 };
     show_invalid = false;
     var label: [96]u8 = undefined;
     var title: [96]u8 = undefined;
-    fields[0] = .{ .kind = .text, .label = view.format(&label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true };
+    fields[0] = .{ .kind = .text, .label = view.format(&label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = if (want_five_by_five) .any else .win95 };
     fields[1] = .{ .kind = .action, .label = view.t(.key_continue), .primary = true, .id = continue_id };
     fields[2] = .{ .kind = .action, .label = view.t(.profile_cancel), .id = cancel_id };
     const hooks = form.Hooks{ .context = @ptrCast(&dummy_context), .invalid = hookInvalid };
     var selected: usize = 0;
     const heading = view.format(&title, .win9x_key_title, &.{system_name});
     while (true) {
-        switch (form.run(heading, view.t(.win9x_key_subtitle), &fields, hooks, &selected)) {
+        switch (form.run(heading, view.t(if (may_be_empty) .win9x_key_subtitle_95 else .win9x_key_subtitle), &fields, hooks, &selected)) {
             .back => return null,
             .x_on, .y_on => {},
             .action => |id| {
@@ -127,4 +146,14 @@ test "a 95 key is asked only for Windows 95 without one" {
     var manual = Profile{ .win9x_setup = .manual };
     try std.testing.expect(!needed("windows-95", &manual, false));
     try std.testing.expect(needed("windows-95", null, false));
+    // Windows 95: the key may be left out (Setup's page asks); NT 4.0 and
+    // POSReady need theirs.
+    try std.testing.expect(optional("windows-95") and !optional("windows-nt-4") and !optional("windows-embedded-posready-2009") and !optional("windows-98-se"));
+    may_be_empty = true;
+    want_five_by_five = false;
+    try std.testing.expect(validInput("") and validInput("123-4567890") and validInput("12345-OEM-0000007-54321") and !validInput("123-45"));
+    may_be_empty = false;
+    try std.testing.expect(!validInput(""));
+    // The CD key typed as on the yellow sticker is a 95 key.
+    try std.testing.expect(valid95("875-1234567"));
 }

@@ -270,7 +270,7 @@ fn load(p: *const Profile) void {
     org_text.set(p.org.slice());
     password_text.set(p.password.slice());
     var key: [29]u8 = undefined;
-    key_text.set(answer.profile.normalizeKey(p.keyFor(system_id), &key));
+    key_text.set(answer.profile.normalizeKeyFor(p.keyFor(system_id), &key, keyStyle()));
     loadEdition(p.editionFor(system_id));
     timezone_index = if (p.timezone) |i| @as(usize, i) + 1 else 0;
     language_index = if (p.language) |i| @as(usize, i) + 1 else 0;
@@ -433,7 +433,7 @@ fn build(out: *Profile) void {
     } else custom_keyboard;
     // Already XXXXX-XXXXX-... in capitals (answer.profile.keyTyped).
     var key: [29]u8 = undefined;
-    out.setSystemKey(system_id, answer.profile.normalizeKey(key_text.slice(), &key)) catch {};
+    out.setSystemKey(system_id, answer.profile.normalizeKeyFor(key_text.slice(), &key, keyStyle())) catch {};
     const edition: []const u8 = if (editionManual()) std.mem.trim(u8, edition_text.slice(), " ") else edition_values[edition_index];
     out.setSystemEdition(system_id, edition) catch {};
     out.remember_key = remember_key;
@@ -482,7 +482,7 @@ fn problemOf(id: F) ?Problem {
         .computer => answer.profile.checkComputer(computer_text.slice()),
         .org => answer.profile.checkOrg(org_text.slice()),
         .password => answer.profile.checkPassword(password_text.slice()),
-        .key => answer.profile.checkKey(key_text.slice()),
+        .key => answer.profile.checkKeyFor(key_text.slice(), keyStyle()),
         .edition => if (editionManual()) answer.profile.checkEdition(edition_text.slice()) else null,
         .workgroup => answer.profile.checkWorkgroup(workgroup_text.slice()),
         else => null,
@@ -501,6 +501,11 @@ fn duplicateName() bool {
     return answer_profiles.nameTaken(name_text.slice(), &scope_probe, previous_stem);
 }
 
+/// Windows 95 / NT 4.0: the CD key or the OEM ID (answer.profile.KeyStyle).
+fn keyStyle() answer.profile.KeyStyle {
+    return answer.profile.keyStyleFor(system_id);
+}
+
 fn problemText(problem: Problem) []const u8 {
     return switch (problem) {
         .too_long => t(.profile_problem_too_long),
@@ -509,7 +514,7 @@ fn problemText(problem: Problem) []const u8 {
         .reserved_name => t(.profile_problem_reserved_name),
         .same_as_user => t(.profile_problem_same_as_user),
         .only_digits => t(.profile_problem_only_digits),
-        .bad_key_format => t(.profile_problem_bad_key_format),
+        .bad_key_format => t(if (keyStyle() == .win95) .profile_problem_bad_key_format_95 else .profile_problem_bad_key_format),
         .duplicate => t(.profile_problem_duplicate),
         else => t(.profile_problem_bad_characters),
     };
@@ -554,14 +559,14 @@ fn helpKey(id: F) view.Key {
 
 fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
     const id = field_ids[index];
-    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{system_name}) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
+    help_lines[0] = if (id == .key) view.format(&help_text[0], if (keyStyle() == .win95) .profile_help_key_95 else .profile_help_key, &.{system_name}) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
     var n: usize = 1;
     if (problemOf(id)) |problem| {
         if (show_all or !isEmptyRequired(id)) {
             help_lines[1] = problemText(problem);
             // A key being typed: how far it is (the count, never the key).
             if (id == .key and problem == .bad_key_format) {
-                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimit(key_text.slice()) }) catch help_lines[1];
+                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle()) }) catch help_lines[1];
             }
             n = 2;
         }
@@ -702,7 +707,7 @@ fn buildFields() void {
     // the Setup rows (manual: the key and owner rows only feed USOS itself).
     if (answer.msbatch.releaseFor(system_id) != null)
         addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
-    if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
+    if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
     if (!dos) {

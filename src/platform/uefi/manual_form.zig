@@ -68,6 +68,9 @@ pub const Field = struct {
     /// A product key: letters and digits only, in capitals, the dashes put
     /// in on their own (answer.profile.keyTyped); never traced.
     product_key: bool = false,
+    /// How the product key types (answer.profile.KeyStyle): Windows 95 /
+    /// NT 4.0 fields take only the CD key ddd-ddddddd or the OEM ID.
+    key_style: answer_profile.KeyStyle = .any,
     placeholder: []const u8 = "",
     // choice
     options: []const []const u8 = &.{},
@@ -273,7 +276,7 @@ fn traceText(field: *const Field, out: *[16]u8) []const u8 {
     const value = field.text.?.slice();
     if (value.len == 0) return "";
     if (field.secret) return "(secret)";
-    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.keySymbolLimit(value) }) catch "(key)";
+    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.keySymbolLimitFor(value, field.key_style) }) catch "(key)";
     return value;
 }
 
@@ -560,7 +563,7 @@ fn typeChar(index: usize, raw: u8) bool {
     if (field.product_key) {
         const text = field.text.?;
         const before = text.len;
-        text.len = answer_profile.keyTyped(&text.bytes, text.len, raw);
+        text.len = answer_profile.keyTypedFor(&text.bytes, text.len, raw, field.key_style);
         if (text.len == before) return false;
         notifyChanged(index);
         return true;
@@ -577,7 +580,7 @@ fn backspace(index: usize) void {
     if (field.product_key) {
         const text = field.text.?;
         const before = text.len;
-        text.len = answer_profile.keyBackspace(&text.bytes, text.len);
+        text.len = answer_profile.keyBackspaceFor(&text.bytes, text.len, field.key_style);
         if (text.len != before) notifyChanged(index);
         return;
     }
@@ -744,4 +747,10 @@ test "the trace never shows a product key or a password" {
     try std.testing.expectEqualStrings("(secret)", traceText(&password_field, &out));
     key.set("");
     try std.testing.expectEqualStrings("", traceText(&key_field, &out));
+    // A Windows 95 field: the CD key counts to 10.
+    const key95_field = Field{ .kind = .text, .label = "Product key", .text = &key, .product_key = true, .key_style = .win95 };
+    key.set("123-45");
+    try std.testing.expectEqualStrings("(key 5/10)", traceText(&key95_field, &out));
+    key.set("12345-OEM-00");
+    try std.testing.expectEqualStrings("(key 10/20)", traceText(&key95_field, &out));
 }

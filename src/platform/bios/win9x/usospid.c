@@ -12,7 +12,8 @@
  * mini-Windows (MINI.CAB SYSTEM.INI [boot] drivers=, next to USOSKEY.DRV;
  * src/compat/win3x/w9x_mini.zig), types it into that page once:
  *
- *   DRV_LOAD    reads USOSPID.KEY (ddddd-OEM-ddddddd-ddddd), overwrites
+ *   DRV_LOAD    reads USOSPID.KEY (ddddd-OEM-ddddddd-ddddd, or a retail
+ *               CD's ddd-ddddddd CD key), overwrites
  *               the file with zeros and deletes it; no valid key: the load
  *               fails and the driver is gone (Setup asks as before).
  *   DRV_ENABLE  a WH_CBT hook: every window that becomes active
@@ -20,9 +21,10 @@
  *               this driver.
  *   timer       (task time, the window's own message loop) the decisions
  *               of usospid_logic.h: the active wizard frame (Next 0x3024)
- *               showing the OEM page (950: Edit 526 + Static 1010, no
- *               1097; OSR2: the COA page's Edits 1125 / 1126 / 1127, no
- *               526) twice in a row with empty fields -> WM_SETTEXT of the
+ *               showing the key's page (OEM ID, 950: Edit 526 + Static
+ *               1010, no 1097; OSR2: the COA page's Edits 1125 / 1126 /
+ *               1127, no 526; CD key: Edit 526 + 1097, the retail pages
+ *               601 / 602 / 612) with empty fields -> WM_SETTEXT of the
  *               key (OSR2: its 5 / 7 / 5 digits, one per field); the next
  *               tick, with the field(s) full and Next enabled -> WM_COMMAND
  *               Next (BN_CLICKED), posted.
@@ -30,6 +32,11 @@
  *               before that -> OK once (back to the page; Setup's batch
  *               mode pressed Next on the empty field). After typing, that
  *               box, another page or a field the user changed: stop.
+ *   focus       (the same hook, HCBT_SETFOCUS) the page's first field
+ *               gets the focus while still empty: the key goes in at
+ *               once, before Setup's batch mode presses Next on the empty
+ *               page (the 950 RTM X470 run showed the invalid-ID box
+ *               first); the ticks then press Next or stop as above.
  *   stop        all timers killed, the hook removed, the key zeroed. Also
  *               after 30 minutes, at DRV_DISABLE / DRV_FREE and in WEP.
  *
@@ -51,7 +58,10 @@
 /* DGROUP only: SS is not DS in a driver (-zu), so nothing on the stack is
  * handed to Windows by address. */
 static char key[PID_KEY_LEN + 1];
+static int key_kind;            /* PID_KEY_OEM or PID_KEY_CD */
+static int key_len;
 static char part[8];
+static char seen[PID_KEY_LEN + 2];
 static int coa;                 /* the page found is OSR2's COA page */
 static BYTE buf[64];
 static OFSTRUCT of;
@@ -79,6 +89,8 @@ static int read_key(void)
     _lclose(f);
     if (n < 0 || n > (int)sizeof(buf)) n = 0;
     ok = pid_key_parse(buf, n, key);
+    key_kind = ok;
+    key_len = ok == PID_KEY_CD ? PID_CD_KEY_LEN : PID_KEY_LEN;
     zero(buf, sizeof(buf));
     f = OpenFile(KEY_FILE, &of, OF_WRITE);
     if (f != HFILE_ERROR) {
@@ -117,14 +129,19 @@ static int coa_page(HWND c)
     return 1;
 }
 
-/* The visible child page of a wizard frame that is the OEM Product ID page
- * (950) or the COA page (OSR2: coa = 1). */
+/* The visible child page of a wizard frame that takes the key: for an OEM
+ * ID the OEM Product ID page (950) or the COA page (OSR2: coa = 1), for a
+ * CD key a retail page (Edit 526 with the "Advanced..." button 1097). */
 static HWND oem_page(HWND frame)
 {
     HWND c;
     coa = 0;
     for (c = GetWindow(frame, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
         if (!IsWindowVisible(c)) continue;
+        if (key_kind == PID_KEY_CD) {
+            if (class_is(GetDlgItem(c, PID_EDIT_ID), "Edit") && GetDlgItem(c, PID_ADVANCED_ID)) return c;
+            continue;
+        }
         if (class_is(GetDlgItem(c, PID_EDIT_ID), "Edit") && GetDlgItem(c, PID_LABEL_ID) &&
             !GetDlgItem(c, PID_ADVANCED_ID))
             return c;
@@ -133,23 +150,43 @@ static HWND oem_page(HWND frame)
     return 0;
 }
 
-/* Empty: every field of the page is empty; full: each holds its length. */
-static void fields(HWND page, BYTE *empty, BYTE *full)
+/* Field `w` holds exactly want[0..n) (letters compared in upper case).
+ * seen[] is zeroed after use. */
+static int holds(HWND w, const char *want, int n)
+{
+    int i, got, same = 1;
+    got = GetWindowText(w, seen, sizeof(seen));
+    if (got != n) same = 0;
+    for (i = 0; same && i < n; i++) {
+        char a = seen[i];
+        if (a >= 'a' && a <= 'z') a = (char)(a - 32);
+        if (a != want[i]) same = 0;
+    }
+    zero((BYTE *)seen, sizeof(seen));
+    return same;
+}
+
+/* Empty: every field of the page is empty; full: each holds its length;
+ * ours: each holds its part of the key. */
+static void fields(HWND page, BYTE *empty, BYTE *full, BYTE *ours)
 {
     int i, n, len;
     if (!coa) {
         len = GetWindowTextLength(GetDlgItem(page, PID_EDIT_ID));
         *empty = len == 0;
-        *full = len == PID_KEY_LEN;
+        *full = len == key_len;
+        *ours = *full && holds(GetDlgItem(page, PID_EDIT_ID), key, key_len);
         return;
     }
     *empty = 1;
     *full = 1;
+    *ours = 1;
     for (i = 0; i < 3; i++) {
         len = GetWindowTextLength(GetDlgItem(page, coa_ids[i]));
         n = pid_key_part(key, i, part);
         if (len != 0) *empty = 0;
         if (len != n) *full = 0;
+        if (len != n || !holds(GetDlgItem(page, coa_ids[i]), part, n)) *ours = 0;
     }
     zero((BYTE *)part, sizeof(part));
 }
@@ -201,7 +238,7 @@ void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
         next = GetDlgItem(w, PID_NEXT_ID);
         if (class_is(next, "Button")) page = oem_page(w);
     }
-    if (page) fields(page, &view.edit_empty, &view.edit_full);
+    if (page) fields(page, &view.edit_empty, &view.edit_full, &view.edit_ours);
     view.page = page != 0;
     view.next_ready = next && IsWindowVisible(next) && IsWindowEnabled(next);
     switch (pid_step(&st, &view)) {
@@ -235,10 +272,34 @@ static void arm(HWND w)
     else KillTimer(w, PID_TIMER);       /* no slot to kill it later: not armed */
 }
 
+/* An Edit gets the focus: the first field (526, OSR2 1125) of the key's
+ * page in a wizard frame, still empty -> the key goes in now (pid_focus). */
+static void focus_fill(HWND edit)
+{
+    HWND page, frame;
+    int id;
+    if (!class_is(edit, "Edit")) return;
+    id = GetDlgCtrlID(edit);
+    if (id != PID_EDIT_ID && id != PID_COA1_ID) return;
+    page = GetParent(edit);
+    frame = page ? GetParent(page) : 0;
+    if (!frame || !class_is(GetDlgItem(frame, PID_NEXT_ID), "Button")) return;
+    if (oem_page(frame) != page) return;
+    zero((BYTE *)&view, sizeof(view));
+    view.expired = GetTickCount() - started > PID_LIFETIME_MS;
+    view.page = 1;
+    fields(page, &view.edit_empty, &view.edit_full, &view.edit_ours);
+    if (pid_focus(&st, &view) == PA_TYPE) {
+        type_key(page);
+        arm(frame);
+    }
+}
+
 LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
 {
     LRESULT r = CallNextHookEx(cbt_hook, code, wp, lp);
     if (code == HCBT_ACTIVATE && wp && !st.done) arm((HWND)wp);
+    if (code == HCBT_SETFOCUS && wp && !st.done && !st.typed) focus_fill((HWND)wp);
     return r;
 }
 

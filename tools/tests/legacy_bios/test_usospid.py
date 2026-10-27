@@ -31,6 +31,7 @@ SRC = ROOT / 'src/platform/bios/win9x'
 LOGIC = SRC / 'usospid_logic.h'
 DRIVER = SRC / 'usospid.c'
 FAKE_ID = '12345-OEM-0000007-54321'
+FAKE_CD = '111-1111111'
 
 HARNESS = r'''
 #include <stdio.h>
@@ -39,14 +40,15 @@ HARNESS = r'''
 #include "usospid_logic.h"
 /* k HEX...: pid_key_parse of each byte string; s FLAGS...: pid_step per
  * tick, FLAGS = 7 digits expired active box page edit_empty edit_full
- * next_ready; prints the action numbers; p KEY: the COA parts 0..3 of a
- * parsed key, "len:text" each. */
+ * next_ready, an 8th digit edit_ours (else 0), a leading F: pid_focus
+ * instead (the field got the focus); prints the action numbers; p KEY:
+ * the COA parts 0..3 of a parsed OEM ID, "len:text" each. */
 int main(int argc, char **argv)
 {
     int i;
     if (argv[1][0] == 'p') {
         char key[PID_KEY_LEN + 1], part[8];
-        if (!pid_key_parse((const unsigned char *)argv[2], (int)strlen(argv[2]), key)) { printf("bad\n"); return 0; }
+        if (pid_key_parse((const unsigned char *)argv[2], (int)strlen(argv[2]), key) != PID_KEY_OEM) { printf("bad\n"); return 0; }
         for (i = 0; i < 4; i++) { int n = pid_key_part(key, i, part); printf("%d:%s\n", n, part); }
     } else if (argv[1][0] == 'k') {
         for (i = 2; i < argc; i++) {
@@ -63,9 +65,12 @@ int main(int argc, char **argv)
         for (i = 2; i < argc; i++) {
             PIDVIEW v;
             const char *f = argv[i];
+            int focus = f[0] == 'F';
+            if (focus) f++;
             v.expired = f[0] == '1'; v.active = f[1] == '1'; v.box = f[2] == '1'; v.page = f[3] == '1';
             v.edit_empty = f[4] == '1'; v.edit_full = f[5] == '1'; v.next_ready = f[6] == '1';
-            printf("%d", pid_step(&s, &v));
+            v.edit_ours = strlen(f) > 7 && f[7] == '1';
+            printf("%d", focus ? pid_focus(&s, &v) : pid_step(&s, &v));
         }
         printf("\n");
     }
@@ -79,6 +84,9 @@ PAGE_EMPTY = '0101101'
 PAGE_TYPED = '0101011'
 PAGE_TYPED_NEXT_OFF = '0101010'
 PAGE_USER = '0101001'      # someone typed something else
+PAGE_OURS = '01010111'     # the field already holds the key (Setup, the focus fill)
+FOCUS_EMPTY = 'F0001101'   # the page's empty field gets the focus
+FOCUS_USER = 'F0001001'
 BOX = '0110000'
 OTHER = '0100000'          # another page / window active
 BEHIND = '0001101'         # the page's frame, but not the active window
@@ -108,34 +116,55 @@ class Logic(unittest.TestCase):
         cases = [(FAKE_ID.encode() + b'\r\n', '1 ' + FAKE_ID), (FAKE_ID.encode(), '1 ' + FAKE_ID),
                  (FAKE_ID.lower().encode() + b'\n\0\0', '1 ' + FAKE_ID), (FAKE_ID.encode() + b' \t', '1 ' + FAKE_ID),
                  (FAKE_ID[:-1].encode(), '0 '), (FAKE_ID.encode() + b'9', '0 '), (FAKE_ID.replace('OEM', 'OEX').encode(), '0 '),
-                 (FAKE_ID.replace('-', '=', 1).encode(), '0 '), (b'123-4567890\r\n', '0 '), (b'', '0 '),
-                 (FAKE_ID.encode() + b'\r\nmore', '0 ')]
+                 (FAKE_ID.replace('-', '=', 1).encode(), '0 '), (b'', '0 '),
+                 (FAKE_ID.encode() + b'\r\nmore', '0 '),
+                 # a retail CD's CD key (2026-10-27): PID_KEY_CD
+                 (FAKE_CD.encode() + b'\r\n', '2 ' + FAKE_CD), (FAKE_CD.encode(), '2 ' + FAKE_CD),
+                 (FAKE_CD[:-1].encode(), '0 '), (FAKE_CD.encode() + b'9', '0 '), (b'1234567890\r\n', '0 '),
+                 (b'12a-4567890', '0 '), (FAKE_CD.replace('-', '=').encode(), '0 ')]
         got = self.run_exe('k', *[hexs(b) or '00' for b, _ in cases])
         # an empty argument is not passed: 00 is one NUL byte (too short)
         self.assertEqual([g.rstrip() for g in got], [w.rstrip() for _, w in cases])
 
-    def test_types_once_after_a_stable_page_then_next(self):
-        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, PAGE_TYPED, PAGE_TYPED), NONE + TYPE + NEXT + STOP)
+    def test_types_on_the_first_sight_of_the_page_then_next(self):
+        # 2026-10-27: no second sighting any more (the RTM X470 run showed
+        # Setup's batch Next on the empty field first).
+        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_TYPED, PAGE_TYPED), TYPE + NEXT + STOP)
+
+    def test_focus_fills_the_empty_field_at_once(self):
+        # The field gets the focus: typed then; the next tick presses Next.
+        self.assertEqual(self.steps(FOCUS_EMPTY, PAGE_TYPED), TYPE + NEXT)
+        # Setup moved on by itself with the key (its batch Next): done.
+        self.assertEqual(self.steps(FOCUS_EMPTY, OTHER, PAGE_EMPTY), TYPE + STOP + STOP)
+        # Once only; never into a field with text; not after the box.
+        self.assertEqual(self.steps(FOCUS_EMPTY, FOCUS_EMPTY), TYPE + NONE)
+        self.assertEqual(self.steps(FOCUS_USER, PAGE_USER), NONE + STOP)
+        self.assertEqual(self.steps('F0011101', 'F1001101'), NONE + NONE)
+        self.assertEqual(self.steps(PAGE_EMPTY, FOCUS_EMPTY, PAGE_TYPED), TYPE + NONE + NEXT)
+
+    def test_a_field_that_already_holds_the_key_goes_to_next(self):
+        self.assertEqual(self.steps(PAGE_OURS), NEXT)
+        self.assertEqual(self.steps('01010101', PAGE_OURS), NONE + NEXT)
 
     def test_batch_invalid_box_first_is_answered_once(self):
         # Setup's batch mode pressed Next on the empty field: OK, then the page.
-        self.assertEqual(self.steps(BOX, BOX, BEHIND, PAGE_EMPTY, PAGE_EMPTY, PAGE_TYPED), DISMISS + NONE + NONE + NONE + TYPE + NEXT)
+        self.assertEqual(self.steps(BOX, BOX, BEHIND, PAGE_EMPTY, PAGE_TYPED), DISMISS + NONE + NONE + TYPE + NEXT)
 
     def test_rejected_key_stops_at_the_box(self):
-        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, BOX, BOX), NONE + TYPE + STOP + STOP)
+        self.assertEqual(self.steps(PAGE_EMPTY, BOX, BOX), TYPE + STOP + STOP)
 
     def test_user_typing_or_page_change_stops(self):
         self.assertEqual(self.steps(PAGE_USER, PAGE_EMPTY), STOP + STOP)
-        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, PAGE_USER), NONE + TYPE + STOP)
-        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, OTHER), NONE + TYPE + STOP)
+        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_USER), TYPE + STOP)
+        self.assertEqual(self.steps(PAGE_EMPTY, OTHER), TYPE + STOP)
 
-    def test_flicker_resets_and_inactive_windows_change_nothing(self):
-        self.assertEqual(self.steps(PAGE_EMPTY, OTHER, PAGE_EMPTY, BEHIND, PAGE_EMPTY), NONE + NONE + NONE + NONE + TYPE)
+    def test_inactive_windows_change_nothing(self):
+        self.assertEqual(self.steps(OTHER, BEHIND, OTHER, PAGE_EMPTY), NONE + NONE + NONE + TYPE)
 
     def test_next_disabled_waits_then_gives_up(self):
-        ticks = [PAGE_EMPTY, PAGE_EMPTY] + [PAGE_TYPED_NEXT_OFF] * 10
-        self.assertEqual(self.steps(*ticks), NONE + TYPE + NONE * 9 + STOP)
-        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, PAGE_TYPED_NEXT_OFF, PAGE_TYPED), NONE + TYPE + NONE + NEXT)
+        ticks = [PAGE_EMPTY] + [PAGE_TYPED_NEXT_OFF] * 10
+        self.assertEqual(self.steps(*ticks), TYPE + NONE * 9 + STOP)
+        self.assertEqual(self.steps(PAGE_EMPTY, PAGE_TYPED_NEXT_OFF, PAGE_TYPED), TYPE + NONE + NEXT)
 
     def test_coa_parts_are_the_digit_groups(self):
         # OSR2's COA page: 5 + 7 + 5 digits, without "OEM" and the dashes.
@@ -167,6 +196,13 @@ class Source(unittest.TestCase):
         typing = c[c.index('static void type_key(HWND page)'):c.index('void FAR PASCAL __export __loadds tick(')]
         self.assertIn('SetWindowText(GetDlgItem(page, coa_ids[i]), part);', typing)
         self.assertIn('zero((BYTE *)part, sizeof(part));', typing)
+        # a CD key goes only into a retail page (526 with 1097), an OEM ID never
+        page = c[c.index('static HWND oem_page(HWND frame)'):c.index('/* Field `w` holds')]
+        self.assertIn('if (class_is(GetDlgItem(c, PID_EDIT_ID), "Edit") && GetDlgItem(c, PID_ADVANCED_ID)) return c;', page)
+        self.assertLess(page.index('key_kind == PID_KEY_CD'), page.index('PID_LABEL_ID'))
+        # the focus fill: in the CBT hook, only before typing, read-back buffer zeroed
+        self.assertIn('if (code == HCBT_SETFOCUS && wp && !st.done && !st.typed) focus_fill((HWND)wp);', c)
+        self.assertIn('zero((BYTE *)seen, sizeof(seen));', c)
         # nothing on the stack is handed to Windows or helpers by address (SS != DS)
         self.assertNotIn('&coa', c)
         target = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')

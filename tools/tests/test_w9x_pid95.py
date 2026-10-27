@@ -158,18 +158,22 @@ class Pid95(unittest.TestCase):
             if kind == 'USER':
                 self.assertIn('warning: the answer file ProductID has 18+ characters', out)
 
-    def test_stage_key_only_for_an_oem_id(self):
+    def test_stage_key_for_an_oem_id_or_a_cd_key(self):
         key = self.tmp / 'USOSPID.KEY'
-        for value, result in ((OEM_ID, 'staged'), (OEM_ID.lower(), 'staged'), (RETAIL_ID, 'none'), (None, 'none'),
-                              ('12345-OEM-0000007-5432', 'none'), ('12345-OEM-000000a-54321', 'none'), ('x' * 23, 'none')):
+        # A retail CD's ddd-ddddddd CD key goes to the page too (2026-10-27).
+        for value, result in ((OEM_ID, 'staged'), (OEM_ID.lower(), 'staged'), (RETAIL_ID, 'staged'), (None, 'none'),
+                              ('12345-OEM-0000007-5432', 'none'), ('12345-OEM-000000a-54321', 'none'), ('x' * 23, 'none'),
+                              ('111-111111', 'none'), ('1111111111', 'none'), ('111-11111111', 'none')):
             with self.subTest(value=value):
                 key.write_bytes(b'old')
                 self.stage(value)
                 rc, out, err = sh(f'. "{LIB}"\nw9x_pid95_stage_key "$I" "$K"', {'I': self.inf.as_posix(), 'K': key.as_posix()})
                 self.assertEqual((rc, out.strip()), (0, result), err)
                 self.assertNotIn(OEM_ID[6:], out + err)
+                self.assertNotIn(RETAIL_ID[4:], out + err)
                 if result == 'staged':
-                    self.assertEqual(key.read_bytes(), OEM_ID.encode() + b'\r\n')   # OEM upper case
+                    want = RETAIL_ID if value == RETAIL_ID else OEM_ID
+                    self.assertEqual(key.read_bytes(), want.encode() + b'\r\n')   # OEM upper case
                 else:
                     self.assertFalse(key.exists())
 

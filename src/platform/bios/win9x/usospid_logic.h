@@ -10,7 +10,8 @@
  *   OEM Product ID page (dialog 604): one Edit 526 for the whole
  *     xxxxx-OEM-xxxxxxx-xxxxx, its label Static 1010; no control 1097.
  *     The retail pages 601 / 602 / 612 have 526 plus the hidden
- *     "Advanced..." button 1097: no match.
+ *     "Advanced..." button 1097: the page for a CD key (below), never
+ *     for an OEM ID.
  *   OSR2 (SETUP 4.00.1111; read from the user's 95 OSR2.1 PL SUWIN.EXE):
  *     the Certificate of Authenticity page (dialog 604 there) has three
  *     Edits 1125 / 1126 / 1127 for the 5 + 7 + 5 digits ("-OEM-" and "-"
@@ -19,6 +20,15 @@
  *   "Invalid Product ID" box (dialog 156): OK 1, Ignore 1118, Exit 2
  *     (950 and OSR2.1 alike).
  *   Wizard frame (COMMCTRL property sheet): Back 0x3023, Next 0x3024.
+ *   Which page: SUWIN passes SETUPPP.INF [Data] ProductType to SETUPX
+ *     PIDValidate (950 SETUPX.DLL, read from OSR1 EN): 1..6 check a
+ *     ddd-ddddddd key (2/4/6 also refuse the sites 333..999), 7..9 the
+ *     ddddd-OEM-ddddddd-ddddd ID (23 characters, dashes at 5/9/17, mod-7
+ *     digits). The retail ("CD Key", "10-digit Key") pages 601/602/612
+ *     take the ddd-ddddddd key in their one Edit 526 (with the dash, as on
+ *     the sticker: PIDValidate reads 3 digits, the dash, 7 digits). Every
+ *     local 95 CD (RTM PL, OSR1 EN win95_a_oem.iso, OSR2.1 PL) and the
+ *     98/98SE/Me CDs have ProductType=9: an OEM page.
  */
 #ifndef USOSPID_LOGIC_H
 #define USOSPID_LOGIC_H
@@ -31,23 +41,33 @@
 #define PID_COA1_ID      1125
 #define PID_COA2_ID      1126
 #define PID_COA3_ID      1127
-#define PID_KEY_LEN      23
-/* Two ticks of 500 ms on the page before typing; at most 10 ticks waiting
- * for an enabled Next after typing; 30 minutes in all. */
-#define PID_STABLE_TICKS 2
+#define PID_KEY_LEN      23      /* the OEM ID; also the key buffer size */
+#define PID_CD_KEY_LEN   11      /* ddd-ddddddd */
+/* What pid_key_parse found. */
+#define PID_KEY_OEM      1
+#define PID_KEY_CD       2
+/* Typed on the first tick that sees the empty page (or at once when the
+ * page's field gets the focus, pid_focus); at most 10 ticks of 500 ms
+ * waiting for an enabled Next after typing; 30 minutes in all. */
+#define PID_STABLE_TICKS 1
 #define PID_NEXT_TICKS   10
 #define PID_LIFETIME_MS  (30UL * 60UL * 1000UL)
 
-/* ddddd-OEM-ddddddd-ddddd (OEM in any case) at the start of buf[0..len),
- * followed only by CR, LF, space, tab or NUL: out gets the 23 characters
- * (OEM upper case) and a NUL, returns 1. Anything else: 0, out emptied. */
+/* ddddd-OEM-ddddddd-ddddd (OEM in any case; returns PID_KEY_OEM) or the
+ * CD key ddd-ddddddd (PID_KEY_CD) at the start of buf[0..len), followed
+ * only by CR, LF, space, tab or NUL: out (room for PID_KEY_LEN + 1) gets
+ * the characters (OEM upper case) and a NUL. Anything else: 0, out
+ * emptied. */
 static int pid_key_parse(const unsigned char *buf, int len, char *out)
 {
-    static const char shape[PID_KEY_LEN + 1] = "ddddd-OEM-ddddddd-ddddd";
-    int i;
+    static const char oem_shape[PID_KEY_LEN + 1] = "ddddd-OEM-ddddddd-ddddd";
+    static const char cd_shape[PID_CD_KEY_LEN + 1] = "ddd-ddddddd";
+    const char *shape = oem_shape;
+    int i, n = PID_KEY_LEN, kind = PID_KEY_OEM;
     out[0] = 0;
-    if (len < PID_KEY_LEN) return 0;
-    for (i = 0; i < PID_KEY_LEN; i++) {
+    if (len >= 4 && buf[3] == '-') { shape = cd_shape; n = PID_CD_KEY_LEN; kind = PID_KEY_CD; }
+    if (len < n) return 0;
+    for (i = 0; i < n; i++) {
         unsigned char c = buf[i], want = (unsigned char)shape[i];
         if (want == 'd') {
             if (c < '0' || c > '9') goto bad;
@@ -63,8 +83,8 @@ static int pid_key_parse(const unsigned char *buf, int len, char *out)
         unsigned char c = buf[i];
         if (c != '\r' && c != '\n' && c != ' ' && c != '\t' && c != 0) goto bad;
     }
-    out[PID_KEY_LEN] = 0;
-    return 1;
+    out[n] = 0;
+    return kind;
 bad:
     for (i = 0; i < PID_KEY_LEN + 1; i++) out[i] = 0;
     return 0;
@@ -101,8 +121,10 @@ typedef struct {
     unsigned char box;          /* it is the invalid-ID box */
     unsigned char page;         /* it is the wizard frame showing the OEM page */
     unsigned char edit_empty;   /* the page's field (OSR2: all three) is empty */
-    unsigned char edit_full;    /* the page's field holds PID_KEY_LEN characters
+    unsigned char edit_full;    /* the page's field holds the key's length
                                    (OSR2: the three hold 5, 7 and 5) */
+    unsigned char edit_ours;    /* ... and it is exactly the key (filled
+                                   earlier, at the focus, or by Setup) */
     unsigned char next_ready;   /* Next is visible and enabled */
 } PIDVIEW;
 
@@ -130,15 +152,30 @@ static unsigned char pid_step(PIDSTATE *s, const PIDVIEW *v)
         return PA_NONE;
     }
     if (!s->typed) {
-        if (!v->edit_empty) { s->done = 1; return PA_STOP; } /* the user types */
-        if (++s->stable < PID_STABLE_TICKS) return PA_NONE;
-        s->typed = 1;
-        return PA_TYPE;
+        if (v->edit_ours) {
+            s->typed = 1;                                   /* already there: on to Next */
+        } else {
+            if (!v->edit_empty) { s->done = 1; return PA_STOP; } /* the user types */
+            if (++s->stable < PID_STABLE_TICKS) return PA_NONE;
+            s->typed = 1;
+            return PA_TYPE;
+        }
     }
     if (!v->edit_full) { s->done = 1; return PA_STOP; }
     if (v->next_ready) { s->done = 1; return PA_NEXT; }
     if (++s->waited >= PID_NEXT_TICKS) { s->done = 1; return PA_STOP; }
     return PA_NONE;
+}
+
+/* The page's field gets the focus (CBT hook, before Setup's batch mode
+ * can press Next on it): type at once into an empty field, nothing else.
+ * The ticks then go on as after PA_TYPE (Next, or stop when Setup moved
+ * on by itself). */
+static unsigned char pid_focus(PIDSTATE *s, const PIDVIEW *v)
+{
+    if (s->done || s->typed || v->expired || v->box || !v->page || !v->edit_empty) return PA_NONE;
+    s->typed = 1;
+    return PA_TYPE;
 }
 
 #endif

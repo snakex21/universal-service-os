@@ -357,15 +357,16 @@ fn start(
     if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     // Windows 95 without a 95 key (profile or none): ask for it now, while
-    // the gamepads still work (the on-screen keyboard). Phase 1 runs in the
-    // VM only with a key; the native start freezes on modern boards.
+    // the gamepads still work (the on-screen keyboard). Windows 95 may go on
+    // without one (Setup's own page asks); NT 4.0 / POSReady need theirs.
     keyed_95 = null;
     if (usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) == .win9x_uefi) {
         const key_prompt = @import("win9x_key_prompt.zig");
         const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
         if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
             const key = key_prompt.ask(system.name, system.id) orelse return;
-            keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
+            // Windows 95 without a key: Setup's own Product ID page asks.
+            if (key.len > 0) keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
         }
     }
     // No USB gamepad transfer may outlive the menu into another loader;
