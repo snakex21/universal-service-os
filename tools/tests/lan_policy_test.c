@@ -78,9 +78,29 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   fixture("PHASE1.OK","phase1=native \r\n");CHECK(!native95_handoff());
   fixture("PHASE1.OK","phase1=native\r\nx");CHECK(!native95_handoff());
   fixture("PHASE1.OK","phase1=nativ\r\n");CHECK(!native95_handoff());
+  /* native OSR2 phase 1 (20 bytes) */
+  fixture("PHASE1.OK","phase1=native-osr2\r\n");CHECK(native95_handoff());
+  fixture("PHASE1.OK","phase1=native-osr2");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native-osr2\r\nx");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native-osr3\r\n");CHECK(!native95_handoff());
   test_setup_status=ERROR_SUCCESS;fixture("PHASE1.OK","phase1=native\r\n");CHECK(!native95_handoff());test_setup_status=ERROR_FILE_NOT_FOUND;
   copy(system_id,"98");CHECK(!native95_handoff());copy(system_id,"95");
-  test_build_number=1111;CHECK(!native95_handoff());test_build_number=0x040003b6UL;
+  fixture("PHASE1.OK","phase1=native\r\n");
+  test_build_number=0x04000457UL;CHECK(native95_handoff()); /* OSR2 / OSR2.1 1111 */
+  test_build_number=0x040004bcUL;CHECK(native95_handoff()); /* OSR2.5 1212 */
+  test_build_number=0x040004c0UL;CHECK(native95_handoff()); /* OSR2.5 1216 */
+  test_build_number=0x040004bdUL;CHECK(!native95_handoff()); /* 1213: not a 95 build */
+  test_build_number=0x040003b6UL;
+  /* /setup display boundary (usosfb.c display_ready) */
+  {static const char *f[]={"VESALATE.BAT","VLATE.OK","VESA95.BAT","VESA95.OK","VESA95.BAD"};
+   for(i=0;i<5;i++){local(path,f[i]);DeleteFileA(path);}
+   CHECK(display95_ready());                 /* nothing staged */
+   fixture("VESA95.BAT","x");CHECK(!display95_ready());
+   fixture("VESA95.BAD","x");CHECK(display95_ready());local(path,"VESA95.BAD");DeleteFileA(path);
+   fixture("VESA95.OK","x");CHECK(display95_ready());
+   fixture("VESALATE.BAT","x");CHECK(!display95_ready()); /* 950: VLATE.OK only */
+   fixture("VLATE.OK","x");CHECK(display95_ready());
+   for(i=0;i<5;i++){local(path,f[i]);DeleteFileA(path);}}
   test_platform=VER_PLATFORM_WIN32_NT;CHECK(!native95_handoff());test_platform=VER_PLATFORM_WIN32_WINDOWS;
   test_version_available=FALSE;CHECK(!native95_handoff());test_version_available=TRUE;
   test_os_version=0x80005a04UL;test_minor=90;test_build_number=0x045a0bb8UL;local(path,"PHASE1.OK");DeleteFileA(path);
@@ -110,7 +130,7 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
     fixture("PHASE1.OK","phase1=qemu elapsed=123\r\n");
     for(i=0;i<sizeof(cases)/sizeof(cases[0]);i++){
       DeleteFileA(ini);test_os_version=cases[i].legacy;test_minor=cases[i].minor;test_build_number=cases[i].build;
-      CHECK(read_config()&&eq(system_id,cases[i].id));CHECK(native95_handoff()==(i<2));
+      CHECK(read_config()&&eq(system_id,cases[i].id));CHECK(native95_handoff()==(i<3));
     }
     DeleteFileA(ini);test_version_available=FALSE;CHECK(!read_config()&&GetFileAttributesA(ini)==INVALID_FILE_ATTRIBUTES);test_version_available=TRUE;
     test_platform=VER_PLATFORM_WIN32_NT;CHECK(!read_config());test_platform=VER_PLATFORM_WIN32_WINDOWS;

@@ -318,17 +318,27 @@ static int vm(void){unsigned a,b,c,d;__cpuid(1,a,b,c,d);if(c&0x80000000u)return 
  * filesystem verification. The caller must also wait for the desktop.
  * The nested first-stage Setup has no postprocessor marker and defers.
  */
+/* usosfb.c coordinated_build / display_ready: 950 (RTM / OSR1) and the OSR2
+ * family (1111, 1212..1216). 950 binds VESALATE.BAT late (VLATE.OK); OSR2
+ * stages no VESALATE: VESA95.BAT had its one attempt (OK or BAD), or none. */
+static int coordinated95_build(DWORD build){build&=0xffff;
+  return build==950||build==1111||build==1212||build==1214||build==1216;}
+static int present95(const char *name){local(path,name);return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES;}
+static int display95_ready(void){
+  if(present95("VESALATE.BAT"))return present95("VLATE.OK");
+  return present95("VESA95.OK")||present95("VESA95.BAD")||!present95("VESA95.BAT");}
 static int native95_handoff(void){char raw[96];DWORD n,i;HANDLE f;HKEY setup;LONG status;OSVERSIONINFOA version={0};
   version.dwOSVersionInfoSize=sizeof version;
   if(!eq(system_id,"95")||!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||
-     version.dwMajorVersion!=4||version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950)return 0;
+     version.dwMajorVersion!=4||version.dwMinorVersion!=0||!coordinated95_build(version.dwBuildNumber))return 0;
   local(path,"PHASE1.OK");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
   if(f==INVALID_HANDLE_VALUE)return 0;
   n=0;status=GetFileSize(f,0)<sizeof(raw)&&ReadFile(f,raw,sizeof(raw),&n,0);CloseHandle(f);
   if(!status)return 0;
   /* Native phase 1 (tools/w9x_950_post.sh, COMMAND.COM "ECHO phase1=native> PHASE1.OK")
-   * writes exactly "phase1=native\r\n"; QEMU phase 1 writes "phase1=qemu elapsed=N\r\n". */
-  if(n!=15||memcmp(raw,"phase1=native\r\n",15)){
+   * writes exactly "phase1=native\r\n", native OSR2 "phase1=native-osr2\r\n";
+   * QEMU phase 1 writes "phase1=qemu elapsed=N\r\n". */
+  if((n!=15||memcmp(raw,"phase1=native\r\n",15))&&(n!=20||memcmp(raw,"phase1=native-osr2\r\n",20))){
     if(n<23||memcmp(raw,"phase1=qemu elapsed=",20))return 0;
     i=20;while(i<n&&raw[i]>='0'&&raw[i]<='9')i++;
     if(i==20||i+2!=n||raw[i]!='\r'||raw[i+1]!='\n')return 0;}
@@ -474,7 +484,7 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
    if(setup_mode){
      /* native95_handoff also checks the exact phase1 marker and original
       * Setup key absence after read_config supplies the selected OS. */
-     local(path,"VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)ExitProcess(2);
+     if(!display95_ready())ExitProcess(2);
      local(path,"FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES)ExitProcess(2);
    }}
   /* Never while 9x Setup's RunOnce\Setup list is not empty (950 first GUI boot froze in GRPCONV, X470 2026-10-25). */
