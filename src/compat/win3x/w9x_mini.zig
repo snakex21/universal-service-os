@@ -20,7 +20,7 @@
 //!    driver).
 //!
 //! 3. HELPERDIR also holding USOSPID.DRV (tools/w9x_csmwrap_target.sh
-//!    leaves it there only for a 950 native phase 1 with a staged OEM
+//!    leaves it there only for a 950 / OSR2 native phase 1 with a staged OEM
 //!    Product ID, C:\USOS9X\USOSPID.KEY): it goes into the cabinet with the
 //!    bridge and drivers= names it after usoskey.drv; it types that ID into
 //!    SUWIN's Product ID page (src/platform/bios/win9x/usospid.c). The log

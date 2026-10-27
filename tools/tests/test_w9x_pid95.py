@@ -191,19 +191,24 @@ class Pid95(unittest.TestCase):
         self.assertNotIn(OEM_ID[6:], out + err)                          # the key is never logged
         return work / 'c/USOS9X', out
 
-    def test_target_block_stages_the_key_for_950_only(self):
-        # 950 native, USOS answer, USOSPID.DRV on the stick: key file, driver kept.
-        d, out = self.target_block('95', '4 0 0 950', '0', 'PROFILE', True)
-        self.assertEqual((d / 'USOSPID.KEY').read_bytes(), OEM_ID.encode() + b'\r\n')
-        self.assertTrue((d / 'USOSPID.DRV').exists())
-        self.assertIn('product id: dropped', out)
-        self.assertIn('product id: staged for the Product ID page', out)
-        rc, got, _ = sh(f'. "{LIB}"\nw9x_pid95_value "$I"', {'I': (d / 'MSBATCH.INF').as_posix()})
-        self.assertEqual(got.strip(), '')
-        # OSR2, the VM phase 1, a user's file, 98 SE, or no driver: no key, no driver.
-        for case in (('95', '4 0 0 1111', '0', 'PROFILE', True), ('95', '4 0 0 950', '1', 'PROFILE', True),
+    def test_target_block_stages_the_key_for_950_and_osr2(self):
+        # 950 / OSR2 native, USOS answer, USOSPID.DRV on the stick: key file,
+        # driver kept (OSR2: the COA page's three fields, usospid_logic.h).
+        for version in ('4 0 0 950', '4 0 0 1111', '4 0 0 1216'):
+            with self.subTest(version=version):
+                d, out = self.target_block('95', version, '0', 'PROFILE', True)
+                self.assertEqual((d / 'USOSPID.KEY').read_bytes(), OEM_ID.encode() + b'\r\n')
+                self.assertTrue((d / 'USOSPID.DRV').exists())
+                self.assertIn('product id: dropped', out)
+                self.assertIn('product id: staged for the Product ID page', out)
+                rc, got, _ = sh(f'. "{LIB}"\nw9x_pid95_value "$I"', {'I': (d / 'MSBATCH.INF').as_posix()})
+                self.assertEqual(got.strip(), '')
+        # An unknown version, the VM phase 1, a user's file, 98 SE, or no
+        # driver: no key, no driver.
+        for case in (('95', '4 0 0 999', '0', 'PROFILE', True), ('95', '4 0 0 950', '1', 'PROFILE', True),
+                     ('95', '4 0 0 1111', '1', 'PROFILE', True), ('95', '4 0 0 1111', '0', 'USER', True),
                      ('95', '4 0 0 950', '0', 'USER', True), ('98SE', '', '0', 'PROFILE', True),
-                     ('95', '4 0 0 950', '0', 'PROFILE', False)):
+                     ('95', '4 0 0 950', '0', 'PROFILE', False), ('95', '4 0 0 1111', '0', 'PROFILE', False)):
             with self.subTest(case=case):
                 d, out = self.target_block(*case)
                 self.assertFalse((d / 'USOSPID.KEY').exists())
@@ -230,6 +235,18 @@ class Pid95(unittest.TestCase):
                 self.assertEqual((d / 'USOSPID.KEY').exists(), kept)
                 self.assertEqual((d / 'USOSPID.DRV').exists(), kept)
                 self.assertNotIn(OEM_ID[6:], out)
+
+    def test_leftover_key_leaves_the_disk_after_phase_1(self):
+        # OSR2 has no W950POST.BAT: C:\AUTOEXEC.BAT deletes a key USOSPID.DRV
+        # never read once Setup copied Windows (a resumed Setup still has it).
+        lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
+        line = r'ECHO @IF EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY>>C:\AUTOEXEC.BAT'
+        at = lines.index(line)
+        self.assertGreater(at, lines.index(':CSMFIXOK'))
+        self.assertLess(at, lines.index(r'ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT'))
+        self.assertLess(len(line) - len('ECHO ') - len(r'>>C:\AUTOEXEC.BAT'), 128)
+        self.assertIn(r'IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY',
+                      (ROOT / 'tools/w9x_950_post.sh').read_text(encoding='utf-8'))
 
     def test_target_wiring(self):
         text = TARGET.read_text()

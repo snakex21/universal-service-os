@@ -54,9 +54,10 @@ w9x_pid95_prepare() {
     echo dropped
 }
 
-# 950 native phase 1 with a USOS answer: the OEM ID for Setup's own Product
-# ID page (USOSPID.DRV in the mini-Windows types it once, then the page's
-# Next; src/platform/bios/win9x/usospid.c). Call before w9x_pid95_prepare.
+# 950 or OSR2 native phase 1 with a USOS answer: the OEM ID for Setup's own
+# Product ID page (USOSPID.DRV in the mini-Windows types it once, 950 into
+# its one field, OSR2 into the COA page's three, then the page's Next;
+# src/platform/bios/win9x/usospid.c). Call before w9x_pid95_prepare.
 # w9x_pid95_stage_key MSBATCH.INF KEYFILE: prints
 #   staged     [Setup] ProductID is ddddd-OEM-ddddddd-ddddd (OEM in any
 #              case): KEYFILE gets it (OEM upper case) + CR LF

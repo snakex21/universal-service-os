@@ -203,6 +203,9 @@ REM the first GUI start, and writes PHASE1.OK, which FIRSTBT.BAT waits for.
 ECHO @IF EXIST C:\USOS9X\W950POST.BAT CALL C:\USOS9X\W950POST.BAT>>C:\AUTOEXEC.BAT
 REM Source950 only: ordinary RunOnce blocks the first desktop until complete.
 ECHO @IF EXIST C:\USOS9X\FIRSTBT.BAT CALL C:\USOS9X\FIRSTBT.BAT>>C:\AUTOEXEC.BAT
+REM 95 native: a Product ID that USOSPID.DRV never read (tools/w9x_pid95.sh)
+REM leaves the disk once Setup copied Windows (950: W950POST.BAT too).
+ECHO @IF EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT

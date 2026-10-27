@@ -10,9 +10,14 @@
  *   OEM Product ID page (dialog 604): one Edit 526 for the whole
  *     xxxxx-OEM-xxxxxxx-xxxxx, its label Static 1010; no control 1097.
  *     The retail pages 601 / 602 / 612 have 526 plus the hidden
- *     "Advanced..." button 1097; OSR2's COA page has three Edits
- *     1125..1127 and no 526: neither matches.
- *   "Invalid Product ID" box (dialog 156): OK 1, Ignore 1118, Exit 2.
+ *     "Advanced..." button 1097: no match.
+ *   OSR2 (SETUP 4.00.1111; read from the user's 95 OSR2.1 PL SUWIN.EXE):
+ *     the Certificate of Authenticity page (dialog 604 there) has three
+ *     Edits 1125 / 1126 / 1127 for the 5 + 7 + 5 digits ("-OEM-" and "-"
+ *     are Statics between them) and no 526; no other dialog of that
+ *     SUWIN, and none of the 950 ones, has 1125..1127.
+ *   "Invalid Product ID" box (dialog 156): OK 1, Ignore 1118, Exit 2
+ *     (950 and OSR2.1 alike).
  *   Wizard frame (COMMCTRL property sheet): Back 0x3023, Next 0x3024.
  */
 #ifndef USOSPID_LOGIC_H
@@ -23,6 +28,9 @@
 #define PID_ADVANCED_ID  1097
 #define PID_IGNORE_ID    1118
 #define PID_NEXT_ID      0x3024
+#define PID_COA1_ID      1125
+#define PID_COA2_ID      1126
+#define PID_COA3_ID      1127
 #define PID_KEY_LEN      23
 /* Two ticks of 500 ms on the page before typing; at most 10 ticks waiting
  * for an enabled Next after typing; 30 minutes in all. */
@@ -62,6 +70,20 @@ bad:
     return 0;
 }
 
+/* The OSR2 COA page's field `part` (0, 1, 2) of a parsed key: the 5, 7
+ * and 5 digits without "OEM" and the dashes, into out (NUL-terminated,
+ * room for 8). Returns the length (5, 7, 5), 0 for another part. */
+static int pid_key_part(const char *key, int part, char *out)
+{
+    static const unsigned char start[3] = { 0, 10, 18 }, len[3] = { 5, 7, 5 };
+    int i;
+    out[0] = 0;
+    if (part < 0 || part > 2) return 0;
+    for (i = 0; i < len[part]; i++) out[i] = key[start[part] + i];
+    out[len[part]] = 0;
+    return len[part];
+}
+
 enum { PA_NONE, PA_TYPE, PA_NEXT, PA_DISMISS, PA_STOP };
 
 typedef struct {
@@ -78,8 +100,9 @@ typedef struct {
     unsigned char active;       /* this window is the active window */
     unsigned char box;          /* it is the invalid-ID box */
     unsigned char page;         /* it is the wizard frame showing the OEM page */
-    unsigned char edit_empty;   /* the page's field is empty */
-    unsigned char edit_full;    /* the page's field holds PID_KEY_LEN characters */
+    unsigned char edit_empty;   /* the page's field (OSR2: all three) is empty */
+    unsigned char edit_full;    /* the page's field holds PID_KEY_LEN characters
+                                   (OSR2: the three hold 5, 7 and 5) */
     unsigned char next_ready;   /* Next is visible and enabled */
 } PIDVIEW;
 
