@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Зарежда KEYB с подредбата на профила. Само PS/2 клавиатура: USB клавиатура на PC без CSM остава с US подредба в DOS.",
   "boot.profile.field.dos_winsock": "Winsock (експериментален)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 и WfW 3.11: инсталира WINSOCK.DLL на USOS, мрежовия драйвер с опашка за Windows и групата \"USOS Winsock test\" (GETHTTP). Изключено: инсталация както досега.",
+  "boot.profile.field.win9x_setup": "Инсталиране на Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 и Me: автоматично отговаря на страниците на Setup от този профил. Ръчно: Setup показва всичките си страници (собственик, продуктов ключ, часова зона, мрежа); корекциите и добавките на USOS остават.",
   "boot.profile.field.show_extensions": "Показване на разширенията",
   "boot.profile.help.show_extensions": "Explorer показва разширенията на имената на файлове, напр. .exe (за всеки нов потребител).",
   "boot.profile.field.show_hidden": "Показване на скритите файлове",

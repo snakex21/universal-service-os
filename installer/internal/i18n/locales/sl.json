@@ -1151,6 +1151,8 @@
   "boot.profile.help.dos_keyb": "Naloži KEYB z razporeditvijo profila. Samo tipkovnica PS/2: tipkovnica USB na računalniku brez CSM v DOS ostane z razporeditvijo US.",
   "boot.profile.field.dos_winsock": "Winsock (poskusno)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 in WfW 3.11: namesti USOS WINSOCK.DLL, omrežni gonilnik s čakalno vrsto za Windows in skupino \"USOS Winsock test\" (GETHTTP). Izklopljeno: namestitev kot doslej.",
+  "boot.profile.field.win9x_setup": "Namestitev sistema Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 in Me: samodejno odgovori na strani namestitve iz tega profila. Ročno: namestitev prikaže vse svoje strani (lastnik, ključ izdelka, časovni pas, omrežje); popravki in dodatki USOS ostanejo.",
   "boot.profile.field.show_extensions": "Pokaži pripone datotek",
   "boot.profile.help.show_extensions": "Raziskovalec prikaže pripone imen datotek, kot je .exe (za vsakega novega uporabnika).",
   "boot.profile.field.show_hidden": "Pokaži skrite datoteke",

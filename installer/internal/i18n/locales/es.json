@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Carga KEYB con la distribución del perfil. Solo teclado PS/2: un teclado USB en un PC sin CSM mantiene en DOS la distribución US.",
   "boot.profile.field.dos_winsock": "Winsock (experimental)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 y WfW 3.11: instala el WINSOCK.DLL de USOS, el controlador de red con cola para Windows y el grupo \"USOS Winsock test\" (GETHTTP). Desactivado: instalación como hasta ahora.",
+  "boot.profile.field.win9x_setup": "Instalación de Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 y Me: automático responde las páginas de Setup con este perfil. Manual: Setup muestra todas sus páginas (propietario, clave de producto, zona horaria, red); las correcciones y complementos de USOS se mantienen.",
   "boot.profile.field.show_extensions": "Mostrar extensiones",
   "boot.profile.help.show_extensions": "El Explorador muestra las extensiones de nombre de archivo, como .exe (para cada usuario nuevo).",
   "boot.profile.field.show_hidden": "Mostrar archivos ocultos",

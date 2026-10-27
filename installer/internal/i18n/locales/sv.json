@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Läser in KEYB med profilens layout. Endast PS/2-tangentbord: ett USB-tangentbord på en dator utan CSM behåller US-layouten i DOS.",
   "boot.profile.field.dos_winsock": "Winsock (experimentell)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 och WfW 3.11: installerar USOS WINSOCK.DLL, nätverksdrivrutinen med kö för Windows och gruppen \"USOS Winsock test\" (GETHTTP). Av: installation som tidigare.",
+  "boot.profile.field.win9x_setup": "Installation av Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 och Me: automatiskt besvarar installationsprogrammets sidor från den här profilen. Manuellt: installationsprogrammet visar alla sina sidor (ägare, produktnyckel, tidszon, nätverk); USOS-korrigeringarna och tilläggen finns kvar.",
   "boot.profile.field.show_extensions": "Visa filnamnstillägg",
   "boot.profile.help.show_extensions": "Utforskaren visar filnamnstillägg som .exe (för varje ny användare).",
   "boot.profile.field.show_hidden": "Visa dolda filer",

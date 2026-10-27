@@ -78,6 +78,8 @@ const F = enum(u8) {
     dos_keyb,
     /// Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (answer.dos).
     dos_winsock,
+    /// Windows 95 / 98 / Me: automatic or manual Setup (answer.msbatch).
+    win9x_setup,
     save,
     cancel,
 };
@@ -179,6 +181,10 @@ var dos_regional_options: [2][]const u8 = undefined;
 var dos_regional_index: usize = 0;
 var dos_keyb = false;
 var dos_winsock = false;
+/// Windows 95 / 98 / Me Setup: index into Win9xSetup (auto, manual); the
+/// labels are the DOS regional ones ("Automatic from the profile", "Manual
+/// in the installer").
+var win9x_setup_index: usize = 0;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
 
@@ -298,6 +304,7 @@ fn load(p: *const Profile) void {
     dos_regional_index = @intFromEnum(p.dos_regional);
     dos_keyb = p.dos_keyb;
     dos_winsock = p.dos_winsock;
+    win9x_setup_index = @intFromEnum(p.win9x_setup);
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = if (answer.display_profile.supportsSystem(system_id))
         (if (answer.display_profile.requested(p)) @intFromEnum(p.display) + @as(usize, 1) else 0)
@@ -448,6 +455,7 @@ fn build(out: *Profile) void {
     out.dos_regional = @enumFromInt(dos_regional_index);
     out.dos_keyb = dos_keyb;
     out.dos_winsock = dos_winsock;
+    out.win9x_setup = @enumFromInt(win9x_setup_index);
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     if (answer.display_profile.supportsSystem(system_id)) {
@@ -539,6 +547,7 @@ fn helpKey(id: F) view.Key {
         .dos_regional => .profile_help_dos_regional,
         .dos_keyb => .profile_help_dos_keyb,
         .dos_winsock => .profile_help_dos_winsock,
+        .win9x_setup => .profile_help_win9x_setup,
         .save, .cancel => subtitleKey(),
     };
 }
@@ -689,6 +698,10 @@ fn buildFields() void {
         // Off by default; Windows 3.1 / 3.11 / WfW 3.11 only.
         if (answer.dos.winsockCapable(system_id)) addField(.dos_winsock, .{ .kind = .toggle, .label = t(.profile_field_dos_winsock), .flag = &dos_winsock });
     }
+    // Windows 95 / 98 / Me: automatic (default) or manual Setup, first of
+    // the Setup rows (manual: the key and owner rows only feed USOS itself).
+    if (answer.msbatch.releaseFor(system_id) != null)
+        addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
     if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
@@ -844,4 +857,30 @@ test "every system's profile editor fits the form; labels and help titles are va
     }
     // Windows 10 / 11 have more rows than the old limit of 40.
     try std.testing.expect(widest > 40);
+}
+
+test "Windows 9x Setup row: 95/98/Me only, auto by default, manual saved" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-xp", false }, .{ "windows-3-11", false } }) |case| {
+        const id, const offered = case;
+        system_id = id;
+        system_name = id;
+        edition_images = null;
+        previous_stem = null;
+        base = defaults("pl");
+        load(&base);
+        setOptions();
+        buildFields();
+        var row: ?usize = null;
+        for (field_ids[0..field_count], 0..) |fid, i| {
+            if (fid == .win9x_setup) row = i;
+        }
+        try std.testing.expectEqual(offered, row != null);
+        if (row == null) continue;
+        try std.testing.expectEqual(@as(usize, 0), win9x_setup_index);
+        win9x_setup_index = 1;
+        var out: Profile = .{};
+        build(&out);
+        try std.testing.expectEqual(answer.profile.Win9xSetup.manual, out.win9x_setup);
+        win9x_setup_index = 0;
+    }
 }

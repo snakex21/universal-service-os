@@ -10,6 +10,17 @@
 //! clearRendered() removes it at the next UEFI start (it may hold a key).
 //! Windows 95 keys have another format (ddddd-OEM-ddddddd-ddddd or
 //! ddd-ddddddd) and go to ProductID.
+//!
+//! Profile option win9x_setup=manual (profile.Win9xSetup): Setup shows its
+//! pages. The file then has `;USOS-SETUP=manual` (tools/w9x_csmwrap_prepare.sh:
+//! no phase-1 VM, nobody could answer there), no Express / setup type /
+//! startup disk / licence / restart answers, no owner, product key, time
+//! zone or network identification, and keeps only what the modern-PC path
+//! needs: InstallDir C:\WINDOWS with ChangeDir=0 (the USOS start hooks look
+//! there), NoDirWarn (USOS creates C:\WINDOWS before Setup), DevicePath=1
+//! (the USOS drivers next to Setup), the network protocol defaults and
+//! metadata (preselected on the network page), and the [Install] sections:
+//! memory limits, the CSMWrap/USB lines, RunOnce, options and add-ons.
 const std = @import("std");
 const profile_mod = @import("profile.zig");
 const Profile = profile_mod.Profile;
@@ -118,14 +129,20 @@ const windows98_zones = [_][]const u8{
 /// profile's or one typed at start); ignored for Windows 95.
 pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8) ![]const u8 {
     var w: std.Io.Writer = .fixed(buffer);
+    const manual = p.win9x_setup == .manual;
     try w.writeAll("; MSBATCH.INF rendered by USOS from an answer profile (docs/win9x-modern-2026-09-30.md)\r\n");
+    if (manual) try w.writeAll("; Manual Setup: Setup shows its pages; only the USOS settings for this PC below.\r\n;USOS-SETUP=manual\r\n");
     try w.writeAll("[Version]\r\nSignature=\"$CHICAGO$\"\r\n\r\n[Setup]\r\n");
-    try w.writeAll("Express=1\r\nInstallDir=\"C:\\WINDOWS\"\r\nInstallType=1\r\nEBD=0\r\nShowEula=0\r\nChangeDir=0\r\n");
-    try w.writeAll("OptionalComponents=1\r\nNetwork=1\r\nSystem=0\r\nCCP=0\r\nCleanBoot=0\r\nDisplay=0\r\n");
-    try w.writeAll("DevicePath=1\r\nNoDirWarn=1\r\nNoPrompt2Boot=1\r\nUninstall=0\r\nVRC=1\r\n");
+    if (manual) {
+        try w.writeAll("InstallDir=\"C:\\WINDOWS\"\r\nChangeDir=0\r\nNoDirWarn=1\r\nDevicePath=1\r\n");
+    } else {
+        try w.writeAll("Express=1\r\nInstallDir=\"C:\\WINDOWS\"\r\nInstallType=1\r\nEBD=0\r\nShowEula=0\r\nChangeDir=0\r\n");
+        try w.writeAll("OptionalComponents=1\r\nNetwork=1\r\nSystem=0\r\nCCP=0\r\nCleanBoot=0\r\nDisplay=0\r\n");
+        try w.writeAll("DevicePath=1\r\nNoDirWarn=1\r\nNoPrompt2Boot=1\r\nUninstall=0\r\nVRC=1\r\n");
+    }
     // 98/Me: ProductKey (5x5); 95: ProductID (OEM ddddd-OEM-ddddddd-ddddd or
     // retail ddd-ddddddd). A key of the other kind is left out (Setup asks).
-    const shape = profile_mod.keyShape(key);
+    const shape = if (manual) null else profile_mod.keyShape(key);
     const key_field: ?[]const u8 = if (shape) |s| switch (s) {
         .five_by_five => if (release != .windows_95) "ProductKey" else null,
         .win95_oem, .win95_retail => if (release == .windows_95) "ProductID" else null,
@@ -135,7 +152,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         for (key) |c| try w.writeByte(std.ascii.toUpper(c));
         try w.writeAll("\"\r\n");
     }
-    if (p.timeZone()) |zone| {
+    if (if (manual) null else p.timeZone()) |zone| {
         if (timeZoneName(zone)) |name98| {
             const name = if (release == .windows_95) timeZoneName95(name98) else name98;
             if (name) |n| try w.print("TimeZone=\"{s}\"\r\n", .{n});
@@ -143,10 +160,13 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     }
     // An empty field makes Setup show the user page (it needs a key press).
     const org = if (p.org.slice().len > 0) p.org.slice() else "USOS";
-    try w.print("\r\n[NameAndOrg]\r\nName=\"{s}\"\r\nOrg=\"{s}\"\r\nDisplay=0\r\n", .{ p.user.slice(), org });
+    if (!manual) try w.print("\r\n[NameAndOrg]\r\nName=\"{s}\"\r\nOrg=\"{s}\"\r\nDisplay=0\r\n", .{ p.user.slice(), org });
     const computer = if (p.computer.slice().len > 0) p.computer.slice() else "USOS-9X";
     const workgroup = if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP";
-    try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
+    if (manual) {
+        // The identification page stays (no names, no Display=0).
+        try w.writeAll("\r\n[Network]\r\n");
+    } else try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
     try @import("network_defaults.zig").msbatch(p, computer, release == .windows_me, &w);
     try @import("addons_profile.zig").metadata(p, &w);
     // Typed options (options.zig): their own AddReg section, only when set.
@@ -334,6 +354,60 @@ test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     try std.testing.expect(std.mem.indexOf(u8, no_org, "\r\nOrg=\"USOS\"\r\n") != null);
     var small: [64]u8 = undefined;
     try std.testing.expectError(error.WriteFailed, render(&p, .windows_98, key, &small));
+}
+
+test "manual Setup: no page answers, the modern-PC settings stay" {
+    var p = Profile{};
+    try p.name.set("Retro");
+    try p.user.set("Jan");
+    try p.org.set("Lab");
+    try p.computer.set("RETRO");
+    p.timezone = @intCast(tables.timeZoneIndex("Europe/Warsaw").?);
+    p.show_extensions = true;
+    p.no_autorun = true; // 95 too
+    var buffer: [4096]u8 = undefined;
+    var auto_buffer: [4096]u8 = undefined;
+    const auto = try render(&p, .windows_98, "abcde-12345-fghij-67890-klmno", &auto_buffer);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "USOS-SETUP") == null);
+    p.win9x_setup = .manual;
+    for ([_]struct { Release, []const u8 }{
+        .{ .windows_98, "abcde-12345-fghij-67890-klmno" }, .{ .windows_me, "abcde-12345-fghij-67890-klmno" },
+        .{ .windows_95, "12345-OEM-0012345-12345" },        .{ .windows_95, "123-4567890" },
+    }) |case| {
+        const release, const key = case;
+        const text = try render(&p, release, key, &buffer);
+        try std.testing.expect(std.mem.startsWith(u8, text, "; MSBATCH.INF rendered by USOS"));
+        try std.testing.expect(std.mem.indexOf(u8, text, "\r\n;USOS-SETUP=manual\r\n[Version]\r\n") != null);
+        try std.testing.expect(std.mem.indexOf(u8, text, "\r\n[Setup]\r\nInstallDir=\"C:\\WINDOWS\"\r\nChangeDir=0\r\nNoDirWarn=1\r\nDevicePath=1\r\n") != null);
+        for ([_][]const u8{ "Express=", "InstallType=", "EBD=", "ShowEula=", "NoPrompt2Boot=", "VRC=", "Uninstall=", "System=", "CCP=",
+            "ProductKey", "ProductID", "TimeZone=", "[NameAndOrg]", "Name=\"", "ComputerName=", "Workgroup=", "Description=", "Display=0" }) |gone|
+            try std.testing.expect(std.mem.indexOf(u8, text, gone) == null);
+        // the fixes and add-ons stay
+        for ([_][]const u8{ "\r\n[Network]\r\n", "\r\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile", "\r\nUpdateInis=USOS.Memory\r\nUpdateIniFields=USOS.Csm\r\n",
+            "system.ini,386Enh,,\"MaxPhysPage=40000\"", "[USOS.Addons]", "[USOS.Lan]" }) |kept|
+            try std.testing.expect(std.mem.indexOf(u8, text, kept) != null);
+        try std.testing.expect(std.mem.endsWith(u8, text, "[USOS.Csm]\r\n"));
+        for (text, 0..) |c, i| {
+            if (c == '\n') try std.testing.expectEqual(@as(u8, '\r'), text[i - 1]);
+        }
+    }
+}
+
+test "win9x_setup: auto by default and unwritten, manual round-trips, bad values refused" {
+    var p: Profile = undefined;
+    try std.testing.expect(profile_mod.parse("name=A\nuser=Jan\n", &p) == .ok);
+    try std.testing.expectEqual(profile_mod.Win9xSetup.auto, p.win9x_setup);
+    var out: [4096]u8 = undefined;
+    try std.testing.expect(std.mem.indexOf(u8, try profile_mod.write(&p, &out), "win9x_setup") == null);
+    try std.testing.expect(profile_mod.parse("name=A\nuser=Jan\nwin9x_setup=MANUAL\n", &p) == .ok);
+    try std.testing.expectEqual(profile_mod.Win9xSetup.manual, p.win9x_setup);
+    const written = try profile_mod.write(&p, &out);
+    try std.testing.expect(std.mem.indexOf(u8, written, "\r\nwin9x_setup=manual\r\n") != null);
+    var back: Profile = undefined;
+    try std.testing.expect(profile_mod.parse(written, &back) == .ok);
+    try std.testing.expectEqual(profile_mod.Win9xSetup.manual, back.win9x_setup);
+    const bad = profile_mod.parse("name=A\nuser=Jan\nwin9x_setup=sometimes\n", &p).invalid;
+    try std.testing.expectEqual(profile_mod.Field.win9x_setup, bad.field.?);
 }
 
 test "the USOS default MSBATCH.INF and the renderer share the base keys" {

@@ -1148,6 +1148,8 @@
   "boot.profile.help.dos_keyb": "Načte KEYB s rozložením profilu. Jen klávesnice PS/2: klávesnice USB na PC bez CSM má v DOS rozložení US.",
   "boot.profile.field.dos_winsock": "Winsock (experimentální)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 a WfW 3.11: nainstaluje WINSOCK.DLL od USOS, síťový ovladač s frontou pro Windows a skupinu \"USOS Winsock test\" (GETHTTP). Vypnuto: instalace jako dosud.",
+  "boot.profile.field.win9x_setup": "Instalace Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 a Me: automaticky odpovídá na stránky instalace z tohoto profilu. Ručně: instalace zobrazí všechny své stránky (vlastník, kód Product Key, časové pásmo, síť); opravy a doplňky USOS zůstávají.",
   "boot.profile.field.show_extensions": "Zobrazit přípony souborů",
   "boot.profile.help.show_extensions": "Průzkumník zobrazuje přípony názvů souborů, například .exe (pro každého nového uživatele).",
   "boot.profile.field.show_hidden": "Zobrazit skryté soubory",

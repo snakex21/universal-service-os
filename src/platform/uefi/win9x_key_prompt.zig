@@ -38,6 +38,8 @@ pub fn needed(system_id: []const u8, profile: ?*const Profile, answer_file: bool
     const p = profile orelse return true;
     if (nt4) return !answer.nt4.validKey(p.keyFor(system_id));
     if (posready) return !answer.posready.validKey(p.keyFor(system_id));
+    // Manual Setup (win9x_setup=manual): Setup's own page asks for the key.
+    if (p.win9x_setup == .manual) return false;
     return !answer.applies.has95Key(p);
 }
 
@@ -121,4 +123,8 @@ test "a 95 key is asked only for Windows 95 without one" {
     try p.setSystemKey("windows-embedded-posready-2009", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
     try std.testing.expect(!needed("windows-embedded-posready-2009", &p, false));
     try std.testing.expect(valid95("123-1234567") and !valid95("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !valid95("12345-OEM"));
+    // Manual Setup: Setup's own page asks, not the menu.
+    var manual = Profile{ .win9x_setup = .manual };
+    try std.testing.expect(!needed("windows-95", &manual, false));
+    try std.testing.expect(needed("windows-95", null, false));
 }

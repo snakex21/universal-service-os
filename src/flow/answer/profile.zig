@@ -136,6 +136,8 @@ pub const Field = enum {
     dos_keyb,
     // Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (dos.zig, 2026-10-24).
     dos_winsock,
+    // Windows 95 / 98 / Me: automatic or manual Setup (msbatch.zig, 2026-10-27).
+    win9x_setup,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -183,6 +185,14 @@ pub const NetworkLocation = enum {
 /// regional text pages of Windows 3.1 Setup answered; `manual` = none of it
 /// written or answered, the user picks them.
 pub const DosRegional = enum { auto, manual };
+
+/// Windows 95 / 98 / Me Setup (msbatch.zig): `auto` = MSBATCH.INF answers
+/// Setup's pages from the profile (the default, user decision 2026-10-26);
+/// `manual` = Setup shows its pages and the user answers them (owner,
+/// product key, time zone, network identification, components...), while
+/// MSBATCH.INF keeps only what the modern-PC path needs (C:\WINDOWS, the
+/// USOS drivers next to Setup, memory limits, the USOS fixes and add-ons).
+pub const Win9xSetup = enum { auto, manual };
 
 pub const Theme = enum {
     default,
@@ -338,6 +348,8 @@ pub const Profile = struct {
     /// Windows 3.1 / 3.11 / WfW 3.11: stage the experimental USOS Winsock
     /// (WINSOCK.DLL, USOSPKTQ queue driver, GETHTTP test icon). Off by default.
     dos_winsock: bool = false,
+    /// Windows 95 / 98 / Me: automatic (MSBATCH.INF answers) or manual Setup.
+    win9x_setup: Win9xSetup = .auto,
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -979,6 +991,7 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
         .dos_regional => p.dos_regional = enumByName(DosRegional, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .win9x_setup => p.win9x_setup = enumByName(Win9xSetup, value) orelse return .{ .field = field, .problem = .bad_choice },
         .display => {
             p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice };
             p.display_explicit = value.len > 0;
@@ -1058,6 +1071,7 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     if (p.dos_regional != .auto) try w.print("dos_regional={s}\r\n", .{@tagName(p.dos_regional)});
     if (p.dos_keyb) try w.writeAll("dos_keyb=yes\r\n");
     if (p.dos_winsock) try w.writeAll("dos_winsock=yes\r\n");
+    if (p.win9x_setup != .auto) try w.print("win9x_setup={s}\r\n", .{@tagName(p.win9x_setup)});
     inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
         if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
     }

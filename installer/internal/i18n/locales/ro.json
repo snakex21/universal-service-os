@@ -1148,6 +1148,8 @@
   "boot.profile.help.dos_keyb": "Încarcă KEYB cu aranjamentul profilului. Doar tastatură PS/2: o tastatură USB pe un PC fără CSM rămâne în DOS cu aranjamentul US.",
   "boot.profile.field.dos_winsock": "Winsock (experimental)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 și WfW 3.11: instalează WINSOCK.DLL USOS, driverul de rețea cu coadă pentru Windows și grupul \"USOS Winsock test\" (GETHTTP). Dezactivat: instalare ca înainte.",
+  "boot.profile.field.win9x_setup": "Instalarea Windows 9x",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 și Me: automat răspunde la paginile Setup din acest profil. Manual: Setup afișează toate paginile sale (proprietar, cheie de produs, fus orar, rețea); corecturile și suplimentele USOS rămân.",
   "boot.profile.field.show_extensions": "Afișare extensii fișiere",
   "boot.profile.help.show_extensions": "Explorer afișează extensiile numelor de fișiere, de ex. .exe (pentru fiecare utilizator nou).",
   "boot.profile.field.show_hidden": "Afișare fișiere ascunse",

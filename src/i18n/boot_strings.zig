@@ -536,6 +536,7 @@ pub const Key = enum(u16) {
     profile_field_user_script,
     profile_field_visual_effects,
     profile_field_widgets_off,
+    profile_field_win9x_setup,
     profile_field_windows_update,
     profile_field_workgroup,
     profile_file_detail,
@@ -621,6 +622,7 @@ pub const Key = enum(u16) {
     profile_help_user_script,
     profile_help_visual_effects,
     profile_help_widgets_off,
+    profile_help_win9x_setup,
     profile_help_windows_update,
     profile_help_workgroup,
     profile_hidden_other_systems,
@@ -1373,6 +1375,7 @@ pub const hashes = [_]u32{
     0x813657d9, // profile.field.user_script
     0xf0f12e9b, // profile.field.visual_effects
     0xc8544321, // profile.field.widgets_off
+    0x4d2afeef, // profile.field.win9x_setup
     0x9ca4635d, // profile.field.windows_update
     0xc6e00a62, // profile.field.workgroup
     0x39ab14e9, // profile.file.detail
@@ -1458,6 +1461,7 @@ pub const hashes = [_]u32{
     0xd135a07e, // profile.help.user_script
     0xed125ac2, // profile.help.visual_effects
     0xe2dec316, // profile.help.widgets_off
+    0x79ef77a4, // profile.help.win9x_setup
     0xa6ae3d48, // profile.help.windows_update
     0xe79573c5, // profile.help.workgroup
     0xe8f04310, // profile.hidden_other_systems
@@ -2509,6 +2513,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -3049,6 +3055,7 @@ pub const english = [_][]const u8{
     "Run my script at first sign-in",
     "Visual effects",
     "Turn off widgets",
+    "Windows 9x Setup",
     "Automatic updates",
     "Workgroup",
     "Answer file from the Unattended folder, used as it is",
@@ -3134,6 +3141,7 @@ pub const english = [_][]const u8{
     "At the first sign-in Windows runs Scripts\\first-logon.reg and Scripts\\first-logon.cmd from the USOS_DATA partition if the stick is still plugged in.",
     "Best performance turns off animations, shadows and window contents while dragging (for every new user).",
     "No widgets board or news and interests on the taskbar (policy for the whole computer).",
+    "Windows 95, 98 and Me: automatic answers Setup's pages from this profile. Manual: Setup shows all its pages (owner, product key, time zone, network); the USOS fixes and add-ons stay.",
     "Automatic Updates policy: no restart while someone is signed in, notify before downloading, or off.",
     "The workgroup of the computer: up to 15 letters, digits and dashes. Empty: WORKGROUP.",
     "Hidden profiles (made for another system): {0}",

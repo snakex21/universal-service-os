@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Laadib KEYB profiili paigutusega. Ainult PS/2 klaviatuur: USB-klaviatuur ilma CSM-ita arvutis jääb DOS-is US-paigutusele.",
   "boot.profile.field.dos_winsock": "Winsock (katseline)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 ja WfW 3.11: paigaldab USOS-i WINSOCK.DLL-i, Windowsi järjekorraga võrgudraiveri ja rühma \"USOS Winsock test\" (GETHTTP). Väljas: paigaldus nagu varem.",
+  "boot.profile.field.win9x_setup": "Windows 9x häälestus",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 ja Me: automaatne vastab häälestuse lehtedele sellest profiilist. Käsitsi: häälestus näitab kõiki oma lehti (omanik, tootevõti, ajavöönd, võrk); USOS-i parandused ja lisad jäävad.",
   "boot.profile.field.show_extensions": "Näita faililaiendeid",
   "boot.profile.help.show_extensions": "Explorer näitab failinimede laiendeid, nt .exe (igale uuele kasutajale).",
   "boot.profile.field.show_hidden": "Näita peidetud faile",

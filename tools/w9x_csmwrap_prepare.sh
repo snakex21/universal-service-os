@@ -530,6 +530,13 @@ usos_w9x_csmwrap_prepare() {
                 vm_reason='Windows 95 without a product key (ProductID) in the answer keeps the native Setup start'
             fi
         fi
+        # A manual-Setup profile (;USOS-SETUP=manual, src/flow/answer/msbatch.zig):
+        # the user answers Setup's pages, which nobody can do in the VM.
+        if [ "$vm_phase1" = yes ] && grep -qi '^;USOS-SETUP=manual' "$answer_inf" 2>/dev/null; then
+            W9X_VM_KEY=''
+            vm_phase1=no
+            vm_reason='manual Setup (answer profile): native Setup start on this PC'
+        fi
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
     # Windows 9x on NVMe (tools/w9x_nvme.sh): the usosnvme.mpd miniport only

@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Laadt KEYB met de indeling van het profiel. Alleen PS/2-toetsenbord: een USB-toetsenbord op een pc zonder CSM houdt in DOS de US-indeling.",
   "boot.profile.field.dos_winsock": "Winsock (experimenteel)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 en WfW 3.11: installeert de USOS-WINSOCK.DLL, het netwerkstuurprogramma met wachtrij voor Windows en de groep \"USOS Winsock test\" (GETHTTP). Uit: installatie zoals voorheen.",
+  "boot.profile.field.win9x_setup": "Windows 9x Setup",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 en Me: automatisch beantwoordt de pagina's van Setup uit dit profiel. Handmatig: Setup toont al zijn pagina's (eigenaar, productsleutel, tijdzone, netwerk); de USOS-correcties en add-ons blijven.",
   "boot.profile.field.show_extensions": "Bestandsextensies tonen",
   "boot.profile.help.show_extensions": "Verkenner toont bestandsnaamextensies zoals .exe (voor elke nieuwe gebruiker).",
   "boot.profile.field.show_hidden": "Verborgen bestanden tonen",

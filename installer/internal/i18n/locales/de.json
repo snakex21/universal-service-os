@@ -1145,6 +1145,8 @@
   "boot.profile.help.dos_keyb": "Lädt KEYB mit dem Layout des Profils. Nur PS/2-Tastatur: eine USB-Tastatur an einem PC ohne CSM behält in DOS das US-Layout.",
   "boot.profile.field.dos_winsock": "Winsock (experimentell)",
   "boot.profile.help.dos_winsock": "Windows 3.1, 3.11 und WfW 3.11: installiert die USOS-WINSOCK.DLL, den Netzwerktreiber mit Warteschlange für Windows und die Gruppe \"USOS Winsock test\" (GETHTTP). Aus: Installation wie bisher.",
+  "boot.profile.field.win9x_setup": "Windows 9x Setup",
+  "boot.profile.help.win9x_setup": "Windows 95, 98 und Me: automatisch beantwortet die Setup-Seiten aus diesem Profil. Manuell: Setup zeigt alle seine Seiten (Besitzer, Produktschlüssel, Zeitzone, Netzwerk); die USOS-Korrekturen und Add-ons bleiben.",
   "boot.profile.field.show_extensions": "Dateierweiterungen anzeigen",
   "boot.profile.help.show_extensions": "Der Explorer zeigt Dateinamenerweiterungen wie .exe an (für jeden neuen Benutzer).",
   "boot.profile.field.show_hidden": "Versteckte Dateien anzeigen",
