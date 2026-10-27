@@ -882,6 +882,19 @@ if [ "$ANSWER_KIND" != USER ] && [ "$SYSTEM_TAG" = 95 ] &&
         w9x_firstboot_write "$work/c/USOS9X" "$setup_version" || fail 'cannot stage the 95 first-desktop coordinator'
     log "first desktop: 95 ($setup_version) ordinary RunOnce coordinator, one final post-addons restart"
 fi
+# 98 FE / 98 SE: the same coordinator (add-ons, display and LAN defaults
+# before the first desktop instead of MSBATCH's Run USOSAddons next to it).
+# 98 has no root SETUP.EXE version: the release gives the GetVersionEx build.
+# Not fatal: without it 98 keeps the Run chain at the desktop, as before.
+if [ "$ANSWER_KIND" != USER ] && { [ "$SYSTEM_TAG" = 98 ] || [ "$SYSTEM_TAG" = 98SE ]; }; then
+    fb98_version='4 10 0 1998';[ "$SYSTEM_TAG" != 98SE ] || fb98_version='4 10 0 2222'
+    if [ -r "$LIB/w9x_firstboot.sh" ] && . "$LIB/w9x_firstboot.sh" && w9x_firstboot_write "$work/c/USOS9X" "$fb98_version"; then
+        log "first desktop: $SYSTEM_TAG ($fb98_version) ordinary RunOnce coordinator, one final post-addons restart"
+    else
+        rm -f "$work/c/USOS9X/FIRSTBT.ON" "$work/c/USOS9X/FIRSTBT.REG" "$work/c/USOS9X/FIRSTBT.BAT" "$work/c/USOS9X/SHELLHDR.INI"
+        log "first desktop: $SYSTEM_TAG coordinator not staged (USOSFB.EXE missing?); add-ons from Run at the desktop"
+    fi
+fi
 # Source950 with a native phase 1: the VM path's post-phase-1 steps
 # (w9x_csmwrap_prepare.sh: w9x_950_post_inject, PHASE1.OK) need the files
 # Setup copies, after the prep system is gone: W950POST.BAT does them DOS-side
@@ -897,6 +910,11 @@ elif [ "${VM_PHASE1:-0}" != 1 ] && [ "$SYSTEM_TAG" = 95 ] && [ -f "$work/c/USOS9
     [ -r "$LIB/w9x_950_post.sh" ] && . "$LIB/w9x_950_post.sh" &&
         w9x_950_post_dos_write "$work/c/USOS9X" osr2 || fail 'cannot stage the OSR2 native phase-1 marker'
     log 'native phase 1: W950POST.BAT (OSR2: PHASE1.OK only) before the first GUI start'
+# 98 / 98 SE with the coordinator: only PHASE1.OK ("phase1=native-98").
+elif [ "${VM_PHASE1:-0}" != 1 ] && { [ "$SYSTEM_TAG" = 98 ] || [ "$SYSTEM_TAG" = 98SE ]; } && [ -f "$work/c/USOS9X/FIRSTBT.ON" ]; then
+    [ -r "$LIB/w9x_950_post.sh" ] && . "$LIB/w9x_950_post.sh" &&
+        w9x_950_post_dos_write "$work/c/USOS9X" 98 || fail 'cannot stage the 98 native phase-1 marker'
+    log 'native phase 1: W950POST.BAT (98: PHASE1.OK only) before the first GUI start'
 fi
 # Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
 # 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand

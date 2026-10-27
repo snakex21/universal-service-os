@@ -4,6 +4,12 @@
 # native X470 run (OSR2.1 PL, 2026-10-27) took the 98 path (MSBATCH [Install]
 # Run USOSAddons at the desktop, no first-desktop hold): the same chain, the
 # same real-mode steps, USOSFB's build check accepts 1111 / 1212 / 1214 / 1216.
+# Windows 98 FE (4.10.1998) and 98 SE (4.10.2222) too, from the same
+# AUTOEXEC.BAT line (98 runs AUTOEXEC.BAT; Me does not and stays outside):
+# the caller passes '4 10 0 1998' / '4 10 0 2222' (98 has no root SETUP.EXE
+# version read). Their Setup applies MSBATCH [Install] AddReg itself, so the
+# REG95 Network\Logon block below is skipped there (no REG95.OK); PHASE1.OK
+# comes from W950POST.BAT's 98 mode (tools/w9x_950_post.sh) or the VM path.
 # It never creates RunOnce\Setup, which would block the real-mode guards.
 # Until FIRSTBT.OK, every boot also replaces HKLM\Network\Logon with
 # REG95LGN.REG (tools/w9x_reg95.sh writes it at prep time from REG95.REG,
@@ -35,6 +41,8 @@ w9x_firstboot_write() {
     case "$2" in
         '4 0 0 950') fbon='source950 first complete desktop' ;;
         '4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') fbon="95 OSR2 ($2) first complete desktop" ;;
+        '4 10 0 1998') fbon='98 FE (4 10 0 1998) first complete desktop' ;;
+        '4 10 0 2222') fbon='98 SE (4 10 0 2222) first complete desktop' ;;
         *) return 1 ;;
     esac
     [ -f "$1/USOSFB.EXE" ] || return 1

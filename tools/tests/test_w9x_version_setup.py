@@ -56,8 +56,8 @@ class VersionAndLogging(unittest.TestCase):
                                   (2, '95 OSR2', 1111), (3, '98 FE', 1998),
                                   (4, '98 SE', 2222), (5, 'ME', 3000)):
             with self.subTest(system=name):
-                data = self.run_case(case, 0 if case<3 else 2,
-                                     'already completed' if case<3 else 'requires 95 (950 / OSR2)')
+                data = self.run_case(case, 0 if case<5 else 2,
+                                     'already completed' if case<5 else 'requires 95 (950 / OSR2) or 98 (1998 / 2222)')
                 self.assertIn(f'build={build}\r\n'.encode(), data)
 
     def test_refused_os_and_missing_markers_always_log_exit_two(self):
@@ -77,6 +77,18 @@ class VersionAndLogging(unittest.TestCase):
                 data = self.run_case(case, code, reason)
                 self.assertIn(f'build={build}\r\n'.encode(), data)
                 self.assertNotIn(b'VLATE.OK absent', data)
+
+    def test_98_setup_mode_under_the_coordinator(self):
+        # 98 FE / 98 SE: no VESALATE / VESA95 (Setup binds the VESA driver),
+        # PHASE1.OK and FIRSTBT.ON still required; 4.10 only with 98 builds.
+        for case, code, reason, build in ((22, 0, 'already completed', 1998),
+                                          (23, 0, 'already completed', 2222),
+                                          (24, 2, 'FIRSTBT.ON absent', 1998),
+                                          (25, 2, 'requires 95 (950 / OSR2) or 98 (1998 / 2222)', 1111)):
+            with self.subTest(case=case):
+                data = self.run_case(case, code, reason)
+                self.assertIn(f'version=4.10 build={build}\r\n'.encode(), data)
+                self.assertNotIn(b'VESA95 display boundary absent', data)
 
     def test_other_early_exits_and_vbe_failure_are_logged(self):
         for case, code, reason, profile in (

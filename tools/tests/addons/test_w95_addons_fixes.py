@@ -102,10 +102,13 @@ class AddonsFixes(unittest.TestCase):
         self.assertIn('continue;', block)
         self.assertNotIn('restart()', block); self.assertNotIn('MessageBox', block)
         start = src[src.index('void __cdecl ua_start(void) {'):]
-        self.assertIn('!coordinated_build(g_facts.build)||!display_boundary()', start)
+        self.assertIn('!coordinated_build(g_facts.minor,g_facts.build)||!display_boundary()', start)
         self.assertNotIn('!=950', start)
-        build = src[src.index('static int coordinated_build(int build) {'):src.index('static int display_boundary(void) {')]
-        self.assertIn('build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216', build)
+        build = src[src.index('static int coordinated_build(int minor, int build) {'):src.index('static int display_boundary(void) {')]
+        self.assertIn('if (minor == 0) return build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216;', build)
+        # 98 FE / 98 SE (4.10) under the coordinator too; Me (4.90) not
+        self.assertIn('return minor == 10 && (build == 1998 || build == 2222);', build)
+        self.assertIn('g_facts.major!=4||!coordinated_build(', start)
         disp = src[src.index('static int display_boundary(void) {'):src.index('static int setup_busy(void)')]
         self.assertIn('if (exists("C:\\\\USOS9X\\\\VESALATE.BAT")) return exists("C:\\\\USOS9X\\\\VLATE.OK");', disp)
         # a Run start while USOSFB owns the chain does nothing and keeps the value
@@ -156,8 +159,8 @@ class AddonsFixes(unittest.TestCase):
         self.assertIn('if(code==1001){', src)
         self.assertIn('wsprintfA(next,"mid%d\\r\\n",mid+1)', src)
         # 950: DCOM95 + IE restarts, a Q810847 retry and one spare
-        self.assertIn('if(mid>=4)fail(', src)
-        self.assertIn("phase[3]<='4'", src)
+        self.assertIn('if(mid>=mid_limit())fail(', src)
+        self.assertIn('static int mid_limit(void){return win98?9:4;}', src)
         self.assertIn('rundll32.exe C:\\\\WINDOWS\\\\SYSTEM\\\\iernonce.dll,RunOnceExProcess', src)
         self.assertIn('RegDeleteValueA(key,"PrimaryProvider")', src)
         # code 2 (nothing to remove) is "absent", not a failure (run 2026-10-27)

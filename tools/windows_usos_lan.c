@@ -318,27 +318,33 @@ static int vm(void){unsigned a,b,c,d;__cpuid(1,a,b,c,d);if(c&0x80000000u)return 
  * filesystem verification. The caller must also wait for the desktop.
  * The nested first-stage Setup has no postprocessor marker and defers.
  */
-/* usosfb.c coordinated_build / display_ready: 950 (RTM / OSR1) and the OSR2
- * family (1111, 1212..1216). 950 binds VESALATE.BAT late (VLATE.OK); OSR2
- * stages no VESALATE: VESA95.BAT had its one attempt (OK or BAD), or none. */
-static int coordinated95_build(DWORD build){build&=0xffff;
-  return build==950||build==1111||build==1212||build==1214||build==1216;}
+/* usosfb.c coordinated_build / display_ready: 4.00 950 (RTM / OSR1) and the
+ * OSR2 family (1111, 1212..1216), 4.10 98 FE (1998) and 98 SE (2222), each
+ * with its own NETCFG system= (95, 98, 98SE). 950 binds VESALATE.BAT late
+ * (VLATE.OK); OSR2 stages no VESALATE: VESA95.BAT had its one attempt (OK or
+ * BAD), or none; 98 stages neither. */
+static int coordinated95_build(DWORD minor,DWORD build){build&=0xffff;
+  if(minor==0)return eq(system_id,"95")&&(build==950||build==1111||build==1212||build==1214||build==1216);
+  return minor==10&&(build==1998?eq(system_id,"98"):build==2222&&eq(system_id,"98SE"));}
 static int present95(const char *name){local(path,name);return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES;}
 static int display95_ready(void){
   if(present95("VESALATE.BAT"))return present95("VLATE.OK");
   return present95("VESA95.OK")||present95("VESA95.BAD")||!present95("VESA95.BAT");}
 static int native95_handoff(void){char raw[96];DWORD n,i;HANDLE f;HKEY setup;LONG status;OSVERSIONINFOA version={0};
   version.dwOSVersionInfoSize=sizeof version;
-  if(!eq(system_id,"95")||!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||
-     version.dwMajorVersion!=4||version.dwMinorVersion!=0||!coordinated95_build(version.dwBuildNumber))return 0;
+  if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||
+     version.dwMajorVersion!=4||!coordinated95_build(version.dwMinorVersion,version.dwBuildNumber))return 0;
   local(path,"PHASE1.OK");f=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
   if(f==INVALID_HANDLE_VALUE)return 0;
   n=0;status=GetFileSize(f,0)<sizeof(raw)&&ReadFile(f,raw,sizeof(raw),&n,0);CloseHandle(f);
   if(!status)return 0;
   /* Native phase 1 (tools/w9x_950_post.sh, COMMAND.COM "ECHO phase1=native> PHASE1.OK")
-   * writes exactly "phase1=native\r\n", native OSR2 "phase1=native-osr2\r\n";
+   * writes exactly "phase1=native\r\n", native OSR2 "phase1=native-osr2\r\n",
+   * native 98 / 98 SE "phase1=native-98\r\n" (each only on its own 4.x);
    * QEMU phase 1 writes "phase1=qemu elapsed=N\r\n". */
-  if((n!=15||memcmp(raw,"phase1=native\r\n",15))&&(n!=20||memcmp(raw,"phase1=native-osr2\r\n",20))){
+  if((version.dwMinorVersion!=0||n!=15||memcmp(raw,"phase1=native\r\n",15))&&
+     (version.dwMinorVersion!=0||n!=20||memcmp(raw,"phase1=native-osr2\r\n",20))&&
+     (version.dwMinorVersion!=10||n!=18||memcmp(raw,"phase1=native-98\r\n",18))){
     if(n<23||memcmp(raw,"phase1=qemu elapsed=",20))return 0;
     i=20;while(i<n&&raw[i]>='0'&&raw[i]<='9')i++;
     if(i==20||i+2!=n||raw[i]!='\r'||raw[i+1]!='\n')return 0;}

@@ -96,12 +96,29 @@ w9x_950_post_inject() {
 # the latest, once Setup's files are on C: (USOSPID.DRV deletes it earlier).
 # Display binding (VESA95 / VESALATE) is left alone: the native run ends
 # with one adapter.
-# w9x_950_post_dos_write <C:\USOS9X staging dir> [osr2]
+# w9x_950_post_dos_write <C:\USOS9X staging dir> [osr2|98]
 # osr2: 95 OSR2 under the first-desktop coordinator (tools/w9x_firstboot.sh):
 # only the marker (PHASE1.OK, which FIRSTBT.BAT waits for) and the Product
 # ID file, at the same point; OSR2 needs neither text fix (its X470 runs:
 # no GRPCONV hang, MaxResolution from the EDID).
+# 98: Windows 98 FE / 98 SE under the coordinator: only the marker
+# "phase1=native-98" (USOSLAN's native handoff accepts it on 4.10 only),
+# once Setup's WIN.COM and SYSTEM.DAT are on C:; no Product ID file (98's
+# key comes from MSBATCH.INF).
 w9x_950_post_dos_write() {
+    if [ "${2:-}" = 98 ]; then
+        sed 's/$/\r/' > "$1/W950POST.BAT" <<'EOF'
+@ECHO OFF
+REM USOS (tools/w9x_950_post.sh): 98 / 98 SE after a native phase 1, marker only.
+IF EXIST C:\USOS9X\PHASE1.OK GOTO END
+IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
+ECHO 98: PHASE1.OK only>> C:\USOS9X\W950POST.LOG
+ECHO phase1=native-98> C:\USOS9X\PHASE1.OK
+:END
+EOF
+        return
+    fi
     if [ "${2:-}" = osr2 ]; then
         sed 's/$/\r/' > "$1/W950POST.BAT" <<'EOF'
 @ECHO OFF

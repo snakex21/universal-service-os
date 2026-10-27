@@ -178,6 +178,31 @@ class NativeTwin(unittest.TestCase):
         self.assertIn('[ -f "$work/c/USOS9X/FIRSTBT.ON" ] && usos_w9x_95_osr2 "${setup_version:-}"', target[call - 300:call])
         self.assertIn('"${VM_PHASE1:-0}" != 1', target[call - 300:call])
 
+    def test_98_marker_only(self):
+        # 98 FE / 98 SE under the coordinator: PHASE1.OK DOS-side only, with
+        # its own content (USOSLAN accepts "native-98" on 4.10 only).
+        rc, _, err = sh(f'. "{LIB}"\nw9x_950_post_dos_write "{self.tmp.as_posix()}" 98')
+        self.assertEqual(rc, 0, err)
+        data = (self.tmp / 'W950POST.BAT').read_bytes()
+        self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
+        text = data.decode('ascii')
+        lines = text.split('\r\n')
+        self.assertEqual(lines[2:5], [r'IF EXIST C:\USOS9X\PHASE1.OK GOTO END', r'IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END',
+                                      r'IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END'])
+        self.assertEqual(lines[-3:], [r'ECHO phase1=native-98> C:\USOS9X\PHASE1.OK', ':END', ''])
+        for word in ('VESBIND', 'PMDROP', 'MAXRES', 'SETUP.INI', 'MONITOR.INF', 'USOSPID', 'osr2'):
+            self.assertNotIn(word, text)
+        for i, l in enumerate(lines):
+            if 'GOTO ' in l:
+                self.assertGreater(lines.index(':' + l.split('GOTO ')[1]), i, l)
+        target = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        call = target.index('w9x_950_post_dos_write "$work/c/USOS9X" 98')
+        self.assertIn('''elif [ "${VM_PHASE1:-0}" != 1 ] && { [ "$SYSTEM_TAG" = 98 ] || [ "$SYSTEM_TAG" = 98SE ]; } && [ -f "$work/c/USOS9X/FIRSTBT.ON" ]; then''',
+                      target[call - 300:call])
+        # staged after the 98 coordinator, before the boot floppy's AUTOEXEC
+        self.assertLess(target.index('# 98 FE / 98 SE: the same coordinator'), call)
+        self.assertLess(call, target.index('> "$work/AUTOEXEC.BAT"'))
+
     def test_install_bat_and_target_wire_it_for_native_950_only(self):
         install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1').splitlines()
         post = install.index(r'ECHO @IF EXIST C:\USOS9X\W950POST.BAT CALL C:\USOS9X\W950POST.BAT>>C:\AUTOEXEC.BAT')

@@ -65,11 +65,14 @@ static void zero(void *p, unsigned n) { volatile BYTE *b = (volatile BYTE *)p; w
 static void file_path(const char *name) { lstrcpyA(path, directory); lstrcatA(path, name); }
 #ifdef USOSRES_9X
 static int present(const char *name) { file_path(name); return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES; }
-/* usosfb.c coordinated_build / display_ready: 950 (RTM / OSR1) and the OSR2
- * family (1111, 1212..1216). 950 binds VESALATE.BAT late (VLATE.OK); OSR2
- * stages no VESALATE: VESA95.BAT had its one attempt (OK or BAD), or none. */
-static int coordinated_build(DWORD build) { build&=0xffff;
-    return build==950||build==1111||build==1212||build==1214||build==1216; }
+/* usosfb.c coordinated_build / display_ready: 4.00 950 (RTM / OSR1) and the
+ * OSR2 family (1111, 1212..1216), 4.10 98 FE (1998) and 98 SE (2222). 950
+ * binds VESALATE.BAT late (VLATE.OK); OSR2 stages no VESALATE: VESA95.BAT
+ * had its one attempt (OK or BAD), or none; 98 stages neither (Setup binds
+ * the VESA driver from USOSVESA.INF), so its boundary is always open. */
+static int coordinated_build(DWORD minor,DWORD build) { build&=0xffff;
+    if(minor==0) return build==950||build==1111||build==1212||build==1214||build==1216;
+    return minor==10&&(build==1998||build==2222); }
 #endif
 static void say(const char *text) {
     DWORD done;
@@ -415,7 +418,7 @@ static void run(void) {
           lstrcatA(line," version=");number(version.dwMajorVersion);lstrcatA(line,".");number(version.dwMinorVersion);
           lstrcatA(line," build=");number(version.dwBuildNumber&0xffff);lstrcatA(line,"\r\n");say(line);
           if(version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
-             version.dwMinorVersion!=0||!coordinated_build(version.dwBuildNumber)){say("DISPLAY refused: /setup requires 95 (950 / OSR2)\r\n");leave(2);}
+             !coordinated_build(version.dwMinorVersion,version.dwBuildNumber)){say("DISPLAY refused: /setup requires 95 (950 / OSR2) or 98 (1998 / 2222)\r\n");leave(2);}
           file_path("PHASE1.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: PHASE1.OK absent\r\n");leave(2);}
           if(present("VESALATE.BAT")){if(!present("VLATE.OK")){say("DISPLAY refused: VLATE.OK absent\r\n");leave(2);}}
           else if(!present("VESA95.OK")&&!present("VESA95.BAD")&&present("VESA95.BAT")){say("DISPLAY refused: VESA95 display boundary absent\r\n");leave(2);}

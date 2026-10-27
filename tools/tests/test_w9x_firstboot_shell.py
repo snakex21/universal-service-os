@@ -136,10 +136,10 @@ class Coordinator(unittest.TestCase):
         so VESA95's one attempt is the display boundary; the REG95 USOSVmd
         RunOnce value still queued counts as the mouse's late command."""
         s=self.src
-        build=section(s,'static int coordinated_build(DWORD build){','static int vmd_queued(')
-        self.assertIn('build==950||build==1111||build==1212||build==1214||build==1216',build)
+        build=section(s,'static int coordinated_build(DWORD minor,DWORD build){','static int vmd_queued(')
+        self.assertIn('if(minor==0)return build==950||build==1111||build==1212||build==1214||build==1216;',build)
         start=s[s.index('void __cdecl fb_start(void){'):]
-        self.assertIn('!coordinated_build(version.dwBuildNumber)',start)
+        self.assertIn('!coordinated_build(version.dwMinorVersion,version.dwBuildNumber)',start)
         self.assertNotIn('!=950',start)
         disp=section(s,'static int display_ready(void){','static int coordinated_build(')
         self.assertIn('if(exists("VESALATE.BAT"))return exists("VLATE.OK");',disp)
@@ -147,15 +147,40 @@ class Coordinator(unittest.TestCase):
         self.assertNotIn('exists("VLATE.OK")||',start)
         self.assertIn('if(!display_ready()||!tz_ready()){',start)
         late=section(s,'static int late_ready(void){','static void run_once_values(')
-        self.assertIn('if(!display_ready()||!tz_ready()||!exists("REG95.OK"))',late)
+        self.assertIn('if(!display_ready()||!tz_ready()||(!win98&&!exists("REG95.OK")))',late)
         self.assertIn('exists("VLATE.ERR")',late)
         # The OSR2 network markers are the 950 ones (NET95L.BAT writes NET95.OK there).
-        self.assertIn('exists("NET\\\\NET95.REG")&&(!exists("NET\\\\NET95.OK")||!exists("NET\\\\NLATE.OK")||!exists("NET\\\\NFILES.OK"))',late)
+        self.assertIn('if(!win98&&exists("NET\\\\NET95.REG")&&(!exists("NET\\\\NET95.OK")||!exists("NET\\\\NLATE.OK")||!exists("NET\\\\NFILES.OK"))',late)
         mouse=section(s,'static void finish_mouse(void){','static int tz_ready(')
         self.assertIn('if(!(exists("VMDLATE.RUN")||(!exists("VMDLATE.BAT")&&vmd_queued()))||exists("VMDLATE.ERR")||',mouse)
         queued=section(s,'static int vmd_queued(void){','static int mouse_configured(')
         self.assertIn('RegQueryValueExA(key,"USOSVmd",0,&type,',queued)
         self.assertIn('contains(text,"C:\\\\USOS9X\\\\USOSVMD.INF")',queued)
+
+    def test_98_scope_and_gates(self):
+        r"""98 FE (4.10.1998) / 98 SE (4.10.2222) under the coordinator: 95's
+        gates stay for 4.00; 98 has no REG95.OK / NET95 step / Network\Logon
+        fix, nine package restarts, and a first start that tolerates a
+        taskbar and waits out RunOnce\Setup without FIRSTBT.ERR."""
+        s=self.src
+        build=section(s,'static int coordinated_build(DWORD minor,DWORD build){','static int vmd_queued(')
+        self.assertIn('return minor==10&&(build==1998||build==2222);}',build)
+        self.assertNotIn('3000',build)    # Me: no AUTOEXEC.BAT, stays out
+        start=s[s.index('void __cdecl fb_start(void){'):]
+        self.assertIn('win98=version.dwMinorVersion==10;',start)
+        self.assertLess(start.index('win98=version.dwMinorVersion==10;'),start.index('coordinator entered before desktop'))
+        first=start[start.index('if(win98&&!shell_mode&&!exists("FIRSTBT.STA")){'):start.index('if(shell_mode)run_once_values();')]
+        self.assertIn('if(!setup_done()){log_line("98: original RunOnce Setup not finished; the coordinator starts again at the next boot");leave(0);}',first)
+        self.assertNotIn('fail(',first.split('else if')[0])
+        # 95 keeps both hard checks in their old order
+        self.assertIn('else if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");',first)
+        self.assertLess(first.index('else if(FindWindowA'),first.index('if(!setup_done())fail("original RunOnce Setup has not completed");'))
+        self.assertLess(first.index('if(!setup_done())fail('),first.index('read_local("FIRSTBT.STA"'))
+        logon=section(s,'static void windows_logon(void){','static int mid_limit(void)')
+        self.assertLess(logon.index('if(win98){'),logon.index('RegOpenKeyExA'))
+        self.assertIn('static int mid_limit(void){return win98?9:4;}',s)
+        self.assertIn("phase[3]>='1'&&phase[3]-'0'<=mid_limit()&&",s)
+        self.assertIn('if(mid>=mid_limit())fail(',s)
 
     def test_install_phase_resumes(self):
         """A restart or Retry inside the package boundary (FIRSTBT.STA

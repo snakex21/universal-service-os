@@ -85,6 +85,23 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   fixture("PHASE1.OK","phase1=native-osr3\r\n");CHECK(!native95_handoff());
   test_setup_status=ERROR_SUCCESS;fixture("PHASE1.OK","phase1=native\r\n");CHECK(!native95_handoff());test_setup_status=ERROR_FILE_NOT_FOUND;
   copy(system_id,"98");CHECK(!native95_handoff());copy(system_id,"95");
+  /* 98 FE / 98 SE under the coordinator: "phase1=native-98" (18 bytes) on
+     4.10 only, NETCFG system= per build; 95's markers are not 98's. */
+  fixture("PHASE1.OK","phase1=native-98\r\n");CHECK(!native95_handoff()); /* 4.00 950 */
+  test_minor=10;test_build_number=0x040a07ceUL;copy(system_id,"98");CHECK(native95_handoff());
+  copy(system_id,"98SE");CHECK(!native95_handoff());copy(system_id,"95");CHECK(!native95_handoff());
+  test_build_number=0x040a08aeUL;copy(system_id,"98SE");CHECK(native95_handoff());
+  copy(system_id,"98");CHECK(!native95_handoff());copy(system_id,"98SE");
+  test_setup_status=ERROR_SUCCESS;CHECK(!native95_handoff());test_setup_status=ERROR_FILE_NOT_FOUND;
+  fixture("PHASE1.OK","phase1=native-98");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native-98\r\nx");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native-99\r\n");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native\r\n");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=native-osr2\r\n");CHECK(!native95_handoff());
+  fixture("PHASE1.OK","phase1=qemu elapsed=7\r\n");CHECK(native95_handoff());
+  test_build_number=0x040a07cfUL;copy(system_id,"98");CHECK(!native95_handoff()); /* 1999 */
+  test_build_number=0x040a03b6UL;copy(system_id,"95");CHECK(!native95_handoff()); /* 4.10 with 950 */
+  test_minor=0;test_build_number=0x040003b6UL;copy(system_id,"95");
   fixture("PHASE1.OK","phase1=native\r\n");
   test_build_number=0x04000457UL;CHECK(native95_handoff()); /* OSR2 / OSR2.1 1111 */
   test_build_number=0x040004bcUL;CHECK(native95_handoff()); /* OSR2.5 1212 */
@@ -130,7 +147,7 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
     fixture("PHASE1.OK","phase1=qemu elapsed=123\r\n");
     for(i=0;i<sizeof(cases)/sizeof(cases[0]);i++){
       DeleteFileA(ini);test_os_version=cases[i].legacy;test_minor=cases[i].minor;test_build_number=cases[i].build;
-      CHECK(read_config()&&eq(system_id,cases[i].id));CHECK(native95_handoff()==(i<3));
+      CHECK(read_config()&&eq(system_id,cases[i].id));CHECK(native95_handoff()==(i<5));
     }
     DeleteFileA(ini);test_version_available=FALSE;CHECK(!read_config()&&GetFileAttributesA(ini)==INVALID_FILE_ATTRIBUTES);test_version_available=TRUE;
     test_platform=VER_PLATFORM_WIN32_NT;CHECK(!read_config());test_platform=VER_PLATFORM_WIN32_WINDOWS;

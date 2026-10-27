@@ -699,14 +699,17 @@ static void unregister(void) {
     }
 }
 
-/* USOSFB's builds: 950 (RTM / OSR1) and the OSR2 family (1111, 1212..1216). */
-static int coordinated_build(int build) {
+/* USOSFB's builds: 4.00 950 (RTM / OSR1) and the OSR2 family (1111,
+ * 1212..1216); 4.10 98 FE (1998) and 98 SE (2222). */
+static int coordinated_build(int minor, int build) {
     build &= 0xffff;
-    return build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216;
+    if (minor == 0) return build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216;
+    return minor == 10 && (build == 1998 || build == 2222);
 }
 
 /* The display boundary USOSFB waits for (usosfb.c display_ready): 950's
- * VESALATE.BAT binding, or on OSR2 (no VESALATE) VESA95.BAT's one attempt. */
+ * VESALATE.BAT binding, or on OSR2 (no VESALATE) VESA95.BAT's one attempt;
+ * 98 stages neither (open boundary). */
 static int display_boundary(void) {
     if (exists("C:\\USOS9X\\VESALATE.BAT")) return exists("C:\\USOS9X\\VLATE.OK");
     return exists("C:\\USOS9X\\VESA95.OK") || exists("C:\\USOS9X\\VESA95.BAD") || !exists("C:\\USOS9X\\VESA95.BAT");
@@ -1136,8 +1139,8 @@ void __cdecl ua_start(void) {
 
     detect();
     g_setup_mode=exact_switch(cmdline,"setup");
-    if(g_setup_mode && (g_facts.nt||g_facts.major!=4||g_facts.minor!=0||!coordinated_build(g_facts.build)||!display_boundary())){
-        log_line("USOSADD setup: 95 (950 / OSR2) late display boundary missing; nothing installed");ExitProcess(2);}
+    if(g_setup_mode && (g_facts.nt||g_facts.major!=4||!coordinated_build(g_facts.minor,g_facts.build)||!display_boundary())){
+        log_line("USOSADD setup: 95 (950 / OSR2) / 98 (1998 / 2222) late display boundary missing; nothing installed");ExitProcess(2);}
     /* A start from HKLM Run (MSBATCH [Install] / REG95.REG USOSAddons) while
      * the first-desktop coordinator owns the chain (FIRSTBT.ON, neither
      * FIRSTBT.OK nor FIRSTBT.ERR): nothing runs, the value stays, so the

@@ -1,5 +1,6 @@
-/* Windows 95 first-desktop coordinator (RTM / OSR1 4.00.950 and OSR2 /
- * OSR2.1 / OSR2.5 4.00.1111..1216). USOS, GPL-3.0-or-later.
+/* Windows 95 / 98 first-desktop coordinator (95 RTM / OSR1 4.00.950, OSR2 /
+ * OSR2.1 / OSR2.5 4.00.1111..1216, 98 FE 4.10.1998, 98 SE 4.10.2222).
+ * USOS, GPL-3.0-or-later.
  * Ordinary RunOnce is synchronous before Shell_TrayWnd on Windows95 RTM;
  * the first boot after Setup still starts the coordinator from it. The
  * package boots after it run with this program as the Windows shell (see
@@ -14,7 +15,7 @@ static const char sysini[]="C:\\WINDOWS\\SYSTEM.INI";
 static const char fbexe[]="C:\\USOS9X\\USOSFB.EXE";
 static HANDLE journal=INVALID_HANDLE_VALUE;
 static char path[MAX_PATH],text[8192];
-static int shell_mode;
+static int shell_mode,win98;
 void *memset(void *p,int v,unsigned n){BYTE*b=p;while(n--)*b++=(BYTE)v;return p;}
 static unsigned length(const char*s){unsigned n=0;while(s[n])n++;return n;}
 static void local(const char*leaf){lstrcpyA(path,root);lstrcatA(path,leaf);}
@@ -147,10 +148,12 @@ static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHI
 static int display_ready(void){
     if(exists("VESALATE.BAT"))return exists("VLATE.OK");
     return exists("VESA95.OK")||exists("VESA95.BAD")||!exists("VESA95.BAT");}
-/* GetVersionEx build: 950 (RTM / OSR1) or the OSR2 family (OSR2 / OSR2.1
- * 1111, OSR2.5 1212..1216). */
-static int coordinated_build(DWORD build){build&=0xffff;
-    return build==950||build==1111||build==1212||build==1214||build==1216;}
+/* GetVersionEx 4.00 build: 950 (RTM / OSR1) or the OSR2 family (OSR2 /
+ * OSR2.1 1111, OSR2.5 1212..1216); 4.10 build: 98 FE 1998 or 98 SE 2222.
+ * Me (4.90) runs no AUTOEXEC.BAT, so FIRSTBT.BAT never arms it. */
+static int coordinated_build(DWORD minor,DWORD build){build&=0xffff;
+    if(minor==0)return build==950||build==1111||build==1212||build==1214||build==1216;
+    return minor==10&&(build==1998||build==2222);}
 /* The REG95 / VMDLATE RunOnce value USOSVmd with our INF command, still queued. */
 static int vmd_queued(void){HKEY key;DWORD size=sizeof text-1,type;LONG code;
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_READ,&key)!=ERROR_SUCCESS)return 0;
@@ -188,11 +191,14 @@ static void finish_mouse(void){HKEY key;LONG code;
 static int tz_ready(void){
     if(exists("TZDST.OK")||!exists("TZFIX.BAT"))return 1;
     return exists("TZFIX.OK")&&!exists("TZDST.PND");}
+/* 98 / 98 SE: Setup applies MSBATCH.INF [Install] AddReg and installs
+ * TCP/IP itself, so there is no REG95.BAT (REG95.OK) and no NET95 step;
+ * a stray NET95.REG there is not ours to wait for. */
 static int late_ready(void){
-    if(!display_ready()||!tz_ready()||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
+    if(!display_ready()||!tz_ready()||(!win98&&!exists("REG95.OK"))){log_line("late: display/time zone/registry marker missing");return 0;}
     if(exists("R95LATE.REG")&&!exists("R95LATE.OK")){log_line("late: IE registry import missing");return 0;}
     if(exists("VLATE.ERR")||exists("TZFIX.BAD")||exists("R95LATE.ERR")||exists("VMDLATE.ERR")){log_line("late: real-mode error marker present");return 0;}
-    if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
+    if(!win98&&exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
     if(!mouse_configured()){log_line("late: selected DOS-box mouse missing in SYSTEM.INI");return 0;}
     if(!legacy_absent()){log_line("late: legacy display still present");return 0;}return 1;}
 /* Explorer's part in a shell boot. On 95 RTM Explorer ran the values that
@@ -248,20 +254,26 @@ static void finish_runonceex(void){DWORD before=ex_sections(),code;char line[160
     wsprintfA(line,"RunOnceEx: iernonce exit %lu, sections %lu -> %lu",code,before,ex_sections());log_line(line);}
 /* 950 Setup writes Network\Logon PrimaryProvider "Microsoft Network" although
  * the answer asks for Windows Logon; FIRSTBT.BAT removes the key in real mode
- * on every boot until FIRSTBT.OK, this is the last removal before the desktop. */
+ * on every boot until FIRSTBT.OK, this is the last removal before the desktop.
+ * 98 keeps the logon provider its Setup chose from the answer. */
 static void windows_logon(void){HKEY key;LONG code;char line[96];
+    if(win98){log_line("98: Network\\Logon left as Setup wrote it");return;}
     code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Network\\Logon",0,KEY_SET_VALUE,&key);
     if(code==ERROR_SUCCESS){code=RegDeleteValueA(key,"PrimaryProvider");RegCloseKey(key);}
     if(code==ERROR_SUCCESS)lstrcpyA(line,"Network\\Logon PrimaryProvider removed");
     else if(code==ERROR_FILE_NOT_FOUND)lstrcpyA(line,"Network\\Logon PrimaryProvider absent");
     else wsprintfA(line,"Network\\Logon PrimaryProvider not removed (code %ld)",code);
     log_line(line);}
-/* FIRSTBT.STA phases: late, install, mid1..mid4 (USOSADD exit 1001: a package
- * restart the chain asked for), resume1..resume4, reboot (the final one).
- * 950: DCOM95 and IE 5.5 SP2 restart (reboot_setup=now), one more for a
- * package retried after a restart (Q810847 check_setup), one spare. */
+/* FIRSTBT.STA phases: late, install, mid1..mid9 (USOSADD exit 1001: a package
+ * restart the chain asked for), resume1..resume9, reboot (the final one).
+ * 95 allows four: 950's DCOM95 and IE 5.5 SP2 restart (reboot_setup=now),
+ * one more for a package retried after a restart (Q810847 check_setup), one
+ * spare. 98 allows nine: the reboot=now packages of legacy-pack.ini (kept
+ * under /setup) are DCOM98, DUN 1.4 and IE 6 SP1, on 98 SE also Q243199
+ * and WMP 9, plus the options (ASPI, DS client, KernelEx) and retries. */
+static int mid_limit(void){return win98?9:4;}
 static int mid_phase(const char*phase){
-    if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]<='4'&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
+    if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]-'0'<=mid_limit()&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
     return 0;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[64];DWORD code;HKEY key;int mid;
     shell_mode=usos_shell();
@@ -273,12 +285,21 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         log_line("WARNING: shell=USOSFB was set for this boot but Explorer started; package boots stay under Explorer's RunOnce");}
     memset(&version,0,sizeof version);version.dwOSVersionInfoSize=sizeof version;
     if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
-       version.dwMinorVersion!=0||!coordinated_build(version.dwBuildNumber)||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))
-        fail("95 (950 / OSR2) / phase1 scope refused");
+       !coordinated_build(version.dwMinorVersion,version.dwBuildNumber)||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))
+        fail("95 (950 / OSR2) / 98 (1998 / 2222) / phase1 scope refused");
+    win98=version.dwMinorVersion==10;
     if(exists("FIRSTBT.OK")){log_line("already complete");leave(0);}
     if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");leave(2);}
     log_line("coordinator entered before desktop");
-    if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
+    /* 98, first start under Explorer's RunOnce (no FIRSTBT.STA yet; not yet
+     * seen on hardware). A taskbar only means Explorer did not wait for
+     * RunOnce: this start installs nothing and restarts into a shell boot at
+     * once. A RunOnce\Setup list still there (98 Setup restarts inside it)
+     * is waited out without FIRSTBT.ERR: FIRSTBT.BAT arms the next boot. */
+    if(win98&&!shell_mode&&!exists("FIRSTBT.STA")){
+        if(!setup_done()){log_line("98: original RunOnce Setup not finished; the coordinator starts again at the next boot");leave(0);}
+        if(FindWindowA("Shell_TrayWnd",0))log_line("WARNING: 98 taskbar present at the first coordinator start; restarting into a shell boot");}
+    else if(FindWindowA("Shell_TrayWnd",0))fail("ordinary RunOnce started after desktop");
     if(!setup_done())fail("original RunOnce Setup has not completed");
     phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))fail("cannot read phase journal");
     if(shell_mode)run_once_values();
@@ -327,7 +348,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
             /* The chain asked for a restart (DCOM95 / IE 5.5 SP2 reboot_setup=now, or
              * a retry after a restart): restart, keep holding the desktop,
              * resume the chain from STATE.INI. */
-            if(mid>=4)fail("more than four package restarts before the desktop");
+            if(mid>=mid_limit())fail(win98?"more than nine package restarts before the desktop":"more than four package restarts before the desktop");
             wsprintfA(next,"mid%d\r\n",mid+1);wsprintfA(note,"restart: package restart %d before the desktop",mid+1);
             reboot(next,note);}
         if(code!=0&&code!=3010)fail("packages did not finish before final restart");}

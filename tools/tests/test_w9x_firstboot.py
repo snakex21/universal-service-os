@@ -11,7 +11,8 @@ class FirstBoot(unittest.TestCase):
         result=subprocess.run([r'C:\Program Files\Git\bin\sh.exe','-c',script,'test',str(ROOT/'tools/w9x_firstboot.sh').replace('\\','/'),str(target).replace('\\','/'),version],capture_output=True)
         return target,result
     def test_other_source_versions_and_missing_helper_do_not_arm(self):
-        for version,helper in [('4 0 0 1112',True),('4 10 0 2222',True),('4 0 0 950',False),('4 0 0 1111',False),('',True)]:
+        for version,helper in [('4 0 0 1112',True),('4 10 0 2000',True),('4 10 0 2222',False),('4 90 0 3000',True),
+                               ('4 0 0 950',False),('4 0 0 1111',False),('',True)]:
             folder,result=self.generate(version,helper)
             self.assertNotEqual(result.returncode,0)
             self.assertFalse(list(folder.glob('FIRST*')))
@@ -24,6 +25,31 @@ class FirstBoot(unittest.TestCase):
                 self.assertEqual((folder/name).read_bytes(),(base/name).read_bytes(),(version,name))
             self.assertEqual((folder/'FIRSTBT.ON').read_bytes(),f'95 OSR2 ({version}) first complete desktop\r\n'.encode())
         self.assertEqual((base/'FIRSTBT.ON').read_bytes(),b'source950 first complete desktop\r\n')
+    def test_98_gets_the_same_coordinator(self):
+        # 98 FE / 98 SE: add-ons before the first desktop (their Run chain ran
+        # next to it, X470 98 FE PL 2026-10-27). The same real-mode files; the
+        # REG95 Network\Logon block is guarded by REG95.OK, which 98 never has.
+        base,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
+        for version,label in (('4 10 0 1998','98 FE'),('4 10 0 2222','98 SE')):
+            folder,result=self.generate(version);self.assertEqual(result.returncode,0,result.stderr)
+            for name in ('FIRSTBT.BAT','FIRSTBT.REG','SHELLHDR.INI'):
+                self.assertEqual((folder/name).read_bytes(),(base/name).read_bytes(),(version,name))
+            self.assertEqual((folder/'FIRSTBT.ON').read_bytes(),f'{label} ({version}) first complete desktop\r\n'.encode())
+        lines=(base/'FIRSTBT.BAT').read_bytes().split(b'\r\n')
+        self.assertLess(lines.index(rb'IF NOT EXIST C:\USOS9X\REG95.OK GOTO LGNEND'),
+                        lines.index(rb'C:\USOS9X\VESBIND.EXE DELKEY C:\WINDOWS\SYSTEM.DAT HKEY_LOCAL_MACHINE\Network\Logon C:\USOS9X\LGNDEL.LOG'))
+    def test_target_stages_98_without_failing_and_keeps_me_out(self):
+        target=(ROOT/'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        block=target[target.index('# 98 FE / 98 SE: the same coordinator'):]
+        block=block[:block.index('\nfi\n')+4]
+        self.assertIn('''if [ "$ANSWER_KIND" != USER ] && { [ "$SYSTEM_TAG" = 98 ] || [ "$SYSTEM_TAG" = 98SE ]; }; then''',block)
+        self.assertIn("fb98_version='4 10 0 1998';[ \"$SYSTEM_TAG\" != 98SE ] || fb98_version='4 10 0 2222'",block)
+        self.assertNotIn('fail ',block)   # 98 falls back to the Run chain
+        self.assertIn('rm -f "$work/c/USOS9X/FIRSTBT.ON"',block)
+        self.assertNotIn('= ME',block)
+        # the 95 staging stays fatal and unchanged
+        self.assertIn("w9x_firstboot_write \"$work/c/USOS9X\" \"$setup_version\" || fail 'cannot stage the 95 first-desktop coordinator'",target)
+        self.assertLess(target.index("cannot stage the 95 first-desktop coordinator"),target.index('# 98 FE / 98 SE: the same coordinator'))
     def test_real_mode_queue_is_ordinary_runonce_and_dos_sized(self):
         folder,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
         reg=(folder/'FIRSTBT.REG').read_bytes();batch=(folder/'FIRSTBT.BAT').read_bytes()
