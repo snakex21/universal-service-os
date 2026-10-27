@@ -378,6 +378,17 @@ if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
     fi
 fi
 [ "$pid_key" = staged ] || rm -f "$work/c/USOS9X/USOSPID.DRV" "$work/c/USOS9X/USOSPID.KEY"
+# Windows Me with a native phase 1: the VM path's w9x_phase1_patch_c
+# (SYSTEM.INI [386Enh] mouse= out, MSDOS.SYS Logo=0) has no real-mode step
+# to run in (Me runs no program from C:\AUTOEXEC.BAT). USOSP1.DRV
+# (src/platform/bios/win9x/usosp1.c) does both edits in Setup's own
+# mini-Windows when it ends, before Setup's restart; log C:\USOS9X\USOSP1.TXT.
+# Every other system and the VM path: the driver leaves C:\USOS9X.
+if [ "$SYSTEM_TAG" = ME ] && [ "$VM_PHASE1" != 1 ] && [ -f "$work/c/USOS9X/USOSP1.DRV" ]; then
+    log 'me phase 1 end: USOSP1.DRV for the mini-Windows (SYSTEM.INI [386Enh] mouse=, MSDOS.SYS Logo=0)'
+else
+    rm -f "$work/c/USOS9X/USOSP1.DRV"
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -528,6 +539,15 @@ if [ -f "$work/c/USOS9X/USOSPID.KEY" ]; then
     else
         rm -f "$work/c/USOS9X/USOSPID.KEY" "$work/c/USOS9X/USOSPID.DRV"
         log 'product id: no mini-Windows helper; key removed, Setup asks for it'
+    fi
+fi
+# USOSP1.DRV (above) only inside this MINI.CAB with the bridge.
+if [ -f "$work/c/USOS9X/USOSP1.DRV" ]; then
+    if [ "$mini_bridge" = 1 ] && tr -d '\r' < "$work/c/USOS9X/USOSMINI.TXT" 2>/dev/null | grep -qx 'p1=on'; then
+        log 'me phase 1 end: USOSP1.DRV in the mini-Windows'
+    else
+        rm -f "$work/c/USOS9X/USOSP1.DRV"
+        log 'me phase 1 end: no mini-Windows helper; SYSTEM.INI [386Enh] mouse= and MSDOS.SYS stay as Setup writes them'
     fi
 fi
 

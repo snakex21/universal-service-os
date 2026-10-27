@@ -70,6 +70,11 @@
                 once (950 native phase 1 only; tools/w9x_pid95.sh stages the
                 key, src/compat/win3x/w9x_mini.zig the driver; otherwise
                 removed from C:\\USOS9X)
+  USOSP1.DRV    Win16 installable driver for Setup's own mini-Windows
+                (src/platform/bios/win9x/usosp1.c): at the end of a Windows
+                Me native phase 1 drops C:\\WINDOWS\\SYSTEM.INI [386Enh]
+                mouse= and adds Logo=0 to C:\\MSDOS.SYS, the VM path's
+                w9x_phase1_patch_c (Me only; tools/w9x_csmwrap_target.sh)
   W950POST.BAT  (written by tools/w9x_950_post.sh, not here) the DOS-side
                 950 post-phase-1 fixes for a native phase 1 (VESBIND
                 PMDROP / MAXRES), PHASE1.OK for FIRSTBT.BAT
@@ -144,7 +149,9 @@ STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'USOSFB.EXE', 'MSBATCH.INF', 'V
     # mode; not in the Legacy Core RAM disk list: its 4096-byte headroom).
     'U9V10STK.COM',) + (
     # 950 native phase 1 with an OEM ID: Setup's mini-Windows types it.
-    'USOSPID.DRV',)
+    'USOSPID.DRV',) + (
+    # Me native phase 1: Setup's mini-Windows edits C: before its restart.
+    'USOSP1.DRV',)
 USOSNVME = ROOT / 'tools/nt/usosnvme'
 USOSUSB = ROOT / 'tools/nt/usosusb9x'
 USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
@@ -326,26 +333,43 @@ USOSPID_IMPORTS = {'KERNEL', 'USER'}
 def build_usospid(out: Path, work: Path) -> Path:
     """USOSPID.DRV: Win16 installable driver (OpenWatcom wcc/wlink as
     USOSKEY.DRV, no runtime) for Windows 95 Setup's mini-Windows."""
+    return build_mini_driver(out, work, 'usospid', USOSPID_IMPORTS)
+
+
+# USOSP1.DRV: KERNEL only (file I/O), checked against the Me mini-Windows.
+USOSP1_IMPORTS = {'KERNEL'}
+
+
+def build_usosp1(out: Path, work: Path) -> Path:
+    """USOSP1.DRV: Win16 installable driver for Windows Me Setup's
+    mini-Windows (the native phase 1's end fixes)."""
+    return build_mini_driver(out, work, 'usosp1', USOSP1_IMPORTS)
+
+
+def build_mini_driver(out: Path, work: Path, stem: str, allowed: set) -> Path:
+    """SOURCE/<stem>.c + <stem>.lnk -> out/<STEM>.DRV (OpenWatcom wcc/wlink,
+    no C runtime, imports within `allowed`)."""
     import sys
     sys.path.insert(0, str(ROOT / 'tools'))
     from build_win3_usb_keyboard import openwatcom, ne_imported_modules
     ow = openwatcom()
     env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{SOURCE};{ow / "h"};{ow / "h/win"}',
                PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
-    obj = work / 'usospid.obj'
+    obj = work / f'{stem}.obj'
     subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=windows', '-bd', '-ms', '-zu', '-zl', '-s', '-3', '-osi',
-                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usospid.c')], env=env, check=True, cwd=work)
-    drv = out / 'USOSPID.DRV'
-    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usospid.lnk'), 'file', str(obj),
-                    'name', str(drv), 'option', 'map=' + str(work / 'usospid.map')], env=env, check=True, cwd=work)
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / f'{stem}.c')], env=env, check=True, cwd=work)
+    name = stem.upper() + '.DRV'
+    drv = out / name
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / f'{stem}.lnk'), 'file', str(obj),
+                    'name', str(drv), 'option', 'map=' + str(work / f'{stem}.map')], env=env, check=True, cwd=work)
     data = drv.read_bytes()
     ne = int.from_bytes(data[0x3c:0x3e], 'little')
-    if data[ne:ne + 2] != b'NE' or b'DRIVERPROC' not in data or b'USOSPID' not in data:
-        raise ValueError('USOSPID.DRV is not the expected NE driver')
-    if not set(ne_imported_modules(data)) <= USOSPID_IMPORTS:
-        raise ValueError('USOSPID.DRV may import KERNEL and USER only, not %r' % ne_imported_modules(data))
-    if 'clib' in (work / 'usospid.map').read_text(errors='replace').lower():
-        raise ValueError('USOSPID.DRV must not link the OpenWatcom C library')
+    if data[ne:ne + 2] != b'NE' or b'DRIVERPROC' not in data or stem.upper().encode() not in data:
+        raise ValueError(f'{name} is not the expected NE driver')
+    if not set(ne_imported_modules(data)) <= allowed:
+        raise ValueError(f'{name} may import {sorted(allowed)} only, not %r' % ne_imported_modules(data))
+    if 'clib' in (work / f'{stem}.map').read_text(errors='replace').lower():
+        raise ValueError(f'{name} must not link the OpenWatcom C library')
     return drv
 
 
@@ -597,6 +621,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     build_diag(out, work)
     build_usosdbg(out, work)
     build_usospid(out, work)
+    build_usosp1(out, work)
     build_usoslog(out, work)
     build_vesbind(out, work)
     from build_usosgrpw import build as build_grpwatch
