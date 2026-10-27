@@ -33,6 +33,7 @@ static struct big {
     char appendbuf[SMALL_CAP];
     char verbuf[VERBUF_CAP];
     char seen[SEEN_CAP][96];     /* dialog titles logged for the running package */
+    char runonce_last[UA_LINE];  /* RunOnce names last seen while it runs */
     ua_ini m, sel, st;
     ua_pkgs p;
     ua_plan plan;
@@ -401,6 +402,56 @@ static BOOL CALLBACK answer_window(HWND w, LPARAM lp) {
     return TRUE;
 }
 
+#define RUN_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+#define RUNONCE_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+
+/* HKLM RunOnce value names and the number of RunOnceEx sections (IE's
+ * registrations wait there for iernonce), after <prefix>. */
+static void runonce_line(char *line, int cap, const char *prefix) {
+    char name[128];
+    HKEY k;
+    DWORD i = 0, n, keys = 0;
+    line[0] = 0;
+    ua_append(line, cap, prefix);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY, 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        for (i = 0; i < 64; i++) {
+            n = sizeof name;
+            if (RegEnumValueA(k, i, name, &n, 0, 0, 0, 0) != ERROR_SUCCESS) break;
+            ua_append(line, cap, i ? ", " : " ");
+            ua_append(line, cap, name[0] ? name : "(default)");
+        }
+        if (!i) ua_append(line, cap, " -");
+        RegCloseKey(k);
+    } else {
+        ua_append(line, cap, " (no key)");
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY "Ex", 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        if (RegQueryInfoKeyA(k, 0, 0, 0, &keys, 0, 0, 0, 0, 0, 0, 0) != ERROR_SUCCESS) keys = 0;
+        RegCloseKey(k);
+    }
+    ua_append(line, cap, "; RunOnceEx sections: ");
+    ua_itoa(name, 16, (int)keys);
+    ua_append(line, cap, name);
+}
+
+/* Diagnostics while a package runs, log only (X470 95 RTM, 2026-10-27: IE
+ * 5.5's install showed a RUNDLL error box for IEDKCS32.DLL,
+ * BrandCleanInstallStubs while its replacements were pending): every 2 s the RunOnce list is compared with the last one seen
+ * and logged when it changed, with the tick count. */
+static void runonce_watch(int start) {
+    char line[UA_LINE], num[16];
+    runonce_line(line, sizeof line, "");
+    if (start) { ua_copy(g_big->runonce_last, sizeof g_big->runonce_last, line); return; }
+    if (ua_ieq(line, g_big->runonce_last)) return;
+    ua_copy(g_big->runonce_last, sizeof g_big->runonce_last, line);
+    ua_itoa(num, sizeof num, (int)GetTickCount());
+    ua_copy(line, sizeof line, "    RunOnce now (tick ");
+    ua_append(line, sizeof line, num);
+    ua_append(line, sizeof line, "):");
+    ua_append(line, sizeof line, g_big->runonce_last);
+    log_line(line);
+}
+
 static DWORD spawn(char *cmdline, const char *cwd) {
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
@@ -417,7 +468,7 @@ static DWORD spawn(char *cmdline, const char *cwd) {
      * second never came while a busy installer kept posting messages, so
      * the final "Winsock2 Setup" box stayed open (X470 95 RTM, 2026-10-26). */
     {
-        DWORD last = GetTickCount() - 250;
+        DWORD last = GetTickCount() - 250, watched = GetTickCount();
         for (;;) {
             DWORD r = MsgWaitForMultipleObjects(1, &pi.hProcess, FALSE, 250, QS_ALLINPUT);
             if (r == WAIT_OBJECT_0) break;
@@ -425,6 +476,10 @@ static DWORD spawn(char *cmdline, const char *cwd) {
             if (GetTickCount() - last >= 250) {
                 last = GetTickCount();
                 EnumWindows(answer_window, 0);
+            }
+            if (g_answer_pkg && GetTickCount() - watched >= 2000) {
+                watched = GetTickCount();
+                runonce_watch(0);
             }
         }
     }
@@ -553,10 +608,6 @@ static void set_why(int i, int st, const char *why, const char *detail) {
     log2("  reason: ", g_state.why[i]);
     set_state(i, st);
 }
-
-
-#define RUN_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-#define RUNONCE_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
 
 /* HKLM Run "USOSAddons" = this program, until the chain is finished. Run
  * (not RunOnce): Run entries start after the shell, and RunOnce entries of
@@ -698,30 +749,8 @@ static void restart(void) {
 /* Diagnostics after each package: HKLM RunOnce value names and the number
  * of RunOnceEx sections (IE's registrations wait there for iernonce). */
 static void log_runonce(void) {
-    char line[UA_LINE], name[128];
-    HKEY k;
-    DWORD i = 0, n, keys = 0;
-    line[0] = 0;
-    ua_append(line, sizeof line, "  RunOnce:");
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY, 0, KEY_READ, &k) == ERROR_SUCCESS) {
-        for (i = 0; i < 64; i++) {
-            n = sizeof name;
-            if (RegEnumValueA(k, i, name, &n, 0, 0, 0, 0) != ERROR_SUCCESS) break;
-            ua_append(line, sizeof line, i ? ", " : " ");
-            ua_append(line, sizeof line, name[0] ? name : "(default)");
-        }
-        if (!i) ua_append(line, sizeof line, " -");
-        RegCloseKey(k);
-    } else {
-        ua_append(line, sizeof line, " (no key)");
-    }
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY "Ex", 0, KEY_READ, &k) == ERROR_SUCCESS) {
-        if (RegQueryInfoKeyA(k, 0, 0, 0, &keys, 0, 0, 0, 0, 0, 0, 0) != ERROR_SUCCESS) keys = 0;
-        RegCloseKey(k);
-    }
-    ua_append(line, sizeof line, "; RunOnceEx sections: ");
-    ua_itoa(name, 16, (int)keys);
-    ua_append(line, sizeof line, name);
+    char line[UA_LINE];
+    runonce_line(line, sizeof line, "  RunOnce:");
     log_line(line);
 }
 
@@ -832,6 +861,7 @@ static void run_chain(void) {
         g_answer_pkg = p;
         g_seen_n = 0;
         g_answered = 0;
+        runonce_watch(1);
         for (k = 1; ok && k < 64; k++) {
             const char *cmd;
             key[0] = 0;

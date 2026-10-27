@@ -66,6 +66,27 @@ class AddonsFixes(unittest.TestCase):
         bad.find('msi20-9x').keys['reboot_setup'] = 'now'  # os=9X: also 98 / Me
         self.assertTrue(any('reboot_setup/check_setup only for Windows 95' in e for e in lm.validate(bad)))
 
+    def test_ie55_rundll_box_confirmed_and_runonce_watched(self):
+        # X470 95 RTM PL (2026-10-27): ADDONS.LOG "dialog seen: RUNDLL"
+        # (IEDKCS32.DLL,BrandCleanInstallStubs) during the IE 5.5 install.
+        m = lm.Manifest.load()
+        self.assertEqual(lm.validate(m), [])
+        self.assertEqual(m.find('ie55sp2-pl').get('answer1'), 'RUNDLL|1')
+        self.assertNotIn('RUNDLL', '\n'.join(v for s, k, v in m.entries if s == 'pack'))
+        # the DCOM95 restart that fixed advpack / rpcrt4 stays
+        self.assertEqual(m.find('dcom95').get('reboot_setup'), 'now')
+        src = (ROOT/'src/platform/win32_legacy/usosadd/main.c').read_text()
+        body = src[src.index('static DWORD spawn('):src.index('static int code_ok(')]
+        self.assertIn('if (g_answer_pkg && GetTickCount() - watched >= 2000) {', body)
+        self.assertIn('runonce_watch(0);', body)
+        watch = src[src.index('static void runonce_watch(int start)'):src.index('static DWORD spawn(')]
+        self.assertIn('"    RunOnce now (tick "', watch)
+        self.assertNotIn('RegDeleteValue', watch)
+        self.assertNotIn('RegSetValue', watch)
+        chain = src[src.index('static void run_chain(void)'):]
+        self.assertLess(chain.index('g_answer_pkg = p;'), chain.index('runonce_watch(1);'))
+        self.assertLess(chain.index('runonce_watch(1);'), chain.index('ok = run_one(p, cmd);'))
+
     def test_answerer_polls_every_wakeup_and_logs(self):
         src = (ROOT/'src/platform/win32_legacy/usosadd/main.c').read_text()
         body = src[src.index('static DWORD spawn('):src.index('static int code_ok(')]
