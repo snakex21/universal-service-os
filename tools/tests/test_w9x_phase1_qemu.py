@@ -534,9 +534,15 @@ class TargetVmParts(unittest.TestCase):
         self.assertLess(copy, lines.index(':USBDONE'))
         self.assertFalse(any('XHCI98' in l and 'COPY' in l for l in lines[:guard]))
 
-    def test_install_bat_adds_p_i_for_the_vm(self):
+    def test_install_bat_adds_p_i_under_csmwrap(self):
+        # 98 / 98 SE / Me: /P I with the VM phase 1 (U9VM=1) and with the
+        # native one (U9CSM=1 alone): the target script writes U9CSM=1 on
+        # both paths, so the switches are the same.
         lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
-        vm = lines.index('IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I')
+        self.assertNotIn('IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I', lines)
+        vm = lines.index('IF "%U9CSM%"=="1" SET U9SW=%U9SW% /P I')
+        target = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn(r"SET U9CSM=1\r\n", target)
         self.assertGreater(vm, lines.index('IF "%U9SYS%"=="95" SET U9SW=/IS /IW'))
         # 95 has no ACPI (and its Setup knows no /P I): skipped.
         self.assertEqual(lines[vm - 1], 'IF "%U9SYS%"=="95" GOTO VMSWOK')

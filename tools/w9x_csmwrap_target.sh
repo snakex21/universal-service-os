@@ -346,10 +346,13 @@ fi
 # never patched. Retail IDs (11 characters) stay. The VM phase 1 keeps its
 # answer as it is (its page controller types the key). A user's own answer
 # file stays 1:1. The key itself is never logged.
-# SETUP 4.00.950 (RTM / OSR1): before the drop, an OEM ID goes to
+# SETUP 4.00.950 (RTM / OSR1) and OSR2 (4.00.1068..1216, the versions
+# w9x_filesystem.sh knows): before the drop, an OEM ID goes to
 # C:\USOS9X\USOSPID.KEY, and USOSPID.DRV (Setup's mini-Windows, the step
-# below) types it into the Product ID page once and presses Next; the driver
-# deletes the file when it loads, W950POST.BAT after phase 1 in any case.
+# below) types it into the Product ID page once (950: its one field; OSR2:
+# the COA page's three fields) and presses Next; the driver deletes the file
+# when it loads, after phase 1 in any case W950POST.BAT (950) or
+# C:\AUTOEXEC.BAT (INSTALL.BAT, once C:\WINDOWS\WIN.COM exists).
 # Without a staged key USOSPID.DRV leaves C:\USOS9X: the page waits for the
 # user as before.
 pid_key=none
@@ -360,7 +363,11 @@ if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
         [ "${#pid_value}" -le 17 ] || log 'warning: the answer file ProductID has 18+ characters; Windows 95 Setup will ignore the whole file'
         pid_value=
     else
-        if [ "${setup_version:-}" = '4 0 0 950' ] && [ -f "$work/c/USOS9X/USOSPID.DRV" ]; then
+        case "${setup_version:-}" in
+            '4 0 0 950'|'4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') pid_page=1 ;;
+            *) pid_page=0 ;;
+        esac
+        if [ "$pid_page" = 1 ] && [ -f "$work/c/USOS9X/USOSPID.DRV" ]; then
             pid_key=$(w9x_pid95_stage_key "$work/c/USOS9X/MSBATCH.INF" "$work/c/USOS9X/USOSPID.KEY") ||
                 fail 'cannot stage the Windows 95 product ID for Setup'
         fi
@@ -371,6 +378,17 @@ if [ "$SYSTEM_TAG" = 95 ] && [ "$VM_PHASE1" != 1 ]; then
     fi
 fi
 [ "$pid_key" = staged ] || rm -f "$work/c/USOS9X/USOSPID.DRV" "$work/c/USOS9X/USOSPID.KEY"
+# Windows Me with a native phase 1: the VM path's w9x_phase1_patch_c
+# (SYSTEM.INI [386Enh] mouse= out, MSDOS.SYS Logo=0) has no real-mode step
+# to run in (Me runs no program from C:\AUTOEXEC.BAT). USOSP1.DRV
+# (src/platform/bios/win9x/usosp1.c) does both edits in Setup's own
+# mini-Windows when it ends, before Setup's restart; log C:\USOS9X\USOSP1.TXT.
+# Every other system and the VM path: the driver leaves C:\USOS9X.
+if [ "$SYSTEM_TAG" = ME ] && [ "$VM_PHASE1" != 1 ] && [ -f "$work/c/USOS9X/USOSP1.DRV" ]; then
+    log 'me phase 1 end: USOSP1.DRV for the mini-Windows (SYSTEM.INI [386Enh] mouse=, MSDOS.SYS Logo=0)'
+else
+    rm -f "$work/c/USOS9X/USOSP1.DRV"
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -521,6 +539,15 @@ if [ -f "$work/c/USOS9X/USOSPID.KEY" ]; then
     else
         rm -f "$work/c/USOS9X/USOSPID.KEY" "$work/c/USOS9X/USOSPID.DRV"
         log 'product id: no mini-Windows helper; key removed, Setup asks for it'
+    fi
+fi
+# USOSP1.DRV (above) only inside this MINI.CAB with the bridge.
+if [ -f "$work/c/USOS9X/USOSP1.DRV" ]; then
+    if [ "$mini_bridge" = 1 ] && tr -d '\r' < "$work/c/USOS9X/USOSMINI.TXT" 2>/dev/null | grep -qx 'p1=on'; then
+        log 'me phase 1 end: USOSP1.DRV in the mini-Windows'
+    else
+        rm -f "$work/c/USOS9X/USOSP1.DRV"
+        log 'me phase 1 end: no mini-Windows helper; SYSTEM.INI [386Enh] mouse= and MSDOS.SYS stay as Setup writes them'
     fi
 fi
 

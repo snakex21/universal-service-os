@@ -130,6 +130,7 @@ try {
         'EFI/USOS/dos-native/win9x/USOSDIAG.COM',
         'EFI/USOS/dos-native/win9x/USOSDBG.EXE',
         'EFI/USOS/dos-native/win9x/USOSPID.DRV',
+        'EFI/USOS/dos-native/win9x/USOSP1.DRV',
         'EFI/USOS/dos-native/win9x/VBMOUSE.EXE',
         'EFI/USOS/dos-native/win9x/VBMOUSE.DRV',
         'EFI/USOS/dos-native/win9x/VBADOS.TXT',

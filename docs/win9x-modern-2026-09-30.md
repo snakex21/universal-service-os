@@ -454,6 +454,37 @@ on the Kingston is still empty, copy it there before the X470 run).
   typed, finish) -> last restart: report whether the desktop appears or the start stops like in QEMU
   (with `Logo=0` the last text line is visible). USB mouse on Me: see **Mouse** above.
 
+### Me with a native phase 1 (2026-10-27)
+
+With `phase1-native.flag` (or no QEMU) Me Setup's phase 1 runs on the PC
+under CSMWrap, and two VM-path steps were missing:
+
+* **`/P I`**: INSTALL.BAT now gives 98 / 98 SE / Me Setup `/P I` whenever
+  `U9CSM=1` (both paths), not only with `U9VM=1`; the Setup switches are the
+  same on both paths. 95 keeps its own rules.
+* **`w9x_phase1_patch_c`** (SYSTEM.INI `[386Enh] mouse=` out, MSDOS.SYS
+  `Logo=0`): Me runs no program from `C:\AUTOEXEC.BAT` and Me's IO.SYS most
+  likely ignores `DEVICE=` lines, so there is no real-mode step after Setup's
+  restart. An MSBATCH `UpdateInis` delete would run too early: in the Me VM
+  install of 2026-10-20 the batch's `MaxPhysPage=40000` sits in `[386Enh]`
+  before `display=`, `keyboard=` and `device=*vmouse`, so Setup writes the
+  device lines after the batch INI step. The only own code that runs after
+  Setup wrote SYSTEM.INI and MSDOS.SYS (`[Uruchom ponownie]` in SETUPLOG:
+  IO.SYS / LOGO.SYS / root files) and before the restart is Setup's own
+  mini-Windows. **USOSP1.DRV** (`src/platform/bios/win9x/usosp1.c`, own Win16
+  installable driver, KERNEL imports only, resolved against the Me
+  `MINI.CAB` KRNL386.EXE) joins `drivers=` with the USOSKEY bridge
+  (`w9x_mini.zig`, log `p1=on`) and, on `DRV_EXITSESSION` / `DRV_DISABLE` /
+  `DRV_FREE`, does the same two edits (`usosp1_logic.h`, host-tested byte for
+  byte against `w9x_phase1_patch_c`), in place, MSDOS.SYS attributes kept;
+  one line per check in `C:\USOS9X\USOSP1.TXT`. Kept only for Me with a
+  native phase 1 and the bridge (`tools/w9x_csmwrap_target.sh`).
+* **Open (X470)**: whether the Me mini-Windows sends one of those messages
+  before Setup restarts (USOSP1.TXT shows which, or is missing); without one
+  nothing changes against today. The VM path is unchanged. The Me
+  `MINI.CAB` SYSTEM.INI has `shell=w9xsetup.bin` and the same `[boot]`
+  layout as 95/98, which the bridge edit handles (tests).
+
 ## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
 
 The idle-graphics key typing described in this historical section was replaced

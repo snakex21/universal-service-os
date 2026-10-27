@@ -2,10 +2,11 @@
  * USOSPID.DRV - the Windows 95 OEM Product ID for Setup's own page.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- * Windows 95 RTM / OSR1 (SETUP 4.00.950) with a native phase 1 under
- * CSMWrap: an OEM ID in MSBATCH.INF [Setup] ProductID makes SUWIN drop the
- * whole batch file (tools/w9x_pid95.sh), and even when it loaded, the
- * "Product Identification" page took only its edit field. So the ID goes
+ * Windows 95 RTM / OSR1 (SETUP 4.00.950) and OSR2 (4.00.1111 / OSR2.5)
+ * with a native phase 1 under CSMWrap: an OEM ID in MSBATCH.INF [Setup]
+ * ProductID makes SUWIN drop the whole batch file (tools/w9x_pid95.sh),
+ * and even when it loaded, the 950 "Product Identification" page took only
+ * its edit field. So the ID goes
  * out of MSBATCH.INF and into C:\USOS9X\USOSPID.KEY (tools/w9x_pid95.sh
  * w9x_pid95_stage_key), and this installable driver, loaded by Setup's own
  * mini-Windows (MINI.CAB SYSTEM.INI [boot] drivers=, next to USOSKEY.DRV;
@@ -19,10 +20,12 @@
  *               this driver.
  *   timer       (task time, the window's own message loop) the decisions
  *               of usospid_logic.h: the active wizard frame (Next 0x3024)
- *               showing the OEM page (Edit 526 + Static 1010, no 1097)
- *               twice in a row with an empty field -> WM_SETTEXT of the
- *               key; the next tick, with the field holding 23 characters
- *               and Next enabled -> WM_COMMAND Next (BN_CLICKED), posted.
+ *               showing the OEM page (950: Edit 526 + Static 1010, no
+ *               1097; OSR2: the COA page's Edits 1125 / 1126 / 1127, no
+ *               526) twice in a row with empty fields -> WM_SETTEXT of the
+ *               key (OSR2: its 5 / 7 / 5 digits, one per field); the next
+ *               tick, with the field(s) full and Next enabled -> WM_COMMAND
+ *               Next (BN_CLICKED), posted.
  *               The "Invalid Product ID" box (OK 1, Ignore 1118, Exit 2)
  *               before that -> OK once (back to the page; Setup's batch
  *               mode pressed Next on the empty field). After typing, that
@@ -48,6 +51,8 @@
 /* DGROUP only: SS is not DS in a driver (-zu), so nothing on the stack is
  * handed to Windows by address. */
 static char key[PID_KEY_LEN + 1];
+static char part[8];
+static int coa;                 /* the page found is OSR2's COA page */
 static BYTE buf[64];
 static OFSTRUCT of;
 static char cls[16];
@@ -100,17 +105,67 @@ static int class_is(HWND w, const char *name)
     return 1;
 }
 
-/* The visible child page of a wizard frame that is the OEM Product ID page. */
+static const int coa_ids[3] = { PID_COA1_ID, PID_COA2_ID, PID_COA3_ID };
+
+/* OSR2's Certificate of Authenticity page: the three Edits, no 526. */
+static int coa_page(HWND c)
+{
+    int i;
+    if (GetDlgItem(c, PID_EDIT_ID)) return 0;
+    for (i = 0; i < 3; i++)
+        if (!class_is(GetDlgItem(c, coa_ids[i]), "Edit")) return 0;
+    return 1;
+}
+
+/* The visible child page of a wizard frame that is the OEM Product ID page
+ * (950) or the COA page (OSR2: coa = 1). */
 static HWND oem_page(HWND frame)
 {
     HWND c;
+    coa = 0;
     for (c = GetWindow(frame, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
         if (!IsWindowVisible(c)) continue;
         if (class_is(GetDlgItem(c, PID_EDIT_ID), "Edit") && GetDlgItem(c, PID_LABEL_ID) &&
             !GetDlgItem(c, PID_ADVANCED_ID))
             return c;
+        if (coa_page(c)) { coa = 1; return c; }
     }
     return 0;
+}
+
+/* Empty: every field of the page is empty; full: each holds its length. */
+static void fields(HWND page, BYTE *empty, BYTE *full)
+{
+    int i, n, len;
+    if (!coa) {
+        len = GetWindowTextLength(GetDlgItem(page, PID_EDIT_ID));
+        *empty = len == 0;
+        *full = len == PID_KEY_LEN;
+        return;
+    }
+    *empty = 1;
+    *full = 1;
+    for (i = 0; i < 3; i++) {
+        len = GetWindowTextLength(GetDlgItem(page, coa_ids[i]));
+        n = pid_key_part(key, i, part);
+        if (len != 0) *empty = 0;
+        if (len != n) *full = 0;
+    }
+    zero((BYTE *)part, sizeof(part));
+}
+
+static void type_key(HWND page)
+{
+    int i;
+    if (!coa) {
+        SetWindowText(GetDlgItem(page, PID_EDIT_ID), key);
+        return;
+    }
+    for (i = 0; i < 3; i++) {
+        pid_key_part(key, i, part);
+        SetWindowText(GetDlgItem(page, coa_ids[i]), part);
+    }
+    zero((BYTE *)part, sizeof(part));
 }
 
 static int invalid_box(HWND w)
@@ -135,8 +190,7 @@ static void stop_all(void)
 
 void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
 {
-    HWND page = 0, edit = 0, next = 0;
-    int len = -1;
+    HWND page = 0, next = 0;
     (void)msg; (void)id; (void)now;
     if (st.done) { KillTimer(w, PID_TIMER); return; }
     zero((BYTE *)&view, sizeof(view));
@@ -147,17 +201,12 @@ void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
         next = GetDlgItem(w, PID_NEXT_ID);
         if (class_is(next, "Button")) page = oem_page(w);
     }
-    if (page) {
-        edit = GetDlgItem(page, PID_EDIT_ID);
-        len = GetWindowTextLength(edit);
-    }
+    if (page) fields(page, &view.edit_empty, &view.edit_full);
     view.page = page != 0;
-    view.edit_empty = len == 0;
-    view.edit_full = len == PID_KEY_LEN;
     view.next_ready = next && IsWindowVisible(next) && IsWindowEnabled(next);
     switch (pid_step(&st, &view)) {
     case PA_TYPE:
-        SetWindowText(edit, key);
+        type_key(page);
         break;
     case PA_NEXT:
         PostMessage(w, WM_COMMAND, PID_NEXT_ID, MAKELPARAM(next, BN_CLICKED));

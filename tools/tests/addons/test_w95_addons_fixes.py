@@ -134,6 +134,12 @@ class AddonsFixes(unittest.TestCase):
         src = (ROOT/'src/platform/win32_legacy/usosfb.c').read_text()
         body = src[src.index('static void fail('):src.index('static int setup_done(')]
         self.assertIn('MB_RETRYCANCEL|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST', body)
+        # the box in the installed system's language: PL (0x15) or EN (OSR1)
+        self.assertIn('(GetSystemDefaultLangID()&0x3ff)==0x15?fail_pl:fail_en', body)
+        self.assertIn('static const char fail_en[]="USOS could not finish the installation.', src)
+        self.assertIn('Retry = try again after a restart', src)
+        self.assertIn('Cancel = go to the desktop', src)
+        self.assertIn(r'static const char fail_pl[]="USOS nie m\363g\263 doko', src)
         self.assertIn('MoveFileA(path,aside)', body)
         self.assertIn('ExitWindowsEx(EWX_REBOOT,0)', body)
         self.assertNotIn('WS_POPUP', src)

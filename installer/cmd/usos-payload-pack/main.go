@@ -86,6 +86,9 @@ var payloadFiles = []payloadFile{
 	// Windows 95 950 native phase 1: Setup's mini-Windows types the OEM
 	// Product ID (tools/w9x_csmwrap_target.sh keeps it only with a key).
 	{`zig-out/dos-native/win9x/USOSPID.DRV`, `EFI/USOS/dos-native/win9x/USOSPID.DRV`},
+	// Windows Me native phase 1: Setup's mini-Windows edits C: before its
+	// restart (tools/w9x_csmwrap_target.sh keeps it only for that path).
+	{`zig-out/dos-native/win9x/USOSP1.DRV`, `EFI/USOS/dos-native/win9x/USOSP1.DRV`},
 	{`zig-out/dos-native/win9x/USOSLOG.EXE`, `EFI/USOS/dos-native/win9x/USOSLOG.EXE`},
 	// Windows 95 RTM (4.00.950): VESA95.BAT binds the display with it
 	// (tools/w9x_vesa95.sh requires it for the 950 source).

@@ -203,6 +203,9 @@ REM the first GUI start, and writes PHASE1.OK, which FIRSTBT.BAT waits for.
 ECHO @IF EXIST C:\USOS9X\W950POST.BAT CALL C:\USOS9X\W950POST.BAT>>C:\AUTOEXEC.BAT
 REM Source950 only: ordinary RunOnce blocks the first desktop until complete.
 ECHO @IF EXIST C:\USOS9X\FIRSTBT.BAT CALL C:\USOS9X\FIRSTBT.BAT>>C:\AUTOEXEC.BAT
+REM 95 native: a Product ID that USOSPID.DRV never read (tools/w9x_pid95.sh)
+REM leaves the disk once Setup copied Windows (950: W950POST.BAT too).
+ECHO @IF EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
@@ -336,10 +339,12 @@ REM The same for usosnet on 95 (NET\USOSNET.SYS = the NDIS 4.0 usosnet4.sys,
 REM staged only for a matching PCI card): without the PCI bus node 95 never
 REM enumerates the card on the real PC, so USOSNET.INF would never be used.
 IF "%U9SYS%"=="95" IF EXIST C:\%U9SRC%\USOSNET.SYS SET U9SW=/IS /IW /P I
-REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
-REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
+REM 98/98 SE/Me under CSMWrap (U9CSM=1): /P I keeps Windows off ACPI
+REM (APM/legacy), with the phase 1 in USOS's QEMU (U9VM=1, ACPI off) as on
+REM this PC (native phase 1): the same Setup switches on both paths, so the
+REM native path installs what the VM path proved on the X470.
 IF "%U9SYS%"=="95" GOTO VMSWOK
-IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I
+IF "%U9CSM%"=="1" SET U9SW=%U9SW% /P I
 :VMSWOK
 REM U9MINI=1 (tools/w9x_csmwrap_target.sh, phase 1 on this PC under
 REM CSMWrap): Setup's own mini-Windows (MINI.CAB, standard mode, no VxD)

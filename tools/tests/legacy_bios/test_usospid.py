@@ -1,6 +1,7 @@
-"""USOSPID.DRV (src/platform/bios/win9x/usospid.c): the Windows 95 950 OEM
-Product ID typed into Setup's own Product ID page by a Win16 installable
-driver in Setup's mini-Windows.
+"""USOSPID.DRV (src/platform/bios/win9x/usospid.c): the Windows 95 OEM
+Product ID typed into Setup's own Product ID page (950: one field; OSR2:
+the COA page's three fields) by a Win16 installable driver in Setup's
+mini-Windows.
 
 Always: the decisions of usospid_logic.h compiled for the host with zig cc
 (key file format, the tick state machine), and source checks (what the
@@ -9,7 +10,7 @@ pinned OpenWatcom in tools/cache/openwatcom: the driver builds without the
 C runtime, imports KERNEL/USER only. With the user's 95/98 media (read-only,
 as test_w9x_setup_mini.py): every import resolves against the mini-Windows
 KRNL386.EXE / USER.EXE of MINI.CAB, and the SUWIN.EXE dialog templates of
-the 950 media carry the control IDs the driver looks for.
+the 950 and OSR2.1 media carry the control IDs the driver looks for.
 Made-up test IDs only (no real keys)."""
 from pathlib import Path
 import os
@@ -38,11 +39,16 @@ HARNESS = r'''
 #include "usospid_logic.h"
 /* k HEX...: pid_key_parse of each byte string; s FLAGS...: pid_step per
  * tick, FLAGS = 7 digits expired active box page edit_empty edit_full
- * next_ready; prints the action numbers. */
+ * next_ready; prints the action numbers; p KEY: the COA parts 0..3 of a
+ * parsed key, "len:text" each. */
 int main(int argc, char **argv)
 {
     int i;
-    if (argv[1][0] == 'k') {
+    if (argv[1][0] == 'p') {
+        char key[PID_KEY_LEN + 1], part[8];
+        if (!pid_key_parse((const unsigned char *)argv[2], (int)strlen(argv[2]), key)) { printf("bad\n"); return 0; }
+        for (i = 0; i < 4; i++) { int n = pid_key_part(key, i, part); printf("%d:%s\n", n, part); }
+    } else if (argv[1][0] == 'k') {
         for (i = 2; i < argc; i++) {
             unsigned char buf[64];
             char out[PID_KEY_LEN + 1];
@@ -131,6 +137,12 @@ class Logic(unittest.TestCase):
         self.assertEqual(self.steps(*ticks), NONE + TYPE + NONE * 9 + STOP)
         self.assertEqual(self.steps(PAGE_EMPTY, PAGE_EMPTY, PAGE_TYPED_NEXT_OFF, PAGE_TYPED), NONE + TYPE + NONE + NEXT)
 
+    def test_coa_parts_are_the_digit_groups(self):
+        # OSR2's COA page: 5 + 7 + 5 digits, without "OEM" and the dashes.
+        self.assertEqual(self.run_exe('p', FAKE_ID), ['5:12345', '7:0000007', '5:54321', '0:'])
+        self.assertEqual(self.run_exe('p', FAKE_ID.lower()), ['5:12345', '7:0000007', '5:54321', '0:'])
+        self.assertEqual(self.run_exe('p', '123-4567890'), ['bad'])
+
     def test_never_appearing_page_times_out_quietly(self):
         self.assertEqual(self.steps(OTHER, OTHER, EXPIRED, PAGE_EMPTY), NONE + NONE + STOP + STOP)
 
@@ -147,6 +159,16 @@ class Source(unittest.TestCase):
         self.assertIn('case DRV_LOAD:    return read_key() ? 1L : 0L;', c)
         for banned in ('OutputDebugString', 'wsprintf', 'MessageBox', 'WinExec', 'keybd_event'):
             self.assertNotIn(banned, c)
+        # OSR2 COA page: the three Edits without 526, typed one part each,
+        # the part buffer zeroed after use.
+        self.assertIn('static const int coa_ids[3] = { PID_COA1_ID, PID_COA2_ID, PID_COA3_ID };', c)
+        coa = c[c.index('static int coa_page(HWND c)'):c.index('static HWND oem_page(')]
+        self.assertIn('if (GetDlgItem(c, PID_EDIT_ID)) return 0;', coa)
+        typing = c[c.index('static void type_key(HWND page)'):c.index('void FAR PASCAL __export __loadds tick(')]
+        self.assertIn('SetWindowText(GetDlgItem(page, coa_ids[i]), part);', typing)
+        self.assertIn('zero((BYTE *)part, sizeof(part));', typing)
+        # nothing on the stack is handed to Windows or helpers by address (SS != DS)
+        self.assertNotIn('&coa', c)
         target = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('"$work/c/USOS9X/USOSPID.KEY"', target)
 
@@ -275,13 +297,73 @@ def ne_dialogs(raw: bytes) -> dict:
     return out
 
 
+SUWIN_OSR2 = {
+    '95-osr21-pl': 'Windows 95/Windows 95 OSR2.1 PL.iso',
+}
 SUWIN_950 = {
     '95-rtm-pl': 'Windows 95/Windows 95 RTM PL OEM x86/Microsoft Windows 95 [Polish] (OEM) (ISO)/disk01.iso',
     '95-osr1-en': 'Windows 95/Windows 95 OSR1 EN OEM x86/win95_a_oem.iso',
 }
 
 
+def _suwin(m, iso, d):
+    # SUWIN.EXE spans PRECOPY1.CAB and PRECOPY2.CAB: both next to each other.
+    subprocess.run([str(m.SEVEN), 'e', '-y', f'-o{d}', str(m.MEDIA / iso), 'WIN95/PRECOPY1.CAB', 'WIN95/PRECOPY2.CAB'],
+                   capture_output=True)
+    cab = next(d.glob('[Pp][Rr][Ee][Cc][Oo][Pp][Yy]1.[Cc][Aa][Bb]'), None)
+    if cab is None:
+        return None
+    subprocess.run([str(m.SEVEN), 'e', '-y', f'-o{d}', str(cab), 'suwin.exe'], capture_output=True)
+    return next(d.glob('[Ss][Uu][Ww][Ii][Nn].[Ee][Xx][Ee]'), None)
+
+
 class SuwinDialogs(unittest.TestCase):
+    def test_osr2_coa_page_ids(self):
+        # Also read (not here: 7-Zip archives) from the OSR2 EN 4.00.1111 and
+        # OSR2.5 EN CDs: their SUWIN.EXE is one file (sha256 b8507541...),
+        # 604 with the same three Edits, 156 with OK / 1118 / Exit.
+        import test_w9x_setup_mini as m
+        if not m.SEVEN.exists():
+            self.skipTest('7-Zip not installed')
+        logic = LOGIC.read_text()
+        ids = {name: int(logic.split(f'#define {name}')[1].split()[0], 0)
+               for name in ('PID_EDIT_ID', 'PID_COA1_ID', 'PID_COA2_ID', 'PID_COA3_ID', 'PID_IGNORE_ID')}
+        coa = [ids['PID_COA1_ID'], ids['PID_COA2_ID'], ids['PID_COA3_ID']]
+        seen = 0
+        tmp = Path(tempfile.mkdtemp(prefix='usos-usospid-osr2-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        for k, iso in SUWIN_OSR2.items():
+            if not (m.MEDIA / iso).exists():
+                continue
+            with self.subTest(media=k):
+                d = tmp / k
+                d.mkdir()
+                suwin = _suwin(m, iso, d)
+                self.assertIsNotNone(suwin)
+                dialogs = ne_dialogs(suwin.read_bytes())
+                page = dict(dialogs[604])
+                self.assertEqual([page.get(i) for i in coa], ['Edit'] * 3)
+                self.assertNotIn(ids['PID_EDIT_ID'], page)
+                for rid, ctrls in dialogs.items():
+                    if rid != 604:
+                        self.assertFalse(set(coa) & set(dict(ctrls)), rid)
+                box = dict(dialogs[156])
+                self.assertEqual([box.get(1), box.get(ids['PID_IGNORE_ID']), box.get(2)], ['Button'] * 3)
+                seen += 1
+        # and no 950 SUWIN has any of them
+        for k, iso in SUWIN_950.items():
+            if not (m.MEDIA / iso).exists():
+                continue
+            with self.subTest(media=k):
+                d = tmp / k
+                d.mkdir()
+                suwin = _suwin(m, iso, d)
+                self.assertIsNotNone(suwin)
+                for rid, ctrls in ne_dialogs(suwin.read_bytes()).items():
+                    self.assertFalse(set(coa) & set(dict(ctrls)), rid)
+        if not seen:
+            self.skipTest('no Windows 95 OSR2 media')
+
     def test_950_page_ids(self):
         import test_w9x_setup_mini as m
         if not m.SEVEN.exists():
