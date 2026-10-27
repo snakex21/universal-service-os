@@ -108,7 +108,9 @@ class AddonsFixes(unittest.TestCase):
         self.assertIn("phase[3]<='4'", src)
         self.assertIn('rundll32.exe C:\\\\WINDOWS\\\\SYSTEM\\\\iernonce.dll,RunOnceExProcess', src)
         self.assertIn('RegDeleteValueA(key,"PrimaryProvider")', src)
-        final = src[src.index('if(!lstrcmpA(phase,"reboot\\r\\n")){'):src.index('mid=mid_phase(phase);')]
+        # code 2 (nothing to remove) is "absent", not a failure (run 2026-10-27)
+        self.assertIn('else if(code==ERROR_FILE_NOT_FOUND)lstrcpyA(line,"Network\\\\Logon PrimaryProvider absent");', src)
+        final =src[src.index('if(!lstrcmpA(phase,"reboot\\r\\n")){'):src.index('mid=mid_phase(phase);')]
         self.assertLess(final.index('finish_runonceex();'), final.index('USOSADD.EXE /setup /check'))
         self.assertLess(final.index('windows_logon();'), final.index('FIRSTBT.OK'))
         tail = src[src.index('mid=mid_phase(phase);'):]

@@ -128,6 +128,7 @@ static void windows_logon(void){HKEY key;LONG code;char line[96];
     code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Network\\Logon",0,KEY_SET_VALUE,&key);
     if(code==ERROR_SUCCESS){code=RegDeleteValueA(key,"PrimaryProvider");RegCloseKey(key);}
     if(code==ERROR_SUCCESS)lstrcpyA(line,"Network\\Logon PrimaryProvider removed");
+    else if(code==ERROR_FILE_NOT_FOUND)lstrcpyA(line,"Network\\Logon PrimaryProvider absent");
     else wsprintfA(line,"Network\\Logon PrimaryProvider not removed (code %ld)",code);
     log_line(line);}
 /* FIRSTBT.STA phases: late, install, mid1..mid4 (USOSADD exit 1001: a package
