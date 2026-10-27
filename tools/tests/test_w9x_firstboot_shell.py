@@ -130,6 +130,33 @@ class Coordinator(unittest.TestCase):
         self.assertIn('if(code!=ERROR_SUCCESS){wsprintfA(line,"RunOnce %s not deleted',body)
         self.assertNotIn('HKEY_CURRENT_USER',body)
 
+    def test_osr2_scope_display_and_mouse(self):
+        """95 OSR2 under the coordinator (X470 OSR2.1 PL native 2026-10-27):
+        builds 1111 / 1212 / 1214 / 1216 next to 950; no VESALATE on OSR2,
+        so VESA95's one attempt is the display boundary; the REG95 USOSVmd
+        RunOnce value still queued counts as the mouse's late command."""
+        s=self.src
+        build=section(s,'static int coordinated_build(DWORD build){','static int vmd_queued(')
+        self.assertIn('build==950||build==1111||build==1212||build==1214||build==1216',build)
+        start=s[s.index('void __cdecl fb_start(void){'):]
+        self.assertIn('!coordinated_build(version.dwBuildNumber)',start)
+        self.assertNotIn('!=950',start)
+        disp=section(s,'static int display_ready(void){','static int coordinated_build(')
+        self.assertIn('if(exists("VESALATE.BAT"))return exists("VLATE.OK");',disp)
+        self.assertIn('return exists("VESA95.OK")||exists("VESA95.BAD")||!exists("VESA95.BAT");',disp)
+        self.assertNotIn('exists("VLATE.OK")||',start)
+        self.assertIn('if(!display_ready()||!tz_ready()){',start)
+        late=section(s,'static int late_ready(void){','static void run_once_values(')
+        self.assertIn('if(!display_ready()||!tz_ready()||!exists("REG95.OK"))',late)
+        self.assertIn('exists("VLATE.ERR")',late)
+        # The OSR2 network markers are the 950 ones (NET95L.BAT writes NET95.OK there).
+        self.assertIn('exists("NET\\\\NET95.REG")&&(!exists("NET\\\\NET95.OK")||!exists("NET\\\\NLATE.OK")||!exists("NET\\\\NFILES.OK"))',late)
+        mouse=section(s,'static void finish_mouse(void){','static int tz_ready(')
+        self.assertIn('if(!(exists("VMDLATE.RUN")||(!exists("VMDLATE.BAT")&&vmd_queued()))||exists("VMDLATE.ERR")||',mouse)
+        queued=section(s,'static int vmd_queued(void){','static int mouse_configured(')
+        self.assertIn('RegQueryValueExA(key,"USOSVmd",0,&type,',queued)
+        self.assertIn('contains(text,"C:\\\\USOS9X\\\\USOSVMD.INF")',queued)
+
     def test_child_logs_a_taskbar_and_long_commands_fit(self):
         body=section(self.src,'static DWORD child(const char*command){','static int legacy_absent(')
         self.assertIn('MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,500,QS_ALLINPUT)',body)

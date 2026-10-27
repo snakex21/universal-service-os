@@ -11,10 +11,19 @@ class FirstBoot(unittest.TestCase):
         result=subprocess.run([r'C:\Program Files\Git\bin\sh.exe','-c',script,'test',str(ROOT/'tools/w9x_firstboot.sh').replace('\\','/'),str(target).replace('\\','/'),version],capture_output=True)
         return target,result
     def test_other_source_versions_and_missing_helper_do_not_arm(self):
-        for version,helper in [('4 0 0 1111',True),('4 10 0 2222',True),('4 0 0 950',False),('',True)]:
+        for version,helper in [('4 0 0 1112',True),('4 10 0 2222',True),('4 0 0 950',False),('4 0 0 1111',False),('',True)]:
             folder,result=self.generate(version,helper)
             self.assertNotEqual(result.returncode,0)
             self.assertFalse(list(folder.glob('FIRST*')))
+    def test_osr2_gets_the_same_coordinator(self):
+        # X470 95 OSR2.1 PL native (2026-10-27): no first-desktop hold before.
+        base,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
+        for version in ('4 0 0 1068','4 0 0 1111','4 0 0 1212','4 0 0 1214','4 0 0 1216'):
+            folder,result=self.generate(version);self.assertEqual(result.returncode,0,result.stderr)
+            for name in ('FIRSTBT.BAT','FIRSTBT.REG','SHELLHDR.INI'):
+                self.assertEqual((folder/name).read_bytes(),(base/name).read_bytes(),(version,name))
+            self.assertEqual((folder/'FIRSTBT.ON').read_bytes(),f'95 OSR2 ({version}) first complete desktop\r\n'.encode())
+        self.assertEqual((base/'FIRSTBT.ON').read_bytes(),b'source950 first complete desktop\r\n')
     def test_real_mode_queue_is_ordinary_runonce_and_dos_sized(self):
         folder,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
         reg=(folder/'FIRSTBT.REG').read_bytes();batch=(folder/'FIRSTBT.BAT').read_bytes()

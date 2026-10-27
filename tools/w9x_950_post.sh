@@ -96,8 +96,26 @@ w9x_950_post_inject() {
 # the latest, once Setup's files are on C: (USOSPID.DRV deletes it earlier).
 # Display binding (VESA95 / VESALATE) is left alone: the native run ends
 # with one adapter.
-# w9x_950_post_dos_write <C:\USOS9X staging dir>
+# w9x_950_post_dos_write <C:\USOS9X staging dir> [osr2]
+# osr2: 95 OSR2 under the first-desktop coordinator (tools/w9x_firstboot.sh):
+# only the marker (PHASE1.OK, which FIRSTBT.BAT waits for) and the Product
+# ID file, at the same point; OSR2 needs neither text fix (its X470 runs:
+# no GRPCONV hang, MaxResolution from the EDID).
 w9x_950_post_dos_write() {
+    if [ "${2:-}" = osr2 ]; then
+        sed 's/$/\r/' > "$1/W950POST.BAT" <<'EOF'
+@ECHO OFF
+REM USOS (tools/w9x_950_post.sh): 95 OSR2 after a native phase 1, marker only.
+IF EXIST C:\USOS9X\PHASE1.OK GOTO END
+IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END
+IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
+ECHO OSR2: no 950 text fixes, PHASE1.OK only>> C:\USOS9X\W950POST.LOG
+ECHO phase1=native-osr2> C:\USOS9X\PHASE1.OK
+:END
+EOF
+        return
+    fi
     [ -f "$1/VESBIND.EXE" ] || return 1
     sed 's/$/\r/' > "$1/W950POST.BAT" <<'EOF'
 @ECHO OFF

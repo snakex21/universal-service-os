@@ -801,11 +801,13 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         fi
     fi
 fi
-if [ "$ANSWER_KIND" != USER ] &&
-   [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
+# The coordinator (USOSFB): 950 and OSR2 (the same RunOnce start, package
+# boots with USOSFB as the shell, one final restart; tools/w9x_firstboot.sh).
+if [ "$ANSWER_KIND" != USER ] && [ "$SYSTEM_TAG" = 95 ] &&
+   { [ "${setup_version:-}" = '4 0 0 950' ] || usos_w9x_95_osr2 "${setup_version:-}"; }; then
     [ -r "$LIB/w9x_firstboot.sh" ] && . "$LIB/w9x_firstboot.sh" &&
-        w9x_firstboot_write "$work/c/USOS9X" "$setup_version" || fail 'cannot stage source950 first-desktop coordinator'
-    log 'first desktop: source950 ordinary RunOnce coordinator, one final post-addons restart'
+        w9x_firstboot_write "$work/c/USOS9X" "$setup_version" || fail 'cannot stage the 95 first-desktop coordinator'
+    log "first desktop: 95 ($setup_version) ordinary RunOnce coordinator, one final post-addons restart"
 fi
 # Source950 with a native phase 1: the VM path's post-phase-1 steps
 # (w9x_csmwrap_prepare.sh: w9x_950_post_inject, PHASE1.OK) need the files
@@ -816,6 +818,12 @@ if [ "${VM_PHASE1:-0}" != 1 ] && [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 
     [ -r "$LIB/w9x_950_post.sh" ] && . "$LIB/w9x_950_post.sh" &&
         w9x_950_post_dos_write "$work/c/USOS9X" || fail 'cannot stage the 950 native post-phase-1 fixes'
     log 'native phase 1: W950POST.BAT (SETUP.INI progman.only, MONITOR.INF VESADDC MaxRes, PHASE1.OK) before the first GUI start'
+# OSR2 with the coordinator: only PHASE1.OK (and the Product ID file)
+# DOS-side; the 950 text fixes stay 950's (OSR2 needs neither).
+elif [ "${VM_PHASE1:-0}" != 1 ] && [ "$SYSTEM_TAG" = 95 ] && [ -f "$work/c/USOS9X/FIRSTBT.ON" ] && usos_w9x_95_osr2 "${setup_version:-}"; then
+    [ -r "$LIB/w9x_950_post.sh" ] && . "$LIB/w9x_950_post.sh" &&
+        w9x_950_post_dos_write "$work/c/USOS9X" osr2 || fail 'cannot stage the OSR2 native phase-1 marker'
+    log 'native phase 1: W950POST.BAT (OSR2: PHASE1.OK only) before the first GUI start'
 fi
 # Windows 98 FE (IE 4): no Channel Bar at the first sign-in. shdocvw.dll
 # 4.72 (98 FE PL CD) reads HKCU\...\Internet Explorer\Main Show_ChannelBand

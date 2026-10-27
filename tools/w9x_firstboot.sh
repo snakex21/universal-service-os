@@ -1,4 +1,9 @@
-# Source950 only: ordinary RunOnce coordinator, after original Setup.
+# Windows 95 RTM / OSR1 (SETUP 4.0.0.950) and OSR2 / OSR2.1 / OSR2.5 (SETUP
+# 4.0.0.1068..1216, tools/w9x_filesystem.sh usos_w9x_95_osr2): ordinary
+# RunOnce coordinator, after original Setup. OSR2 came under it after its
+# native X470 run (OSR2.1 PL, 2026-10-27) took the 98 path (MSBATCH [Install]
+# Run USOSAddons at the desktop, no first-desktop hold): the same chain, the
+# same real-mode steps, USOSFB's build check accepts 1111 / 1212 / 1214 / 1216.
 # It never creates RunOnce\Setup, which would block the real-mode guards.
 # Until FIRSTBT.OK, every boot also replaces HKLM\Network\Logon with
 # REG95LGN.REG (tools/w9x_reg95.sh writes it at prep time from REG95.REG,
@@ -27,9 +32,13 @@
 # 950's COPY sets no reliable ERRORLEVEL: results are checked with
 # IF EXIST and FIND (0 found, 1 not found), FIND reads stdin (no header).
 w9x_firstboot_write() {
-    [ "$2" = '4 0 0 950' ] || return 1
+    case "$2" in
+        '4 0 0 950') fbon='source950 first complete desktop' ;;
+        '4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') fbon="95 OSR2 ($2) first complete desktop" ;;
+        *) return 1 ;;
+    esac
     [ -f "$1/USOSFB.EXE" ] || return 1
-    printf 'source950 first complete desktop\r\n' > "$1/FIRSTBT.ON" || return 1
+    printf '%s\r\n' "$fbon" > "$1/FIRSTBT.ON" || return 1
     sed 's/$/\r/' > "$1/FIRSTBT.REG" <<'EOF'
 REGEDIT4
 

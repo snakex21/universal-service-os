@@ -158,6 +158,26 @@ class NativeTwin(unittest.TestCase):
             if 'GOTO ' in l:
                 self.assertIn(':' + l.split('GOTO ')[1], labels)
 
+    def test_osr2_marker_only(self):
+        # 95 OSR2 under the coordinator: PHASE1.OK DOS-side, no 950 text fix,
+        # no VESBIND needed.
+        rc, _, err = sh(f'. "{LIB}"\nw9x_950_post_dos_write "{self.tmp.as_posix()}" osr2')
+        self.assertEqual(rc, 0, err)
+        data = (self.tmp / 'W950POST.BAT').read_bytes()
+        self.assertEqual(data.count(b'\n'), data.count(b'\r\n'))
+        text = data.decode('ascii')
+        lines = text.split('\r\n')
+        self.assertEqual(lines[2:6], [r'IF EXIST C:\USOS9X\PHASE1.OK GOTO END', r'IF NOT EXIST C:\WINDOWS\WIN.COM GOTO END',
+                                      r'IF EXIST C:\USOS9X\USOSPID.KEY DEL C:\USOS9X\USOSPID.KEY',
+                                      r'IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END'])
+        self.assertEqual(lines[-3:], [r'ECHO phase1=native-osr2> C:\USOS9X\PHASE1.OK', ':END', ''])
+        for word in ('VESBIND', 'PMDROP', 'MAXRES', 'SETUP.INI', 'MONITOR.INF'):
+            self.assertNotIn(word, text)
+        target = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
+        call = target.index('w9x_950_post_dos_write "$work/c/USOS9X" osr2')
+        self.assertIn('[ -f "$work/c/USOS9X/FIRSTBT.ON" ] && usos_w9x_95_osr2 "${setup_version:-}"', target[call - 300:call])
+        self.assertIn('"${VM_PHASE1:-0}" != 1', target[call - 300:call])
+
     def test_install_bat_and_target_wire_it_for_native_950_only(self):
         install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1').splitlines()
         post = install.index(r'ECHO @IF EXIST C:\USOS9X\W950POST.BAT CALL C:\USOS9X\W950POST.BAT>>C:\AUTOEXEC.BAT')

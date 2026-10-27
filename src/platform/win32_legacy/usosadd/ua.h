@@ -119,8 +119,8 @@ typedef struct {
 
 int ua_load_pkgs(const ua_ini *m, ua_pkgs *out);
 int ua_pkg_find(const ua_pkgs *p, const char *id);
-/* USOSADD /setup (the source950 first-boot coordinator, Windows 95 build 950
- * only): reboot_setup= and check_setup= of a package replace its reboot= and
+/* USOSADD /setup (the Windows 95 first-boot coordinator USOSFB, builds 950
+ * and OSR2): reboot_setup= and check_setup= of a package replace its reboot= and
  * check=. Other systems and the ordinary Run flow never read them. Returns
  * the number of replaced values. */
 int ua_setup_overrides(const ua_ini *m, ua_pkgs *p);

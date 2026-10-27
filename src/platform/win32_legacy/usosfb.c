@@ -1,4 +1,5 @@
-/* Source950 first-desktop coordinator. USOS, GPL-3.0-or-later.
+/* Windows 95 first-desktop coordinator (RTM / OSR1 4.00.950 and OSR2 /
+ * OSR2.1 / OSR2.5 4.00.1111..1216). USOS, GPL-3.0-or-later.
  * Ordinary RunOnce is synchronous before Shell_TrayWnd on Windows95 RTM;
  * the first boot after Setup still starts the coordinator from it. The
  * package boots after it run with this program as the Windows shell (see
@@ -139,6 +140,23 @@ static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;ch
     GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);return code;}
 static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Enum\\Root\\*PNP0900",0,KEY_READ,&key);
     if(code==ERROR_SUCCESS)RegCloseKey(key);return code==ERROR_FILE_NOT_FOUND;}
+/* 950: the late binding of VESALATE.BAT (VLATE.OK). OSR2 stages no
+ * VESALATE (its PnP drops the legacy display itself): VESA95.BAT had its
+ * one attempt before the first GUI start (VESA95.OK, or VESA95.BAD with
+ * Setup's display kept), or none is staged. */
+static int display_ready(void){
+    if(exists("VESALATE.BAT"))return exists("VLATE.OK");
+    return exists("VESA95.OK")||exists("VESA95.BAD")||!exists("VESA95.BAT");}
+/* GetVersionEx build: 950 (RTM / OSR1) or the OSR2 family (OSR2 / OSR2.1
+ * 1111, OSR2.5 1212..1216). */
+static int coordinated_build(DWORD build){build&=0xffff;
+    return build==950||build==1111||build==1212||build==1214||build==1216;}
+/* The REG95 / VMDLATE RunOnce value USOSVmd with our INF command, still queued. */
+static int vmd_queued(void){HKEY key;DWORD size=sizeof text-1,type;LONG code;
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_READ,&key)!=ERROR_SUCCESS)return 0;
+    code=RegQueryValueExA(key,"USOSVmd",0,&type,(BYTE*)text,&size);RegCloseKey(key);
+    if(code!=ERROR_SUCCESS||type!=REG_SZ)return 0;text[size<sizeof text?size:sizeof text-1]=0;
+    return contains(text,"C:\\USOS9X\\USOSVMD.INF");}
 static int mouse_configured(void){HANDLE f;DWORD n=0;
     if(!exists("USOSVMD.ON"))return 1;
     f=CreateFileA("C:\\WINDOWS\\SYSTEM.INI",GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
@@ -151,7 +169,10 @@ static void finish_mouse(void){HKEY key;LONG code;
      * coordinator can therefore precede the VMDLATE value added in B1.
      * Complete only our known queued INF command before other prerequisites;
      * do not execute arbitrary remaining RunOnce commands or expose a tray. */
-    if(!exists("VMDLATE.RUN")||exists("VMDLATE.ERR")||!exists("USOSVMD.INF")||!exists("USOSVMD.VXD"))
+    /* OSR2 has no VMDLATE: REG95.REG queued USOSVmd before the first GUI
+     * boot; if that boot's Explorer did not run it, it is still queued. */
+    if(!(exists("VMDLATE.RUN")||(!exists("VMDLATE.BAT")&&vmd_queued()))||exists("VMDLATE.ERR")||
+       !exists("USOSVMD.INF")||!exists("USOSVMD.VXD"))
         fail("selected DOS-box mouse has no valid queued late command");
     if(child("C:\\WINDOWS\\rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSVMD.INF")!=0)
         fail("queued DOS-box mouse INF failed");
@@ -168,7 +189,7 @@ static int tz_ready(void){
     if(exists("TZDST.OK")||!exists("TZFIX.BAT"))return 1;
     return exists("TZFIX.OK")&&!exists("TZDST.PND");}
 static int late_ready(void){
-    if(!exists("VLATE.OK")||!tz_ready()||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
+    if(!display_ready()||!tz_ready()||!exists("REG95.OK")){log_line("late: display/time zone/registry marker missing");return 0;}
     if(exists("R95LATE.REG")&&!exists("R95LATE.OK")){log_line("late: IE registry import missing");return 0;}
     if(exists("VLATE.ERR")||exists("TZFIX.BAD")||exists("R95LATE.ERR")||exists("VMDLATE.ERR")){log_line("late: real-mode error marker present");return 0;}
     if(exists("NET\\NET95.REG")&&(!exists("NET\\NET95.OK")||!exists("NET\\NLATE.OK")||!exists("NET\\NFILES.OK"))){log_line("late: network preparation incomplete");return 0;}
@@ -252,7 +273,8 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         log_line("WARNING: shell=USOSFB was set for this boot but Explorer started; package boots stay under Explorer's RunOnce");}
     memset(&version,0,sizeof version);version.dwOSVersionInfoSize=sizeof version;
     if(!GetVersionExA(&version)||version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
-       version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))fail("source950/phase1 scope refused");
+       version.dwMinorVersion!=0||!coordinated_build(version.dwBuildNumber)||!exists("FIRSTBT.ON")||!exists("PHASE1.OK"))
+        fail("95 (950 / OSR2) / phase1 scope refused");
     if(exists("FIRSTBT.OK")){log_line("already complete");leave(0);}
     if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");leave(2);}
     log_line("coordinator entered before desktop");
@@ -265,7 +287,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
          * no package runs here; the same phase continues in a shell boot. */
         if(shell_set(1))reboot(phase[0]?phase:"late\r\n","restart: package boots continue with USOSFB as the Windows shell");
         save("SHELL.BAD","shell=USOSFB could not be set\r\n");log_line("shell mode unavailable; packages run under Explorer's RunOnce");}
-    if(!exists("VLATE.OK")||!tz_ready()){
+    if(!display_ready()||!tz_ready()){
         if(phase[0])fail("late real-mode preparation did not complete after Setup transition");
         reboot("late\r\n","restart: Setup transition before late DOS preparation");}
     finish_mouse();

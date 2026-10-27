@@ -642,6 +642,19 @@ static void unregister(void) {
     }
 }
 
+/* USOSFB's builds: 950 (RTM / OSR1) and the OSR2 family (1111, 1212..1216). */
+static int coordinated_build(int build) {
+    build &= 0xffff;
+    return build == 950 || build == 1111 || build == 1212 || build == 1214 || build == 1216;
+}
+
+/* The display boundary USOSFB waits for (usosfb.c display_ready): 950's
+ * VESALATE.BAT binding, or on OSR2 (no VESALATE) VESA95.BAT's one attempt. */
+static int display_boundary(void) {
+    if (exists("C:\\USOS9X\\VESALATE.BAT")) return exists("C:\\USOS9X\\VLATE.OK");
+    return exists("C:\\USOS9X\\VESA95.OK") || exists("C:\\USOS9X\\VESA95.BAD") || !exists("C:\\USOS9X\\VESA95.BAT");
+}
+
 /* Windows Setup still finishing: its RunOnce\Setup list is not empty, or
  * there is no taskbar yet. */
 static int setup_busy(void) {
@@ -1051,9 +1064,20 @@ void __cdecl ua_start(void) {
 
     detect();
     g_setup_mode=exact_switch(cmdline,"setup");
-    if(g_setup_mode && (g_facts.nt||g_facts.major!=4||g_facts.minor!=0||(g_facts.build&0xffff)!=950||!exists("C:\\USOS9X\\VLATE.OK"))){
-        log_line("USOSADD setup: source950 late display boundary missing; nothing installed");ExitProcess(2);}
-    /* 950 coordinator only: e.g. IE 5.5 SP2 restarts at once (reboot_setup=now)
+    if(g_setup_mode && (g_facts.nt||g_facts.major!=4||g_facts.minor!=0||!coordinated_build(g_facts.build)||!display_boundary())){
+        log_line("USOSADD setup: 95 (950 / OSR2) late display boundary missing; nothing installed");ExitProcess(2);}
+    /* A start from HKLM Run (MSBATCH [Install] / REG95.REG USOSAddons) while
+     * the first-desktop coordinator owns the chain (FIRSTBT.ON, neither
+     * FIRSTBT.OK nor FIRSTBT.ERR): nothing runs, the value stays, so the
+     * ordinary Run chain still follows if the coordinator stops with
+     * FIRSTBT.ERR. After FIRSTBT.OK the value is only removed. OSR2 Setup
+     * applies [Install] AddReg (X470 OSR2.1 PL native, 2026-10-27), so Run
+     * USOSAddons exists there before the coordinator's first /setup. */
+    if(!g_setup_mode && !g_facts.nt && exists("C:\\USOS9X\\FIRSTBT.ON") && !exists("C:\\USOS9X\\FIRSTBT.ERR")){
+        if(exists("C:\\USOS9X\\FIRSTBT.OK")){
+            unregister();log_line("USOSADD: the first-desktop coordinator finished the chain; Run value removed");ExitProcess(0);}
+        log_line("USOSADD: the first-desktop coordinator (USOSFB) runs the chain; nothing done from Run");ExitProcess(0);}
+    /* Coordinator only: e.g. IE 5.5 SP2 restarts at once (reboot_setup=now)
      * so its WININIT replacements and RunOnceEx precede the later packages. */
     if(g_setup_mode && ua_setup_overrides(&g_m,&g_p)) log_line("USOSADD setup: reboot_setup/check_setup values applied");
     /* Locale/keyboard can differ from the installation media's language.
