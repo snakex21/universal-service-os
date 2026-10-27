@@ -718,6 +718,7 @@ payload_zip	EFI/USOS/dos-native/win9x/USOSMOUS.DRV
 payload_zip	EFI/USOS/dos-native/win9x/USOSNVME.INF
 payload_zip	EFI/USOS/dos-native/win9x/USOSNVME.MPD
 payload_zip	EFI/USOS/dos-native/win9x/USOSP1.DRV
+payload_zip	EFI/USOS/dos-native/win9x/USOSPG.DRV
 payload_zip	EFI/USOS/dos-native/win9x/USOSPID.DRV
 payload_zip	EFI/USOS/dos-native/win9x/USOSUSB.INF
 payload_zip	EFI/USOS/dos-native/win9x/USOSUSB.MPD

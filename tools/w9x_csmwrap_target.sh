@@ -395,6 +395,34 @@ if [ "$SYSTEM_TAG" = ME ] && [ "$VM_PHASE1" != 1 ] && [ -f "$work/c/USOS9X/USOSP
 else
     rm -f "$work/c/USOS9X/USOSP1.DRV"
 fi
+# Windows 98 / 98 SE with a native phase 1 (X470 98 FE PL, 2026-10-27):
+# Setup loaded the automatic answer (Express=1, ShowEula=0) and filled its
+# pages, but stopped on user information, the licence, the product key and
+# the last page (the VM phase 1 went past them). USOSPG.DRV
+# (src/platform/bios/win9x/usospg.c) in Setup's mini-Windows presses Next /
+# Finish on those pages when they are filled, accepts the licence; log
+# C:\USOS9X\USOSPG.TXT. Only for a USOS answer in automatic mode
+# (C:\USOS9X\USOSPG.CFG mode=auto; never win9x_setup=manual, never the
+# user's own file); otherwise the driver leaves C:\USOS9X.
+pg_auto=0
+case "$SYSTEM_TAG" in
+    98|98SE)
+        if [ "$VM_PHASE1" != 1 ] && [ "${ANSWER_KIND:-}" != USER ] && [ -f "$work/c/USOS9X/USOSPG.DRV" ] &&
+            tr -d '\r' < "$work/c/USOS9X/MSBATCH.INF" | awk '
+                { l = tolower($0); gsub(/[ \t]/, "", l) }
+                l == ";usos-setup=manual" { manual = 1 }
+                l == "express=1" { express = 1 }
+                l == "showeula=0" { eula = 1 }
+                END { exit !(express && eula && !manual) }'; then
+            pg_auto=1
+        fi ;;
+esac
+if [ "$pg_auto" = 1 ]; then
+    printf 'mode=auto\r\n' > "$work/c/USOS9X/USOSPG.CFG"
+    log 'setup pages: USOSPG.DRV for the mini-Windows (Next / Finish on the filled pages, licence accepted; automatic mode)'
+else
+    rm -f "$work/c/USOS9X/USOSPG.DRV" "$work/c/USOS9X/USOSPG.CFG"
+fi
 # Display: the answer's ;USOS-DISPLAY= request, else (user decision
 # 2026-10-20) auto = the native (EDID) mode, else the highest validated one, capped at 1920x1080 on 9x (docs/display-policy.md), for every
 # USOS-made answer. A user's own answer file (copied 1:1) gets no request.
@@ -569,6 +597,15 @@ if [ -f "$work/c/USOS9X/USOSP1.DRV" ]; then
     else
         rm -f "$work/c/USOS9X/USOSP1.DRV"
         log 'me phase 1 end: no mini-Windows helper; SYSTEM.INI [386Enh] mouse= and MSDOS.SYS stay as Setup writes them'
+    fi
+fi
+# USOSPG.DRV (above) only inside this MINI.CAB with the bridge.
+if [ -f "$work/c/USOS9X/USOSPG.DRV" ]; then
+    if [ "$mini_bridge" = 1 ] && tr -d '\r' < "$work/c/USOS9X/USOSMINI.TXT" 2>/dev/null | grep -qx 'pg=on'; then
+        log 'setup pages: USOSPG.DRV in the mini-Windows'
+    else
+        rm -f "$work/c/USOS9X/USOSPG.DRV" "$work/c/USOS9X/USOSPG.CFG"
+        log 'setup pages: no mini-Windows helper; Setup waits on its pages for the user'
     fi
 fi
 

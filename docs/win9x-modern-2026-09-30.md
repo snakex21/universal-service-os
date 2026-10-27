@@ -484,6 +484,24 @@ under CSMWrap, and two VM-path steps were missing:
   nothing changes against today. The VM path is unchanged. The Me
   `MINI.CAB` SYSTEM.INI has `shell=w9xsetup.bin` and the same `[boot]`
   layout as 95/98, which the bridge edit handles (tests).
+* **98 / 98 SE native phase 1, filled pages (2026-10-27)**: on the X470 the
+  98 FE PL Setup loaded the automatic answer (`Express=1`, `ShowEula=0`) and
+  filled its pages, yet stopped on user information, the licence, the
+  product key and the last "Finish" page (the VM phase 1 went past them).
+  **USOSPG.DRV** (`src/platform/bios/win9x/usospg.c`, KERNEL / USER imports,
+  resolved against the 98 / 98 SE `MINI.CAB`) joins `drivers=` with the
+  bridge (log `pg=on`) and presses Next / Finish (posted `WM_COMMAND`
+  BN_CLICKED of the KOMMCTRL wizard frame's 0x3024 / 0x3025) only on a page
+  that already holds what Setup needs: SETUPX.DLL dialog 112 with a name in
+  Edit 1025, dialog 600 (licence: radio 618 accepted first), dialogs
+  607 / 608 with all five key Edits 1058..1062 at 5 characters, the last
+  page (dialog 4205) when the frame shows Finish. A page that is empty,
+  declined, keeps Next disabled or stays after the button is left to the
+  user. One line per page and action in `C:\USOS9X\USOSPG.TXT` (never key
+  text); 30 minutes at most. Kept only for a USOS answer in automatic mode
+  (`C:\USOS9X\USOSPG.CFG` `mode=auto`; never `win9x_setup=manual`, never the
+  user's own file). **Open (X470)**: whether the pages now move on;
+  USOSPG.TXT names each page seen.
 
 ## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
 

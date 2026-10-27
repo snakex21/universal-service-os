@@ -163,9 +163,9 @@ class Payload(unittest.TestCase):
             self.assertIn(f"'EFI/USOS/dos-native/win9x/{name}'", ps1)
         build = (ROOT / 'tools/build_win9x_support.py').read_text(encoding='utf-8')
         # build() makes USOSDBG.EXE and USOSLOG.EXE; the Setup mini-Windows
-        # drivers (USOSPID.DRV, USOSP1.DRV) are built between them
+        # drivers (USOSPID.DRV, USOSP1.DRV, USOSPG.DRV) are built between them
         self.assertIn('    build_usosdbg(out, work)\n    build_usospid(out, work)\n'
-                      '    build_usosp1(out, work)\n    build_usoslog(out, work)\n', build)
+                      '    build_usosp1(out, work)\n    build_usospg(out, work)\n    build_usoslog(out, work)\n', build)
         # reproducible: the link time is not kept
         self.assertIn("raw[pe + 8:pe + 12] = (0).to_bytes(4, 'little')", build)
 

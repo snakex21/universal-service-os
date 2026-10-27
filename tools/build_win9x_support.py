@@ -76,6 +76,12 @@
                 Me native phase 1 drops C:\\WINDOWS\\SYSTEM.INI [386Enh]
                 mouse= and adds Logo=0 to C:\\MSDOS.SYS, the VM path's
                 w9x_phase1_patch_c (Me only; tools/w9x_csmwrap_target.sh)
+  USOSPG.DRV    Win16 installable driver for Setup's own mini-Windows
+                (src/platform/bios/win9x/usospg.c): presses Next / Finish
+                on the 98 / 98 SE pages already filled from MSBATCH.INF
+                (user information, licence, product key, last page), log
+                C:\\USOS9X\\USOSPG.TXT (98 / 98 SE native phase 1, USOS
+                answer in automatic mode only; tools/w9x_csmwrap_target.sh)
   W950POST.BAT  (written by tools/w9x_950_post.sh, not here) the DOS-side
                 950 post-phase-1 fixes for a native phase 1 (VESBIND
                 PMDROP / MAXRES), PHASE1.OK for FIRSTBT.BAT
@@ -152,7 +158,10 @@ STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'USOSFB.EXE', 'MSBATCH.INF', 'V
     # 950 native phase 1 with an OEM ID: Setup's mini-Windows types it.
     'USOSPID.DRV',) + (
     # Me native phase 1: Setup's mini-Windows edits C: before its restart.
-    'USOSP1.DRV',)
+    'USOSP1.DRV',) + (
+    # 98 / 98 SE native phase 1 (automatic mode): Setup's mini-Windows
+    # moves past the pages MSBATCH.INF filled.
+    'USOSPG.DRV',)
 USOSNVME = ROOT / 'tools/nt/usosnvme'
 USOSUSB = ROOT / 'tools/nt/usosusb9x'
 USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
@@ -345,6 +354,17 @@ def build_usosp1(out: Path, work: Path) -> Path:
     """USOSP1.DRV: Win16 installable driver for Windows Me Setup's
     mini-Windows (the native phase 1's end fixes)."""
     return build_mini_driver(out, work, 'usosp1', USOSP1_IMPORTS)
+
+
+# USOSPG.DRV: KERNEL (log, mode file) and USER (the wizard's windows),
+# checked against the 98 / 98 SE mini-Windows by test_usospg.py.
+USOSPG_IMPORTS = {'KERNEL', 'USER'}
+
+
+def build_usospg(out: Path, work: Path) -> Path:
+    """USOSPG.DRV: Win16 installable driver for Windows 98 / 98 SE Setup's
+    mini-Windows (Next / Finish on the pages MSBATCH.INF filled)."""
+    return build_mini_driver(out, work, 'usospg', USOSPG_IMPORTS)
 
 
 def build_mini_driver(out: Path, work: Path, stem: str, allowed: set) -> Path:
@@ -623,6 +643,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     build_usosdbg(out, work)
     build_usospid(out, work)
     build_usosp1(out, work)
+    build_usospg(out, work)
     build_usoslog(out, work)
     build_vesbind(out, work)
     from build_usosgrpw import build as build_grpwatch
