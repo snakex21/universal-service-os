@@ -363,6 +363,7 @@ static void hw_tick(HWND frame)
     act = hw_step(&g_hw, (unsigned long)frame, (unsigned long)page, &p);
     if (act == AA_NEXT) { press(frame, HW_NEXT_ID); say2("wizard: Next pressed on ", page_name[kind]); }
     else if (act == AA_FINISH) { press(frame, HW_FINISH_ID); say("wizard: Finish pressed (Plug and Play Monitor)"); }
+    else if (act == AA_LEAVE && g_hw.event == AE_STUCK) say2("wizard: page stayed after the press, still watching: ", page_name[kind]);
     else if (act == AA_LEAVE) say2("wizard: left to the user: ", event_name[g_hw.event]);
 }
 

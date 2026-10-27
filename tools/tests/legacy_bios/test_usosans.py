@@ -284,6 +284,26 @@ class Logic(unittest.TestCase):
         self.assertEqual(acts.count(NEXT), 1)
         self.assertIn((LEAVE, E_STUCK, HP_INTRO), got)
 
+    def test_places_stays_40_s_then_ready(self):
+        # X470 98 FE PL 2026-10-27: the search runs behind the places page; 120 s before it counts as stayed
+        ticks = [page(**INTRO)] * 4 + [page(**CHOICE)] * 4 + [page(**PLACES)] * (4 + 160) + \
+                [page(**READY)] * 4 + [page(**FIN)] * 6
+        got = self.hw(*ticks)
+        self.assertEqual([a for a, _, _ in got if a != NONE], [NEXT, NEXT, NEXT, NEXT, FINISH])
+        self.assertNotIn(LEAVE, [a for a, _, _ in got])
+
+    def test_stayed_page_is_reported_once_and_the_wizard_goes_on(self):
+        # places beyond 120 s: reported once, then the ready / finish pages still get their press
+        ticks = [page(**INTRO)] * 4 + [page(**CHOICE)] * 4 + [page(**PLACES)] * (4 + 500) + \
+                [page(**READY)] * 4 + [page(**FIN)] * 6
+        got = self.hw(*ticks)
+        self.assertEqual([(a, e) for a, e, _ in got if a == LEAVE], [(LEAVE, E_STUCK)])
+        self.assertEqual([a for a, _, _ in got if a in (NEXT, FINISH)], [NEXT, NEXT, NEXT, NEXT, FINISH])
+        # another page: 20 s as before, then the next page gets its turn
+        got = self.hw(*[page(**INTRO)] * 90, *[page(**CHOICE)] * 4)
+        self.assertEqual([(a, e) for a, e, _ in got if a == LEAVE], [(LEAVE, E_STUCK)])
+        self.assertEqual(got[-1][0], NEXT)
+
     def test_new_frame_starts_over(self):
         got = self.hw(*[page(**dict(INTRO, monitor=0))] * 4, *[page(frame=8, **INTRO)] * 4)
         self.assertEqual(got[3][:2], (LEAVE, E_OTHER))

@@ -68,11 +68,16 @@
 
 /* 250 ms ticks. A dialog / page is acted on after it has been shown,
  * unchanged, for 1 s; at most 10 s for its button to be enabled; a page
- * still shown 20 s after Next / Finish is left alone. */
+ * still shown 20 s after Next / Finish (the search places page: 120 s,
+ * the driver search runs behind it) is logged once and only watched from
+ * then on: the next page of that wizard gets its turn (X470 98 FE PL,
+ * 2026-10-27: places stayed while searching, the wizard was given up and
+ * the ready / finish pages stayed). */
 #define AN_TICK_MS       250
 #define AN_STABLE_TICKS  4
 #define AN_WAIT_TICKS    40
 #define AN_GONE_TICKS    80
+#define AN_PLACES_GONE_TICKS 480
 #define AN_LIFETIME_MS   (10UL * 60UL * 1000UL)
 /* OK presses per start (logon dialogs), whatever the dialogs. */
 #define AN_LOGON_MAX     3
@@ -260,17 +265,24 @@ typedef struct {
     unsigned char ticks;
     unsigned char waited;
     unsigned char pressed;      /* Next / Finish pressed on this page */
-    unsigned char gone;         /* ticks since then */
+    unsigned short gone;        /* ticks since then */
+    unsigned char stuck;        /* that page stayed: logged, only watched */
     unsigned char stop;         /* this wizard is the user's */
     unsigned char event;
     unsigned char seen;         /* HP_* kinds already logged (bit per kind) */
+    unsigned char why;          /* AW_*: why this tick pressed nothing */
 } HWSTATE;
+
+/* Why a tick pressed nothing (usosans.c logs every change). */
+enum { AW_NONE, AW_NO_PAGE, AW_UNKNOWN_PAGE, AW_SETTLING, AW_WAIT_BUTTON, AW_AFTER_PRESS, AW_STAYED,
+       AW_STOPPED };
 
 /* One tick for wizard frame `frame` showing page `page` (0: none visible).
  * Every page is judged on its own after AN_STABLE_TICKS; a page that does
  * not match its rule ends the automation of this wizard for good (AA_LEAVE
  * with the reason); a page of an unknown kind (searching, not found,
- * other results) is only watched. */
+ * other results) is only watched; a page that stays after its press is
+ * reported once (AA_LEAVE, AE_STUCK) and watched, the wizard stays ours. */
 static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HWPAGE *p)
 {
     int kind = page ? hw_classify(p) : HP_NONE, ok = 0, ready = 0;
@@ -278,17 +290,25 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
         s->frame = frame; s->page = 0; s->kind = HP_NONE; s->confirmed = 0; s->ticks = 0;
         s->waited = 0; s->pressed = 0; s->gone = 0; s->stop = 0; s->event = AE_NONE; s->seen = 0;
     }
-    if (s->stop) return AA_NONE;
+    s->why = AW_NONE;
+    if (s->stop) { s->why = AW_STOPPED; return AA_NONE; }
     s->event = AE_NONE;
     if (page != s->page || kind != s->kind) {
         s->page = page; s->kind = (unsigned char)kind; s->ticks = 0; s->waited = 0; s->pressed = 0; s->gone = 0;
+        s->stuck = 0;
     }
     if (s->pressed) {
-        if (++s->gone >= AN_GONE_TICKS) { s->stop = 1; s->event = AE_STUCK; return AA_LEAVE; }
+        /* not final: logged once (AA_LEAVE + AE_STUCK), the next page gets its turn */
+        if (s->stuck) { s->why = AW_STAYED; return AA_NONE; }
+        s->why = AW_AFTER_PRESS;
+        if (++s->gone >= (kind == HP_PLACES ? AN_PLACES_GONE_TICKS : AN_GONE_TICKS)) {
+            s->stuck = 1; s->event = AE_STUCK; return AA_LEAVE;
+        }
         return AA_NONE;
     }
-    if (kind == HP_NONE || kind == HP_OTHER) return AA_NONE;
-    if (++s->ticks < AN_STABLE_TICKS) return AA_NONE;
+    if (kind == HP_NONE) { s->why = AW_NO_PAGE; return AA_NONE; }
+    if (kind == HP_OTHER) { s->why = AW_UNKNOWN_PAGE; return AA_NONE; }
+    if (++s->ticks < AN_STABLE_TICKS) { s->why = AW_SETTLING; return AA_NONE; }
     switch (kind) {
     case HP_INTRO:
         if (!p->monitor) { s->stop = 1; s->event = AE_OTHER_DEVICE; return AA_LEAVE; }
@@ -319,6 +339,7 @@ static int hw_step(HWSTATE *s, unsigned long frame, unsigned long page, const HW
     if (!ok) return AA_NONE;
     if (!ready) {
         if (++s->waited >= AN_WAIT_TICKS) { s->stop = 1; s->event = AE_NO_BUTTON; return AA_LEAVE; }
+        s->why = AW_WAIT_BUTTON;
         return AA_NONE;
     }
     s->pressed = 1;
