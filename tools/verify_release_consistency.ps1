@@ -150,6 +150,7 @@ try {
         'EFI/USOS/dos-native/win9x/USOSUSB.REG',
         'EFI/USOS/dos-native/win9x/USOSVMD.VXD',
         'EFI/USOS/dos-native/win9x/USOSLOG.EXE',
+        'EFI/USOS/dos-native/win9x/USOSANS.EXE',
         'EFI/USOS/dos-native/win9x/VESBIND.EXE',
         'EFI/USOS/dos-native/win9x/USOSGRPW.EXE',
         'EFI/USOS/dos-native/win9x/USOSFB.EXE',

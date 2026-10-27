@@ -86,6 +86,14 @@
                 950 post-phase-1 fixes for a native phase 1 (VESBIND
                 PMDROP / MAXRES), PHASE1.OK for FIRSTBT.BAT
 
+  USOSANS.EXE   Win32, no window, from the machine RunServices key (USOS
+                answer in automatic mode, empty password; tools/w9x_csmwrap_target.sh):
+                OK on the first Windows Logon dialog (password fields left
+                empty, Windows creates the list itself), Next / Finish in the
+                new hardware wizard for the Plug and Play Monitor only; log
+                C:\\USOS9X\\USOSANS.TXT, removes its value after the first
+                starts (src/platform/bios/win9x/usosans.c, tools/tests/legacy_bios/test_usosans.py)
+
 Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
 nothing runs them unless EFI/USOS/win9x/diag.flag exists):
   USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
@@ -161,7 +169,10 @@ STAGED = FILES + ('VESBIND.EXE', 'USOSGRPW.EXE', 'USOSFB.EXE', 'MSBATCH.INF', 'V
     'USOSP1.DRV',) + (
     # 98 / 98 SE native phase 1 (automatic mode): Setup's mini-Windows
     # moves past the pages MSBATCH.INF filled.
-    'USOSPG.DRV',)
+    'USOSPG.DRV',) + (
+    # 95 / 98 / 98 SE / Me, automatic mode with an empty password: the
+    # first Windows Logon dialog and the monitor's new hardware wizard.
+    'USOSANS.EXE',)
 USOSNVME = ROOT / 'tools/nt/usosnvme'
 USOSUSB = ROOT / 'tools/nt/usosusb9x'
 USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
@@ -511,6 +522,62 @@ def build_usoslog(out: Path, work: Path, *, nt3: bool = False) -> Path:
     return exe
 
 
+# What USOSANS.EXE may import: the Windows 95 (4.00.950) subset of
+# KERNEL32 / USER32 / ADVAPI32, nothing looked up at run time.
+USOSANS_IMPORTS = {
+    'kernel32.dll': {
+        'CloseHandle', 'CreateFileA', 'CreateMutexA', 'ExitProcess', 'FlushFileBuffers', 'GetLastError',
+        'GetLocalTime', 'GetModuleFileNameA', 'GetTickCount', 'GetVersion', 'ReadFile', 'SetFilePointer',
+        'Sleep', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA'},
+    'user32.dll': {
+        'EnumChildWindows', 'EnumWindows', 'FindWindowA', 'GetClassNameA', 'GetDlgItem', 'GetParent',
+        'GetWindowTextA', 'IsWindowEnabled', 'IsWindowVisible', 'PostMessageA', 'SendMessageTimeoutA',
+        'wsprintfA'},
+    'advapi32.dll': {'RegCloseKey', 'RegDeleteValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
+}
+
+
+def build_usosans(out: Path, work: Path) -> Path:
+    """USOSANS.EXE: Win32 GUI program without a window (OpenWatcom wcc386 /
+    wlink, no runtime), PE 4.00 so Windows 95 / 98 / Me load it: OK on the
+    first Windows Logon dialog with an empty password, Next / Finish in the
+    new hardware wizard for the Plug and Play Monitor only."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import openwatcom
+    ow = openwatcom()
+    openwatcom_nt(ow)
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{ow / "h/nt"};{ow / "h"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usosans.obj'
+    subprocess.run([str(ow / 'binnt64/wcc386.exe'), '-q', '-bt=nt', '-zl', '-s', '-5r', '-os', '-zp4',
+                    '-w3', '-we', '-i=' + str(SOURCE), '-fo=' + str(obj), str(SOURCE / 'usosans.c')],
+                   env=env, check=True, cwd=work)
+    exe = out / 'USOSANS.EXE'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usosans.lnk'), 'file', str(obj),
+                    'name', str(exe), 'option', 'map=' + str(work / 'usosans.map')], env=env, check=True, cwd=work)
+    spec = importlib_util_spec('pe_nt4_version', ROOT / 'tools/nt4/pe_nt4_version.py')
+    raw = bytearray(exe.read_bytes())
+    pe = int.from_bytes(raw[0x3C:0x40], 'little')
+    if raw[pe:pe + 4] != b'PE\0\0':
+        raise ValueError('USOSANS.EXE has no PE header')
+    raw[pe + 8:pe + 12] = (0).to_bytes(4, 'little')    # reproducible: no link time
+    data = spec.set_nt4(bytes(raw), 4, 0)
+    exe.write_bytes(data)
+    if data[:2] != b'MZ' or b'USOSANS' not in data:
+        raise ValueError('USOSANS.EXE is not the expected PE program')
+    imports = pe_imports(data)
+    if set(imports) - set(USOSANS_IMPORTS):
+        raise ValueError(f'USOSANS.EXE imports other DLLs: {sorted(set(imports) - set(USOSANS_IMPORTS))}')
+    for dll, names in imports.items():
+        extra = names - USOSANS_IMPORTS[dll]
+        if extra:
+            raise ValueError(f'USOSANS.EXE imports outside the 9x list: {dll} {sorted(extra)}')
+    if 'clib' in (work / 'usosans.map').read_text(errors='replace').lower():
+        raise ValueError('USOSANS.EXE must not link the OpenWatcom C library')
+    return exe
+
+
 def importlib_util_spec(name: str, path: Path):
     import importlib.util
     spec = importlib.util.spec_from_file_location(name, path)
@@ -645,6 +712,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     build_usosp1(out, work)
     build_usospg(out, work)
     build_usoslog(out, work)
+    build_usosans(out, work)
     build_vesbind(out, work)
     from build_usosgrpw import build as build_grpwatch
     build_grpwatch(out)
@@ -680,8 +748,15 @@ if __name__ == '__main__':
                    help='only USOSDBG.EXE and USOSLOG.EXE (for in-place kits)')
     p.add_argument('--vesbind', action='store_true', help='only the 950 DOS late-display binding helper')
     p.add_argument('--usospid', action='store_true', help='only the 950 Setup Product ID helper USOSPID.DRV')
+    p.add_argument('--usosans', action='store_true', help='only USOSANS.EXE (first-start dialogs helper)')
     a = p.parse_args()
-    if a.usospid:
+    if a.usosans:
+        o = a.out or ROOT / 'zig-out/dos-native/win9x'
+        w = ROOT / 'zig-out/win9x-support'
+        o.mkdir(parents=True, exist_ok=True)
+        w.mkdir(parents=True, exist_ok=True)
+        print(build_usosans(o, w))
+    elif a.usospid:
         o = a.out or ROOT / 'zig-out/dos-native/win9x'
         w = ROOT / 'zig-out/win9x-support'
         o.mkdir(parents=True, exist_ok=True)

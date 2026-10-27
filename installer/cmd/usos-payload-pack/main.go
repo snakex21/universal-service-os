@@ -93,6 +93,9 @@ var payloadFiles = []payloadFile{
 	// presses Next / Finish on the pages MSBATCH.INF filled.
 	{`zig-out/dos-native/win9x/USOSPG.DRV`, `EFI/USOS/dos-native/win9x/USOSPG.DRV`},
 	{`zig-out/dos-native/win9x/USOSLOG.EXE`, `EFI/USOS/dos-native/win9x/USOSLOG.EXE`},
+	// 95 / 98 / 98 SE / Me (automatic mode, empty password): the first Windows
+	// Logon dialog and the monitor's new hardware wizard (RunServices).
+	{`zig-out/dos-native/win9x/USOSANS.EXE`, `EFI/USOS/dos-native/win9x/USOSANS.EXE`},
 	// Windows 95 RTM (4.00.950): VESA95.BAT binds the display with it
 	// (tools/w9x_vesa95.sh requires it for the 950 source).
 	{`zig-out/dos-native/win9x/VESBIND.EXE`, `EFI/USOS/dos-native/win9x/VESBIND.EXE`},

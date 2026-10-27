@@ -706,6 +706,7 @@ payload_zip	EFI/USOS/dos-native/win9x/MSBATCH.INF
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.COM
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.TXT
 payload_zip	EFI/USOS/dos-native/win9x/U9V10STK.COM
+payload_zip	EFI/USOS/dos-native/win9x/USOSANS.EXE
 payload_zip	EFI/USOS/dos-native/win9x/USOSDBG.EXE
 payload_zip	EFI/USOS/dos-native/win9x/USOSDIAG.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSFB.EXE
