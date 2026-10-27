@@ -46,7 +46,11 @@ HARNESS = r'''
  * (a pause: nothing changes, prints "p"), E = DRV_ENABLE (prints "e" and
  * pg_may_start), F = DRV_FREE (pg_end, prints "f"); a W ARMED... :
  * pg_arm_slot for window W, ARMED = window/alive pairs ("3/1"), prints
- * "slot already". */
+ * "slot already"; r N: pg_rec_allow N + 2 times, prints the results;
+ * h VK EDIT: pg_key_hidden; d V: pg_u32_dec; m EV...: PGMOVES, EV =
+ * "x,y,ms" (a move) or "?ms" / "!ms" (pg_move_due / forced; when due
+ * prints "n/still/dist/span" and resets, else "-"); o PAGE/STATE...:
+ * pg_radio_note per pair. */
 int main(int argc, char **argv)
 {
     int i;
@@ -67,6 +71,43 @@ int main(int argc, char **argv)
         p.eula_yes = f[4] - '0'; p.eula_no = f[5] - '0'; p.key_edits = f[6] - '0'; p.clickable = f[7] - '0';
         p.next_shown = f[8] - '0'; p.finish_shown = f[9] - '0';
         printf("%d\n", pg_classify(&p));
+    } else if (argv[1][0] == 'r') {
+        unsigned lines = 0;
+        int n = atoi(argv[2]);
+        for (i = 0; i < n + 2; i++) printf("%d", pg_rec_allow(&lines));
+        printf("\n");
+    } else if (argv[1][0] == 'h') {
+        printf("%d\n", pg_key_hidden((unsigned)strtoul(argv[2], 0, 0), atoi(argv[3])));
+    } else if (argv[1][0] == 'd') {
+        char out[16];
+        int n = pg_u32_dec(out, strtoul(argv[2], 0, 10));
+        out[n] = 0;
+        printf("%s\n", out);
+    } else if (argv[1][0] == 'm') {
+        PGMOVES m;
+        memset(&m, 0, sizeof(m));
+        for (i = 2; i < argc; i++) {
+            const char *f = argv[i];
+            if (f[0] == '?' || f[0] == '!') {
+                unsigned long now = strtoul(f + 1, 0, 10);
+                if (pg_move_due(&m, now, f[0] == '!')) {
+                    printf("%u/%u/%lu/%lu ", m.n, m.still, m.dist, (unsigned long)(unsigned)(now - m.since));
+                    pg_move_reset(&m);
+                } else printf("- ");
+            } else {
+                int x, y;
+                unsigned long ms;
+                sscanf(f, "%d,%d,%lu", &x, &y, &ms);
+                pg_move_add(&m, x, y, ms);
+            }
+        }
+        printf("\n");
+    } else if (argv[1][0] == 'o') {
+        PGRADIO r;
+        memset(&r, 0, sizeof(r));
+        for (i = 2; i < argc; i++)
+            printf("%d", pg_radio_note(&r, (unsigned short)atoi(argv[i]), (unsigned char)atoi(strchr(argv[i], '/') + 1)));
+        printf("\n");
     } else if (argv[1][0] == 'a') {
         unsigned short armed[16];
         unsigned char alive[16];
@@ -262,6 +303,39 @@ class Logic(unittest.TestCase):
         self.assertEqual(arm(9, '3/1', '4/1', '5/1'), (-1, 0))
 
 
+    # ---- the input recorder (usospg_logic.h)
+    def test_line_limit(self):
+        self.assertEqual(self.run_exe('r', '2000'), '1' * 2000 + '20')
+
+    def test_typing_keys_in_an_edit_are_hidden(self):
+        for vk in (0x20, 0x30, 0x39, 0x41, 0x5A, 0x60, 0x6F, 0xBA, 0xC0, 0xDB, 0xDF, 0xE2):
+            with self.subTest(vk=hex(vk)):
+                self.assertEqual(self.run_exe('h', hex(vk), '1'), '1')
+                self.assertEqual(self.run_exe('h', hex(vk), '0'), '0')
+        # Tab, Enter, Esc, Backspace, Shift, Ctrl, Alt, arrows, F1, Delete keep their code
+        for vk in (0x09, 0x0D, 0x1B, 0x08, 0x10, 0x11, 0x12, 0x25, 0x28, 0x70, 0x2E):
+            with self.subTest(vk=hex(vk)):
+                self.assertEqual(self.run_exe('h', hex(vk), '1'), '0')
+
+    def test_decimal(self):
+        for v in ('0', '7', '10', '65535', '65536', '1800000', '4294967295'):
+            self.assertEqual(self.run_exe('d', v), v)
+
+    def test_moves_summary(self):
+        # nothing moved: never due, not even forced
+        self.assertEqual(self.run_exe('m', '?100', '!200'), '- -')
+        # 3 moves (one still), due 5 s after the first one
+        self.assertEqual(self.run_exe('m', '10,10,1000', '13,6,2000', '13,6,3000', '?5999', '?6000', '?9000'),
+                         '- 3/1/7/5000 -')
+        # the next window starts at its first move; the last position is kept
+        self.assertEqual(self.run_exe('m', '0,0,0', '?5000', '0,0,7000', '!7500'), '1/0/0/5000 1/1/0/500')
+        # GetTickCount wraps
+        self.assertEqual(self.run_exe('m', '1,1,4294967000', '?4703', '?4704'), '- 1/0/0/5000')
+
+    def test_licence_radio_changes(self):
+        self.assertEqual(self.run_exe('o', '5/0', '5/0', '5/1', '5/1', '6/1', '6/2'), '101011')
+
+
 class Source(unittest.TestCase):
     def test_driver_reads_and_logs(self):
         c = DRIVER.read_text(encoding='utf-8')
@@ -271,8 +345,28 @@ class Source(unittest.TestCase):
         self.assertIn('if (!read_cfg()) return 0L;', c)
         # the key fields: only their lengths, never their text
         self.assertNotIn('GetWindowText(GetDlgItem(c, PG_KEY1_ID', c)
-        self.assertEqual(c.count('GetWindowText('), 1)
+        self.assertEqual(c.count('GetWindowText('), 2)
         self.assertIn('GetWindowText(GetDlgItem(page, PG_TITLE_ID), title, sizeof(title))', c)
+        # the recorder reads text only through rec_text: Buttons, Statics, dialogs, top-level windows
+        rec = c[c.index('static int rec_text(HWND w)'):c.index('static int rec_begin(const char *what)')]
+        self.assertIn('if (is_child(w) && !class_is(w, "Button") && !class_is(w, "Static") && !class_is(w, "#32770")) return 0;', rec)
+        self.assertIn('n = GetWindowText(w, rtext, sizeof(rtext));', rec)
+        key = c[c.index('static void rec_key(UINT vk, LPARAM flags)'):c.index('LRESULT FAR PASCAL __export __loadds mouse_proc(')]
+        self.assertIn('int in_edit = f && (class_is(f, "Edit") || class_is(f, "ComboBox"));', key)
+        self.assertIn('if (pg_key_hidden(vk, in_edit)) rput("char");', key)
+        # the hooks pass everything on and go with the CBT hook (pause and stop)
+        for hook in ('mouse_proc', 'key_proc'):
+            fn = c[c.index(f'LRESULT FAR PASCAL __export __loadds {hook}('):]
+            fn = fn[:fn.index('return r;')]
+            self.assertIn('LRESULT r = CallNextHookEx(', fn)
+            self.assertIn('code == HC_ACTION', fn)
+            self.assertNotIn('PostMessage', fn)
+        pause = c[c.index('static void pause_all(void)'):c.index('static void stop_all(void)')]
+        self.assertIn('rec_unhook();', pause)
+        self.assertIn('if (mouse_hook) { UnhookWindowsHookEx(mouse_hook); mouse_hook = 0; }', c)
+        self.assertIn('if (key_hook) { UnhookWindowsHookEx(key_hook); key_hook = 0; }', c)
+        self.assertEqual(c.count('PostMessage('), 3)
+        self.assertEqual(c.count('CheckRadioButton('), 1)
         self.assertIn('GetWindowTextLength(GetDlgItem(c, PG_KEY1_ID + i)) == PG_KEY_PART_LEN', c)
         # the buttons go to the frame as their BN_CLICKED; the licence radio to its page
         tick_fn = c[c.index('void FAR PASCAL __export __loadds tick('):c.index('static int is_frame(HWND w)')]
@@ -286,6 +380,7 @@ class Source(unittest.TestCase):
         self.assertIn('case DRV_FREE:    stop_all();', proc)
         start_fn = c[c.index('static int start(void)'):c.index('LRESULT FAR PASCAL __export __loadds DriverProc(')]
         self.assertNotIn('st.done', start_fn)
+        self.assertIn('rec_hook();', start_fn)
         self.assertIn('if (cbt_hook || !pg_may_start(&st)) return 1;', start_fn)
         self.assertIn('arm(GetActiveWindow());', start_fn)
         # only wizard frames are armed, a full table is logged
@@ -573,7 +668,7 @@ class Build(unittest.TestCase):
         self.assertEqual(self.drv[:2], b'MZ')
         self.assertEqual(set(ne_imported_modules(self.drv)), {'KERNEL', 'USER'})
         exports = m.ne_exports(self.drv)
-        for name in ('DRIVERPROC', 'WEP', 'TICK', 'CBT_PROC'):
+        for name in ('DRIVERPROC', 'WEP', 'TICK', 'CBT_PROC', 'MOUSE_PROC', 'KEY_PROC'):
             self.assertIn(name, exports)
 
     def mini(self, key):

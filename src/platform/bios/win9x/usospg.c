@@ -38,7 +38,30 @@
  *
  * C:\USOS9X\USOSPG.TXT gets a line per page seen (its kind and title) and
  * per action or give-up; for the key only how many fields are complete,
- * never their text (the driver reads only their lengths). Only USER and
+ * never their text (the driver reads only their lengths).
+ *
+ * Input recorder (diagnostics, 2026-10-27: the pages still stopped on the
+ * X470 with MSBATCH.INF loaded; does input from the USB bridge make Setup
+ * leave its batch mode?). Hooked and unhooked with the CBT hook (DRV_ENABLE,
+ * DRV_DISABLE pause, stop); it never presses or changes anything:
+ *   WH_MOUSE    every button press (L / R / M, double clicks, non-client)
+ *               taken from a queue: "t=<ms since the first DRV_ENABLE>
+ *               click L x= y= hit=", the target's class, control ID, text
+ *               (Button / Static only), button state, the top-level
+ *               window's title and, in a wizard frame, the page title
+ *               (Static 1070). Pointer moves are only counted: "moves N
+ *               still= dist= in <ms>" at most every 5 s and only when
+ *               there were any (moves while nobody touches the mouse are
+ *               the phantom input looked for; "still" = the pointer did
+ *               not move).
+ *   WH_KEYBOARD every key press: its virtual key code and the focus
+ *               window as above; with the focus in an Edit / ComboBox a
+ *               typing key is "char" only (usospg_logic.h pg_key_hidden).
+ *   timer       the licence page's radio buttons 618 / 619 at first sight
+ *               and at every change.
+ * At most PG_REC_MAX (2000) recorder lines, then one notice; the page and
+ * action lines go on. Text is read only from Buttons, Statics, dialogs and
+ * top-level windows (rec_text), never from an Edit. Only USER and
  * KERNEL calls that Windows 3.1 standard mode has; the imports are checked
  * against the 98 / 98 SE mini-Windows (tools/tests/legacy_bios/
  * test_usospg.py). No OpenWatcom runtime (own entry point, -zl), as
@@ -74,6 +97,19 @@ static BYTE no_slot_logged;
 static HWND logged_page;
 static BYTE key_complete;
 static BYTE stopping;
+/* The recorder: its own line and text buffers (GetWindowText may let
+ * another task run, and with it a hook or this driver's timer). */
+static HHOOK mouse_hook, key_hook;
+static BYTE in_rec;
+static BYTE rec_hook_failed;
+static unsigned rec_lines;
+static PGMOVES moves;
+static PGRADIO radio;
+static char rline[256];
+static unsigned rpos;
+static char rcls[16];
+static char rtext[48];
+static char rnum[12];
 
 static const char *const kind_name[] = { "other", "user", "eula", "key", "finish" };
 
@@ -97,7 +133,8 @@ static void put_num(unsigned v)
     while (n && lpos < sizeof(line) - 3) line[lpos++] = d[--n];
 }
 
-static void log_line(void)
+/* Appends s[0 .. *pos) and CR LF to the log (s keeps 2 bytes of room). */
+static void write_log(char *s, unsigned *pos)
 {
     HFILE f;
     copy_path(LOG_FILE);
@@ -105,12 +142,17 @@ static void log_line(void)
     if (f == HFILE_ERROR) f = OpenFile(path, &of, OF_CREATE | OF_WRITE);
     if (f != HFILE_ERROR) {
         _llseek(f, 0L, 2);
-        line[lpos++] = '\r';
-        line[lpos++] = '\n';
-        _lwrite(f, line, lpos);
+        s[(*pos)++] = '\r';
+        s[(*pos)++] = '\n';
+        _lwrite(f, s, *pos);
         _lclose(f);
     }
-    lpos = 0;
+    *pos = 0;
+}
+
+static void log_line(void)
+{
+    write_log(line, &lpos);
 }
 
 static void say(const char *what)
@@ -262,6 +304,267 @@ static void log_action(unsigned char action)
     log_line();
 }
 
+/* ---- the input recorder ---- */
+
+static int is_frame(HWND);
+
+static void rput(const char *s)
+{
+    while (*s && rpos < sizeof(rline) - 3) rline[rpos++] = *s++;
+}
+
+static void rput_num(unsigned long v)
+{
+    int i, n = pg_u32_dec(rnum, v);
+    for (i = 0; i < n && rpos < sizeof(rline) - 3; i++) rline[rpos++] = rnum[i];
+}
+
+static void rput_int(int v)
+{
+    if (v < 0) { rput("-"); rput_num((unsigned long)(-(long)v)); }
+    else rput_num((unsigned long)v);
+}
+
+static void rput_hex2(unsigned v)
+{
+    static const char hex[] = "0123456789abcdef";
+    if (rpos < sizeof(rline) - 4) {
+        rline[rpos++] = hex[(v >> 4) & 15];
+        rline[rpos++] = hex[v & 15];
+    }
+}
+
+/* rtext between quotes, control characters as blanks. */
+static void rput_text(int n)
+{
+    int i;
+    rput("'");
+    for (i = 0; i < n && i < (int)sizeof(rtext) - 1; i++)
+        if (rpos < sizeof(rline) - 4) rline[rpos++] = (char)((BYTE)rtext[i] < 32 ? ' ' : rtext[i]);
+    rput("'");
+}
+
+static int is_child(HWND w)
+{
+    return (GetWindowLong(w, GWL_STYLE) & WS_CHILD) != 0;
+}
+
+/* The text of w into rtext, only for a Button, a Static, a dialog or a
+ * top-level window: never an Edit's (names, the product key). */
+static int rec_text(HWND w)
+{
+    int n;
+    rtext[0] = 0;
+    if (!w || !IsWindow(w)) return 0;
+    if (is_child(w) && !class_is(w, "Button") && !class_is(w, "Static") && !class_is(w, "#32770")) return 0;
+    n = GetWindowText(w, rtext, sizeof(rtext));
+    if (n < 0) n = 0;
+    if (n > (int)sizeof(rtext) - 1) n = sizeof(rtext) - 1;
+    return n;
+}
+
+/* rline = "USOSPG t=<ms> <what>": 0 when the recorder's line limit is
+ * reached (the notice is written once). */
+static int rec_begin(const char *what)
+{
+    int allow = pg_rec_allow(&rec_lines);
+    if (!allow) return 0;
+    rpos = 0;
+    rput("USOSPG t=");
+    rput_num(GetTickCount() - started);
+    if (allow == 2) {
+        rput(" rec: 2000 lines, the recorder stops logging");
+        write_log(rline, &rpos);
+        return 0;
+    }
+    rput(" ");
+    rput(what);
+    return 1;
+}
+
+static void rec_end(void)
+{
+    write_log(rline, &rpos);
+}
+
+static HWND top_of(HWND w)
+{
+    int i;
+    for (i = 0; i < 16 && w && is_child(w); i++) w = GetParent(w);
+    return w;
+}
+
+/* The visible page of wizard frame w (the child with the title Static). */
+static HWND page_of(HWND w)
+{
+    HWND c;
+    for (c = GetWindow(w, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT))
+        if (IsWindowVisible(c) && GetDlgItem(c, PG_TITLE_ID)) return c;
+    return 0;
+}
+
+/* " cls= id= text= btn= top= page=" for window w. */
+static void rec_where(HWND w)
+{
+    HWND top, page;
+    long style;
+    int n;
+    if (!w || !IsWindow(w)) { rput(" window=none"); return; }
+    n = GetClassName(w, rcls, sizeof(rcls));
+    if (n < 0) n = 0;
+    if (n > (int)sizeof(rcls) - 1) n = sizeof(rcls) - 1;
+    rcls[n] = 0;
+    rput(" cls=");
+    rput(rcls);
+    style = GetWindowLong(w, GWL_STYLE);
+    if (style & WS_CHILD) { rput(" id="); rput_num((unsigned)GetDlgCtrlID(w)); }
+    if (class_is(w, "Button") || class_is(w, "Static")) { rput(" text="); rput_text(rec_text(w)); }
+    if (class_is(w, "Button")) {
+        rput(" style=");
+        rput_num((unsigned)(style & 15));
+        rput(" check=");
+        rput_num((unsigned)SendMessage(w, BM_GETCHECK, 0, 0L));
+    }
+    rput(IsWindowEnabled(w) ? " enabled" : " disabled");
+    top = top_of(w);
+    if (top && top != w) { rput(" top="); rput_text(rec_text(top)); }
+    if (top && is_frame(top) && (page = page_of(top)) != 0) {
+        rput(" page=");
+        rput_text(rec_text(GetDlgItem(page, PG_TITLE_ID)));
+    }
+}
+
+/* The "moves" summary when due (force: whatever was counted). */
+static void rec_moves(int force)
+{
+    DWORD now = GetTickCount();
+    if (!pg_move_due(&moves, now, force)) return;
+    if (rec_begin("moves ")) {
+        rput_num(moves.n);
+        rput(" still=");
+        rput_num(moves.still);
+        rput(" dist=");
+        rput_num(moves.dist);
+        rput(" in ");
+        rput_num(now - moves.since);
+        rput(" ms");
+        rec_end();
+    }
+    pg_move_reset(&moves);
+}
+
+static const char *button_name(UINT msg)
+{
+    switch (msg) {
+    case WM_LBUTTONDOWN:     return "click L";
+    case WM_RBUTTONDOWN:     return "click R";
+    case WM_MBUTTONDOWN:     return "click M";
+    case WM_LBUTTONDBLCLK:   return "dblclk L";
+    case WM_RBUTTONDBLCLK:   return "dblclk R";
+    case WM_MBUTTONDBLCLK:   return "dblclk M";
+    case WM_NCLBUTTONDOWN:   return "ncclick L";
+    case WM_NCRBUTTONDOWN:   return "ncclick R";
+    case WM_NCMBUTTONDOWN:   return "ncclick M";
+    case WM_NCLBUTTONDBLCLK: return "ncdblclk L";
+    case WM_NCRBUTTONDBLCLK: return "ncdblclk R";
+    }
+    return 0;
+}
+
+static void rec_mouse(UINT msg, int x, int y, HWND w, UINT hit)
+{
+    const char *name;
+    if (msg == WM_MOUSEMOVE || msg == WM_NCMOUSEMOVE) {
+        pg_move_add(&moves, x, y, GetTickCount());
+        rec_moves(0);
+        return;
+    }
+    name = button_name(msg);
+    if (!name) return;
+    rec_moves(0);
+    if (!rec_begin(name)) return;
+    rput(" x=");
+    rput_int(x);
+    rput(" y=");
+    rput_int(y);
+    rput(" hit=");
+    rput_int((int)hit);
+    rec_where(w);
+    rec_end();
+}
+
+static void rec_key(UINT vk, LPARAM flags)
+{
+    HWND f = GetFocus();
+    int in_edit = f && (class_is(f, "Edit") || class_is(f, "ComboBox"));
+    rec_moves(0);
+    if (!rec_begin("key ")) return;
+    if (pg_key_hidden(vk, in_edit)) rput("char");
+    else { rput("vk=0x"); rput_hex2(vk); }
+    if (flags & 0x40000000L) rput(" repeat");
+    if (flags & 0x20000000L) rput(" alt");
+    rput(" focus");
+    rec_where(f);
+    rec_end();
+}
+
+/* Both hooks pass everything on unchanged (CallNextHookEx first, its
+ * result returned); HC_NOREMOVE peeks are not logged. */
+LRESULT FAR PASCAL __export __loadds mouse_proc(int code, WPARAM wp, LPARAM lp)
+{
+    LRESULT r = CallNextHookEx(mouse_hook, code, wp, lp);
+    LPMOUSEHOOKSTRUCT m = (LPMOUSEHOOKSTRUCT)lp;
+    if (code == HC_ACTION && m && !in_rec && !st.done) {
+        in_rec = 1;
+        rec_mouse((UINT)wp, m->pt.x, m->pt.y, m->hwnd, m->wHitTestCode);
+        in_rec = 0;
+    }
+    return r;
+}
+
+LRESULT FAR PASCAL __export __loadds key_proc(int code, WPARAM wp, LPARAM lp)
+{
+    LRESULT r = CallNextHookEx(key_hook, code, wp, lp);
+    if (code == HC_ACTION && !(lp & 0x80000000L) && !in_rec && !st.done) {
+        in_rec = 1;
+        rec_key((UINT)wp, lp);
+        in_rec = 0;
+    }
+    return r;
+}
+
+/* The licence radios, from the timer: first sight and every change. */
+static void rec_radio(HWND page)
+{
+    unsigned char state = (unsigned char)(view.accepted | (view.declined << 1));
+    if (in_rec || !pg_radio_note(&radio, (unsigned short)page, state)) return;
+    in_rec = 1;
+    if (rec_begin("eula radios accept=")) {
+        rput_num(view.accepted);
+        rput(" decline=");
+        rput_num(view.declined);
+        rec_end();
+    }
+    in_rec = 0;
+}
+
+static void rec_hook(void)
+{
+    HINSTANCE self = GetModuleHandle("USOSPG");
+    if (!mouse_hook) mouse_hook = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)mouse_proc, self, 0);
+    if (!key_hook) key_hook = SetWindowsHookEx(WH_KEYBOARD, (HOOKPROC)key_proc, self, 0);
+    if ((!mouse_hook || !key_hook) && !rec_hook_failed) {
+        rec_hook_failed = 1;
+        say(!mouse_hook ? "rec: no mouse hook" : "rec: no keyboard hook");
+    }
+}
+
+static void rec_unhook(void)
+{
+    if (mouse_hook) { UnhookWindowsHookEx(mouse_hook); mouse_hook = 0; }
+    if (key_hook) { UnhookWindowsHookEx(key_hook); key_hook = 0; }
+}
+
 /* Timers killed, the hook removed; st is kept (a pause). */
 static void pause_all(void)
 {
@@ -273,6 +576,7 @@ static void pause_all(void)
         armed[i] = 0;
     }
     if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
+    rec_unhook();
     stopping = 0;
 }
 
@@ -289,6 +593,7 @@ void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
     unsigned char action;
     (void)msg; (void)id; (void)now;
     if (st.done) { KillTimer(w, PG_TIMER); return; }
+    if (!in_rec) { in_rec = 1; rec_moves(0); in_rec = 0; }
     view.expired = GetTickCount() - started > PG_LIFETIME_MS;
     view.active = GetActiveWindow() == w;
     view.page = 0;
@@ -300,6 +605,7 @@ void FAR PASCAL __export __loadds tick(HWND w, UINT msg, UINT id, DWORD now)
         if (class_is(next, "Button") && class_is(finish, "Button") && class_is(GetDlgItem(w, PG_BACK_ID), "Button"))
             page = find_page(w, next, finish);
         if (page) log_page(page, next, finish);
+        if (page && view.kind == PG_EULA) rec_radio(page);
         if (page && view.kind != PG_OTHER) view.page = (unsigned short)page;
         view.next_ready = (BYTE)ready(next);
     }
@@ -376,6 +682,7 @@ static int start(void)
     if (!started) started = GetTickCount();
     cbt_hook = SetWindowsHookEx(WH_CBT, (HOOKPROC)cbt_proc, GetModuleHandle("USOSPG"), 0);
     if (!cbt_hook) { say("no CBT hook, stopped"); stop_all(); return 1; }
+    rec_hook();
     arm(GetActiveWindow());
     return 1;
 }
@@ -392,7 +699,10 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
         if (pg_may_start(&st)) say("enable");
         return start();
     case DRV_DISABLE:
-        if (pg_may_start(&st)) say("disable (pause)");
+        if (pg_may_start(&st)) {
+            if (!in_rec) { in_rec = 1; rec_moves(1); in_rec = 0; }
+            say("disable (pause)");
+        }
         pause_all();
         return 1L;
     case DRV_FREE:    stop_all(); return 1L;

@@ -77,6 +77,7 @@ static unsigned char pg_classify(const PGSHAPE *p)
     return PG_OTHER;
 }
 
+#ifndef PG_PAGES_ONLY
 /* C:\USOS9X\USOSPG.CFG: "mode=auto" at the start of a line (CR LF / LF,
  * any case). Anything else: 0 (the driver does not load). The target
  * script writes it only for a USOS answer in automatic mode (Express=1,
@@ -100,6 +101,7 @@ static int pg_cfg_auto(const unsigned char *buf, int len)
     }
     return 0;
 }
+#endif
 
 typedef struct {
     unsigned short cur;         /* the page being watched (its HWND) */
@@ -180,6 +182,7 @@ static unsigned char pg_step(PGSTATE *s, const PGVIEW *v)
     return PA_NONE;
 }
 
+#ifndef PG_PAGES_ONLY
 /* Lifecycle. Setup's mini-Windows sends DRV_DISABLE / DRV_ENABLE around
  * its own work (X470 98 FE PL, 2026-10-27: DRV_DISABLE after the first
  * two pages, the driver then stopped for good and the next pages stayed):
@@ -190,12 +193,16 @@ static int pg_may_start(const PGSTATE *s)
 {
     return !s->done;
 }
+#endif
 
+#ifndef PG_PAGES_ONLY
 static void pg_end(PGSTATE *s)
 {
     s->done = 1;
 }
+#endif
 
+#ifndef PG_PAGES_ONLY
 /* arm(): the slot for window w among n armed windows (armed[i] 0 = free,
  * alive[i] 0 = no longer a window, its slot reusable). *already = 1 when
  * w holds one. -1 = no slot. */
@@ -210,5 +217,124 @@ static int pg_arm_slot(const unsigned short *armed, const unsigned char *alive, 
     }
     return slot;
 }
+#endif
+
+/* ---- the input recorder (diagnostics only: it never presses anything)
+ *
+ * X470 98 FE PL, 2026-10-27: the filled pages still stopped with
+ * MSBATCH.INF loaded (Express=1); suspected: input from the USB bridge
+ * (USOSKEY / VBMOUSE) that makes Setup leave its batch mode. usospg.c's
+ * WH_MOUSE / WH_KEYBOARD hooks log every button press and key press (with
+ * where it went) and a summary of pointer moves, so one install clicked by
+ * hand shows what the user pressed and whether input came while nobody
+ * touched anything. Never the text of an Edit: in an Edit (or a ComboBox)
+ * a typing key is logged as "char" without its key code. */
+#define PG_REC_MAX      2000        /* recorder lines per run, then one notice */
+#define PG_MOVE_WINDOW  5000UL      /* ms: one "moves" summary at most this often */
+
+#ifndef PG_PAGES_ONLY
+/* 1 = write the line, 2 = write the limit notice instead (once), 0 = nothing. */
+static int pg_rec_allow(unsigned *lines)
+{
+    if (*lines < PG_REC_MAX) { (*lines)++; return 1; }
+    if (*lines == PG_REC_MAX) { (*lines)++; return 2; }
+    return 0;
+}
+#endif
+
+#ifndef PG_PAGES_ONLY
+/* A key whose code would give away what is typed into an Edit: space,
+ * digits, letters, the numeric pad, the OEM punctuation keys. Other keys
+ * (Tab, Enter, Esc, arrows, Backspace, Shift / Ctrl / Alt, F keys) keep
+ * their code. Outside an Edit nothing is hidden. */
+static int pg_key_hidden(unsigned vk, int in_edit)
+{
+    if (!in_edit) return 0;
+    if (vk == 0x20) return 1;
+    if (vk >= 0x30 && vk <= 0x39) return 1;
+    if (vk >= 0x41 && vk <= 0x5A) return 1;
+    if (vk >= 0x60 && vk <= 0x6F) return 1;
+    if (vk >= 0xBA && vk <= 0xC0) return 1;
+    if (vk >= 0xDB && vk <= 0xDF) return 1;
+    if (vk == 0xE2) return 1;
+    return 0;
+}
+#endif
+
+/* Pointer moves (WM_MOUSEMOVE / WM_NCMOUSEMOVE taken from a queue): a
+ * window starts at the first move and is summarised once PG_MOVE_WINDOW
+ * has passed: how many, how many with the pointer where it was ("still":
+ * zero-delta reports, or Windows' own moves after a window change), and
+ * the distance. No moves, no line. */
+typedef struct {
+    unsigned long since;        /* ms of the window's first move */
+    unsigned long dist;         /* |dx| + |dy| */
+    unsigned n;
+    unsigned still;
+    int x, y;                   /* the last position (kept across windows) */
+    unsigned char have;
+} PGMOVES;
+
+static void pg_move_add(PGMOVES *m, int x, int y, unsigned long now)
+{
+    long dx, dy;
+    if (!m->n) { m->since = now; m->dist = 0; m->still = 0; }
+    if (m->n < 65535U) m->n++;
+    if (m->have) {
+        dx = (long)x - m->x;
+        dy = (long)y - m->y;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (!dx && !dy) { if (m->still < 65535U) m->still++; }
+        else m->dist += (unsigned long)(dx + dy);
+    }
+    m->x = x; m->y = y; m->have = 1;
+}
+
+/* 1: a summary is due now (force: whatever there is, e.g. at a pause). */
+static int pg_move_due(const PGMOVES *m, unsigned long now, int force)
+{
+    if (!m->n) return 0;
+    return force || now - m->since >= PG_MOVE_WINDOW;
+}
+
+static void pg_move_reset(PGMOVES *m)
+{
+    m->n = 0; m->still = 0; m->dist = 0;
+}
+
+/* The licence page's radio buttons (618 / 619), polled by the timer:
+ * 1 when this page or its state (bit 0 accept, bit 1 decline) is new. */
+typedef struct {
+    unsigned short page;
+    unsigned char state;
+} PGRADIO;
+
+#ifndef PG_PAGES_ONLY
+static int pg_radio_note(PGRADIO *r, unsigned short page, unsigned char state)
+{
+    if (r->page == page && r->state == state) return 0;
+    r->page = page;
+    r->state = state;
+    return 1;
+}
+#endif
+
+#ifndef PG_PAGES_ONLY
+/* Decimal of v into out (no 32-bit division: a 16-bit build has no C
+ * runtime helper for it). Returns the length (1..10), out not terminated. */
+static int pg_u32_dec(char *out, unsigned long v)
+{
+    static const unsigned long pow10[] = { 1000000000UL, 100000000UL, 10000000UL, 1000000UL, 100000UL,
+                                           10000UL, 1000UL, 100UL, 10UL, 1UL };
+    int i, n = 0;
+    for (i = 0; i < 10; i++) {
+        char d = '0';
+        while (v >= pow10[i]) { v -= pow10[i]; d++; }
+        if (d != '0' || n || i == 9) out[n++] = d;
+    }
+    return n;
+}
+#endif
 
 #endif
