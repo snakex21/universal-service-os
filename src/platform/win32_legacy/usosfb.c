@@ -34,7 +34,25 @@ static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
     for(a=s,b=word;*a&&*b;a++,b++){char x=*a,y=*b;if(x>='A'&&x<='Z')x+='a'-'A';if(y>='A'&&y<='Z')y+='a'-'A';if(x!=y)break;}
     if(!*b)return 1;}return 0;}
 static void drop(const char*leaf){local(leaf);DeleteFileA(path);}
+static int contains_n(const char*s,const char*word,unsigned n){unsigned i;
+    for(i=0;i<n;i++){char x=s[i],y=word[i];if(x>='A'&&x<='Z')x+='a'-'A';if(x!=y)return 0;}return 1;}
 static DWORD child(const char*command);
+static const char*running;  /* command line of the child being waited for */
+static int arm(void);
+/* A hidden top-level window: WM_ENDSESSION while a child runs means some
+ * process restarted Windows under it (an installer inside USOSADD whose
+ * restart could not be refused). FIRSTBT.STA already names this boundary;
+ * the RunOnce value is armed again and SHELLRUN.FLG goes, so the next boot
+ * resumes it as a shell boot instead of FIRSTBT.BAT's "ended without its
+ * own restart" fallback. The restart itself is never refused here. */
+static LRESULT CALLBACK session_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){char line[1100];
+    if(msg==WM_ENDSESSION&&wp&&running){
+        wsprintfA(line,"session ends while a child runs (%.900s): phase kept, armed for the next boot",running);
+        log_line(line);arm();drop("SHELLRUN.FLG");return 0;}
+    return DefWindowProcA(w,msg,wp,lp);}
+static void session_window(void){WNDCLASSA wc;HINSTANCE inst=GetModuleHandleA(0);
+    memset(&wc,0,sizeof wc);wc.lpfnWndProc=session_proc;wc.hInstance=inst;wc.lpszClassName="USOSFBSession";RegisterClassA(&wc);
+    if(!CreateWindowExA(0,"USOSFBSession","USOSFB",WS_POPUP,0,0,0,0,0,0,inst,0))log_line("session window not created");}
 /* Package boots run with SYSTEM.INI [boot] shell=C:\USOS9X\USOSFB.EXE, so no
  * Explorer exists and no desktop can appear however long a package takes.
  * X470 95 OSR1 EN (SHELL32 4.00.951, 2026-10-27): Explorer stopped waiting
@@ -113,6 +131,19 @@ static int setup_done(void){HKEY key;DWORD keys=0,values=0;LONG code;
 static int arm(void){HKEY key;const char command[]="C:\\USOS9X\\USOSFB.EXE";LONG code;
     if(RegCreateKeyExA(HKEY_LOCAL_MACHINE,once,0,0,0,KEY_WRITE,0,&key,0)!=ERROR_SUCCESS)return 0;
     code=RegSetValueExA(key,"USOSFirstBoot",0,REG_SZ,(const BYTE*)command,sizeof command);RegCloseKey(key);return code==ERROR_SUCCESS;}
+/* ExitWindowsEx refused while another shutdown is already in progress
+ * (X470 98 FE PL 2026-10-27: WMP 7.1's setup_wm restarted Windows itself;
+ * this restart was "rejected", FIRSTBT.ERR then stopped every later boot).
+ * The phase is journalled and the value armed, so that shutdown's next
+ * boot resumes: no FIRSTBT.ERR. Only a session still alive a minute later
+ * gets one more request, and fails if that is refused too. */
+static void rejected(void){char line[160];DWORD start=GetTickCount(),gone;MSG message;
+    wsprintfA(line,"restart request rejected (error %lu): another shutdown may be in progress; FIRSTBT.STA kept, no FIRSTBT.ERR, waiting up to 60 s",GetLastError());
+    log_line(line);
+    while((gone=GetTickCount()-start)<60000){MsgWaitForMultipleObjects(0,0,FALSE,60000-gone,QS_ALLINPUT);
+        while(PeekMessageA(&message,0,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageA(&message);}}
+    log_line("session still running a minute after the rejected restart: one more restart request");
+    if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))fail("restart request rejected twice");}
 static void reboot(const char*phase,const char*reason){int last=!lstrcmpA(phase,"reboot\r\n");
     if(last){
         if(!shell_set(0))fail("cannot restore SYSTEM.INI shell=Explorer.exe before the final restart");
@@ -123,14 +154,14 @@ static void reboot(const char*phase,const char*reason){int last=!lstrcmpA(phase,
             log_line("shell mode unavailable; the next boot starts this coordinator from Explorer's RunOnce");}}
     if(!arm()||!save("FIRSTBT.STA",phase))fail("cannot persist/arm restart boundary");log_line(reason);
     drop("SHELLRUN.FLG");
-    if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))fail("restart request rejected");
+    if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))rejected();
     /* Never return to Explorer while shutdown messages are being dispatched. */
     {MSG message;while(GetMessageA(&message,0,0,0)>0){TranslateMessage(&message);DispatchMessageA(&message);}}
     fail("restart returned without ending this session");}
 /* A taskbar that appears while a child runs means Explorer no longer waits
  * for this coordinator (OSR1 under RunOnce): logged once, with the tick. */
 static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[1024];DWORD code=999,wait;MSG message;int tray;
-    log_line(command);lstrcpynA(cmd,command,sizeof cmd);memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
+    log_line(command);running=command;lstrcpynA(cmd,command,sizeof cmd);memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
     if(!CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi)){log_line("child not started");return code;}CloseHandle(pi.hThread);
     tray=FindWindowA("Shell_TrayWnd",0)!=0;
     for(;;){wait=MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,500,QS_ALLINPUT);
@@ -138,7 +169,7 @@ static DWORD child(const char*command){STARTUPINFOA si;PROCESS_INFORMATION pi;ch
         if(!tray&&FindWindowA("Shell_TrayWnd",0)){tray=1;
             log_line("WARNING: desktop taskbar (Shell_TrayWnd) appeared while this child runs: Explorer stopped waiting for the coordinator");}
         while(PeekMessageA(&message,0,0,0,PM_REMOVE)){if(message.message!=WM_QUIT){TranslateMessage(&message);DispatchMessageA(&message);}}}
-    GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);return code;}
+    GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hProcess);running=0;return code;}
 static int legacy_absent(void){HKEY key;LONG code=RegOpenKeyExA(HKEY_LOCAL_MACHINE,"Enum\\Root\\*PNP0900",0,KEY_READ,&key);
     if(code==ERROR_SUCCESS)RegCloseKey(key);return code==ERROR_FILE_NOT_FOUND;}
 /* 950: the late binding of VESALATE.BAT (VLATE.OK). OSR2 stages no
@@ -264,6 +295,24 @@ static void windows_logon(void){HKEY key;LONG code;char line[96];
     else if(code==ERROR_FILE_NOT_FOUND)lstrcpyA(line,"Network\\Logon PrimaryProvider absent");
     else wsprintfA(line,"Network\\Logon PrimaryProvider not removed (code %ld)",code);
     log_line(line);}
+/* USOSADD's STATE.INI with a package still "running" (an installer
+ * restarted Windows inside it, X470 98 FE PL 2026-10-27 wmp71-pl=running:1,
+ * or a retry deferred to a restart), or a clean exit without the CHAIN.END
+ * that its last /setup run writes at the end of the chain: the chain is not
+ * complete, so the restart is a package restart, never the final one. The
+ * id of the first running package goes into why. 1 = running, 2 = no end. */
+static int running_entry(const char*s,char*why,unsigned cap){const char*l,*e;unsigned i;
+    why[0]=0;
+    for(l=s;*l;l=*e?e+1:e){for(e=l;*e&&*e!='\n';e++);
+        for(i=0;l+i<e&&l[i]!='=';i++);
+        if(l+i<e&&i&&l[0]!=';'&&l[0]!='['&&e-(l+i+1)>=7&&contains_n(l+i+1,"running",7)){
+            if(i>=cap)i=cap-1;lstrcpynA(why,l,i+1);return 1;}}
+    return 0;}
+static int chain_open(char*why,unsigned cap){HANDLE f;DWORD n=0;
+    f=CreateFileA("C:\\USOS\\ADDONS\\STATE.INI",GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+    if(f!=INVALID_HANDLE_VALUE){if(!ReadFile(f,text,sizeof text-1,&n,0))n=0;CloseHandle(f);}
+    text[n]=0;if(running_entry(text,why,cap))return 1;
+    return GetFileAttributesA("C:\\USOS\\ADDONS\\CHAIN.END")==INVALID_FILE_ATTRIBUTES?2:0;}
 /* FIRSTBT.STA phases: late, install, mid1..mid9 (USOSADD exit 1001: a package
  * restart the chain asked for), resume1..resume9, reboot (the final one).
  * 95 allows four: 950's DCOM95 and IE 5.5 SP2 restart (reboot_setup=now),
@@ -274,11 +323,15 @@ static void windows_logon(void){HKEY key;LONG code;char line[96];
 static int mid_limit(void){return win98?9:4;}
 static int mid_phase(const char*phase){
     if(phase[0]=='m'&&phase[1]=='i'&&phase[2]=='d'&&phase[3]>='1'&&phase[3]-'0'<=mid_limit()&&phase[4]=='\r'&&phase[5]=='\n'&&!phase[6])return phase[3]-'0';
+    /* resumeN: the boot ended inside that package boundary (an installer
+     * restart USOSADD could not refuse): the same boundary runs again. */
+    if(contains_n(phase,"resume",6)&&phase[6]>='1'&&phase[6]-'0'<=mid_limit()&&phase[7]=='\r'&&phase[8]=='\n'&&!phase[9])return phase[6]-'0';
     return 0;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[64];DWORD code;HKEY key;int mid;
     shell_mode=usos_shell();
     local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
     if(journal==INVALID_HANDLE_VALUE)leave(2);SetFilePointer(journal,0,0,FILE_END);
+    session_window();
     if(shell_mode){save("SHELLRUN.FLG","USOSFB shell boot running; deleted before its own restart\r\n");drop("SHELL.TRY");
         log_line("running as the Windows shell (SYSTEM.INI [boot] shell=C:\\USOS9X\\USOSFB.EXE): no Explorer, no desktop in this boot");}
     else if(exists("SHELL.TRY")){drop("SHELL.TRY");save("SHELL.BAD","shell=USOSFB was set but Explorer started\r\n");
@@ -344,6 +397,11 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     }
     if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES){
         code=child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup");
+        if(code!=1001){char why[64],line[200];int open=chain_open(why,sizeof why);
+            if(open==1||(open==2&&(code==0||code==3010))){
+                if(open==1)wsprintfA(line,"USOSADD exit %lu with %s still running in STATE.INI: package restart, not the final one",code,why);
+                else wsprintfA(line,"USOSADD exit %lu without CHAIN.END (chain not finished): package restart, not the final one",code);
+                log_line(line);code=1001;}}
         if(code==1001){
             /* The chain asked for a restart (DCOM95 / IE 5.5 SP2 reboot_setup=now, or
              * a retry after a restart): restart, keep holding the desktop,

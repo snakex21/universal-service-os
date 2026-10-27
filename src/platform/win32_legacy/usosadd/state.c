@@ -123,3 +123,14 @@ int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
     }
     return 1;
 }
+
+int ua_deferred_provides(const ua_pkgs *p, const char *deferred, const char *cap) {
+    char item[48];
+    int i, j;
+    for (i = 0; i < p->count; i++) {
+        if (!deferred[i]) continue;
+        for (j = 0; ua_list_item(p->pkg[i].provides, j, item, sizeof item); j++)
+            if (ua_cap_satisfies(item, cap)) return 1;
+    }
+    return 0;
+}

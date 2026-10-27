@@ -227,5 +227,9 @@ const char *ua_requires_missing(const ua_pkg *p, int tcpip, char *item, int cap)
  * DONE/PRESENT. Writes the first unmet capability into unmet. */
 int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
                  const ua_system *s, int pkg, char *unmet, int cap);
+/* /setup: a package whose retry after a restart was deferred to the end of
+ * the chain (deferred[i] != 0) provides the capability cap: a package that
+ * needs it waits for the next start instead of being skipped. */
+int ua_deferred_provides(const ua_pkgs *p, const char *deferred, const char *cap);
 
 #endif

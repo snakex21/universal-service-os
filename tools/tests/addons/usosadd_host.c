@@ -287,6 +287,19 @@ static int selftest(void) {
     CHECK(ua_after_run(0, UA_REBOOT_NOW, 0, 1) == UA_AFTER_RETRY);
     CHECK(ua_after_run(0, UA_REBOOT_NO, 0, 1) == UA_AFTER_CONTINUE);
     CHECK(ua_after_run(0, UA_REBOOT_END, 1, 2) == UA_AFTER_CONTINUE);
+    /* /setup: a retry deferred to the end of the chain (NUSB 3.3a on 98)
+     * keeps a package that needs its capability waiting, not skipped */
+    {
+        char deferred[UA_MAX_PKGS];
+        int a = ua_pkg_find(&pk, "a");
+        memset(deferred, 0, sizeof deferred);
+        CHECK(a >= 0 && !ua_deferred_provides(&pk, deferred, "msi:2.0"));
+        deferred[a] = 1;
+        CHECK(ua_deferred_provides(&pk, deferred, "msi:2.0"));
+        CHECK(ua_deferred_provides(&pk, deferred, "msi"));
+        CHECK(!ua_deferred_provides(&pk, deferred, "msi:3.0"));
+        CHECK(!ua_deferred_provides(&pk, deferred, "ie:5.01"));
+    }
     CHECK(ua_command_exit("C:\\TMP\\DXSETUP.EXE /silent",1)==3010);
     CHECK(ua_command_exit("\"C:\\A B\\dxsetup.exe\" /silent",1)==3010);
     CHECK(ua_command_exit("dxsetup.exe /silent",3010)==3010);

@@ -63,6 +63,10 @@ static int g_setup_mode;         /* source950 ordinary RunOnce, before tray */
 static HWND g_wnd, g_text;
 static DWORD g_last_code;       /* exit code of the last command */
 static int g_restart_asked;     /* a command of this package exited 3010 / 1641 */
+static HWND g_guard;             /* /setup: hidden window that refuses installer restarts */
+static const ua_pkg *g_guard_pkg; /* package whose commands run while the guard refuses */
+static int g_restart_refused;    /* times this package's restart was refused */
+static char g_deferred[UA_MAX_PKGS]; /* /setup: retried after one restart at the end of the chain */
 
 /* ---- small helpers -------------------------------------------------------- */
 
@@ -367,6 +371,46 @@ static void window_open(void) {
     g_text = CreateWindowExA(0, "STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT, 12, 12, w - 30, h - 45,
                              g_wnd, 0, inst, 0);
     pump();
+}
+
+/* /setup (the 95 / 98 first-desktop coordinator USOSFB): a hidden
+ * top-level window answers WM_QUERYENDSESSION with FALSE while a package's
+ * commands run, so an installer cannot restart the PC in the middle of the
+ * chain; USOSADD and USOSFB decide the restarts. X470 98 FE PL 2026-10-27:
+ * WMP 7.1's setup_wm restarted Windows itself although its IExpress outer
+ * had /R:N (STATE.INI wmp71-pl=running:1; USOSFB's own final restart was
+ * then rejected). On 9x one FALSE cancels ExitWindowsEx of any process;
+ * EWX_FORCE (no WM_QUERYENDSESSION) cannot be refused, and that case is
+ * left to the resume of the package still "running". A refused restart is
+ * a restart the package asked for (batched). Our own restart paths take
+ * the guard down first (guard_off). */
+static LRESULT CALLBACK guard_proc(HWND w, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_QUERYENDSESSION) {
+        if (!g_guard_pkg) return TRUE;
+        if (g_restart_refused++ < 3) log2("    installer restart refused: ", g_guard_pkg->id);
+        return FALSE;
+    }
+    if (msg == WM_ENDSESSION && wp && g_guard_pkg)
+        log2("    session ends while the package runs (restart not refusable); it resumes as running: ", g_guard_pkg->id);
+    return DefWindowProcA(w, msg, wp, lp);
+}
+
+static void guard_open(void) {
+    WNDCLASSA wc;
+    HINSTANCE inst = GetModuleHandleA(0);
+    zero(&wc, sizeof wc);
+    wc.lpfnWndProc = guard_proc;
+    wc.hInstance = inst;
+    wc.lpszClassName = "USOSADDGuard";
+    RegisterClassA(&wc);
+    g_guard = CreateWindowExA(0, "USOSADDGuard", "USOSADD restart guard", WS_POPUP, 0, 0, 0, 0, 0, 0, inst, 0);
+    log_line(g_guard ? "USOSADD setup: restart guard on (installer restarts refused while a package runs)"
+                     : "USOSADD setup: restart guard window not created");
+}
+
+static void guard_off(void) {
+    g_guard_pkg = 0;
+    if (g_guard) { DestroyWindow(g_guard); g_guard = 0; pump(); }
 }
 
 static void status(const char *text) {
@@ -790,6 +834,7 @@ static void repair_ndis_before_restart(void) {
 }
 
 static void restart(void) {
+    guard_off();
     repair_ndis_before_restart();
     g_state.pending_reboot = 1;
     save_state();
@@ -934,6 +979,10 @@ static void run_chain(void) {
         check = run_check(p);
         if (st == UA_ST_RUNNING) {
             int d = ua_resume_decision(g_state.tries[x], check >= 0, check == 1);
+            ua_itoa(num, sizeof num, g_state.tries[x]);
+            log2(d == 1 ? "  left running (a restart inside the package, or a retry after one): check passes, tries "
+                 : d == 2 ? "  left running (a restart inside the package, or a retry after one): not installed, runs again, tries "
+                          : "  left running twice, not installed, tries ", num);
             if (d == 1) { set_state(x, UA_ST_DONE); continue; }
             if (d == 3) { set_why(x, UA_ST_FAILED, g_pl ? "przerwana dwa razy" : "interrupted twice", 0); continue; }
         } else if (check == 1) {
@@ -943,6 +992,10 @@ static void run_chain(void) {
         }
         if (*p->status) { set_why(x, UA_ST_SKIPPED, "status: ", p->status); continue; }
         if (!ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet)) {
+            if (ua_deferred_provides(&g_p, g_deferred, unmet)) {
+                log2("  needs a package retried after the restart; runs after it: ", unmet);
+                continue;
+            }
             set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "needs ", unmet);
             continue;
         }
@@ -981,6 +1034,8 @@ static void run_chain(void) {
         ok = 1;
         g_last_code = 0;
         g_restart_asked = 0;
+        g_restart_refused = 0;
+        if (g_setup_mode) g_guard_pkg = p;
         g_answer_pkg = p;
         g_seen_n = 0;
         g_answered = 0;
@@ -996,6 +1051,13 @@ static void run_chain(void) {
             ok = run_one(p, cmd);
         }
         g_answer_pkg = 0;
+        g_guard_pkg = 0;
+        if (g_restart_refused) {
+            log_line("  the installer's own restart was refused: counted as a restart it asked for");
+            g_restart_asked = 1;
+            g_state.pending_reboot = 1;
+            save_state();
+        }
         log_runonce();
         check = run_check(p);
         if (check >= 0) ok = check;
@@ -1006,6 +1068,16 @@ static void run_chain(void) {
             /* stays "running": after the restart its check decides, else it runs once more */
             ua_itoa(num, sizeof num, (int)g_last_code);
             log2("  not installed yet, a restart is pending: retry after the restart, exit code ", num);
+            /* /setup: the rest of the chain first, then one restart for all
+             * such packages (98 NUSB 3.3a: its USBSTOR.SYS check turns true
+             * only after a restart, which came in the middle of the chain). */
+            if (g_setup_mode) {
+                g_deferred[x] = 1;
+                g_state.pending_reboot = 1;
+                save_state();
+                log_line("  retry deferred to one restart at the end of the chain");
+                continue;
+            }
             restart();
         }
         if (ok) {
@@ -1017,6 +1089,11 @@ static void run_chain(void) {
         }
         if (after == UA_AFTER_RESTART) restart();
         if (after == UA_AFTER_PENDING) { g_state.pending_reboot = 1; save_state(); }
+    }
+    for (pos = 0; pos < g_p.count && !g_deferred[pos]; pos++) ;
+    if (pos < g_p.count) {
+        log_line("USOSADD setup: end of the chain; one restart for the packages retried after it");
+        restart();
     }
 }
 
@@ -1065,9 +1142,15 @@ static void finish(void) {
     ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
     ua_append(text, sizeof text, g_log);
     if (g_setup_mode) {
+        char end[UA_PATH];
+        guard_off();
         lan_defaults(0);
         unregister();
         if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
+        /* CHAIN.END: this run reached the end of the chain (USOSFB's final
+         * restart needs it next to a STATE.INI without "running"). */
+        path_join(end, g_root, "CHAIN.END");
+        write_file(end, "chain finished\r\n", 16);
         log_line("USOSADD setup: chain returned without restarting or showing a summary dialog");
         ExitProcess(failed || skipped ? 2 : g_state.pending_reboot ? 3010 : 0);
     }
@@ -1233,6 +1316,11 @@ void __cdecl ua_start(void) {
     g_state.starts++;
     g_state.pending_reboot = 0; /* we are running after the restart */
     save_state();
+    if (g_setup_mode) {
+        path_join(path, g_root, "CHAIN.END");
+        DeleteFileA(path);
+        guard_open();
+    }
     window_open();
     status(g_pl ? "USOS: instalowanie dodatk\363w..." : "USOS: installing add-ons...");
     run_chain();
