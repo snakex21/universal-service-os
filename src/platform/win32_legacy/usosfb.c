@@ -29,10 +29,16 @@ static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
  * Retry moves FIRSTBT.ERR aside (FIRSTBT.ER1..ER9) and restarts, so the
  * RunOnce that FIRSTBT.BAT re-arms each boot runs the coordinator again;
  * Cancel exits so Explorer starts (the ERR marker keeps later boots quiet). */
+/* The box in the language of the installed system (RTM PL, OSR1 EN): Polish
+ * for a Polish system locale (primary language 0x15, as USOSADD decides),
+ * else English. Retry/Cancel are Windows' own buttons in that language. */
+static const char fail_pl[]="USOS nie m\363g\263 doko\361czy\346 instalacji.\r\nSzczeg\363\263y: C:\\USOS9X\\FIRSTBT.LOG\r\n\r\n"
+    "Pon\363w = spr\363buj ponownie po restarcie\r\nAnuluj = przejd\237 do pulpitu";
+static const char fail_en[]="USOS could not finish the installation.\r\nDetails: C:\\USOS9X\\FIRSTBT.LOG\r\n\r\n"
+    "Retry = try again after a restart\r\nCancel = go to the desktop";
 static void fail(const char*reason){char aside[MAX_PATH];int i;
     log_line(reason);save("FIRSTBT.ERR",reason);
-    if(MessageBoxA(0,"USOS nie m\363g\263 doko\361czy\346 instalacji.\r\nSzczeg\363\263y: C:\\USOS9X\\FIRSTBT.LOG\r\n\r\n"
-        "Pon\363w = spr\363buj ponownie po restarcie\r\nAnuluj = przejd\237 do pulpitu","USOS",
+    if(MessageBoxA(0,(GetSystemDefaultLangID()&0x3ff)==0x15?fail_pl:fail_en,"USOS",
         MB_RETRYCANCEL|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST)==IDRETRY){
         local("FIRSTBT.ERR");for(i=1;i<=9;i++){wsprintfA(aside,"%sFIRSTBT.ER%d",root,i);
             if(GetFileAttributesA(aside)==INVALID_FILE_ATTRIBUTES)break;}
