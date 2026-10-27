@@ -47,6 +47,22 @@ static void detect_case(int nt, int major, int minor, int build, const char *csd
     }
 }
 
+/* 9x with an empty szCSDVersion: the registry SubVersionNumber decides. */
+static void detect_sub(int build, const char *csd, const char *subver, const char *os) {
+    ua_facts f;
+    ua_system s;
+    memset(&f, 0, sizeof f);
+    f.major = 4; f.build = build;
+    strcpy(f.csd, csd);
+    strcpy(f.subver, subver);
+    f.lang_id = 0x409;
+    ua_detect(&f, &s);
+    if (strcmp(s.os, os)) {
+        printf("FAIL detect 4.0.%d '%s' SubVersionNumber '%s' -> %s, want %s\n", build, csd, subver, s.os, os);
+        failures++;
+    }
+}
+
 static int selftest(void) {
     static ua_ini ini;
     static ua_pkgs pk;
@@ -158,6 +174,15 @@ static int selftest(void) {
     /* detection table (docs/design/legacy-compat-pack.md 2.2) */
     detect_case(0, 4, 0, 950, "", 0, 0, 0, 0x415, "95RTM", "PL", "");
     detect_case(0, 4, 0, 950, " A", 0, 0, 0, 0x409, "95OSR1", "EN", "");
+    /* OSR1 EN on X470 (2026-10-27): CSD "" but SubVersionNumber "a" */
+    detect_sub(950, "", "a", "95OSR1");
+    detect_sub(950, "", " A", "95OSR1");
+    detect_sub(950, " ", " a ", "95OSR1");
+    detect_sub(950, "", "", "95RTM");
+    detect_sub(950, "", " ", "95RTM");
+    detect_sub(950, " A", "", "95OSR1");
+    detect_sub(950, "", "b", "95RTM");
+    detect_sub(1111, "", " C", "95OSR25");
     detect_case(0, 4, 0, 1111, " B", 4, 0, 0, 0x415, "95OSR2", "PL", "");
     detect_case(0, 4, 0, 1111, " B", 4, 3, 0, 0x415, "95OSR21", "PL", "");
     detect_case(0, 4, 0, 1212, " B", 0, 0, 0, 0x415, "95OSR2", "PL", "");

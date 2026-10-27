@@ -57,6 +57,7 @@ typedef struct {
     int nt;            /* 0 = Windows 9x, 1 = NT */
     int major, minor, build;
     char csd[64];      /* szCSDVersion as returned */
+    char subver[16];   /* 9x: HKLM\...\Windows\CurrentVersion SubVersionNumber */
     int ntkern_ver[4]; /* 9x: SYSTEM\VMM32\NTKERN.VXD file version, 0 if unknown */
     int sp6a_hotfix;   /* NT: Hotfix\Q246009 present */
     unsigned lang_id;  /* GetSystemDefaultLangID() */

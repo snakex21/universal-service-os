@@ -212,6 +212,10 @@ static void detect(void) {
     g_facts.minor = (int)v.dwMinorVersion;
     g_facts.build = (int)(v.dwBuildNumber & 0xffff);
     ua_copy(g_facts.csd, sizeof g_facts.csd, v.szCSDVersion);
+    g_facts.subver[0] = 0;
+    if (!g_facts.nt)
+        reg_string(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion", "SubVersionNumber",
+                   g_facts.subver, sizeof g_facts.subver, 0);
     g_facts.lang_id = GetSystemDefaultLangID();
     for (i = 0; i < 4; i++) g_facts.ntkern_ver[i] = 0;
     if (!g_facts.nt) {
@@ -1046,6 +1050,10 @@ void __cdecl ua_start(void) {
               g_state.starts + 1, g_facts.nt ? "NT" : "9x", g_facts.major, g_facts.minor, g_facts.build,
               g_facts.csd, g_sys.os, g_sys.lang, g_sys.ntsp[0] ? g_sys.ntsp : "-", dry ? " (dry run)" : "");
     log_line(line);
+    if (!g_facts.nt && g_facts.subver[0]) {
+        wsprintfA(line, "  SubVersionNumber \"%s\"", g_facts.subver);
+        log_line(line);
+    }
     v = ua_ini_get(&g_sel, "select", "expect");
     if (v && *v && !ua_ieq(v, g_sys.os)) log2("  note: USOS expected ", v);
     if (ua_ieq(g_sys.os, "?")) { log_line("USOSADD: unsupported system, nothing done"); ExitProcess(1); }

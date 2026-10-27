@@ -45,6 +45,9 @@ void ua_detect(const ua_facts *f, ua_system *out) {
     if (f->major == 4 && f->minor == 0) {
         int build = f->build & 0xffff;
         char letter = csd_letter(f->csd);
+        /* OSR1 EN (X470, 2026-10-27): GetVersionEx left szCSDVersion empty;
+         * the registry SubVersionNumber said "a". */
+        if (!letter) letter = csd_letter(f->subver);
         if (build < 1000) {
             ua_copy(out->os, sizeof out->os, letter == 'A' ? "95OSR1" : "95RTM");
         } else if (letter == 'C') {
