@@ -196,6 +196,56 @@ class Runner(unittest.TestCase):
         self.assertIn('left running', body)
 
 
+class SkippedMissing(unittest.TestCase):
+    """Product decision 2026-10-28: a package whose files are not on the
+    media (X470 98 FE PL: 13 hf98x-* hotfixes absent from the Kingston
+    DATA\\Addons\\Win98) never blocks the first desktop."""
+    src = ADD.read_text(encoding='latin-1')
+    fb = FB.read_text(encoding='latin-1')
+
+    def test_missing_files_are_skipped_missing_not_skipped(self):
+        chain = section(self.src, 'static void run_chain(void) {', 'static void finish(void) {')
+        self.assertIn('if (!files_present(p)) { set_why(x, UA_ST_MISSING,', chain)
+        self.assertNotIn('if (!files_present(p)) { set_why(x, UA_ST_SKIPPED,', chain)
+        # a state already decided is never re-run on resume
+        self.assertIn('st == UA_ST_SKIPPED || st == UA_ST_MISSING) continue;', chain)
+
+    def test_dependents_of_a_missing_package_follow_it(self):
+        chain = section(self.src, 'static void run_chain(void) {', 'static void finish(void) {')
+        needs = chain[chain.index('if (!ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet)) {'):]
+        dep = needs.index('if (ua_missing_provides(&g_p, &g_state, unmet)) {')
+        self.assertLess(needs.index('ua_deferred_provides('), dep)
+        self.assertLess(dep, needs.index('set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "needs ", unmet);'))
+        self.assertIn('set_why(x, UA_ST_MISSING,', needs[dep:dep + 300])
+        group = chain[chain.index('if (p->tier == UA_TIER_GROUP) {'):]
+        self.assertIn('ua_missing_provides(&g_p, &g_state, unmet) ? UA_ST_MISSING : UA_ST_SKIPPED', group[:400])
+
+    def test_setup_exit_code_ignores_skipped_missing(self):
+        fin = section(self.src, 'static void finish(void) {', '/* ---- entry')
+        self.assertIn('else { skipped++; if (st == UA_ST_MISSING) missing++; }', fin)
+        self.assertIn('ExitProcess(failed || skipped > missing ? 2 : g_state.pending_reboot ? 3010 : 0);', fin)
+        self.assertNotIn('ExitProcess(failed || skipped ? 2', fin)
+        # still listed in the log with its reason
+        self.assertIn('st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;', fin)
+
+    def test_final_check_ignores_skipped_missing(self):
+        start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
+        chk = start[start.index('if(g_setup_mode && exact_switch(cmdline,"check")){'):]
+        chk = chk[:chk.index('ExitProcess(failed?2:0);')]
+        self.assertLess(chk.index('if(g_state.st[x]==UA_ST_MISSING)'), chk.index('check=run_check(p);'))
+        self.assertIn('continue;}', chk[chk.index('if(g_state.st[x]==UA_ST_MISSING)'):chk.index('check=run_check(p);')])
+
+    def test_coordinator_takes_exit_0_or_3010_to_the_final_restart(self):
+        body = self.fb[self.fb.index('code=child("C:\\\\USOS\\\\ADDONS\\\\USOSADD.EXE /setup");'):]
+        self.assertLess(body.index('if(code!=0&&code!=3010)fail('), body.index('reboot("reboot\\r\\n"'))
+        self.assertIn('child("C:\\\\USOS\\\\ADDONS\\\\USOSADD.EXE /setup /check")!=0', self.fb)
+
+    def test_state_name_round_trips(self):
+        state = (ROOT / 'src/platform/win32_legacy/usosadd/state.c').read_text(encoding='latin-1')
+        self.assertIn('"skipped", "skipped-missing" };', state)
+        self.assertIn('k <= UA_ST_MISSING; k++', state)
+
+
 class Manifest(unittest.TestCase):
     def test_wmp71_inner_setup_gets_no_reboot(self):
         text = PACK.read_text(encoding='utf-8')

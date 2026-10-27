@@ -352,6 +352,38 @@ static int selftest(void) {
         strcpy(s.os, "NT4"); /* no OS-provided ie: only a's msi:2.0 is asked */
         CHECK(!ua_needs_met(&ini, &pk, &st2, &s, 1, unmet, sizeof unmet) && strcmp(unmet, "ie:5.01") == 0);
     }
+    /* skipped-missing (files not on the media, X470 98 FE PL 2026-10-27:
+     * 13 hf98x-* hotfixes absent from DATA\Addons\Win98): its own state in
+     * STATE.INI, and a package needing only what it provides follows it */
+    {
+        static ua_state ms, ms2;
+        static ua_ini msi;
+        char unmet[48], buf[4096];
+        int a = ua_pkg_find(&pk, "a"), b = ua_pkg_find(&pk, "b");
+        CHECK(strcmp(ua_state_name(UA_ST_MISSING), "skipped-missing") == 0);
+        ua_state_load(&ms, 0, &pk);
+        CHECK(!ua_missing_provides(&pk, &ms, "msi:2.0"));
+        ms.st[a] = UA_ST_MISSING; strcpy(ms.why[a], "file missing");
+        CHECK(ua_missing_provides(&pk, &ms, "msi:2.0") && ua_missing_provides(&pk, &ms, "msi"));
+        CHECK(!ua_missing_provides(&pk, &ms, "msi:3.0") && !ua_missing_provides(&pk, &ms, "ie:5.01"));
+        strcpy(s.os, "NT4"); strcpy(s.lang, "PL"); s.ntsp[0] = 0;
+        CHECK(!ua_needs_met(&ini, &pk, &ms, &s, b, unmet, sizeof unmet) && strcmp(unmet, "msi:2.0") == 0
+              && ua_missing_provides(&pk, &ms, unmet));
+        ms.st[b] = UA_ST_SKIPPED; strcpy(ms.why[b], "needs ie:5.01");
+        ua_state_write(&ms, &pk, buf, sizeof buf);
+        CHECK(strstr(buf, "a=skipped-missing\r\n") && strstr(buf, "b=skipped\r\n") && strstr(buf, "a=file missing\r\n"));
+        ua_ini_parse(&msi, buf, (int)strlen(buf));
+        ua_state_load(&ms2, &msi, &pk);
+        CHECK(ms2.st[a] == UA_ST_MISSING && ms2.st[b] == UA_ST_SKIPPED && strcmp(ms2.why[a], "file missing") == 0);
+        /* a provider that was present and genuinely failed is a failure,
+         * not a missing file: its dependents are ordinary skips */
+        ms.st[a] = UA_ST_FAILED;
+        CHECK(!ua_missing_provides(&pk, &ms, "msi:2.0"));
+        ms.st[a] = UA_ST_SKIPPED;
+        CHECK(!ua_missing_provides(&pk, &ms, "msi:2.0"));
+        ms.st[a] = UA_ST_DONE;
+        CHECK(!ua_missing_provides(&pk, &ms, "msi:2.0"));
+    }
     printf(failures ? "selftest: %d failure(s)\n" : "selftest: ok\n", failures);
     return failures ? 1 : 0;
 }

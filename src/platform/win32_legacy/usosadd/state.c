@@ -2,9 +2,9 @@
  * STATE.INI:  [state] starts=N  pending_reboot=0|1  <id>=<state>[:<tries>] */
 #include "ua.h"
 
-static const char *const names[] = { "new", "running", "done", "present", "failed", "skipped" };
+static const char *const names[] = { "new", "running", "done", "present", "failed", "skipped", "skipped-missing" };
 
-const char *ua_state_name(int st) { return (st >= 0 && st <= UA_ST_SKIPPED) ? names[st] : "?"; }
+const char *ua_state_name(int st) { return (st >= 0 && st <= UA_ST_MISSING) ? names[st] : "?"; }
 
 void ua_state_load(ua_state *s, const ua_ini *ini, const ua_pkgs *p) {
     int i;
@@ -23,7 +23,7 @@ void ua_state_load(ua_state *s, const ua_ini *ini, const ua_pkgs *p) {
         if (v) ua_copy(s->why[i], sizeof s->why[i], v);
         v = ua_ini_get(ini, "state", p->pkg[i].id);
         if (!v) continue;
-        for (k = 0; k <= UA_ST_SKIPPED; k++) {
+        for (k = 0; k <= UA_ST_MISSING; k++) {
             int n = ua_len(names[k]);
             if (ua_ieqn(v, names[k], n) && (v[n] == 0 || v[n] == ':')) {
                 s->st[i] = k;
@@ -58,7 +58,7 @@ int ua_state_write(const ua_state *s, const ua_pkgs *p, char *out, int cap) {
     }
     ua_append(out, cap, "[why]\r\n");
     for (i = 0; i < p->count; i++) {
-        if (!s->why[i][0] || (s->st[i] != UA_ST_FAILED && s->st[i] != UA_ST_SKIPPED)) continue;
+        if (!s->why[i][0] || (s->st[i] != UA_ST_FAILED && s->st[i] != UA_ST_SKIPPED && s->st[i] != UA_ST_MISSING)) continue;
         ua_append(out, cap, p->pkg[i].id);
         ua_append(out, cap, "=");
         ua_append(out, cap, s->why[i]);
@@ -133,4 +133,20 @@ int ua_deferred_provides(const ua_pkgs *p, const char *deferred, const char *cap
             if (ua_cap_satisfies(item, cap)) return 1;
     }
     return 0;
+}
+
+int ua_missing_provides(const ua_pkgs *p, const ua_state *st, const char *cap) {
+    char item[48];
+    int i, j, missing = 0;
+    for (i = 0; i < p->count; i++) {
+        int s = st->st[i];
+        if (s != UA_ST_MISSING && s != UA_ST_FAILED && s != UA_ST_SKIPPED) continue;
+        for (j = 0; ua_list_item(p->pkg[i].provides, j, item, sizeof item); j++) {
+            if (!ua_cap_satisfies(item, cap)) continue;
+            if (s != UA_ST_MISSING) return 0;
+            missing = 1;
+            break;
+        }
+    }
+    return missing;
 }

@@ -969,10 +969,11 @@ static void run_chain(void) {
         const ua_pkg *p = &g_p.pkg[x];
         const char *name = ua_ini_get(&g_m, p->section, name_key);
         int st = g_state.st[x];
-        if (st == UA_ST_DONE || st == UA_ST_PRESENT || st == UA_ST_FAILED || st == UA_ST_SKIPPED) continue;
+        if (st == UA_ST_DONE || st == UA_ST_PRESENT || st == UA_ST_FAILED || st == UA_ST_SKIPPED || st == UA_ST_MISSING) continue;
         if (!name) name = p->id;
         if (p->tier == UA_TIER_GROUP) {
-            set_state(x, ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet) ? UA_ST_DONE : UA_ST_SKIPPED);
+            set_state(x, ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet) ? UA_ST_DONE
+                         : ua_missing_provides(&g_p, &g_state, unmet) ? UA_ST_MISSING : UA_ST_SKIPPED);
             continue;
         }
         log2("Package ", p->id);
@@ -996,6 +997,12 @@ static void run_chain(void) {
                 log2("  needs a package retried after the restart; runs after it: ", unmet);
                 continue;
             }
+            /* its provider's files are not on the media: left out the same
+             * way, not a failure (the first desktop does not wait for it) */
+            if (ua_missing_provides(&g_p, &g_state, unmet)) {
+                set_why(x, UA_ST_MISSING, g_pl ? "wymaga (brak plik\363w): " : "needs (files missing): ", unmet);
+                continue;
+            }
             set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "needs ", unmet);
             continue;
         }
@@ -1011,7 +1018,9 @@ static void run_chain(void) {
                 continue;
             }
         }
-        if (!files_present(p)) { set_why(x, UA_ST_SKIPPED, g_pl ? "brak pliku" : "file missing", 0); continue; }
+        /* Files not on the media (not staged, e.g. hotfixes absent from
+         * DATA\Addons): skipped-missing, logged, never a failure. */
+        if (!files_present(p)) { set_why(x, UA_ST_MISSING, g_pl ? "brak pliku" : "file missing", 0); continue; }
         /* No restart here merely because one is pending: restarts are batched
          * into the final one (95 RTM: install -> one restart -> desktop);
          * ua_after_run retries a package once after a restart when the
@@ -1101,7 +1110,7 @@ static void run_chain(void) {
  * (pow\363d)". A failed package never stops the chain (run_chain goes on). */
 static void finish(void) {
     static char text[4096];
-    int i, done = 0, failed = 0, skipped = 0, listed = 0;
+    int i, done = 0, failed = 0, skipped = 0, missing = 0, listed = 0;
     char num[8];
     const char *name_key = g_pl ? "name_pl" : "name_en";
     repair_ndis_before_restart();
@@ -1111,7 +1120,7 @@ static void finish(void) {
         if (g_p.pkg[g_plan.idx[i]].tier == UA_TIER_GROUP) continue;
         if (st == UA_ST_DONE || st == UA_ST_PRESENT) done++;
         else if (st == UA_ST_FAILED) failed++;
-        else skipped++;
+        else { skipped++; if (st == UA_ST_MISSING) missing++; }
     }
     text[0] = 0;
     ua_append(text, sizeof text, g_pl ? "Pakiet zgodno\234ci USOS: zainstalowano " : "USOS compatibility pack: installed ");
@@ -1128,7 +1137,7 @@ static void finish(void) {
         int x = g_plan.idx[i], st = g_state.st[x];
         const char *name = ua_ini_get(&g_m, g_p.pkg[x].section, name_key);
         char line[200];
-        if (st != UA_ST_FAILED && st != UA_ST_SKIPPED) continue;
+        if (st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;
         if (g_p.pkg[x].tier == UA_TIER_GROUP) continue;
         line[0] = 0;
         ua_append(line, sizeof line, "- ");
@@ -1152,7 +1161,11 @@ static void finish(void) {
         path_join(end, g_root, "CHAIN.END");
         write_file(end, "chain finished\r\n", 16);
         log_line("USOSADD setup: chain returned without restarting or showing a summary dialog");
-        ExitProcess(failed || skipped ? 2 : g_state.pending_reboot ? 3010 : 0);
+        if (missing) {
+            ua_itoa(num, sizeof num, missing);
+            log2("USOSADD setup: skipped-missing (files not on the media, not a failure): ", num);
+        }
+        ExitProcess(failed || skipped > missing ? 2 : g_state.pending_reboot ? 3010 : 0);
     }
     lan_defaults(1);
     unregister();
@@ -1285,6 +1298,8 @@ void __cdecl ua_start(void) {
             int x=g_plan.idx[i],check;
             const ua_pkg *p=&g_p.pkg[x];
             if(p->tier==UA_TIER_GROUP)continue;
+            /* files not on the media: not installed on purpose, not a failure */
+            if(g_state.st[x]==UA_ST_MISSING){log2("USOSADD setup final check: skipped-missing, ignored: ",p->id);continue;}
             check=run_check(p);
             if(check==0||(check<0&&g_state.st[x]!=UA_ST_DONE&&g_state.st[x]!=UA_ST_PRESENT)){
                 failed++;log2("USOSADD setup final check failed: ",p->id);}

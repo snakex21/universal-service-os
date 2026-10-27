@@ -182,7 +182,11 @@ typedef struct {
 int ua_parse_check(const char *expanded, ua_check *out);
 
 /* ---- state (state.c) ------------------------------------------------------- */
-enum { UA_ST_NEW, UA_ST_RUNNING, UA_ST_DONE, UA_ST_PRESENT, UA_ST_FAILED, UA_ST_SKIPPED };
+/* UA_ST_MISSING ("skipped-missing"): the package's files are not on the
+ * media (not staged); it, and every package that needs only what it would
+ * provide, is left out without counting as a failure (/setup exit code and
+ * the final /check ignore it). */
+enum { UA_ST_NEW, UA_ST_RUNNING, UA_ST_DONE, UA_ST_PRESENT, UA_ST_FAILED, UA_ST_SKIPPED, UA_ST_MISSING };
 typedef struct {
     int st[UA_MAX_PKGS];
     int tries[UA_MAX_PKGS];
@@ -231,5 +235,9 @@ int ua_needs_met(const ua_ini *m, const ua_pkgs *p, const ua_state *st,
  * the chain (deferred[i] != 0) provides the capability cap: a package that
  * needs it waits for the next start instead of being skipped. */
 int ua_deferred_provides(const ua_pkgs *p, const char *deferred, const char *cap);
+/* An unmet capability whose only fate is a missing file: some provider is
+ * skipped-missing and none is failed or skipped for another reason. The
+ * package that needs it is then skipped-missing as well. */
+int ua_missing_provides(const ua_pkgs *p, const ua_state *st, const char *cap);
 
 #endif
