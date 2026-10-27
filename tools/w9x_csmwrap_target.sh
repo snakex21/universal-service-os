@@ -322,10 +322,16 @@ cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
 # A profile run has no W9X_TIME_ZONE: TZFIX takes the answer's TimeZone.
 [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" || fail 'missing time zone helper'
 tz_source=''
+tz_mode=''
 if [ "$SYSTEM_TAG:${setup_version:-}" = '95:4 0 0 950' ]; then
-    tz_source=950
+    tz_source=950 tz_mode=950
     w9x_msbatch_tz950 "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot map the time zone to the 950 key'
     TIME_ZONE=''
+elif [ "$SYSTEM_TAG" = 95 ] && usos_w9x_95_osr2 "${setup_version:-}"; then
+    # OSR2 queues the zone step in the plain RunOnce and MSPRINT's printer
+    # step in RunOnce\Setup as 950 does (X470 OSR2.1 PL SYSTEM.1ST,
+    # 2026-10-27): TZFIX's pending detection and printer replacement.
+    tz_mode=OSR2
 fi
 if [ -z "$TIME_ZONE" ]; then
     TIME_ZONE=$(sed -n 's/^TimeZone="\([^"]*\)".*$/\1/p' "$work/c/USOS9X/MSBATCH.INF" | head -n 1)
@@ -713,7 +719,7 @@ case "$SYSTEM_TAG:$TIME_ZONE" in
         # it as UTC with no TZ set, so `date` shows the local clock
         # (tools/w9x_tzfix.sh). It decides the first boot's ActiveTimeBias.
         tz_when=$(date '+%Y-%m-%d %H:%M' 2>/dev/null || :)
-        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when" "${tz_source:-}" "$tz_lang"; then
+        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X" "$tz_when" "${tz_mode:-}" "$tz_lang"; then
             log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step, local time ${tz_when:-unknown})"
         else
             rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG" "$work/c/USOS9X/TZDST.REG" "$work/c/USOS9X/TZPR1.REG" "$work/c/USOS9X/TZPR2.REG"

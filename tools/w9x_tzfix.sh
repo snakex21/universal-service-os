@@ -43,6 +43,12 @@
 # (EN) = "rundll32.exe sysdm.cpl,InstallDevice_Rundll printer,,0", the Add
 # Printer wizard on the first desktop: TZPR1.REG / TZPR2.REG replace it with
 # the same harmless command (X470 950 PL SYSTEM.1ST, 2026-10-25).
+# Windows 95 OSR2 (arg 4 = OSR2): the zone keys of OSR2.1 / 98 ("Warsaw"),
+# but its Setup with MSBATCH.INF queues the zone step in the plain RunOnce
+# ("Strefa czasowa" = TIMEDATE.CPL,,/Z Warsaw) and MSPRINT's "Drukarki"
+# printer step in RunOnce\Setup exactly as 950 does (X470 95 OSR2.1 PL
+# native SYSTEM.1ST, 2026-10-27): the same pending detection and printer
+# replacement; the GRPCONV wrapper stays 950's (OSR2 has no GRPCONV hang).
 
 # w9x_tz950_key KEY: the 950 TIMEZONE.INF key for an OSR2.1 / 98 key
 # (src/flow/answer/msbatch.zig timeZoneName95, tools/w9x_csmwrap_prepare.sh
@@ -216,7 +222,7 @@ w9x_tzfix_write() {
     rm -f "$dir/TZPR1.REG" "$dir/TZPR2.REG"
     printer='REM -' printer_check='REM -' grpwrap='REM -' grpcheck='REM -'
     plain_export='REM -' plain_check='REM -'
-    if [ "$src" = 950 ]; then
+    if [ "$src" = 950 ] || [ "$src" = OSR2 ]; then
         # With MSBATCH.INF loaded (TimeZone set), 950 SUWIN queues its zone
         # step in the plain machine RunOnce instead: "Strefa czasowa" =
         # "RUNDLL32.EXE SHELL32.DLL,Control_RunDLL TIMEDATE.CPL,,/Z Lisbon
@@ -227,11 +233,25 @@ w9x_tzfix_write() {
         # step itself stays (it only applies the answer's zone). The printer
         # step is pending on its own: MSPRINT.DLL queues it either way.
         plain_export="$R /E TZ5.CHK $runonce"
-        plain_check="REM 950: zone step in the plain RunOnce, or only the printer step.
+        plain_check="REM 950 / OSR2: zone step in the plain RunOnce, or only the printer step.
 IF EXIST TZ5.CHK $F /I \"TIMEDATE\" TZ5.CHK > NUL
 IF NOT ERRORLEVEL 1 GOTO PENDING
 $F /I \"InstallDevice_Rundll\" TZ0.CHK > NUL
 IF NOT ERRORLEVEL 1 GOTO PENDING"
+        printf 'REGEDIT4\r\n\r\n[%s]\r\n"Drukarki"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR1.REG" || return 1
+        printf 'REGEDIT4\r\n\r\n[%s]\r\n"Set up printer"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR2.REG" || return 1
+        printer="REM 950 / OSR2: MSPRINT.DLL's Add Printer wizard step goes too.
+$F /I \"Drukarki\" TZ0.CHK > NUL
+IF NOT ERRORLEVEL 1 $R ${U}TZPR1.REG
+$F /I \"Set up printer\" TZ0.CHK > NUL
+IF NOT ERRORLEVEL 1 $R ${U}TZPR2.REG"
+        printer_check="$F /I \"InstallDevice_Rundll\" TZ2.CHK > NUL
+IF ERRORLEVEL 1 GOTO OKALL
+ECHO ok-printer-left> ${U}TZFIX.OK
+GOTO ATTR
+:OKALL"
+    fi
+    if [ "$src" = 950 ]; then
         grpwrap="REM 950: wrap the real GRPCONV command, preserving its localized name.
 IF EXIST ${U}TZGRP.REG DEL ${U}TZGRP.REG > NUL
 IF EXIST ${U}TZGRP.REG GOTO BAD
@@ -247,18 +267,6 @@ $R ${U}TZGRP.REG
 :GRPDONE"
         grpcheck="IF EXIST ${U}TZGRP.REG $F /I \"USOSGRPW.EXE\" TZ2.CHK > NUL
 IF EXIST ${U}TZGRP.REG IF ERRORLEVEL 1 GOTO BAD"
-        printf 'REGEDIT4\r\n\r\n[%s]\r\n"Drukarki"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR1.REG" || return 1
-        printf 'REGEDIT4\r\n\r\n[%s]\r\n"Set up printer"="%s"\r\n\r\n' "$run" "$harmless" > "$dir/TZPR2.REG" || return 1
-        printer="REM 950: MSPRINT.DLL's Add Printer wizard step goes too.
-$F /I \"Drukarki\" TZ0.CHK > NUL
-IF NOT ERRORLEVEL 1 $R ${U}TZPR1.REG
-$F /I \"Set up printer\" TZ0.CHK > NUL
-IF NOT ERRORLEVEL 1 $R ${U}TZPR2.REG"
-        printer_check="$F /I \"InstallDevice_Rundll\" TZ2.CHK > NUL
-IF ERRORLEVEL 1 GOTO OKALL
-ECHO ok-printer-left> ${U}TZFIX.OK
-GOTO ATTR
-:OKALL"
     fi
     sed 's/$/\r/' > "$dir/TZFIX.BAT" <<EOF || return 1
 @ECHO OFF

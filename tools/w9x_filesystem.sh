@@ -1,13 +1,20 @@
 # Own filesystem/MBR policy for the confirmed disposable or user-selected
 # 9x target. No disk I/O here. GPL-3.0-or-later.
+
+# Windows 95 OSR2 / OSR2.1 / OSR2.5: the root SETUP.EXE file versions
+# (pe-file-version) of the FAT32-capable 95 CDs.
+usos_w9x_95_osr2() {
+    case "$1" in '4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') return 0 ;; esac
+    return 1
+}
+
 usos_w9x_fs_select() {
     W9X_FAT_BITS=32 W9X_MBR_TYPE=12 W9X_FAT_RESERVED=32
     case "$1" in
         95)
             case "$2" in
                 '4 0 0 950') W9X_FAT_BITS=16 W9X_MBR_TYPE=6 W9X_FAT_RESERVED=1 ;;
-                '4 0 0 1068'|'4 0 0 1111'|'4 0 0 1212'|'4 0 0 1214'|'4 0 0 1216') ;;
-                *) return 1 ;;
+                *) usos_w9x_95_osr2 "$2" || return 1 ;;
             esac ;;
         98|98SE|ME) ;;
         *) return 1 ;;

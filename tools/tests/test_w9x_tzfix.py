@@ -197,6 +197,34 @@ class Tzfix950(unittest.TestCase):
         self.assertNotIn('TZ5.CHK /', text)
         self.assertNotIn('InstallDevice_Rundll', text)
 
+    def test_osr2_plain_runonce_zone_step_and_printer_step(self):
+        # X470 95 OSR2.1 PL native (2026-10-27, SYSTEM.1ST): "Strefa czasowa"=
+        # "...TIMEDATE.CPL,,/Z Warsaw" in the plain RunOnce, MSPRINT's
+        # "Drukarki" in RunOnce\Setup, as on 950; no GRPCONV wrapper.
+        for language in ('PL', 'EN'):
+            for p in self.tmp.iterdir():
+                p.unlink()
+            _, files = self.write('Warsaw', 'OSR2', language)
+            text = files['TZFIX.BAT'].decode('ascii')
+            lines = text.split('\r\n')
+            run = 'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'
+            self.assertIn('REGEDIT /L:SYSTEM.DAT /R:USER.DAT /E TZ5.CHK ' + run, lines)
+            zone = lines.index('IF EXIST TZ5.CHK C:\\WINDOWS\\COMMAND\\FIND.EXE /I "TIMEDATE" TZ5.CHK > NUL')
+            printer = lines.index('C:\\WINDOWS\\COMMAND\\FIND.EXE /I "InstallDevice_Rundll" TZ0.CHK > NUL')
+            self.assertTrue(zone < printer < lines.index('ECHO not-pending> C:\\USOS9X\\TZFIX.OK'))
+            harmless = b'"="RUNDLL32.EXE SHELL32.DLL,Control_FillCache_RunDLL"\r\n'
+            self.assertIn(b'"Drukarki' + harmless, files['TZPR1.REG'])
+            self.assertIn(b'"Set up printer' + harmless, files['TZPR2.REG'])
+            self.assertIn('FIND.EXE /I "Drukarki" TZ0.CHK > NUL\r\nIF NOT ERRORLEVEL 1 REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\\USOS9X\\TZPR1.REG', text)
+            self.assertIn('ECHO ok-printer-left>', text)
+            self.assertNotIn('WRAPGRP', text); self.assertNotIn('USOSGRPW', text)
+            # OSR2 keeps its own zone keys and TZI (no 950 rewrite).
+            self.assertNotIn(b'Time Zones', files['TZFIX.REG'])
+            self.assertLessEqual(max(map(len, lines)), 125)
+        for p in self.tmp.iterdir():
+            p.unlink()
+        self.assertEqual(self.write('Lisbon Warsaw', 'OSR2'), (1, {}))
+
     def test_nothing_pending_writes_tzdst_ok(self):
         # USOSFB (late_ready) waits for TZDST.OK; nothing deferred means done.
         for zone, src in (('Lisbon Warsaw', 950), ('Warsaw', ''), ('Eastern', '')):
@@ -407,12 +435,16 @@ class Wiring(unittest.TestCase):
             self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
             (tmp / 'c/USOS9X').mkdir(parents=True)
             (tmp / 'A.INF').write_bytes(b'[Setup]\r\nTimeZone="%s"\r\n' % zone.encode())
+            # The target sources tools/w9x_filesystem.sh first (usos_w9x_95_osr2).
             script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nfail() { exit 9; }\n'
+                      f'. "{(ROOT / "tools/w9x_filesystem.sh").as_posix()}"\n'
                       f'SYSTEM_TAG={tag}\nsetup_version="$V"\nTIME_ZONE="$G"\nANSWER_INF="{(tmp / "A.INF").as_posix()}"\n'
-                      f'LIB="{(ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block + '\nprintf "%s" "$TIME_ZONE"')
+                      f'LIB="{(ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block + '\nprintf "%s %s" "$tz_mode" "$TIME_ZONE"')
             rc, out, err = sh(script, {'V': version, 'G': given})
             self.assertEqual(rc, 0, err)
-            self.assertTrue(out.endswith(want), (tag, version, given, out))
+            self.assertFalse(err, err)
+            mode = {'4 0 0 950': '950', '4 0 0 1111': 'OSR2'}.get(version, '')
+            self.assertTrue(out.endswith(f'{mode} {want}'), (tag, version, given, out))
             if version == '4 0 0 950':
                 self.assertIn(b'TimeZone="Lisbon Warsaw"\r\n', (tmp / 'c/USOS9X/MSBATCH.INF').read_bytes())
 
