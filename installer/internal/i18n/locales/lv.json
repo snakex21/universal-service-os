@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Instalēšanas programma pati uzdod visus jautājumus; netiek izmantots ne profils, ne fails",
   "boot.profile.problem.bad_characters": "Tajā ir rakstzīmes, kas šeit nav atļautas.",
   "boot.profile.problem.bad_key_format": "Produkta atslēgas forma ir XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Šīs atslēgas forma ir xxx-xxxxxxx (CD atslēga) vai xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profils ar šādu nosaukumu jau pastāv.",
   "boot.profile.problem.empty": "Šis lauks ir obligāts.",
   "boot.profile.problem.only_digits": "Datora nosaukums nevar būt tikai cipari.",

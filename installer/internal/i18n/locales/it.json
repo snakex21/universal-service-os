@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "L'installazione pone da sola tutte le domande; non viene usato alcun profilo né file",
   "boot.profile.problem.bad_characters": "Contiene caratteri non consentiti qui.",
   "boot.profile.problem.bad_key_format": "Un codice Product Key ha la forma XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Questo codice ha la forma xxx-xxxxxxx (codice CD) o xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Esiste già un profilo con questo nome.",
   "boot.profile.problem.empty": "Questo campo è obbligatorio.",
   "boot.profile.problem.only_digits": "Un nome computer non può essere composto solo da cifre.",

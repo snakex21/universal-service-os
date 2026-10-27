@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Install küsib kõik küsimused ise; profiili ega faili ei kasutata",
   "boot.profile.problem.bad_characters": "See sisaldab märke, mis pole siin lubatud.",
   "boot.profile.problem.bad_key_format": "Tootevõtme kuju on XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Selle võtme kuju on xxx-xxxxxxx (CD-võti) või xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Selle nimega profiil on juba olemas.",
   "boot.profile.problem.empty": "See väli on kohustuslik.",
   "boot.profile.problem.only_digits": "Arvuti nimi ei saa koosneda ainult numbritest.",

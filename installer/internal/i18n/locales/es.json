@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "El programa de instalación hace todas las preguntas; no se usa ningún perfil ni archivo",
   "boot.profile.problem.bad_characters": "Contiene caracteres que no se permiten aquí.",
   "boot.profile.problem.bad_key_format": "Una clave de producto tiene el formato XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Esta clave tiene la forma xxx-xxxxxxx (clave de CD) o xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Ya existe un perfil con este nombre.",
   "boot.profile.problem.empty": "Este campo es obligatorio.",
   "boot.profile.problem.only_digits": "Un nombre de equipo no puede tener solo dígitos.",

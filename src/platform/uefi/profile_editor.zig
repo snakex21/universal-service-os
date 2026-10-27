@@ -514,7 +514,7 @@ fn problemText(problem: Problem) []const u8 {
         .reserved_name => t(.profile_problem_reserved_name),
         .same_as_user => t(.profile_problem_same_as_user),
         .only_digits => t(.profile_problem_only_digits),
-        .bad_key_format => t(if (keyStyle() == .win95) .profile_problem_bad_key_format_95 else .profile_problem_bad_key_format),
+        .bad_key_format => t(.profile_problem_bad_key_format),
         .duplicate => t(.profile_problem_duplicate),
         else => t(.profile_problem_bad_characters),
     };
@@ -566,7 +566,14 @@ fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
             help_lines[1] = problemText(problem);
             // A key being typed: how far it is (the count, never the key).
             if (id == .key and problem == .bad_key_format) {
-                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle()) }) catch help_lines[1];
+                const count = answer.profile.keySymbolCount(key_text.slice());
+                const limit = answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle());
+                // Windows 95 / NT 4.0: the first line already names both
+                // shapes (profile_help_key_95), so only the count.
+                help_lines[1] = (if (keyStyle() == .win95)
+                    std.fmt.bufPrint(&help_text[1], "({d}/{d})", .{ count, limit })
+                else
+                    std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), count, limit })) catch help_lines[1];
             }
             n = 2;
         }

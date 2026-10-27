@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Setup stellt alle Fragen selbst; weder Profil noch Datei werden verwendet",
   "boot.profile.problem.bad_characters": "Enthält Zeichen, die hier nicht erlaubt sind.",
   "boot.profile.problem.bad_key_format": "Ein Produktschlüssel hat die Form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Dieser Schlüssel hat die Form xxx-xxxxxxx (CD-Key) oder xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Ein Profil mit diesem Namen existiert bereits.",
   "boot.profile.problem.empty": "Dieses Feld ist erforderlich.",
   "boot.profile.problem.only_digits": "Ein Computername darf nicht nur aus Ziffern bestehen.",

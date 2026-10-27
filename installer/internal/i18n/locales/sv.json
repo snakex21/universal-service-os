@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Setup ställer alla frågor själv; ingen profil eller fil används",
   "boot.profile.problem.bad_characters": "Innehåller tecken som inte är tillåtna här.",
   "boot.profile.problem.bad_key_format": "En produktnyckel har formen XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Nyckeln har formen xxx-xxxxxxx (CD-nyckel) eller xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Det finns redan en profil med det här namnet.",
   "boot.profile.problem.empty": "Det här fältet är obligatoriskt.",
   "boot.profile.problem.only_digits": "Ett datornamn kan inte bestå av bara siffror.",

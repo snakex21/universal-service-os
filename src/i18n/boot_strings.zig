@@ -637,7 +637,6 @@ pub const Key = enum(u16) {
     profile_missing_password,
     profile_problem_bad_characters,
     profile_problem_bad_key_format,
-    profile_problem_bad_key_format_95,
     profile_problem_duplicate,
     profile_problem_empty,
     profile_problem_only_digits,
@@ -1479,7 +1478,6 @@ pub const hashes = [_]u32{
     0x02d02387, // profile.missing.password
     0xb6210153, // profile.problem.bad_characters
     0x568a5598, // profile.problem.bad_key_format
-    0x4ed34293, // profile.problem.bad_key_format_95
     0x94cec6cc, // profile.problem.duplicate
     0x45a02e98, // profile.problem.empty
     0xa0ced9c8, // profile.problem.only_digits
@@ -2523,7 +2521,6 @@ pub const bios = [_]bool{
     false,
     false,
     false,
-    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2864,7 +2861,7 @@ pub const english = [_][]const u8{
     "Please wait",
     "Please wait - keep the USB drive connected",
     "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
-    "CD key xxx-xxxxxxx or OEM ID xxxxx-OEM-xxxxxxx-xxxxx. Leave it empty to type it on Setup's own page. Used for this installation only, not saved.",
+    "CD key xxx-xxxxxxx or OEM ID xxxxx-OEM-xxxxxxx-xxxxx. Empty: Setup asks. Not saved.",
     "Enter the {0} product key",
     "Start is not possible with these settings",
     "Prepare and chainload",
@@ -3097,7 +3094,7 @@ pub const english = [_][]const u8{
     "XP and Server 2003: the Outlook Express shortcuts are removed; the program itself stays.",
     "Server: Internet Explorer Enhanced Security Configuration is off for administrators and users. Less protection when browsing.",
     "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
-    "Product key for {0}: the 10-digit CD key (xxx-xxxxxxx) or the OEM ID (xxxxx-OEM-xxxxxxx-xxxxx). Empty: Setup asks for it.",
+    "Product key for {0}: xxx-xxxxxxx or xxxxx-OEM-xxxxxxx-xxxxx. Empty: Setup asks.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
     "NTFS does not record the last-access time of a file on every read (fewer disk writes).",
@@ -3165,7 +3162,6 @@ pub const english = [_][]const u8{
     "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",
     "It contains characters that are not allowed here.",
     "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-    "This key has the form xxx-xxxxxxx (CD key) or xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
     "A profile with this name exists already.",
     "This field is required.",
     "A computer name cannot be only digits.",

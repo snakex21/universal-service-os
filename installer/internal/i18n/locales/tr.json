@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Kurulum tüm soruları kendisi sorar; profil veya dosya kullanılmaz",
   "boot.profile.problem.bad_characters": "Burada izin verilmeyen karakterler içeriyor.",
   "boot.profile.problem.bad_key_format": "Ürün anahtarı XXXXX-XXXXX-XXXXX-XXXXX-XXXXX biçimindedir.",
-  "boot.profile.problem.bad_key_format_95": "Bu anahtarın biçimi xxx-xxxxxxx (CD anahtarı) veya xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Bu ada sahip bir profil zaten var.",
   "boot.profile.problem.empty": "Bu alan zorunludur.",
   "boot.profile.problem.only_digits": "Bilgisayar adı yalnızca rakamlardan oluşamaz.",

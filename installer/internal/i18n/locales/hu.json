@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "A telepítő minden kérdést maga tesz fel; nincs profil vagy fájl használva",
   "boot.profile.problem.bad_characters": "Itt nem engedélyezett karaktereket tartalmaz.",
   "boot.profile.problem.bad_key_format": "A termékkulcs formája: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "A kulcs formája xxx-xxxxxxx (CD-kulcs) vagy xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Már létezik ilyen nevű profil.",
   "boot.profile.problem.empty": "Ez a mező kötelező.",
   "boot.profile.problem.only_digits": "A számítógépnév nem állhat csak számjegyekből.",

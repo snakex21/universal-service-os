@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Η εγκατάσταση κάνει μόνη της όλες τις ερωτήσεις· δεν χρησιμοποιείται προφίλ ή αρχείο",
   "boot.profile.problem.bad_characters": "Περιέχει χαρακτήρες που δεν επιτρέπονται εδώ.",
   "boot.profile.problem.bad_key_format": "Το Product Key έχει τη μορφή XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Αυτό το κλειδί έχει τη μορφή xxx-xxxxxxx (κλειδί CD) ή xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Υπάρχει ήδη προφίλ με αυτό το όνομα.",
   "boot.profile.problem.empty": "Αυτό το πεδίο είναι υποχρεωτικό.",
   "boot.profile.problem.only_digits": "Το όνομα υπολογιστή δεν μπορεί να είναι μόνο ψηφία.",

@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Diegimo programa pati užduoda visus klausimus; nenaudojamas nei profilis, nei failas",
   "boot.profile.problem.bad_characters": "Yra simbolių, kurie čia neleidžiami.",
   "boot.profile.problem.bad_key_format": "Produkto rakto forma: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Šio rakto forma xxx-xxxxxxx (CD raktas) arba xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profilis tokiu pavadinimu jau yra.",
   "boot.profile.problem.empty": "Šis laukas privalomas.",
   "boot.profile.problem.only_digits": "Kompiuterio vardas negali būti vien skaitmenys.",

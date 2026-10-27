@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Instalator sam zada wszystkie pytania; żaden profil ani plik nie jest używany",
   "boot.profile.problem.bad_characters": "Zawiera niedozwolone tu znaki.",
   "boot.profile.problem.bad_key_format": "Klucz produktu ma postać XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Ten klucz ma postać xxx-xxxxxxx (klucz CD) albo xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profil o tej nazwie już istnieje.",
   "boot.profile.problem.empty": "To pole jest wymagane.",
   "boot.profile.problem.only_digits": "Nazwa komputera nie może składać się z samych cyfr.",

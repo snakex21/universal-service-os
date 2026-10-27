@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Інсталятор сам ставить усі запитання; профіль і файл не використовуються",
   "boot.profile.problem.bad_characters": "Містить символи, не дозволені тут.",
   "boot.profile.problem.bad_key_format": "Ключ продукту має вигляд XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Цей ключ має вигляд xxx-xxxxxxx (CD-ключ) або xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Профіль із такою назвою вже існує.",
   "boot.profile.problem.empty": "Це поле обов'язкове.",
   "boot.profile.problem.only_digits": "Ім'я комп'ютера не може складатися лише з цифр.",

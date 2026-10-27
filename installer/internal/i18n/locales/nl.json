@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Setup stelt zelf alle vragen; er wordt geen profiel of bestand gebruikt",
   "boot.profile.problem.bad_characters": "Het bevat tekens die hier niet zijn toegestaan.",
   "boot.profile.problem.bad_key_format": "Een productcode heeft de vorm XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Deze sleutel heeft de vorm xxx-xxxxxxx (CD-sleutel) of xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Er bestaat al een profiel met deze naam.",
   "boot.profile.problem.empty": "Dit veld is verplicht.",
   "boot.profile.problem.only_digits": "Een computernaam mag niet alleen uit cijfers bestaan.",

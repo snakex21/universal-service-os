@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Instalace se na vše zeptá sama; nepoužije se žádný profil ani soubor",
   "boot.profile.problem.bad_characters": "Obsahuje znaky, které zde nejsou povoleny.",
   "boot.profile.problem.bad_key_format": "Kód Product Key má tvar XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Tento klíč má tvar xxx-xxxxxxx (klíč CD) nebo xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profil s tímto názvem již existuje.",
   "boot.profile.problem.empty": "Toto pole je povinné.",
   "boot.profile.problem.only_digits": "Název počítače nemůže obsahovat jen číslice.",

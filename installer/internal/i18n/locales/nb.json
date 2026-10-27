@@ -1047,7 +1047,6 @@
   "boot.profile.manual.detail": "Setup stiller alle spørsmålene selv; ingen profil eller fil brukes",
   "boot.profile.problem.bad_characters": "Den inneholder tegn som ikke er tillatt her.",
   "boot.profile.problem.bad_key_format": "En produktnøkkel har formen XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Nøkkelen har formen xxx-xxxxxxx (CD-nøkkel) eller xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Det finnes allerede en profil med dette navnet.",
   "boot.profile.problem.empty": "Dette feltet er påkrevd.",
   "boot.profile.problem.only_digits": "Et datamaskinnavn kan ikke bestå av bare sifre.",

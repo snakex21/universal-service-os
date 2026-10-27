@@ -1053,7 +1053,6 @@
   "boot.profile.manual.detail": "Namestitev sama postavi vsa vprašanja; ne uporabi se noben profil ali datoteka",
   "boot.profile.problem.bad_characters": "Vsebuje znake, ki tukaj niso dovoljeni.",
   "boot.profile.problem.bad_key_format": "Ključ izdelka ima obliko XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Ta ključ ima obliko xxx-xxxxxxx (ključ CD) ali xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profil s tem imenom že obstaja.",
   "boot.profile.problem.empty": "To polje je obvezno.",
   "boot.profile.problem.only_digits": "Ime računalnika ne sme vsebovati samo števk.",

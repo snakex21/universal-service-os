@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Instalarea pune singură toate întrebările; nu se folosește niciun profil sau fișier",
   "boot.profile.problem.bad_characters": "Conține caractere nepermise aici.",
   "boot.profile.problem.bad_key_format": "O cheie de produs are forma XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Această cheie are forma xxx-xxxxxxx (cheie CD) sau xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Există deja un profil cu acest nume.",
   "boot.profile.problem.empty": "Acest câmp este obligatoriu.",
   "boot.profile.problem.only_digits": "Numele computerului nu poate conține doar cifre.",

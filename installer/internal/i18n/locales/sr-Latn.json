@@ -1050,7 +1050,6 @@
   "boot.profile.manual.detail": "Instalacija sama postavlja sva pitanja; ne koristi se ni profil ni datoteka",
   "boot.profile.problem.bad_characters": "Sadrži znakove koji ovde nisu dozvoljeni.",
   "boot.profile.problem.bad_key_format": "Ključ proizvoda ima oblik XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-  "boot.profile.problem.bad_key_format_95": "Ovaj ključ ima oblik xxx-xxxxxxx (CD ključ) ili xxxxx-OEM-xxxxxxx-xxxxx (OEM).",
   "boot.profile.problem.duplicate": "Profil sa ovim imenom već postoji.",
   "boot.profile.problem.empty": "Ovo polje je obavezno.",
   "boot.profile.problem.only_digits": "Ime računara ne može da sadrži samo cifre.",
