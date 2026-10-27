@@ -6,8 +6,10 @@
  * edits C: after Setup's first restart, before the real PC boots it:
  * SYSTEM.INI [386Enh] mouse= goes (Setup's detection writes
  * mouse=*vmouse, msmouse.vxd; on the X470 VPICD_Phys_EOI stopped with that
- * line under CSMWrap) and MSDOS.SYS gets Logo=0 (Me writes its own MSDOS.SYS;
- * the animated logo hung under QEMU OVMF + CSMWrap). 95/98/98 SE repeat the
+ * line under CSMWrap) and MSDOS.SYS gets Logo=0 and BootLog=1 (Me writes its
+ * own MSDOS.SYS; the animated logo hung under QEMU OVMF + CSMWrap, and
+ * BootLog=1 writes C:\BOOTLOG.TXT so a power-off at boot names the last VxD).
+ * 95/98/98 SE repeat the
  * first in real mode (U9FIX /CSM from C:\AUTOEXEC.BAT); Me runs no program
  * from AUTOEXEC.BAT, so with a native phase 1 nothing did either.
  *
@@ -16,7 +18,7 @@
  * next to USOSKEY.DRV (src/compat/win3x/w9x_mini.zig; tools/w9x_csmwrap_target.sh
  * keeps it only for Me with a native phase 1). When that Windows ends
  * (DRV_EXITSESSION, DRV_DISABLE, DRV_FREE: after Setup wrote SYSTEM.INI
- * and MSDOS.SYS for the restart) it applies the same two edits
+ * and MSDOS.SYS for the restart) it applies the same edits
  * (usosp1_logic.h) to C:\WINDOWS\SYSTEM.INI and C:\MSDOS.SYS. Every one of
  * those messages repeats the check: the edits are idempotent, so an early
  * one changes nothing a later one would miss.

@@ -147,7 +147,8 @@ class Logic(unittest.TestCase):
                 _, want = self.vm_patch(msdos=msdos)
                 self.assertEqual(got, want)
         self.assertEqual([self.edit('l', m)[0] for m in MSDOS], [1, 1, 2, 2, 3, 3])
-        self.assertEqual(self.edit('l', MSDOS[0])[2], MSDOS[0].replace(b'[Options]\r\n', b'[Options]\r\nLogo=0\r\n'))
+        self.assertEqual(self.edit('l', MSDOS[0])[2],
+                         MSDOS[0].replace(b'[Options]\r\n', b'[Options]\r\nLogo=0\r\nBootLog=1\r\n'))
         # once: the result has a Logo= line
         once = self.edit('l', MSDOS[0])[2]
         self.assertEqual(self.edit('l', once)[0], 2)

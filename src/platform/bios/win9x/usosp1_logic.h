@@ -8,7 +8,13 @@
  *               blanks allowed) and ends at the next line starting with `[`.
  *   MSDOS.SYS   with a line starting `[Options]` (any case) and no line
  *               `logo=` anywhere (leading blanks allowed): `Logo=0` CR LF
- *               right after the first `[Options]` line.
+ *               then `BootLog=1` CR LF right after the first `[Options]`
+ *               line. BootLog=1 writes C:\BOOTLOG.TXT on every boot, so an
+ *               unexplained power-off at boot under CSMWrap names the last
+ *               VxD (valid on Me / 98; 95 950 PL rejects it, but 95/98 take
+ *               Logo=0 from INSTALL.BAT in real mode and never reach here,
+ *               their MSDOS.SYS already has a logo= line). A user's own
+ *               logo= line leaves the file untouched.
  * Lines end at LF (a CR before it stays part of the line); a last line
  * without LF is a line too.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
@@ -19,7 +25,7 @@
 /* P1_MAX: the largest file handled (SYSTEM.INI after Setup's phase 1 is
  * about 2 KiB, MSDOS.SYS about 1.7 KiB); larger ones are left alone. */
 #define P1_MAX   16000u
-#define P1_SLACK 16u
+#define P1_SLACK 24u     /* "Logo=0\r\nBootLog=1\r\n" (20) + a leading CR LF */
 
 enum { P1_SAME = 0, P1_CHANGED = 1, P1_PRESENT = 2, P1_NO_OPTIONS = 3, P1_TOO_BIG = 4 };
 
@@ -79,11 +85,12 @@ static int p1_drop_mouse(const char *in, unsigned n, char *out, unsigned *len, u
     return *removed ? P1_CHANGED : P1_SAME;
 }
 
-/* MSDOS.SYS: out (room for n + P1_SLACK) gets in with Logo=0 added (see
- * the top). Returns P1_CHANGED, P1_PRESENT (a logo= line exists),
+/* MSDOS.SYS: out (room for n + P1_SLACK) gets in with Logo=0 and BootLog=1
+ * added (see the top). Returns P1_CHANGED, P1_PRESENT (a logo= line exists),
  * P1_NO_OPTIONS or P1_TOO_BIG; *len = the new length (0 unless changed). */
 static int p1_add_logo(const char *in, unsigned n, char *out, unsigned *len)
 {
+    static const char add[] = "Logo=0\r\nBootLog=1\r\n";
     unsigned at, e, o = 0, i, opt = n + 1;
     *len = 0;
     if (n > P1_MAX) return P1_TOO_BIG;
@@ -95,7 +102,7 @@ static int p1_add_logo(const char *in, unsigned n, char *out, unsigned *len)
     if (opt > n) return P1_NO_OPTIONS;
     for (i = 0; i < opt; i++) out[o++] = in[i];
     if (opt == n && (n == 0 || in[n - 1] != '\n')) { out[o++] = '\r'; out[o++] = '\n'; }
-    for (i = 0; "Logo=0\r\n"[i]; i++) out[o++] = "Logo=0\r\n"[i];
+    for (i = 0; add[i]; i++) out[o++] = add[i];
     for (i = opt; i < n; i++) out[o++] = in[i];
     *len = o;
     return P1_CHANGED;

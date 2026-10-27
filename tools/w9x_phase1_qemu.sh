@@ -379,14 +379,17 @@ w9x_phase1_patch_c() {
     # Me writes its own MSDOS.SYS in the VM (INSTALL.BAT's Logo=0 is 95/98
     # only): Logo=0 under [Options] for the text start (start messages
     # visible; the animated logo never got past itself under QEMU OVMF +
-    # CSMWrap, 2026-10-06). Rewritten in place (cat >), so the directory
-    # entry keeps its hidden/system/read-only bits.
+    # CSMWrap, 2026-10-06), then BootLog=1 so an unexplained power-off at
+    # boot names the last VxD in C:\BOOTLOG.TXT (valid on Me / 98). The same
+    # two lines USOSP1.DRV adds on the native path (usosp1_logic.h, kept byte
+    # for byte by tools/tests/legacy_bios/test_usosp1.py). Rewritten in place
+    # (cat >), so the directory entry keeps its hidden/system/read-only bits.
     msdos="$1/MSDOS.SYS"
     if [ -f "$msdos" ] && grep -qi '^\[options\]' "$msdos" && ! grep -qi '^[ 	]*logo[ 	]*=' "$msdos"; then
-        awk -v BINMODE=3 '{ print } !done && tolower($0) ~ /^\[options\]/ { printf "Logo=0\r\n"; done = 1 }' "$msdos" > "$msdos.u9p" &&
+        awk -v BINMODE=3 '{ print } !done && tolower($0) ~ /^\[options\]/ { printf "Logo=0\r\nBootLog=1\r\n"; done = 1 }' "$msdos" > "$msdos.u9p" &&
             cat "$msdos.u9p" > "$msdos" || { rm -f "$msdos.u9p"; echo 'cannot patch MSDOS.SYS'; return 1; }
         rm -f "$msdos.u9p"
-        echo 'MSDOS.SYS: added Logo=0'
+        echo 'MSDOS.SYS: added Logo=0, BootLog=1'
     fi
     return 0
 }

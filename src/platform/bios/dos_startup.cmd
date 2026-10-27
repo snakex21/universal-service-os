@@ -36,6 +36,13 @@ ECHO BootMenu=0>>C:\MSDOS.SYS
 REM After a failed start the menu defaults to Normal, not Safe mode: safe
 REM mode loads HIMEM without /M:2 and hangs under CSMWrap.
 ECHO BootMenuDefault=1>>C:\MSDOS.SYS
+REM BootLog=1: every boot writes C:\BOOTLOG.TXT, so an unexplained power-off
+REM at boot under CSMWrap names the last VxD. 98/98 SE accept it; 95 (950 PL)
+REM rejects the line, so this is skipped there. Me writes its own MSDOS.SYS
+REM and gets the line from USOSP1.DRV in the mini-Windows instead.
+IF "%U9SYS%"=="95" GOTO NOBOOTLOG
+ECHO BootLog=1>>C:\MSDOS.SYS
+:NOBOOTLOG
 %U9X%\ATTRIB.EXE +H +S +R C:\MSDOS.SYS
 :SYSDONE
 REM Disk mode: the one-time syslinux start goes (98/95: SYS replaced its boot

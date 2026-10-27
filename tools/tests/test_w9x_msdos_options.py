@@ -15,7 +15,15 @@ class MsdosOptions(unittest.TestCase):
 
     def test_options_block(self):
         written = [l.split('>>')[0][5:] for l in self.lines()]
-        self.assertEqual(written, ['[Options]', 'Logo=0', 'BootMenu=0', 'BootMenuDefault=1'])
+        self.assertEqual(written, ['[Options]', 'Logo=0', 'BootMenu=0', 'BootMenuDefault=1', 'BootLog=1'])
+
+    def test_bootlog_gated_out_of_95(self):
+        # BootLog=1 writes C:\BOOTLOG.TXT every boot (an unexplained power-off at
+        # boot names the last VxD). 95 (950 PL) rejects the line, so it is gated.
+        text = INSTALL.read_text(encoding='latin-1').splitlines()
+        bootlog = next(i for i, l in enumerate(text) if l.startswith('ECHO BootLog=1>>C:\MSDOS.SYS'))
+        guard = text[bootlog - 1]
+        self.assertRegex(guard, r'IF "%U9SYS%"=="95" GOTO NOBOOTLOG')
 
     def test_no_forced_boot_menu_anywhere(self):
         pattern = re.compile(r'BootMenu\s*=\s*1|BootKeys\s*=\s*1|BootMenuDelay', re.I)
