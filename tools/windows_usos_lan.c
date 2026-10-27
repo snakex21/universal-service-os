@@ -220,20 +220,93 @@ static void remove_me_dialup(void){HMODULE dll;HDEVINFO devices;SP_DEVINFO_DATA 
   }
   if(!found)log_line("ME Dial-Up Adapter absent");destroy(devices);FreeLibrary(dll);
 }
-static void transports(void){HKEY k;DWORD index,n;char name[32],key[MAX_PATH],value[MAX_PATH];int count=0;
+/* DHCP lease evidence, log only. 95's VDHCP keeps a lease in
+ * VxD\DHCP\DhcpInfoNN "DhcpInfo" (X470 95 RTM run with a lease, 2026-10-26:
+ * DhcpInfo00, address at +4, mask at +8, server at +12, network order);
+ * the run without one (2026-10-27) had no DhcpInfoNN key. NetTrans
+ * IPAddress 0.0.0.0 is only the "obtain automatically" setting. */
+static void ip_text(char *out,const BYTE *p){unsigned i,k=0,n,v;char d[3];
+  for(i=0;i<4;i++){v=p[i];n=0;do{d[n++]=(char)('0'+v%10);v/=10;}while(v);while(n)out[k++]=d[--n];if(i<3)out[k++]='.';}
+  out[k]=0;}
+static void dhcp_lease(const char *when){HKEY k;char key[80],line[MAX_PATH],ip[16];BYTE data[64];DWORD n,type;unsigned i,found=0;LONG r;
+  for(i=0;i<8;i++){
+    lstrcpyA(key,"System\\CurrentControlSet\\Services\\VxD\\DHCP\\DhcpInfo00");key[len(key)-1]=(char)('0'+i);
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,key,0,KEY_QUERY_VALUE,&k))continue;
+    n=sizeof data;r=RegQueryValueExA(k,"DhcpInfo",0,&type,data,&n);RegCloseKey(k);
+    found++;copy(line,"DHCP ");cat(line,when);cat(line,": ");cat(line,key+len(key)-10);
+    if(r||n<16){cat(line," without a readable DhcpInfo value");log_line(line);continue;}
+    ip_text(ip,data+4);cat(line," ip=");cat(line,ip);
+    ip_text(ip,data+8);cat(line," mask=");cat(line,ip);
+    ip_text(ip,data+12);cat(line," server=");cat(line,ip);
+    if(!(data[4]|data[5]|data[6]|data[7]))cat(line," (no address)");
+    log_line(line);
+  }
+  if(!found){copy(line,"DHCP ");cat(line,when);cat(line,": no lease (no VxD\\DHCP\\DhcpInfoNN)");log_line(line);}
+}
+/* 950 only: NETDI wrote NETBEUI$ / nwlink$ into PROTOCOL.INI for the
+ * defaults NETCLEAN (tools/w9x_reg95.sh) removes from the registry; setupx
+ * cannot delete an INI section. Only once no NetTrans instance has that
+ * DeviceID any more. WritePrivateProfileStringA is resolved at run time (the
+ * static imports stay the verified NT4 RTM list). An absent section or file
+ * is nothing to do. */
+static int win950(void){OSVERSIONINFOA v={0};v.dwOSVersionInfoSize=sizeof v;
+  return GetVersionExA(&v)&&v.dwPlatformId==VER_PLATFORM_WIN32_WINDOWS&&v.dwMajorVersion==4&&v.dwMinorVersion==0&&(v.dwBuildNumber&0xffff)==950;}
+static int ini_has_section(const char *text,const char *name){const char *p=text,*a,*b;
+  for(;*p;p++){if(p!=text&&p[-1]!='\n')continue;if(*p!='[')continue;
+    for(a=p+1,b=name;*a&&*b;a++,b++){char x=*a,y=*b;if(x>='A'&&x<='Z')x+='a'-'A';if(y>='A'&&y<='Z')y+='a'-'A';if(x!=y)break;}
+    if(!*b&&*a==']')return 1;}
+  return 0;}
+static void protocol_ini(const char *section,int installed){static char text[16385];char file[MAX_PATH],line[MAX_PATH];HANDLE f;DWORD n=0;HMODULE k32;
+  BOOL(WINAPI *write)(LPCSTR,LPCSTR,LPCSTR,LPCSTR);
+  n=GetWindowsDirectoryA(file,sizeof file);if(!n||n>sizeof(file)-14)return;lstrcatA(file,"\\PROTOCOL.INI");
+  f=CreateFileA(file,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return;
+  n=0;if(!ReadFile(f,text,sizeof(text)-1,&n,0))n=0;CloseHandle(f);text[n]=0;
+  if(!ini_has_section(text,section))return;
+  copy(line,"PROTOCOL.INI [");cat(line,section);
+  if(installed){cat(line,"] kept: its protocol is still in NetTrans");log_line(line);return;}
+  k32=LoadLibraryA("kernel32.dll");write=k32?(void*)GetProcAddress(k32,"WritePrivateProfileStringA"):0;
+  if(write&&write(section,0,0,file)){write(0,0,0,file);cat(line,"] removed (950 default, not installed)");}
+  else cat(line,"] removal failed (log only; the section is unused)");
+  if(k32)FreeLibrary(k32);log_line(line);}
+static void transports(void){HKEY k;DWORD index,n;char name[32],key[MAX_PATH],value[MAX_PATH];int count=0,nwlink=0,netbeui=0;
   const char *base="System\\CurrentControlSet\\Services\\Class\\NetTrans";
   if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,base,0,KEY_ENUMERATE_SUB_KEYS,&k)){
-    log_line("TCP/IP NetTrans not enumerated; Setup binding needs hardware verification");return;}
+    log_line("TCP/IP NetTrans not enumerated; Setup binding needs hardware verification");dhcp_lease("now");return;}
   for(index=0;;index++){
     n=sizeof(name);if(RegEnumKeyExA(k,index,name,&n,0,0,0,0))break;
     copy(key,base);cat(key,"\\");cat(key,name);cat(key,"\\Ndi");
-    if(!query(HKEY_LOCAL_MACHINE,key,"DeviceID",value,sizeof(value))||!eq(value,"MSTCP"))continue;
+    if(!query(HKEY_LOCAL_MACHINE,key,"DeviceID",value,sizeof(value)))continue;
+    if(eq(value,"NWLINK"))nwlink++;if(eq(value,"NETBEUI"))netbeui++;
+    if(!eq(value,"MSTCP"))continue;
     count++;copy(key,base);cat(key,"\\");cat(key,name);log_line(key);
     if(query(HKEY_LOCAL_MACHINE,key,"IPAddress",value,sizeof(value)))log_line(value);
     if(query(HKEY_LOCAL_MACHINE,key,"IPMask",value,sizeof(value)))log_line(value);
   }
   RegCloseKey(k);if(!count)log_line("TCP/IP unbound/absent in NetTrans: no LAN connectivity asserted");
+  dhcp_lease("now");
+  if(eq(system_id,"95")&&win950()){protocol_ini("nwlink$",nwlink);protocol_ini("NETBEUI$",netbeui);}
 }
+/* "/dhcplater": the copy a /refresh run starts. It never blocks the caller
+ * (the 950 first-desktop coordinator waits for /refresh): it sleeps 30 s,
+ * then appends the lease state to NETSETUP.TXT, nothing else. */
+#define USOS_DHCP_LATER_DELAY 30000
+static int dhcp_later_requested(void){const char *p=GetCommandLineA();
+  while(*p){if(*p==' '&&len(p)>=11&&p[1]=='/'&&!memcmp(p+2,"dhcplater",9)&&(p[11]==0||p[11]==' '))return 1;p++;}return 0;}
+static void dhcp_later_spawn(void){char exe[MAX_PATH],cmd[MAX_PATH+16];STARTUPINFOA si;PROCESS_INFORMATION pi;DWORD n;
+  n=GetModuleFileNameA(0,exe,sizeof exe);if(!n||n>=sizeof exe)return;
+  lstrcpyA(cmd,"\"");lstrcatA(cmd,exe);lstrcatA(cmd,"\" /dhcplater");
+  memset(&si,0,sizeof si);si.cb=sizeof si;
+  if(CreateProcessA(exe,cmd,0,0,FALSE,0,0,dir,&si,&pi)){CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+    log_line("DHCP lease recheck in 30 s started (log only, nothing waits for it)");}
+  else log_line("DHCP lease recheck could not start (log only)");}
+static void dhcp_later(void){unsigned i;
+  Sleep(USOS_DHCP_LATER_DELAY);
+  /* The /refresh run may still hold NETSETUP.TXT (shared for reading only). */
+  local(path,"LOGS\\NETSETUP.TXT");
+  for(i=0;i<20;i++){log_handle=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,0,0);
+    if(log_handle!=INVALID_HANDLE_VALUE)break;Sleep(1000);}
+  if(log_handle==INVALID_HANDLE_VALUE)ExitProcess(1);
+  SetFilePointer(log_handle,0,0,FILE_END);dhcp_lease("30 s after refresh");CloseHandle(log_handle);ExitProcess(0);}
 #endif
 
 static int vm(void){unsigned a,b,c,d;__cpuid(1,a,b,c,d);if(c&0x80000000u)return 1;
@@ -385,6 +458,9 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
   n=GetModuleFileNameA(0,dir,sizeof(dir));if(!n||n>=sizeof(dir))ExitProcess(1);
   p=dir+n;while(p>dir&&p[-1]!='\\')p--;*p=0;
   local(ini,"NETCFG.INI");
+#ifndef USOS_LAN_NT
+  if(dhcp_later_requested())dhcp_later();
+#endif
 #ifdef USOS_LAN_NT
   local(path,"NETSETUP.TXT");
 #else
@@ -435,7 +511,11 @@ void entry(void){DWORD n;char *p;unsigned bit;int refresh;HANDLE mutex;
 #endif
   refresh=refresh_requested();
   if(!load_state(refresh)){log_line("LAN gave up: invalid private retry state");unregister();CloseHandle(log_handle);ExitProcess(2);}
-  if(refresh){usos_lan_refresh(&state);log_line("LAN explicit post-package refresh");}
+  if(refresh){usos_lan_refresh(&state);log_line("LAN explicit post-package refresh");
+#ifndef USOS_LAN_NT
+    dhcp_later_spawn();
+#endif
+  }
   if(state.done==USOS_LAN_ALL){log_line("LAN already completed; user settings preserved");unregister();CloseHandle(log_handle);ExitProcess(0);}
   if(!usos_lan_attempt(&state)){log_line("LAN gave up after three attempts; completed steps/user settings preserved");unregister();CloseHandle(log_handle);ExitProcess(2);}
   if(!save_state()){log_line("LAN gave up: cannot persist private retry state");unregister();CloseHandle(log_handle);ExitProcess(2);}

@@ -227,6 +227,33 @@ class RunValueAndStartPage(unittest.TestCase):
         self.assertIn('set(root,main_key,"First Home Page",REG_SZ,page,len(page)+1);',lan)
         self.assertIn('config_hash',lan)
         self.assertNotIn('page',lan[lan.index('static unsigned long config_hash'):lan.index('static void initial_state')])
+    def test_95_dhcp_lease_logged_now_and_30s_after_refresh(self):
+        # X470 95 RTM 2026-10-27: no DhcpInfo00 and USOSLAN logged only the
+        # 0.0.0.0 "obtain automatically" setting. Log only, never waited for.
+        lan=(ROOT/'tools/windows_usos_lan.c').read_text()
+        tr=lan[lan.index('static void transports(void)'):]
+        tr=tr[:tr.index('\n}\n')]
+        self.assertIn('dhcp_lease("now");',tr)
+        self.assertIn('"System\\\\CurrentControlSet\\\\Services\\\\VxD\\\\DHCP\\\\DhcpInfo00"',lan)
+        self.assertIn('#define USOS_DHCP_LATER_DELAY 30000',lan)
+        entry=lan[lan.index('void entry(void)'):]
+        # The child sleeps before it opens the log; nothing else runs in it.
+        self.assertLess(entry.index('if(dhcp_later_requested())dhcp_later();'),entry.index('log_handle=CreateFileA'))
+        later=lan[lan.index('static void dhcp_later(void)'):]
+        later=later[:later.index('ExitProcess(0);}')]
+        self.assertLess(later.index('Sleep(USOS_DHCP_LATER_DELAY);'),later.index('CreateFileA'))
+        # Started without waiting, only by an explicit /refresh run.
+        refresh=entry[entry.index('if(refresh){usos_lan_refresh(&state);'):]
+        self.assertLess(refresh.index('dhcp_later_spawn();'),refresh.index('}'))
+        spawn=lan[lan.index('static void dhcp_later_spawn(void)'):lan.index('static void dhcp_later(void)')]
+        self.assertIn('CloseHandle(pi.hProcess)',spawn)
+        self.assertNotIn('WaitFor',spawn)
+        # PROTOCOL.INI sections only on 950 and only once NetTrans lost them;
+        # a failure there never fails the coordinator's /refresh.
+        self.assertIn('if(eq(system_id,"95")&&win950()){protocol_ini("nwlink$",nwlink);protocol_ini("NETBEUI$",netbeui);}',tr)
+        ini=lan[lan.index('static void protocol_ini('):lan.index('static void transports(void)')]
+        self.assertNotIn('failures++',ini)
+        self.assertIn('GetProcAddress(k32,"WritePrivateProfileStringA")',ini)
 
 class Render(unittest.TestCase):
     @classmethod

@@ -52,6 +52,16 @@ void entry(void){unsigned i,slot;DWORD n;char *p;UsosLanState fake={0,0,0,0};
   CHECK(icw_target("C:\\Program Files\\Internet Explorer\\Connection Wizard\\ICWCONN1.EXE"));
   CHECK(icw_target("c:/x/icwconn1.exe")&&!icw_target("C:\\x\\ICWCONN1.EXE.txt")&&!icw_target("unrelated.exe"));
   test_command="unit.exe /refresh";CHECK(refresh_requested());test_command="unit.exe /r";CHECK(!refresh_requested());
+  CHECK(!dhcp_later_requested());test_command="\"C:\\USOS9X\\USOSLAN.EXE\" /dhcplater";CHECK(dhcp_later_requested()&&!refresh_requested());
+  test_command="unit.exe /dhcplaterx";CHECK(!dhcp_later_requested());test_command="unit.exe /setup /refresh";CHECK(!dhcp_later_requested());
+  test_command="unit.exe";
+  {char ip[16];static const BYTE lease[16]={0,0,0,0,0xc0,0xa8,0,0xd7,0xff,0xff,0xff,0,0xc0,0xa8,0,1};
+   ip_text(ip,lease+4);CHECK(!lstrcmpA(ip,"192.168.0.215"));ip_text(ip,lease+8);CHECK(!lstrcmpA(ip,"255.255.255.0"));
+   ip_text(ip,lease);CHECK(!lstrcmpA(ip,"0.0.0.0"));}
+  {static const char ini[]="[NETBEUI$]\r\nDriverName=NETBEUI$\r\n\r\n[nwlink$]\r\nFrame_Type=4\r\n[ndishlp$]\r\nBindings=\r\n";
+   CHECK(ini_has_section(ini,"NETBEUI$")&&ini_has_section(ini,"nwlink$")&&ini_has_section(ini,"NWLINK$"));
+   CHECK(!ini_has_section(ini,"protman$")&&!ini_has_section(ini,"nwlink")&&!ini_has_section("x[nwlink$]\r\n","nwlink$"));
+   CHECK(!ini_has_section("[ndishlp$]\r\nBindings=nwlink$\r\n","nwlink$"));}
   n=GetModuleFileNameA(0,dir,sizeof dir);CHECK(n&&n<sizeof dir);p=dir+n;while(p>dir&&p[-1]!='\\')p--;*p=0;
   copy(system_id,"95");test_os_version=0x83b60004UL;
   local(path,"PHASE1.OK");DeleteFileA(path);CHECK(!native95_handoff()&&test_setup_opens==0);
