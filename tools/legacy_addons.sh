@@ -90,6 +90,22 @@ usos_addons_unpack_zip() {
 usos_addons_run_reg() {
     printf '%s\r\n' 'REGEDIT4' '' '[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run]' '"USOSAddons"="C:\\USOS\\ADDONS\\USOSADD.EXE"'
 }
+# usos_addons_staged TARGET_ROOT CAPABILITY: 0 when a package staged for the
+# plan provides CAPABILITY (manifest provides=, e.g. ie), else 1. Reads the
+# staged LEGACY.INI / PLAN.TXT / PKG\<dir> only.
+usos_addons_staged() {
+    local app=$1/USOS/ADDONS found
+    [ -f "$app/PLAN.TXT" ] && [ -f "$app/LEGACY.INI" ] && [ -f "$app/USOSADD.EXE" ] || return 1
+    found=$(awk -F'|' -v cap="$2" '
+      FNR==NR{sub(/\r$/,"");if($0~/^\[/){id="";if($0~/^\[pkg:/){id=$0;sub(/^\[pkg:/,"",id);sub(/\].*/,"",id)}}
+              else if(id!=""&&$0~/^[ \t]*provides[ \t]*=/){v=substr($0,index($0,"=")+1);gsub(/[ \t]/,"",v);n=split(v,a,",")
+                for(i=1;i<=n;i++){split(a[i],b,":");if(tolower(b[1])==tolower(cap))prov[id]=1}}
+              next}
+      $1=="file"&&($2 in prov){print $3}' "$app/LEGACY.INI" "$app/PLAN.TXT" | while IFS= read -r dir; do
+        [ -n "$dir" ] && [ -n "$(ls -A "$app/PKG/$dir" 2>/dev/null)" ] && { echo yes; break; }
+    done)
+    [ "$found" = yes ]
+}
 usos_addons_stage() {
     # CONFIG TARGET_ROOT LIB_ROOT DATA_ADDONS OS_TOKEN LANGUAGE [NTSP]
     local cfg=$1 target=$2 lib=$3 data=$4 os=$5 lang=$6 ntsp=${7:-} preset options exclude dialup

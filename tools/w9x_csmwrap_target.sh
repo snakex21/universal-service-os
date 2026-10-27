@@ -749,7 +749,17 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         # usos_net_w95_stage): imported with REG95.REG, checked into NET.
         reg95_net=
         [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || reg95_net="$work/c/USOS9X/NET/NET95.REG"
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}"; then
+        # 950: the Internet icon command (IE 3 path) only with a staged IE package.
+        reg95_ie=
+        if [ "${setup_version:-}" = '4 0 0 950' ]; then
+            if command -v usos_addons_staged >/dev/null 2>&1 && usos_addons_staged "$work/c" ie; then
+                log 'answer registry: Internet icon -> IEXPLORE.EXE (IE package staged)'
+            else
+                reg95_ie=noie
+                log 'answer registry: Internet icon left as 950 Setup wrote it (no IE package staged)'
+            fi
+        fi
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}" "$reg95_ie"; then
             log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
             [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
         else

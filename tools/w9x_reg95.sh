@@ -50,6 +50,11 @@
 #     "Internet" icon opens Internet Explorer 3 instead of ICWCONN1.EXE
 #     (95 OSR2's {FBF23B42-...} Shell\Open\Command until the wizard ran;
 #     the wizard installs Dial-Up Networking and the Dial-Up Adapter).
+#     Only where C:\Program Files\Internet Explorer\IEXPLORE.EXE will exist:
+#     950 (RTM / OSR1) has no IE there of its own (OSR1 EN: IE 2.0 in
+#     Program Files\Plus!\Microsoft Internet; X470 2026-10-27, the icon
+#     could not start the hard-coded path), so on 950 the caller passes
+#     "noie" unless an IE package is staged, and the system's value stays.
 #   * NoWelcome's replacement: Explorer\Tips Show = 0 (no Welcome window).
 #   * IE start page: Internet Explorer 3 cannot open about:blank (X470,
 #     2026-10-20: "cannot find"), so an about:blank Start Page / First Home
@@ -68,7 +73,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_LATE_FILE=${6:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_IE=${W9X_REG95_IE:-} W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_LATE_FILE=${6:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -226,7 +231,7 @@ w9x_reg95_convert() {
         if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
-        if (icw) {
+        if (icw && ENVIRON["W9X_REG95_IE"] != "noie") {
             ckey = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command"
             cdata = "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\""
             if (late != "") late_emit(ckey, "", cdata); else emit(ckey, "", cdata)
@@ -797,14 +802,15 @@ CD \\
 EOF
 }
 
-# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version]
+# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG] [source version] [noie]
+# noie: no Internet icon command (no IE at the IE 3 path, see above).
 # NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
 # usosnet4 adapter, TCP/IP and client registry for a fresh install; its
 # sections are appended to REG95.REG (one import) and REG95.BAT exports
 # them afterwards to DIR\NET\C1..C3.REG and checks them with FIND:
 # NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-} W9X_REG95_IE=${7:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
     reg95_identity='' reg95_vmdlate=''
