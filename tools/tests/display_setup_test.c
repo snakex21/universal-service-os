@@ -17,9 +17,14 @@ static LPSTR WINAPI fake_command(void){return "unit.exe /setup";}
 static DWORD WINAPI fake_attributes(LPCSTR file){const char *name=file,*p=file;
     while(*p){if(*p=='\\')name=p+1;p++;}
     if(!lstrcmpA(name,"PHASE1.OK"))return test_case==10?INVALID_FILE_ATTRIBUTES:0;
-    if(!lstrcmpA(name,"VLATE.OK"))return test_case==11?INVALID_FILE_ATTRIBUTES:0;
+    if(!lstrcmpA(name,"VLATE.OK"))return test_case==11||test_case>=19?INVALID_FILE_ATTRIBUTES:0;
+    /* 950 stages VESALATE.BAT; OSR2 (19..21) only VESA95.BAT. */
+    if(!lstrcmpA(name,"VESALATE.BAT"))return test_case<19?0:INVALID_FILE_ATTRIBUTES;
+    if(!lstrcmpA(name,"VESA95.BAT"))return test_case>=19?0:INVALID_FILE_ATTRIBUTES;
+    if(!lstrcmpA(name,"VESA95.BAD"))return test_case==20?0:INVALID_FILE_ATTRIBUTES;
+    if(!lstrcmpA(name,"VESA95.OK"))return test_case==21?0:INVALID_FILE_ATTRIBUTES;
     if(!lstrcmpA(name,"FIRSTBT.ON"))return test_case==12?INVALID_FILE_ATTRIBUTES:0;
-    if(!lstrcmpA(name,"DISPLAY.DONE"))return test_case<6?0:INVALID_FILE_ATTRIBUTES;
+    if(!lstrcmpA(name,"DISPLAY.DONE"))return test_case<6||test_case>=20?0:INVALID_FILE_ATTRIBUTES;
     return INVALID_FILE_ATTRIBUTES;
 }
 static LONG WINAPI fake_reg_open(HKEY r,LPCSTR k,DWORD o,REGSAM a,PHKEY out){
@@ -56,10 +61,11 @@ static BOOL WINAPI fake_process(LPCSTR a,LPSTR b,LPSECURITY_ATTRIBUTES c,LPSECUR
 void entry(void){const char *args=GetCommandLineA(),*last=args;
     while(*args){if(*args==' ')last=args+1;args++;}
     while(*last>='0'&&*last<='9')test_case=test_case*10+(*last++-'0');
-    if(test_case>18)ExitProcess(203);
+    if(test_case>21)ExitProcess(203);
     test_legacy=test_case<3?0x80000004UL:test_case<5?0x80000a04UL:0x80005a04UL;
     test_minor=test_case<3?0:test_case<5?10:90;
     test_build=test_case<2?0x040003b6UL:test_case==2?0x04000457UL:test_case==3?0x040a07ceUL:test_case==4?0x040a08aeUL:0x045a0bb8UL;
     if(test_case>=6){test_legacy=0x80000004UL;test_minor=0;test_build=0x040003b6UL;}
+    if(test_case>=19)test_build=test_case==19?0x04000457UL:test_case==20?0x040004bcUL:0x040004beUL; /* 1111 / 1212 / 1214 */
     run();
 }

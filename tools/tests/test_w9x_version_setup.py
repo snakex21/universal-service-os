@@ -56,17 +56,27 @@ class VersionAndLogging(unittest.TestCase):
                                   (2, '95 OSR2', 1111), (3, '98 FE', 1998),
                                   (4, '98 SE', 2222), (5, 'ME', 3000)):
             with self.subTest(system=name):
-                data = self.run_case(case, 0 if case<2 else 2,
-                                     'already completed' if case<2 else 'requires source950')
+                data = self.run_case(case, 0 if case<3 else 2,
+                                     'already completed' if case<3 else 'requires 95 (950 / OSR2)')
                 self.assertIn(f'build={build}\r\n'.encode(), data)
 
     def test_refused_os_and_missing_markers_always_log_exit_two(self):
-        for case, reason in ((6, 'GetVersionExA failed'), (7, 'requires source950'),
-                             (8, 'requires source950'), (9, 'requires source950'),
+        for case, reason in ((6, 'GetVersionExA failed'), (7, 'requires 95 (950 / OSR2)'),
+                             (8, 'requires 95 (950 / OSR2)'), (9, 'requires 95 (950 / OSR2)'),
                              (10, 'PHASE1.OK absent'), (11, 'VLATE.OK absent'),
                              (12, 'FIRSTBT.ON absent')):
             with self.subTest(case=case):
                 self.run_case(case, 2, reason)
+
+    def test_osr2_display_boundary_without_vesalate(self):
+        # OSR2 stages no VESALATE.BAT: VESA95.BAT's one attempt (OK or BAD).
+        for case, code, reason, build in ((19, 2, 'VESA95 display boundary absent', 1111),
+                                          (20, 0, 'already completed', 1212),
+                                          (21, 0, 'already completed', 1214)):
+            with self.subTest(case=case):
+                data = self.run_case(case, code, reason)
+                self.assertIn(f'build={build}\r\n'.encode(), data)
+                self.assertNotIn(b'VLATE.OK absent', data)
 
     def test_other_early_exits_and_vbe_failure_are_logged(self):
         for case, code, reason, profile in (

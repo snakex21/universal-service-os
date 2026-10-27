@@ -63,6 +63,14 @@ __attribute__((noreturn)) static void leave(DWORD code);
 
 static void zero(void *p, unsigned n) { volatile BYTE *b = (volatile BYTE *)p; while (n--) *b++ = 0; }
 static void file_path(const char *name) { lstrcpyA(path, directory); lstrcatA(path, name); }
+#ifdef USOSRES_9X
+static int present(const char *name) { file_path(name); return GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES; }
+/* usosfb.c coordinated_build / display_ready: 950 (RTM / OSR1) and the OSR2
+ * family (1111, 1212..1216). 950 binds VESALATE.BAT late (VLATE.OK); OSR2
+ * stages no VESALATE: VESA95.BAT had its one attempt (OK or BAD), or none. */
+static int coordinated_build(DWORD build) { build&=0xffff;
+    return build==950||build==1111||build==1212||build==1214||build==1216; }
+#endif
 static void say(const char *text) {
     DWORD done;
     if (log_file != INVALID_HANDLE_VALUE) { WriteFile(log_file, text, lstrlenA(text), &done, NULL); FlushFileBuffers(log_file); }
@@ -407,9 +415,10 @@ static void run(void) {
           lstrcatA(line," version=");number(version.dwMajorVersion);lstrcatA(line,".");number(version.dwMinorVersion);
           lstrcatA(line," build=");number(version.dwBuildNumber&0xffff);lstrcatA(line,"\r\n");say(line);
           if(version.dwPlatformId!=VER_PLATFORM_WIN32_WINDOWS||version.dwMajorVersion!=4||
-             version.dwMinorVersion!=0||(version.dwBuildNumber&0xffff)!=950){say("DISPLAY refused: /setup requires source950\r\n");leave(2);}
+             version.dwMinorVersion!=0||!coordinated_build(version.dwBuildNumber)){say("DISPLAY refused: /setup requires 95 (950 / OSR2)\r\n");leave(2);}
           file_path("PHASE1.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: PHASE1.OK absent\r\n");leave(2);}
-          file_path("VLATE.OK");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: VLATE.OK absent\r\n");leave(2);}
+          if(present("VESALATE.BAT")){if(!present("VLATE.OK")){say("DISPLAY refused: VLATE.OK absent\r\n");leave(2);}}
+          else if(!present("VESA95.OK")&&!present("VESA95.BAD")&&present("VESA95.BAT")){say("DISPLAY refused: VESA95 display boundary absent\r\n");leave(2);}
           file_path("FIRSTBT.ON");if(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES){say("DISPLAY refused: FIRSTBT.ON absent\r\n");leave(2);}
       }
     }
