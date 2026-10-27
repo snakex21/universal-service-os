@@ -157,6 +157,18 @@ class Coordinator(unittest.TestCase):
         self.assertIn('RegQueryValueExA(key,"USOSVmd",0,&type,',queued)
         self.assertIn('contains(text,"C:\\\\USOS9X\\\\USOSVMD.INF")',queued)
 
+    def test_install_phase_resumes(self):
+        """A restart or Retry inside the package boundary (FIRSTBT.STA
+        "install", OSR2.1 X470 2026-10-27) runs the boundary again instead of
+        "unknown phase"; under Explorer it goes to a shell boot like late."""
+        start=self.src[self.src.index('void __cdecl fb_start(void){'):]
+        self.assertIn('!lstrcmpA(phase,"late\\r\\n")||!lstrcmpA(phase,"install\\r\\n")||mid_phase(phase))){',start)
+        self.assertIn('if(phase[0]&&lstrcmpA(phase,"late\\r\\n")&&lstrcmpA(phase,"install\\r\\n")&&!mid)fail("unknown phase',start)
+        # the install boundary itself: journal, USOSRES (DISPLAY.DONE ends it), USOSADD (STATE.INI)
+        tail=start[start.index('resume: package boundary (install) runs again'):]
+        self.assertLess(tail.index('save("FIRSTBT.STA","install\\r\\n")'),tail.index('USOSRES.EXE /setup'))
+        self.assertLess(tail.index('USOSRES.EXE /setup'),tail.index('USOSADD.EXE /setup")'))
+
     def test_child_logs_a_taskbar_and_long_commands_fit(self):
         body=section(self.src,'static DWORD child(const char*command){','static int legacy_absent(')
         self.assertIn('MsgWaitForMultipleObjects(1,&pi.hProcess,FALSE,500,QS_ALLINPUT)',body)

@@ -282,7 +282,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(!setup_done())fail("original RunOnce Setup has not completed");
     phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))fail("cannot read phase journal");
     if(shell_mode)run_once_values();
-    else if(!exists("SHELL.BAD")&&(!phase[0]||!lstrcmpA(phase,"late\r\n")||mid_phase(phase))){
+    else if(!exists("SHELL.BAD")&&(!phase[0]||!lstrcmpA(phase,"late\r\n")||!lstrcmpA(phase,"install\r\n")||mid_phase(phase))){
         /* Under Explorer's RunOnce (first boot after Setup, or after Retry):
          * no package runs here; the same phase continues in a shell boot. */
         if(shell_set(1))reboot(phase[0]?phase:"late\r\n","restart: package boots continue with USOSFB as the Windows shell");
@@ -304,7 +304,12 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         log_line("complete: releasing first desktop; final_post_addons_restarts=1");CloseHandle(journal);ExitProcess(0);
     }
     mid=mid_phase(phase);
-    if(phase[0]&&lstrcmpA(phase,"late\r\n")&&!mid)fail("unknown phase; automatic retry refused");
+    /* "install": a restart or Retry inside the package boundary (OSR2.1
+     * X470 2026-10-27: USOSRES refused, Retry met "unknown phase"). The
+     * boundary runs again: DISPLAY.DONE ends USOSRES at once, USOSADD
+     * resumes from its STATE.INI. */
+    if(phase[0]&&lstrcmpA(phase,"late\r\n")&&lstrcmpA(phase,"install\r\n")&&!mid)fail("unknown phase; automatic retry refused");
+    if(!lstrcmpA(phase,"install\r\n"))log_line("resume: package boundary (install) runs again");
     if(mid){
         wsprintfA(note,"resume after package restart %d before the desktop",mid);log_line(note);
         finish_runonceex();
