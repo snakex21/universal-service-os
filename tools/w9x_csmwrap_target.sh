@@ -945,6 +945,45 @@ for name in AUTOEXEC.BAT CONFIG.SYS; do
     mattrib -i "$floppy" -r -h -s "::/$name" >/dev/null 2>&1 || true
     mcopy -o -i "$floppy" "$work/$name" "::/$name" || fail "cannot write $name into the boot floppy"
 done
+# INSTALL.BAT writes C:\CONFIG.SYS with C:\WINDOWS\HIMEM.SYS and, for a
+# restart before Setup copied it, the floppy's copy C:\USOS9X\HIMEM.SYS;
+# Setup turns that second line into a second C:\WINDOWS\HIMEM.SYS line
+# (X470 98 FE PL native 2026-10-27, BOOTLOG: LoadFailed for the second).
+# HIMEMFIX.BAT (AUTOEXEC.BAT, every start until HIMEMFIX.OK) rebuilds
+# CONFIG.SYS with one HIMEM line once C:\WINDOWS\WIN.COM and HIMEM.SYS
+# exist: CREGFIX and HIMEM (CFGHEAD.SYS) + every other line as Setup left
+# it. FIND reads stdin (a file argument prints a header); no ERRORLEVEL
+# after COPY (950).
+if [ -f "$work/c/USOS9X/CREGFIX.SYS" ] && [ "$SYSTEM_TAG" != ME ]; then
+    printf 'DEVICE=C:\\USOS9X\\CREGFIX.SYS\r\nDEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2\r\n' > "$work/c/USOS9X/CFGHEAD.SYS" ||
+        fail 'cannot write CFGHEAD.SYS'
+    sed 's/$/\r/' > "$work/c/USOS9X/HIMEMFIX.BAT" <<'EOF' || fail 'cannot write HIMEMFIX.BAT'
+@ECHO OFF
+IF EXIST C:\USOS9X\HIMEMFIX.OK GOTO HMEND
+IF NOT EXIST C:\WINDOWS\WIN.COM GOTO HMEND
+IF NOT EXIST C:\WINDOWS\HIMEM.SYS GOTO HMEND
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO HMEND
+IF NOT EXIST C:\USOS9X\CFGHEAD.SYS GOTO HMEND
+C:\WINDOWS\COMMAND\FIND.EXE /I "C:\USOS9X\CREGFIX.SYS" < C:\CONFIG.SYS > NUL
+IF ERRORLEVEL 1 GOTO HMEND
+C:\WINDOWS\COMMAND\FIND.EXE /V /I "HIMEM.SYS" < C:\CONFIG.SYS > C:\USOS9X\CFG.SH1
+C:\WINDOWS\COMMAND\FIND.EXE /V /I "C:\USOS9X\CREGFIX.SYS" < C:\USOS9X\CFG.SH1 > C:\USOS9X\CFG.SH2
+IF EXIST C:\USOS9X\CFG.NEW DEL C:\USOS9X\CFG.NEW
+COPY /B C:\USOS9X\CFGHEAD.SYS + C:\USOS9X\CFG.SH2 C:\USOS9X\CFG.NEW > NUL
+IF NOT EXIST C:\USOS9X\CFG.NEW GOTO HMLOG
+C:\WINDOWS\COMMAND\FIND.EXE /I "DEVICE=C:\WINDOWS\HIMEM.SYS" < C:\USOS9X\CFG.NEW > NUL
+IF ERRORLEVEL 1 GOTO HMLOG
+COPY /Y C:\CONFIG.SYS C:\USOS9X\CONFIG.HM0 > NUL
+COPY /Y C:\USOS9X\CFG.NEW C:\CONFIG.SYS > NUL
+ECHO CONFIG.SYS: one HIMEM.SYS line> C:\USOS9X\HIMEMFIX.OK
+GOTO HMEND
+:HMLOG
+ECHO HIMEMFIX: CONFIG.SYS not rebuilt>> C:\USOS9X\USOSLOG.TXT
+ECHO CONFIG.SYS not rebuilt, left as Setup wrote it> C:\USOS9X\HIMEMFIX.OK
+:HMEND
+EOF
+    log 'CONFIG.SYS: HIMEMFIX.BAT keeps one HIMEM.SYS line after Setup'
+fi
 # JO.SYS: the CD's "CD-ROM Startup Menu" (boot from hard disk / CD), which
 # IO.SYS runs when it is on the boot drive; its default boots the hard disk,
 # i.e. this loader again. The BIOS Core leaves it out of its RAM disk too.

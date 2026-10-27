@@ -186,6 +186,9 @@ GOTO CSMFIXOK
 :CSMFIX95
 ECHO @C:\USOS9X\U9FIX.COM /95 /CSM C:\WINDOWS\SYSTEM.INI>>C:\AUTOEXEC.BAT
 :CSMFIXOK
+REM 95/98/98 SE: C:\USOS9X\HIMEMFIX.BAT (tools/w9x_csmwrap_target.sh) keeps one
+REM HIMEM.SYS line once Setup made the fallback line a second C:\WINDOWS one.
+ECHO @IF EXIST C:\USOS9X\HIMEMFIX.BAT CALL C:\USOS9X\HIMEMFIX.BAT>>C:\AUTOEXEC.BAT
 REM 95/98/98 SE with the USOS default answer: C:\USOS9X\TZFIX.BAT (tools/w9x_tzfix.sh)
 REM presets the time zone once and drops the first-boot Date/Time step.
 ECHO @IF EXIST C:\USOS9X\TZFIX.BAT CALL C:\USOS9X\TZFIX.BAT>>C:\AUTOEXEC.BAT
