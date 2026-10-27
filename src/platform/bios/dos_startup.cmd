@@ -311,9 +311,16 @@ IF NOT "%U9LOG%"=="1" GOTO LOGRO
 IF NOT EXIST C:\USOS9X\USOSLOG.EXE GOTO LOGRO
 ECHO HKLM,%%USOSRN%%,USOSLog,,"C:\USOS9X\USOSLOG.EXE">>C:\%U9SRC%\MSBATCH.INF
 :LOGRO
+REM First-start dialogs (U9ANH=1: automatic mode, empty password): USOSANS.EXE
+REM from the machine RunServices key, before the logon dialog (95: REG95.REG).
+IF NOT "%U9ANH%"=="1" GOTO ANSRS
+IF NOT EXIST C:\USOS9X\USOSANS.EXE GOTO ANSRS
+ECHO HKLM,%%USOSRS%%,USOSAns,,"C:\USOS9X\USOSANS.EXE">>C:\%U9SRC%\MSBATCH.INF
+:ANSRS
 ECHO [Strings]>>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSRO="Software\Microsoft\Windows\CurrentVersion\RunOnce">>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSRN="Software\Microsoft\Windows\CurrentVersion\Run">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSRS="Software\Microsoft\Windows\CurrentVersion\RunServices">>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSMOUS.INF">>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSUC="regedit /s C:\USOS9X\USOSUSB.REG">>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSVC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSVMD.INF">>C:\%U9SRC%\MSBATCH.INF

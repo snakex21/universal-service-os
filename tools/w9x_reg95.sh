@@ -26,6 +26,9 @@
 # Windows 95 additions (no AddReg line on 98 does these):
 #   * usoslog argument: the USOSLOG.EXE Run value (INSTALL.BAT appends it as
 #     [USOS.CsmReg] at DOS time, after this conversion).
+#   * 9th argument (C:\USOS9X\USOSANS.EXE): the RunServices value USOSAns,
+#     the first-start dialogs helper (src/platform/bios/win9x/usosans.c;
+#     98 / Me get it from INSTALL.BAT's [USOS.CsmReg]).
 #   * vmd inf argument (C:\USOS9X\USOSVMD.INF: the mouse in MS-DOS boxes,
 #     docs/dos-mouse-2026-10-18.md "Windows 95"), two values 98 / Me do not
 #     need. (a) The machine RunOnce value USOSVmd that runs the INF (rundll
@@ -81,7 +84,7 @@ W9X_REG95_START_PAGE='file://C:\USOS9X\START.HTM'
 
 w9x_reg95_convert() {
     # Values through the environment: awk -v would expand the backslashes.
-    W9X_REG95_IE=${W9X_REG95_IE:-} W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_LATE_FILE=${6:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
+    W9X_REG95_IE=${W9X_REG95_IE:-} W9X_REG95_ANS=${W9X_REG95_ANS:-} W9X_REG95_LOG=${2:-} W9X_REG95_VMD=${3:-} W9X_REG95_NET_IDENTITY=${4:-} W9X_REG95_VMD_LATE=${5:-} W9X_REG95_LATE_FILE=${6:-} W9X_REG95_CLSID=$W9X_REG95_INTERNET_CLSID W9X_REG95_HOME=$W9X_REG95_START_PAGE awk '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     # INF fields: comma separated, "..." quoted ("" inside = one quote).
     function fields(line, out,    n, i, c, q, cur) {
@@ -237,6 +240,11 @@ w9x_reg95_convert() {
             if ("description" in identity) emit(idkey, "Comment", "\"" esc(identity["description"]) "\"")
         }
         if (usoslog != "") { nrun++; runname[nrun] = "USOSLog"; rundata[nrun] = "\"" esc(usoslog) "\"" }
+        # USOSANS.EXE (first-start dialogs) from RunServices: started before
+        # the logon dialog; the [USOS.CsmReg] line of INSTALL.BAT is lost on 95.
+        if (ENVIRON["W9X_REG95_ANS"] != "")
+            emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", "USOSAns",
+                 "\"" esc(ENVIRON["W9X_REG95_ANS"]) "\"")
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
         if (icw && ENVIRON["W9X_REG95_IE"] != "noie") {
@@ -918,6 +926,7 @@ EOF
 # NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
     dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-} source_version=${6:-} W9X_REG95_IE=${7:-} setup_src=${8:-}
+    W9X_REG95_ANS=${9:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
     reg95_identity='' reg95_vmdlate='' net_mode=''

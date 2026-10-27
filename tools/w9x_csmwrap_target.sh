@@ -749,6 +749,35 @@ if [ "$LOGGING" = 1 ]; then
     fi
 fi
 [ "$log_ok" = 1 ] || log 'logging: USOSLOG.EXE stays in C:\USOS9X (not started)'
+# The first-start dialogs (X470 95 / 98 FE PL, 2026-10-27): the Windows
+# Logon dialog of the first sign-in (user name from Setup's DefaultUserName,
+# empty password; OK makes Windows write the user's empty password list) and
+# 98's new hardware wizard for the Plug and Play Monitor (DDC stays on).
+# USOSANS.EXE (src/platform/bios/win9x/usosans.c) presses exactly those OK /
+# Next / Finish buttons, from the machine RunServices key (started before
+# the logon dialog; 98 / Me: INSTALL.BAT's [USOS.CsmReg] with U9ANH=1, 95:
+# REG95.REG), logs C:\USOS9X\USOSANS.TXT and removes its value after the
+# first starts. Only for a USOS answer in automatic mode with Winlogon
+# AutoAdminLogon "1", a user name and an empty DefaultPassword; never
+# ;USOS-SETUP=manual, never the user's own file.
+ans_ok=0
+if [ "$ANSWER_KIND" != USER ] && [ -f "$work/c/USOS9X/USOSANS.EXE" ] &&
+    tr -d '\r' < "$work/c/USOS9X/MSBATCH.INF" | awk '
+        { l = tolower($0); gsub(/[ \t]/, "", l) }
+        l == ";usos-setup=manual" { manual = 1 }
+        l ~ /^hklm,"software\\microsoft\\windows\\currentversion\\winlogon",/ {
+            n = split(l, f, ",")
+            if (n == 5 && f[3] == "autoadminlogon" && f[4] == "" && f[5] == "\"1\"") auto = 1
+            if (n == 5 && f[3] == "defaultusername" && f[4] == "" && f[5] != "\"\"" && f[5] ~ /^".+"$/) user = 1
+            if (n == 5 && f[3] == "defaultpassword" && f[4] == "") pw = (f[5] == "\"\"") ? 1 : 2
+        }
+        END { exit !(auto && user && pw == 1 && !manual) }'; then
+    ans_ok=1
+    printf 'SET U9ANH=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+    log 'first-start dialogs: USOSANS.EXE from RunServices (logon OK with the empty password, Plug and Play Monitor wizard; automatic mode)'
+else
+    rm -f "$work/c/USOS9X/USOSANS.EXE"
+fi
 # The boot disk is the only BIOS hard disk with usosnvme.mpd (NVMe) and with
 # USOSUSB.MPD (every target: it offers only sticks without a BIOS number).
 int13_only=off
@@ -803,6 +832,8 @@ if [ "$SYSTEM_TAG" = 95 ]; then
         [ "$log_ok" != 1 ] || reg95_log='C:\USOS9X\USOSLOG.EXE'
         reg95_vmd=
         [ "$vmd_ok" != 1 ] || reg95_vmd='C:\USOS9X\USOSVMD.INF'
+        reg95_ans=
+        [ "${ans_ok:-0}" != 1 ] || reg95_ans='C:\USOS9X\USOSANS.EXE'
         # usosnet4 adapter + TCP/IP + client (tools/network_setup.sh
         # usos_net_w95_stage): imported with REG95.REG, checked into NET.
         reg95_net=
@@ -817,7 +848,7 @@ if [ "$SYSTEM_TAG" = 95 ]; then
                 log 'answer registry: Internet icon left as 950 Setup wrote it (no IE package staged)'
             fi
         fi
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}" "$reg95_ie" "$work/c/$SETUP_FOLDER"; then
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net" "${setup_version:-}" "$reg95_ie" "$work/c/$SETUP_FOLDER" "$reg95_ans"; then
             log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon; RunOnce InitShell removed)"
             if [ "$w95_net_late" = OSR2 ]; then
                 log 'usosnet4: OSR2: NFILES.BAT (cabinets from LAYOUT.INF) before the first GUI start; NET95.REG / TCP95.REG by NET95L.BAT after RunOnce\Setup (C1/C2.REG, NET95.OK, NLATE.OK)'
@@ -830,6 +861,11 @@ if [ "$SYSTEM_TAG" = 95 ]; then
             fi
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG" "$work/c/USOS9X/REG95LGN.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'
+            if [ "${ans_ok:-0}" = 1 ]; then
+                ans_ok=0
+                rm -f "$work/c/USOS9X/USOSANS.EXE"
+                log 'first-start dialogs: USOSANS.EXE removed again (no REG95.BAT for its RunServices value)'
+            fi
             if [ "$vmd_ok" = 1 ]; then
                 vmd_ok=0
                 rm -f "$work/c/USOS9X/USOSVMD.VXD" "$work/c/USOS9X/USOSVMD.ON" "$work/c/USOS9X/USOSVMD.INF"

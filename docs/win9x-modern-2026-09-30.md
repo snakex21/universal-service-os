@@ -502,6 +502,36 @@ under CSMWrap, and two VM-path steps were missing:
   (`C:\USOS9X\USOSPG.CFG` `mode=auto`; never `win9x_setup=manual`, never the
   user's own file). **Open (X470)**: whether the pages now move on;
   USOSPG.TXT names each page seen.
+- First-start dialogs after Setup (X470 95 / 98 FE PL, 2026-10-27): the
+  Windows Logon dialog of the first sign-in (MPRSERV.DLL dialog 13 "Enter
+  Windows Password", user name preset, empty password; OK makes Windows
+  write the user's empty password list, its hint says the prompt does not
+  come back) and on 98 the new hardware wizard for "Plug and Play Monitor"
+  (MONITOR.INF *PNP09FF, DDC stays on). **USOSANS.EXE**
+  (`src/platform/bios/win9x/usosans.c`, decisions in `usosans_logic.h`,
+  Win32 PE 4.00, Windows 95 imports of KERNEL32 / USER32 / ADVAPI32 only)
+  starts from HKLM `RunServices` value `USOSAns` (98 / Me: INSTALL.BAT's
+  `[USOS.CsmReg]` with `U9ANH=1`; 95: REG95.REG) before the logon dialog
+  and polls every 250 ms for 10 minutes. Logon dialogs (dialogs 13 / 2 / 3,
+  Edits 30 / 31 or 40 / 41): OK after 1 s with the password field(s) empty
+  and a user name present; nothing is ever typed, a typed password leaves
+  the dialog to the user, no PWL file is written by USOS. Wizard (SYSDM.CPL
+  frame STR 1777 "Add New Hardware Wizard"): Next on the intro page with
+  that device name in Static 4004 (Me: radio 3317 still selected), the
+  search choice (3315 still selected), the search places (as shown), the
+  ready page (a Static names `...\MONITOR.INF`), Finish on page 4120 with
+  that device name in 4122; any other device, changed choice, other driver
+  or unknown result page is the user's. Log `C:\USOS9X\USOSANS.TXT`; state
+  `USOSANS.STA` (starts, starts that reached the desktop): the value is
+  removed once two starts reached the desktop and the add-on chain is over
+  (no `USOSAddons` Run value), at the latest after the 4th start. Only for a
+  USOS answer in automatic mode with AutoAdminLogon "1", a user name and an
+  empty DefaultPassword (`tools/w9x_csmwrap_target.sh`). Me keeps its
+  stock-user list seeding (`tools/w9x_logon.sh`); the helper covers other
+  names there. **Open (X470)**: the whole path; titles / IDs are checked
+  against the PL 95 RTM / OSR2.1, 98, 98 SE, Me and EN 95 OSR1 media only
+  (the EN wizard title and EN monitor name: no EN 98 / Me medium here,
+  unverified).
 
 ## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
 

@@ -415,7 +415,8 @@ class MeBridge(unittest.TestCase):
         self.assertIn('ECHO system.ini,boot,drivers,,usoskey.drv>>C:\\%U9SRC%\\MSBATCH.INF\nGOTO CSMREGS\n', me)
         reg = self.csm_reg()
         # (echo_output ignores the IF lines: IgnorePnPBIOS 98/98 SE only, USOSMouse
-        # with USOSMOUS.INF (Me), USOSUsb Me + U9UDS=1, USOSVmd U9VMD=1, USOSLog U9LOG=1)
+        # with USOSMOUS.INF (Me), USOSUsb Me + U9UDS=1, USOSVmd U9VMD=1, USOSLog U9LOG=1,
+        # USOSAns U9ANH=1)
         self.assertEqual(self.echo_output(reg, 'C:\\WIN9X\\MSBATCH.INF'), [
             '[USOS.CsmReg]',
             'HKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Detect",IgnorePnPBIOS,,"1"',
@@ -423,9 +424,11 @@ class MeBridge(unittest.TestCase):
             'HKLM,%USOSRO%,USOSUsb,,"%USOSUC%"',
             'HKLM,%USOSRO%,USOSVmd,,"%USOSVC%"',
             'HKLM,%USOSRN%,USOSLog,,"C:\\USOS9X\\USOSLOG.EXE"',
+            'HKLM,%USOSRS%,USOSAns,,"C:\\USOS9X\\USOSANS.EXE"',
             '[Strings]',
             'USOSRO="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"',
             'USOSRN="Software\\Microsoft\\Windows\\CurrentVersion\\Run"',
+            'USOSRS="Software\\Microsoft\\Windows\\CurrentVersion\\RunServices"',
             'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"',
             'USOSUC="regedit /s C:\\USOS9X\\USOSUSB.REG"',
             'USOSVC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSVMD.INF"'])
@@ -433,6 +436,7 @@ class MeBridge(unittest.TestCase):
         for want, gate in (('ECHO HKLM,%%USOSRO%%,USOSUsb,', 'IF NOT "%U9UDS%"=="1"'),
                            ('ECHO HKLM,%%USOSRO%%,USOSVmd,', 'IF NOT EXIST C:\\USOS9X\\USOSVMD.INF'),
                            ('ECHO HKLM,%%USOSRN%%,USOSLog,', 'IF NOT EXIST C:\\USOS9X\\USOSLOG.EXE'),
+                           ('ECHO HKLM,%%USOSRS%%,USOSAns,', 'IF NOT EXIST C:\\USOS9X\\USOSANS.EXE'),
                            ('ECHO HKLM,%%USOSRO%%,USOSMouse,', 'IF NOT EXIST C:\\USOS9X\\USOSMOUS.INF')):
             i = next(n for n, l in enumerate(lines) if l.startswith(want))
             self.assertEqual(lines[i - 1].split(' GOTO ')[0], gate, want)
