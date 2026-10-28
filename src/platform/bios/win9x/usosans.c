@@ -64,7 +64,8 @@
  * USOSAddons Run value; on 95 that also means FIRSTBT.OK), at the latest
  * after the 4th start; while the first-desktop coordinator still owns the
  * starts (FIRSTBT.ON, no FIRSTBT.OK / FIRSTBT.ERR) it stays, up to the 12th. Nothing is left running: one instance (a mutex),
- * it ends after 10 minutes.
+ * it ends 10 minutes after its start, or after the coordinator's chain
+ * ended (FIRSTBT.OK / FIRSTBT.ERR) when it started during it (2 h at most).
  */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -817,7 +818,7 @@ static void scan(void)
 void __cdecl usos_entry(void)
 {
     char line[200];
-    DWORD start, now;
+    DWORD start, now, ref;
     HANDLE mutex;
     int pending, desk_now = 0, k;
     if (!paths()) ExitProcess(2);
@@ -846,7 +847,7 @@ void __cdecl usos_entry(void)
         ExitProcess(0);
     }
     state_write();
-    start = GetTickCount();
+    start = ref = GetTickCount();
     for (;;) {
         scan();
         if (!desk_now && FindWindowA("Shell_TrayWnd", 0)) {
@@ -856,11 +857,12 @@ void __cdecl usos_entry(void)
             say("desktop reached");
         }
         now = GetTickCount();
-        if (an_time_up(now - start, g_watch && IsWindowVisible(g_watch))) break;
+        if (chain_open()) ref = now;
+        if (an_chain_time_up(now - start, now - ref, g_watch && IsWindowVisible(g_watch))) break;
         for (k = 0; k < AN_TICK_MS / AN_POLL_MS; k++) { rec_poll(); Sleep(AN_POLL_MS); }
     }
     pending = addons_pending();
-    say("USOSANS: time over (10 minutes, longer while a wizard was shown), ending");
+    say("USOSANS: time over (10 minutes after the start or after the coordinator's chain ended, longer while a wizard was shown; 2 hours at most), ending");
     /* The next start would only remove the value: do it now. */
     if (an_remove_now(g_boots + 1, g_desk, pending, chain_open()))
         remove_value(g_boots + 1 > AN_HARD_MAX_BOOTS ? "hard start limit" : g_boots + 1 > AN_MAX_BOOTS ? "start limit" : "first starts done");

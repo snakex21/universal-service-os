@@ -140,6 +140,8 @@ int main(int argc, char **argv)
         printf("\n");
     } else if (argv[1][0] == 'z') {
         printf("%d\n", an_time_up(strtoul(argv[2], 0, 10), atoi(argv[3])));
+    } else if (argv[1][0] == 'Z') {
+        printf("%d\n", an_chain_time_up(strtoul(argv[2], 0, 10), strtoul(argv[3], 0, 10), atoi(argv[4])));
     } else if (argv[1][0] == 'h') {
         HWSTATE s;
         memset(&s, 0, sizeof s);
@@ -450,6 +452,25 @@ class Logic(unittest.TestCase):
         for ms, watching, want in ((599999, 0, 0), (600000, 0, 1), (600000, 1, 0), (1799999, 1, 0), (1800000, 1, 1)):
             with self.subTest(ms=ms, watching=watching):
                 self.assertEqual(self.run_exe('z', str(ms), str(watching)), str(want))
+
+    def test_lifetime_follows_the_coordinator_chain(self):
+        # X470 98 FE PL 2026-10-28: "time over" after 10 minutes while the
+        # chain still ran; now 10 minutes after the chain was last seen open
+        m = 60 * 1000
+        for start, ref, watching, want in (
+                (40 * m, 0, 0, 0),             # chain open at this tick
+                (40 * m, 10 * m - 1, 0, 0),    # chain ended 10 min ago - 1 ms
+                (40 * m, 10 * m, 0, 1),
+                (40 * m, 10 * m, 1, 0),        # a wizard keeps it
+                (40 * m, 30 * m, 1, 1),        # the old 30-minute wizard cap
+                (120 * m - 1, 0, 0, 0),
+                (120 * m, 0, 0, 1),            # 2 h at most in all
+                (10 * m, 10 * m, 0, 1)):       # no coordinator: as before
+            with self.subTest(start=start, ref=ref, watching=watching):
+                self.assertEqual(self.run_exe('Z', str(start), str(ref), str(watching)), str(want))
+        src = (ROOT / 'src/platform/bios/win9x/usosans.c').read_text(encoding='ascii')
+        loop = src[src.index('start = ref = GetTickCount();'):src.index('pending = addons_pending();', src.index('start = ref = GetTickCount();'))]
+        self.assertLess(loop.index('if (chain_open()) ref = now;'), loop.index('an_chain_time_up(now - start, now - ref,'))
 
     def test_new_frame_starts_over(self):
         got = self.hw(*[page(**dict(INTRO, monitor=0))] * 4, *[page(frame=8, **INTRO)] * 4)

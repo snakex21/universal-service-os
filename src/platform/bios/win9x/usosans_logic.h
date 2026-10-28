@@ -523,6 +523,19 @@ static int an_time_up(unsigned long since_start, int watching)
     return since_start >= AN_LIFETIME_MS && !watching;
 }
 
+/* With the 95 / 98 first-desktop coordinator (FIRSTBT.ON, no FIRSTBT.OK /
+ * ERR) a start lasts as long as that boot's part of the chain, which ran
+ * past 10 minutes (X470 98 FE PL 2026-10-28: "time over" at 12:00:58 while
+ * the hotfixes still ran): the lifetime counts from the last tick that saw
+ * the chain open (since_ref), and a start never runs past AN_CHAIN_MAX_MS
+ * in all. Without a coordinator since_ref == since_start. */
+#define AN_CHAIN_MAX_MS (120UL * 60UL * 1000UL)
+static int an_chain_time_up(unsigned long since_start, unsigned long since_ref, int watching)
+{
+    if (since_start >= AN_CHAIN_MAX_MS) return 1;
+    return an_time_up(since_ref, watching);
+}
+
 /* ---- the RunServices value's lifetime ---- */
 
 /* C:\USOS9X\USOSANS.STA: "boots=N desk=M" (decimal, any order, other text
