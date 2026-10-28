@@ -832,6 +832,17 @@ if [ -n "$nt4_native_mbr" ]; then
     mbr_hook=$work/hook.bin
     log 'MBR: NT 3.x MBR + hook (E820 filter, HPET LegacyReplacement off), PCI BIOS kept (options byte 509 = 1)'
 fi
+# Native NT 3.5: RAM cap 128 MiB in the hook sector (byte 508, 16 MiB units,
+# nt3_e820_mbr.S HOOK_RAM_CAP). Its kernel loses the boot disk above 128 MiB
+# (docs/nt35-2026-10-09.md) and its text-mode SETUPLDR ignores /MAXMEM, so the
+# hook clips E820 and AH=88h / AX=E801h. NT 3.51 / 4.0 and the VM path keep 0.
+if [ "$NATIVE" = 1 ] && [ "$nt3:$minor" = yes:50 ] && [ -n "$mbr_hook" ]; then
+    cp "$mbr_hook" "$work/hook35.bin" && printf '\010' | dd of="$work/hook35.bin" bs=1 seek=508 count=1 conv=notrunc 2>/dev/null ||
+        fail 'cannot prepare the MBR hook sector. No disk was changed'
+    [ "$(od -An -tu1 -j508 -N1 "$work/hook35.bin" | tr -d ' \n')" = 8 ] || fail 'the MBR hook RAM cap did not take. No disk was changed'
+    mbr_hook=$work/hook35.bin
+    log 'MBR: NT 3.x MBR + hook, RAM cap 128 MiB (hook byte 508 = 8; E820 + AH=88h/E801h)'
+fi
 
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'

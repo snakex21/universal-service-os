@@ -21,7 +21,7 @@
  *     (VideoPortVerifyAccessRanges), no \Device\Video0 is created and text-mode
  *     Setup stops "while initializing your computer's video" (0, C0000034);
  *     the installed system then lacks a display (STOP C0000143);
- *   - RAM entries are clipped at 4 GiB;
+ *   - RAM entries are clipped at 4 GiB (and at the RAM cap, below);
  *   - the RAM entry at address 0 ends below the hook (INT 12h size).
  * Everything else is the XP geometry-fix MBR: boot the active partition and
  * correct the BPB head count from INT 13h AH=08.
@@ -70,6 +70,16 @@
  * stays visible.  The NT 4.0 HAL has no such bridge loop (the installed NT
  * 4.0 runs on the X470 with every bus) and its PCI bus handler is what the
  * NT 4.0 AHCINT build and the display path rely on.
+ *
+ * RAM cap: byte 508 of the hook sector (HOOK_RAM_CAP) is a RAM limit in
+ * 16 MiB units, 0 = none.  E820 RAM entries that start at or above it become
+ * the F0000-FFFFF copy, the others end at it; AH=88h / AX=E801h report at
+ * most (cap - 16 MiB) above 16 MiB.  Native NT 3.5 gets 8 (128 MiB): its
+ * kernel loses the boot disk (0x7B, C0000034) with more than 128 MiB
+ * (docs/nt35-2026-10-09.md: 64 / 128 MiB boot, 256 MiB / 2 GiB stop; 2 GiB
+ * with BOOT.INI /MAXMEM=128 boots), and its text-mode SETUPLDR ignores
+ * /MAXMEM.  The 3.5 SETUPLDR sizes memory with AH=88h + AX=E801h and with
+ * E820 (both are covered).  NT 3.51 and NT 4.0 keep the byte 0.
  */
 .intel_syntax noprefix
 .code16
@@ -88,6 +98,8 @@
    script sets it per system (nt4_csmwrap_target.sh). */
 .equ HOOK_OPTIONS,    509
 .equ OPT_KEEP_PCI_BIOS, 1
+/* RAM cap in 16 MiB units (0 = none), read by the resident hook as cs:[508]. */
+.equ HOOK_RAM_CAP,    508
 
 nt3_e820_mbr_start:
     cli
@@ -295,6 +307,17 @@ hook_start:
     mov dword ptr es:[di + 8], eax
     and dword ptr es:[di + 12], 0
 3:
+    /* RAM cap (HOOK_RAM_CAP, 16 MiB units): at or above it -> ROM copy,
+       across it -> ends at it.  The entry lies below 4 GiB here. */
+    movzx eax, byte ptr cs:[HOOK_RAM_CAP]
+    shl eax, 24
+    jz 10f
+    sub eax, dword ptr es:[di]
+    jbe 6f
+    cmp dword ptr es:[di + 8], eax
+    jbe 10f
+    mov dword ptr es:[di + 8], eax
+10:
     cmp dword ptr es:[di], 0
     jne 7f
     /* The hook segment (CS) starts at the INT 12h top. */
@@ -379,6 +402,15 @@ mem_sizes:
     test ebx, ebx
     jnz 1b
 4:
+    /* RAM cap: at most (cap - 16 MiB) / 64 KiB blocks above 16 MiB. */
+    mov ah, byte ptr cs:[HOOK_RAM_CAP]
+    sub ah, 1
+    jc 11f
+    mov al, 0
+    cmp word ptr [bp - 4], ax
+    jbe 11f
+    mov word ptr [bp - 4], ax
+11:
     clc
 5:
     lea sp, [bp - 24]

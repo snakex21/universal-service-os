@@ -352,7 +352,23 @@ class Nt4NativeWiring(unittest.TestCase):
         self.assertLess(src.index('    mov word ptr [0x15 * 4 + 2], es\n'), check)
         ps1 = (ROOT / 'tools/build_xp_geometry_fix_mbr.ps1').read_text(encoding='utf-8')
         # The hook code stays below the options byte.
-        self.assertIn('max is 502', ps1)
+        self.assertIn('max is 500', ps1)
+
+    def test_nt35_native_ram_cap(self):
+        # Native NT 3.5 only: hook byte 508 = 8 (128 MiB), set before the
+        # first disk write; NT 3.51 / 4.0 / the VM path leave it 0.
+        src = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        self.assertIn('.equ HOOK_RAM_CAP,    508', src)
+        self.assertIn('    movzx eax, byte ptr cs:[HOOK_RAM_CAP]\n    shl eax, 24\n', src)
+        self.assertIn('    mov ah, byte ptr cs:[HOOK_RAM_CAP]\n    sub ah, 1\n', src)
+        text = TARGET.read_text(encoding='utf-8')
+        cond = 'if [ "$NATIVE" = 1 ] && [ "$nt3:$minor" = yes:50 ] && [ -n "$mbr_hook" ]; then'
+        self.assertEqual(text.count('seek=508'), 1)
+        block = text[text.index(cond):]
+        block = block[:block.index(chr(10) + 'fi' + chr(10))]
+        self.assertIn("printf '\\010' | dd of=\"$work/hook35.bin\" bs=1 seek=508 count=1", block)
+        self.assertIn('mbr_hook=$work/hook35.bin', block)
+        self.assertLess(text.index(cond), text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
 
     def test_kernel_tool_entry_points(self):
         fb = (ROOT / 'src/platform/linux/fb_ui_main.zig').read_text(encoding='utf-8')

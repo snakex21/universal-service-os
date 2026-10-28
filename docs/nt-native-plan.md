@@ -184,7 +184,16 @@ Memory: `/MAXMEM` in `[SetupData] OsLoadOptions` is ignored in text mode
 of the installed system with BOOT.INI /MAXMEM=1024). 3.51 text + GUI mode
 ran with 2 GB under CSMWrap in QEMU. NT 3.5 stops with 0x7B above 128 MiB
 (docs/nt35-2026-10-09.md), so native NT 3.5 needs a RAM cap before the
-loader (hook option) - open.
+loader. Implemented: hook sector byte 508 (`HOOK_RAM_CAP`, 16 MiB units,
+0 = none) next to the options byte; `nt4_csmwrap_target.sh` sets it to 8
+(128 MiB) for a native NT 3.5 only (NT 3.51 / 4.0 / the VM path keep 0).
+The hook then ends E820 RAM at 128 MiB (entries above become the
+F0000-FFFFF copy) and reports at most 0x700 64 KiB blocks above 16 MiB for
+AX=E801h; the 3.5 SETUPLDR's real-mode part calls AH=88h, AX=E801h and
+E820 (same `su` layout as 3.51, own disassembly of the user's CD file).
+128 MiB is the largest size proven: 64 / 128 MiB guests and 2 GiB with
+BOOT.INI /MAXMEM=128 boot, 256 MiB stops (QEMU, 2026-10-09). Emulated in
+`tools/tests/legacy_bios/test_nt3_e820_hook.py`; no X470 run yet.
 
 ### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 

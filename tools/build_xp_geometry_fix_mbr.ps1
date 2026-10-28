@@ -78,20 +78,21 @@ Write-Host "[PASS] NT3 E820 MBR: $($code.Length)/440 bytes SHA256=$sha"
 Write-Host "OUTPUT=$nt3bin"
 
 # Its resident INT 15h / INT 1Ah hooks: sector 1 of the disk, "U3" (55 33)
-# in the last two bytes; the old vectors follow the code (8 bytes).
+# in the last two bytes; the old vectors follow the code (8 bytes), below the
+# RAM cap byte (508) and the options byte (509).
 $hookraw = Join-Path $out 'nt3-e820-hook.raw.bin'
 $hookbin = Join-Path $out 'nt3-e820-hook-512.bin'
 & $zig objcopy -O binary -j .hook $nt3elf $hookraw
 if ($LASTEXITCODE -ne 0) { throw "NT3 MBR hook objcopy failed: $LASTEXITCODE" }
 $code = [IO.File]::ReadAllBytes($hookraw)
-if ($code.Length -gt 502) { throw "NT3 MBR hook code is $($code.Length) bytes; max is 502" }
+if ($code.Length -gt 500) { throw "NT3 MBR hook code is $($code.Length) bytes; max is 500" }
 $padded = New-Object byte[] 512
 [Array]::Copy($code,$padded,$code.Length)
 $padded[510] = 0x55
 $padded[511] = 0x33
 [IO.File]::WriteAllBytes($hookbin,$padded)
 $sha = (Get-FileHash -LiteralPath $hookbin -Algorithm SHA256).Hash
-Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/502 bytes SHA256=$sha"
+Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/500 bytes SHA256=$sha"
 Write-Host "OUTPUT=$hookbin"
 
 # ReactOS (and own BIOS images) behind CSMWrap: the ELCR MBR marks the PCI
