@@ -89,6 +89,26 @@ class NativeWiring(unittest.TestCase):
         self.assertIn("log 'NT351 LAN skipped: native install", text)
         self.assertIn('if [ "$major:$minor" = 3:50 ] && [ "$NATIVE" != 1 ]; then', text)
 
+    def test_native_nt3_lan_stage_needs_no_lan_library(self):
+        # X470 2026-10-28 (B261028-165856): the native path never sources
+        # nt351_network_setup.sh, so "usos_nt351_stage: not found" stopped
+        # the prep. Run the staging block as it is, without the libraries.
+        nl = chr(10)
+        text = TARGET.read_text(encoding='utf-8')
+        start = text.index('if [ "$NATIVE" != 1 ]; then' + nl + '[ "$minor" != 51 ] || usos_nt351_stage')
+        block = text[start:text.index(nl + 'fi' + nl, start) + 4]
+        self.assertIn('usos_nt35_client_request', block)
+        stub = nl.join(['fail() { echo "FAIL $1"; exit 9; }', 'work=/x; product=0; ANSWER_KIND=PROFILE', ''])
+        for minor in ('51', '50'):
+            rc, out, err = sh(stub + 'NATIVE=1; minor=' + minor + nl + block + 'echo ok' + nl)
+            self.assertEqual((rc, out.strip()), (0, 'ok'), err)
+        # The install VM path still calls the sourced stage functions.
+        names = ('usos_nt351_stage', 'usos_nt351_client_request', 'usos_nt35_stage', 'usos_nt35_client_request')
+        calls = ''.join(n + '() { echo ' + n + '; }' + nl for n in names)
+        for minor, want in (('51', list(names[:2])), ('50', list(names[2:]))):
+            rc, out, err = sh(stub + calls + 'NATIVE=0; minor=' + minor + nl + block)
+            self.assertEqual((rc, out.split()), (0, want), err)
+
     def test_target_nt35_needs_no_key_page(self):
         text = TARGET.read_text(encoding='utf-8')
         block = text[text.index('if [ "$NATIVE" = 1 ] && [ "$minor" = 50 ]; then'):]
