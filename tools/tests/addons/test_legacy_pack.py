@@ -124,7 +124,8 @@ EXPECTED_FULL = {
                          'hf98-q273991', 'hf98-q323172', 'hf98-q323255', 'hf98-q329115', 'hf98-q811630',
                          'hf98-q823559', 'hf98-js56', 'hf98-q313829', 'hf98-q831167', 'hf98-wmp9-kb819639',
                          'hotfixes-98-pl'],
-    ('ME', 'PL', ''): ['ie6sp1-pl-9x', 'msi20-9x', 'dx9c', 'mdac28sp1-pl', 'vbrun6sp6', 'vcredist6sp6', 'mslu',
+    # Me: no vcredist6sp6 (X470 2026-10-28: IExpress abort; Me's SFP keeps its own MFC42 / MSVCRT / ATL)
+    ('ME', 'PL', ''): ['ie6sp1-pl-9x', 'msi20-9x', 'dx9c', 'mdac28sp1-pl', 'vbrun6sp6', 'mslu',
                        'wmp9-pl', 'dotnet20', 'dotnet20-pl'],
     ('95OSR21', 'PL', ''): ['dcom95', 'ws2-95', 'ie55sp2-pl', 'ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
                             'vcredist6sp6', 'mslu'],

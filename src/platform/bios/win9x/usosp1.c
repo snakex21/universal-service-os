@@ -21,7 +21,15 @@
  * and MSDOS.SYS for the restart) it applies the same edits
  * (usosp1_logic.h) to C:\WINDOWS\SYSTEM.INI and C:\MSDOS.SYS. Every one of
  * those messages repeats the check: the edits are idempotent, so an early
- * one changes nothing a later one would miss.
+ * one changes nothing a later one would miss. With the Me USB mouse staged
+ * (C:\WINDOWS\SYSTEM\USOSMOUS.DRV and C:\USOS9X\USOSMOUS.INF, dos_startup.cmd)
+ * SYSTEM.INI [boot] also gets mouse.drv=usosmous.drv, so the first start of
+ * the installed Me (hardware setup, first-start wizard) has the USB mouse;
+ * Setup's detection there writes mouse.drv=mouse.drv again for the next
+ * start, which USOSANS.EXE sets back (X470 Me PL 2026-10-28).
+ * Every line (and one at DRV_ENABLE) also names the mini-Windows mouse
+ * module and, with VBMOUSE.DRV, the INT 33h version / type and position
+ * (mouse_diag): the phase 1 mouse there did not move on that run.
  *
  * Files are rewritten in place (open, write, truncate with a zero-length
  * write): MSDOS.SYS keeps its directory entry and gets its attributes back
@@ -41,13 +49,15 @@
 #define INI_FILE  "C:\\WINDOWS\\SYSTEM.INI"
 #define DOS_FILE  "C:\\MSDOS.SYS"
 #define LOG_FILE  "C:\\USOS9X\\USOSP1.TXT"
+#define MOUSE_DRV "C:\\WINDOWS\\SYSTEM\\USOSMOUS.DRV"
+#define MOUSE_INF "C:\\USOS9X\\USOSMOUS.INF"
 
 /* DGROUP only: SS is not DS in a driver (-zu), so nothing on the stack is
  * handed to Windows or DOS by address. */
 static char in[P1_MAX + 1];
 static char out[P1_MAX + P1_SLACK];
-static char line[96];
-static char path[24];
+static char line[200];
+static char path[40];
 static OFSTRUCT of;
 static unsigned lpos;
 static unsigned olen, oremoved;    /* p1_* results (DGROUP, see above) */
@@ -111,15 +121,99 @@ static int store(unsigned len)
     return ok;
 }
 
+static void copy_out(unsigned len)
+{
+    unsigned i;
+    for (i = 0; i < len; i++) in[i] = out[i];
+}
+
+/* The Me USB mouse switch (dos_startup.cmd stages both for Me only):
+ * USOSMOUS.DRV in SYSTEM and the C:\USOS9X\USOSMOUS.INF marker. */
+static int me_mouse_staged(void)
+{
+    copy_path(MOUSE_DRV);
+    if (OpenFile(path, &of, OF_EXIST) == HFILE_ERROR) return 0;
+    copy_path(MOUSE_INF);
+    return OpenFile(path, &of, OF_EXIST) != HFILE_ERROR;
+}
+
 static void fix_ini(void)
 {
-    int n = load(INI_FILE);
+    int n = load(INI_FILE), dirty = 0, r;
+    unsigned len;
     put(" ini=");
     if (n < 0) { put("absent"); return; }
-    if (p1_drop_mouse(in, (unsigned)n, out, &olen, &oremoved) != P1_CHANGED) { put("ok"); return; }
-    if (!store(olen)) { put("write-failed"); return; }
-    put("mouse-removed:");
-    put_num(oremoved);
+    len = (unsigned)n;
+    if (p1_drop_mouse(in, len, out, &olen, &oremoved) == P1_CHANGED) { len = olen; copy_out(len); dirty = 1; }
+    /* the USB mouse from the first start of the installed Me on */
+    r = me_mouse_staged() ? p1_set_mousedrv(in, len, out, &olen) : P1_SAME;
+    if (r == P1_CHANGED) { len = olen; copy_out(len); dirty = 2 | dirty; }
+    if (!dirty) { put("ok"); return; }
+    for (n = 0; n < (int)len; n++) out[n] = in[n];
+    copy_path(INI_FILE);
+    if (!store(len)) { put("write-failed"); return; }
+    if (dirty & 1) { put("mouse-removed:"); put_num(oremoved); }
+    if (dirty & 2) put(dirty & 1 ? ",usosmous" : "usosmous");
+}
+
+/* Diagnostics of Setup's own mini-Windows mouse (X470 Me PL 2026-10-28: no
+ * USB mouse there, the keyboard worked): which module MOUSE is (the
+ * bridge's VBMOUSE.DRV or Setup's MSMOUS31.DRV / NOMOUSE.DRV copy) and,
+ * only with VBMOUSE.DRV loaded (it calls INT 33h itself, so the DOS driver
+ * VBMOUSE.EXE is there), INT 33h 0024h (version, type, IRQ) and 0003h
+ * (position, buttons): positions that change between two lines mean the
+ * USB mouse reaches the DOS driver. Read only. */
+static char modname[80];
+static WORD i33ver, i33type, i33x, i33y, i33b;
+
+static void put_hex(unsigned v)
+{
+    static const char hx[] = "0123456789ABCDEF";
+    int s;
+    for (s = 12; s >= 0; s -= 4)
+        if (lpos < sizeof(line) - 3) line[lpos++] = hx[(v >> s) & 15];
+}
+
+static void mouse_diag(void)
+{
+    HMODULE m = GetModuleHandle("MOUSE");
+    int n, i, base = 0;
+    put(" mouse=");
+    if (!m) { put("none"); return; }
+    n = GetModuleFileName(m, modname, sizeof(modname) - 1);
+    if (n <= 0) { put("?"); return; }
+    modname[n] = 0;
+    for (i = 0; i < n; i++) if (modname[i] == '\\' || modname[i] == ':') base = i + 1;
+    put(modname + base);
+    for (i = base; modname[i]; i++) if (modname[i] >= 'a' && modname[i] <= 'z') modname[i] = (char)(modname[i] - 32);
+    {
+        static const char want[] = "VBMOUSE.DRV";
+        for (i = 0; want[i]; i++) if (modname[base + i] != want[i]) return;
+        if (modname[base + i]) return;
+    }
+    _asm {
+        mov ax, 0024h
+        xor bx, bx
+        xor cx, cx
+        int 33h
+        mov i33ver, bx
+        mov i33type, cx
+        mov ax, 0003h
+        int 33h
+        mov i33b, bx
+        mov i33x, cx
+        mov i33y, dx
+    }
+    put(" i33=");
+    put_hex(i33ver);
+    put("/");
+    put_hex(i33type);
+    put(" pos=");
+    put_num(i33x);
+    put(",");
+    put_num(i33y);
+    put(" b=");
+    put_num(i33b);
 }
 
 static void fix_logo(void)
@@ -167,6 +261,21 @@ static void fix(const char *event)
     put(event);
     fix_ini();
     fix_logo();
+    mouse_diag();
+    log_line();
+    busy = 0;
+}
+
+/* Mouse diagnostics only (no file edits): DRV_ENABLE, when the mini-Windows
+ * starts and after each of its pauses. */
+static void diag(const char *event)
+{
+    if (busy) return;
+    busy = 1;
+    lpos = 0;
+    put("USOSP1 ");
+    put(event);
+    mouse_diag();
     log_line();
     busy = 0;
 }
@@ -175,8 +284,8 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
 {
     (void)id; (void)driver; (void)p1; (void)p2;
     switch (msg) {
+    case DRV_ENABLE:      diag("enable"); return 1L;
     case DRV_LOAD:
-    case DRV_ENABLE:
     case DRV_OPEN:
     case DRV_CLOSE:       return 1L;
     case DRV_EXITSESSION: fix("exitsession"); return 1L;

@@ -33,7 +33,7 @@ HARNESS = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include "usosp1_logic.h"
-/* m IN OUT: p1_drop_mouse; l IN OUT: p1_add_logo. Prints "status removed";
+/* m IN OUT: p1_drop_mouse; l IN OUT: p1_add_logo; s IN OUT: p1_set_mousedrv. Prints "status removed";
  * OUT is written only for P1_CHANGED. */
 static char in[P1_MAX + 2], out[P1_MAX + P1_SLACK];
 int main(int argc, char **argv)
@@ -44,7 +44,8 @@ int main(int argc, char **argv)
     if (!f) return 2;
     n = (unsigned)fread(in, 1, sizeof(in), f);
     fclose(f);
-    r = argv[1][0] == 'm' ? p1_drop_mouse(in, n, out, &len, &removed) : p1_add_logo(in, n, out, &len);
+    r = argv[1][0] == 'm' ? p1_drop_mouse(in, n, out, &len, &removed)
+      : argv[1][0] == 's' ? p1_set_mousedrv(in, n, out, &len) : p1_add_logo(in, n, out, &len);
     if (r == P1_CHANGED) {
         f = fopen(argv[3], "wb");
         fwrite(out, 1, len, f);
@@ -153,6 +154,35 @@ class Logic(unittest.TestCase):
         once = self.edit('l', MSDOS[0])[2]
         self.assertEqual(self.edit('l', once)[0], 2)
 
+    def test_me_mouse_drv(self):
+        # X470 Me PL 2026-10-28: the first start after phase 1 had Setup's mouse.drv=mouse.drv (no USB mouse)
+        cases = (
+            (b'[boot]\r\nmouse.drv=mouse.drv\r\n[386Enh]\r\nmouse.drv=x\r\n', 1,
+             b'[boot]\r\nmouse.drv=usosmous.drv\r\n[386Enh]\r\nmouse.drv=x\r\n'),
+            (b'[boot]           \r\nshell=Explorer.exe\r\n  MOUSE.DRV = mouse.drv\r\nkeyboard.drv=keyboard.drv\r\n', 1,
+             b'[boot]           \r\nshell=Explorer.exe\r\nmouse.drv=usosmous.drv\r\nkeyboard.drv=keyboard.drv\r\n'),
+            (b'[boot]\r\nshell=Explorer.exe\r\n[386Enh]\r\n', 1,
+             b'[boot]\r\nmouse.drv=usosmous.drv\r\nshell=Explorer.exe\r\n[386Enh]\r\n'),
+            (b'[boot]', 1, b'[boot]\r\nmouse.drv=usosmous.drv\r\n'),
+            (b'[boot]\r\nmouse.drv= USOSMOUS.DRV \r\n', 0, None),
+            (b'[386Enh]\r\nmouse=x\r\n', 3, None),
+            (b'[boot]\r\nmouse.drv=usosmous.drv2\r\n', 1, b'[boot]\r\nmouse.drv=usosmous.drv\r\n'),
+        )
+        for ini, status, want in cases:
+            with self.subTest(ini=ini[:40]):
+                got_status, _, got = self.edit('s', ini)
+                self.assertEqual(got_status, status)
+                self.assertEqual(got, want if want is not None else ini)
+        # once: the result is left alone; after the [386Enh] mouse= drop (the driver's order)
+        once = self.edit('s', cases[0][0])[2]
+        self.assertEqual(self.edit('s', once)[0], 0)
+        dropped = self.edit('m', INIS[1])[2]
+        status, _, both = self.edit('s', dropped)
+        self.assertEqual(status, 1)
+        self.assertTrue(both.startswith(b'[boot]\r\nmouse.drv=usosmous.drv\r\ndrivers=mmsystem.dll usoskey.drv\r\n'))
+        self.assertNotIn(b'MOUSE = *vmouse', both)
+        self.assertEqual(self.edit('s', b'[boot]\r\n' + b';' * 16000)[0], 4)
+
     def test_too_big_is_left_alone(self):
         big = b'[386Enh]\r\nmouse=x\r\n' + b';' * 16000
         self.assertEqual(self.edit('m', big)[:2], (4, 0))
@@ -185,8 +215,49 @@ class Source(unittest.TestCase):
         # nothing on the stack handed out by address (SS != DS)
         self.assertNotIn('&len', c)
         self.assertNotIn('&removed', c)
-        for banned in ('WritePrivateProfileString', 'GetPrivateProfileString', 'MessageBox', 'WinExec'):
+        for banned in ('WritePrivateProfileString', 'GetPrivateProfileString', 'MessageBox', 'WinExec', 'lstrcmp'):
             self.assertNotIn(banned, c)
+
+    def test_me_mouse_switch_and_diagnostics(self):
+        c = DRIVER.read_text(encoding='utf-8')
+        self.assertIn(r'#define MOUSE_DRV "C:\\WINDOWS\\SYSTEM\\USOSMOUS.DRV"', c)
+        self.assertIn(r'#define MOUSE_INF "C:\\USOS9X\\USOSMOUS.INF"', c)
+        ini = c[c.index('static void fix_ini(void)'):c.index('static char modname[80];')]
+        # the [386Enh] drop first, then mouse.drv only with the Me mouse staged; one write
+        self.assertLess(ini.index('p1_drop_mouse('), ini.index('p1_set_mousedrv('))
+        self.assertIn('r = me_mouse_staged() ? p1_set_mousedrv(in, len, out, &olen) : P1_SAME;', ini)
+        self.assertEqual(ini.count('store('), 1)
+        self.assertLess(ini.index('copy_path(INI_FILE);'), ini.index('store(len)'))
+        staged = c[c.index('static int me_mouse_staged(void)'):c.index('static void fix_ini(void)')]
+        self.assertIn('copy_path(MOUSE_DRV);', staged)
+        self.assertIn('copy_path(MOUSE_INF);', staged)
+        self.assertEqual(staged.count('OF_EXIST'), 2)
+        # diagnostics: read only; INT 33h only with VBMOUSE.DRV as module MOUSE, never a reset
+        diag = c[c.index('static void mouse_diag(void)'):c.index('static void fix_logo(void)')]
+        self.assertIn('GetModuleHandle("MOUSE")', diag)
+        self.assertLess(diag.index('"VBMOUSE.DRV"'), diag.index('int 33h'))
+        self.assertIn('mov ax, 0024h', diag)
+        self.assertIn('mov ax, 0003h', diag)
+        for banned in ('mov ax, 0000h', 'mov ax, 0021h', 'OpenFile', 'store('):
+            self.assertNotIn(banned, diag)
+        proc = c[c.index('DriverProc('):c.index('int FAR PASCAL __export __loadds WEP(')]
+        self.assertIn('case DRV_ENABLE:      diag("enable"); return 1L;', proc)
+        install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='utf-8', errors='replace')
+        self.assertIn(r'COPY /Y C:\USOS9X\USOSMOUS.DRV C:\WINDOWS\SYSTEM >NUL', install)
+        self.assertIn(r'ECHO [Version]>C:\USOS9X\USOSMOUS.INF', install)
+
+    def test_me_phase1_xms_manager(self):
+        # Me's floppy has no HIMEM.SYS: HimemX (port 92h) instead of Setup's XMSMMGR.EXE, native phase 1 only
+        text = TARGET.read_text(encoding='utf-8')
+        block = text[text.index("if mdir -i \"$floppy\" ::/HIMEM.SYS"):text.index("printf 'FILES=40")]
+        self.assertIn('elif [ "$SYSTEM_TAG" = ME ] && [ "$VM_PHASE1" != 1 ] && [ -f "$ESP_DIR/dos-native/msdos/HIMEMX.EXE" ]; then', block)
+        self.assertIn(r"printf 'DEVICE=C:\\USOS9X\\HIMEMX.EXE /MAX=32768 /X2MAX32 /METHOD:PORT92\r\n'", block)
+        self.assertIn('cp "$ESP_DIR/dos-native/msdos/HIMEMX.EXE" "$work/c/USOS9X/HIMEMX.EXE"', block)
+        # CREGFIX first, then the XMS manager, as on 98 / 98 SE
+        self.assertLess(text.index("printf 'DEVICE=C:\\\\USOS9X\\\\CREGFIX.SYS\\r\\n' >> \"$work/CONFIG.SYS\""),
+                        text.index("if mdir -i \"$floppy\" ::/HIMEM.SYS"))
+        self.assertIn('payload_zip\tEFI/USOS/dos-native/msdos/HIMEMX.EXE\n',
+                      (ROOT / 'tools/tests/golden/staged_payloads.tsv').read_text(encoding='utf-8'))
 
     def test_staged_with_the_win9x_support(self):
         import build_win9x_support as b

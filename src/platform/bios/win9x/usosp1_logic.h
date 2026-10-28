@@ -25,7 +25,8 @@
 /* P1_MAX: the largest file handled (SYSTEM.INI after Setup's phase 1 is
  * about 2 KiB, MSDOS.SYS about 1.7 KiB); larger ones are left alone. */
 #define P1_MAX   16000u
-#define P1_SLACK 24u     /* "Logo=0\r\nBootLog=1\r\n" (20) + a leading CR LF */
+#define P1_SLACK 32u     /* "Logo=0\r\nBootLog=1\r\n" (20) or
+                            "mouse.drv=usosmous.drv\r\n" (24), + a leading CR LF */
 
 enum { P1_SAME = 0, P1_CHANGED = 1, P1_PRESENT = 2, P1_NO_OPTIONS = 3, P1_TOO_BIG = 4 };
 
@@ -83,6 +84,65 @@ static int p1_drop_mouse(const char *in, unsigned n, char *out, unsigned *len, u
     }
     *len = o;
     return *removed ? P1_CHANGED : P1_SAME;
+}
+
+/* SYSTEM.INI [boot] mouse.drv=usosmous.drv (Me, X470 2026-10-28: the
+ * first start after phase 1 ran with Setup's mouse.drv=mouse.drv, BOOTLOG
+ * "No mouse driver installed", so the hardware setup and the first-start
+ * wizard had no USB mouse; 98 / 98 SE get the same line from U9FIX /CSM in
+ * real mode at every start). Every mouse.drv= line of [boot] (any case,
+ * leading blanks) gets the value; with none, one is added right after the
+ * first [boot] line. Other sections stay. out has room for n + P1_SLACK.
+ * P1_CHANGED, P1_SAME (already usosmous.drv), P1_NO_OPTIONS (no [boot])
+ * or P1_TOO_BIG; *len = the new length (0 unless changed). */
+static int p1_value_is(const char *s, unsigned n, const char *want)
+{
+    unsigned i = 0, k;
+    while (i < n && s[i] != '=') i++;
+    if (i >= n) return 0;
+    i++;
+    while (i < n && (s[i] == ' ' || s[i] == '\t')) i++;
+    for (k = 0; want[k]; k++, i++)
+        if (i >= n || p1_low((unsigned char)s[i]) != (unsigned char)want[k]) return 0;
+    while (i < n && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')) i++;
+    return i == n;
+}
+
+static int p1_set_mousedrv(const char *in, unsigned n, char *out, unsigned *len)
+{
+    static const char line[] = "mouse.drv=usosmous.drv\r\n";
+    unsigned at, e, o = 0, i, boot_end = n + 1;
+    int inboot = 0, found = 0, changed = 0;
+    *len = 0;
+    if (n > P1_MAX) return P1_TOO_BIG;
+    for (at = 0; at < n; at = e) {
+        e = p1_line(in, n, at);
+        if (p1_starts(in + at, e - at, 1, "[")) {
+            inboot = p1_starts(in + at, e - at, 1, "[boot]");
+            if (inboot && boot_end > n) boot_end = e;
+        } else if (inboot && p1_is_key(in + at, e - at, "mouse.drv")) {
+            found = 1;
+            if (!p1_value_is(in + at, e - at, "usosmous.drv")) {
+                for (i = 0; line[i]; i++) out[o++] = line[i];
+                changed = 1;
+                continue;
+            }
+        }
+        for (i = at; i < e; i++) out[o++] = in[i];
+    }
+    if (boot_end > n) return P1_NO_OPTIONS;
+    if (!found) {
+        /* again, with the line right after the [boot] header */
+        o = 0;
+        for (i = 0; i < boot_end; i++) out[o++] = in[i];
+        if (boot_end == n && (n == 0 || in[n - 1] != '\n')) { out[o++] = '\r'; out[o++] = '\n'; }
+        for (i = 0; line[i]; i++) out[o++] = line[i];
+        for (i = boot_end; i < n; i++) out[o++] = in[i];
+        changed = 1;
+    }
+    if (!changed) return P1_SAME;
+    *len = o;
+    return P1_CHANGED;
 }
 
 /* MSDOS.SYS: out (room for n + P1_SLACK) gets in with Logo=0 and BootLog=1

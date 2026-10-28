@@ -939,6 +939,19 @@ printf '@ECHO OFF\r\nCALL C:\\USOS9X\\U9ENV.BAT\r\nC:\\USOS9X\\INSTALL.BAT\r\n' 
 [ ! -f "$work/c/USOS9X/CREGFIX.SYS" ] || printf 'DEVICE=C:\\USOS9X\\CREGFIX.SYS\r\n' >> "$work/CONFIG.SYS"
 if mdir -i "$floppy" ::/HIMEM.SYS >/dev/null 2>&1; then
     printf 'DEVICE=A:\\HIMEM.SYS /TESTMEM:OFF /M:2\r\n' >> "$work/CONFIG.SYS"
+elif [ "$SYSTEM_TAG" = ME ] && [ "$VM_PHASE1" != 1 ] && [ -f "$ESP_DIR/dos-native/msdos/HIMEMX.EXE" ]; then
+    # Me's floppy has no HIMEM.SYS, so Setup's DOSSETUP loads its own
+    # XMSMMGR.EXE (A20 auto-detected) under the mini-Windows; 95 / 98 /
+    # 98 SE run it over HIMEM.SYS /M:2 (port 92h), and the Windows 3.1
+    # standard-mode bridge PASS on the X470 too. X470 Me PL 2026-10-28: the
+    # USB mouse (VBMOUSE bridge) did not move in that mini-Windows, the
+    # keyboard did; the XMS manager is the one difference found in the DOS
+    # stack. HimemX 3.40 (already on the ESP for MS-DOS, X470-proven with
+    # these limits) with port 92h, as /M:2. Not yet proven on hardware;
+    # USOSP1.TXT logs the mini-Windows mouse either way.
+    cp "$ESP_DIR/dos-native/msdos/HIMEMX.EXE" "$work/c/USOS9X/HIMEMX.EXE" || fail 'cannot copy HIMEMX.EXE'
+    printf 'DEVICE=C:\\USOS9X\\HIMEMX.EXE /MAX=32768 /X2MAX32 /METHOD:PORT92\r\n' >> "$work/CONFIG.SYS"
+    log 'me phase 1: HimemX 3.40 (port 92h) instead of Setup'"'"'s XMSMMGR.EXE under the mini-Windows'
 fi
 printf 'FILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\n' >> "$work/CONFIG.SYS"
 for name in AUTOEXEC.BAT CONFIG.SYS; do
