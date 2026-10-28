@@ -1,0 +1,59 @@
+{
+  "schema": "accepted-1c1-vhd-cleanup-v1",
+  "authorization": "user-2026-10-25-F-i",
+  "inventory_sha256": "18df82b15fb5e6024a2a627f9dcb94de0d7d69ed1352f63ba4c523b3567384c2",
+  "state": "complete",
+  "raw_sources_preserved": [
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/target.raw",
+      "bytes": 17179869184,
+      "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/target.raw",
+      "bytes": 6442450944,
+      "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01"
+    }
+  ],
+  "deleted": [
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/native/converted-fixed.vhd",
+      "bytes": 17179869696,
+      "sha256": "2d021d863c239f8c77731ae2048e8021049c458d2ba859dd170f14212f52ee4e",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/native/readonly-copy.vhd",
+      "bytes": 17179869696,
+      "sha256": "2d021d863c239f8c77731ae2048e8021049c458d2ba859dd170f14212f52ee4e",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/native/converted-fixed.vhd",
+      "bytes": 6442451456,
+      "sha256": "170d49174333d6f562d6777b016e92bb75b54b73cee4cd3fb7fd746a8e460894",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/native/readonly-copy.vhd",
+      "bytes": 6442451456,
+      "sha256": "170d49174333d6f562d6777b016e92bb75b54b73cee4cd3fb7fd746a8e460894",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01/native"
+    }
+  ],
+  "small_evidence_deleted": false
+}

@@ -1,0 +1,107 @@
+{
+  "schema": "minios-1c23-resume-evidence-v1",
+  "code_head": "61cc50b9ce06179fd6d58be2e9f52daad514507f",
+  "code_branch": "codex/minios-etap1",
+  "f3_dirty": 0,
+  "guest_head": "1f83101cea2253130edb1a6388d5763521c445b1",
+  "final_zig_tests": 174,
+  "final_python_tests": 70,
+  "artifacts": [
+    {
+      "name": "usosprep-x86_64.efi",
+      "bytes": 348672,
+      "sha256": "fa3820ab91e3fc937029d448f3e6a8fe796b1270982e968bb960e96a8aeba3b9"
+    },
+    {
+      "name": "usosprep-ia32.efi",
+      "bytes": 345600,
+      "sha256": "eb8e541b6a2ee264639f084604b1509783e196b43770fa968c46f8df96e36ae4"
+    },
+    {
+      "name": "usosprep-install-bios.img",
+      "bytes": 1048576,
+      "sha256": "010e0c268f856042a4915c8376585f2e1e425ca906252daf4a6c0655cd1f526c"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "1c23/final-logs/resume-core-final02.log",
+      "bytes": 1608,
+      "sha256": "f9293f0322f79838fce64c134367660ade008ae2e80af82d554bbe384e5b838f"
+    },
+    {
+      "path": "1c23/final-logs/resume-bios-final02.log",
+      "bytes": 1695,
+      "sha256": "c2f5aaee3617aaef6b80d4d211559af4e422bae304ea8ed382a626c68fa419a7"
+    },
+    {
+      "path": "1c23/final-logs/resume-harness-final02.log",
+      "bytes": 14050,
+      "sha256": "51afb5778fba570e86e165b8240c016aa201f85263c09b804842f935274e9e12"
+    },
+    {
+      "path": "1c23/final-logs/lzx-sha-bench01/result.json",
+      "bytes": 6181,
+      "sha256": "04f3e0f9d330ffcbdde9bd725c67ab0faffe9725b7300737cfee62626fbc3b5b"
+    },
+    {
+      "path": "1c23/fixtures/vpc-direct01/result.json",
+      "bytes": 8960,
+      "sha256": "bbfa2925ad278dfd4bbda48b7a8cf2622a6dc4cd6c9a41032d82f19fe4f7df74"
+    },
+    {
+      "path": "1c23/final-logs/native-reuse-reference-bios-final01.log",
+      "bytes": 8045,
+      "sha256": "db2cc48e6e47ba06f9b38f09076b4d6aab0c90db5b4802d9f53abff528ffa035"
+    },
+    {
+      "path": "1c23/final-logs/native-reuse-own-container-final01.json",
+      "bytes": 465,
+      "sha256": "a174f21615b6a2f02f9c6e0e8b609d5ef6ac21ab8ace33572d7d6abc241f87d7"
+    },
+    {
+      "path": "1c23/qemu-x64/win11-whpx128-01/result.json",
+      "bytes": 3751,
+      "sha256": "14d25cf207bb1078eed7773f61e0935bc8dabd62abc9f2e51a4f084ef52a92a6"
+    },
+    {
+      "path": "1c23/qemu-x64/win11-whpx128-01/closed-diagnosis.json",
+      "bytes": 6247,
+      "sha256": "9bbf844438668f00855c8769c3871c9d693bd844524ac58856b25035959d3b5b"
+    },
+    {
+      "path": "1c23/qemu-x64/win11-whpx128-01/progress.csv",
+      "bytes": 32992,
+      "sha256": "72826fe4ad7dc7778f309e412d3cf8c9609cbea5f9e52dbb0f17bd4e7faa06b9"
+    },
+    {
+      "path": "1c23/final-logs/resume-closed-images.json",
+      "bytes": 11845,
+      "sha256": "7d98c617ffa84147767e909e177f5583199c174dbbd906ba0251f030ec9e2e13"
+    },
+    {
+      "path": "1c23/final-logs/resume-closed-capacity.json",
+      "bytes": 4716,
+      "sha256": "c71077f9fad61a2281168901bfdb5ac9ec0a4ee00bc608bc12b560de8c1335c1"
+    },
+    {
+      "path": "1c23/final-logs/resume-sys-cer-audit.json",
+      "bytes": 2512,
+      "sha256": "5d441d960bac18e68377f6cc0fbc5d018c3828d914f24cb9a5bacfd2715ae7d8"
+    },
+    {
+      "path": "1c23/final-logs/resume-timeboxes01.json",
+      "bytes": 390,
+      "sha256": "3da61f8cb01157b48cf4a25123b8df22c453b1bfab3cae3d84cdb4c35ecccb73"
+    }
+  ],
+  "first_gate_passed": false,
+  "stop_reason": "WHPX Win11 selected apply exceeded1800s; first failed gate stops remaining matrix",
+  "native_chkdsk_current_case": false,
+  "windows_firstboot_attempted": false,
+  "retained_images_deleted": [],
+  "physical_disks_opened": false,
+  "g_drive_accessed": false,
+  "integration_policy": "selective MiniOS paths only; no merge; exclude all sys/cer including acpi.sys",
+  "sys_cer_final_diff_since_stop": []
+}

@@ -1,0 +1,224 @@
+{
+  "schema": "minios-sys-cer-integration-audit-1c23-v1",
+  "master_ref": "0ba50f6e",
+  "branch_ref": "97378ead55277dafee13852ce80e2ac79f823489",
+  "master_count": 34,
+  "branch_count": 74,
+  "branch_only": [
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/acpi.sys",
+      "blob": "8419c703f13f5f03fb8783c1ae42e7d6ac6be147",
+      "bytes": 327680
+    },
+    {
+      "path": "src/platform/bios/msdos/windows_early_config.sys",
+      "blob": "e2bd5b346207ccbe8da99fa0808f595ae99a6576",
+      "bytes": 1634
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/NT6/amd64/usosmpart.sys",
+      "blob": "96ed2b1c1d2894d370b16141ab4095e490d8a31e",
+      "bytes": 15360
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/amd64/usosmpart.sys",
+      "blob": "31e976bf1600f4efdafb3c933fc9aa383afaee1d",
+      "bytes": 15360
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/i386/usosmpart.sys",
+      "blob": "19ddeadec4dc29637ec3ebf456cc57c21106a423",
+      "bytes": 10752
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet.sys",
+      "blob": "2ff771a5dc1a37767a48a26ee00b180023e03bfb",
+      "bytes": 20096
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet35.sys",
+      "blob": "34ff2559b30c527817b61155b3c20f74d3110654",
+      "bytes": 16384
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet351.sys",
+      "blob": "e345d52f69a7d0adf7f7a620b221cba3cfe9431c",
+      "bytes": 17024
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet4.sys",
+      "blob": "4660784524c06c9efe734a065599813990d14c83",
+      "bytes": 21248
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys",
+      "blob": "dbe789b60151d0ffb328440c72d096394027bcfa",
+      "bytes": 20096
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys",
+      "blob": "e33211e6fcb14fc2f90304f3ff84e98120b1beb0",
+      "bytes": 11776
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT31/i386/usosnvme.sys",
+      "blob": "b9183112db1324ad1c6548bfe3e61899e2494ee2",
+      "bytes": 12032
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT351/i386/usosnvme.sys",
+      "blob": "c85a575f069c2fd0fc73f90e32b03d6fc82f115f",
+      "bytes": 12032
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys",
+      "blob": "c32a348ccb693c103921ae74f1ad1b6d085ac157",
+      "bytes": 11648
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT6/amd64/usosnvme.sys",
+      "blob": "787d3c8278d548410236a51d9a94aa61142a3d0d",
+      "bytes": 16896
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys",
+      "blob": "7a5de022df5a2bc99a2d4b404a7bcb57191fb9f8",
+      "bytes": 12288
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/i386/usosusb.sys",
+      "blob": "d223508f928794813dc7e1973e1bf6d9376ca302",
+      "bytes": 53504
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/nt31/i386/usosusb.sys",
+      "blob": "f0126a9a4880eb440f2ed3ae7a622e1d2afabab1",
+      "bytes": 32256
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/nt6/i386/usosusb.sys",
+      "blob": "01317a128b144188293fd444f9811c60b9e23bce",
+      "bytes": 56576
+    },
+    {
+      "path": "tools/nt4/usosvbe/bin/i386/usosvbe.sys",
+      "blob": "be12233038adf2e489565a9dbdbd714abae37fce",
+      "bytes": 14208
+    },
+    {
+      "path": "tools/nt4/usosvbe/bin/nt3/i386/usosvbe.sys",
+      "blob": "9fc29410f287012e916202c4fadb55cdbe476b44",
+      "bytes": 15232
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/2KXP/i386/ahcint.sys",
+      "blob": "9b669700c8dc04698820b8ca4939312bbaf51fab",
+      "bytes": 21504
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys",
+      "blob": "60262634dc42b0d95b33e8973d83513b5177d392",
+      "bytes": 19712
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys",
+      "blob": "1987cef040297d04551d3d10be1d59ded7fac42c",
+      "bytes": 19968
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys",
+      "blob": "bd375c5dce9c623a455ab546fa95c2f96be849cf",
+      "bytes": 19840
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0/bin/2KXP/i386/ahcint.sys",
+      "blob": "daecc1f6fe30e72cf41e8f9329e9cbaceb3748db",
+      "bytes": 19456
+    },
+    {
+      "path": "tools/vendor/cregfix/f0693437/cregfix.sys",
+      "blob": "4246c67837544ea01f9e2eaf378e06b0a34d3168",
+      "bytes": 115
+    },
+    {
+      "path": "tools/vendor/uniata/0.47b/uniata.sys",
+      "blob": "514ea642f96298ce7bf9d0aacd668c366a96e95a",
+      "bytes": 140867
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos2/release-x64/xhci98.sys",
+      "blob": "5e70a92cf898c3b18638c9b22c5c4a543fb5a7c0",
+      "bytes": 103936
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos2/release-x86/xhci98.sys",
+      "blob": "63f25b8ff88c6f163433468ced990470f78e60f1",
+      "bytes": 83968
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3-w9x/release-x86/xhci98.sys",
+      "blob": "a84464a9038131e02653b6898ca0b28d446bb2cf",
+      "bytes": 81920
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3/release-x64/xhci98.sys",
+      "blob": "81c2eca62e8c99aefe6c72d0c143319374561ad4",
+      "bytes": 105984
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3/release-x86/xhci98.sys",
+      "blob": "85ab7a206ec1ae062ca264de15bf3f3ef16ba9f9",
+      "bytes": 85504
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0/release-x64/xhci98.sys",
+      "blob": "f0cc86f3c6565349ab875f135b2951e0cc2b61cf",
+      "bytes": 97280
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0/release-x86/xhci98.sys",
+      "blob": "59cd53848739931750fd7235bfe5353ee09a5317",
+      "bytes": 86059
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/i386/usosrst.sys",
+      "blob": "8a3411c15fda23da9482b61842a90565ad0d4d98",
+      "bytes": 16128
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt31/i386/usosrst.sys",
+      "blob": "cf150586b6d476185944b17295d7392095e38033",
+      "bytes": 19072
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt35/i386/usosrst.sys",
+      "blob": "d9a617cab632ee5d523ead03cd91b81c4ea9a3e5",
+      "bytes": 19968
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt351/i386/usosrst.sys",
+      "blob": "4f8f7ead4ed75a6aa47a3733e951594a977b7b8a",
+      "bytes": 20224
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt4/i386/usosrst.sys",
+      "blob": "6c7538cea5e4f4b12d69c8683b068c65c76ebc87",
+      "bytes": 20096
+    }
+  ],
+  "master_only": [],
+  "different": [
+    {
+      "path": "src/platform/bios/msdos/windows_config.sys",
+      "master": {
+        "blob": "16316f6b128e7d3804d74ce4286b5323dea42362",
+        "bytes": 463
+      },
+      "branch": {
+        "blob": "98a3c6153e382be6f8b5d4ec3c607658b547d9ee",
+        "bytes": 478
+      }
+    }
+  ],
+  "instruction": "Do not restore branch-only legacy SYS/CER at integration; especially historical acpi.sys. No merge/deploy performed."
+}

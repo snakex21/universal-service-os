@@ -1,0 +1,48 @@
+{
+  "schema": "minios-1c4-pretests-v1",
+  "production_head": "1fb9157a826c2d706a4db42535a46f8c1b2987c7",
+  "production_changes_before_tests": false,
+  "native": {
+    "receipt": "1c4/host-baseline/result.json",
+    "target_format": "raw",
+    "target_sparse": true,
+    "target_bytes": 34359738368,
+    "elapsed_seconds": 212.8562906,
+    "passed": true,
+    "qemu": false,
+    "direct_wim_not_iso": true,
+    "layout": "single GPT NTFS partition; timing diagnostic only",
+    "independent_chkdsk_not_run": true
+  },
+  "firmware_probe": {
+    "receipt": "1c4/probe-qcow/win11-128/result.json",
+    "target_format": "qcow2",
+    "firmware_sha256": "fa3820ab91e3fc937029d448f3e6a8fe796b1270982e968bb960e96a8aeba3b9",
+    "memory_mib": 128,
+    "accelerator": "whpx",
+    "guest_time_limit_seconds": 400,
+    "apply_coverage_seconds": 311,
+    "timed_out_by_design": true,
+    "not_full_installation_pass": true,
+    "source_and_blank_checkpoint_unchanged": true,
+    "comparison": {
+      "old_receipt": "1c23/qemu-x64/win11-whpx128-01/result.json",
+      "old_head": "1f83101cea2253130edb1a6388d5763521c445b1",
+      "head_difference": "new preflight refusal for unsupported directory DATA; measured normal Win11 traversal and call counts identical",
+      "items_start": 10151,
+      "items_end": 12613,
+      "items_delta": 2462,
+      "resources_delta": 2000,
+      "aggregate_blockio_calls_delta": 97318,
+      "dynamic_vhd_seconds": 508,
+      "qcow2_seconds": 8,
+      "dynamic_vhd_wall_ms_per_aggregate_call": 5.220000411,
+      "qcow2_wall_ms_per_aggregate_call": 0.082204731,
+      "wall_speedup": 63.5,
+      "metric_limit": "wall time / aggregate source+target BlockIo calls; not exclusive target IO latency; guest clock resolution 1 second"
+    }
+  },
+  "source_wim_sha256": "de1f5d0d14b9337cb32790d718a84bcfbc94425660b224c705833da5d9e88a51",
+  "cleanup_performed": false,
+  "physical_disks_opened": false
+}

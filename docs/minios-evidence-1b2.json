@@ -1,0 +1,1166 @@
+{
+  "schema": "minios-evidence-1b2-v1",
+  "qemu_and_host_only": true,
+  "stage": "1b-2",
+  "base_commit": "2ab9df7c",
+  "application_source_seal": "836e5ae9",
+  "oracle_contract_commit": "8bd962ca",
+  "ram_helper_seal": "08e2681d",
+  "all_required_native_gates_pass": true,
+  "native_gate_count": 24,
+  "native_gates": [
+    {
+      "name": "real/win10",
+      "receipt": "win10-final07/windows01/result.json",
+      "receipt_sha256": "2e195328ca4ccb721b3ec69fb1d2ced112b039a528f23881877d2dc243880615",
+      "source_sha256": "2314f056b91d73e234c9833d969cf80836c19239688b76ebb48e196a0b2b8a3a",
+      "image_bytes": 8589934592,
+      "vhd_sha256": "5a0dbbd16017b666ae17dae04937b56e09fb70a0f0f4960726d3fa27c717eaa3",
+      "entries": 99220,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 172,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "real/win7",
+      "receipt": "win7-final07/windows01/result.json",
+      "receipt_sha256": "74eaa023b681befc00032d5b2bebb19bdc3c2343c2b5ee454aecd221bfdbd98f",
+      "source_sha256": "f6e553eb650a36216c924bf2a211b14cc9bd96324e3a1d28777ebb598e9813f6",
+      "image_bytes": 6442450944,
+      "vhd_sha256": "0e243f01ebc7e96a729c8fa6d4d9c70104de8ed48ffa8678016dc2f345b234d4",
+      "entries": 57146,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/features",
+      "receipt": "host-final07/features/windows01/result.json",
+      "receipt_sha256": "3178fffc8cd569cf5266c88dea4d2711e782b5d827e7ab992a20d5a3dc63499e",
+      "source_sha256": "ba6e8c9a2c4046eeb7e387020eebc0311a02b41ca362a844e2a618951d9a0a22",
+      "image_bytes": 268435456,
+      "vhd_sha256": "e82c4340d9469652ec4921b7b29d880866d0c0a08bfa22a954f5c6917167ec63",
+      "entries": 5014,
+      "api_reordered_sd_count": 12,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/smoke/xpress",
+      "receipt": "host-final07/smoke/xpress/windows01/result.json",
+      "receipt_sha256": "9a94704fd5b9677393a7001858ae07594be3d96cbef0f66bbdd77b502367ba21",
+      "source_sha256": "de7020130e11e5850939167d69dbf93272298492003e2e1faa0fdfec74d50762",
+      "image_bytes": 268435456,
+      "vhd_sha256": "ce021f30dc0ab23990229fea492b82fccbe21a2db3cb2a1b6555a8fe9f7e52b6",
+      "entries": 411,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/smoke/lzx",
+      "receipt": "host-final07/smoke/lzx/windows01/result.json",
+      "receipt_sha256": "6a3b9745d21fdec8240579c832b65f0f55a56aaf78a97f8da94e1df152cd19a6",
+      "source_sha256": "0849e3cd4f0221660f7b4a1874c841316b518af1a8afc49766bde058a9fabb81",
+      "image_bytes": 268435456,
+      "vhd_sha256": "a3d391192d23194108f77fa72df3f8d5c0fc4c113481d619a0f4482187c7c534",
+      "entries": 411,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/smoke/lzms-nonsolid",
+      "receipt": "host-final07/smoke/lzms-nonsolid/windows01/result.json",
+      "receipt_sha256": "639a88384057e417c4b5dce7565457b86244d6308b9e21d19927c5eae35864b8",
+      "source_sha256": "222a32275ea7f4a7a9bfcde99fa1b0a2d32f374b6a67ba32d919df921c5f6268",
+      "image_bytes": 268435456,
+      "vhd_sha256": "255bc97af74e1e26bc4ce96f071045dd19ed2dbf4b23265dc7f2073392028582",
+      "entries": 411,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/smoke/multi-index2",
+      "receipt": "host-final07/smoke/multi-index2/windows01/result.json",
+      "receipt_sha256": "1a72cb797cf19cc20a4c2fa25635c9d381ee3fc604083bf54fde22b1f6959312",
+      "source_sha256": "7ae572d09910d2e4c4c24abb042c5d127fffea04c3475d859a0ec4e648210c23",
+      "image_bytes": 268435456,
+      "vhd_sha256": "fc6cb787ee844575336448f9a4760fb8d4cb93f99d65ae0c8059fe96ce55a12a",
+      "entries": 23,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/large/xpress",
+      "receipt": "host-final07/large/xpress/windows01/result.json",
+      "receipt_sha256": "a4340b73697904fc6f7cfc0f82ff4cc89ee8aceadbc8c17852c90385d1ecc6c4",
+      "source_sha256": "2c0d9074ff12e716605098e366e78d588ec471af83966bee34f9f210d4b3dee2",
+      "image_bytes": 268435456,
+      "vhd_sha256": "391ecd5f0e1e39a9981a597249941da1e404882c0d7328e6ab9c996f387b56f2",
+      "entries": 1228,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/large/lzx",
+      "receipt": "host-final07/large/lzx/windows01/result.json",
+      "receipt_sha256": "c00b1cb9352eb2d893cae80792b99d23357928f483cc3f68b8c4dd4f41d53c66",
+      "source_sha256": "763e6376084d19704a20a6ce44ab26f1a10e2131aa3440ac86ca59cb1101f3aa",
+      "image_bytes": 268435456,
+      "vhd_sha256": "1749fdef0b8d49701019910918aebb49be274f2daa7377722983a39b2e1aadae",
+      "entries": 1228,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/large/lzms-nonsolid",
+      "receipt": "host-final07/large/lzms-nonsolid/windows01/result.json",
+      "receipt_sha256": "c5482c30af796eba6abf550a18ba9c55e87b653b5ec3377632513e8dc2fc6978",
+      "source_sha256": "012ce421eaed43a48812a455213ea75acd4744ce1b32efcba8efcf1c19027583",
+      "image_bytes": 268435456,
+      "vhd_sha256": "f84436c4fcd751788ea03a497ed4f3633393577346cc01c4f5498fb5f1b8e8c9",
+      "entries": 1228,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "host/ads/xpress",
+      "receipt": "host-final07/ads/xpress/windows01/result.json",
+      "receipt_sha256": "6452dec98e8b9e7dc7a614c68b0e112b7902bba506bee85f3350abd2cb3af3ce",
+      "source_sha256": "6436c38769f534df5788f06a4787f73557068b281a28d254147182bec138c3f5",
+      "image_bytes": 268435456,
+      "vhd_sha256": "7e8a27695c90c0964668a61479f04cc2d57e0c804690c2e88e2b16cf36ebdbd0",
+      "entries": 15,
+      "api_reordered_sd_count": 0,
+      "api_synthesized_normal_count": 0,
+      "root_reserved_metadata_applied": true,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-x64-xpress-64",
+      "arch": "x86_64",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 36.1803046999994,
+      "own_memory": {
+        "allocator_peak": 1711788,
+        "physical_heap": null,
+        "conservative_own_bytes": 2068140,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-x64-xpress-64/completed.json",
+      "application_receipt_sha256": "87f1fe2986a6fd3d5189c6073f355d1792ffc557afd2db642ee4bd1d0424418c",
+      "windows_receipt": "firmware-tests/fw07-large-x64-xpress-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "0591dc3ca2fda0ca66394834efa62594193ee49553ef30b849598bbb13975fcf",
+      "windows_closure_receipt": "firmware-tests/fw07-large-x64-xpress-64/windows-completed.json",
+      "windows_closure_sha256": "40faaa60569ebd54422043e7134ff6dff65761be6b5677b5a42eb4b1919dd4e5",
+      "source_sha256": "17f741e4755ba8665ef6aa5a97b12ade36f8e6de099abaa704b9f9329f754e7e",
+      "vhd_sha256": "7e53fcbf1576329964c014526c1fd2ee5c2977603c255d509eaf9feebc10e4f7",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-x64-lzx-64",
+      "arch": "x86_64",
+      "kind": "mbr",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 39.65341350000381,
+      "own_memory": {
+        "allocator_peak": 1723416,
+        "physical_heap": null,
+        "conservative_own_bytes": 2079768,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-x64-lzx-64/completed.json",
+      "application_receipt_sha256": "616df7c4cffb027a5af39e2480c486e5bb82ce0168e27b47e9394820a1202668",
+      "windows_receipt": "firmware-tests/fw07-large-x64-lzx-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "e3fa713e06b185215060cfe75f48ad11c1d5412e305b0dd2eab19aff324b3b5a",
+      "windows_closure_receipt": "firmware-tests/fw07-large-x64-lzx-64/windows-completed.json",
+      "windows_closure_sha256": "d8fd589f30b090bcc73a2f18ff6c92df1ab98938c2d01a2fa00d899919d96367",
+      "source_sha256": "be9ec7a50aa3ef6de318848b4d182473281b8aeafc24b9658a104bfe1dbab196",
+      "vhd_sha256": "0ec113e39a448ef578b3a695d300c49508e5a9429c97dd91efbbdf9a50dd7412",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-x64-lzms-64",
+      "arch": "x86_64",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 44.94872049999685,
+      "own_memory": {
+        "allocator_peak": 2362848,
+        "physical_heap": null,
+        "conservative_own_bytes": 2719200,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-x64-lzms-64/completed.json",
+      "application_receipt_sha256": "d1733d957a3ee7f70839d02ccdaed297c8875ce8af1834cd691ffb988a9d7921",
+      "windows_receipt": "firmware-tests/fw07-large-x64-lzms-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "1ede702c4a5b11566d116c34b17f1ff63a06fc185ce95e6c90409c9177ff0273",
+      "windows_closure_receipt": "firmware-tests/fw07-large-x64-lzms-64/windows-completed.json",
+      "windows_closure_sha256": "5d7cbc320b210f93d64b00e7476260a79937d00627584afc79f7b4edcfa2fbdc",
+      "source_sha256": "ed6dd16f2b33f2cd0a8b68a17be3242581dbd1e431cdb002e381066bdbc83e63",
+      "vhd_sha256": "2aea1fb1bb8e5b078ea87de239327320d478f3a3030024a53f19aa6caf0e9c85",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-ia32-xpress-64",
+      "arch": "ia32",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 46.827053900000465,
+      "own_memory": {
+        "allocator_peak": 1711332,
+        "physical_heap": null,
+        "conservative_own_bytes": 2055396,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-ia32-xpress-64/completed.json",
+      "application_receipt_sha256": "c844c86652ce1d760f0695fefc5c8acdefffb958b9db97e50be8b44ce079373e",
+      "windows_receipt": "firmware-tests/fw07-large-ia32-xpress-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "b5ece1d0ca48972afe61176cd9ce2144d6ad5e71f866b756b7ec74c3e7c136ac",
+      "windows_closure_receipt": "firmware-tests/fw07-large-ia32-xpress-64/windows-completed.json",
+      "windows_closure_sha256": "60dcc864614d57117285c5c17f8e72caed784994185245334521004390919856",
+      "source_sha256": "a8f109f30d4037578669e4e5d844db294b13ebe125ed5bc9010f93fa5c3318e8",
+      "vhd_sha256": "a1baa566e736fe2ed5b23e5162df53a3570d3b1ffef79e8c5c86b986022ea786",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-ia32-lzx-64",
+      "arch": "ia32",
+      "kind": "mbr",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 48.85336030000326,
+      "own_memory": {
+        "allocator_peak": 1722960,
+        "physical_heap": null,
+        "conservative_own_bytes": 2067024,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-ia32-lzx-64/completed.json",
+      "application_receipt_sha256": "e305660d463c95df11d58b69f7f91b9d88ce35a407c613f745d250668cfc4ec7",
+      "windows_receipt": "firmware-tests/fw07-large-ia32-lzx-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "60eaaace95eadaa521f9c47a3afc615cdad6273b5b597428f45c3d196020c7e7",
+      "windows_closure_receipt": "firmware-tests/fw07-large-ia32-lzx-64/windows-completed.json",
+      "windows_closure_sha256": "07ade044b25630c8d4388b08fb6a68e23b2a8cbace7e99be693f5dcce89d25d9",
+      "source_sha256": "73b69bb7ad3eb625101bdfc7e6e7033b744d028e75dca7ab2d97770edeba7fd9",
+      "vhd_sha256": "7b8fc8c1deb90242ca71d3d3ad2a556f9d9e1deecf73b72c958e9085f58255d4",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-large-ia32-lzms-64",
+      "arch": "ia32",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "max",
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "target_bytes": 268435456,
+      "elapsed_seconds": 56.24308759999985,
+      "own_memory": {
+        "allocator_peak": 2362392,
+        "physical_heap": null,
+        "conservative_own_bytes": 2706456,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-large-ia32-lzms-64/completed.json",
+      "application_receipt_sha256": "8b553e502500092527ac417e586a35d246bd52e1b53e76b4a32eb34a19f4ad61",
+      "windows_receipt": "firmware-tests/fw07-large-ia32-lzms-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "293ff79820b6141cb5cd02a6a60257b8c51bee6369387c37175cc97b77c36602",
+      "windows_closure_receipt": "firmware-tests/fw07-large-ia32-lzms-64/windows-completed.json",
+      "windows_closure_sha256": "e532dcaad1dc81e2524af035be95ac545d153db42d872ac26221b6288303625d",
+      "source_sha256": "ae53297166311dbaa5cd07cfc4912fb881937639acb8c5a5623bd0ec17f3b240",
+      "vhd_sha256": "480d83b09dc7c7973d116442709b7a44d4503e2b118f063246526fadf2b352a5",
+      "checked_entries": 1228,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-bios-xpress-64",
+      "arch": "bios",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "486",
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "target_bytes": 134217728,
+      "elapsed_seconds": 11.62915090000024,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-bios-xpress-64/completed.json",
+      "application_receipt_sha256": "f5870321fb7430db201bd9fba5778232f7ef6dbd43e74a191837f661144c7102",
+      "windows_receipt": "firmware-tests/fw07-bios-xpress-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "ae6b9b6628c31195a6f9f8e0ff01194015c1b0e11137117983973d853d049c45",
+      "windows_closure_receipt": "firmware-tests/fw07-bios-xpress-64/windows-completed.json",
+      "windows_closure_sha256": "4ed629f4150b255fe70280466c1ef48bbe65d0e87ba575aa22ea13666c2a6e61",
+      "source_sha256": "da1317185a076f1bbc44a0f212668d39109504365c38fd165fa1696950f125cc",
+      "vhd_sha256": "a59ff244127ea449d950741e60962ac22c5fed1bd68b9b1cef02027e7fdee5e1",
+      "checked_entries": 411,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-bios-lzx-64",
+      "arch": "bios",
+      "kind": "mbr",
+      "memory_mib": 64,
+      "cpu": "486",
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "target_bytes": 134217728,
+      "elapsed_seconds": 11.628501099999994,
+      "own_memory": {
+        "allocator_peak": 654720,
+        "physical_heap": {
+          "current": 0,
+          "peak": 655140,
+          "extent_peak": 656420,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-bios-lzx-64/completed.json",
+      "application_receipt_sha256": "a747e0da697a12d9f22780a4ffffa40d1fdebbddff12be7365121ee57c7457d5",
+      "windows_receipt": "firmware-tests/fw07-bios-lzx-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "d8e3a706292f0ad0b6006c2680f2c40848e5a3bf1f8082edf763bdcf0daaccd2",
+      "windows_closure_receipt": "firmware-tests/fw07-bios-lzx-64/windows-completed.json",
+      "windows_closure_sha256": "36f7bc8a4d8e8d4c09f2a6025d11eda18933165f753ad6b1ddbd162895e3a033",
+      "source_sha256": "e6fa2f7ea4f67214e6c13ec34c57ae35e89293a365b0b17c1680b8eae739d2a4",
+      "vhd_sha256": "3e093f7799ffca0a3b403cc8817dc99f0e85f846b60b3c023ee22224cdb45946",
+      "checked_entries": 411,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-bios-lzms-64",
+      "arch": "bios",
+      "kind": "gpt",
+      "memory_mib": 64,
+      "cpu": "486",
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "target_bytes": 134217728,
+      "elapsed_seconds": 11.646843000002264,
+      "own_memory": {
+        "allocator_peak": 1294152,
+        "physical_heap": {
+          "current": 0,
+          "peak": 1294572,
+          "extent_peak": 1295852,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-bios-lzms-64/completed.json",
+      "application_receipt_sha256": "52df479d38675b24925d6681849548d6731eb0fd00f4a3df5db70fa2ec39d6f8",
+      "windows_receipt": "firmware-tests/fw07-bios-lzms-64/windows-oracle/result.json",
+      "windows_receipt_sha256": "609eef73331416e440c084b05840a2e70b915721b330b331db7486e2245fde9d",
+      "windows_closure_receipt": "firmware-tests/fw07-bios-lzms-64/windows-completed.json",
+      "windows_closure_sha256": "9f7abcac7a141614df856c1dc6c8967ab78efadbc8dd3e3e0b9192b920a0a2d7",
+      "source_sha256": "94fc38dd1588dcb042b269349e9e599b9a91d227f48a07554da4a2bac41a842a",
+      "vhd_sha256": "b3b42cac1f700cea2234e096a64c0aab1b27fb59b0d8bfa312130938ebf9ee1b",
+      "checked_entries": 411,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-bios-486-xpress-32",
+      "arch": "bios",
+      "kind": "gpt",
+      "memory_mib": 32,
+      "cpu": "486",
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "target_bytes": 134217728,
+      "elapsed_seconds": 10.452800200000638,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-bios-486-xpress-32/completed.json",
+      "application_receipt_sha256": "a7f5a34e5420e9e2b50ccbc934316cc212e0568c3daad09419051b27c6911dba",
+      "windows_receipt": "firmware-tests/fw07-bios-486-xpress-32/windows-oracle/result.json",
+      "windows_receipt_sha256": "f94ad98770fc506b4e8d287c01f3b34fbc208264a91ee78aabae7d3893541bc2",
+      "windows_closure_receipt": "firmware-tests/fw07-bios-486-xpress-32/windows-completed.json",
+      "windows_closure_sha256": "37caaaadd21cfd56c7748262520fdd549578d42fb39cbf2653d8f5e5801fc324",
+      "source_sha256": "48875b8e2d816cb9ede2eeb665e1558fe145d63d5559f34c09d150c8b97e0e71",
+      "vhd_sha256": "1845ee4112bd29cf2f82f6af020d46fa60786017ae8ff5146d3a0ace8696be24",
+      "checked_entries": 411,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "fw07-bios-pentium-xpress-32",
+      "arch": "bios",
+      "kind": "gpt",
+      "memory_mib": 32,
+      "cpu": "pentium",
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "target_bytes": 134217728,
+      "elapsed_seconds": 10.523236000000907,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "application_receipt": "firmware-tests/fw07-bios-pentium-xpress-32/completed.json",
+      "application_receipt_sha256": "1a90281b05b240ecc2eb6dc53139c6907bea49470ef1bca142925c60e782c4c9",
+      "windows_receipt": "firmware-tests/fw07-bios-pentium-xpress-32/windows-oracle/result.json",
+      "windows_receipt_sha256": "020f0e470c75a25011bbcb22e0534d3772b13cb9c1856c74c6cc0609545a671d",
+      "windows_closure_receipt": "firmware-tests/fw07-bios-pentium-xpress-32/windows-completed.json",
+      "windows_closure_sha256": "320635fafe4429aa19b936d158906f265277266f081e109cd09e617e0c806233",
+      "source_sha256": "c05f4a85b931fcd1d9a281f07e6228b810921b32a4064336cfdfec6ca000330e",
+      "vhd_sha256": "bc992cc6e3136a67c9561d749c43e059d5f36f140fa53454f2ed7196652b303d",
+      "checked_entries": 411,
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "minimum/x64",
+      "receipt": "ram-windows-final07/x64/windows01/result.json",
+      "receipt_sha256": "d38d6c7e0bdb51d3e4a5c7c19ae11ddac73d9324b52c5607dcd5f9f5d1cf323d",
+      "image_bytes": 268435456,
+      "source_sha256": "e854138b32869541cec115837ed314423ff311500eed30ceb97a2f62090793df",
+      "vhd_sha256": "1b1050c426458c931b13e5504607c2790f86eb7c5a332b2e18f277c488f43f9a",
+      "entries": 1228,
+      "memory_mib": 49,
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    },
+    {
+      "name": "minimum/ia32",
+      "receipt": "ram-windows-final07/ia32/windows01/result.json",
+      "receipt_sha256": "bf19c2c3a3aee82306444db5a6c1b18a874f2649f89874a7dc1b8932d5e9b1da",
+      "image_bytes": 268435456,
+      "source_sha256": "282bbb8156c12d00c879bb48dbbd199d962d96ac06be78755db3a77b89f86c41",
+      "vhd_sha256": "179dab38c8e4e23124092e0a1c31448e3b5d60855f65d512170645bd4ef8b72e",
+      "entries": 1228,
+      "memory_mib": 48,
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "chkdsk_exit": 0,
+      "native_tree_metadata_streams_pass": true,
+      "raw_security_pass": true,
+      "guard_pass": true,
+      "dismounted_and_alias_removed": true,
+      "source_vhd_unchanged": true
+    }
+  ],
+  "ram_search": {
+    "kind": "final07-uefi-ram-bisection",
+    "workload": "set02large LZMS non-solid;1208files including134217851B file; only this QEMU/EDK2 workload",
+    "rows": [
+      {
+        "arch": "x64",
+        "lowest_tested_pass_mib": 49,
+        "highest_tested_fail_mib": 48,
+        "resolution_mib": 1,
+        "baseline64mib_actual_windows_pass": true,
+        "probes": [
+          {
+            "memory_mib": 32,
+            "pass": false,
+            "receipt": "runtime/ram-final07/x64-m032/completed.json",
+            "returncode": 1,
+            "timed_out": true,
+            "receipt_sha256": "855c063f52d1d9d5ef1d7760dbe86f80c3c6e8e007d0347ec5dcc131d91000e6"
+          },
+          {
+            "memory_mib": 48,
+            "pass": false,
+            "receipt": "runtime/ram-final07/x64-m048/completed.json",
+            "returncode": 35,
+            "timed_out": false,
+            "receipt_sha256": "92a5fd3e326d080736e95768f3dc50e99be9faffb2240b44e2b2e4117aca2526"
+          },
+          {
+            "memory_mib": 56,
+            "pass": true,
+            "receipt": "runtime/ram-final07/x64-m056/completed.json",
+            "returncode": 33,
+            "timed_out": false,
+            "receipt_sha256": "17de219fecb71f1eb94001583138a229570edac24556d8b21786271abe26d34e"
+          },
+          {
+            "memory_mib": 52,
+            "pass": true,
+            "receipt": "runtime/ram-final07/x64-m052/completed.json",
+            "returncode": 33,
+            "timed_out": false,
+            "receipt_sha256": "e7efd667f7875c1b94de50e15fffed3f2caa09712f1de7aeae71b24e1eceffc6"
+          },
+          {
+            "memory_mib": 50,
+            "pass": true,
+            "receipt": "runtime/ram-final07/x64-m050/completed.json",
+            "returncode": 33,
+            "timed_out": false,
+            "receipt_sha256": "7b1aef64f248394adb4222715f622a8d72749b57d3c86be0c2fbeba2196756e6"
+          },
+          {
+            "memory_mib": 49,
+            "pass": true,
+            "receipt": "runtime/ram-final07/x64-m049/completed.json",
+            "returncode": 33,
+            "timed_out": false,
+            "receipt_sha256": "ae00e33d0016c8724da1e7908879819ca7c77df4357fd0ee2fc59a70ca18b5d8"
+          }
+        ],
+        "minimum_exact_within_search_floor": true
+      },
+      {
+        "arch": "ia32",
+        "lowest_tested_pass_mib": 48,
+        "highest_tested_fail_mib": 47,
+        "resolution_mib": 1,
+        "baseline64mib_actual_windows_pass": true,
+        "probes": [
+          {
+            "memory_mib": 32,
+            "pass": false,
+            "receipt": "runtime/ram-final07/ia32-m032/completed.json",
+            "returncode": 1,
+            "timed_out": true,
+            "receipt_sha256": "4472bd47fc8a8a23ea0c478e4125ada9541af70f4d5730f84a370072254413c6"
+          },
+          {
+            "memory_mib": 48,
+            "pass": true,
+            "receipt": "runtime/ram-final07/ia32-m048/completed.json",
+            "returncode": 33,
+            "timed_out": false,
+            "receipt_sha256": "bbacb2961de53d5d841c95f695c706704e053fe095011e85240d82356cc13622"
+          },
+          {
+            "memory_mib": 40,
+            "pass": false,
+            "receipt": "runtime/ram-final07/ia32-m040/completed.json",
+            "returncode": 1,
+            "timed_out": true,
+            "receipt_sha256": "55ee107fdfcb436035afb9411155b69933c691b5483db40e6ff4aa34aef1db74"
+          },
+          {
+            "memory_mib": 44,
+            "pass": false,
+            "receipt": "runtime/ram-final07/ia32-m044/completed.json",
+            "returncode": 1,
+            "timed_out": true,
+            "receipt_sha256": "fd163b66de5d6ba4223436057647648d4a6e0dfed2ea45f420681c729c4a0163"
+          },
+          {
+            "memory_mib": 46,
+            "pass": false,
+            "receipt": "runtime/ram-final07/ia32-m046/completed.json",
+            "returncode": 35,
+            "timed_out": false,
+            "receipt_sha256": "c75663fa2f048b480958b8cc22e7c685c58bc429d2f5fa3eb8d5883915bfb2a4"
+          },
+          {
+            "memory_mib": 47,
+            "pass": false,
+            "receipt": "runtime/ram-final07/ia32-m047/completed.json",
+            "returncode": 35,
+            "timed_out": false,
+            "receipt_sha256": "847758765d78bead2afa1bdf8f3ef898a2e9db104d6a32f542c60ab14d25bfe0"
+          }
+        ],
+        "minimum_exact_within_search_floor": true
+      }
+    ],
+    "only_fresh_cows": true,
+    "only_esp_exports": true,
+    "no_new_windows_vhds": true,
+    "cleanup_performed": false
+  },
+  "ram_winning_pins": {
+    "schema": "minios-wim-final07-ram-winning-pins-v1",
+    "rows": [
+      {
+        "arch": "x64",
+        "minimum_pass_mib": 49,
+        "maximum_fail_mib": 48,
+        "workload": "set02large/LZMSnon-solid/1208files/134217851Bfile",
+        "baseline": "runtime/firmware-tests/fw07-large-x64-lzms-64",
+        "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+        "qemu_sha256": "47d57a6072e0bb3bd98f87926eb129eb1736dfe818c67b3b81ef7ce4edd0b3cd",
+        "host_firmware_sha256": "33090cc07675baa5190d9f1e84bf5176b33bcbfa9bacac522961150cdb6dbb2a",
+        "source_wim_sha256": "74ad02c85060ec8550c56267cd8a3c8577c36a0fb174894443923b4e6a0fd31a",
+        "expected_tree": "runtime/synthetic/set02large/lzms/oracle-image1/tree.jsonl",
+        "expected_tree_sha256": "93ef5aabcc419f095386471d234903cb1d82afd2353200cd0cb30858ac4f6357",
+        "expected_security": "runtime/synthetic/set02large/lzms/oracle-image1/security.jsonl",
+        "expected_security_sha256": "f422da06ef136d33e298af7f069e36fd784299bd3d7e923dd97e997875ca8dd5",
+        "source_receipt": "runtime/ram-final07/x64-m049/completed.json",
+        "source_receipt_sha256": "ae00e33d0016c8724da1e7908879819ca7c77df4357fd0ee2fc59a70ca18b5d8",
+        "source_cow": "runtime/ram-final07/x64-m049/target.qcow2",
+        "source_cow_bytes": 155058176,
+        "source_cow_sha256": "0319718250786a90d0669571ec533f72ac299eec3ba8f13b7b13bf061fed9901",
+        "source_cow_readonly": true,
+        "target_virtual_bytes": 268435456,
+        "immutable_bases": [
+          {
+            "path": "runtime/firmware-tests/fw07-large-x64-lzms-64/esp-base.raw",
+            "bytes": 68157440,
+            "sha256": "570a6cbfcc200b5cde70d878ee628e7d2cd439a570507165486a15bfafb938e1"
+          },
+          {
+            "path": "runtime/firmware-tests/fw07-large-x64-lzms-64/target-base.raw",
+            "bytes": 268435456,
+            "sha256": "0ccff544a1189f7152175012602972b5c3c96b3dd43b2cf72e605c28a6c50312"
+          }
+        ],
+        "own_memory": {
+          "allocator_peak": 2362848,
+          "physical_heap": null,
+          "conservative_own_bytes": 2719200,
+          "firmware_excluded": true
+        },
+        "all_vm_processes_closed": true,
+        "no_new_target_raw_export_performed": true,
+        "baseline64_full_windows_pass": true
+      },
+      {
+        "arch": "ia32",
+        "minimum_pass_mib": 48,
+        "maximum_fail_mib": 47,
+        "workload": "set02large/LZMSnon-solid/1208files/134217851Bfile",
+        "baseline": "runtime/firmware-tests/fw07-large-ia32-lzms-64",
+        "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+        "qemu_sha256": "dbbf7242e5b0d295e54336c69034a266ee1cc117d7ac6e3060e38bb61651200b",
+        "host_firmware_sha256": "c8161f6e8464778e13795297e87f5e83cf97c8987480eea1d80742f6c98c18a9",
+        "source_wim_sha256": "74ad02c85060ec8550c56267cd8a3c8577c36a0fb174894443923b4e6a0fd31a",
+        "expected_tree": "runtime/synthetic/set02large/lzms/oracle-image1/tree.jsonl",
+        "expected_tree_sha256": "93ef5aabcc419f095386471d234903cb1d82afd2353200cd0cb30858ac4f6357",
+        "expected_security": "runtime/synthetic/set02large/lzms/oracle-image1/security.jsonl",
+        "expected_security_sha256": "f422da06ef136d33e298af7f069e36fd784299bd3d7e923dd97e997875ca8dd5",
+        "source_receipt": "runtime/ram-final07/ia32-m048/completed.json",
+        "source_receipt_sha256": "bbacb2961de53d5d841c95f695c706704e053fe095011e85240d82356cc13622",
+        "source_cow": "runtime/ram-final07/ia32-m048/target.qcow2",
+        "source_cow_bytes": 155058176,
+        "source_cow_sha256": "30d58dc789e2c269c909091953edd88183d7dab4789e2951a1d1b4ffad025601",
+        "source_cow_readonly": true,
+        "target_virtual_bytes": 268435456,
+        "immutable_bases": [
+          {
+            "path": "runtime/firmware-tests/fw07-large-ia32-lzms-64/esp-base.raw",
+            "bytes": 68157440,
+            "sha256": "c3e7570df51ec289af14c7946f0f72f88c9be84640c001e2c521e7b337c15f85"
+          },
+          {
+            "path": "runtime/firmware-tests/fw07-large-ia32-lzms-64/target-base.raw",
+            "bytes": 268435456,
+            "sha256": "270b462ffad5d40de7b1e83a6d7678ee31d64eb7125d6b2f0e8602ea75041a7a"
+          }
+        ],
+        "own_memory": {
+          "allocator_peak": 2362392,
+          "physical_heap": null,
+          "conservative_own_bytes": 2706456,
+          "firmware_excluded": true
+        },
+        "all_vm_processes_closed": true,
+        "no_new_target_raw_export_performed": true,
+        "baseline64_full_windows_pass": true
+      }
+    ],
+    "bisection": "runtime/ram-final07/bisection.json",
+    "bisection_sha256": "16793d222f169d3f94ad7664ca014bb5ecefe96f580eaae44cf4d653fcab9631",
+    "cleanup_performed": false
+  },
+  "source_and_artifacts": {
+    "kind": "minios-wim-final07-source-artifact-seal-v1",
+    "source_commit": "836e5ae9",
+    "head_at_evidence": "4454e11887344f9bdd0f86a98cd992532ba889e6",
+    "sources": [
+      {
+        "path": "build.zig",
+        "bytes": 41410,
+        "sha256": "6681c6004f49caa6c2857f5b45c6b3b07e17a8c2cb63afe4846ffbf62f010036"
+      },
+      {
+        "path": "tools/minios/build_bios.py",
+        "bytes": 3366,
+        "sha256": "d57cccbc081a65b84cb21c4c08484dfae0f62736df2ae40fe037171b658b8c6e"
+      },
+      {
+        "path": "src/prep/app.zig",
+        "bytes": 6048,
+        "sha256": "572373c705cb2130d4342766b043dc0c7859dcbad8490dc6b340bd746681dc72"
+      },
+      {
+        "path": "src/prep/bios_heap.zig",
+        "bytes": 3888,
+        "sha256": "64c70899cc852e8c85594b3aa18ce20f3a2116e788ceec8b9b66199a1223d30c"
+      },
+      {
+        "path": "src/prep/bios_main.zig",
+        "bytes": 14527,
+        "sha256": "91d86bcf07e97b1404bda0c3213b2e0ab0cdc14f13953690ad3dcad20034a76e"
+      },
+      {
+        "path": "src/prep/bios_wim_main.zig",
+        "bytes": 240,
+        "sha256": "a9915a23c0cec69476f25c28a3226220427fe7fa26ee23ab243fbbd0ae08a4ad"
+      },
+      {
+        "path": "src/prep/bitmap.zig",
+        "bytes": 4368,
+        "sha256": "ae470da8f674985c2fc7c350983d9d34252b41859fe30f6116ef96d44dbe3bd7"
+      },
+      {
+        "path": "src/prep/entropy.zig",
+        "bytes": 16048,
+        "sha256": "2ad888b1e77ff615b5857bea3a4e2e8ec7c8fca7ef362f3d34fbaecc6d8ff021"
+      },
+      {
+        "path": "src/prep/fixed_heap.zig",
+        "bytes": 9564,
+        "sha256": "72420bbb035f66d9c1342bad8b5b98b19aa83eae2b45ce2af2caf3f84b32f3ef"
+      },
+      {
+        "path": "src/prep/fw_cfg.zig",
+        "bytes": 3998,
+        "sha256": "30ed8647f55935294fad6dc6b88c336565e0ca963dd0d221803c8d8df4596d77"
+      },
+      {
+        "path": "src/prep/host_main.zig",
+        "bytes": 7406,
+        "sha256": "99b31d5b024bb0a9687ca4d2ce570b671c2fadfb1350c2cbe42df5eaa041a61c"
+      },
+      {
+        "path": "src/prep/ia32_rt.zig",
+        "bytes": 2401,
+        "sha256": "55cd0fb167ae5c385dd6fbdd63b73f7626ac36f2af893d74f73dbca0a2b83ead"
+      },
+      {
+        "path": "src/prep/identity.zig",
+        "bytes": 2637,
+        "sha256": "2cf00240ee5284f97889b6c579ba283636c966a3ec25b8d002718180cc1636c3"
+      },
+      {
+        "path": "src/prep/index.zig",
+        "bytes": 33768,
+        "sha256": "a7f2201e805bec2a57036d0edbad5667a97210c7073b237651a515a9f5f05dbc"
+      },
+      {
+        "path": "src/prep/ntfs.zig",
+        "bytes": 118807,
+        "sha256": "960b504dbdd237b1ebac61ff7a9a1a100f054144c960fcd6ee3d9503f1b675c0"
+      },
+      {
+        "path": "src/prep/partitions.zig",
+        "bytes": 7870,
+        "sha256": "936332eadd1638c63326c788794302d6307be5e1984a783e6240ef6874b9c940"
+      },
+      {
+        "path": "src/prep/platform.zig",
+        "bytes": 4044,
+        "sha256": "21de81b1f04c53f544f10a5c53c03428e21f6fe7e4a1cd261f1b0eeeec7cf925"
+      },
+      {
+        "path": "src/prep/preflight_tests.zig",
+        "bytes": 26122,
+        "sha256": "bcf8a659cee44a0a8a6c3d143b3f70b6e0e3fcef132a57c6fe8ff87d6ce75c80"
+      },
+      {
+        "path": "src/prep/record.zig",
+        "bytes": 9781,
+        "sha256": "98d9430e2b52dfdc06db373e76cd791f1adb0eba4310fa9121086846cece34f0"
+      },
+      {
+        "path": "src/prep/runs.zig",
+        "bytes": 5565,
+        "sha256": "5ec7691bc4f7921a3fa7c1363b3c7fd8df8f571ec4948d657c7783df062bada7"
+      },
+      {
+        "path": "src/prep/scale.zig",
+        "bytes": 9551,
+        "sha256": "b80a1d65eb777a8ee8db72391667fca48c4fb820a2e826baed14af83be85e100"
+      },
+      {
+        "path": "src/prep/scale_main.zig",
+        "bytes": 4269,
+        "sha256": "a2795a02e0037bb8b01875ccf7376fc7bbf5b5ffd0fc0b7835357d42ddac2f5b"
+      },
+      {
+        "path": "src/prep/scale_tests.zig",
+        "bytes": 20505,
+        "sha256": "67d2c0b313751192c6db83b79dc2e0073f13399ea1eb56500e6028974604dca4"
+      },
+      {
+        "path": "src/prep/secure_index.zig",
+        "bytes": 10307,
+        "sha256": "f2a8c16a3f56ed3bbbb0137e33a29b7f049a3145b6fa4e3d90dd156a5eca1c04"
+      },
+      {
+        "path": "src/prep/tests.zig",
+        "bytes": 714,
+        "sha256": "36886d835ab050a8482f72676b4026beb32daa218ab1d2298fb4bbde500ef861"
+      },
+      {
+        "path": "src/prep/uefi_main.zig",
+        "bytes": 24612,
+        "sha256": "89158517932ee2f18e38b4e8fea3761ff34bbeab5a8da69dea70a9159e5846b3"
+      },
+      {
+        "path": "src/prep/unicode_upper.zig",
+        "bytes": 14076,
+        "sha256": "35ee395ed4b07bc3b26d408f5de4882dd209fdf7ac533791f297bf872176b1d0"
+      },
+      {
+        "path": "src/prep/wim.zig",
+        "bytes": 22899,
+        "sha256": "24dc772b8cee71e43199837ab597ba7b436e344af5859a1d5ac99e275ec58a62"
+      },
+      {
+        "path": "src/prep/wim_app.zig",
+        "bytes": 12517,
+        "sha256": "314e9613f75d50cfe214d8c37fedc50cad664091e58ee6285b13f4aa02595592"
+      },
+      {
+        "path": "src/prep/wim_apply_main.zig",
+        "bytes": 3339,
+        "sha256": "532774abe0e3fdbaa7ab3ff692181ac75dd46ea894bc030667da6e3a8421391e"
+      },
+      {
+        "path": "src/prep/wim_bits.zig",
+        "bytes": 5983,
+        "sha256": "02341c0b3695b27372346a99039b01d87c6728bd0b7e35f3bcd2803edc00f797"
+      },
+      {
+        "path": "src/prep/wim_codec.zig",
+        "bytes": 2220,
+        "sha256": "22b847609cdeac52c7bcb491e7951997884a57053da266b53dfc1ada75a2acf9"
+      },
+      {
+        "path": "src/prep/wim_codec_vectors.zig",
+        "bytes": 3887,
+        "sha256": "2f5ce9630fd5621778fa43e4186b19c964cb8f8b5853b18c35cd50c1cda63289"
+      },
+      {
+        "path": "src/prep/wim_feature_main.zig",
+        "bytes": 3207,
+        "sha256": "a899720ca17d8283c7d73659f3140b15859e3b2f60ca573a6cc8986a5654318a"
+      },
+      {
+        "path": "src/prep/wim_inspect.zig",
+        "bytes": 4675,
+        "sha256": "6d7e2f12da12961a18c833290a84ad6916d211216ef32503f723138a9f03bb4c"
+      },
+      {
+        "path": "src/prep/wim_lzms.zig",
+        "bytes": 17581,
+        "sha256": "c52a91a0c7054b14161d38504b2c81cddf600a7cf3e5609a8a2475704b9c0508"
+      },
+      {
+        "path": "src/prep/wim_lzms_tables.zig",
+        "bytes": 3443,
+        "sha256": "710a2768df5dcd6bbb8c05b0960ddbca0878a4d3703d664c8edf38ad7d557809"
+      },
+      {
+        "path": "src/prep/wim_lzx.zig",
+        "bytes": 8230,
+        "sha256": "d3ee412cdf368a12ea909c0d7114084a9992b1dec055a92dd5ca0db14b79d8d8"
+      },
+      {
+        "path": "src/prep/wim_metadata.zig",
+        "bytes": 15862,
+        "sha256": "54ad94d7577b1f9c0474920840017edb38bfe0fba6cc3b124e9f5c50a722a98b"
+      },
+      {
+        "path": "src/prep/wim_ntfs_tests.zig",
+        "bytes": 21338,
+        "sha256": "a77bbe896a79687610e3ff7c5e22701794bace7e870486130b512e33c2fb14cf"
+      },
+      {
+        "path": "src/prep/wim_xml.zig",
+        "bytes": 7307,
+        "sha256": "b306b7880baea4757478ff29fee2c06294bc437223b8d1261a050e6ace407c56"
+      },
+      {
+        "path": "src/prep/wim_xpress.zig",
+        "bytes": 2476,
+        "sha256": "6daa05035c4340b31ccda1cbcf85631ffc445cbd8909e926437e0efa3a4c91b3"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "zig-out/final07/bin/usosprep-wim-host.exe",
+        "bytes": 700416,
+        "sha256": "d0ad2608603f47e87388867741ffaadf831e7100ca419125a00b6475990c802b",
+        "pe_size_of_image": 749568
+      },
+      {
+        "path": "zig-out/final07/bin/usosprep-wim-features.exe",
+        "bytes": 637952,
+        "sha256": "8295b23411ea1fedb043a738134ef953c027686f9d9acf6c8633861f2a1a3faa",
+        "pe_size_of_image": 688128
+      },
+      {
+        "path": "zig-out/final07/bin/usosprep-wim-inspect.exe",
+        "bytes": 562176,
+        "sha256": "c8139dd0df1c6eedb644b2d859806ccf2fc00f9bf827b0f8defb2f999b964611",
+        "pe_size_of_image": 614400
+      },
+      {
+        "path": "zig-out/final07/test-assets/usosprep-x86_64.efi",
+        "bytes": 338432,
+        "sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+        "pe_size_of_image": 352256
+      },
+      {
+        "path": "zig-out/final07/test-assets/usosprep-ia32.efi",
+        "bytes": 330752,
+        "sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+        "pe_size_of_image": 339968
+      },
+      {
+        "path": "zig-out/final07/test-assets/usosprep-wim-bios.img",
+        "bytes": 1048576,
+        "sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e"
+      }
+    ],
+    "build_log": "build-final07.log",
+    "build_log_sha256": "8db0006c6f5f42b89ddc6289b532dfbab5a2296a59e6c60586dcd78ac66aa822",
+    "zig_tests": 690,
+    "python_discovery_log": "python-final07.log",
+    "python_discovery_sha256": "140afc8a099a9cfaad41b7345e8cca42d31c3945272a9000228acbc8273f3c33",
+    "python_tests_passed": 162,
+    "python_tests_skipped_then_targeted": 1,
+    "abi_test_log": "python-final07-abi.log",
+    "abi_test_sha256": "9e84a47bd9f7752182926c1182f1fea5f5821642f18bbd06c0320df1d51d0688",
+    "abi_targeted_pass": true,
+    "no_runtime_source_changes_after_build": true,
+    "note": "This immutable artifact seal predates the final RAM helper correction. Latest final test totals are in tests:165 Python, no skips; compiled application sources unchanged."
+  },
+  "tests": {
+    "zig_passed": 690,
+    "zig_steps": 84,
+    "python_passed": 165,
+    "python_skipped": 0,
+    "independent_codec_vectors": 720,
+    "host_negative_refusals": 6,
+    "native_oracle_mini_conditions": 41,
+    "minimum_export_pure_guards": 21
+  },
+  "references": [
+    {
+      "path": "root-closed-real-host-verification01.json",
+      "sha256": "fb0a1128da52d65b7e5aba2f516044a823b6361cd908791d174eebe2d6da551d"
+    },
+    {
+      "path": "root-closed-firmware-verification01.json",
+      "sha256": "9c25d9da56effeac26118881a5de61fc170afbb5a0c0f0aa348954139b72e612"
+    },
+    {
+      "path": "firmware-final07-windows-queue02.json",
+      "sha256": "ade8cb4c8296b079cb7052c574444e33944e1fccdbeed568562a0e7ebfa43ab3"
+    },
+    {
+      "path": "host-final07/windows-qualified-summary01.json",
+      "sha256": "b6094f91f0ba723fc902794429e268cb22bd59a4b701cdbfa9571c7c2dd9f766"
+    },
+    {
+      "path": "ram-windows-final07/summary.json",
+      "sha256": "3f967b873c904ed9ec9d25f570668f8e205d3a495ee2f8fb295c32e35c10d817"
+    },
+    {
+      "path": "ram-final07/winning-minimum-pins.json",
+      "sha256": "ab33e7f28e695646edd599e218ff8b46f388cd719efffe3763cde58700753e49"
+    },
+    {
+      "path": "ram-final07/bisection.json",
+      "sha256": "16793d222f169d3f94ad7664ca014bb5ecefe96f580eaae44cf4d653fcab9631"
+    },
+    {
+      "path": "final07-artifacts.json",
+      "sha256": "b7d08a47ac7624c27f7abbbc9ccfbcdcb3f8eecc6673b641cf43e7a26e2aa7dd"
+    },
+    {
+      "path": "build-final07.log",
+      "sha256": "8db0006c6f5f42b89ddc6289b532dfbab5a2296a59e6c60586dcd78ac66aa822"
+    },
+    {
+      "path": "python-final08-helper-closure.log",
+      "sha256": "563727ae24af9f7c800b11f3fa83356ef5c6e2caa8b1fd3f94a22f9abbd9e0c0"
+    }
+  ],
+  "contract": {
+    "fresh_format_only": true,
+    "short_names_8_3_created": false,
+    "solid_lzms_supported": false,
+    "split_swm_supported": false,
+    "root_mft5_reserved_flags_explicit": 6,
+    "root_source_metadata_manifest_unchanged": true,
+    "changed_time": "WIM modifiedTime",
+    "no_microsoft_implementation_source_consulted_this_stage": true,
+    "no_new_media_binaries_in_git": true,
+    "no_menu_or_installer_integration": true,
+    "no_physical_hardware_test": true,
+    "bios_lowest_executed_mib": 32,
+    "bios_lower_boundary_not_measured": true
+  },
+  "image_retention": "All images retained at report production; later authorized two-phase cleanup is recorded with exact list in RAPORT-MINIOS-ETAP1B2.md",
+  "path_roots": "runtime/ means external approved test runtime, repository/ means this worktree; no absolute user paths stored"
+}

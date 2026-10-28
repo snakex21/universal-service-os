@@ -1,0 +1,309 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+# MiniOS import into master line (2026-10-28)
+
+Path-scoped import of the MiniOS prep environment from Codex branch
+`codex/minios-etap1` at `33aa5c6d` (reviewed and accepted up to that commit).
+No branch history was merged. Paths taken from `33aa5c6d`:
+`src/prep/**`, `tools/minios/**`, `src/storage/ntfs.zig`, the MiniOS
+`tools/tests/*` files, `docs/minios*`, the `addUsosPrep` hunk of `build.zig`
+and the `/runtime/` lines of `.gitignore`.
+
+Included by state: 1381f4fa (removal of the historical bootfiles capacity
+override) and b13074eb..33aa5c6d (retirement of the scoped DISM exception,
+executable allowlist, CPU profile name, normal reservation). The one-off
+capacity exception introduced in 89cb5d00 is absent from the imported state
+(`tools/minios/bootfiles_capacity.py` does not exist; guard test
+`tools/tests/test_minios_bootfiles_capacity.py`). No SYS/CER or other
+Microsoft binaries are imported.
+
+Authorship: original MiniOS code by Codex (commits as snakex21) with Claude
+reviews; NT5 sources were used by Codex only for status names/mechanism
+qualification as recorded in the per-round reports.
+
+## Codex commits covered (f8a2f50c..33aa5c6d, MiniOS paths)
+
+- 33aa5c6d fix(minios): charge full diagnostic growth against the normal reservation
+- 4b4a2e15 docs(minios): require path-scoped cherry-picks and exclusion of capacity history
+- 17320cc8 fix(minios): name WHPX max profile after all disabled CPU features
+- 1a937c9d fix(minios): allow only normalized system DISM and pinned Python executables
+- b13074eb fix(minios): retire scoped DISM capacity exception and enforce normal budgets
+- 0ac0de52 docs(minios): separate earlier runner additions for integration review
+- 7b958995 docs(minios): preserve unresolved WIM tag 4 evidence and provenance
+- cdc1bd22 docs(minios): record WHPX CPU result and unpassed visual Windows gate
+- 3632d023 fix(minios): exclude AVX512 foundation in WHPX max CPU probe
+- 04e935ab fix(minios): check interrupted checkpoints and bound WHPX diagnostic choices
+- af977519 docs(minios): establish offline BFSVC failure and missing causal evidence
+- 6a8e3d98 docs(minios): qualify OOBE status and record review safety policy
+- 1381f4fa fix(minios): remove historical bootfiles capacity override from branch
+- ba7a788a fix(minios): permanently remove host bcdboot execution paths
+- 4c1c955e fix(minios): allow display wake only at the final screenshot endpoint
+- ad47382d fix(minios): finish firstboot evidence on unexpected QMP stop
+- 92ef6444 style(minios): preserve LF in bootfiles runner changes
+- 6215189a fix(minios): apply bootfiles limits throughout the preparation gate
+- 89cb5d00 fix(minios): bound bootfiles images and retained output before writes
+- 08070c97 fix(minios): reject incomplete allocated stream coverage
+- 910e1d03 fix(minios): enforce fail-closed host mutation gate
+- ba8d4257 docs(minios): correct host DISM execution history
+- 85d441d2 feat(minios): bound reference Windows firstboot
+- 6c300525 feat(minios): map diagnostic firstboot VHDX chain
+- da677834 fix(minios): accept bounded zero QCOW header extension
+- 3e83d68e feat(minios): prepare guarded reference boot runner
+- 0494af3c feat(minios): plan bounded reference boot invocation
+- 9c48bb83 fix(minios): label deferred reference comparison accurately
+- e2724c3e feat(minios): add isolated QEMU reference boot client
+- 69ac79cc feat(minios): pin diagnostic reference boot configuration
+- fc6da9d1 feat(minios): isolate reference boot file provisioning
+- 1bb78898 feat(minios): guard diagnostic reference ESP writes
+- df403e44 feat(minios): validate diagnostic QCOW backing metadata
+- 02479994 feat(minios): validate diagnostic DISM boot identity and budgets
+- 922962eb fix(minios): identify reserved NTFS metadata ancestry
+- 0a0f191c fix(minios): retain details for rejected NTFS parent links
+- 69405431 fix(minios): inspect Windows protective MBR sentinel
+- 1a7a6d2c fix(minios): bound scoped DISM metadata comparison
+- a8ca4700 fix(minios): resume reviewed control image after GPT initialization
+- 504ba140 fix(minios): validate Windows initialized reserved partition
+- 76abcd78 fix(minios): preserve parsed host DISM job object
+- b0376631 fix(minios): preserve DISM evidence and bound subprocess cleanup
+- 28a453b6 feat(minios): prepare guarded host dism reference
+- 42e9015c test(minios): cover bounded host process logs
+- f44a7b2f feat(minios): bound host dism helper output
+- 178c258a feat(minios): guard dism scratch against wim tree
+- 545172e7 feat(minios): check scoped host dism capacity
+- 1db436b4 fix(minios): read fixed vhdx through verified bat
+- 9af0caf3 feat(minios): create fully allocated vhdx natively
+- 227ad60e fix(minios): accept known optional vhdx regions
+- 6f0e5d00 feat(minios): inspect fixed vhdx allocation and bat
+- c6584102 feat(minios): add read-only host dism identity probes
+- c28d23f0 docs(minios): design guarded host dism control
+- 542b2251 feat(minios): validate standalone vhdx before metadata capture
+- b0bdb119 test(minios): add experimental WIM metadata comparison
+- 0cc43c23 test(minios): allow opt-in WHPX first-boot diagnostic
+- 5cb52229 test(minios): allow isolated NIC in first boot diagnostics
+- 9e59eb2f test(minios): document unknown NTFS volume flag refusal
+- 55188b42 fix(minios): pack UpCase mappings for BIOS memory limit
+- 9feac9f7 test(minios): initialize optional reader state in legacy byte fixtures
+- a59d921c test(minios): type raw mapping-pair fixtures for isolated reader tests
+- 10d10b82 test(minios): execute isolated reader regression tests in the full suite
+- 3cc2ba4d docs(minios): complete NT5-based NTFS coverage and explicit reader limits
+- ca522c30 test(minios): verify preserved compressed files against independent WIM hashes
+- ecb1f65a fix(minios): stream Unicode table through bounded source reads
+- af50cb5f feat(minios): validate NTFS volume state and use its Unicode case table
+- 3097c72a feat(minios): resume Windows firstboot from verified checkpoint overlays
+- 7e195d15 feat(minios): read sparse and initialized NTFS ranges without leaking disk bytes
+- 8ffa68d3 fix(minios): accept pinned boot utility in firstboot proof chain
+- 83593bd9 docs(minios): record real MFT reader and UEFI bootfile gates
+- 318921fe test(minios): add image-locked read-only NTFS reader gate
+- 35bddc71 feat(minios): resolve MFT attribute-list extents in isolated NTFS reader
+- f29ceb84 docs(minios): audit NTFS coverage against local NT5 mechanisms
+- 21113b5b docs(minios): record boot-source MFT limitation after authorized BCD deferral
+- e309eeeb feat(minios): disclose authorized BCD reference deferral for boot gates
+- 9af1e9c9 docs(minios): report firstboot runner gates and stop on bcdboot collision
+- 4412f4a8 fix(minios): distinguish acknowledged Windows QMP quit from early reset
+- 7378ca92 fix(minios): reject disk errors received during firstboot shutdown
+- 12c81f2b fix(minios): drain screenshot pipe when producer closes before connect
+- 5d6d1129 fix(minios): avoid unsupported guest-core option on Windows QEMU
+- 6ea6cd4a fix(minios): enforce firstboot disk output and lifetime bounds
+- ead7cfe5 docs(minios): record authorized cleanup of fourteen retired targets
+- 112af328 style(minios): normalize 1c5 evidence line endings
+- 1716a3a4 docs(minios): close 1c5 with Win11 pass and remaining gate limits
+- 53f676c7 test(minios): record 486 pass and Pentium scan deadline
+- ffe7620e test(minios): record complete Win11 firmware and readonly native gates
+- 4431f6e6 fix(minios): record guest duration separately from evidence hashing
+- 1c61b0e0 docs(minios): record isolated profiler and buffer A/B results
+- 7104f3c6 fix(minios): recognize the guarded TSC helper in ELF assembly audits
+- 33f43e01 test(minios): encode the whole binary-mode RTC fixture consistently
+- 3ab4309c fix(minios): avoid RTC fixture name collision in Zig tests
+- 347de79b fix(minios): use checked BIOS RTC and preserve isolated CPU evidence
+- 0edd8249 test(minios): make full isolated harness discovery reliable on Windows
+- ed8ab512 perf(minios): calibrate optional TSC timing once and default profiling off
+- ac7230bb test(minios): isolate runtime profiling and combiner A/B probes
+- ffb1df78 docs(minios): record 1c4 timeout and retained A/B evidence
+- f7165378 test(minios): enforce actual target IO call budget for small files
+- 45d04b1d perf(minios): wire combined target IO and checked timing in BIOS client
+- 6c828494 fix(minios): isolate a larger BIOS installer packaging slot
+- 16eb5f45 fix(minios): keep final durability recovery and reject missing coarse time
+- 5d5941c2 perf(minios): integrate prepared directory index and persistent bitmap
+- 62914c8f perf(minios): integrate combined target writes and category timing in UEFI
+- 53891772 perf(minios): retain allocation cursor and add checked read-only PM timing
+- 5dda7b39 feat(minios): add bounded nested high-resolution profiling
+- ffd423fe perf(minios): combine ordered virtual target writes with sticky recovery
+- 09c3d019 perf(minios): cache directory index pages and reuse insertion searches
+- a8e68d1f perf(minios): coalesce ordinary MFT records in bounded cache
+- a582ffab fix(minios): use checkpointed QCOW2 for live preparation targets
+- 945813c8 docs(minios): record native RAW and WHPX QCOW2 baseline timings
+- 1fb9157a docs(minios): stop after bounded WHPX selected apply timeout
+- 61cc50b9 fix(minios): refuse unmapped directory DATA before formatting
+- 0a774716 fix(minios): require selected stream completion for BIOS boot admission
+- 3fda8704 fix(minios): bind reused bcdboot bases to original firmware proof
+- 1f83101c feat(minios): verify selected WIM streams with live firmware telemetry
+- 5f5b0350 test(minios): prove direct dynamic VHD checkpoints without a guest
+- 12e5fe04 feat(minios): reuse immutable prepared VHD for native filesystem gates
+- b441f03c feat(minios): prepare directly into retained dynamic VHD targets
+- 8e826223 perf(minios): avoid prefetch amplification on random source reads
+- 941c599c feat(minios): support bounded WHPX preparation and selected WIM verification
+- 977f2a02 perf(minios): measure actual firmware LZX and SHA1 on real WIM samples
+- ac438ff4 perf(minios): cache WIM chunk offsets and sequential source reads
+- 51760a50 feat(minios): report bounded progress and storage telemetry
+- 00abbed0 docs(minios): stop at real firmware WIM verification gate
+- 63a8cc45 feat(minios): gate first Windows boot with one QMP endpoint
+- 241618fc test(minios): budget bounded first Windows boot overlays
+- ae0ecb9b test(minios): gate BIOS boot provisioning on actual native and BCD proofs
+- b4c7115d test(minios): pin BIOS preparation entropy and capture provenance
+- 310cf376 test(minios): pin completed guest captures to the clean build
+- 698409d2 test(minios): add explicit BIOS preparation firmware harness
+- d9262ed5 perf(minios): use virtio during verified target preparation
+- 29e9afb1 feat(minios): gate UEFI boot provisioning on pinned native receipts
+- 0c409741 fix(minios): charge bounded growth within closed VM reservations
+- edbf36e9 fix(minios): restrict UEFI boot writes to ESP and use short control names
+- 1455b901 feat(minios): add separate guarded BIOS boot provisioning client
+- 81f70fe1 fix(minios): retain IDE overlays for BIOS handoff fixture
+- a9d9c492 fix(minios): expose readonly install source through virtio block
+- ea63f333 test(minios): smoke firmware installation with small own data
+- 38735827 feat(minios): add own BIOS chain-loader templates and handoff fixture
+- a92ca8ca fix(minios): write target marker without qemu-io path quoting
+- f3d59d8a feat(minios): provision experimental BIOS boot files with run binding
+- 17b48687 refactor(minios): share bounded read-only boot source inventory
+- e4821fc9 fix(minios): bind FAT fixtures to the approved image pool
+- ec41d1ea test(minios): allow a bounded three GiB optical source pack
+- fa8a180a feat(minios): build an isolated i486 BIOS install client
+- 09e3f524 perf(minios): use bounded heap sort for unique metadata keys
+- 61769800 refactor(minios): keep WIM metadata validation errors small
+- 9170d183 feat(minios): guard real bcdboot on an isolated virtual child
+- ffd29db4 build(minios): add separately gated UEFI boot provisioning clients
+- 03341198 refactor(minios): derive disk identities with shared SHA256 expansion
+- 2c5d1586 feat(minios): add isolated gated UEFI boot provisioning client
+- 6c892464 refactor(minios): avoid large NTFS constructor error constants
+- e993fac0 feat(minios): verify multipartition installs through one dynamic VHD
+- ca52647c feat(minios): provision UEFI boot files from applied Windows NTFS
+- e9ce2af7 perf(minios): mount installer ISO directly into tracked heap
+- d3232b66 refactor(minios): open firmware ISO source in tracked heap
+- b3333ed6 refactor(minios): keep optical error unions small on firmware
+- 4402496f feat(minios): prepare Windows disks from ISO on NTFS in UEFI
+- 24b1c2b8 feat(minios): guard fresh VHD normalization and independently read dynamic disks
+- f7427b6d feat(minios): apply ISO through guarded Windows disk preparation
+- a3cff345 fix(minios): normalize sparse VHD copies before the FAT32 Windows gate
+- b687ed01 test(minios): bind BCD oracle to clean final state and executable
+- 24493e30 docs(minios): document optical follow-ups and bounded NTFS source reads
+- 8712f52b refactor(minios): use shared bounded optical walker in host manifests
+- 57a05caa feat(minios): prepare Windows partitions after complete WIM preflight
+- 67993576 fix(minios): cap fragmented NTFS run allocation precisely
+- 5f753d01 fix(minios): fall back when primary UDF anchor is unreadable
+- 189f4f3a feat(minios): resume validated ESP allocation across preparation gates
+- 9efff0c1 test(minios): recheck retained fragmented VHD read-only on clean build
+- 004c0799 test(minios): compare required BCD route against native bcdboot
+- 627f2880 fix(minios): validate hive offsets before 32-bit additions
+- 549f87ca feat(minios): authorize blank disks and plan Windows GPT and MBR layouts
+- 3a5f05ac perf(minios): validate bounded blank VHD in native byte loop
+- 17bc47b4 fix(minios): create ordinary nonsparse VHD for native NTFS fixture
+- f5dad097 feat(minios): build qualified GPT and MBR BCD stores offline
+- 746f9223 fix(minios): bound registry lists before IA32 byte arithmetic
+- 7e0c9176 fix(minios): skip optional ISO associated streams during traversal
+- 12b6afb4 test(minios): validate fragmented source geometry and AL bounds
+- 3ebddf1d fix(minios): sign every sector of the complete FAT32 boot record
+- bde15be8 fix(minios): allocate full final REGF big-data segment for Windows
+- 5a43fe1c test(minios): verify Windows-fragmented NTFS ISO with independent parser
+- 66937660 test(minios): create Windows-fragmented ISO on guarded virtual NTFS
+- ff4c29f8 perf(minios): retain aligned FAT32 stream batches for firmware IO
+- 0fc6c243 feat(minios): resolve fragmented NTFS ISO streams through attribute lists
+- 7fb928c1 test(minios): add independent FAT32 and guarded read-only Windows gates
+- a6e43865 refactor(minios): bound optical stack copies and test disk sector sizes
+- d6cf0429 chore(minios): record approved VHD cleanup and actual master payload audit
+- 97378ead feat(minios): format FAT32 and stream ESP files with bounded buffers
+- c12cab4a feat(minios): diagnose ESD and split WIM optical sources
+- 4e760b39 fix(minios): retain original optical stream error in diagnostics
+- 37236c64 feat(minios): enforce optical tree budget in shared walker
+- ce74df14 feat(minios): add offline REGF hive writer with segmented values
+- d0c42c4d fix(minios): skip and count unsupported optical entries
+- dfd176ff chore(minios): guard the accepted four-copy VHD cleanup
+- 2563a25c fix(minios): try redundant UDF anchors after invalid primary
+- 1f4f9fb1 fix(minios): accept UDF System ICB attribute
+- 2669a0bc docs(minios): seal optical reader evidence and retained image inventory
+- 240d6a07 fix(minios): seal duplicate capture receipt only once
+- 5e13f1dd fix(minios): reap Windows stream processes before closing evidence logs
+- 57d29d26 fix(minios): refuse linked optical output images before formatting
+- 90be6d51 fix(minios): drain 7-Zip output before buffered extraction logs
+- a723d919 test(minios): verify NTFS ISO streams against pinned 7-Zip manifests
+- 7c0400ca test(minios): reject unbound optical integration evidence before image creation
+- de621c80 feat(minios): stream ISO files on NTFS directly into WIM apply
+- a2661c68 test(minios): guard sparse fixtures and allow ReleaseSafe fuzz harness
+- 758e0c64 test(minios): verify all identical and conflicting WIM duplicates
+- 53f2688a fix(minios): report all unmatched RP_FIX targets before writes
+- e9762ca5 fix(minios): harden optical metadata and streamed extent validation
+- 6196cac7 test(minios): add streamed 7-Zip optical oracle and synthetic fixtures
+- d0853462 fix(minios): report unmatched RP_FIX and verify identical duplicate blobs
+- 1fa682db feat(minios): add bounded read-only ISO Joliet and UDF streams
+- b8854db3 chore(minios): label build logs and require clean final evidence
+- 4201bcbc chore(minios): guard cleanup of the accepted 1c0 inventory
+- fa7ca354 docs(minios): record final 1c0 gates and retained evidence
+- 183beb45 test(minios): retain and run native wimlib ABI proof
+- 5bb46577 docs(minios): refresh payload audit for the reviewed branch
+- 71fdb8bc fix(minios): plan DOS aliases from stored WIM source order
+- 25055c4e test(minios): pin the reader in duplicate resource evidence
+- 2d0b5bc2 fix(minios): create one DOS name pair per hardlinked inode
+- 5f851dfe chore(minios): guard authorized cleanup of superseded test images
+- c0b57635 chore(minios): parameterize host paths and add SPDX headers
+- 72025f80 test(minios): compare duplicate WIM resources with wimlib
+- e39b47ac feat(minios): preserve WIM object IDs and extended attributes
+- ac2e87a3 docs(minios): audit legacy payload against the pinned integration master
+- 713c0b33 feat(minios): preserve WIM DOS aliases without inflating hardlinks
+- 68b6d33e fix(minios): retarget RP_FIX links to the destination volume
+- 82c68caf docs(minios): record verified post-report WIM image cleanup
+- f5473a20 docs(minios): seal 24 qualified WIM and NTFS acceptance gates
+- 7e9cc46a Record final WIM firmware and native-verified RAM boundaries
+- 879a3a82 docs(minios): close native gates for minimum-RAM WIM results
+- 08e2681d Bind RAM baselines to exact native evidence and full COW bounds
+- 64dab3f0 docs(minios): qualify final07 real WIM and nine host Windows gates
+- 4454e118 docs(minios): pin final07 host memory timing and refusal metrics
+- 872b3244 Probe WIM UEFI RAM with retained COWs of verified baselines
+- 55152ea6 chore(minios): repin unchanged public final07 feature expectations
+- 8bd962ca fix(minios): enforce explicit NTFS root metadata contract
+- 836e5ae9 fix(minios): preserve reserved volume-root SI flags during WIM apply
+- e8a9b603 Allow explicit temporary 150 GiB WIM pool with strict cap tests
+- 327e644f test(minios): guard two-phase post-report WIM image cleanup
+- 7dcfe044 docs(minios): preserve root metadata06 native chkdsk failure
+- 31fc0d8e fix(minios): read complete SACL and prove API NORMAL attributes
+- a654c2d1 fix(minios): retain reserved root filename metadata flags
+- 2a325be6 fix(minios): derive compact ESP payload offsets from BPB geometry
+- a2c2f381 test(minios): read protected WIM ACLs with backup intent
+- 27989003 docs(minios): record Windows ADS validation and NTFS failure guards
+- 02af9493 test(minios): capture and apply real NTFS ADS through WIM
+- c69a3d99 test(minios): enforce aggregate WIM pool and compact firmware fixtures
+- a3ecdaf6 test(minios): add 1200-file 128MiB WIM workload profile
+- 83bcbac8 test(minios): verify final host WIM codecs and preformat refusals
+- 11986fa7 feat(minios): apply selected verified WIM to fresh NTFS images and firmware targets
+- 3cee6b38 test(minios): add isolated WIM firmware and readonly oracle harness
+- 168bcd46 fix(minios): distinguish WIM IMAGE entries from IMAGESTATE metadata
+- 15ba313d perf(minios): initialize LZMS state without large rodata aggregate
+- 946669ec feat(minios): stream verified WIM metadata and explicit image inventory
+- 47679d51 test(minios): generate pinned own-data WIM oracle fixtures
+- b503579c docs(minios): pin legacy driver and certificate audit
+- 4b8c6386 fix(minios): apply root metadata and poison failed data writes
+- 098720f6 test(minios): gate exact raw security and native SD sections
+- f8396062 feat(minios): isolate WIM BIOS payload within existing slot
+- 22db3bc5 feat(minios): add explicit WIM firmware test profiles
+- f267dd7c fix(minios): collate named NTFS attributes using UpCase
+- 4fcabed5 test(minios): retain per-file failures and exact native diagnostics
+- abf34240 fix(minios): accept omitted final LZX raw alignment byte
+- 2b5c9458 docs(minios): specify WIM NTFS metadata API and bounds
+- 8f58feda test(minios): generate independent NTFS feature expectations
+- 6e54614e feat(minios): preserve WIM NTFS links security streams and metadata
+- 90854da7 test(minios): compare native readonly NTFS metadata with WIM oracle
+- 0cccacc4 feat(minios): decode bounded raw LZMS with adaptive Huffman and delta matches
+- cfc1c5ee test(minios): add pinned independent WIM metadata oracle
+- 5c9df632 feat(minios): stream WIM resources and validate indexed SHA1 digests
+- 41fc5ddd feat(minios): decode WIM LZX blocks and E8 filtering in Zig
+- 3fedb942 feat(minios): decode bounded XPRESS WIM chunks in pure Zig
+- 871f036b fix(prep): reject unhealthy entropy from every provider
+- 2ab9df7c docs(minios): close pre-WIM gates with pinned cleanup evidence
+- a8ca5d16 fix(minios): resume only the closed Windows oracle after storage refusal
+- f2913342 test(minios): pin preflight oracles and guard post-report cleanup
+- c01ce59a feat(minios): guard firmware entropy and add pre-WIM acceptance cases
+- 6fa3aa72 fix(minios): bootstrap fragmented MFT and stream metadata bitmaps safely
+- bad3f68f chore(minios): remove unused Unicode license artifact
+- cd89148f docs(minios): close NTFS scaling acceptance and preserved evidence
+- 8d941ef1 feat(minios): validate bounded i486 firmware backends and acceptance evidence
+- b5b11276 build(minios): declare and audit explicit i486 firmware targets
+- 7472cca9 test(minios): exercise large NTFS workloads and inspect emitted metadata
+- 685068f8 feat(minios): scale NTFS allocation and directory trees
+- 7ea4a0ac fix(minios): validate portable NTFS preparation against Windows read-only checks
+- a1e0fe37 feat(minios): add isolated Zig disk preparation proof of concept

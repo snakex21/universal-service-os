@@ -1,0 +1,111 @@
+{
+  "schema": "minios-1c4-retained-images-v1",
+  "items": [
+    {
+      "relative": "1c4/host-baseline/blank-base.qcow2",
+      "bytes": 328192,
+      "sha256": "39b78d34110f1bcf401234c873ac6e8974380f163ca35ae315af3070cf57e966",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/host-baseline/target.raw",
+      "bytes": 34359738368,
+      "sha256": "18bd451dea6938bf1161d106beed70525d2e55988fe81a4d216c332e2e452c9c",
+      "hash_basis": "completed_receipt; no writer reopened this closed image",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/host-baseline/test-cow.qcow2",
+      "bytes": 197120,
+      "sha256": "9d549c2714087c47d57d16b843757bc766eacd6bbf79255ce576cdce8fdb991b",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/probe-qcow/win11-128/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "753392bc16687527ce76c10ce96a7090c051220c116cbc8f885e8a1f672b7e9e",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/probe-qcow/win11-128/boot.qcow2",
+      "bytes": 786432,
+      "sha256": "389f9d3cf6c5f2a12f0c2936a9e5d7f4e1de03ad574e1f2b95c63ae60a4e1a74",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/probe-qcow/win11-128/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "5db6acfa79a10591e6a55062ccdd5427c205920c0c0ef659ee12f1143780ba9f",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/probe-qcow/win11-128/target.qcow2",
+      "bytes": 8248950784,
+      "sha256": "1f8cb5b5bf8bc594e3727cf38a64849bac8d13898c86e95c25e224803ac5c69c",
+      "hash_basis": "completed_receipt; no writer reopened this closed image",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/probe-qcow/win11-128/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/win11-final/whpx128-01/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "ac96b2b29c144ea73f0ab39f2664c6265192780db07289cfcca376678c8763c0",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/win11-final/whpx128-01/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "7638391c17de04ebbf99454bcdf41932a015760f29673f8f4acb67643d4ccd67",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/win11-final/whpx128-01/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "a6e84a40d940a41088ea42c1153f7eea3d9e4e9febef61e54cf4117f87a502f9",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/win11-final/whpx128-01/target.qcow2",
+      "bytes": 3465150464,
+      "sha256": "f88d2fb86cc2939dc14ccd8824a3ac281bdc296cddff74285ca783a5df35507e",
+      "hash_basis": "completed_receipt; no writer reopened this closed image",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "relative": "1c4/win11-final/whpx128-01/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "closed small image rehashed during report",
+      "retained": true,
+      "deletion_authorized": false
+    }
+  ],
+  "deleted": [],
+  "cleanup_performed": false
+}
