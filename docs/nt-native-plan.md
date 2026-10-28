@@ -195,6 +195,45 @@ E820 (same `su` layout as 3.51, own disassembly of the user's CD file).
 BOOT.INI /MAXMEM=128 boot, 256 MiB stops (QEMU, 2026-10-09). Emulated in
 `tools/tests/legacy_bios/test_nt3_e820_hook.py`; no X470 run yet.
 
+**Result (B261028-191138, NT 3.51 WS EN, Micron NVMe):** installed, desktop,
+but only PS/2 input, and NTLDR's menu at every start (30 s, entries
+"[VGA mode]" and "Unrecognized Operating System on C:"). Offline read of the
+Micron: usosusb installed by the service (POST.LOG `done`, Start 1, group
+Keyboard Port) but **never started** (no `usosusb\Parameters\Diag`; SysEvent
+has one EventLog start = the first start only; POST.LOG has no `restart`, so
+the service's restart 30 s after `done` never came). On the VM path the VM
+did that first start + restart, and `nt4_vm_finish` rewrote BOOT.INI; the
+native path had neither. The menu itself is NT's own BOOT.INI menu (no USOS
+or CSMWrap stage): Setup's `timeout=30`, the `C:\` entry is the syslinux boot
+sector winnt /b saved as BOOTSECT.DOS.
+
+QEMU (read-only copy of that Micron disk, q35 + OVMF + CSMWrap, NVMe behind a
+root port, 12 root ports, qemu-xhci + usb-kbd + usb-mouse; the q35 i8042
+stays: with `i8042=off` NTDETECT hangs, the X470 has a PS/2 controller):
+the next start loads `usosusb 1.4-nt4` (`hc0=00:02.0(8 ports) p5:s1K-
+p6:s2-M`), Ctrl+Alt+Del and logon by USB keyboard, Program Manager menus;
+keyboard and mouse unplugged/plugged on root ports re-enumerate (`p5-gone
+p7:s1K-`, `p6-gone p8:s2-M`); a FAT16 stick plugged at runtime gets E: (D: is
+QEMU's empty CD), `dir`/`copy` from it and a write to it work, unplug + plug
+again gives `UsosUsbDisk1:E` and a second write lands. A write unplugged
+~10 s after the command did not reach the stick (NT 3.51 FAT lazy write; no
+safe-removal UI: wait before unplugging).
+
+Fix (`usosnt3`, `NATIVE.TXT` from `nt4_csmwrap_target.sh`, native NT 3.5x
+only): `/setup` (GUI Setup) already copies `usosusb.sys` and writes its
+service + `ConnectMultiplePorts`, so the first start has USB input; the
+service rewrites BOOT.INI like `nt4_boot_ini` (timeout=5, no `C:\` entry,
+the native load options on every entry, `[USOS /SOS]`, `[VGA mode]`) and
+removes BOOTSECT.DOS, the syslinux files and WINNT.SIF. `usosnt3 /finish`
+does both by hand on a native install made before (needs NATIVE.TXT).
+QEMU: `/finish` on the disk copy, reboot passes the 5 s menu to the logon.
+
+Still without USB: text-mode and GUI-mode Setup (zero input needed there).
+Text mode would need SETUPLDR to load usosusb before kbdclass
+([SCSI.Load] makes it a boot driver of the new system as well, and its
+KeyboardPort0 would then hide a PS/2 keyboard unless kbdclass connects
+multiple ports in the Setup hive); not done, no X470 evidence yet.
+
 ### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 
 Rule (user, 2026-10-28): the native path needs **zero input**. NT 3.x/4 text
