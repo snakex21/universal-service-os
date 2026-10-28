@@ -827,8 +827,16 @@ void __cdecl usos_entry(void)
     state_read();
     g_boots++;
     pending = addons_pending();
+    /* With the first-desktop coordinator (FIRSTBT.ON) USOSFB runs the
+     * add-on chain, not the USOSAddons Run value: its markers say whether
+     * the chain is over (X470 98 FE PL 2026-10-28 logged "chain over" at
+     * the start of a package boot). The removal decision is unchanged. */
     wsprintfA(line, "USOSANS start %u (desktop reached in %u earlier starts, add-on chain %s)",
-              g_boots, g_desk, pending ? "pending" : "over");
+              g_boots, g_desk,
+              !beside("FIRSTBT.ON") ? (pending ? "pending" : "over")
+              : beside("FIRSTBT.OK") ? "over (USOSFB: FIRSTBT.OK)"
+              : beside("FIRSTBT.ERR") ? "stopped (USOSFB: FIRSTBT.ERR)"
+              : "pending (USOSFB: no FIRSTBT.OK / ERR yet)");
     say(line);
     say(chain_open() ? "first-desktop coordinator still owns the starts (FIRSTBT.ON, no FIRSTBT.OK / ERR): value kept up to 12 starts"
                      : "first-desktop coordinator not staged or finished");

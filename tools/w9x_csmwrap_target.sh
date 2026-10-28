@@ -891,7 +891,7 @@ if [ "$ANSWER_KIND" != USER ] && { [ "$SYSTEM_TAG" = 98 ] || [ "$SYSTEM_TAG" = 9
     if [ -r "$LIB/w9x_firstboot.sh" ] && . "$LIB/w9x_firstboot.sh" && w9x_firstboot_write "$work/c/USOS9X" "$fb98_version"; then
         log "first desktop: $SYSTEM_TAG ($fb98_version) ordinary RunOnce coordinator, one final post-addons restart"
     else
-        rm -f "$work/c/USOS9X/FIRSTBT.ON" "$work/c/USOS9X/FIRSTBT.REG" "$work/c/USOS9X/FIRSTBT.BAT" "$work/c/USOS9X/SHELLHDR.INI"
+        rm -f "$work/c/USOS9X/FIRSTBT.ON" "$work/c/USOS9X/FIRSTBT.REG" "$work/c/USOS9X/FIRSTBT.BAT" "$work/c/USOS9X/SHELLHDR.INI" "$work/c/USOS9X/BOOTLOG.ON"
         log "first desktop: $SYSTEM_TAG coordinator not staged (USOSFB.EXE missing?); add-ons from Run at the desktop"
     fi
 fi

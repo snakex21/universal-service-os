@@ -105,8 +105,11 @@ class Coordinator(unittest.TestCase):
 
     def test_start_handoff_and_runonce_order(self):
         s=self.src;start=s[s.index('void __cdecl fb_start(void){'):]
-        self.assertLess(start.index('shell_mode=usos_shell();'),start.index('journal=CreateFileA'))
-        self.assertIn('if(journal==INVALID_HANDLE_VALUE)leave(2);',start)
+        # the journal's first line comes first (X470 98 FE 2026-10-28); a
+        # journal failure still leaves knowing the shell mode
+        self.assertLess(start.index('journal=CreateFileA'),start.index('start_line();'))
+        self.assertLess(start.index('start_line();'),start.index('shell_mode=usos_shell();'))
+        self.assertLess(start.index('shell_mode=usos_shell();'),start.index('if(journal==INVALID_HANDLE_VALUE)leave(2);'))
         self.assertIn('save("SHELLRUN.FLG"',start);self.assertIn('drop("SHELL.TRY");',start)
         self.assertIn('else if(exists("SHELL.TRY")){',start)  # shell= set but Explorer came: no loop
         self.assertIn('log_line("already complete");leave(0);',start)

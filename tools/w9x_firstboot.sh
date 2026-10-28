@@ -37,6 +37,88 @@
 # shell mode only when SYSTEM.INI starts with [boot] and SHELLHDR.INI exists.
 # 950's COPY sets no reliable ERRORLEVEL: results are checked with
 # IF EXIST and FIND (0 found, 1 not found), FIND reads stdin (no header).
+# Boot sequence diagnostics (X470 98 FE PL 2026-10-28: a package boot died
+# early with no record; BOOTLOG.TXT / .PRV only held the two boots before
+# the first package that queued WININIT renames, although MSDOS.SYS kept
+# BootLog=1, untouched since Setup, in this run and in the 27 Oct runs).
+# Every boot until the first one that sees FIRSTBT.OK or FIRSTBT.ERR (which
+# writes LOGS\BOOTSEQ.END): LOGS\BOOTSEQ.TXT gets the boot number, the
+# FIRSTBT.STA phase and the markers (WININIT.INI pending, MSDOS.SYS
+# BootLog=1), and C:\BOOTLOG.TXT as it stands is copied to LOGS\BOOTnn.TXT
+# (TYPE: also reads a hidden file; equal consecutive copies = no new log).
+# DOS batch has no arithmetic: LOGS\BOOTNUM.nn is renamed one step per
+# boot, the copy twelve boots older is deleted (at most 12 copies), and
+# boot 40 is the last one recorded. 98 only (BOOTLOG.ON; 950 rejects the
+# line): a MSDOS.SYS without BootLog=1 gets it back (its old BootLog lines
+# in LOGS\BOOTLOG.ORG, BOOTLOG.FRC set); the last record puts the profile's
+# own lines back. Every GOTO jumps forward.
+w9x_bootseq_block() {
+    printf '%s\n' 'IF EXIST C:\USOS9X\LOGS\BOOTSEQ.END GOTO BSDONE' \
+        'IF NOT EXIST C:\USOS9X\LOGS\NUL MD C:\USOS9X\LOGS' \
+        'IF EXIST C:\USOS9X\LOGS\BOOTNUM.40 GOTO BSDONE'
+    n=39
+    while [ "$n" -ge 1 ]; do
+        printf 'IF EXIST C:\\USOS9X\\LOGS\\BOOTNUM.%02d GOTO BN%02d\n' "$n" $((n + 1)); n=$((n - 1))
+    done
+    printf '%s\n' ':BN01' 'ECHO USOS boot counter> C:\USOS9X\LOGS\BOOTNUM.01' 'SET U9BN=01' 'GOTO BNGO'
+    n=2
+    while [ "$n" -le 40 ]; do
+        printf ':BN%02d\nREN C:\\USOS9X\\LOGS\\BOOTNUM.%02d BOOTNUM.%02d\nSET U9BN=%02d\n' "$n" $((n - 1)) "$n" "$n"
+        [ "$n" -le 12 ] || printf 'IF EXIST C:\\USOS9X\\LOGS\\BOOT%02d.TXT DEL C:\\USOS9X\\LOGS\\BOOT%02d.TXT\n' $((n - 12)) $((n - 12))
+        [ "$n" -eq 40 ] || printf 'GOTO BNGO\n'
+        n=$((n + 1))
+    done
+    cat <<'EOF'
+:BNGO
+ECHO ----- boot %U9BN%: C:\BOOTLOG.TXT now in LOGS\BOOT%U9BN%.TXT; FIRSTBT.STA phase:>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\USOS9X\FIRSTBT.STA TYPE C:\USOS9X\FIRSTBT.STA>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF NOT EXIST C:\USOS9X\FIRSTBT.STA ECHO (no FIRSTBT.STA)>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\USOS9X\FIRSTBT.OK ECHO FIRSTBT.OK present: last record>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\USOS9X\FIRSTBT.ERR ECHO FIRSTBT.ERR present: last record>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\USOS9X\SHELL.ON ECHO SHELL.ON: shell=USOSFB boot>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\WINDOWS\WININIT.INI ECHO WININIT.INI pending: WIN.COM runs WININIT this boot>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+TYPE C:\BOOTLOG.TXT> C:\USOS9X\LOGS\BOOT%U9BN%.TXT
+SET U9BN=
+IF NOT EXIST C:\USOS9X\BOOTLOG.ON GOTO BLDONE
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO BLDONE
+IF EXIST C:\USOS9X\FIRSTBT.OK GOTO BLREST
+IF EXIST C:\USOS9X\FIRSTBT.ERR GOTO BLREST
+C:\WINDOWS\COMMAND\FIND.EXE /I "BOOTLOG=1" < C:\MSDOS.SYS > NUL
+IF ERRORLEVEL 1 GOTO BLADD
+ECHO MSDOS.SYS BootLog=1 present>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+GOTO BLDONE
+:BLADD
+ECHO MSDOS.SYS without BootLog=1: added again until FIRSTBT.OK>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF EXIST C:\USOS9X\LOGS\BOOTLOG.ORG GOTO BLSAVED
+C:\WINDOWS\COMMAND\FIND.EXE /I "BOOTLOG=" < C:\MSDOS.SYS > C:\USOS9X\LOGS\BOOTLOG.ORG
+:BLSAVED
+C:\WINDOWS\COMMAND\ATTRIB.EXE -H -S -R C:\MSDOS.SYS
+C:\WINDOWS\COMMAND\FIND.EXE /V /I "BOOTLOG=" < C:\MSDOS.SYS > C:\USOS9X\MSDOS.BL1
+ECHO [Options]>> C:\USOS9X\MSDOS.BL1
+ECHO BootLog=1>> C:\USOS9X\MSDOS.BL1
+C:\WINDOWS\COMMAND\FIND.EXE /I "WINDIR=" < C:\USOS9X\MSDOS.BL1 > NUL
+IF ERRORLEVEL 1 GOTO BLLOCK
+COPY /Y C:\USOS9X\MSDOS.BL1 C:\MSDOS.SYS > NUL
+ECHO BootLog=1 added by FIRSTBT.BAT> C:\USOS9X\LOGS\BOOTLOG.FRC
+GOTO BLLOCK
+:BLREST
+IF NOT EXIST C:\USOS9X\LOGS\BOOTLOG.FRC GOTO BLDONE
+ECHO MSDOS.SYS: the profile's BootLog lines put back>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+C:\WINDOWS\COMMAND\ATTRIB.EXE -H -S -R C:\MSDOS.SYS
+C:\WINDOWS\COMMAND\FIND.EXE /V /I "BOOTLOG=" < C:\MSDOS.SYS > C:\USOS9X\MSDOS.BL1
+COPY /B C:\USOS9X\MSDOS.BL1 + C:\USOS9X\LOGS\BOOTLOG.ORG C:\USOS9X\MSDOS.BL2 > NUL
+C:\WINDOWS\COMMAND\FIND.EXE /I "WINDIR=" < C:\USOS9X\MSDOS.BL2 > NUL
+IF ERRORLEVEL 1 GOTO BLLOCK
+COPY /Y C:\USOS9X\MSDOS.BL2 C:\MSDOS.SYS > NUL
+DEL C:\USOS9X\LOGS\BOOTLOG.FRC
+:BLLOCK
+C:\WINDOWS\COMMAND\ATTRIB.EXE +H +S +R C:\MSDOS.SYS
+:BLDONE
+IF EXIST C:\USOS9X\FIRSTBT.OK ECHO FIRSTBT.OK seen> C:\USOS9X\LOGS\BOOTSEQ.END
+IF EXIST C:\USOS9X\FIRSTBT.ERR ECHO FIRSTBT.ERR seen> C:\USOS9X\LOGS\BOOTSEQ.END
+:BSDONE
+EOF
+}
 w9x_firstboot_write() {
     case "$2" in
         '4 0 0 950') fbon='source950 first complete desktop' ;;
@@ -54,7 +136,11 @@ REGEDIT4
 "USOSFirstBoot"="C:\\USOS9X\\USOSFB.EXE"
 EOF
     printf '[boot]\r\nshell=Explorer.exe\r\n' > "$1/SHELLHDR.INI" || return 1
-    sed 's/$/\r/' > "$1/FIRSTBT.BAT" <<'EOF'
+    case "$2" in
+        '4 10 0 '*) printf 'MSDOS.SYS BootLog=1 kept until FIRSTBT.OK (98 only)\r\n' > "$1/BOOTLOG.ON" || return 1 ;;
+        *) rm -f "$1/BOOTLOG.ON" ;;
+    esac
+    { cat <<'EOF'
 @ECHO OFF
 IF NOT EXIST C:\USOS9X\SHELL.ON GOTO SHLEND
 IF NOT EXIST C:\WINDOWS\SYSTEM.INI GOTO SHLEND
@@ -88,6 +174,9 @@ GOTO SHLEND
 :SHLLOG
 ECHO FIRSTBT: SYSTEM.INI shell=USOSFB not restored in real mode>> C:\USOS9X\USOSLOG.TXT
 :SHLEND
+EOF
+    w9x_bootseq_block
+    cat <<'EOF'
 IF EXIST C:\USOS9X\FIRSTBT.OK GOTO END
 IF NOT EXIST C:\USOS9X\PHASE1.OK GOTO END
 IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
@@ -125,4 +214,5 @@ C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H SYSTEM.DAT
 C:\WINDOWS\COMMAND\ATTRIB.EXE +S +R +H USER.DAT
 :END
 EOF
+    } | sed 's/$/\r/' > "$1/FIRSTBT.BAT"
 }

@@ -381,6 +381,8 @@ def validate(m: Manifest) -> list[str]:
             continue
         if p.get('reboot') not in REBOOTS:
             errors.append(f'{where}: reboot {p.get("reboot")!r}')
+        if p.get('slow') not in ('', '1'):
+            errors.append(f'{where}: slow {p.get("slow")!r} (only 1)')
         # USOSADD /setup (Windows 95 build 950 coordinator) overrides only
         if p.get('reboot_setup') and p.get('reboot_setup') not in REBOOTS:
             errors.append(f'{where}: reboot_setup {p.get("reboot_setup")!r}')

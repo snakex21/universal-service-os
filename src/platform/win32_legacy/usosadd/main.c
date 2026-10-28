@@ -343,8 +343,40 @@ static int run_check(const ua_pkg *p) {
 
 /* ---- window ----------------------------------------------------------------- */
 
+/* The package line stays, its elapsed time below it is redrawn every
+ * second by a WM_TIMER (dispatched by pump() in run_one's 250 ms wait), so
+ * a package that runs for minutes (X470 98 FE PL: .NET 2.0, no sign of life,
+ * the user took it for a hang) still shows that the box is alive. */
+#define UA_TICK_TIMER 1
+static char g_shown[UA_LINE];   /* package text without the elapsed line */
+static DWORD g_pkg_start;       /* GetTickCount at the package start */
+static int g_pkg_timing;        /* the elapsed line is shown */
+
+static void elapsed_text(char *out, int cap, DWORD ms) {
+    DWORD sec = ms / 1000;
+    char num[16];
+    ua_copy(out, cap, g_pl ? "Up\263yn\352\263o: " : "Elapsed: ");
+    ua_itoa(num, sizeof num, (int)(sec / 60));
+    ua_append(out, cap, num);
+    ua_append(out, cap, (sec % 60) < 10 ? ":0" : ":");
+    ua_itoa(num, sizeof num, (int)(sec % 60));
+    ua_append(out, cap, num);
+}
+
+static void status_draw(void) {
+    char text[UA_LINE + 64], line[48];
+    ua_copy(text, sizeof text, g_shown);
+    if (g_pkg_timing) {
+        elapsed_text(line, sizeof line, GetTickCount() - g_pkg_start);
+        ua_append(text, sizeof text, "\r\n");
+        ua_append(text, sizeof text, line);
+    }
+    if (g_text) SetWindowTextA(g_text, text);
+}
+
 static LRESULT CALLBACK wnd_proc(HWND w, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_CLOSE) return 0; /* not closable while installing */
+    if (msg == WM_TIMER && wp == UA_TICK_TIMER) { if (g_pkg_timing) status_draw(); return 0; }
     return DefWindowProcA(w, msg, wp, lp);
 }
 
@@ -356,7 +388,7 @@ static void pump(void) {
 static void window_open(void) {
     WNDCLASSA wc;
     HINSTANCE inst = GetModuleHandleA(0);
-    int w = 520, h = 110;
+    int w = 520, h = 130;   /* header, package, slow note, elapsed time */
     zero(&wc, sizeof wc);
     wc.lpfnWndProc = wnd_proc;
     wc.hInstance = inst;
@@ -413,8 +445,24 @@ static void guard_off(void) {
     if (g_guard) { DestroyWindow(g_guard); g_guard = 0; pump(); }
 }
 
+static void timing_off(void) {
+    if (g_pkg_timing && g_wnd) KillTimer(g_wnd, UA_TICK_TIMER);
+    g_pkg_timing = 0;
+}
+
 static void status(const char *text) {
-    if (g_text) SetWindowTextA(g_text, text);
+    timing_off();
+    ua_copy(g_shown, sizeof g_shown, text);
+    status_draw();
+    pump();
+}
+
+/* A package starts: its text, the elapsed time from now (every second). */
+static void status_package(const char *text) {
+    ua_copy(g_shown, sizeof g_shown, text);
+    g_pkg_start = GetTickCount();
+    g_pkg_timing = g_wnd && SetTimer(g_wnd, UA_TICK_TIMER, 1000, 0);
+    status_draw();
     pump();
 }
 
@@ -1034,7 +1082,10 @@ static void run_chain(void) {
         ua_append(line, sizeof line, num);
         ua_append(line, sizeof line, "):\r\n");
         ua_append(line, sizeof line, name);
-        status(line);
+        /* slow=1 in legacy-pack.ini: known to take minutes (.NET, DirectX 9.0c, MDAC, IE 6 SP1) */
+        if (ua_ini_get(&g_m, p->section, "slow") && ua_ieq(ua_ini_get(&g_m, p->section, "slow"), "1"))
+            ua_append(line, sizeof line, g_pl ? "\r\nTo mo\277e potrwa\346 kilka minut." : "\r\nThis may take several minutes.");
+        status_package(line);
         path_join(dir, g_root, "TMP");
         path_join(tmpdir, dir, p->dir);
         make_dirs(tmpdir);
@@ -1061,6 +1112,7 @@ static void run_chain(void) {
         }
         g_answer_pkg = 0;
         g_guard_pkg = 0;
+        timing_off();
         if (g_restart_refused) {
             log_line("  the installer's own restart was refused: counted as a restart it asked for");
             g_restart_asked = 1;

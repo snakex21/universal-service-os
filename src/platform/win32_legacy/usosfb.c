@@ -36,6 +36,13 @@ static int contains(const char*s,const char*word){const char*a,*b;for(;*s;s++){
 static void drop(const char*leaf){local(leaf);DeleteFileA(path);}
 static int contains_n(const char*s,const char*word,unsigned n){unsigned i;
     for(i=0;i<n;i++){char x=s[i],y=word[i];if(x>='A'&&x<='Z')x+='a'-'A';if(x!=y)return 0;}return 1;}
+/* The journal's first line of every start, written and flushed before any
+ * other work (X470 98 FE PL 2026-10-28: a boot died before any record, so
+ * whether this program was started at all stayed unknown). */
+static void start_line(void){char phase[32],line[96];unsigned i;
+    phase[0]=0;if(exists("FIRSTBT.STA")&&!read_local("FIRSTBT.STA",phase,sizeof phase))lstrcpyA(phase,"unreadable");
+    for(i=0;phase[i];i++)if(phase[i]=='\r'||phase[i]=='\n'){phase[i]=0;break;}
+    wsprintfA(line,"USOSFB start, phase %s",phase[0]?phase:"none (no FIRSTBT.STA)");log_line(line);}
 static DWORD child(const char*command);
 static const char*running;  /* command line of the child being waited for */
 static int arm(void);
@@ -328,9 +335,10 @@ static int mid_phase(const char*phase){
     if(contains_n(phase,"resume",6)&&phase[6]>='1'&&phase[6]-'0'<=mid_limit()&&phase[7]=='\r'&&phase[8]=='\n'&&!phase[9])return phase[6]-'0';
     return 0;}
 void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[64];DWORD code;HKEY key;int mid;
-    shell_mode=usos_shell();
     local("FIRSTBT.LOG");journal=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
-    if(journal==INVALID_HANDLE_VALUE)leave(2);SetFilePointer(journal,0,0,FILE_END);
+    if(journal!=INVALID_HANDLE_VALUE){SetFilePointer(journal,0,0,FILE_END);start_line();}
+    shell_mode=usos_shell();
+    if(journal==INVALID_HANDLE_VALUE)leave(2);
     session_window();
     if(shell_mode){save("SHELLRUN.FLG","USOSFB shell boot running; deleted before its own restart\r\n");drop("SHELL.TRY");
         log_line("running as the Windows shell (SYSTEM.INI [boot] shell=C:\\USOS9X\\USOSFB.EXE): no Explorer, no desktop in this boot");}
