@@ -194,6 +194,31 @@ nt4_server_answer() {
         }'
 }
 
+# NT 4.0 product key gate (2026-10-28, the key is optional in the menu and
+# profile like Windows 95's). $1 = the answer SIF, $2 = the CD's I386 folder.
+# rc 0: the answer has a ProductId, or the CD's I386\SETUPP.INI [Pid] Pid
+# names the Select (site 270) or MSDN (335) channel, whose Setup is expected
+# not to ask for a CD key (unverified on NT 4.0 hardware; the channel codes
+# are the ones NT Setup keeps in SETUPP.INI). rc 1: no key and a retail/OEM
+# CD - GUI Setup would wait on its key page inside the install VM, where
+# nobody can type. One status word on stdout: key | select | msdn | needed.
+nt4_key_gate() {
+    if awk '{ sub(/\r$/, "") } /^[ \t]*\[/ { s = (tolower($0) ~ /^[ \t]*\[userdata\][ \t]*$/); next }
+            s && tolower($0) ~ /^[ \t]*productid[ \t]*=[ \t]*"?[0-9a-z]/ { f = 1 } END { exit !f }' "$1"; then
+        echo key; return 0
+    fi
+    setupp=''
+    for name in SETUPP.INI setupp.ini; do [ -f "$2/$name" ] && setupp="$2/$name" && break; done
+    pid=''
+    [ -z "$setupp" ] || pid=$(awk '{ sub(/\r$/, "") } /^[ \t]*\[/ { s = (tolower($0) ~ /^[ \t]*\[pid\][ \t]*$/); next }
+            s && tolower($0) ~ /^[ \t]*pid[ \t]*=/ { v = $0; sub(/^[^=]*=[ \t]*/, "", v); gsub(/[ \t"]/, "", v); print toupper(v); exit }' "$setupp")
+    case "$pid" in
+        ?????270*) echo select; return 0 ;;
+        ?????335*) echo msdn; return 0 ;;
+    esac
+    echo needed; return 1
+}
+
 # Terminal Server Edition (stdin -> stdout, CR LF): GUI Setup waits on its
 # "Terminal Server Desktops" page (number of client licenses) unless the
 # answer has [TerminalServerDesktops] Quantity (the CD's I386\UNATTEND.TXT);
@@ -566,6 +591,11 @@ if [ -n "$tse" ] && [ "$EDITION" != tse ] && [ "${NT_MAJOR:-}" = 4 ]; then
     fail 'the ISO is the Windows NT 4.0 Terminal Server Edition CD: choose Windows NT 4.0 Terminal Server Edition for it (it needs its own service pack)'
 fi
 [ -z "$tse" ] || log 'edition: Terminal Server Edition (CDROM_TS.40)'
+if [ -z "$nt3" ]; then
+    key_state=$(nt4_key_gate "$ANSWER_SIF" "$i386") ||
+        fail 'this Windows NT 4.0 CD asks for its product key, and the install runs in a VM where nobody can type it: add the key to the answer profile (or type it when the menu asks). No disk was changed'
+    log "product key: $key_state"
+fi
 if [ -n "$nt3" ]; then
     nt4_resolve_time_zone "${lang:-}" yes < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" yes | nt3_detached_answer > "$work/WINNT.SIF" ||
         fail 'cannot prepare WINNT.SIF'

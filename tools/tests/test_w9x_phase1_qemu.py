@@ -100,7 +100,12 @@ class Phase1Vm(unittest.TestCase):
         self.assertIn('RAM', out)
         self.meminfo.write_text('MemTotal:       16336004 kB\n', newline='\n')
         (self.tmp / 'flags/phase1-native.flag').write_bytes(b'')
-        self.assertNotEqual(self.run_lib('w9x_vm_available 98SE')[0], 0)
+        for tag in ('98SE', '98', 'ME', '95'):
+            self.assertNotEqual(self.run_lib(f'w9x_vm_available {tag}')[0], 0, tag)
+        # The 9x native flag never blocks the NT / POSReady VM installs.
+        for tag in ('NT4', 'NT4S', 'NT4T', 'NT351', 'NT351S', 'NT35', 'NT35S', 'NT31', 'NT31S', 'POSR'):
+            rc, out, _ = self.run_lib(f'w9x_vm_available {tag}')
+            self.assertEqual(rc, 0, f'{tag}: {out}')
         (self.tmp / 'flags/phase1-native.flag').unlink()
         (self.tmp / 'share/vgabios-stdvga.bin').unlink()
         self.assertNotEqual(self.run_lib('w9x_vm_available 98SE')[0], 0)
