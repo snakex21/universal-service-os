@@ -8,7 +8,7 @@
 //! between its starts (usos_nt351_vm_patch); without the VM the local source
 //! is patched before text mode copies it. `get` writes the one file of the
 //! cabinet; `put` writes the cabinet again with that file's bytes replaced
-//! (original header, name, date, time and attributes; cab.build: stored
+//! (original header, name, date, time and attributes; cab.buildFixed: fixed-Huffman
 //! deflate blocks in one MSZIP folder) and checks it by parsing it back.
 //! The patch itself stays in the shell (usos_nt351_loop_inf with its
 //! source / result hash pins). Exit: 0 done, 1 not a one-file cabinet or the
@@ -39,7 +39,7 @@ pub fn put(gpa: std.mem.Allocator, raw: []const u8, data: []const u8) Error![]u8
     if (parsed.files.len != 1) return error.NotOneFileCab;
     var file = parsed.files[0];
     file.data = data;
-    const out = cab.build(gpa, &parsed, &.{file}) catch return error.Corrupt;
+    const out = cab.buildFixed(gpa, &parsed, &.{file}) catch return error.Corrupt;
     errdefer gpa.free(out);
     var check = cab.parse(gpa, out) catch return error.Corrupt;
     defer check.deinit(gpa);

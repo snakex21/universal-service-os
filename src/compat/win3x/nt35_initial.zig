@@ -15,7 +15,7 @@
 //!
 //! so the I586 branch runs (an x86 PC, as on the Pentium VM). Nothing else in
 //! the file changes; the marker makes a second run a no-op. A cabinet is
-//! written again with its original header (cab.build: stored deflate blocks
+//! written again with its original header (cab.buildFixed: fixed-Huffman deflate blocks
 //! in one MSZIP folder) and checked by parsing it back; a plain file stays
 //! plain. Exit: 0 patched or already patched, 1 the file has no
 //! `detect ProcessorVar` line or is not the one-file INITIAL.INF cabinet,
@@ -74,7 +74,7 @@ pub fn rebuild(gpa: std.mem.Allocator, raw: []const u8, out: *?[]u8) Outcome {
     defer gpa.free(patched);
     var file = parsed.files[0];
     file.data = patched;
-    const data = cab.build(gpa, &parsed, &.{file}) catch return .corrupt;
+    const data = cab.buildFixed(gpa, &parsed, &.{file}) catch return .corrupt;
     // Parsed back to exactly the patched file, or nothing is written.
     var check = cab.parse(gpa, data) catch {
         gpa.free(data);

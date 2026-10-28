@@ -1419,12 +1419,17 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
-    if (!post()) goto failed;
-    polish();
+    /* Native: before post(), so a refused post (e.g. NET351 after a GUI
+       Setup network failure) still leaves /MAXMEM in BOOT.INI and the
+       small pagefile (X470 2026-10-28: post refused, BOOT.INI kept Setup's
+       entry without options, the next start ran on 3 GB and stopped with
+       0x0A in the 3.51 system working-set list growth). */
     if (native_install()) {
         pagefile_cap();
         boot_ini_finish();
     }
+    if (!post()) goto failed;
+    polish();
     /* Once only: the service turns itself off before DONE.TXT. */
     if (g_client_requested) {
         if (!client_commit_installer()) goto failed;
@@ -1798,6 +1803,15 @@ static void setup(void)
         } else {
             say_hex("page recorder: CreateProcess failed, error ", GetLastError());
         }
+    }
+    /* Native: BOOT.INI with the boot options (/MAXMEM) from the first start
+       of the installed system on, not only after the service's post()
+       (X470 2026-10-28). INITIAL.INF runs "ChangeBootIniTimeout 30" right
+       after it starts this DetachedProgram, so wait for that rewrite first;
+       the service repeats the step if this one is lost ("[USOS /SOS]"). */
+    if (native_install()) {
+        Sleep(20000);
+        boot_ini_finish();
     }
 }
 

@@ -164,7 +164,15 @@ class NativeWiring(unittest.TestCase):
         service = src[src.index('static void WINAPI service_main('):]
         service = service[:service.index(chr(10) + '}' + chr(10))]
         self.assertIn('if (native_install()) {\n        pagefile_cap();\n        boot_ini_finish();', service)
-        finish = src[src.index('static void boot_ini_finish(void)' + chr(10) + '{'):]
+        # X470 2026-10-28 (B261028-204354): post() refused (NET351 after GUI
+        # Setup's network failure), so the finish after it never ran: BOOT.INI
+        # kept no /MAXMEM, the next start ran on 3 GB and stopped with 0x0A
+        # in the system working-set list growth. The finish now runs before
+        # post() and already at /setup (after INITIAL.INF's timeout rewrite).
+        self.assertLess(service.index('boot_ini_finish();'), service.index('if (!post()) goto failed;'))
+        self.assertIn('if (native_install()) {\n        Sleep(20000);\n        boot_ini_finish();\n    }', setup)
+        self.assertLess(setup.index('USOSANS3.EXE"'), setup.index('boot_ini_finish();'))
+        finish =src[src.index('static void boot_ini_finish(void)' + chr(10) + '{'):]
         finish = finish[:finish.index(chr(10) + '}' + chr(10))]
         for piece in ('"timeout=5"', '" [USOS /SOS]\\" /SOS"', '" [VGA mode]\\" /basevideo /sos"',
                       '"C:\\\\BOOTSECT.DOS"', '"C:\\\\LDLINUX.SYS"', '"C:\\\\WINNT.SIF"'):
