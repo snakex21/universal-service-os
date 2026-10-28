@@ -234,6 +234,33 @@ Text mode would need SETUPLDR to load usosusb before kbdclass
 KeyboardPort0 would then hide a PS/2 keyboard unless kbdclass connects
 multiple ports in the Setup hive); not done, no X470 evidence yet.
 
+**Pagefile (same X470 run):** C:\pagefile.sys was 1816 MiB of the 2000 MiB
+FAT16 C:. GUI Setup's `VIRTUAL.INF` (3.51 WS CD, `DoVirtual`) sizes it
+RAM in MiB + 12 (`VirtualMarkup`), capped at the free space of the drive;
+/MAXMEM is not on Setup's boot entry, so it saw the full RAM and took all
+free space. `ConfigureVirtual` -> `REGISTRY.INF SetPagingFiles` writes
+`PagingFiles` near the end of GUI Setup (after fonts and ACLs), long after
+`/setup` (the DetachedProgram) has run, so a value written there would be
+overwritten. Fix: the first-start service (`pagefile_cap`, native NT 3.5x,
+also `usosnt3 /finish`) writes `PagingFiles` = `C:\pagefile.sys 64 128`
+(REG_MULTI_SZ, MiB). SMSS parses `<path> <min> <max>` and, per the NT5
+sources (`sm\server\pagefile.c`, `mm\modwrite.c NtCreatePagingFile`),
+creates the paging file with FILE_SUPERSEDE and the minimum as allocation
+size, so the large file shrinks to 64 MiB on the next start (the service's
+own restart 30 s after `done`). NT 3.51's SMSS/MM was not disassembled for
+this; the X470 check is `dir /a C:\pagefile.sys` after the second start.
+Native NT 4.0 (syssetup, CMDLINES.TXT + SETUP.REG) not changed.
+
+Partition size limits (not changed): FAT16 with 32 KiB clusters ends at
+~2047 MiB (65524 clusters); 64 KiB clusters (NT only, 4 GiB) are not read
+by DOS-era tools (untested with the syslinux stage that boots `winnt /b`).
+`[Unattended] FileSystem = ConvertNTFS` converts C: in place and keeps its
+size, so it frees no space beyond the FAT16 limit. Realistic options: 64 KiB
+clusters up to 4 GiB (needs a syslinux + NTLDR check) or a second data
+partition after C:.
+NTLDR 3.51 reads its files by INT 13h; the boot files must stay inside what
+the CSMWrap/SeaBIOS INT 13h serves (CHS ~8 GB without extensions).
+
 ### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 
 Rule (user, 2026-10-28): the native path needs **zero input**. NT 3.x/4 text

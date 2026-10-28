@@ -163,12 +163,30 @@ class NativeWiring(unittest.TestCase):
             self.assertIn(piece, early)
         service = src[src.index('static void WINAPI service_main('):]
         service = service[:service.index(chr(10) + '}' + chr(10))]
-        self.assertIn('if (native_install())\n        boot_ini_finish();', service)
+        self.assertIn('if (native_install()) {\n        pagefile_cap();\n        boot_ini_finish();', service)
         finish = src[src.index('static void boot_ini_finish(void)' + chr(10) + '{'):]
         finish = finish[:finish.index(chr(10) + '}' + chr(10))]
         for piece in ('"timeout=5"', '" [USOS /SOS]\\" /SOS"', '" [VGA mode]\\" /basevideo /sos"',
                       '"C:\\\\BOOTSECT.DOS"', '"C:\\\\LDLINUX.SYS"', '"C:\\\\WINNT.SIF"'):
             self.assertIn(piece, finish)
+
+    def test_native_pagefile_cap(self):
+        # X470 2026-10-28 (native NT 3.51): GUI Setup's VIRTUAL.INF sized the
+        # pagefile RAM + 12 MiB capped at the free space: 1816 MiB of the
+        # 2000 MiB FAT16 C:. It writes PagingFiles late in GUI Setup, so the
+        # first-start service (not /setup) sets a fixed 64-128 MiB file.
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
+        cap = src[src.index('static void pagefile_cap(void)' + chr(10) + '{'):]
+        cap = cap[:cap.index(chr(10) + '}' + chr(10))]
+        for piece in ('Session Manager\\\\Memory Management"', '":\\\\pagefile.sys 64 128"',
+                      'REG_MULTI_SZ', '(DWORD)n + 2', 'value[n + 1] = 0;'):
+            self.assertIn(piece, cap)
+        setup = src[src.index('static void setup(void)'):]
+        setup = setup[:setup.index(chr(10) + '}' + chr(10))]
+        self.assertNotIn('pagefile_cap', setup)
+        manual = src[src.index('if (lstrcmpA(opt, "finish") == 0)'):]
+        manual = manual[:manual.index('ExitProcess(0);')]
+        self.assertIn('pagefile_cap();', manual)
 
 
 class Recorder(unittest.TestCase):

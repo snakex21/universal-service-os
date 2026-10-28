@@ -1399,6 +1399,7 @@ static void vesa(void)
 
 static int native_install(void);
 static void boot_ini_finish(void);
+static void pagefile_cap(void);
 
 static void WINAPI handler(DWORD control)
 {
@@ -1420,8 +1421,10 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     open_log("POST.LOG");
     if (!post()) goto failed;
     polish();
-    if (native_install())
+    if (native_install()) {
+        pagefile_cap();
         boot_ini_finish();
+    }
     /* Once only: the service turns itself off before DONE.TXT. */
     if (g_client_requested) {
         if (!client_commit_installer()) goto failed;
@@ -1525,6 +1528,56 @@ static void usb_early(void)
     set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");
     set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
     set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
+}
+
+/* Native install: a small fixed pagefile. GUI Setup's VIRTUAL.INF
+ * (DoVirtual / ConfigureVirtual -> REGISTRY.INF SetPagingFiles) sizes it
+ * RAM in MiB + 12, capped at the drive's free space, near the END of GUI
+ * Setup; on the X470 it saw the full RAM and filled the 2000 MiB FAT16 C:
+ * with an 1816 MiB pagefile.sys. Written at /setup it would be overwritten
+ * there, so the first-start service writes it: "C:\pagefile.sys 64 128"
+ * (MiB; SMSS parses "<path> <min> <max>"). On the next start SMSS creates
+ * the paging file again (NtCreatePagingFile opens it FILE_SUPERSEDE with the
+ * minimum as allocation size), so the large file shrinks to 64 MiB.
+ */
+static void pagefile_cap(void)
+{
+    static const char key[] = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management";
+    char sys[MAX_PATH], value[64], old[300];
+    HKEY h;
+    DWORD type, size = sizeof old - 2;
+    LONG rc;
+    int n;
+    if (!GetSystemDirectoryA(sys, sizeof sys) || sys[1] != ':')
+        lstrcpyA(sys, "C:");
+    value[0] = sys[0];
+    value[1] = 0;
+    lstrcatA(value, ":\\pagefile.sys 64 128");
+    n = len(value);
+    value[n + 1] = 0;                   /* REG_MULTI_SZ: second NUL */
+    rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_ALL_ACCESS, &h);
+    if (rc != ERROR_SUCCESS) {
+        say_hex("pagefile: cannot open Memory Management, rc ", (DWORD)rc);
+        return;
+    }
+    old[0] = 0;
+    if (RegQueryValueExA(h, "PagingFiles", NULL, &type, (BYTE *)old, &size) == ERROR_SUCCESS)
+        old[size < sizeof old - 1 ? size : sizeof old - 1] = 0;
+    else
+        old[0] = 0;
+    if (!lstrcmpiA(old, value)) {
+        say("pagefile: already ");
+        say(value);
+        say("\r\n");
+    } else {
+        rc = RegSetValueExA(h, "PagingFiles", 0, REG_MULTI_SZ, (const BYTE *)value, (DWORD)n + 2);
+        say("pagefile: was \"");
+        say(old);
+        say(rc == ERROR_SUCCESS ? "\", now " : "\", WRITE FAILED: ");
+        say(value);
+        say(rc == ERROR_SUCCESS ? " (MiB, applied at the next start)\r\n" : "\r\n");
+    }
+    RegCloseKey(h);
 }
 
 /* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
@@ -1802,6 +1855,7 @@ void __stdcall entry(void)
             ExitProcess(3);
         }
         usb_early();
+        pagefile_cap();
         boot_ini_finish();
         say("finish done\r\n");
         ExitProcess(0);
