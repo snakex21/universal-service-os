@@ -9,7 +9,10 @@ const bcd = @import("bcd.zig");
 const app = @import("app.zig");
 const u = std.unicode.utf8ToUtf16LeStringLiteral;
 pub const Arch = @import("boot_source.zig").Arch;
-pub const Gates = struct { layout_apply: bool = false, bcd_reference: bool = false, diagnostic_deferred: bool = false };
+/// hardware_flow: the in-process hardware path (uefi_main.zig, USOSPREP_HW_V1)
+/// provisions right after its own successful apply of the same disk; the
+/// QEMU-only host bcdboot comparison is not repeated there (logged as such).
+pub const Gates = struct { layout_apply: bool = false, bcd_reference: bool = false, diagnostic_deferred: bool = false, hardware_flow: bool = false };
 pub const Options = struct {
     arch: Arch,
     loader_guid: [16]u8,
@@ -129,7 +132,7 @@ fn copy(self: *Context, volume: *fat.Volume, item: Item, target: []const u8) !vo
 /// It never discovers a disk, opens the Windows NTFS writer or copies vendor
 /// payloads from the host. All source bytes come from the applied Windows.
 pub fn provisionUefi(disk: p.Disk, prepared: wl.Layout, ids: wl.Ids, tracker: *p.TrackedAllocator, options: Options, log: app.Logger) !Stats {
-    if (!options.gates.layout_apply or !options.gates.bcd_reference) return error.PrerequisiteGateMissing;
+    if (!options.gates.layout_apply or !(options.gates.bcd_reference or options.gates.hardware_flow)) return error.PrerequisiteGateMissing;
     try validateDisk(disk, prepared, ids, tracker.allocator());
     return provisionValidated(disk,prepared,ids,tracker,options,log);
 }

@@ -4,7 +4,9 @@ const std = @import("std");
 const p = @import("platform.zig");
 pub const capacity = 1024 * 1024;
 pub const alignment = std.mem.Alignment.fromByteUnits(4096);
-pub const Backend = enum { raw_file, qcow2_file };
+/// block_device: a real disk through UEFI BlockIo (hardware flow); flush reaches
+/// FlushBlocks. The label only records which backend the caller pinned.
+pub const Backend = enum { raw_file, qcow2_file, block_device };
 pub const Stats = struct {
     logical_writes: u64 = 0,
     logical_bytes: u64 = 0,

@@ -20,6 +20,7 @@ const perf_clock = @import("perf_clock.zig");
 const tsc_clock = @import("tsc_clock.zig");
 const profiling = @import("profiling.zig");
 const writecombine = @import("writecombine.zig");
+const hw = @import("hw_target.zig");
 const W = std.unicode.utf8ToUtf16LeStringLiteral;
 // Separate root client opts into provisioning at compile time. The default
 // prep binary keeps its existing reachable code and config format.
@@ -31,11 +32,22 @@ comptime {
 
 const Workload = enum { stage1a, scale_firmware, scale_tree150k, wim, install };
 const InstallSource = struct { bytes: u64, start: u64, size: u64, serial: u64, path: []const u8 };
-const Config = struct { kind: partitions.Kind, sectors: u64, token: [64]u8, workload: Workload = .stage1a, wim_index: ?u32 = null, source: ?InstallSource = null, verify_scope: wim_app.VerifyScope = .selected, timing: bool = false, combine: bool = true, probe_items: ?u64 = null };
+const Config = struct { kind: partitions.Kind, sectors: u64, token: [64]u8, workload: Workload = .stage1a, wim_index: ?u32 = null, source: ?InstallSource = null, verify_scope: wim_app.VerifyScope = .selected, timing: bool = false, combine: bool = true, probe_items: ?u64 = null, hardware: bool = false, hw: hw.Hardware = .{} };
 
 fn config(text: []const u8) !Config {
     var lines = std.mem.tokenizeAny(u8, text, "\r\n");
-    if (!std.mem.eql(u8, lines.next() orelse return error.InvalidArgument, "USOSPREP_QEMU_ONLY")) return error.InvalidArgument;
+    const header = lines.next() orelse return error.InvalidArgument;
+    // USOSPREP_HW_V1: written by the USOS UEFI menu for a real machine. The
+    // target is the disk the user picks in MiniOS's own disk question
+    // (pickTarget), which then receives this run's token; target_sectors is
+    // taken from that disk and the strict size + token match still applies.
+    const hardware = std.mem.eql(u8, header, "USOSPREP_HW_V1");
+    if (!hardware and !std.mem.eql(u8, header, "USOSPREP_QEMU_ONLY")) return error.InvalidArgument;
+    var hw_cfg: hw.Hardware = .{};
+    var seen_build = false;
+    var seen_locale = false;
+    var seen_unattend = false;
+    var seen_entry = false;
     var kind: ?partitions.Kind = null;
     var sectors: ?u64 = null;
     var token: ?[64]u8 = null;
@@ -96,7 +108,32 @@ fn config(text: []const u8) !Config {
         } else if (std.mem.startsWith(u8, line, "source_iso=")) {
             if (source_path != null or line.len <= 11 or line.len > 1035) return error.InvalidArgument;
             source_path = line[11..];
+        } else if (hardware and std.mem.startsWith(u8, line, "build=")) {
+            if (seen_build or !hw.validBuildId(line[6..])) return error.InvalidArgument;
+            seen_build = true;
+            @memcpy(hw_cfg.build[0 .. line.len - 6], line[6..]);
+            hw_cfg.build_len = line.len - 6;
+        } else if (hardware and std.mem.startsWith(u8, line, "locale=")) {
+            if (seen_locale or !hw.validLocale(line[7..])) return error.InvalidArgument;
+            seen_locale = true;
+            @memcpy(hw_cfg.locale[0 .. line.len - 7], line[7..]);
+            hw_cfg.locale_len = line.len - 7;
+        } else if (hardware and std.mem.startsWith(u8, line, "unattend=")) {
+            if (seen_unattend) return error.InvalidArgument;
+            seen_unattend = true;
+            hw_cfg.unattend = try switchValue(line[9..]);
+        } else if (hardware and std.mem.startsWith(u8, line, "boot_entry=")) {
+            if (seen_entry) return error.InvalidArgument;
+            seen_entry = true;
+            hw_cfg.boot_entry = try switchValue(line[11..]);
         } else return error.InvalidArgument;
+    }
+    if (hardware) {
+        // The disk question supplies the size; diagnostics that stop QEMU
+        // through its exit port have no meaning on a real machine.
+        if (sectors != null or probe_items != null or !seen_build or (workload orelse .stage1a) != .install) return error.InvalidArgument;
+        if (kind != null and kind.? != .gpt) return error.InvalidArgument;
+        sectors = 0;
     }
     const selected = workload orelse .stage1a;
     if ((selected == .wim or selected == .install) != (wim_index != null)) return error.InvalidArgument;
@@ -114,7 +151,7 @@ fn config(text: []const u8) !Config {
         if (src.start < 512 or src.size < 4096 or src.serial == 0 or src.start > src.bytes or src.size > src.bytes - src.start) return error.InvalidArgument;
     }
     if ((timing != null or combine != null or probe_items != null) and selected != .install) return error.InvalidArgument;
-    return .{ .kind = kind orelse return error.InvalidArgument, .sectors = sectors orelse return error.InvalidArgument, .token = token orelse return error.InvalidArgument, .workload = selected, .wim_index = wim_index, .source = source, .verify_scope = verify_scope orelse .selected, .timing = timing orelse false, .combine = combine orelse true, .probe_items = probe_items };
+    return .{ .kind = kind orelse return error.InvalidArgument, .sectors = sectors orelse return error.InvalidArgument, .token = token orelse return error.InvalidArgument, .workload = selected, .wim_index = wim_index, .source = source, .verify_scope = verify_scope orelse .selected, .timing = timing orelse false, .combine = combine orelse true, .probe_items = probe_items, .hardware = hardware, .hw = hw_cfg };
 }
 fn switchValue(value: []const u8) !bool {
     if (std.mem.eql(u8, value, "on")) return true;
@@ -527,6 +564,385 @@ fn runInstall(cfg: Config, boot: uefi.Handle, target: *Device, tracker: *platfor
     log.say("INSTALL layout_mode={s} disk_guid={s} windows_guid={s} esp_guid={s} mbr_signature={x} windows_start={d} windows_size={d} system_start={d} system_size={d}\n", .{ @tagName(result.mode), std.fmt.bytesToHex(ids.base.disk_guid, .lower), std.fmt.bytesToHex(ids.base.partition_guid, .lower), std.fmt.bytesToHex(ids.esp, .lower), ids.base.mbr_signature, result.windows.start_bytes, result.windows.size_bytes, result.system.start_bytes, result.system.size_bytes });
 }
 
+// ------------------------------------------------------------- hardware flow
+
+/// State main() needs after run(): the menu gets a status instead of a
+/// power-off, and the log is copied to EFI\USOS\Logs\MINIOS-<build>.LOG.
+var hw_run: struct { active: bool = false, cancelled: bool = false, target_written: bool = false, build: [32]u8 = @splat(0), build_len: usize = 0 } = .{};
+
+fn logName(buffer: *[48:0]u16, generation: usize) ![:0]const u16 {
+    var ascii: [32]u8 = undefined;
+    const text = try hw.rotationName(&ascii, generation);
+    const n = try std.unicode.utf8ToUtf16Le(buffer[0..47], text);
+    buffer[n] = 0;
+    return buffer[0..n :0];
+}
+fn copyFile(root: *uefi.protocol.File, from: [:0]const u16, to: [:0]const u16) !void {
+    const src = try root.open(from, .read, .{});
+    defer src.close() catch {};
+    if (root.open(to, .read_write, .{})) |old| _ = try old.delete() else |err| if (err != error.NotFound) return err;
+    const dst = try root.open(to, .read_write_create, .{});
+    defer dst.close() catch {};
+    var buffer: [4096]u8 = undefined;
+    while (true) {
+        const n = try src.read(&buffer);
+        if (n == 0) break;
+        if (try dst.write(buffer[0..n]) != n) return error.Io;
+    }
+    try dst.flush();
+}
+/// USOSPREP.LOG -> .1 -> .2 -> .3; only the oldest generation is dropped.
+fn rotateLogs(root: *uefi.protocol.File) !void {
+    const keep = 3;
+    var a: [48:0]u16 = undefined;
+    var b: [48:0]u16 = undefined;
+    if (root.open(try logName(&a, keep), .read_write, .{})) |old| _ = try old.delete() else |err| if (err != error.NotFound) return err;
+    var generation: usize = keep;
+    while (generation > 0) : (generation -= 1) {
+        const from = try logName(&a, generation - 1);
+        const present = if (root.open(from, .read, .{})) |file| blk: {
+            file.close() catch {};
+            break :blk true;
+        } else |err| if (err == error.NotFound) false else return err;
+        if (!present) continue;
+        try copyFile(root, from, try logName(&b, generation));
+        const old = try root.open(from, .read_write, .{});
+        _ = try old.delete();
+    }
+}
+/// Copies the closed USOSPREP.LOG of a hardware run to the stick's USOS log
+/// folder (the UEFI side has no writer for the NTFS DATA partition; the
+/// other UEFI-side logs live in EFI\USOS\Logs as well).
+fn copyHardwareLog() void {
+    if (!hw_run.active) return;
+    const bs = uefi.system_table.boot_services orelse return;
+    const loaded = (bs.handleProtocol(uefi.protocol.LoadedImage, uefi.handle) catch return) orelse return;
+    const filesystem = (bs.handleProtocol(uefi.protocol.SimpleFileSystem, loaded.device_handle orelse return) catch return) orelse return;
+    const root = filesystem.openVolume() catch return;
+    defer root.close() catch {};
+    for ([_][:0]const u16{ W("\\EFI"), W("\\EFI\\USOS"), W("\\EFI\\USOS\\Logs") }) |dir| {
+        const handle = root.open(dir, .read_write_create, .{ .directory = true }) catch return;
+        handle.close() catch {};
+    }
+    var ascii: [96]u8 = undefined;
+    const text = std.fmt.bufPrint(&ascii, "\\EFI\\USOS\\Logs\\MINIOS-{s}.LOG", .{hw_run.build[0..hw_run.build_len]}) catch return;
+    var wide: [96:0]u16 = undefined;
+    const n = std.unicode.utf8ToUtf16Le(wide[0..95], text) catch return;
+    wide[n] = 0;
+    copyFile(root, W("\\USOSPREP.LOG"), wide[0..n :0]) catch {};
+}
+
+fn busName(body: []const u8) []const u8 {
+    var name: []const u8 = "disk";
+    var offset: usize = 0;
+    while (offset + 4 <= body.len) {
+        const len = std.mem.readInt(u16, body[offset + 2 ..][0..2], .little);
+        if (len < 4 or len > body.len - offset) break;
+        if (body[offset] == 0x03) name = switch (body[offset + 1]) {
+            0x17 => "NVMe",
+            0x12 => "SATA",
+            0x05, 0x0f, 0x10 => "USB",
+            0x02 => "SCSI",
+            0x01 => "ATAPI",
+            0x16 => "SAS",
+            else => name,
+        };
+        offset += len;
+    }
+    return name;
+}
+fn readKey() ?uefi.protocol.SimpleTextInput.Key.Input {
+    const con = uefi.system_table.con_in orelse return null;
+    const bs = uefi.system_table.boot_services orelse return null;
+    _ = bs.waitForEvent(&.{con.wait_for_key}) catch return null;
+    return con.readKeyStroke() catch null;
+}
+const Candidate = struct { io: *uefi.protocol.BlockIo, sectors: u64, bus: []const u8, table: []const u8 };
+
+/// The flow's one disk question (hardware only): lists the whole writable
+/// 512-byte-sector disks except the USOS stick (boot device and its parent),
+/// asks for one, waits 3 s, then asks for an explicit Space confirmation.
+/// Writes this run's marker to sector 0 of that disk only and returns its
+/// sector count. Esc anywhere: nothing is written (error.UserCancelled).
+fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, log: app.Logger) !u64 {
+    const bs = uefi.system_table.boot_services orelse return error.Io;
+    const boot_path = (try bs.handleProtocol(uefi.protocol.DevicePath, boot_handle)) orelse return error.Unsupported;
+    const boot_body = try pathBody(boot_path);
+    const handles = (try bs.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.BlockIo.guid })) orelse return error.Io;
+    defer bs.freePool(@ptrCast(@alignCast(handles.ptr))) catch {};
+    if (handles.len > 128) return error.TooManyEntries;
+    var list: [9]Candidate = undefined;
+    var count: usize = 0;
+    var sector: [4096]u8 align(4096) = undefined;
+    for (handles) |handle| {
+        if (handle == boot_handle) continue;
+        const io = (bs.handleProtocol(uefi.protocol.BlockIo, handle) catch continue) orelse continue;
+        const media = io.media;
+        if (!media.media_present or media.logical_partition or media.read_only or media.block_size != 512 or media.io_align > 4096 or media.last_block == std.math.maxInt(u64)) continue;
+        const path = (bs.handleProtocol(uefi.protocol.DevicePath, handle) catch continue) orelse continue;
+        const body = pathBody(path) catch continue;
+        if (body.len == 0 or std.mem.startsWith(u8, boot_body, body)) continue;
+        if (media.last_block + 1 < 64 * 1024 * 1024 / 512 * 256) continue; // < 16 GiB: not a Windows 10/11 target
+        var table: []const u8 = "no partition table";
+        if (blockRead(io, 1, sector[0..512], .source_io)) |_| {
+            if (std.mem.eql(u8, sector[0..8], "EFI PART")) table = "GPT" else if (blockRead(io, 0, sector[0..512], .source_io)) |_| {
+                if (sector[510] == 0x55 and sector[511] == 0xaa) table = "MBR";
+            } else |_| {}
+        } else |_| continue;
+        if (count == list.len) break;
+        list[count] = .{ .io = io, .sectors = media.last_block + 1, .bus = busName(body), .table = table };
+        count += 1;
+    }
+    if (count == 0) {
+        log.say("HW_DISK none: no internal disk of at least 16 GiB besides the USOS stick\n", .{});
+        return error.NoTargetDisk;
+    }
+    if (uefi.system_table.con_out) |console| console.clearScreen() catch {};
+    log.say("\nUSOS MiniOS - Windows install without Windows Setup\nChoose the disk for Windows. EVERYTHING on it will be erased.\n\n", .{});
+    for (list[0..count], 1..) |item, number| {
+        const tenths = item.sectors * 512 * 10 / (1024 * 1024 * 1024);
+        log.say("  {d})  {s}  {d}.{d} GiB  ({s})\n", .{ number, item.bus, tenths / 10, tenths % 10, item.table });
+    }
+    log.say("\nPress 1-{d} to choose, Esc to cancel (USOS then starts Windows Setup instead).\n", .{count});
+    const chosen: Candidate = while (true) {
+        const key = readKey() orelse return error.Io;
+        if (key.scan_code == 0x17) {
+            hw_run.cancelled = true;
+            log.say("HW_DISK cancelled before selection; nothing written\n", .{});
+            return error.UserCancelled;
+        }
+        if (key.unicode_char >= '1' and key.unicode_char < '1' + count) break list[key.unicode_char - '1'];
+    };
+    const tenths = chosen.sectors * 512 * 10 / (1024 * 1024 * 1024);
+    log.say("\nSelected: {s} {d}.{d} GiB ({s}). It will be COMPLETELY ERASED.\n", .{ chosen.bus, tenths / 10, tenths % 10, chosen.table });
+    try bs.stall(3 * 1000 * 1000);
+    if (uefi.system_table.con_in) |con| con.reset(false) catch {};
+    log.say("Press Space to erase it and install Windows, Esc to cancel.\n", .{});
+    while (true) {
+        const key = readKey() orelse return error.Io;
+        if (key.scan_code == 0x17) {
+            hw_run.cancelled = true;
+            log.say("HW_DISK cancelled at confirmation; nothing written\n", .{});
+            return error.UserCancelled;
+        }
+        if (key.unicode_char == ' ') break;
+    }
+    @memset(&sector, 0);
+    const marker = try std.fmt.bufPrint(sector[0..512], "USOSPREP TARGET v1\n{s}\n", .{token});
+    _ = marker;
+    hw_run.target_written = true;
+    try blockWrite(chosen.io, 0, sector[0..512], .target_io);
+    chosen.io.flushBlocks() catch {};
+    log.say("HW_DISK confirmed bus={s} sectors={d} previous_table={s}; marker written to sector 0 of this disk only\n", .{ chosen.bus, chosen.sectors, chosen.table });
+    return chosen.sectors;
+}
+
+const MemorySource = struct {
+    bytes: []const u8,
+    fn read(ctx: *anyopaque, offset: u64, out: []u8) platform.Error!void {
+        const self: *MemorySource = @ptrCast(@alignCast(ctx));
+        if (offset > self.bytes.len or out.len > self.bytes.len - offset) return error.Bounds;
+        @memcpy(out, self.bytes[@intCast(offset)..][0..out.len]);
+    }
+};
+const HwApply = struct {
+    xml: ?[]const u8 = null,
+    high_water: u64 = 0,
+    /// Windows\Panther\unattend.xml: Windows reads it in specialize and
+    /// oobeSystem after an image apply (the windowsPE pass is ignored).
+    fn post(ctx: *anyopaque, fs: *ntfs.Ntfs, log: app.Logger) anyerror!void {
+        const self: *HwApply = @ptrCast(@alignCast(ctx));
+        if (self.xml) |xml| {
+            const windows = (try fs.lookup(5, W("Windows"))) orelse return error.WindowsDirectoryMissing;
+            const panther = (try fs.lookup(windows, W("Panther"))) orelse try fs.mkdir(windows, W("Panther"), .{ .attributes = 0x10 });
+            if (try fs.lookup(panther, W("unattend.xml")) != null) try fs.removeFile(panther, W("unattend.xml"));
+            var source: MemorySource = .{ .bytes = xml };
+            _ = try fs.writeFile(panther, W("unattend.xml"), .{ .context = &source, .size = xml.len, .read_fn = MemorySource.read }, .{});
+            log.say("HW_UNATTEND Windows\\Panther\\unattend.xml bytes={d}\n", .{xml.len});
+        } else log.say("HW_UNATTEND none: Windows starts its own OOBE (manual mode)\n", .{});
+        self.high_water = fs.next_lcn * 4096;
+    }
+};
+
+fn readUnattend(root: *uefi.protocol.File, allocator: std.mem.Allocator) ![]u8 {
+    const file = try root.open(W("\\USOSPREP.XML"), .read_write, .{});
+    var info_buf: [1024]u8 align(8) = undefined;
+    const info = file.getInfo(.file, &info_buf) catch |err| {
+        file.close() catch {};
+        return err;
+    };
+    if (info.file_size == 0 or info.file_size > 64 * 1024) {
+        _ = file.delete() catch false;
+        return error.InvalidUnattendSize;
+    }
+    const bytes = try allocator.alloc(u8, @intCast(info.file_size));
+    errdefer allocator.free(bytes);
+    var done: usize = 0;
+    while (done < bytes.len) {
+        const n = try file.read(bytes[done..]);
+        if (n == 0) return error.Io;
+        done += n;
+    }
+    // It may hold a product key or password: never left on the stick ESP.
+    _ = try file.delete();
+    return bytes;
+}
+
+fn targetPathBody(io: *uefi.protocol.BlockIo, out: []u8) ![]const u8 {
+    const bs = uefi.system_table.boot_services orelse return error.Io;
+    const handles = (try bs.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.BlockIo.guid })) orelse return error.Io;
+    defer bs.freePool(@ptrCast(@alignCast(handles.ptr))) catch {};
+    for (handles) |handle| {
+        const candidate = (bs.handleProtocol(uefi.protocol.BlockIo, handle) catch continue) orelse continue;
+        if (candidate != io) continue;
+        const path = (try bs.handleProtocol(uefi.protocol.DevicePath, handle)) orelse return error.Unsupported;
+        const body = try pathBody(path);
+        if (body.len > out.len) return error.Bounds;
+        @memcpy(out[0..body.len], body);
+        return out[0..body.len];
+    }
+    return error.BootTargetNotFound;
+}
+
+/// What bcdboot does on a Setup install: a "Windows Boot Manager" Boot####
+/// for the target ESP, first in BootOrder. The removable fallback path on
+/// the target ESP remains when the firmware refuses the variables.
+fn addBootEntry(io: *uefi.protocol.BlockIo, esp: partitions.Partition, esp_guid: [16]u8, log: app.Logger) !u16 {
+    var option: [1024]u8 = undefined;
+    const description = W("Windows Boot Manager");
+    const file = W("\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
+    var at: usize = 6;
+    @memcpy(option[at..][0 .. (description.len + 1) * 2], std.mem.sliceAsBytes(description[0 .. description.len + 1]));
+    at += (description.len + 1) * 2;
+    const path_start = at;
+    var body_buf: [512]u8 = undefined;
+    const body = try targetPathBody(io, &body_buf);
+    @memcpy(option[at..][0..body.len], body);
+    at += body.len;
+    var hd: [42]u8 = @splat(0);
+    hd[0] = 4;
+    hd[1] = 1;
+    std.mem.writeInt(u16, hd[2..4], 42, .little);
+    std.mem.writeInt(u32, hd[4..8], 1, .little);
+    std.mem.writeInt(u64, hd[8..16], esp.start_bytes / 512, .little);
+    std.mem.writeInt(u64, hd[16..24], esp.size_bytes / 512, .little);
+    @memcpy(hd[24..40], &esp_guid);
+    hd[40] = 2;
+    hd[41] = 2;
+    @memcpy(option[at..][0..42], &hd);
+    at += 42;
+    const file_bytes = (file.len + 1) * 2;
+    option[at] = 4;
+    option[at + 1] = 4;
+    std.mem.writeInt(u16, option[at + 2 ..][0..2], @intCast(4 + file_bytes), .little);
+    @memcpy(option[at + 4 ..][0..file_bytes], std.mem.sliceAsBytes(file[0 .. file.len + 1]));
+    at += 4 + file_bytes;
+    option[at..][0..4].* = .{ 0x7f, 0xff, 4, 0 };
+    at += 4;
+    std.mem.writeInt(u32, option[0..4], 1, .little); // LOAD_OPTION_ACTIVE
+    std.mem.writeInt(u16, option[4..6], @intCast(at - path_start), .little);
+    const rt = uefi.system_table.runtime_services;
+    const attrs: uefi.tables.RuntimeServices.VariableAttributes = .{ .non_volatile = true, .bootservice_access = true, .runtime_access = true };
+    var name: [9:0]u16 = undefined;
+    var number: u16 = 0;
+    const free = while (number < 0x1000) : (number += 1) {
+        var ascii: [8]u8 = undefined;
+        _ = std.fmt.bufPrint(&ascii, "Boot{X:0>4}", .{number}) catch unreachable;
+        for (ascii, 0..) |c, i| name[i] = c;
+        name[8] = 0;
+        if ((rt.getVariableSize(&name, &uefi.tables.global_variable) catch null) == null) break number;
+    } else return error.NoFreeBootOption;
+    try rt.setVariable(&name, &uefi.tables.global_variable, attrs, option[0..at]);
+    var order: [4096]u8 = undefined;
+    std.mem.writeInt(u16, order[0..2], free, .little);
+    var used: usize = 2;
+    const order_name = W("BootOrder");
+    if (rt.getVariable(order_name, &uefi.tables.global_variable, order[2..]) catch null) |existing| {
+        var i: usize = 0;
+        while (i + 1 < existing[0].len) : (i += 2) {
+            const entry = std.mem.readInt(u16, existing[0][i..][0..2], .little);
+            if (entry == free) continue;
+            std.mem.writeInt(u16, order[used..][0..2], entry, .little);
+            used += 2;
+        }
+    }
+    try rt.setVariable(order_name, &uefi.tables.global_variable, attrs, order[0..used]);
+    log.say("HW_BOOT_ENTRY Boot{X:0>4} Windows Boot Manager first in BootOrder entries={d}\n", .{ free, used / 2 });
+    return free;
+}
+
+/// Hardware install: the QEMU install pipeline over the user's disk, made
+/// equivalent to a blank image by hw_target.VirtualBlank, then the boot
+/// files on the new ESP (in-process, the same identities) and the firmware
+/// entry. The QEMU path (runInstall) is unchanged.
+fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle, target: *Device, tracker: *platform.TrackedAllocator, seed: [64]u8, output: *Output, log: app.Logger) !void {
+    const allocator = tracker.allocator();
+    const src_cfg = cfg.source orelse return error.InvalidArgument;
+    var apply: HwApply = .{};
+    const xml: ?[]u8 = if (cfg.hw.unattend) try readUnattend(root, allocator) else null;
+    defer if (xml) |bytes| allocator.free(bytes);
+    apply.xml = xml;
+    const source = try allocator.create(Device);
+    defer allocator.destroy(source);
+    source.* = .{ .io = try chooseSource(src_cfg, target.io, log), .category = .source_io };
+    output.timing = cfg.timing;
+    output.initProfile();
+    var blank = try hw.VirtualBlank.init(allocator, target.disk());
+    defer blank.deinit();
+    log.say("HW_TARGET virtual_blank chunk={d} sectors={d}; stale bytes hidden, first-touch zeroed\n", .{ hw.chunk_bytes, cfg.sectors });
+    var combined: ?writecombine.Cache = if (cfg.combine) try writecombine.Cache.init(allocator, blank.disk(), .block_device) else null;
+    defer if (combined) |*cache| cache.deinit();
+    const target_disk = if (combined) |*cache| cache.disk() else blank.disk();
+    var wide: [1024]u16 = undefined;
+    const n = try std.unicode.utf8ToUtf16Le(&wide, src_cfg.path);
+    var components: [32][]const u16 = undefined;
+    var count: usize = 0;
+    var iter = std.mem.tokenizeAny(u16, wide[0..n], &.{ '/', '\\' });
+    while (iter.next()) |part| {
+        if (count == components.len or std.mem.eql(u16, part, &.{'.'}) or std.mem.eql(u16, part, &.{ '.', '.' })) return error.InvalidArgument;
+        components[count] = part;
+        count += 1;
+    }
+    if (count == 0) return error.InvalidArgument;
+    const iso = try allocator.create(optical_ntfs.Source);
+    defer allocator.destroy(iso);
+    try optical_ntfs.Source.openInto(.{ .context = source, .size = src_cfg.bytes, .read_fn = sourceRead }, src_cfg.start, src_cfg.size, components[0..count], allocator, iso);
+    defer iso.deinit();
+    errdefer if (iso.last_error) |err| log.say("SOURCE original_error={s}\n", .{@errorName(err)});
+    const ids = try layout.Ids.fromSeed64(seed);
+    var marker: [84]u8 = undefined;
+    const marker_text = try std.fmt.bufPrint(&marker, "USOSPREP TARGET v1\n{s}\n", .{cfg.token});
+    const result = try install_app.run(target_disk, .uefi, ids, .{ .explicit = true, .source_identity = @intFromPtr(source.io), .target_identity = @intFromPtr(target.io), .boot_identity = @intFromPtr(boot), .marker = marker_text, .virtual_blank = true }, tracker, .{ .context = iso, .size = iso.file.size(), .read_fn = iso.reader().read_fn }, cfg.wim_index.?, .{ .verify_scope = cfg.verify_scope, .post_apply_context = &apply, .post_apply = HwApply.post }, log);
+    if (combined) |cache| log.say("TARGET_COMBINE capacity={d} logical_writes={d} upstream_writes={d} drains={d} failures={d}\n", .{ writecombine.capacity, cache.stats.logical_writes, cache.stats.upstream_writes, cache.stats.drains, cache.stats.failures });
+    // Byte-identical to a fresh image wherever Windows reads metadata.
+    try blank.fillRange(0, result.windows.start_bytes);
+    try blank.fillRange(result.windows.start_bytes, result.windows.start_bytes + @min(apply.high_water, result.windows.size_bytes));
+    try blank.disk().flush();
+    log.say("HW_TARGET gap_fill windows_high_water={d} gap_chunks={d} first_touch={d} full_chunks={d} virtual_reads={d}\n", .{ apply.high_water, blank.stats.gap_chunks_zeroed, blank.stats.first_touch_zeroed, blank.stats.full_chunk_writes, blank.stats.virtual_zero_reads });
+    log.say("INSTALL layout_mode={s} disk_guid={s} windows_guid={s} esp_guid={s} windows_start={d} windows_size={d}\n", .{ @tagName(result.mode), std.fmt.bytesToHex(ids.base.disk_guid, .lower), std.fmt.bytesToHex(ids.base.partition_guid, .lower), std.fmt.bytesToHex(ids.esp, .lower), result.windows.start_bytes, result.windows.size_bytes });
+    // Boot files: the same provisioning code as the separate boot client,
+    // gated by this run's own successful apply of this disk.
+    tracker.limit = 16 * 1024 * 1024;
+    var wide_locale: [32]u16 = undefined;
+    const locale_len = try std.unicode.utf8ToUtf16Le(&wide_locale, cfg.hw.localeText());
+    const loader_guid = try hw.loaderGuid(seed, &.{ ids.base.disk_guid, ids.base.partition_guid, ids.esp, ids.msr });
+    const boot_files = @import("boot_files.zig");
+    var guarded = try @import("boot_target.zig").EspOnly.init(blank.disk(), result);
+    const stats = try boot_files.provisionUefi(guarded.disk(), result, ids, tracker, .{
+        .arch = if (builtin.cpu.arch == .x86_64) .x64 else .ia32,
+        .loader_guid = loader_guid,
+        .timestamp = std.math.mul(u64, std.math.add(u64, Output.clock(output), 11644473600) catch return error.InvalidBootTime, 10000000) catch return error.InvalidBootTime,
+        .locale = wide_locale[0..locale_len],
+        .gates = .{ .layout_apply = true, .hardware_flow = true },
+    }, log);
+    try blank.disk().flush();
+    log.say("HW_BOOT files={d} bytes={d} bootmgfw_sha256={s} bcd_sha256={s} bcd_reference=not_rerun_on_hardware\n", .{ stats.files, stats.bytes, std.fmt.bytesToHex(stats.main_sha256, .lower), std.fmt.bytesToHex(stats.bcd_sha256, .lower) });
+    if (cfg.hw.boot_entry) {
+        _ = addBootEntry(target.io, result.esp.?, ids.esp, log) catch |err| log.say("HW_BOOT_ENTRY WARN {s}; target ESP removable path EFI\\BOOT remains\n", .{@errorName(err)});
+    }
+    log.say("USOSPREP HW PASS image={d}; the menu restarts into the new Windows\n", .{cfg.wim_index.?});
+}
+
 const FileSource = struct {
     file: *uefi.protocol.File,
     fn source(self: *FileSource) !ntfs.Source {
@@ -585,15 +1001,13 @@ fn run(output: *Output) anyerror!void {
     const filesystem = (try bs.handleProtocol(uefi.protocol.SimpleFileSystem, boot_handle)) orelse return error.Io;
     const root = try filesystem.openVolume();
     defer root.close() catch {};
-    if (root.open(W("\\USOSPREP.LOG"), .read_write, .{})) |old| {
-        _ = try old.delete();
-    } else |err| {
-        if (err != error.NotFound) return err;
-    }
+    // Earlier logs are kept (USOSPREP.1.LOG .. USOSPREP.3.LOG), never deleted
+    // unless they fall out of the rotation.
+    try rotateLogs(root);
     output.file = try root.open(W("\\USOSPREP.LOG"), .read_write_create, .{});
     const log = output.logger();
     errdefer |err| log.say("USOSPREP UEFI FAIL {s}\n", .{@errorName(err)});
-    log.say("USOSPREP UEFI {s} BEGIN; QEMU-only explicit token target\n", .{@tagName(builtin.cpu.arch)});
+    log.say("USOSPREP UEFI {s} BEGIN; explicit token target (QEMU host token or hardware disk question)\n", .{@tagName(builtin.cpu.arch)});
     log.say("CPU application_baseline={s}; firmware_cpu_requirement_measured_separately\n", .{builtin.cpu.model.name});
     log.say("ENTROPY source={s} bytes=64 qemu_detected={any} no-weak-fallback\n", .{ @tagName(random.source), output.qemu });
     const cfg_file = try root.open(W("\\USOSPREP.CFG"), .read, .{});
@@ -603,16 +1017,26 @@ fn run(output: *Output) anyerror!void {
     var extra: [1]u8 = undefined;
     if (try cfg_file.read(&extra) != 0) return error.InvalidArgument;
     try cfg_file.close();
-    const cfg = try config(cfg_buf[0..cfg_size]);
-    log.say("CONFIG parsed mode={s} sectors={d} token_bytes=64 workload={s}\n", .{ @tagName(cfg.kind), cfg.sectors, @tagName(cfg.workload) });
+    var cfg = try config(cfg_buf[0..cfg_size]);
+    log.say("CONFIG parsed mode={s} sectors={d} token_bytes=64 workload={s} hardware={any}\n", .{ @tagName(cfg.kind), cfg.sectors, @tagName(cfg.workload), cfg.hardware });
+    if (cfg.hardware) {
+        hw_run.active = true;
+        hw_run.build = cfg.hw.build;
+        hw_run.build_len = cfg.hw.build_len;
+        log.say("HW build={s} locale={s} unattend={any} boot_entry={any} qemu_detected={any}\n", .{ cfg.hw.buildId(), cfg.hw.localeText(), cfg.hw.unattend, cfg.hw.boot_entry, output.qemu });
+    }
     try connectStorage(log);
+    // Hardware: the flow's one disk question. Only the chosen disk receives
+    // this run's token; choose() below then requires exactly one disk with
+    // that size and token, as in the QEMU gate.
+    if (cfg.hardware) cfg.sectors = try pickTarget(cfg.token, boot_handle, log);
     var device: Device = .{ .io = try choose(cfg, boot_handle, log) };
     const tracker = output.tracker orelse return error.InvalidArgument;
     errdefer log.say("MEM failure alloc_current={d} alloc_peak={d}\n", .{ tracker.current, tracker.peak });
     switch (cfg.workload) {
         .install => {
             tracker.limit = 14 * 1024 * 1024;
-            try runInstall(cfg, boot_handle, &device, tracker, random.bytes, log);
+            if (cfg.hardware) try runHardwareInstall(cfg, root, boot_handle, &device, tracker, random.bytes, output, log) else try runInstall(cfg, boot_handle, &device, tracker, random.bytes, log);
         },
         .stage1a => {
             var small: FileSource = .{ .file = try root.open(W("\\FIXTURES\\small.bin"), .read, .{}) };
@@ -858,6 +1282,13 @@ pub fn main() uefi.Status {
         };
         output.file = null;
     }
+    // A real machine never powers off here: the USOS menu that started this
+    // app gets the result (and falls back to Windows Setup on any failure).
+    if (!output.qemu) {
+        copyHardwareLog();
+        if (passed) return .success;
+        return if (hw_run.cancelled) .aborted else .device_error;
+    }
     const value: u32 = if (passed) 0x10 else 0x11;
     if (output.qemu) asm volatile ("outl %[value], %[port]"
         :
@@ -913,4 +1344,32 @@ test "install requires complete explicit read-only source identity" {
     try std.testing.expectError(error.InvalidArgument, config(base ++ source ++ "verify_scope=all\nverify_scope=selected\n"));
     try std.testing.expectError(error.InvalidArgument, config(base ++ source ++ "source_bytes=12884901888\n"));
     try std.testing.expectError(error.InvalidArgument, config(base ++ "source_bytes=1024\nsource_start=512\nsource_size=4096\nsource_serial=1234\nsource_iso=INSTALL.ISO\n"));
+}
+
+test "hardware config: menu-written, disk from the disk question, install only" {
+    const token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const source = "source_bytes=128043712512\nsource_start=17179869184\nsource_size=110863843328\nsource_serial=12345678abcdef01\nsource_iso=Systems/Windows/Windows 11/Images/Win11.iso\n";
+    const base = "USOSPREP_HW_V1\nmode=gpt\ntoken=" ++ token ++ "\nprofile=install\nwim_index=6\n" ++ source;
+    const cfg = try config(base ++ "build=B261028-200000-ABCDEF01\nlocale=pl-PL\nunattend=on\nboot_entry=off\n");
+    try std.testing.expect(cfg.hardware and cfg.hw.unattend and !cfg.hw.boot_entry);
+    try std.testing.expectEqual(@as(u64, 0), cfg.sectors);
+    try std.testing.expectEqualStrings("B261028-200000-ABCDEF01", cfg.hw.buildId());
+    try std.testing.expectEqualStrings("pl-PL", cfg.hw.localeText());
+    try std.testing.expectEqualStrings("en-US", (try config(base ++ "build=B1\n")).hw.localeText());
+    // The size always comes from the chosen disk, never from the file.
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\ntarget_sectors=1000\n"));
+    try std.testing.expectError(error.InvalidArgument, config(base));
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=../x\n"));
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\nprobe_items=5\n"));
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\nlocale=a\n"));
+    try std.testing.expectError(error.InvalidArgument, config("USOSPREP_HW_V1\nmode=mbr\ntoken=" ++ token ++ "\nprofile=install\nwim_index=6\n" ++ source ++ "build=B1\n"));
+    try std.testing.expectError(error.InvalidArgument, config("USOSPREP_HW_V1\nmode=gpt\ntoken=" ++ token ++ "\nprofile=wim\nwim_index=6\nbuild=B1\n"));
+    // QEMU configs cannot use the hardware keys.
+    try std.testing.expectError(error.InvalidArgument, config("USOSPREP_QEMU_ONLY\nmode=gpt\ntarget_sectors=4194304\ntoken=" ++ token ++ "\nbuild=B1\n"));
+}
+
+test "bus names come from the last messaging node" {
+    const nvme = [_]u8{ 2, 1, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 6, 0, 0, 1, 3, 0x17, 16, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    try std.testing.expectEqualStrings("NVMe", busName(&nvme));
+    try std.testing.expectEqualStrings("disk", busName(&.{}));
 }

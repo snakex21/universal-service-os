@@ -14,7 +14,7 @@ const app = @import("app.zig");
 const progress = @import("progress.zig");
 const readahead = @import("readahead.zig");
 
-pub const Options = struct { target_drive: u8 = 'C', strict_rpfix: bool = true, verify_scope: wim_app.VerifyScope = .selected };
+pub const Options = struct { target_drive: u8 = 'C', strict_rpfix: bool = true, verify_scope: wim_app.VerifyScope = .selected, post_apply_context: ?*anyopaque = null, post_apply: ?wim_app.PostApply = null };
 const Serials = struct { fat32: u32, system_ntfs: u64 };
 fn serials(ids: layout.Ids) Serials {
     var fat = std.mem.readInt(u32, ids.esp[0..4], .little);
@@ -145,7 +145,8 @@ pub fn run(disk: p.Disk, mode: layout.Mode, ids: layout.Ids, selection: layout.S
     wim_app.runWithOptions(disk, if (mode == .uefi) .gpt else .mbr, ids.base, tracker,
         .{ .context = cached.context, .size = cached.size, .read_fn = cached.read_fn }, selected,
         .{ .target_drive = options.target_drive, .strict_rpfix = options.strict_rpfix, .verify_scope = options.verify_scope,
-           .prepare_context = &preparation, .prepare_partition = Preparation.prepare }, log) catch |err| {
+           .prepare_context = &preparation, .prepare_partition = Preparation.prepare,
+           .post_apply_context = options.post_apply_context, .post_apply = options.post_apply }, log) catch |err| {
         if (stream.last_error) |original| log.say("ISO_STREAM_ERROR original={s} mapped={s}\n", .{ @errorName(original), @errorName(err) });
         if (source.last_error) |original| log.say("ISO_SOURCE_ERROR original={s} mapped={s}\n", .{ @errorName(original), @errorName(err) });
         return err;

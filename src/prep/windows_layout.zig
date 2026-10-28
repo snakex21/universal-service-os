@@ -69,6 +69,11 @@ pub const Selection = struct {
     // An exact, known test authorization marker may replace zero bytes at0.
     marker: []const u8 = &.{},
     progress: ?p.Progress = null,
+    /// Hardware flow only: the disk is wrapped in hw_target.VirtualBlank,
+    /// which presents every never-written chunk as zeros and zeroes chunks
+    /// on first write. The full-device scan would only read those virtual
+    /// zeros, so it is skipped; the user's disk question authorizes erase.
+    virtual_blank: bool = false,
     pub fn validate(self: Selection) !void {
         if (!self.explicit or self.target_identity == 0 or self.source_identity == 0 or self.boot_identity == 0 or
             self.target_identity == self.source_identity or self.target_identity == self.boot_identity) return error.SourceTargetConflict;
@@ -95,6 +100,7 @@ pub fn plan(disk: p.Disk, mode: Mode) !Layout {
 pub fn requireBlank(disk: p.Disk, selection: Selection, scratch: []u8) !void {
     try selection.validate();
     if (scratch.len < 4096 or selection.marker.len > scratch.len) return error.InvalidArgument;
+    if (selection.virtual_blank) return;
     const bytes = try disk.bytes();
     var offset: u64 = 0;
     if (selection.progress) |hook| hook.report(.{ .current = 0, .total = bytes, .bytes = 0, .resources = 0 });

@@ -4,6 +4,7 @@ test {
     _ = @import("tsc_clock.zig");
     _ = @import("perf_clock.zig");
     _ = @import("writecombine.zig");
+    _ = @import("hw_target.zig");
     _ = @import("windows_layout.zig");
     _ = @import("install_app_tests.zig");
     _ = @import("bcd_tests.zig");

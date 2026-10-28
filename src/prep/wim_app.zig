@@ -348,7 +348,13 @@ pub const Options = struct {
     /// verify emptiness and return a new Windows partition for fresh format.
     prepare_context: ?*anyopaque = null,
     prepare_partition: ?PreparePartition = null,
+    /// Hardware flow: runs after every selected stream was applied and
+    /// verified, before the volume is marked clean (unattend staging and
+    /// the allocation high-water mark). A failure leaves the volume dirty.
+    post_apply_context: ?*anyopaque = null,
+    post_apply: ?PostApply = null,
 };
+pub const PostApply = *const fn (*anyopaque, *ntfs.Ntfs, app.Logger) anyerror!void;
 pub const VerifyScope = enum { selected, all };
 pub fn runWithOptions(disk: platform.Disk, kind: partitions.Kind, ids: identity.Identifiers, tracker: *platform.TrackedAllocator, input_: wim.Input, selected: u32, options_: Options, log: app.Logger) !void {
     var input = input_;
@@ -433,6 +439,7 @@ pub fn runWithOptions(disk: platform.Disk, kind: partitions.Kind, ids: identity.
     try metadata.walk(&context, Context.enter, Context.leave);
     for (context.tag_counts.items) |tag|
         log.say("WIM_TAGGED_APPLIED type=0x{x} inode_count={d}\n", .{ tag.tag, tag.applied });
+    if (options_.post_apply) |hook| try hook(options_.post_apply_context orelse return error.InvalidArgument, &fs, log);
     try fs.finish();
     try disk.flush();
     var durable_progress = progress.Reporter.init(log, "apply-durable");
