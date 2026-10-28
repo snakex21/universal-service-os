@@ -12,8 +12,15 @@
  *
  * This MBR keeps 1 KiB at the top of conventional memory for an INT 15h hook
  * that rewrites E820 results:
- *   - entries above 4 GiB and non-RAM entries at or above 1 MiB become a copy
- *     of the BIOS ROM range F0000-FFFFF (type 2), which is below any RAM top;
+ *   - entries above 4 GiB and every non-RAM entry that ends above A0000h
+ *     become a copy of the BIOS ROM range F0000-FFFFF (type 2), which is
+ *     below any RAM top; only a non-RAM entry ending at or below A0000h (the
+ *     EBDA) stays.  CSMWrap reports A0000-FFFFF as one reserved entry (plain
+ *     SeaBIOS: F0000-FFFFF): as a loader descriptor it overlaps the VGA
+ *     window, so the 3.51 vga.sys claim of A0000-BFFFF conflicts
+ *     (VideoPortVerifyAccessRanges), no \Device\Video0 is created and text-mode
+ *     Setup stops "while initializing your computer's video" (0, C0000034);
+ *     the installed system then lacks a display (STOP C0000143);
  *   - RAM entries are clipped at 4 GiB;
  *   - the RAM entry at address 0 ends below the hook (INT 12h size).
  * Everything else is the XP geometry-fix MBR: boot the active partition and
@@ -266,8 +273,14 @@ hook_start:
     jne 6f
     cmp dword ptr es:[di + 16], 1
     je 4f
-    cmp dword ptr es:[di], 0x100000
-    jb 7f
+    /* Non-RAM: kept only when it ends at or below A0000h (EBDA). */
+    cmp dword ptr es:[di + 12], 0
+    jne 6f
+    mov eax, dword ptr es:[di]
+    add eax, dword ptr es:[di + 8]
+    jc 6f
+    cmp eax, 0xA0000
+    jbe 7f
     jmp 6f
 4:
     /* RAM: clip at 4 GiB, end the low entry below the hook. */

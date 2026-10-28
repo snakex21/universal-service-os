@@ -147,6 +147,45 @@ What tells us where it stopped (silent logging, no photos needed):
   computer's hardware configuration": text-mode HAL/NTDETECT (compare with
   the installed-system path, which passes).
 
+**Result (B261028-173747, NT 3.51 WS EN, Micron NVMe):** prep PASS, text
+mode started (usosnvme `NS1 488386 MiB ... OK`), then "Setup has encountered
+a fatal error while initializing your computer's video ... (0, 0xc0000034)".
+Code 0 = opening `\Device\Video0` failed (NT 5 `spvideo.c` VIDEOBUG_OPEN,
+same screen in 3.51): `vga.sys` was loaded (SETUPLDR stops on a missing
+file; `VGA.SYS`/`VIDEOPRT.SYS` are in `~BT`, `[Display]`/`[Display.Load]`
+match the CD) but its HwFindAdapter declined. TXTSETUP.SIF differs from the
+CD only in `[hal]`, `[SCSI.Load]`, `[SCSI]`, `[Files]`, `OsLoadOptions`.
+
+Cause: CSMWrap's E820 has **A0000-FFFFF reserved** as one entry (csmwrap
+`build_e820_map`; plain SeaBIOS: only F0000-FFFFF). The 3.5x/4.0 loaders
+make a memory descriptor of every entry, and the hook kept non-RAM entries
+below 1 MiB, so the 3.51 `vga.sys` claim of A0000-BFFFF
+(`VideoPortVerifyAccessRanges`) conflicted. QEMU repro from a read-only copy
+of the staged Micron C: + its CSMWrap ESP (q35, OVMF + CSMWrap, 12 root
+ports, NVMe or AHCI, 1-3 GB): same screen; SeaBIOS (pc or q35): text mode,
+GUI mode pass; a scratch `vga.sys` copy that ignores the VerifyAccessRanges
+result, or claims only the I/O ranges, passes (memory window = the
+conflict; not shipped). The same image without the hook sector fails too.
+
+Fix (`nt3_e820_mbr.S` hook): a non-RAM E820 entry stays only when it ends at
+or below A0000h (EBDA); every other one becomes the F0000-FFFFF copy, so
+CSMWrap's A0000 entry turns into what SeaBIOS reports. QEMU (same repro,
+new MBR + hook sector): text mode, GUI mode, first start (usosvbe
+1024x768), logon. Test: `tools/tests/legacy_bios/test_nt3_e820_hook.py`
+(runs the hook under unicorn). Not only Setup: without the fix the
+installed system's first boot under CSMWrap stops with STOP C0000143
+(`DISPLAY_DRIVER.DLL`, no video device). Keyboard: `i8042prt` claims ports
+and IRQ 1 only, no memory, so this conflict cannot hit it; whether the
+X470's PS/2 controller gives text mode a `\Device\KeyboardClass0` without a
+PS/2 keyboard is still untested (QEMU always has one).
+
+Memory: `/MAXMEM` in `[SetupData] OsLoadOptions` is ignored in text mode
+(3.51 SETUPLDR has no MAXMEM handling; X470 banner 3079532 KB vs 1044100 KB
+of the installed system with BOOT.INI /MAXMEM=1024). 3.51 text + GUI mode
+ran with 2 GB under CSMWrap in QEMU. NT 3.5 stops with 0x7B above 128 MiB
+(docs/nt35-2026-10-09.md), so native NT 3.5 needs a RAM cap before the
+loader (hook option) - open.
+
 ### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 
 Rule (user, 2026-10-28): the native path needs **zero input**. NT 3.x/4 text
