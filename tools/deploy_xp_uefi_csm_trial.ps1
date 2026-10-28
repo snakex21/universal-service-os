@@ -1,18 +1,19 @@
-# Add the separate experiment to the identified Kingston; preserve production BIOS.
-param([switch]$DriversOnly,[switch]$LaunchersOnly,[switch]$UnifiedMenu,[string]$SourceIso,[string]$Language)
+# Add the separate experiment to the identified stick (default: the Kingston spare); preserve production BIOS.
+# Other sticks: pass -DiskGuid/-DiskSize/-EspGuid/-DataGuid (GPT disk GUID, size in bytes, ESP and DATA PARTUUIDs).
+param([switch]$DriversOnly,[switch]$LaunchersOnly,[switch]$UnifiedMenu,[string]$SourceIso,[string]$Language,[string]$Project=(Join-Path $PSScriptRoot '..'),[string]$DiskGuid='31c644bf-74dd-4807-9cb2-46745adeadd4',[uint64]$DiskSize=61991813632,[string]$EspGuid='0257e175-1685-4311-91aa-5a83d8eb41e5',[string]$DataGuid='deb596cd-0d5b-464d-9780-3d7bbec3935a')
 $ErrorActionPreference='Stop'
 if(([int]$DriversOnly.IsPresent+[int]$LaunchersOnly.IsPresent+[int]$UnifiedMenu.IsPresent) -gt 1){throw 'Choose one targeted deployment mode'}
 if($SourceIso -and !$DriversOnly){throw 'Source ISO deployment requires DriversOnly mode'}
-$project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$project=[IO.Path]::GetFullPath($Project)
 $package=Join-Path $project 'zig-out\xp-uefi-csm'
 function Hash($p){(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()}
-$disks=@(Get-Disk|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]'31c644bf-74dd-4807-9cb2-46745adeadd4'})
-if($disks.Count -ne 1){throw 'Expected Kingston not connected'}
+$disks=@(Get-Disk|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]$DiskGuid})
+if($disks.Count -ne 1){throw "Expected stick $DiskGuid not connected"}
 $disk=$disks[0]
-if($disk.Size -ne 61991813632 -or $disk.BusType -ne 'USB' -or $disk.IsBoot -or $disk.IsSystem){throw 'Kingston identity mismatch'}
+if($disk.Size -ne $DiskSize -or $disk.BusType -ne 'USB' -or $disk.IsBoot -or $disk.IsSystem){throw 'Target stick identity mismatch'}
 $parts=@(Get-Partition -DiskNumber $disk.Number)
-$esp=@($parts|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]'0257e175-1685-4311-91aa-5a83d8eb41e5'})
-$data=@($parts|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]'deb596cd-0d5b-464d-9780-3d7bbec3935a'})
+$esp=@($parts|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]$EspGuid})
+$data=@($parts|Where-Object {$_.Guid -and ([guid]$_.Guid) -eq [guid]$DataGuid})
 if($parts.Count -ne 3 -or $esp.Count -ne 1 -or $data.Count -ne 1 -or !$esp[0].DriveLetter -or !$data[0].DriveLetter){throw 'USB partition identity mismatch'}
 $espRoot=$esp[0].DriveLetter+':\';$dataRoot=$data[0].DriveLetter+':\'
 $volume=$esp[0]|Get-Volume

@@ -256,7 +256,7 @@ byte-for-byte), same package goldens.
 
 ## 9. Hardware results
 
-**2026-09-27, X470 Taichi / Ryzen 7 5700X, CSM OFF, Secure Boot OFF, build
+**2026-09-27, X470 Master SLI/ac / Ryzen 7 5700X, CSM OFF, Secure Boot OFF, build
 B260927-153019: PASS.** USOS (UEFI) prepared the Intel SSD in CSMWrap mode
 (`legacy-xp-csmwrap.log`: NTFS in MBR slot 1 at LBA 2048, CSMWrap ESP in slot
 2 at LBA 234309632, 131072 sectors, BOOTX64.EFI read back); the firmware then
@@ -312,7 +312,8 @@ restart -> firmware boots the disk's UEFI entry -> CSMWrap -> SeaBIOS (card
   VBIOS POSTed) -> MBR -> NT60 -> bootmgr -> PE10 in RAM (BIOS mode, own USB 3,
   AHCI, NVMe) -> USOS Vista installer (usos-vista-csmwrap.flag):
      staging partition marked inactive, Vista setup.exe from the ISO on the
-     stick (ImDisk, as on UEFI), the user picks the unallocated space
+     stick (ImDisk, as on UEFI), InstallTo = the prepared Windows partition
+     (since 2026-10-11, section 13; before: the user picked unallocated space)
   -> Setup in BIOS mode: MBR partition, bootmgr + \Boot\BCD on its own
      partition (active), NT60 MBR
   -> finalizer: test signing in that BCD, USB v11 first boot armed (MBR
@@ -358,7 +359,8 @@ Why this one:
   taken by `usos_answer_plan_take`) and DATA `Unattended` files; since
   2026-09-28 also on the UEFI path with CSM (the same installer merge). The installer inserts its KMDF `<servicing>` block right
   after `<unattend ...>` (`merge_user_answer`, UTF-8 only; a file with its own
-  `servicing` section is refused). Disk selection stays manual (the renderer
+  `servicing` section is refused). Since 2026-10-11 the installer adds InstallTo for
+  the prepared Windows partition (section 13); before, disk selection stayed manual (the renderer
   writes no DiskConfiguration/InstallTo).
 * **Installer** (`tools/windows_vista_install.c`, CSMWrap mode v1): BIOS
   firmware is accepted only with `usos-vista-csmwrap.flag`; before Setup the
@@ -471,7 +473,675 @@ plain "OK" confirmation.
   (the first and the last MiB are zeroed: MBR and both GPT copies, then a new
   MBR); the sectors in between are not overwritten, but no partition refers
   to them any more and Setup formats its new partition. In Vista Setup the
-  user picks the unallocated space.
+  user picked the unallocated space (until 2026-10-11; now InstallTo, section 13).
 * XP: unchanged behaviour (the picker's extra `info=` line appears only with
   `USOS_XP_DISK_NOTE`, set only by step 610; `USOS_UI_VISTA` only with
   `usos.legacy_action=vista-csmwrap`).
+
+## 11. 32-bit Windows 8.1 / 10 without firmware CSM (profile `win-x86-uefi-csmwrap`, 2026-10-10)
+
+Status: **experimental, QEMU end-to-end** (section 11.3); X470 untested.
+
+The X470 firmware is 64-bit UEFI only, so x86 Windows 8.1 / 10 media were
+blocked (`needs_32bit_uefi_or_bios`). Their own Setup WinPE already has
+xHCI, AHCI and NVMe drivers, so unlike Vista (section 10) no PE10 donor is
+needed: the ISO's own x86 `boot.wim` is staged on the target and started in
+BIOS mode through CSMWrap.
+
+```
+UEFI menu (no CSM, x86 media of windows-10 / windows-8-1 / Embedded 8.1)
+  -> windows_native_iso.prepareX86Csmwrap: x86 Setup PE 6.3 or 10, BCD,
+     boot.sdi, root bootmgr, setup.exe, install image; usos-source.ini and
+     request.ini (profile=win-x86-uefi-csmwrap, donor = the ISO itself) in
+     \EFI\USOS\vista-csmwrap; the answer profile is staged as x86
+  -> micro-Linux step 610 (same picker + "FORMAT THE ENTIRE DISK?"), target
+     script with X86_SELF=1, MBR:
+       slot 1  NTFS "Windows", inactive, 1 MiB .. staging
+       slot 2  NTFS "USOS-SETUP", active, 1 GiB: the ISO's bootmgr, boot\bcd,
+               boot\boot.sdi, sources\boot.wim (Setup image) + support.cpio
+               + modern-support.cpio + usos-x86-csmwrap.flag +
+               usos-csmwrap-target.ini (+ usos-unattend.xml)
+       slot 3  CSMWrap ESP (xp_csmwrap_esp.sh)
+restart -> disk UEFI entry -> CSMWrap -> SeaBIOS -> MBR -> bootmgr -> x86 WinPE
+  -> usos-start.cmd mounts the ISO from DATA (usos-source x86, ImDisk x86)
+  -> usos-x86-csmwrap.cmd: usos-x86-csmwrap before (disk by MBR signature,
+     WinPE letters of its volumes dropped, Windows partition active, staging
+     inactive + hidden 0x17, InstallTo DiskID/PartitionID added to the answer)
+  -> setup.exe /noreboot /installfrom /unattend (no disk page)
+  -> usos-x86-csmwrap after (bootmgr + winload.exe on the Windows partition,
+     one active partition; staging entry removed; 2-minute "remove the stick"
+     notice) -> restart -> disk -> CSMWrap -> Windows phase 2 / OOBE
+```
+
+Failure of Setup: `usos-x86-csmwrap failed` makes the staging partition
+active again (the next boot of the disk retries).
+
+### 11.1 Limits / open
+
+* Answer commands are not wrapped by `usos-run-hidden` (x64 only) and user
+  INF drivers (DATA\Drivers) are not loaded on this path.
+* The WinPE notice text is English only (no `winpe.*` key yet).
+* The image list row and the boot-method help still describe the x64 path.
+* After the staging entry is removed its 1 GiB stays unallocated.
+* Same CSMWrap limits as section 3 (legacy VBIOS, one core reserved, Secure
+  Boot off; the menu refuses with Secure Boot on).
+
+### 11.2 Tests
+
+`tools/tests/test_windows_x86_csmwrap.py` (InstallTo edit), Zig tests
+(`formatX86CsmwrapRequest`, variant selection, golden `csmwrap` row).
+QEMU: `tools/tests/windows_native/qemu_native.py` with
+`USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci USOS_NATIVE_TARGET_FIRST=1`
+(the target boots first once prepared; the stick stays connected for the ISO).
+
+### 11.3 Product key and answer architecture (X470 2026-10-11)
+
+X470, build B261011-094317: Windows 10 22H2 x86 Setup stopped right after
+"Instalator rozpoczyna pracę" with "cannot read the `<ProductKey>` setting"
+(setupact: `Callback_Productkey_Validate_Unattend ... hr = 0x80070002`), in
+two runs:
+
+* DATA answer made for amd64 only (generator file, every component
+  `processorArchitecture="amd64"`): 32-bit Setup ignores all of it
+  ("No `<ImageInstall>` section"), so neither the InstallTo the helper added
+  nor the answer's key reached Setup;
+* no answer: the helper's InstallTo-only answer has no key; 8.x / 10 Setup
+  with `/unattend` on multi-edition media without ei.cfg requires one.
+
+Not an encoding or nesting fault of `windows_installto.h`. Fix
+(`usos_it_arch`, `usos_it_key`): an answer without components for Setup's
+architecture is retargeted (x86 <-> amd64); an empty `<Key>` never reaches
+Setup (removed for Vista / 7 / 2008, whose Setup rejects it); for Setup 6.2+
+(version of the ISO's `sources\setup.exe`, 5th argument of
+`usos-x86-csmwrap before`) a missing or empty key becomes
+`00000-00000-00000-00000-00000` with `WillShowUI=Always`, i.e. Setup's own
+key / edition page, as without an answer file. The menu no longer warns
+about an answer for another architecture on these paths.
+
+QEMU recheck (OVMF no CSM, `pc`, AHCI target, real stick path, Windows 10
+22H2 PL x86): the user's amd64-only generator answer (generic Pro key) ->
+helper "components retargeted ... InstallTo added" -> Setup installs with
+no page at all; no answer -> language page, then Setup's own "Aktywuj system
+Windows" key page (with "Nie mam klucza produktu") instead of the stop.
+
+## 12. 32-bit Windows 7 / Vista / Server 2008 without firmware CSM (profile `win-nt6-x86-uefi-csmwrap`, 2026-10-10)
+
+Status: **experimental, QEMU end-to-end for Server 2008 x86** (section 12.2); Windows 7 x86 and Vista x86 untested (no retail 32-bit media in the library); X470 untested.
+
+The 32-bit NT 6.0 / 6.1 media were blocked on the X470 (64-bit UEFI only,
+`needs_32bit_uefi_or_bios`). Their own Setup WinPE has no xHCI driver (no
+keyboard or mouse on the X470), so, as for Vista x64 (section 10), a PE10
+donor runs their Setup: here an **x86** PE10, i.e. the Setup image of a
+Windows 10 x86 ISO. The disk layout and the WinPE helper are the ones of
+section 11 (`X86_SELF=1`), only the staged WinPE comes from the donor.
+
+```
+UEFI menu (no CSM, x86 media of windows-7 / windows-vista / Server 2008)
+  -> windows_native_iso.prepareNt6X86Csmwrap: the ISO has sources/setup.exe
+     and an all-x86 install.wim of NT 6.1 (Windows 7) or 6.0 (Vista / 2008);
+     the x86 PE10 donor = a valid Windows 10 x86 Setup ISO (PE 10.0
+     build 10240..21999, BCD, SDI, setup.exe, root bootmgr) in
+     Programs/USOS/WinPE (the recorded one first: since 2026-10-20 USOS
+     ships PE10_x86_19041_USOS.iso, recorded under x86_ keys in
+     winpe-donor.ini and checked by size and SHA-256 before use), else the
+     first valid one in Systems/Windows/Windows 10/Images (where a
+     Windows 10 x86 ISO for its own install already lives; no record);
+     usos-source.ini (binds the 32-bit ISO) + request.ini
+     (profile=win-nt6-x86-uefi-csmwrap, donor=<the x86 PE10 ISO>)
+  -> micro-Linux step 610: exactly the section 11 layout, with the donor's
+     bootmgr / BCD / boot.sdi / boot.wim (+ support.cpio, modern-support.cpio)
+  -> CSMWrap -> x86 PE10 in BIOS mode -> usos-start.cmd mounts the 32-bit
+     ISO -> usos-x86-csmwrap.cmd: InstallTo added, the ISO's setup.exe
+     /noreboot /installfrom /unattend -> staging entry removed -> restart ->
+     disk -> CSMWrap -> Windows phase 2 / OOBE
+```
+
+Where the ISOs go on DATA: the system ISO in its usual folder
+(`Systems\Windows\Windows 7\Images`, `...\Windows Vista\Images`,
+`...\Windows Server 2008\Images`), the Windows 10 x86 ISO in
+`Systems\Windows\Windows 10\Images` (or `Programs\USOS\WinPE`).
+
+### 12.1 Limits / open
+
+* USB 3 in the installed system: Windows 7 SP1 x86 uses the bundled driver
+  when no other xHCI package is installed (12.8); optional DATA packages
+  still use 12.3. Vista / Server 2008 SP2 x86: USB keyboard and mouse through our own
+  usosusb driver (12.6), USB sticks through the same driver (12.7).
+* DATA\Drivers and answer-command wrapping: as section 11.1.
+* A USOS profile renders x86 components; with no key and no edition Vista /
+  2008 Setup asks for them (a DATA answer with `/IMAGE/INDEX` avoids that).
+
+### 12.2 QEMU results (2026-10-10, build B261010-204513-7DF3AAC3)
+
+OVMF **without CSM** (`pc`, TCG, std VGA), target 40 GiB on AHCI, the test
+stick (`new_native_stick.ps1`: Web Server 2008 SP2 PL x86 ISO, Windows 10
+22H2 x86 ISO as `-DonorPath`, a DATA `Unattended` answer with
+`/IMAGE/INDEX` 1, empty key, Administrator password + autologon) on xHCI,
+`qemu_native.py` with `USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci
+USOS_NATIVE_TARGET_FIRST=1`:
+
+* Menu: the x86 image is listed (no 32-bit block); summary "Boot source ISO
+  = the Windows 10 x86 ISO, Boot PE 10.0.19041 x86 / WIM index 2".
+* Step 610: picker, "FORMAT THE ENTIRE DISK?", PREPARED (X86_SELF layout).
+* Restart -> disk -> CSMWrap -> x86 PE10 -> Server 2008 Setup started from
+  the mounted ISO: **no language, key, edition or disk page** (InstallTo),
+  install ran to the end, usos-x86-csmwrap removed the staging entry, the
+  PE restarted by itself.
+* Phase 2 through CSMWrap, Setup finished, autologon: **Server 2008 Web x86
+  desktop** (Server Manager, computer name from the answer, PL).
+* Final MBR: slot 1 Windows NTFS active, staging entry gone, slot 3 CSMWrap
+  ESP. The disk alone (stick removed, same NVRAM) boots to the desktop.
+* Input on the desktop: none (qemu-xhci, Server 2008 has no xHCI driver;
+  see 12.1). Setup in PE10 had USB.
+
+### 12.3 USB 3 for the installed 32-bit Windows 7 (2026-10-10)
+
+After Setup returned 0 (`/noreboot`) and before the staging entry is
+removed, `usos-x86-csmwrap.cmd` runs a `usb3` step (never fatal):
+
+* `usos-x86-csmwrap.exe target <file>`: the volume at the prepared Windows
+  partition keeps its letter or gets a free one; the file gets
+  `<letter>: <major.minor>` from `Windows\System32\ntoskrnl.exe`.
+* NT 6.1 only. From DATA (the read-only ImDisk mapping the ISO came from):
+  `Systems\Windows\Windows 7\Updates\*kb2864202-x86*.msu` (or
+  `*kb2685811-x86*`; expanded with `expand.exe`) and
+  `Systems\Windows\Windows 7\Drivers\x86\` (one folder per package). The x86
+  PE10's DISM adds the KMDF 1.11 CAB (`/Add-Package`), then the packages
+  (`/Add-Driver /Recurse /ForceUnsigned`; 32-bit Windows 7 does not enforce
+  kernel-mode signatures, so a community-signed package loads). Logs:
+  `<Windows>\USOS-usb3\dism-*.log`. Missing files or a DISM error only skip
+  the step. Windows 8.1 / 10 x86 (same script) are left alone.
+* The 32-bit package used for the tests is the user's Win8 generic USB
+  backport (`driwer\x86`: usbxhci / ucx01000 / usbhub3 / usbd8
+  6.2.9200.22453, `NTx86.6.1`, PCI\CC_0C0330 plus AMD/ASMedia/Intel/...
+  HWIDs, catalog signed by Riolin); it needs KMDF 1.11. KMDF x86 for
+  Windows 7: Microsoft Update Catalog
+  `windows6.1-kb2864202-x86_9e556e48e72ae30ec89c5f1c713acde26da2556a.msu`
+  (the user has it in `driwer\`). Both are user files on DATA, never in the
+  repo or the release (temporary bridge, ROADMAP L6 rule).
+* NT 6.0 x86 (Vista / Server 2008): skipped. Checked 2026-10-10:
+  - DISM 10 refuses NT 6.0 images ("DISM does not support servicing a
+    Windows Vista RTM or earlier operating system"), and Vista's own
+    `pkgmgr /o:` fails offline under a Windows 10 kernel (0x80070057), so
+    KMDF for Vista/2008 x86 (Microsoft Update Catalog
+    `windows6.0-kb2864202-x86_ede193c9c47705284407043eac9daee1ce489389.msu`,
+    one file for both) would have to be installed online (pkgmgr before
+    windeploy, as the Vista x64 v11 flow does);
+  - the user's x86 package cannot load on NT 6.0 even with KMDF 1.11:
+    usbxhci / ucx01000 / usbhub3 import Windows 7 kernel exports that Server
+    2008 SP2 x86 lacks (`KeQueryActiveProcessorCountEx`,
+    `KeGetProcessorIndexFromNumber`, `KeQueryHighestNodeNumber`,
+    `KeGetCurrentProcessorNumberEx`, `RtlUnicodeToUTF8N`, `wcsncpy_s`,
+    `ObfReferenceObjectWithTag`, `ObfDereferenceObjectWithTag`);
+  - the Vista-capable community build used for Vista x64 (marie-systems
+    win7-sp2 `patches/drivers/USB3/XHCI`) has no x86 folder; AMD has no
+    32-bit or Vista USB 3 driver for Ryzen / Promontory; Renesas / ASMedia
+    packages do not bind the AMD controllers.
+  A Vista / 2008 x86 USB 3 path needs a 32-bit xHCI package whose imports
+  resolve against Vista SP2 + KB2864202 (user-supplied), plus the online
+  KMDF step.
+
+### 12.4 QEMU results with retail 32-bit media (2026-10-11, build B261010-215407-A5A3B2C3)
+
+Same harness as 12.2 (OVMF without CSM, `pc`, TCG, AHCI target, stick on
+xHCI, DATA answer file), sticks built with `new_native_stick.ps1
+-DataExtraPath` for the Windows 7 USB 3 files.
+
+* **Windows 7 Ultimate SP1 PL x86** (`pl_windows_7_ultimate_with_sp1_x86_dvd_u_677455.iso`,
+  5 editions Starter..Ultimate, build 7601.17514; answer `/IMAGE/INDEX` 5,
+  local account + autologon): menu lists it (x86, summary "Without CSM",
+  boot PE 10.0.19041 x86); step 610; PE10 Setup hands-free; the `usb3` step
+  logged `installed Windows: C: 6.1`, KMDF DISM exit 0, both packages
+  (usbxhci, uaspstor) "successfully installed", driver DISM exit 0; phase 2
+  through CSMWrap to the **desktop**. The disk alone, then booted with
+  `pc,i8042=off` (no PS/2 controller at all) and only qemu-xhci +
+  usb-kbd + usb-tablet: the USB keyboard types in Notepad / Run; `sc query`
+  shows usbxhci, usbhub3, kbdhid, mouhid RUNNING, i8042prt STOPPED. Windows
+  asks once for a restart (new devices).
+* **Windows Vista SP2 PL x86** (`pl_windows_vista_with_sp2_x86_dvd_x15-36306.iso`,
+  7 editions, build 6002.18005; answer index 4 = Ultimate): accepted by the
+  menu and step 610. Client Vista Setup shows the product key page even
+  with `/IMAGE/INDEX` and no `ProductKey` (an empty `<Key>` is rejected as
+  "invalid product key"); Next + No continues (USB input in PE10). The
+  `usb3` step logs the NT 6.0 skip; phase 2 through CSMWrap, OOBE skipped,
+  autologon: **Vista Ultimate x86 desktop**. No USB input there (12.3).
+* **Server 2008 Web SP2 PL x86**: as 12.2; the `usb3` step logs the NT 6.0
+  skip. An empty `<Key>` is rejected there too; leave `ProductKey` out.
+
+### 12.5 X470: Vista x86 OOBE hang (WinSAT) and stick autochk (2026-10-11)
+
+X470 / 5700X / RX 560, CSM off, build B261011-123142-843DD3F6, no answer
+profile (the helper's InstallTo-only answer), Biostar S100 target.
+
+**WinSAT.** Evidence on the target (read-only): `Windows\Performance\WinSAT\winsat.log`
+of the first OOBE (15:08) ends with `Running Assessment: mem ''` after the
+features / graphics / media / cpu assessments, i.e. `winsat moobe` (OOBE's
+"Sprawdzanie wydajnosci komputera") never returned (user: 100 % CPU, no
+bugcheck); same spot as the Vista x64 stall of 2026-09-21
+(`docs/windows-vista-winsat-recovery-2026-09-21.md`). UnattendGC shows
+`create user [test]` + `Exiting mandatory tasks [0x0]` at 15:08 and, after
+the hard reset, a complete second OOBE (15:16: computer name, time zone,
+`create user [test1]`): OOBE had not finished, so Windows ran all of it
+again, and with no answer profile the pages were interactive. WinSAT then
+logged `Already ran during MOOBE key value = 1` and windeploy finished
+(`IMAGE_STATE_COMPLETE`).
+
+Fix: the x64 Vista path has had the OOBE gate since 2026-09-21
+(`tools/windows_vista_oobe_gate.c`: `WinSAT\MOOBE=2` before OOBE, so `winsat
+moobe` exits before any assessment, no score is invented; an interrupted
+late OOBE with exactly one completed account resumes via the native
+`SkipMachineOOBE` instead of asking for a second account; boot autochk
+limited to the system volume). The x86 path now uses the same gate:
+`usos-vista-oobe-x86.exe` (x86 build with `USOS_GATE_NATIVE_DEPLOY`: hands
+over to native `windeploy.exe`, there is no USB payload), armed by the
+`nt60_gate` step of `usos-x86-csmwrap.cmd` for installed NT 6.0.6002 only:
+offline `MOOBE=2` (SOFTWARE), the gate copied to `<Windows>\USOS\oobe.exe`,
+`Setup\CmdLine` `oobe\windeploy.exe` -> that path, `SetupType=2` (SYSTEM,
+with WinPE's `reg load`). Never fatal: any check failing leaves Setup's own
+entry. WinSAT itself is untouched; the assessment stays available later
+(Control Panel / `winsat formal`). An answer profile with
+user and time zone still fills those pages; without one they stay Setup's own.
+
+**USB input in OOBE.** The keyboard / mouse worked up to the clock page and
+not on the desktop. Vista x86 has no xHCI driver, so that input can only be
+the firmware's legacy USB emulation behind the i8042 (`ACPI\PNP0303` =
+i8042prt is installed); setupapi / System logs show no USB or xHCI device
+install around that point. What ends the emulation is not identified;
+not pursued (no 32-bit NT 6.0 xHCI driver, 12.3).
+
+**Stick autochk ("Skanowanie i naprawianie dysku").** Windows 10 x86 phase 2
+on the X470 scanned the USOS stick. micro-Linux mounts the stick ESP
+read-write (`micro_linux_init.sh`) and step 610 (and the w9x, Vista-prepare,
+hardware, XP-menu paths) ended with `reboot -f` / `poweroff -f` while it was
+still mounted. Linux vfat sets the FAT32 dirty flag (boot sector 0x41
+bit 0) on a read-write mount and clears it only on unmount / remount
+read-only, so the stick ESP came back dirty and Windows' boot autochk
+repaired it. Fix: every micro-Linux restart / power-off goes through
+`tools/stick_release.sh` (remounts every rw FAT / exFAT / NTFS mount
+read-only, unmounts it, each bounded to 10 s, then restarts); `stop()`
+remounts them read-only before the emergency shell
+(`tools/tests/test_stick_release.py` fails on any direct `reboot -f`).
+Diagnostics: `usos-x86-csmwrap.exe stick` logs `FSCTL_IS_VOLUME_DIRTY` of
+every USB / removable volume before Setup and before the restart
+(read-only). A drive-letter based autochk exclusion (`/k:`) cannot cover
+the stick on the installed system (letters unknown offline); the Vista gate
+keeps its fixed-volume exclusion.
+
+QEMU (build B261011-133114-553C6A86; OVMF no CSM, `pc`, AHCI target with
+cache=writeback, stick on xHCI):
+
+* Vista SP2 PL x86, USOS profile "Vista Ultimate" (user Retro, Europe/Warsaw):
+  stick ESP byte 0x41 = 0x00 before boot, **0x01 while micro-Linux had the
+  ESP mounted**, 0x00 right after the step-610 restart
+  (`[STICK_RELEASE] /mnt/esp remounted read-only` / `unmounted`) and through
+  phase 2; WinPE: `installed Windows: C: 6.0 6002`, `OOBE gate armed`;
+  OOBE with no page (profile filled user, computer name, time zone), WinSAT
+  `Already ran during MOOBE key value = 2`, `oobe-prep.log` recovery
+  decision 0, watcher left after OOBE, Setup keys cleared; Retro desktop.
+  `fsutil dirty query` (read-only mount): ESP, DATA, WORK not dirty. PASS.
+* Windows 10 22H2 PL x86, no answer: ESP flag 0 after step 610 and at every
+  later checkpoint, WinPE `dirty bit ... =0` for all three stick volumes, no
+  autochk screen on the two target boots with the stick attached (run stopped
+  at OOBE); ESP, DATA, WORK not dirty. PASS.
+* Side finding: the profile's `skip_games` (`pkgmgr /uu:InboxGames`) shows a
+  console window during specialize for minutes (UX "no console windows").
+
+### 12.6 Vista / Server 2008 SP2 x86: USB keyboard and mouse (usosusb, 2026-10-11)
+
+No 32-bit NT 6.0 xHCI driver exists (12.3), and the X470 has only xHCI
+ports: the Vista x86 OOBE keyboard / mouse ended at the clock page (12.5,
+firmware legacy emulation behind i8042). Our NT 4.0 / 3.x driver
+`tools/nt4/usosusb` (own xHCI polling, root-port HID boot keyboard / mouse,
+legacy keyboard / pointer port for kbdclass / mouclass) gets an NT 6.0 build:
+
+* `build-nt6.cmd` (`-DUSOSUSB_NT6`) -> `tools/nt4/usosusb/bin/nt6/i386/usosusb.sys`:
+  PCI configuration through `HalGet/SetBusDataByOffset` (HAL lock; the
+  CF8h/CFCh `cli` pair of the NT4 build only protects one CPU); input passed
+  on once the class driver connected (also before its first ENABLE);
+  `Parameters\Conn` diagnostics next to `Diag`. Every import resolves on the
+  Server 2008 SP2 x86 kernels (ntoskrnl, ntkrnlpa) and HALs (halmacpi,
+  halacpi): `tools/tests/test_nt60_usosusb.py`, fixture
+  `tools/tests/data/nt60sp2_x86_exports.txt`.
+* How NT 6.0 takes a legacy port: kbdclass / mouclass are system-start
+  services (group "Keyboard Class" / "Pointer Class") and keep the legacy
+  path: a `\Device\KeyboardPortN` listed in `HARDWARE\DEVICEMAP` becomes
+  `\Device\KeyboardClassLegacyN`, and win32k opens
+  `\Device\KeyboardClassLegacy0` / `\Device\PointerClassLegacy0` next to the
+  PnP keyboard interfaces (strings in the 6002 win32k.sys / kbdclass.sys).
+  No PnP device, INF or class filter is needed; i8042prt (PnP, ACPI PNP0303)
+  keeps working beside it.
+* Signing: 32-bit NT 6.0 does not enforce kernel-mode code signing (only
+  x64 does); the unsigned driver loads as a system-start service.
+* Firmware handoff: the driver takes each xHCI controller with the USBLEGSUP
+  handshake (forced after 1 s) and clears the SMI enables, so the firmware's
+  i8042 emulation stops when usosusb starts (boot, before kbdclass), and
+  input comes only from usosusb from then on.
+* Install: `nt60_usb` step of `usos-x86-csmwrap.cmd` after `nt60_gate`, for
+  installed NT 6.0 build 6002 only (Windows 7 and later have usbxhci and are
+  left alone): `usosusb-nt6.sys` (modern-support.cpio) -> `<Windows>\System32\drivers\usosusb.sys`,
+  `reg load` of the target SYSTEM hive in the PE10, service in
+  `ControlSet00<Select\Current>`: Type 1, Start 1, ErrorControl 0, Group
+  "Keyboard Port", ImagePath `system32\drivers\usosusb.sys`. Never fatal.
+* Limits (as NT4): root-port devices only (no hubs, so no keyboards with a
+  built-in hub), HID boot protocol only (no absolute tablets), no power
+  management (sleep / hibernate would leave the controller unprogrammed; the
+  Vista profile turns hibernation off). USB sticks: stage 2 in 12.7 (same
+  driver, volumes instead of a SCSI miniport stack).
+
+QEMU (build B261011-151241-B661FA01; OVMF without CSM, `pc`, TCG, AHCI target
+cache=writeback, stick on qemu-xhci, PE10 x86 donor):
+
+* Web Server 2008 SP2 PL x86 (DATA answer, index 1, Administrator autologon):
+  hands-free to the desktop. With PS/2 present: `Diag` `usosusb 1.0-nt6:
+  hc0=00:03.0(8 ports) p5:s1K-`, `Conn` `kbd c1 e1/1 n262` (the typed
+  command came through usosusb), i8042prt RUNNING beside it. Then the disk
+  alone with `pc,i8042=off`, qemu-xhci + usb-kbd + usb-mouse only: Notepad
+  typing, mouse to the Start button + click opens the Start menu; `Diag`
+  `p5:s1K- p6:s2-M`, `Conn` `kbd c1 e1/1 n400 mou c1 e1/1 n12`, i8042prt
+  STOPPED. PASS.
+* Vista SP2 PL x86 (USOS profile "Vista Ultimate"; client Setup still shows
+  its key page, Next + No): hands-free afterwards to the Retro desktop. The
+  disk alone with `pc,i8042=off`, usb-kbd + usb-mouse only: Notepad typing,
+  Start menu by USB mouse click; `Diag` `p5:s1K- p6:s2-M`, `Conn` `kbd c1
+  e1/1 n408 mou c1 e1/1 n9`, i8042prt STOPPED, `ver` 6.0.6002. PASS.
+* WinPE log (both): `phase=nt60-usb build=6002`, `usosusb: registered in
+  ControlSet001 exit=0` after `OOBE gate armed`.
+
+X470 to check: USB keyboard / mouse on root ports (not behind a hub) from
+the first phase-2 boot through OOBE to the desktop; `Diag` / `Conn` values
+(controllers 2, keyboard `K`, mouse `M`); keyboards with a built-in hub
+will not work (as on NT4).
+
+### 12.7 Vista / Server 2008 SP2 x86: USB sticks (usosusb 1.1-nt6, 2026-10-12)
+
+usosusb stage 2: the NT6 build also handles USB mass storage, so one
+driver owns the xHCI controller for keyboard, mouse and sticks (no second
+driver, no shared rings). Details in `tools/nt4/usosusb/README.md`
+("USB mass storage"):
+
+* Bulk-only transport (class 08h / 06h / 50h, LUN 0), SCSI INQUIRY, TEST
+  UNIT READY, REQUEST SENSE, READ CAPACITY(10), MODE SENSE(6), READ(10) /
+  WRITE(10); 512-byte sectors; one 64 KiB bounce buffer; reset recovery.
+* Volumes, not disks: no SCSI port / disk class / partition manager stack
+  (a legacy driver cannot get one on NT 6.0 without PnP). Each superfloppy,
+  MBR primary partition or GPT entry (max 4 per stick) becomes a removable
+  `FILE_DEVICE_DISK` device that answers the disk and mountdev IOCTLs; the
+  mount manager gives the drive letter (arrival notification; if it assigns
+  none, `CREATE_POINT` on a free letter). File systems mount as usual (FAT,
+  FAT32, NTFS). This also shows every data partition of a multi-partition
+  stick (the USOS stick: DATA and WORK; EFI system partitions get no volume,
+  as in Windows), which the Windows 7 removable-media stack does not.
+* Hot plug: port status events; unplug removes the letter, sets
+  DO_VERIFY_VOLUME and opens the volume once, so the file system's verify
+  fails and it dismounts (without that a removed NTFS stick made shutdown
+  hang on endless write-behind retries); a new stick gets new volume devices.
+* No change to the flow: the `nt60_usb` step installs the same file.
+
+QEMU (2026-10-12; Web Server 2008 SP2 PL x86 installed through the real stick
+path with build B261012-104904 (OVMF without CSM, CSMWrap, PE10 x86 donor,
+DATA answer), then `usosusb.sys` replaced by the 1.1-nt6 build; `pc`,
+qemu-xhci, AHCI target cache=writeback):
+
+* FAT32 stick (512 MiB MBR, `usb-storage` on qemu-xhci) present at boot:
+  `Diag` `p3:s1--S(512M wp0 1v)`, `Msc` `UsosUsbDisk0:0=E` (letter from
+  the mount manager). `dir`, `type`, copy stick -> C: (`fc /b` equal), copy
+  C: -> stick; on the host the image holds the files written by the guest
+  (MD5 equal).
+* Hot unplug (`device_del`): letter removed (`UsosUsbDisk0:gone0`), no
+  crash; hot plug of another FAT32 stick: `p4:s1--S(128M wp0 1v)`, new
+  letter, read + write (MD5 checked on the host).
+* `pc,i8042=off`, usb-kbd + usb-mouse + stick: i8042prt STOPPED, typing,
+  Start menu by mouse click, Explorer "Komputer" lists `USBMSC (D:)` as a
+  removable disk, copy both ways.
+* Hot plug of the USOS test stick (GPT, 20 GiB): 1.7 GB ISO copied from
+  DATA (NTFS) to C: in 43 s (about 41 MB/s under TCG). Final build: the
+  stick at boot gives `S(20480M wp0 2v)`, USOS_DATA D: + USOS_WORK E: (ESP
+  skipped); the ISO copied C: -> WORK in 60 s, a file written to DATA,
+  surprise removal (`UsosUsbDisk0:gone0 UsosUsbDisk1:gone0`), clean
+  shutdown; on the host both NTFS volumes are healthy and `BIG.BIN` has the
+  ISO's MD5.
+* Vista SP2 PL x86 (USOS profile "Vista Ultimate", installed through the same
+  stick path, key page Next + No, then the final driver): `pc,i8042=off`,
+  usb-kbd + usb-mouse + USOS GPT stick + FAT32 stick: `ver` 6.0.6002, Diag
+  `p3:s1--S(20480M wp0 2v) p4:s2--S(512M wp0 1v) p5:s3K- p6:s4-M`, letters
+  D: (DATA) E: (WORK) F: (FAT32), i8042prt STOPPED; copy both ways (`fc /b`
+  equal), NTFS write on DATA, hot swap of the FAT32 stick for another one
+  (`p4-gone p4:s2--S(128M wp0 1v)`, same letter F:, read + write), Explorer
+  lists USOS_DATA / USOS_WORK / HOTPLUG as removable disks, Start menu by USB
+  mouse click, clean shutdown; on the host every file the guest wrote has
+  the expected MD5.
+* Harness: QEMU's qemu-xhci has 4 root ports; a 5th USB device lands behind
+  an emulated hub, which usosusb does not support (`p7-nohid`), so tests keep
+  at most four USB devices.
+
+Limits: root ports only, LUN 0, 2 TiB, polling, no safe-removal UI, Explorer
+may need F5 after a hot plug, at most 32 volume devices per boot.
+
+### 12.8 Windows 7 SP1 x86: bundled USB fallback (2026-10-20)
+
+The Kingston run, build `B261020-154129-13B3EC8A`, installed Windows
+7 Ultimate SP1 PL x86 on the X470/Micron and reached the desktop with
+PS/2 input only. Its `usos-startup.log` says `installed Windows: C: 6.1
+7601`, then `USB3: no 32-bit package in
+D:\Systems\Windows\Windows 7\Drivers\x86; skipped.` DATA contains no
+driver/MSU package. The earlier 11 October USB pass used the manually
+added x86 Riolin backport and KMDF from 12.3/12.4; USB in PE10 alone does
+not supply a Windows 7 target driver. Replacing a full Windows 10 ISO with
+the managed PE10 donor did not remove an automatically migrated Win7 driver.
+
+`nt60_usb` now also accepts NT 6.1.7601 and installs the already bundled
+`usosusb-nt6.sys` before the first target boot. It needs no KMDF, profile,
+download or DATA file. The same NT6 implementation provides root-port boot
+HID keyboards/mice and bulk-only USB disks. Its 42 imports resolve against
+both Win7 SP1 x86 kernels and all three HAL variants (export-name fixture;
+no Windows binary is shipped by this change).
+
+The optional successful DATA package takes precedence. Before enabling
+the fallback, the offline Services tree is also searched for xHCI service
+names/data (`xhc`: USBXHCI, amdxhc, iusb3xhc, ASMTXHCI, etc.), covering a
+package already in the ISO or a partially completed DISM installation.
+The bundled legacy driver must not reset a controller owned by another
+stack. A copy/readback/hive/registration failure stops the automatic reboot.
+
+Limits are those of `usosusb` (12.6/12.7): root ports only, boot HID and
+bulk-only storage, no USB hubs or general USB device stack. Hardware
+validation of this Windows 7 path remains separate from the emulator test.
+
+Validation (20/21 October 2026, release `B261020-210441-22B3BE7F`): the
+Kingston's Windows 7 Ultimate SP1 PL x86 ISO (image 5) and its identical
+managed PE10 x86 19041 donor, with no DATA USB driver/MSU or USOS profile.
+A test-only answer automated edition/account/OOBE; it contained no driver
+paths. The production micro-Linux target preparer and WinPE offline step
+applied the image and registered `usosusb` successfully. Installation's own
+restarts completed with the 8042 present, as on the X470; subsequent USB
+checks used `pc,i8042=off`, OVMF without CSM, CSMWrap, TCG and
+`qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt`. No source stick or ISO was attached
+to these final boots. The root-port USB keyboard, boot mouse and separate
+64 MiB FAT16 proof disk were tested through real Windows input/file APIs.
+
+| Target | First standalone boot | Further cold boot |
+|---|---|---|
+| AHCI, 24 GiB | F8 + mouse click + USB write/flush/reopen/read; usosusb RUNNING, i8042prt STOPPED: PASS | Same checks: PASS |
+| NVMe, 24 GiB | Same checks: PASS | Same checks: PASS |
+
+The host sent input only after the guest probe reported readiness. PASS
+required both hardware input events, the USB file round trip and the service
+states, then an orderly guest shutdown before the next boot. Explicit USB
+port numbers avoid QEMU's automatic hub for the fourth device. The WinPE
+image-apply phase used WHPX; the completed Windows boots above used TCG
+(the CSMWrap/WHPX legacy-kernel limitation is already recorded in 7).
+
+## 13. One disk question per flow (2026-10-11)
+
+Rule (user, 2026-10-11): every flow asks for the target disk **exactly once**.
+Where Windows Setup can boot straight from the stick, that is Setup's own
+disk page and USOS asks nothing. Where something must be staged on the target
+before Setup can boot (the CSMWrap paths), the USOS picker of step 610 is that
+one question and Setup must not ask again.
+
+### 13.1 Inventory
+
+| Path | Before | After | USOS picker required? |
+|---|---|---|---|
+| Windows 8.1 / 10 / 11 x64 native UEFI (also Embedded 8.1 x64, Server 2012 R2 Storage/Foundation) | Setup page only | unchanged | no: wimboot from the stick, Setup chooses |
+| Windows 7 x64 / Server 2008 R2 / Home Server 2011 (UEFI, Int10 dispatcher, PE10 donor) | Setup page only | unchanged | no |
+| Vista x64 UEFI with firmware CSM | Setup page only (USOS disk prep off unless `vista-disk-prep.flag`) | unchanged | no |
+| Vista x64 / Web Server 2008 x64 without CSM (`vista-x64-sp2-uefi-csmwrap`) | **both**: USOS picker + Setup page (pick the unallocated space) | USOS picker only (InstallTo) | yes: the PE10 staging partition and the CSMWrap ESP must be on the disk before Setup can boot in BIOS mode |
+| 8.1 / 10 x86 without CSM (`win-x86-uefi-csmwrap`) | USOS picker only (InstallTo); a UTF-16 answer kept the Setup page | USOS picker only, UTF-16 answers converted | yes (same reason) |
+| 7 / Vista / 2008 x86 without CSM (`win-nt6-x86-uefi-csmwrap`) | as above | as above | yes |
+
+### 13.2 Implementation
+
+* `tools/vista_csmwrap_target.sh`: the Vista x64 layout is now the x86 one
+  (slot 1 NTFS "Windows", inactive; slot 2 the active staging partition;
+  slot 3 the CSMWrap ESP), read back; `usos-vista-target.ini` already carried
+  `windows_start` / `windows_sectors`.
+* `tools/windows_installto.h` (shared by `usos-x86-csmwrap.exe` and
+  `usos-vista-install.exe` CSMWrap mode v2): the answer's own disk settings
+  (`DiskConfiguration`, `InstallTo`, `InstallToAvailablePartition`) are
+  removed, then `ImageInstall/OSImage/InstallTo` = the prepared disk and
+  partition goes into **every** `Microsoft-Windows-Setup` component (answer
+  files often carry one per architecture), or a windowsPE component is added
+  before `</unattend>`. UTF-16 answers are converted to UTF-8. Only the disk
+  confirmed in step 610 can be written by Setup.
+* The disk is the one internal MBR disk with the recorded signature whose
+  partition table holds the prepared Windows partition (offset + length).
+  Not found exactly once: a message box says so, Setup is never started (no
+  fallback to any other disk, no Setup disk page).
+* Host test `tools/tests/test_windows_x86_csmwrap.py` (hostile answer with
+  `WillWipeDisk` on disk 0, two Setup components, UTF-16, the Vista
+  servicing-only answer).
+
+### 13.3 Two-disk QEMU check
+
+`qemu_native.py` with `USOS_NATIVE_DECOY=<qcow2>`: a second internal disk
+(20 GiB, MBR with an active partition, marker data) enumerated before the
+target (Linux `sda`, Windows disk 0); the DATA answer file is hostile on
+purpose (`DiskConfiguration` with `WillWipeDisk` on disk 0 and `InstallTo`
+disk 0). OVMF without CSM, `pc`, TCG, target 40 GiB on its own AHCI
+controller, build B261011-082326-3D3F4F21:
+
+| Run | Result |
+|---|---|
+| Server 2008 Web SP2 PL x86 (`win-nt6-x86-uefi-csmwrap`, x86 PE10 donor) | picker lists both disks, the target is confirmed; PE10: `target physical disk=1`, `the answer's own disk settings removed; InstallTo added`; Setup ran with no page at all, the helper removed the staging entry, phase 2 through CSMWrap, Server 2008 desktop. Target MBR: Windows active at 2048, CSMWrap ESP; decoy: `qemu-img compare` identical to its pristine copy. PASS |
+| Vista SP2 PL x64 (`vista-x64-sp2-uefi-csmwrap`, PE10 x64 donor) | picker + "FORMAT THE ENTIRE DISK?" with the new layout text; PE10 Setup with `vista-csmwrap-answer.xml`: only the (known) client key page, then straight to "Installing Windows" (no edition or disk page); finalizer PASS; phase 2 from the target through CSMWrap in test mode up to the USB v11 gate (stops in QEMU as in 10.4). Target MBR as above; decoy identical. PASS |
+
+
+### 13.4 Finding: SeaBIOS boot priority is per controller, not per port
+
+With the decoy on **port 0 of the target's own AHCI controller**
+(`USOS_NATIVE_DECOY_SAME_CONTROLLER=1`), the firmware started the target's
+CSMWrap ESP correctly, but SeaBIOS then booted the **decoy's** MBR (black
+screen, nothing read from the prepared staging partition). Cause: patch 0004
+(`csm_bootprio_ata`) ranks by the controller's PCI address only; every disk on
+that controller gets the same priority and SeaBIOS breaks the tie by port
+order. This affects every CSMWrap target path (XP, 2000, NT, 9x, Vista, x86)
+on a PC with another disk on a lower port of the same SATA controller (common
+on the X470 chipset ports). It needs a SeaBIOS patch that also matches the
+port (CSMWrap's device path names the SATA port it was loaded from) and a
+CSMWrap rebuild.
+
+**Fixed in CSMWrap 3.1.2-usos4 (patch 0005, 2026-10-11,
+research/csmwrap.md section 9):** CSMWrap tags the BBS entry of the exact
+disk it was loaded from (device-path prefix of the loaded image) with an
+FNV-1a hash of that disk's sector 0; SeaBIOS reads sector 0 of every hard
+disk before mapping drives and moves the one match in front of the first
+hard disk. The target is 0x80, the other disks follow in their usual order
+(0x81, ...), so `rdisk(0)` in boot.ini / WINNT.SIF, the 9x `C:` and NT6's
+system disk (the first BIOS disk) keep meaning the prepared target; nothing
+in the flows had to change. QEMU, OVMF without CSM, build
+B261011-094317-A0DAC3F4:
+
+| Run | Result |
+|---|---|
+| `run_csmwrap_boot_disk_qemu.py`: decoy port 0 / target port 1 of one AHCI controller; target port 0 / decoy port 1; decoy on its own controller; target on qemu-xhci usb-storage | all four: target is 0x80, decoy 0x81 (read through INT 13h), decoy byte-identical. Control with usos3: the decoy boots. PASS |
+| XP Professional SP3 PL, prepared target on port 1, bootable decoy on port 0 of the same controller (`run_csmwrap_xp_ovmf.py --decoy --run-through`) | CSMWrap -> target MBR -> text-mode Setup copies, restarts, second CSMWrap boot -> GUI Setup; decoy byte-identical. PASS |
+| Windows 10 22H2 PL x86 (`win-x86-uefi-csmwrap`), `qemu_native.py` with `USOS_NATIVE_DECOY_SAME_CONTROLLER=1` (decoy port 0, target port 1), stick on qemu-xhci | USOS picker lists both, target confirmed, restart -> CSMWrap from the target ESP -> staging WinPE -> Setup without a disk page -> restart -> second CSMWrap boot from the target -> Windows phase 2 ("Przygotowywanie urządzeń"; run stopped there with the QEMU monitor `quit`). Target MBR: Windows active at 2048, CSMWrap ESP in slot 3; decoy `qemu-img compare` identical to its pristine copy. PASS |
+
+### 13.5 Booting Setup from the stick instead (evaluated, not implemented)
+
+Asked for 2026-10-11: no USOS picker on the CSMWrap paths either; Setup's own
+disk page, with the WinPE boot set loaded into RAM by the UEFI side and
+exposed to SeaBIOS as an INT 13h RAM disk; the CSMWrap ESP added afterwards
+on the disk Setup used.
+
+* Why the design staged on the target (section 2, 10.1): CSMWrap 3.1.2 has
+  no boot-device option (BBS: the drive it was loaded from first); the
+  installed system needs the target ESP on every boot anyway; Vista's own PE
+  has no xHCI, so PE10 had to be bootable without the stick.
+* RAM disk: SeaBIOS in CSM mode has no RAM hard-disk driver (its `ramdisk.c`
+  is a CBFS floppy for coreboot) and CSMWrap always ends in `Legacy16Boot`
+  (BBS). The memdisk part itself exists in USOS: the BIOS `wimboot` gives
+  bootmgr an INT 13h virtual disk built from files in RAM (the BIOS Core's
+  Windows ISO path uses it). Missing: a way to start a preloaded real-mode
+  image after CSMWrap's ExitBootServices without SeaBIOS reading the stick,
+  i.e. a CSMWrap/SeaBIOS patch (for example `boot_image=` in `csmwrap.ini`,
+  loaded below 1 MiB / reserved in E820 and entered instead of the BBS boot)
+  plus a rebuild with the pinned toolchain, new hashes and the release steps
+  of research/csmwrap.md 6.5.
+* USB INT 13h fallback: exists today (Utilities -> BIOS mode: CSMWrap from
+  the stick -> USOS Stage 1 -> Core -> BIOS wimboot from the DATA ISO); never
+  run on the X470; the Core reads the whole boot.wim through SeaBIOS's xHCI
+  driver. QEMU check 2026-10-11 (OVMF without CSM, stick on qemu-xhci, build
+  B261011-082326): the BIOS menu comes up through CSMWrap from the stick, but
+  Windows 10 x86 -> Automatic stops with `RuntimeWindowNotUsable` right after
+  `WIMBOOT FILE LOOKUP PASS`: `windows_wimboot.allocate` reserves 1-17 MiB for
+  wimboot's runtime, and the E820 that CSMWrap builds from the OVMF memory map
+  has a non-RAM range at 8 MiB (section 7: OVMF NVS at 8 MiB). The X470 map is
+  unknown; the fix would be a smaller or relocated window in the Core.
+* Open risks for any "Setup chooses" variant in BIOS mode: Setup puts
+  bootmgr on the active partition of what the BIOS reports as the boot disk;
+  booted from the stick (80h) it may pick another internal disk (the classic
+  multi-disk case), which writes to a disk the user did not choose and leaves
+  the chosen disk unbootable through its own CSMWrap ESP; and 13.4 applies to
+  phase 2 as well. The ESP itself can be carved after phase 1 (PE10
+  `diskpart shrink` by 65 MiB, a free MBR slot: Vista uses one partition,
+  7+ two).
+* Verdict (first evaluation): blocked by the CSMWrap/SeaBIOS rebuild and by
+  the unverified system partition placement.
+
+### 13.6 RAM-disk boot: system partition placement measured (2026-10-11)
+
+The rebuild is no longer the blocker (13.4 landed as usos4). The deciding
+question was what NT6 Setup does when BIOS drive 0x80 is a RAM disk that
+Windows cannot see. `tools/tests/legacy_bios/run_setup_system_disk_probe.py`
+reproduces exactly that BIOS view without building the RAM disk: QEMU legacy
+SeaBIOS, the ISO booted from CD, 0x80 = a virtio-blk disk with an MBR (Setup
+has no virtio driver, so like the RAM disk it is a BIOS disk with no Windows
+disk behind it), the AHCI disks after it, an answer file with language and
+EULA only, so Setup shows its own disk page; the target (40 GiB) is picked.
+
+| Setup | Disks Windows sees | Disk page / Next |
+|---|---|---|
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = decoy (0x81, active NTFS-type partition), disk 1 = target (0x82) | the decoy's partition is listed as type **System**; Next on disk 1: "Instalator nie mógł utworzyć nowej partycji systemowej ani zlokalizować istniejącej partycji systemowej" |
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = blank decoy (0x81), disk 1 = target | same error on disk 1 |
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = target only (0x81) | same error |
+| Windows 10 22H2 PL x86 | disk 0 = target only (0x81) | "Nie mogliśmy utworzyć nowej partycji ani zlokalizować istniejącej" |
+
+Nothing was written in any run (decoy and the 0x80 stand-in byte-identical,
+target still empty). Result: in BIOS mode Setup takes the system disk from
+BIOS drive 0x80. A RAM disk at 0x80 that Windows cannot see makes Setup
+refuse **every** disk, even on a single-disk PC. Numbering the RAM disk after
+the real disks does not help either: then 0x80 is whatever internal disk the
+BIOS lists first, Setup puts the system partition (bootmgr, BCD) there when
+it is not the disk the user picked (the "System" row above) - a write to a
+disk the user did not choose, which the design must never do. Only the disk
+the user picks being 0x80 is safe, and that needs the choice before the BIOS
+boot, i.e. the step-610 USOS picker.
+
+Not built because of this: the UEFI-side boot-set loader, the SeaBIOS RAM
+disk, the E820 reservation for it, and the WinPE helper that would carve the
+CSMWrap ESP after phase 1. The `RuntimeWindowNotUsable` item of 13.5 belongs
+to the BIOS Core's own wimboot path and is unrelated to this result.
+
+Possible route, not attempted: make the RAM disk visible to Windows as a
+fixed disk (a memdisk-style table, mBFT, plus a WinPE disk driver that reads
+it, e.g. the GPL WinVBlock). Setup would then put the system partition on
+the RAM disk (written only in memory), install to the disk the user picked,
+and the helper would run `bcdboot` on that disk and add the CSMWrap ESP. It
+needs a Windows kernel driver for x86 PE 6.x/10 and its own tests; the
+`attributes disk set readonly` trick does not help because the disk the user
+will pick is unknown before Setup runs.
+
+Decision: the USOS picker (step 610, one question, Setup without a disk
+page) stays the default for all CSMWrap paths.

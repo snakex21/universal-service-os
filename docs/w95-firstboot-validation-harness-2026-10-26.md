@@ -1,0 +1,9 @@
+# W95 firstboot: dowody narzędzi kontroli
+
+Są to wyniki narzędzi hosta i własnego ROM, nie zaliczenie RTM/OSR1 ani testów użytkowych Windows.
+
+- Dodatnia kontrola śledzenia wejścia na aktualnym QEMU: własny sektor startowy, sygnał gotowości z unikalnym nonce, następnie ruch i kliknięcie PS/2 oraz klawisz A; exit85/1,401s. Ślad: `ps2_keyboard_event=1`, `ps2_put_keycode=1`, `ps2_mouse_send_packet=2`,260B. QEMU SHA `47d57a6072e0bb3bd98f87926eb129eb1736dfe818c67b3b81ef7ce4edd0b3cd`. Dowód `K:\USOS-VM\W95RTM-FIRSTBOOT-20261025\trace-control-current-01\result.json`. Jedna nowa kontrola była potrzebna, ponieważ dawny manifest r48 nie przypinał SHA programu. Dawne dowody zachowano. Testy użytkowe mają wymagać tego samego SHA oraz rzeczywistych zdarzeń gościa i raportów USB; sama kontrola PS/2 ich nie zalicza.
+- Czytnik wyłącznie do odczytu zamkniętych łańcuchów QCOW2/raw, z istniejącym własnym parserem FAT.69 zakresów po64KiB i5 plików, w tym SYSTEM.DAT, zgodne z wcześniej wykonanym niezależnym `qemu-img convert` dla łańcucha QCOW→QCOW. Drugi zamknięty przypadek QCOW→raw:68 zakresów i4 pliki zgodne z istniejącą płaską kopią. Kompresowane klastry, rozszerzone L2 i pliki spoza własnego katalogu są odrzucane. Dowód `artifacts/firstboot/closed-chain-reader-check.json`; nie utworzono nowego obrazu.
+- Zastosowanie czytnika do końcowego audytu usuwa konieczność kolejnej kopii raw o rozmiarze logicznym4GiB. Najpierw wymagany jest wynik z zakończonym procesem piszącym. Eksport tekstów jest ograniczony do64MiB i wymaga100GiB wolnego plus128MiB rezerwy. Dotychczasowe raw i inne obrazy pozostają zachowane.
+
+Adapter testów po instalacji ma tylko sprawdzoną składnię. Wymaga rzeczywistego `installed-base.json`, tworzy własną nakładkę, zapisuje PCAP urządzeń USB i sieci, śledzi PS/2 oraz oczekuje na zdarzenia po restarcie/wyłączeniu z menu Windows. Nie wywołuje `system_reset`. Żadnego z tych testów gościa jeszcze nie zaliczono.

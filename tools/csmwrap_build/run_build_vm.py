@@ -12,11 +12,12 @@ from tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz (no git).
 Builds nothing on the host; touches no physical disk.
 """
 from pathlib import Path
+import os
 import argparse, functools, hashlib, http.server, io, json, shlex, socket, subprocess, sys, tarfile, threading, time
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-QEMU = ROOT / 'tools/qemu/qemu-system-x86_64.exe'
+QEMU = ROOT / 'tools/qemu' / os.environ.get('USOS_QEMU_EXE', 'qemu-system-x86_64.exe')  # renamed copy: parallel runs
 OUT_DISK_BYTES = 256 * 1024 * 1024
 
 
@@ -110,7 +111,7 @@ def main():
     p.add_argument('--accel', default='whpx')
     p.add_argument('--timeout-minutes', type=float, default=60)
     p.add_argument('--offline', type=Path, help='partial Alpine mirror (build kit csmwrap-vm/apk): no network needed')
-    p.add_argument('--patches', type=Path, help='patch folder instead of 3.1.2-usos3/patches (e.g. 3.1.2-usos1/patches for the 1.0 build)')
+    p.add_argument('--patches', type=Path, help='patch folder instead of 3.1.2-usos18/patches (e.g. 3.1.2-usos1/patches for the 1.0 build)')
     p.add_argument('--usos-version', help='BUILD_VERSION of the patched build (default: lock usos_version)')
     a = p.parse_args()
     lock = json.loads((HERE / 'lock.json').read_text(encoding='utf-8'))
@@ -123,9 +124,9 @@ def main():
         raise SystemExit(f'Alpine ISO missing: {iso} (download {lock["alpine_iso"]["url"]})')
     if sha256(iso) != lock['alpine_iso']['sha256']:
         raise SystemExit(f'Alpine ISO hash mismatch: {iso}')
-    patches = sorted(((a.patches or ROOT / 'tools/vendor/csmwrap/3.1.2-usos3/patches')).glob('*.patch'))
-    if not a.patches and len(patches) != 4:
-        raise SystemExit(f'expected 4 patches, found {len(patches)}')
+    patches = sorted(((a.patches or ROOT / 'tools/vendor/csmwrap/3.1.2-usos18/patches')).glob('*.patch'))
+    if not a.patches and len(patches) != 22:
+        raise SystemExit(f'expected 22 patches (0001-0010, 0012, 0014-0024), found {len(patches)}')
     in_disk, out_disk = work / 'input.tar.img', work / 'output.tar.img'
     mirror = source = None
     if a.offline:

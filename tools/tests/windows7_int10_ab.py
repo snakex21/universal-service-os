@@ -36,6 +36,11 @@ Variants (each a vvfat ESP with the ISO's BCD, fonts, boot.sdi and boot.wim):
             passes, two cold resets (usos-nogop-resets.txt 1, 2), then hand
             back to the firmware and clear the counter
 
+Native-resolution experiment (docs/w7x64-native-res-2026-10-21.md):
+USOS_NATIVE_FLAG="max=1920x1080 single" writes usos-native-res.flag beside
+the dispatcher (usos* variants), VGAMEM_MB=64 enlarges the std VGA memory,
+INT10_AB_TAG / INT10_AB_SLOT give parallel runs their own folders / ports.
+
 INT10_AB_SET=vista runs the same variants with Windows Vista SP2 x64 media
 (section 7): its own 6.0 boot manager from boot.wim, work folder
 zig-out/vista-int10-ab (extract once with the Vista ISO).
@@ -71,8 +76,13 @@ def link(src, dst):
         shutil.copyfile(src, dst)
 
 
+TAG = os.environ.get('INT10_AB_TAG', '')
+NATIVE_FLAG = os.environ.get('USOS_NATIVE_FLAG')  # usos-native-res.flag text
+VGAMEM_MB = os.environ.get('VGAMEM_MB')
+
+
 def esp(variant):
-    root = SP / f'esp-{variant}'
+    root = SP / f'esp-{variant}{TAG}'
     if root.exists():
         shutil.rmtree(root)
     boot = root / 'EFI/BOOT'
@@ -105,6 +115,8 @@ def esp(variant):
         shutil.copyfile(RELEASE if variant in ('usosrel', 'usosnogop') else UEFISEVEN, boot / 'win7.efi')
         link(bootmgfw, boot / 'win7.original.efi')
         (boot / 'UefiSeven.ini').write_bytes(INI)
+        if NATIVE_FLAG:
+            (boot / 'usos-native-res.flag').write_text(NATIVE_FLAG + chr(13) + chr(10), encoding='ascii')
     elif variant == 'upstream':
         shutil.copyfile(UEFISEVEN, boot / 'BOOTX64.EFI')
         link(bootmgfw, boot / 'BOOTX64.original.efi')
@@ -149,19 +161,21 @@ def qmp(port):
 
 def run(variant, minutes, shots):
     root = esp(variant)
-    out = SP / f'result-{variant}'
+    out = SP / f'result-{variant}{TAG}'
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     vars_fd = out / 'vars.fd'
     shutil.copyfile(QEMU / 'share/edk2-i386-vars.fd', vars_fd)
-    port = 4450 + VARIANTS.index(variant)
+    port = 4450 + VARIANTS.index(variant) + 20 * int(os.environ.get('INT10_AB_SLOT', '0'))
     args = [str(QEMU / 'qemu-system-x86_64.exe'), '-machine', 'q35', '-accel', 'tcg', '-cpu', 'max',
             '-m', '2048', '-smp', '2', '-display', 'none', '-nic', 'none']
     if variant == 'usosnogop':
         args += ['-vga', 'none']
     else:
         args += ROOT_PORT_VGA if variant in ('usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm') else ['-vga', 'std']
+        if VGAMEM_MB:
+            args += ['-global', 'VGA.vgamem_mb=' + VGAMEM_MB]
     args += [
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(QEMU / 'share/edk2-x86_64-code.fd'),
             '-drive', 'if=pflash,format=raw,file=' + str(vars_fd),

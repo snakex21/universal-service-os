@@ -1,0 +1,432 @@
+{
+  "task": "W95RTM-FIRSTBOOT",
+  "status": "STOP_NOT_FULL_INSTALL_PASS",
+  "inventoried_utc": "2026-10-26T00:06:37.865842+00:00",
+  "root": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025",
+  "preserved_images": [
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-contract\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-contract\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-contract\\target.qcow2",
+      "bytes": 3670016,
+      "allocated_bytes": 3670016
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-contract\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl\\ADDONS.IMG",
+      "bytes": 134217728,
+      "allocated_bytes": 134217728
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl\\target.qcow2",
+      "bytes": 197120,
+      "allocated_bytes": 197120
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r2\\ADDONS.IMG",
+      "bytes": 134217728,
+      "allocated_bytes": 134217728
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r2\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r2\\stopped.qcow2",
+      "bytes": 189333504,
+      "allocated_bytes": 189333504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r2\\target.qcow2",
+      "bytes": 80150528,
+      "allocated_bytes": 80150528
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r2\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r3\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r3\\stopped.qcow2",
+      "bytes": 189333504,
+      "allocated_bytes": 189333504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r3\\target.qcow2",
+      "bytes": 6815744,
+      "allocated_bytes": 6815744
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\addons-predesktop-real-pl-r3\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract\\target.qcow2",
+      "bytes": 3276800,
+      "allocated_bytes": 3276800
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r2\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r2\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r2\\target.qcow2",
+      "bytes": 4325376,
+      "allocated_bytes": 4325376
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r2\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r3\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r3\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r3\\target.qcow2",
+      "bytes": 4718592,
+      "allocated_bytes": 4718592
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-contract-r3\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-contract\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-contract\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-contract\\target.qcow2",
+      "bytes": 4784128,
+      "allocated_bytes": 4784128
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-contract\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks\\failed-dos-stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks\\target.qcow2",
+      "bytes": 2228224,
+      "allocated_bytes": 2228224
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks-r2\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks-r2\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks-r2\\target.qcow2",
+      "bytes": 5046272,
+      "allocated_bytes": 5046272
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\coordinator-mouse-production-hooks-r2\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-attrs\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-attrs\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 2031616
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-baseline\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-baseline\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 2293760
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-import-trace\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 720896
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-own-attrs\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-own-attrs\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 2031616
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-rtm-regedit\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\delkey-rtm-regedit\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 2031616
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace\\BOOT.IMG",
+      "bytes": 1474584,
+      "allocated_bytes": 1474584
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace\\target.qcow2",
+      "bytes": 197120,
+      "allocated_bytes": 197120
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace-r2\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace-r2\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-native-dos-trace-r2\\target.qcow2",
+      "bytes": 2555904,
+      "allocated_bytes": 2555904
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-order-dos\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-order-dos\\stopped.raw",
+      "bytes": 67108864,
+      "allocated_bytes": 720896
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-order-dos\\target.qcow2",
+      "bytes": 524288,
+      "allocated_bytes": 524288
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-queue-dos\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-queue-dos\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 720896
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-requeue-dos\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-requeue-dos\\stopped.raw",
+      "bytes": 67108864,
+      "allocated_bytes": 720896
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\firstbt-requeue-dos\\target.qcow2",
+      "bytes": 393216,
+      "allocated_bytes": 393216
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\runonce-ordering\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\runonce-ordering\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\runonce-ordering\\target.qcow2",
+      "bytes": 2818048,
+      "allocated_bytes": 2818048
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\runonce-ordering\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\tzgrp-en\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\tzgrp-en\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 1179648
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\tzgrp-pl\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\tzgrp-pl\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 1114112
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\vesalate-production\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\vesalate-production\\DATA.IMG",
+      "bytes": 67108864,
+      "allocated_bytes": 1376256
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal\\target.qcow2",
+      "bytes": 1703936,
+      "allocated_bytes": 1703936
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal-windows-logon\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal-windows-logon\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal-windows-logon\\target.qcow2",
+      "bytes": 4259840,
+      "allocated_bytes": 4259840
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-normal-windows-logon\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-slow-windows-logon\\BOOT.IMG",
+      "bytes": 1474560,
+      "allocated_bytes": 1474560
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-slow-windows-logon\\stopped.qcow2",
+      "bytes": 115605504,
+      "allocated_bytes": 115605504
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-slow-windows-logon\\target.qcow2",
+      "bytes": 2949120,
+      "allocated_bytes": 2949120
+    },
+    {
+      "path": "K:\\USOS-VM\\W95RTM-FIRSTBOOT-20261025\\watchdog-slow-windows-logon\\vars.fd",
+      "bytes": 540672,
+      "allocated_bytes": 540672
+    }
+  ],
+  "removed": [],
+  "removed_count": 0,
+  "source_base_read_only": "K:\\USOS-VM\\Windows95\\sesja-cz-20261023\\seeds\\rtm-auto-vesa-base-r151",
+  "prepared_normal_flow_launched": false
+}

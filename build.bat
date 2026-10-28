@@ -35,7 +35,7 @@ rem the same dependency graph as the full release.
 
 rem Build release USB and manual-QEMU USB in one Zig graph so both copies of
 rem BOOTX64.EFI come from the exact same emitted binary and build identifier.
-"%ZIG%" build --cache-dir "%ROOT%tools\cache\zig" test selftest install qemu-x86_64-manual-image fetch-ntfs-driver micro-linux -Doptimize=ReleaseFast
+"%ZIG%" build -j2 --summary all --cache-dir "%ROOT%tools\cache\zig" test selftest install qemu-x86_64-manual-image fetch-ntfs-driver micro-linux -Doptimize=ReleaseFast
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 rem Release-owned helpers for the direct Core -> Windows PE path.
@@ -47,7 +47,8 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 rem Secure Boot: the vendored Microsoft-signed shim becomes EFI\BOOT\BOOTX64.EFI,
 rem USOS becomes the MOK-signed EFI\BOOT\grubx64.efi, and the micro-Linux kernel,
 rem systemd-boot and the NTFS driver are signed in place. The private key lives
-rem outside the repository (%%APPDATA%%\USOS\signing); without it the same layout
+rem in installer\data\signing (git-ignored, copied once from the older
+rem %%APPDATA%%\USOS\signing); without it the same layout
 rem is emitted UNSIGNED (boots only with Secure Boot off). docs\secure-boot-usos.md
 pushd "%ROOT%installer"
 go run ./cmd/usos-efisign release -root ..

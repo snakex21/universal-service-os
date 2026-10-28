@@ -1,0 +1,14 @@
+mTCP 2026-10-10 - TCP/IP applications for DOS
+Copyright (C) Michael B. Brutman (mbbrutman@gmail.com)
+Licence: GNU General Public License version 3 (COPYING.TXT below).
+
+Home page:  http://www.brutman.com/mTCP/mTCP.html
+Source:     http://www.brutman.com/mTCP/download/mTCP-src_2026-10-10.zip
+            https://github.com/mbbrutman/mTCP
+The complete corresponding source of the binaries in this directory is
+MTCPSRC.ZIP (= mTCP-src_2026-10-10.zip, unmodified). The binaries are the
+unmodified files of mTCP_2026-10-10.zip from the home page.
+
+USOS only adds its own packet driver USOSPKT.COM (GPL-3.0-or-later,
+Copyright (C) 2026 Maksymilian and the USOS Authors) and NETSTART.BAT;
+mTCP talks to it through the Packet Driver interface (INT 60h).

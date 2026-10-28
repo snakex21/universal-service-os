@@ -28,8 +28,10 @@ pub const header_size: usize = 28;
 /// first (strings.bios_count), so its tables end there. The UEFI menu and
 /// usos-fb-ui keep every key.
 pub const key_count = if (with_linux_strings) strings.english.len else strings.bios_count;
-/// Name hashes of the kept keys.
-const kept_hashes = strings.hashes[0..key_count];
+/// Name hashes of the kept keys: a copy of exactly those entries, so the
+/// BIOS Core does not carry the hashes of the UEFI-only strings (a slice of
+/// strings.hashes kept the whole table: 4 bytes per UEFI string).
+const kept_hashes: [key_count]u32 = strings.hashes[0..key_count].*;
 pub const linux_key_count = linux_strings.english.len;
 pub const max_blob_bytes: usize = 256 * 1024;
 
@@ -109,7 +111,7 @@ pub const Table = struct {
             // Unknown keys (newer installer) are ignored; undrawable values stay English.
             if (!cover.covers(value)) continue;
             const hash = nameHash(name);
-            if (indexOfHash(kept_hashes, hash)) |slot| {
+            if (indexOfHash(&kept_hashes, hash)) |slot| {
                 table.values[slot] = value_offset;
             } else if (with_linux_strings) {
                 if (indexOfHash(&linux_strings.hashes, hash)) |slot| table.linux_values[slot] = value_offset;
@@ -351,7 +353,17 @@ test "reverse lookup translates catalog and script English, including templates"
     try std.testing.expectEqualStrings("12 z 40 plików", table.translate(&buffer, "12 of 40 files"));
     try std.testing.expectEqualStrings("WINDOWS XP - wybierz dysk", table.translate(&buffer, "WINDOWS XP - SELECT DISK"));
     try std.testing.expectEqualStrings("Automatycznie (ISO)", table.translate(&buffer, "Automatic (ISO)"));
+    // Disk type line of the confirmation screens (tools/target_disk_identity.sh).
+    try std.testing.expectEqualStrings("Typ: SATA SSD", table.translate(&buffer, "Type: SATA SSD"));
     try std.testing.expectEqualStrings("not a catalog string", table.translate(&buffer, "not a catalog string"));
+    // System entry names go through view.tr: the own-image entry translates,
+    // product names stay as they are (src/catalog/other_systems.zig).
+    try std.testing.expectEqualStrings("Inny system (własny obraz)", table.lookup("Other system (own image)"));
+    try std.testing.expectEqualStrings("Haiku", table.lookup("Haiku"));
+    // The Haiku done screen hint (tools/w9x_csmwrap_prepare.sh).
+    var long: [512]u8 = undefined;
+    const haiku = table.translate(&long, "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu.");
+    try std.testing.expect(std.mem.indexOf(u8, haiku, "utwórz partycję BFS w wolnym miejscu") != null);
     const english = Table.english_only;
     try std.testing.expectEqualStrings("12 of 40 files", english.translate(&buffer, "12 of 40 files"));
 }

@@ -50,7 +50,7 @@ class Pipeline(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.steps = self.tmp / 'pipeline' / 'steps'
         self.steps.mkdir(parents=True)
-        for step, name in (('100', 'nt5_staging'), ('150', 'nt5_resume'), ('500', 'windows_pe_bios_request'), ('610', 'vista_csmwrap')):
+        for step, name in (('100', 'nt5_staging'), ('150', 'nt5_resume'), ('500', 'windows_pe_bios_request'), ('610', 'vista_csmwrap'), ('620', 'w9x_csmwrap')):
             (self.steps / f'{step}_{name}.sh').write_text(
                 f'usos_step_{step}_run() {{ printf "RAN {step} action=%s\\n" "$LEGACY_ACTION"; }}\n', encoding='utf-8')
         self.efi = self.tmp / 'efi'
@@ -86,6 +86,8 @@ class Pipeline(unittest.TestCase):
             ('windows7-iso', 'windows-pe-bios-iso', False, 'profile=windows-pe-bios-iso steps=500 200', 'RAN 500'),
             ('vista-csmwrap', '', True, 'profile=vista-x64-sp2-uefi-csmwrap steps=610', 'RAN 610 action=vista-csmwrap'),
             ('vista-csmwrap', 'vista-x64-sp2-uefi-csmwrap', True, 'profile=vista-x64-sp2-uefi-csmwrap steps=610', 'RAN 610 action=vista-csmwrap'),
+            ('w9x-csmwrap', '', True, 'profile=w9x-uefi-csmwrap steps=620', 'RAN 620 action=w9x-csmwrap'),
+            ('w9x-csmwrap', 'w9x-uefi-csmwrap', True, 'profile=w9x-uefi-csmwrap steps=620', 'RAN 620 action=w9x-csmwrap'),
         ]
         for action, token, uefi, resolved, ran in cases:
             with self.subTest(action=action, token=token, uefi=uefi):
@@ -99,7 +101,7 @@ class Pipeline(unittest.TestCase):
         self.assertIn('CONTINUE profile=windows-pe-bios-iso', out.stdout)
 
     def test_unknown_actions_and_mismatched_tokens_are_refused(self):
-        for action, token in (('hardware', ''), ('bogus', ''), ('xp-staging', 'windows-pe-bios-iso'), ('vista-csmwrap', 'vista-uefi-disk'), ('vista-disk', 'vista-x64-sp2-uefi-csmwrap'),
+        for action, token in (('hardware', ''), ('bogus', ''), ('xp-staging', 'windows-pe-bios-iso'), ('vista-csmwrap', 'vista-uefi-disk'), ('vista-disk', 'vista-x64-sp2-uefi-csmwrap'), ('w9x-csmwrap', 'vista-x64-sp2-uefi-csmwrap'),
                               ('windows7-iso', 'nt5-staging'), ('xp-resume', 'iso-work-chainload'),
                               ('xp-staging', 'w2k-x86-sp4-uefi-csm'), ('windows2000-staging', 'xp-x86-sp3-uefi-csm'),
                               ('xp64-staging', 'w2k3-x86-sp2-uefi-csm'), ('windows2003-staging', 'xp-x64-sp2-uefi-csm')):

@@ -1,0 +1,115 @@
+[Data]
+msdosinitiated="1"
+floppyless="1"
+UseSignatures="yes"
+InstallDir="\WINDOWS"
+EulaComplete="1"
+winntupgrade="no"
+win9xupgrade="no"
+OriSrc="C:\"
+OriTyp="5"
+[Unattended]
+UnattendMode=DefaultHide
+OemSkipEula=Yes
+OemPreinstall=No
+Repartition=No
+FileSystem=LeaveAlone
+TargetPath=\WINDOWS
+WaitForReboot=No
+UnattendSwitch=Yes
+[GuiUnattended]
+OEMSkipRegional=1
+OemSkipWelcome=1
+TimeZone=100
+AdminPassword="Test123!"
+EncryptedAdminPassword=No
+AutoLogon=Yes
+AutoLogonCount=1
+[UserData]
+FullName="Tester"
+OrgName=""
+ComputerName=USOS-XP
+[Identification]
+JoinWorkgroup=USOSLAB
+[Networking]
+InstallDefaultComponents=Yes
+[LicenseFilePrintData]
+AutoMode=PerServer
+AutoUsers=5
+[RegionalSettings]
+LanguageGroup="2"
+SystemLocale=00000415
+UserLocale=00000415
+InputLocale=0415:00000415
+
+----- usos-users.cmd -----
+@echo off
+rem USOS: local administrator accounts from usos-xp.ini, run hidden by pae.exe at setup end.
+set USOS_LOG=%SystemRoot%\usos-users.log
+net user "Tester" "Test123!" /add >> "%USOS_LOG%" 2>&1
+for %%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%G "Tester" /add >> "%USOS_LOG%" 2>&1
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f >> "%USOS_LOG%" 2>&1
+rem USOS profile: Explorer settings for new users (Default User hive).
+set USOS_PD=
+set USOS_DU=
+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
+if not defined USOS_DU set "USOS_DU=Default User"
+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f >> "%USOS_LOG%" 2>&1
+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
+powercfg.exe /hibernate off >> "%USOS_LOG%" 2>&1
+net.exe accounts /maxpwage:unlimited >> "%USOS_LOG%" 2>&1
+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
+exit /b 0
+
+----- usos-reg.txt -----
+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
+DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
+USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|0
+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions|dword|2
+HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel|{20D04FE0-3AEA-1069-A2D8-08002B30309D}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel|{450D8FBA-AD25-11D0-98A8-0800361B1103}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel|{208D2C60-3AEA-1069-A2D7-08002B30309D}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu|{20D04FE0-3AEA-1069-A2D8-08002B30309D}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu|{450D8FBA-AD25-11D0-98A8-0800361B1103}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu|{208D2C60-3AEA-1069-A2D7-08002B30309D}|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Applets\Tour|RunCount|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\CleanupWiz|NoRun|dword|1
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|TaskbarGlomming|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|EnableAutoTray|dword|0
+DEFAULT\Control Panel\Desktop|FontSmoothing|sz|2
+USER\Control Panel\Desktop|FontSmoothing|sz|2
+DEFAULT\Control Panel\Desktop|FontSmoothingType|dword|2
+USER\Control Panel\Desktop|FontSmoothingType|dword|2
+USER\Control Panel\Mouse|MouseSpeed|sz|0
+USER\Control Panel\Mouse|MouseThreshold1|sz|0
+USER\Control Panel\Mouse|MouseThreshold2|sz|0
+USER\Control Panel\Accessibility\StickyKeys|Flags|sz|506
+DEFAULT\Control Panel\PowerCfg|CurrentPowerPolicy|sz|3
+USER\Control Panel\PowerCfg|CurrentPowerPolicy|sz|3
+HKLM\SYSTEM\CurrentControlSet\Control\FileSystem|NtfsDisableLastAccessUpdate|dword|1
+HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server|fDenyTSConnections|dword|0
+HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile\GloballyOpenPorts\List|3389:TCP|sz|3389:TCP:*:Enabled:Remote Desktop
+HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile\GloballyOpenPorts\List|3389:TCP|sz|3389:TCP:*:Enabled:Remote Desktop
+HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile|EnableFirewall|dword|0
+HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile|EnableFirewall|dword|0
+HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Reliability|ShutdownReasonOn|dword|0
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System|DisableCAD|dword|1
+HKLM\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\MYS|DisableShowAtLogon|dword|1
+USER\Software\Policies\Microsoft\Windows NT\CurrentVersion\MYS|DisableShowAtLogon|dword|1
+HKLM\SOFTWARE\Microsoft\PCHealth\ErrorReporting|DoReport|dword|0
+HKLM\SOFTWARE\Microsoft\PCHealth\ErrorReporting|ShowUI|dword|0
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS1UserReg|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.reg regedit.exe /s %d:\Scripts\first-logon.reg
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS2UserScript|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.cmd call %d:\Scripts\first-logon.cmd
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoAdminLogon|sz|1
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultUserName|sz|Tester
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultPassword|sz|Test123!
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoLogonCount|del|

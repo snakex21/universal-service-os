@@ -82,6 +82,8 @@ pub const Injection = union(enum) {
     support: struct { path: []const u8, limit_mib: usize },
     /// A marker file with `flag_content`.
     flag: []const u8,
+    /// Optional marker from the selected system's DATA Unattended folder.
+    unattended_flag: struct { folder: []const u8, source: []const u8, target: []const u8 },
     /// usos-drivers.bin: the bundled Windows 7 Drivers/x64 packages plus
     /// DATA\Drivers\<folder> (Windows 7, Windows Server 2008 R2).
     bundled_drivers: []const u8,
@@ -150,6 +152,9 @@ pub fn wimbootPlan(options: WimbootOptions) WimbootPlan {
             if (options.nvme_packages) plan.add(.{ .flag = "usos-nvme-packages.flag" });
             if (vista and options.int10_dispatcher) plan.add(.{ .flag = "usos-int10-dispatcher.flag" });
             if (!vista) plan.add(.{ .bundled_drivers = folder });
+            if (vista) plan.add(.{ .unattended_flag = .{ .folder = folder, .source = "testmode-watermark-on.txt", .target = "usos-testmode-watermark-on.flag" } });
+            // Win7 x64 UefiSeven native-resolution experiment (default off).
+            if (!vista) plan.add(.{ .unattended_flag = .{ .folder = folder, .source = "native-res-on.txt", .target = "usos-native-res.flag" } });
             plan.add(.boot_files);
             plan.add(.{ .source_ini = folder });
             // The Vista answer folder is "Windows 7" (Vista refuses one first).
@@ -164,6 +169,7 @@ pub fn describe(item: Injection, buffer: []u8) ![]const u8 {
     return switch (item) {
         .support => |s| std.fmt.bufPrint(buffer, "support {s} limit={d}MiB", .{ s.path, s.limit_mib }),
         .flag => |name| std.fmt.bufPrint(buffer, "flag {s}", .{name}),
+        .unattended_flag => |flag| std.fmt.bufPrint(buffer, "optional flag {s} from Systems\\Windows\\{s}\\Unattended\\{s}", .{ flag.target, flag.folder, flag.source }),
         .bundled_drivers => |folder| if (std.mem.eql(u8, folder, "Windows 7"))
             std.fmt.bufPrint(buffer, "drivers usos-drivers.bin bundled+user", .{})
         else
@@ -203,14 +209,16 @@ test "Windows Server 2008 R2 / 2008 plans use their own DATA folder" {
     const r2 = wimbootPlan(.{ .kind = .win7, .folder = "Windows Server 2008 R2", .answer = true });
     const items = r2.slice();
     try std.testing.expectEqualStrings("Windows Server 2008 R2", items[3].bundled_drivers);
-    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[5].source_ini);
-    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[6].answer);
+    try std.testing.expectEqualStrings("native-res-on.txt", items[4].unattended_flag.source);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[4].unattended_flag.folder);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[6].source_ini);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[7].answer);
     var buffer: [160]u8 = undefined;
     try std.testing.expectEqualStrings("drivers usos-drivers.bin bundled+user Drivers\\Windows Server 2008 R2", try describe(items[3], &buffer));
     const vista = wimbootPlan(.{ .kind = .vista, .folder = "Windows Server 2008", .external_pe10 = true });
     try std.testing.expectEqualStrings("Windows Server 2008", vista.items[vista.len - 1].source_ini);
     // The client plans keep their fixed folders.
-    try std.testing.expectEqualStrings("Windows Vista", wimbootPlan(.{ .kind = .vista }).items[4].source_ini);
+    try std.testing.expectEqualStrings("Windows Vista", wimbootPlan(.{ .kind = .vista }).items[5].source_ini);
 }
 
 test "plan keys for the WORK preparation name the profile and its stages" {
@@ -233,4 +241,32 @@ test "Vista gets the Int10 dispatcher flag only when asked; Windows 7 never need
     try std.testing.expect(with_dispatcher.items[plain.len] == .source_ini);
     const win7 = wimbootPlan(.{ .kind = .win7, .int10_dispatcher = true });
     try std.testing.expectEqual(wimbootPlan(.{ .kind = .win7 }).len, win7.len);
+}
+
+test "watermark opt-out is injected only by the Vista x64 plan" {
+    for ([_]WimbootKind{ .modern_setup, .winpe }) |kind| {
+        for (wimbootPlan(.{ .kind = kind }).slice()) |item| try std.testing.expect(item != .unattended_flag);
+    }
+    // Windows 7 has exactly one optional flag: the native-resolution experiment.
+    var win7_flags: usize = 0;
+    for (wimbootPlan(.{ .kind = .win7 }).slice()) |item| switch (item) {
+        .unattended_flag => |flag| {
+            win7_flags += 1;
+            try std.testing.expectEqualStrings("usos-native-res.flag", flag.target);
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), win7_flags);
+    const plan = wimbootPlan(.{ .kind = .vista, .folder = "Windows Server 2008" });
+    var count: usize = 0;
+    for (plan.slice()) |item| switch (item) {
+        .unattended_flag => |flag| {
+            count += 1;
+            try std.testing.expectEqualStrings("Windows Server 2008", flag.folder);
+            try std.testing.expectEqualStrings("testmode-watermark-on.txt", flag.source);
+            try std.testing.expectEqualStrings("usos-testmode-watermark-on.flag", flag.target);
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), count);
 }

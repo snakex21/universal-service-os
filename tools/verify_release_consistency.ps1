@@ -12,7 +12,7 @@ $buildInfoPath = Join-Path $ProjectRoot 'build\generated\build-info.ini'
 $microLinuxInitramfs = Join-Path $ProjectRoot 'zig-out\micro-linux\initramfs-usos'
 $strategyBMbr = Join-Path $ProjectRoot 'zig-out\xp-geometry-fix-mbr\xp-geometry-fix-mbr-440.bin'
 $win7NativeFiles = @('win7-support.cpio', 'vista-support.cpio', 'modern-support.cpio', 'int10.efi', 'int10.original.efi', 'UefiSeven.ini', 'uefiseven-LICENSE.txt')
-$msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM', 'W3CONFIG.CSM', 'W3AUTO.CSM', 'W3INI.BAS', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT', 'VBADOS.TGZ', 'CSMESP.IMG', 'USOSKEY.COM', 'USOSKEY.DRV', 'USOS.SHH')
+$msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM', 'W3CONFIG.CSM', 'W3AUTO.CSM', 'W1CONFIG.SYS', 'W1AUTO.BAT', 'W1CONFIG.CSM', 'W1AUTO.CSM', 'W1SETUP.BAT', 'W3INI.BAS', 'W3INF.BAS', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT', 'VBADOS.TGZ', 'CSMESP.IMG', 'USOSKEY.COM', 'USOSKEY.DRV', 'USOS.SHH')
 
 function Test-StaticEspPath([string]$Relative) {
     # USOS-KEY.cer: the Secure Boot certificate at the ESP root (short path in MokManager).
@@ -113,6 +113,48 @@ try {
         'EFI/USOS/dos-native/ram-patch/manifest.json',
         'EFI/USOS/dos-native/ram-patch/INSTALL.BAT',
         'EFI/USOS/dos-native/ram-patch/REPAIR.BAT',
+        'EFI/USOS/dos-native/win9x/U9FIX.COM',
+        'EFI/USOS/dos-native/win9x/U9FIX.TXT',
+        'EFI/USOS/dos-native/win9x/USOSVESA.INF',
+        'EFI/USOS/dos-native/win9x/VESAMINI.DRV',
+        'EFI/USOS/dos-native/win9x/VESAMINI.VXD',
+        'EFI/USOS/dos-native/win9x/VMHAL9X.DLL',
+        'EFI/USOS/dos-native/win9x/VMHAL486.DLL',
+        'EFI/USOS/dos-native/win9x/VMDISP9X.DLL',
+        'EFI/USOS/dos-native/win9x/VMDISP9X.TXT',
+        'EFI/USOS/dos-native/win9x/MSBATCH.INF',
+        'EFI/USOS/dos-native/win9x/VMDISP9X.TGZ',
+        'EFI/USOS/dos-native/win9x/USOSKEY.COM',
+        'EFI/USOS/dos-native/win9x/USOSKEY.DRV',
+        'EFI/USOS/dos-native/win9x/USOSMOUS.DRV',
+        'EFI/USOS/dos-native/win9x/USOSDIAG.COM',
+        'EFI/USOS/dos-native/win9x/USOSDBG.EXE',
+        'EFI/USOS/dos-native/win9x/USOSPID.DRV',
+        'EFI/USOS/dos-native/win9x/USOSP1.DRV',
+        'EFI/USOS/dos-native/win9x/USOSPG.DRV',
+        'EFI/USOS/dos-native/win9x/VBMOUSE.EXE',
+        'EFI/USOS/dos-native/win9x/VBMOUSE.DRV',
+        'EFI/USOS/dos-native/win9x/VBADOS.TXT',
+        'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT',
+        'EFI/USOS/dos-native/win9x/INWIN.COM',
+        'EFI/USOS/dos-native/win9x/U9V10STK.COM',
+        'EFI/USOS/dos-native/win9x/XHCI98.SYS',
+        'EFI/USOS/dos-native/win9x/XHCI98.INF',
+        'EFI/USOS/dos-native/win9x/XHCI98.TXT',
+        'EFI/USOS/dos-native/win9x/CREGFIX.SYS',
+        'EFI/USOS/dos-native/win9x/CREGFIX.TXT',
+        'EFI/USOS/dos-native/win9x/USOSNVME.MPD',
+        'EFI/USOS/dos-native/win9x/USOSNVME.INF',
+        'EFI/USOS/dos-native/win9x/USOSUSB.MPD',
+        'EFI/USOS/dos-native/win9x/USOSUSB.INF',
+        'EFI/USOS/dos-native/win9x/USOSUSB.REG',
+        'EFI/USOS/dos-native/win9x/USOSVMD.VXD',
+        'EFI/USOS/dos-native/win9x/USOSLOG.EXE',
+        'EFI/USOS/dos-native/win9x/USOSANS.EXE',
+        'EFI/USOS/dos-native/win9x/VESBIND.EXE',
+        'EFI/USOS/dos-native/win9x/USOSGRPW.EXE',
+        'EFI/USOS/dos-native/win9x/USOSFB.EXE',
+        'EFI/USOS/dos-native/win9x/USOSLAN.EXE',
         'EFI/USOS/systemd-bootx64.efi',
         'EFI/USOS/touchi2c_x64.efi',
         'EFI/USOS/licenses/touchi2cdxe/LICENSE',
@@ -186,6 +228,28 @@ try {
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\ram-patch\manifest.json'); Target = 'EFI/USOS/dos-native/ram-patch/manifest.json' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\ram-patch\INSTALL.BAT'); Target = 'EFI/USOS/dos-native/ram-patch/INSTALL.BAT' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\ram-patch\REPAIR.BAT'); Target = 'EFI/USOS/dos-native/ram-patch/REPAIR.BAT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\U9FIX.COM'); Target = 'EFI/USOS/dos-native/win9x/U9FIX.COM' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\U9FIX.TXT'); Target = 'EFI/USOS/dos-native/win9x/U9FIX.TXT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSVESA.INF'); Target = 'EFI/USOS/dos-native/win9x/USOSVESA.INF' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VESAMINI.DRV'); Target = 'EFI/USOS/dos-native/win9x/VESAMINI.DRV' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VESAMINI.VXD'); Target = 'EFI/USOS/dos-native/win9x/VESAMINI.VXD' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VMHAL9X.DLL'); Target = 'EFI/USOS/dos-native/win9x/VMHAL9X.DLL' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VMHAL486.DLL'); Target = 'EFI/USOS/dos-native/win9x/VMHAL486.DLL' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VMDISP9X.DLL'); Target = 'EFI/USOS/dos-native/win9x/VMDISP9X.DLL' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VMDISP9X.TXT'); Target = 'EFI/USOS/dos-native/win9x/VMDISP9X.TXT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\MSBATCH.INF'); Target = 'EFI/USOS/dos-native/win9x/MSBATCH.INF' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VMDISP9X.TGZ'); Target = 'EFI/USOS/dos-native/win9x/VMDISP9X.TGZ' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSKEY.COM'); Target = 'EFI/USOS/dos-native/win9x/USOSKEY.COM' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSKEY.DRV'); Target = 'EFI/USOS/dos-native/win9x/USOSKEY.DRV' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSMOUS.DRV'); Target = 'EFI/USOS/dos-native/win9x/USOSMOUS.DRV' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSDIAG.COM'); Target = 'EFI/USOS/dos-native/win9x/USOSDIAG.COM' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\USOSDBG.EXE'); Target = 'EFI/USOS/dos-native/win9x/USOSDBG.EXE' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBMOUSE.EXE'); Target = 'EFI/USOS/dos-native/win9x/VBMOUSE.EXE' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBMOUSE.DRV'); Target = 'EFI/USOS/dos-native/win9x/VBMOUSE.DRV' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBADOS.TXT'); Target = 'EFI/USOS/dos-native/win9x/VBADOS.TXT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\DOSMOUSE.BAT'); Target = 'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\INWIN.COM'); Target = 'EFI/USOS/dos-native/win9x/INWIN.COM' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\U9V10STK.COM'); Target = 'EFI/USOS/dos-native/win9x/U9V10STK.COM' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'); Target = 'EFI/USOS/micro-linux/vmlinuz-virt' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'); Target = 'EFI/USOS/systemd-bootx64.efi' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'); Target = 'EFI/USOS/ntfs_x64.efi' }
@@ -196,7 +260,7 @@ try {
     foreach ($name in $msDosFiles) {
         $explicitPayloadFiles += @{ Source = (Join-Path $ProjectRoot ('zig-out/dos-native/msdos/' + $name)); Target = ('EFI/USOS/dos-native/msdos/' + $name) }
     }
-    foreach ($name in @('BOOT16.BIN','KERNEL.SYS','COMMAND.COM','DZ.EXE','DZ.DOS','FDAUTO.BAT','FDCONFIG.SYS','TOOLS.BAT','README.TXT','REBOOT.COM','DOSZIP.TXT','COPYING','kernel.zip','freecom.zip','doszip.zip','manifest.json')) {
+    foreach ($name in @('BOOT16.BIN','KERNEL.SYS','COMMAND.COM','DZ.EXE','DZ.DOS','FDAUTO.BAT','FDCONFIG.SYS','TOOLS.BAT','README.TXT','REBOOT.COM','DOSZIP.TXT','VBMOUSE.EXE','VBADOS.TXT','COPYING','kernel.zip','freecom.zip','doszip.zip','manifest.json')) {
         $explicitPayloadFiles += @{ Source = (Join-Path $ProjectRoot ('zig-out/dos-native/freedos/' + $name)); Target = ('EFI/USOS/dos-native/freedos/' + $name) }
     }
     foreach ($item in $explicitPayloadFiles) {

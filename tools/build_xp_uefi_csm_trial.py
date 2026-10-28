@@ -123,7 +123,7 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/')
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/','usr/lib/usos/w2k-drivers/')
 
 # NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
 # system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
@@ -175,6 +175,10 @@ def nt5_storage_files(xp64_isos=()):
 # tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt; tools/nt52_usb_stage.sh).
 # Every file pinned by its manifest.
 XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos2'
+# Windows 2000 only: 1.1.1.0-usos3 (x86), which can poll (Parameters PollMode)
+# when the MPS HAL gives the xHCI functions no interrupt; NT 5.2 stays on the
+# hardware-proven usos2 until it is retested (decision 2026-10-05).
+XHCI98_W2K_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos3'
 
 def nt52_usb_files():
     pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
@@ -186,16 +190,102 @@ def nt52_usb_files():
     files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
     if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
     files['MODIFIED.txt']=(XHCI98_DIR/'MODIFIED.txt').read_bytes()
+    w2k=json.loads((XHCI98_W2K_DIR/'manifest.json').read_text())
+    for name in ('xhci98.sys','xhci98.inf','../MODIFIED.txt'):
+        rel=name if name.startswith('..') else 'release-x86/'+name
+        key=rel.replace('../','')
+        data=(XHCI98_W2K_DIR/key).read_bytes()
+        if hashlib.sha256(data).hexdigest()!=w2k['files'][key]:raise ValueError('xhci98 usos3 file hash mismatch: '+key)
+        files['x86-w2k/'+key.split('/')[-1]]=data
     if hashlib.sha256(files['MODIFIED.txt']).hexdigest()!=pins['files']['MODIFIED.txt']:raise ValueError('xhci98 MODIFIED.txt hash mismatch')
     files['SOURCE.txt']=('xhci98 %s (x86 and amd64, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (source tarball sha256 %s)\n'
         'plus %s, built with WDK 7.1 (7600.16385.1).\n'
         'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
         '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
-        'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
+        'USOS uses it only for Server 2003 x86 and XP x64 Setup; Windows 2000 uses\n'
+        '1.1.1.0-usos3 (x86-w2k/, polling, tools/vendor/xhci98/1.1.1.0-usos3). Staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
-        'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'
+        'Log: %%SystemRoot%%\\xhci98.log (every controller start, start refusal and stop).\n'
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
+    return files
+
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos4 (GPL-3.0, MODIFIED by USOS: real
+# FLUSH CACHE, FUA, caching mode page, engine/link checks, the USOS-gap
+# write test and trace; tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt), a
+# polling ScsiPort miniport built with WDK 7.1, and UniATA 0.47b (GPL-2.0,
+# unmodified, the alternative chosen with DATA's storage-uniata.txt).
+# tools/w2k_stage.sh adapts only the INFs when staging. Every file pinned.
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos4'
+AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
+UNIATA_DIR=ROOT/'tools/vendor/uniata/0.47b'
+# usosrst.sys: USOS's own GPL helper (STOP screen, Setup restart without an 8042).
+USOSRST_DIR=ROOT/'tools/w2k/usosrst'
+# usosvid/bootvid.dll: USOS's own text-mode BOOTVID.DLL (ACPI HAL diagnostic, ~BT only).
+USOSVID_DIR=ROOT/'tools/w2k/usosvid'
+
+def w2k_driver_files():
+    pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
+    base=json.loads((AHCINT_BASE/'manifest.json').read_text())
+    uni=json.loads((UNIATA_DIR/'manifest.json').read_text())
+    rst=json.loads((USOSRST_DIR/'manifest.json').read_text())
+    files={}
+    for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE'),('MODIFIED.txt','MODIFIED.txt')):
+        files[name]=(AHCINT_DIR/member).read_bytes()
+        if hashlib.sha256(files[name]).hexdigest()!=pins['files'][member]:raise ValueError('AHCINT file hash mismatch: '+member)
+    for name,member in (('uniata/uniata.sys','uniata.sys'),('uniata/COPYING-GPL-2.0.txt','COPYING-GPL-2.0.txt'),('uniata/SOURCES.txt','SOURCES.txt')):
+        files[name]=(UNIATA_DIR/member).read_bytes()
+        if hashlib.sha256(files[name]).hexdigest()!=uni['files'][member]:raise ValueError('UniATA file hash mismatch: '+member)
+    files['usosrst.sys']=(USOSRST_DIR/'bin/i386/usosrst.sys').read_bytes()
+    if hashlib.sha256(files['usosrst.sys']).hexdigest()!=rst['files']['bin/i386/usosrst.sys']:raise ValueError('usosrst file hash mismatch')
+    vid=json.loads((USOSVID_DIR/'manifest.json').read_text())
+    files['usosvid/bootvid.dll']=(USOSVID_DIR/'bin/i386/bootvid.dll').read_bytes()
+    if hashlib.sha256(files['usosvid/bootvid.dll']).hexdigest()!=vid['files']['bin/i386/bootvid.dll']:raise ValueError('usosvid file hash mismatch')
+    # Windows 2000 diagnostic setup only (DATA w2k-diag.txt, w2k_stage.sh 10.):
+    # usosvid 1.3-diag and CSMWrap 3.1.2-usos11-diag with its own patch series.
+    files['usosvid-diag/bootvid.dll']=(USOSVID_DIR/'bin/i386-diag/bootvid.dll').read_bytes()
+    if hashlib.sha256(files['usosvid-diag/bootvid.dll']).hexdigest()!=vid['files']['bin/i386-diag/bootvid.dll']:raise ValueError('usosvid-diag file hash mismatch')
+    cdiag=ROOT/'tools/vendor/csmwrap/3.1.2-usos11-diag'
+    cman=json.loads((cdiag/'manifest.json').read_text())
+    files['csmwrap-diag/csmwrapx64.efi']=(cdiag/'csmwrapx64.efi').read_bytes()
+    if hashlib.sha256(files['csmwrap-diag/csmwrapx64.efi']).hexdigest()!=cman['files']['csmwrapx64.efi']:raise ValueError('CSMWrap diag hash mismatch')
+    for name,digest_ in cman['patches'].items():
+        files['csmwrap-diag/patches/'+name]=(cdiag/'patches'/name).read_bytes()
+        if hashlib.sha256(files['csmwrap-diag/patches/'+name]).hexdigest()!=digest_:raise ValueError('CSMWrap diag patch hash mismatch: '+name)
+    files['csmwrap-diag/manifest.json']=(cdiag/'manifest.json').read_bytes()
+    # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme) for an NVMe target:
+    # the NT4 build (non-PnP, scans PCI itself) in 2000's legacy mode (w2k_stage.sh 9.).
+    files['usosnvme/usosnvme.sys']=(ROOT/'tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys').read_bytes()
+    files['usosnvme/usosnvme.inf']=(ROOT/'tools/nt/usosnvme/usosnvme.inf').read_bytes()
+    # usosvbe (own GPL VESA video miniport, tools/nt4/usosvbe, the NT 4.0 build
+    # unchanged) for the setup-end VESA display (w2k_stage.sh 11.); the display
+    # driver is the CD's own framebuf.dll, never shipped.
+    files['usosvbe/usosvbe.sys']=(ROOT/'tools/nt4/usosvbe/bin/i386/usosvbe.sys').read_bytes()
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll','usosvid-diag/bootvid.dll','usosnvme/usosnvme.sys','usosvbe/usosvbe.sys'):
+        if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
+    files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
+        'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
+        'built with WDK 7.1 (7600.16385.1). Licence: GPL-3.0 (LICENSE).\n'
+        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos4/src (patched) and\n'
+        'tools/vendor/ahcint/1.3.0.0/src (upstream) in the USOS sources zip.\n'
+        'uniata/: UniATA 0.47b, unmodified (GPL-2.0, source in the USOS sources zip:\n'
+        'tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar).\n'
+        'usosrst.sys: USOS\'s own helper driver %s (GPL-3.0-or-later, source:\n'
+        'tools/w2k/usosrst/src in the USOS sources zip).\n'
+        'usosvid/bootvid.dll: USOS\'s own text-mode boot video %s (GPL-3.0-or-later,\n'
+        'source: tools/w2k/usosvid/src in the USOS sources zip).\n'
+        'usosvid-diag/, csmwrap-diag/: the Windows 2000 diagnostic setup (DATA\n'
+        'w2k-diag.txt only): usosvid 1.3-diag (same source, USOS_VID_DIAG) and CSMWrap\n'
+        '3.1.2-usos11-diag (LGPL; source = the CSMWrap 3.1.2 archive on the stick plus\n'
+        'csmwrap-diag/patches).\n'
+        'usosnvme/: USOS\'s own NVMe miniport 1.0, NT4 build (GPL-3.0-or-later, source:\n'
+        'tools/nt/usosnvme/src in the USOS sources zip), only for an NVMe target.\n'
+        'usosvbe/: USOS\'s own VESA video miniport (NT 4.0 build, GPL-3.0-or-later,\n'
+        'source: tools/nt4/usosvbe/src in the USOS sources zip), registered at setup\n'
+        'end with the CD\'s own framebuf.dll (DATA vesa-off.txt: not used).\n'
+        'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
+        'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
+        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'],vid['version'])).encode()
     return files
 
 def is_package_entry(name):
@@ -222,9 +312,18 @@ def overlay(base, helper, driver_bundles, xp64_isos=(), xp64_extra=None):
     for name,data in (xp64_extra or {}).items():storage.setdefault(name,data)
     for name,data in storage.items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
     for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
+    for name,data in w2k_driver_files().items():put(entries,Entry(prefix+'w2k-drivers/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
+
+# XP x86 DATA folders whose SP3 ISOs get a source-bound driver bundle: XP,
+# XP Media Center Edition 2005 and XP Tablet PC Edition 2005 (menu entries
+# windows-xp-mce / windows-xp-tablet, the same XP flow).
+XP_IMAGE_FOLDERS=('Windows XP','Windows XP Media Center Edition 2005','Windows XP Tablet PC Edition 2005')
+
+def xp_images(data):
+    return sorted(p for folder in XP_IMAGE_FOLDERS for p in (data/'Systems/Windows'/folder/'Images').glob('*.iso'))
 
 def is_sp3(iso):
     # Microsoft names it "..._with_service_pack_3_...", others "SP3".
@@ -267,7 +366,9 @@ XP64_SP2_PREFIX='usr/lib/usos/nt5-storage/'+xp64_acpi.PREFIX+'sp2/'
 def old_xp64_cabs(old):
     """The XP x64 ACPI SP2.CAB entries of an older package (nt5-storage relative)."""
     entries=parse_newc(gzip.decompress((old/'initramfs-xp').read_bytes()))
-    return {n[len('usr/lib/usos/nt5-storage/'):]:e.data for n,e in entries.items() if n.startswith(XP64_SP2_PREFIX)}
+    # Regular files only: a carried directory entry would become an empty
+    # file in front of its own SP2.CAB (the cpio then cannot create the CAB).
+    return {n[len('usr/lib/usos/nt5-storage/'):]:e.data for n,e in entries.items() if n.startswith(XP64_SP2_PREFIX) and stat.S_ISREG(e.mode)}
 
 # --release-lang: one language's source only (the 1.0 release ships the PL and
 # EN packages as separate assets); the name prefix picks the allowlist entry.
@@ -316,7 +417,7 @@ def build_from_old(micro, data, old):
     env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
     helper=compile_helper(env)
     base=micro/'initramfs-usos';kernel=micro/'vmlinuz-virt'
-    local={p.name:p for p in (data/'Systems/Windows/Windows XP/Images').glob('*.iso')} if data.exists() else {}
+    local={p.name:p for p in xp_images(data)} if data.exists() else {}
     driver_bundles=[];sources=[]
     for source in old_meta['driver_sources']:
         old_bundle=old/'drivers'/source['sha256']/'bundle'
@@ -360,7 +461,7 @@ def build(micro, data, release=False, release_lang=None):
     env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
     helper=compile_helper(env)
     base=micro/'initramfs-usos';kernel=micro/'vmlinuz-virt'
-    images=sorted((data/'Systems/Windows/Windows XP/Images').glob('*.iso'))
+    images=xp_images(data)
     if not images:raise ValueError('No XP ISO on DATA')
     # SP2 remains visible for historical compatibility but is refused before
     # any target write by the new runtime preflight. First hardware trial: SP3.
@@ -391,7 +492,7 @@ def build(micro, data, release=False, release_lang=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser()
     p.add_argument('--micro-linux',type=Path,default=ROOT/'zig-out/micro-linux',help='micro-Linux build the package is derived from')
-    p.add_argument('--data',type=Path,default=Path('L:/'),help='DATA folder with Systems/Windows/Windows XP/Images (read only)')
+    p.add_argument('--data',type=Path,default=Path('L:/'),help='DATA folder with Systems/Windows/Windows XP/Images, .../Windows XP Media Center Edition 2005/Images and .../Windows XP Tablet PC Edition 2005/Images (read only)')
     p.add_argument('--out',type=Path,default=OUT,help='package folder (default zig-out/xp-uefi-csm)')
     p.add_argument('--esp',type=Path,default=Path('J:/'),help='--refresh-pae-flow only: ESP whose base the package was built from')
     p.add_argument('--release',action='store_true',help='release package: only the RELEASE_SOURCES SHA-256 allowlist (original PL x14-80476 and EN x14-80428)')

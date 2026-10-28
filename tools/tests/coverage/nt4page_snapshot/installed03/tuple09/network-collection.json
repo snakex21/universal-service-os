@@ -1,0 +1,50 @@
+{
+  "files": [
+    "collection-state.txt",
+    "driver-sha256.txt",
+    "network-coverage.txt",
+    "observer-status.txt"
+  ],
+  "status": {
+    "network-coverage.txt": "exported",
+    "network-nt4.txt": "unavailable",
+    "driver": "matched",
+    "observer": "exported"
+  },
+  "observer_status": "TESTNET_DONE",
+  "driver_hash_matches": true,
+  "own_network_lines": 7,
+  "installed_runtime_pass": false,
+  "dhcp_pass": true,
+  "gateway_pass": true,
+  "dns_pass": true,
+  "scope": "Guest-filtered own network excerpt only; registry/configuration and file presence are not connectivity PASS",
+  "lan_traffic_matches_lease": true,
+  "lease_matches": [
+    {
+      "address": "10.0.2.15",
+      "server": "10.0.2.2",
+      "routers": [
+        "10.0.2.2"
+      ],
+      "dns": [
+        "10.0.2.3"
+      ],
+      "gateway_match": true,
+      "dns_match": true
+    }
+  ],
+  "first_logon_observed": true,
+  "collector_result": {
+    "ram_mib": 1024,
+    "cpu": "qemu64",
+    "result": "PASS",
+    "stage": "serial shell and selected module loads",
+    "seconds": 30.97,
+    "timed_out": false,
+    "exit_code": 0,
+    "commands_sent": true,
+    "directory": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\read-nt4-network\\1024-qemu64-nt4-network"
+  },
+  "logger_sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2"
+}

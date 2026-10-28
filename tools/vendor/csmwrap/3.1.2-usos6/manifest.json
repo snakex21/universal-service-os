@@ -1,0 +1,55 @@
+{
+  "version": "3.1.2-usos6",
+  "status": "experimental (2026-10-14, branch feature/w2k-acpi-csmen): the release binary in test builds since then; installer/cmd/usos-efisign/release.go stages it with the source archive, the seven patches and the licence notices; tools/xp_csmwrap_esp.sh and the BIOS Core DOS installer pin its hash",
+  "naming": "3.1.2-usos6 = 3.1.2-usos5 + patch 0007 (diagnostic ACPI enable before the legacy boot, Windows 2000 ACPI flow only). Earlier: usos5 = usos4 + patch 0006 (ACPI 1.0 view), usos4 = usos3 + patch 0005, usos3 = usos1 + patch 0004.",
+  "modified": "MODIFIED version of CSMWrap 3.1.2 and of its SeaBIOS fork: quiet boot unless csmwrap.ini sets verbose = true (patches 0001-0003, as in 3.1.2-usos1), and SeaBIOS CSM boot priorities looked up in CSMWrap's BBS table by PCI address, USB mass storage included (patch 0004, 2026-09-29); the exact disk CSMWrap was loaded from becomes BIOS drive 0x80 also when other disks share its controller (patch 0005, 2026-10-11: CSMWrap tags its BBS entry with an FNV-1a hash of its sector 0, SeaBIOS moves the matching hard disk first, the others keep their order); and an ACPI 1.0 view for legacy systems on CSMWrap's RSDP copy (patch 0006, 2026-10-13: RsdtAddress 0 / invalid RSDT / RSDT without the FACP or APIC the XSDT lists -> a new RSDT from the XSDT entries below 4 GiB; FADT 32-bit FIRMWARE_CTRL/DSDT/PM/GPE fields 0 with the X_ field set below 4 GiB -> a FADT copy with them filled, referenced from the RSDT only; csmwrap.ini acpi_legacy_fadt = true (written only for Windows 2000 with ACPI) -> the RSDT FADT is always a copy cut to revision 1 / 116 bytes, because the 2000 ACPI HALs copy FADT.Length bytes into a 0x84-byte buffer; with the same option the RSDT's DSDT/SSDTs are copies whose static resource templates have QWord windows above 4 GiB cleared, because the 2000 acpi.sys truncates a QWord Length to 32 bits and stops with STOP 0xA5 (0x2) in its PCI root window check; a valid 1.0 view without the option is left untouched; logged as \"USOS ACPI10\"); and, only with the same csmwrap.ini acpi_legacy_fadt = true, a legacy-to-ACPI-mode transition as the last step before Legacy16Boot (patch 0007, 2026-10-14, diagnostic: RTC A/B read, FADT ACPI_ENABLE written to SMI_CMD when PM1a_CNT.SCI_EN is 0, SCI_EN polled for at most 3 s on the PM timer, RTC A/B read again; 8 result bytes at physical 0x4F4 (BDA inter-application communication area) for usosvid; logged as \"USOS ACPIEN\")",
+  "signed": false,
+  "base": {
+    "url": "https://github.com/CSMWrap/CSMWrap",
+    "tag": "3.1.2",
+    "commit": "808ac8ea5393db9052044fb0f74aa55e0d719afc",
+    "seabios_url": "https://github.com/CSMWrap/seabios-csmwrap",
+    "seabios_commit": "578d260b94f62150bf6ab9149784287bd1154f06",
+    "submodules": "submodules.txt (all pinned in tools/csmwrap_build/lock.json)"
+  },
+  "source_archive": {
+    "file": "../3.1.2-src/csmwrap-3.1.2-src.tar.xz",
+    "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72",
+    "note": "unpatched 3.1.2 tree with all submodules and seabios/.version (shared with 3.1.2-usos1); the usos3 source is this archive plus patches/*.patch applied in order with patch -p1"
+  },
+  "patches": {
+    "0001-csmwrap-logo-only-when-verbose.patch": "7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8",
+    "0002-quiet-flag-no-seabios-banner-or-boot-messages.patch": "9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d",
+    "0003-seabios-no-boot-menu-when-quiet.patch": "e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790",
+    "0004-seabios-csm-bbs-priority-by-pci-address.patch": "7b85e08e2f554066c3c092813aaaa784486332df3cbfd0dafca15b44d2b0d9b3",
+    "0005-boot-disk-by-sector0-hash.patch": "3433a2323e333a70196440070540ed65b9f5697e00fbc54a794c6c51ba2264fd",
+    "0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch": "17f0675395b70ab4ce63ad6ef6882524dfda4a603e030dae5900bd9ebf4e1d9c",
+    "0007-acpi-enable-before-legacy-boot.patch": "be231170e2401dfd3b67089eafb2f9b765bda2c60c9a711815455963f0bc194e"
+  },
+  "files": {
+    "csmwrapx64.efi": "804d5f870c8958067ced48a23b461a69e98da81a645e50750b99d8b7feb4f342",
+    "toolchain.txt": "a64623c1a3f733095558777afa9c215d1c9176c51bcdc7c3e25790c6ca094ce0",
+    "apk-installed.txt": "8cac689fe22d3b482f89e1ddc58312112dce75c43831018d4b96430f928e0590",
+    "submodules.txt": "64642d521d527381b7f80bbcca65b2be717a1f83fd86fbaf9fced57e2f2247a7"
+  },
+  "embedded_blobs": {
+    "Csm16.bin": "fb9df025c879ba7596dd064edd38b53356e7805b3e2b0f4e3f712c74f4e43219",
+    "vgabios.bin": "897025f7ce4f082942877749e55c7347f11f6a88647cac48c3b0ed32417e8db6"
+  },
+  "upstream_rebuild": {
+    "note": "the same source and toolchain built WITHOUT patches in each run: matches 3.1.2-usos1/manifest.json upstream_rebuild",
+    "sha256": "62d617fc02e0bf983f4d62c7f9a95d31bcfd4b049d3b0bc46b988434502856da"
+  },
+  "build": {
+    "script": "tools/build_csmwrap.ps1 (host) + tools/csmwrap_build/guest_build.sh (guest)",
+    "host": "Alpine Linux 3.24.1 virt live ISO in QEMU 11.1.0 (WHPX), kernel 6.18.35-0-virt",
+    "command": "make -j4 ARCH=x86_64 BUILD_VERSION=3.1.2-usos6",
+    "toolchain": "gcc 15.2.0-r5 (Alpine), binutils 2.45.1-r1, nasm 3.01-r0, xxd 9.2.1178-r0 (9.2.1091-r0 was superseded on the v3.24 branch on 2026-10-13), make 4.4.1-r4, python3 3.14.8-r0 (3.14.7-r1 was superseded on the v3.24 branch; the unpatched rebuild still matches upstream_rebuild), patch 2.8-r0, GNU tar 1.35-r5, xz 5.8.4-r0, git 2.54.0-r0",
+    "repeatable": "one VM run on 2026-10-14 (tools/csmwrap_build/run_build_vm.py --patches 3.1.2-usos6/patches --usos-version 3.1.2-usos6, same lock as usos5) building usos6 twice from fresh trees: identical binaries; the unpatched build still matches upstream_rebuild"
+  },
+  "version_strings": {
+    "csmwrap": "CSMWrap Version 3.1.2-usos6",
+    "seabios": "578d260b-CSMWrap-3.1.2-usos6"
+  },
+  "tests": "tools/tests/csmwrap/test_csmwrap_acpi10.py (host unit test of usos_acpi10.c taken from patch 0006, wiring and the xp_csmwrap_esp.sh gate); tools/tests/csmwrap/run_csmwrap_acpi10_qemu.py (OVMF smoke run; q35 A/B 2026-10-13: usos4 black \"_\" hang, usos5 + acpi_legacy_fadt reaches the kernel); tools/tests/csmwrap/test_csmwrap_acpien.py (host unit test of usos_acpien.c taken from patch 0007, wiring and the acpi_legacy_fadt gate)"
+}

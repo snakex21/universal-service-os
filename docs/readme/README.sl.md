@@ -166,8 +166,8 @@ v PowerShellu) glede na `SHA256SUMS`.
    64 GB; ključek, ki se prodaja kot „32 GB“, je navadno premajhen).
    **Vse na njem bo izbrisano.**
 2. Na računalniku z Windows zaženite `USOS-Installer-1.0.0.exe` (zahteva
-   skrbniške pravice), izberite **Namestitev**, izberite ključek, vpišite
-   potrditveno besedilo in kliknite **IZBRIŠI IN NAMESTI**.
+   skrbniške pravice), izberite **Namestitev**, izberite ključek, označite
+   potrditveno polje in kliknite **IZBRIŠI IN NAMESTI**.
 3. Slike ISO kopirajte na razdelek DATA v mapo `Images` ustreznega sistema,
    npr. `Systems\Windows\Windows 11\Images\`.
 4. Po želji: za Visto ali izvirni Windows 7 v UEFI kopirajte mapo `Programs`

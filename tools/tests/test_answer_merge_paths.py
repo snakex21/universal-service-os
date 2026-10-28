@@ -111,6 +111,8 @@ def commands(specialize: ET.Element) -> list[str]:
 class MergePaths(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import depguard
+        depguard.require_zig()
         subprocess.run([str(ZIG), 'build', '--cache-dir', str(ROOT / 'tools' / 'cache' / 'zig'), 'answer-tool'],
                        cwd=ROOT, check=True)
         OUT.mkdir(parents=True, exist_ok=True)

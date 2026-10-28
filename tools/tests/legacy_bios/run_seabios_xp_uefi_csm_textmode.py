@@ -17,13 +17,24 @@ ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools'))
 import build_micro_linux as cpio
 
-QEMU=ROOT/'tools/qemu/qemu-system-x86_64.exe'
+QEMU=ROOT/'tools/qemu'/__import__('os').environ.get('USOS_QEMU_EXE','qemu-system-x86_64.exe')
 QEMU_IMG=ROOT/'tools/qemu/qemu-img.exe'
 SEABIOS=ROOT/'tools/qemu/share/bios-256k.bin'
 # USOS_XP_PACKAGE_DIR: a package derived for tests (derive_xp_uefi_csm_package.py).
 PACKAGE=Path(__import__('os').environ.get('USOS_XP_PACKAGE_DIR',ROOT/'zig-out/xp-uefi-csm'))
 DEFAULT_ISO=Path('L:/Systems/Windows/Windows XP/Images/pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso')
 TARGET_BYTES=12*1024**3
+# Windows 2000: 40 GiB. Its GUI Setup can hit the ESENT security-log flood
+# (docs/windows-2000-modern-2026-09-30.md); with 12 GiB the flood fills the disk
+# and Setup stops with "initializing the security subsystem failed".
+# USOS_TEST_TARGET_GIB overrides the size for any profile.
+TARGET_BYTES_BY_PROFILE={'w2k-x86-sp4-uefi-csm':40*1024**3}
+def target_bytes(profile):
+    gib=__import__('os').environ.get('USOS_TEST_TARGET_GIB','')
+    return int(gib)*1024**3 if gib else TARGET_BYTES_BY_PROFILE.get(profile,TARGET_BYTES)
+# TARGET_NVME (run_csmwrap_xp_prepared.py --nvme): the target is an NVMe disk
+# (-device nvme), so the package sees /dev/nvme0n1 (docs/nvme-nt-2026-10-11.md).
+TARGET_NVME=False
 
 PROBE_INIT=r'''#!/bin/sh
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -36,9 +47,10 @@ for d in /sys/bus/pci/devices/*; do modprobe "$(cat "$d/modalias")" 2>/dev/null;
 for m in sd_mod isofs ntfs3 loop; do modprobe $m 2>/dev/null; done
 sleep 3; mdev -s; cat /proc/partitions
 # The kernel may enumerate the three IDE disks in any order: pick them by size
-# (USOS stand-in 256 MiB, target 12 GiB, the rest is the ISO).
+# (USOS stand-in 256 MiB, target 12 GiB or target_bytes(), the rest is the ISO).
 USOS_DEV= TARGET_DEV= ISO_DEV=
-for b in /sys/block/sd?; do
+for b in /sys/block/sd? /sys/block/nvme?n?; do
+  [ -e "$b/size" ] || continue
   case "$(cat "$b/size")" in 524288) USOS_DEV=/dev/${b##*/} ;; 25165824) TARGET_DEV=/dev/${b##*/} ;; *) ISO_DEV=/dev/${b##*/} ;; esac
 done
 log "disks usos=$USOS_DEV target=$TARGET_DEV iso=$ISO_DEV"
@@ -100,10 +112,13 @@ NT5_UEFI_SYSTEMS={'w2k-x86-sp4-uefi-csm':'windows-2000','w2k3-x86-sp2-uefi-csm':
 
 def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),sif=None):
     usos=out/'usos-blank.qcow2';target=out/'target.qcow2'
-    for disk,size in ((usos,256*1024**2),(target,TARGET_BYTES)):
+    size_target=target_bytes(profile)
+    for disk,size in ((usos,256*1024**2),(target,size_target)):
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
     probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
+    # The probe picks the target disk by its size in 512-byte sectors.
+    probe=probe.replace(' 25165824) TARGET_DEV=',' %d) TARGET_DEV='%(size_target//512),1)
     if profile in NT5_UEFI_SYSTEMS:
         # Windows 2000 / Server 2003 / XP x64 from UEFI: their NT5 profile.
         probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM='+NT5_UEFI_SYSTEMS[profile]+'; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
@@ -114,6 +129,10 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         # The BIOS NT5 profile has no driver preflight (and no bundles).
         probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
+    # USOS_TEST_PROBE_EXPORTS="NAME=value ...": test-only variables for the staging scripts
+    # (e.g. USOS_W2K_ACPI=on, USOS_W2K_AHCINT_MODE=pnp), exported before the chain runs.
+    extra=__import__('os').environ.get('USOS_TEST_PROBE_EXPORTS','').split()
+    if extra:probe=probe.replace('export USOS_PLAN_PROFILE=','export '+' '.join(extra)+chr(10)+'export USOS_PLAN_PROFILE=',1)
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
     if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/amd64/genahci.inf' not in entries:
@@ -126,10 +145,18 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         for name,data in builder.nt5_storage_files((iso,)).items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt5-storage/'+name,stat.S_IFREG|0o644,data))
     # USOS_TREE_NT52_USB=1: the working tree's xhci98 files replace the package's.
     tree_usb=__import__('os').environ.get('USOS_TREE_NT52_USB')=='1'
-    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and (tree_usb or 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries):
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm','w2k-x86-sp4-uefi-csm') and (tree_usb or 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries):
         # A package from before xhci98 (NT 5.2 USB), or the tree's: add the files as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.nt52_usb_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt52-usb/'+name,stat.S_IFREG|0o644,data))
+    if profile=='w2k-x86-sp4-uefi-csm' and (tree_usb or 'usr/lib/usos/w2k-drivers/ahcint.sys' not in entries):
+        # A package from before the Windows 2000 set (AHCINT): add it as the builder does.
+        sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
+        for name,data in builder.w2k_driver_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/w2k-drivers/'+name,stat.S_IFREG|0o644,data))
+    # USOS_TEST_W2K_AHCI_SYS: a test-only binary staged under the name ahcint.sys
+    # (A/B controls of the AHCI miniport, e.g. UniATA or a rebuilt AHCINT).
+    alt=__import__('os').environ.get('USOS_TEST_W2K_AHCI_SYS')
+    if profile=='w2k-x86-sp4-uefi-csm' and alt:cpio.put(entries,cpio.Entry('usr/lib/usos/w2k-drivers/ahcint.sys',stat.S_IFREG|0o644,Path(alt).read_bytes()))
     if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
     # --tree-scripts: test the working tree's scripts in the package's kernel/initramfs.
     for name in tree_scripts:
@@ -140,21 +167,25 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
          '-serial','file:'+str(serial),'-kernel',str(PACKAGE/'vmlinuz.efi'),'-initrd',str(initrd),
          '-append','console=ttyS0,115200 rdinit=/probe-init quiet',
          '-drive','if=none,id=usos,format=qcow2,file='+str(usos),'-device','ide-hd,bus=ide.0,unit=0,drive=usos,serial=USOS-PROBE-STICK',
-         '-drive','if=none,id=target,format=qcow2,file='+str(target),'-device','ide-hd,bus=ide.0,unit=1,drive=target,serial=XP-TEXTMODE-TARGET',
+         '-drive','if=none,id=target,format=qcow2,cache=writeback,file='+str(target),*(['-device','nvme,drive=target,serial=XP-NVME-TARGET'] if TARGET_NVME else ['-device','ide-hd,bus=ide.0,unit=1,drive=target,serial=XP-TEXTMODE-TARGET']),
          '-drive','if=none,id=iso,format=raw,snapshot=on,file='+str(iso),'-device','ide-hd,bus=ide.1,unit=0,drive=iso,serial=XP-SOURCE-ISO']
     subprocess.run(cmd,timeout=1800,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     log=serial.read_text(errors='replace')
     if '[TEXTMODE_PROBE] RESULT PREPARED-PASS' not in log:raise SystemExit('preparation failed:\n'+log[-5000:])
     return target
 
-def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False,type_at=()):
+def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False,type_at=(),smp=1):
     port=free_port();pending=sorted(type_at)
     # --ahci: the target on an AHCI controller (PCI class 010601, the X470 case).
-    disk=['-device','ahci,id=ahci','-drive','if=none,id=target,format=qcow2,file='+str(target),'-device','ide-hd,drive=target,bus=ahci.0'] if ahci else ['-drive','if=ide,index=0,format=qcow2,file='+str(target)]
+    # USOS_QEMU_DISK_CACHE=writethrough: every guest write reaches the qcow2 file with its metadata,
+    # so a killed VM leaves a consistent image (a guest driver that never flushes, e.g. AHCINT,
+    # otherwise loses qcow2 cluster allocations at the kill and the NTFS looks corrupt).
+    cache=__import__('os').environ.get('USOS_QEMU_DISK_CACHE','');cache=',cache='+cache if cache else ''
+    disk=['-device','ahci,id=ahci','-drive','if=none,id=target,format=qcow2'+cache+',file='+str(target),'-device','ide-hd,drive=target,bus=ahci.0'] if ahci else ['-drive','if=ide,index=0,format=qcow2'+cache+',file='+str(target)]
     usb=['-device','qemu-xhci,id=xhci','-device','usb-kbd,bus=xhci.0','-device','usb-tablet,bus=xhci.0'] if usb_only else []
-    proc=subprocess.Popen([str(QEMU),'-machine','pc','-accel','tcg,thread=multi','-cpu','max','-m','512','-smp','1','-bios',str(SEABIOS),
+    proc=subprocess.Popen([str(QEMU),'-machine','pc','-accel','tcg,thread=multi','-cpu','max','-m','512','-smp',str(smp),'-bios',str(SEABIOS),
         '-boot','order=c,strict=on','-display','none','-vga','std','-nic','none','-monitor',f'tcp:127.0.0.1:{port},server=on,wait=off',
-        *disk,*usb],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        *disk,*usb,*__import__('os').environ.get('USOS_QEMU_EXTRA','').split()],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     screens=[];last=None;deadline=time.time()+minutes*60;shots=out/'screens';shots.mkdir(exist_ok=True)
     key_list=keys.split() if keys else [];key_index=0;result='timeout';copying_since=None
     try:
@@ -191,7 +222,7 @@ def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False
                 result='copying'
                 if not run_through:break
             if copying and copying_since is None:copying_since=time.time()
-            if key_list and copying_since is not None and time.time()-copying_since>45:
+            if key_list and not run_through and copying_since is not None and time.time()-copying_since>45:
                 # Keys kept arriving for 45 s of copying: still copying = no effect.
                 result='copying';break
             if key_list and ('instalator' in low or 'setup' in low):
@@ -212,6 +243,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
     p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging','w2k-x86-sp4-uefi-csm','w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm'],help='nt5-staging: the BIOS XP preparation of the same scripts; w2k-x86-sp4-uefi-csm: Windows 2000 from UEFI (--iso a 2000 ISO)')
     p.add_argument('--ahci',action='store_true',help='boot the prepared target from an AHCI controller')
+    p.add_argument('--smp',type=int,default=1,help='CPUs of the phase 2 VM (2: SeaBIOS lists both in its MP table, the Windows 2000 MPS HAL case)')
     p.add_argument('--usb-only',action='store_true',help='qemu-xhci + usb-kbd + usb-tablet; the pointer is routed to the USB tablet (the 8042 stays: the X470 has one, and NTDETECT hangs without it)')
     p.add_argument('--run-through',action='store_true',help='keep running after text-mode copying (frames every 3 s)')
     p.add_argument('--type-at',default='',help='seconds after the boot at which to type and move the pointer (space-separated)');p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
@@ -222,6 +254,6 @@ if __name__=='__main__':
     # Boot an overlay so the prepared image stays pristine for further runs.
     target=out/'boot-overlay.qcow2';target.unlink(missing_ok=True)
     subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2','-F','qcow2','-b',str(prepared),str(target)],check=True)
-    r=textmode(out,target,a.keys,a.minutes,a.ahci,a.usb_only,a.run_through,[float(t) for t in a.type_at.split()])
+    r=textmode(out,target,a.keys,a.minutes,a.ahci,a.usb_only,a.run_through,[float(t) for t in a.type_at.split()],a.smp)
     print('[RESULT]',r)
     sys.exit(0 if r=='copying' else 1)

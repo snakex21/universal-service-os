@@ -1,0 +1,450 @@
+USOS 3.1.2-usos8 patch 9/9 (2026-10-15): APM power-off ACPI mode first, helper ResetSystem last, CMOS breadcrumbs
+
+Windows 98 SE on the ASRock X470 (CSM off, CSMWrap 3.1.2-usos7) stays on
+the "shutting down" logo forever. Before usos7 (no APM power-off from the
+protected-mode interfaces) it ended at "It's now safe to turn off your
+computer". usos7 asks the helper core for UEFI ResetSystem first, then
+writes S5 in legacy mode; something in that sequence never returns on the
+X470, and nothing records which step it was (no serial port on the board).
+
+Own code from the APM 1.2 and ACPI specifications (ACPI 6.x: 4.8.3.1 PM1
+event registers, 4.8.3.2 PM1 control, 5.2.9 FADT, 16.1.6 entering a
+sleeping state) and the MC146818 RTC register map:
+- apm.c: new order for 5307h BX=0001h CX=0003h from every interface:
+  1. SCI_EN = 0 and an SMI_CMD port: FADT ACPI_ENABLE to SMI_CMD, SCI_EN
+     polled for at most 1 s; 2. PM1a_EVT and GPE0 status bits cleared, all
+     their enables 0; 3. S5 (SLP_TYP from \_S5, PM1a/PM1b, SLP_EN last),
+     2 s wait; 4. still on, INT 15h and 32-bit PM only: helper-core
+     ResetSystem (2 s timeout) as the last resort; 5. still on: AH=60h.
+  Every wait loop is bounded by the PM timer and by a spin count, so a PM
+  timer that does not tick cannot turn a wait into a hang.
+- Breadcrumbs in battery-backed CMOS, the RTC alarm bytes 01h/03h/05h
+  (outside the checksum range; the alarm interrupt stays off). Every value
+  is a valid alarm time in the RTC's format (Status B DM, BCD or binary),
+  because edk2 PcRtcInit (and firmware derived from it) resets an invalid
+  alarm to 00:00:00 at every boot: seconds = 40 + last step, minutes =
+  path * 15 + 5307h off call count, hours = 1 + bitmap of the APM
+  functions seen (32-bit PM connect, real/16-bit connect, other runtime
+  calls). Armed (40/0/1) when CSMWrap starts SeaBIOS (handle_csm_0002);
+  every step also goes to port 80h as A0h | step. Own port I/O with
+  interrupts off around each index/data pair (hw/rtc.c is not linked into
+  the 32-bit segmented code of the 32-bit PM entry). The USOS UEFI menu
+  reads them on the next boot of the stick (EFI\USOS\Logs\apm-off.txt).
+- biostables.c: PM1a_EVT_BLK / GPE0_BLK and their lengths from the FADT
+  (X_ GAS fallbacks) for step 2.
+- "USOS APMOFF:" serial lines: path=s5 for the S5 write (all paths),
+  path=uefi for the helper step.
+
+Applies on top of patches 0001-0008 to CSMWrap 3.1.2 (808ac8e) with its
+seabios submodule (578d260b), patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos8, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/src/apm.c b/seabios/src/apm.c
+--- a/seabios/src/apm.c
++++ b/seabios/src/apm.c
+@@ -14,6 +14,7 @@
+ #include "util.h" // apm_shutdown
+ #include "x86.h" // outb
+ #include "fw/usos_s5.h" // usos_s5_cnt
++#include "hw/rtc.h" // PORT_CMOS_INDEX (USOS 0009 breadcrumbs)
+ 
+ // APM installation check
+ static void
+@@ -92,21 +93,24 @@ handle_155306(struct bregs *regs)
+  * Own code written from the APM 1.2 specification (5307h, BX=0001h,
+  * CX=0003h) and the ACPI specification (4.8.3.2 PM1 control, 7.4.2 \_S5).
+  *
+- * Order:
+- *  1. UEFI ResetSystem(EfiResetShutdown) on the helper core through the
+- *     bios_proxy mailbox (usos_proxy_reset_timed, 2 s timeout): from real /
+- *     V86 mode (INT 15h) and from the 32-bit protected-mode APM interface
+- *     (Windows 9x VPOWERD). Not from the 16-bit protected-mode interface
+- *     (no data segment for the mailbox there).
+- *  2. Direct ACPI S5: SLP_TYPa/b from the DSDT/SSDT Name(_S5) (X470: 5,
+- *     QEMU: 0) into PM1a_CNT/PM1b_CNT, then SLP_EN. Port I/O only, so it
+- *     runs in every mode.
+- *  3. Still running after 2 s with SCI_EN = 0 and an SMI_CMD port: ACPI
+- *     mode on (FADT ACPI_ENABLE to SMI_CMD), S5 written again.
+- *  4. Still running: the APM call fails (AH=60h, "can't enter requested
++ * Order (USOS 0009, CSMWrap 3.1.2-usos8; usos7 asked the helper first):
++ *  1. ACPI mode: SCI_EN = 0 and an SMI_CMD port -> FADT ACPI_ENABLE to
++ *     SMI_CMD, SCI_EN polled for at most 1 s (what every ACPI OS does
++ *     before it uses PM1_CNT).
++ *  2. PM1a_EVT and GPE0 status bits cleared, their enables 0.
++ *  3. Direct ACPI S5: SLP_TYPa/b from the DSDT/SSDT Name(_S5) (X470: 5,
++ *     QEMU: 0) into PM1a_CNT/PM1b_CNT, then SLP_EN; 2 s wait. Port I/O
++ *     only, so steps 1-3 run in every mode.
++ *  4. Still running: UEFI ResetSystem(EfiResetShutdown) on the helper core
++ *     through the bios_proxy mailbox (usos_proxy_reset_timed, 2 s timeout)
++ *     from real / V86 mode (INT 15h) and from the 32-bit protected-mode
++ *     APM interface (Windows 9x VPOWERD). Not from the 16-bit protected-
++ *     mode interface (no data segment for the mailbox there).
++ *  5. Still running: the APM call fails (AH=60h, "can't enter requested
+  *     state") instead of halting, so the caller can show its own text.
++ * Every wait is bounded by the PM timer and by a spin count.
+  * Not done: the _PTS(5) method (no AML interpreter); boards that need it
+- * for S5 are covered only by step 1 (firmware ResetSystem).
++ * for S5 are covered only by step 4 (firmware ResetSystem).
+  *
+  * Diagnostics: "USOS APMOFF:" lines through dprintf (they reach the serial
+  * port only with csmwrap.ini serial = true, patch 0008 serialio.c) and,
+@@ -115,12 +119,145 @@ handle_155306(struct bregs *regs)
+  *   4FF bit0 _S5 found, bit1 PM1a, bit2 PM1b, bit3 helper timeout,
+  *       bit4 helper reset unavailable, bit5 ACPI enable tried
+  * path 1 = INT 15h, 2 = 16-bit PM, 3 = 32-bit PM; step 1 = helper asked,
+- * 2 = S5 written, 3 = S5 written after ACPI enable, 4 = gave up.
++ * 2 = S5 written (flags bit5: after an ACPI enable), 4 = gave up.
+  */
+ #define USOS_APMOFF_INT15 1
+ #define USOS_APMOFF_PM16  2
+ #define USOS_APMOFF_PM32  3
+ 
++/*
++ * USOS 0009: power-off breadcrumbs in battery-backed CMOS, so a hung or
++ * forced-off X470 still tells the next USOS boot what happened. Bytes: the
++ * RTC alarm registers 01h/03h/05h (MC146818; outside the AT checksum range
++ * 10h-2Dh; the alarm interrupt stays off, Status B AIE = 0, neither
++ * SeaBIOS nor USOS sets an alarm).
++ *
++ * Every value written is a VALID alarm time in the RTC's own format
++ * (Status B DM: BCD or binary; hours 1-8 are valid in 12- and 24-hour
++ * mode): edk2's PcRtc driver (PcRtcInit) and firmware derived from it
++ * reset an invalid alarm to 00:00:00 on every boot, which would wipe the
++ * record before the USOS menu reads it.
++ *   01h seconds  40 + last step (USOS_STEP_*, 0-15)
++ *   03h minutes  path of the last 5307h off call * 15 + call count (0-14)
++ *   05h hours    1 + bitmap: bit0 32-bit PM connect (5303h), bit1 real-
++ *                mode or 16-bit PM connect (5301h/5302h), bit2 any other
++ *                runtime call (5305h/5306h idle/busy, 5308h/530Ah/530Bh/
++ *                530Dh/530Fh)
++ * "Armed" = 40/0/1, written when CSMWrap starts SeaBIOS
++ * (usos_apm_crumb_arm from handle_csm_0002); the USOS UEFI menu reads a
++ * record (seconds 40-55 and hours 1-8), appends it to
++ * EFI\USOS\Logs\apm-off.txt and writes 0/0/0
++ * (src/platform/uefi/apm_breadcrumbs.zig). Every step also goes to port
++ * 80h as A0h | step (POST code display).
++ *
++ * Own port I/O with interrupts off around each index/data pair (an OS
++ * interrupt handler touching the RTC in between would otherwise take our
++ * index); hw/rtc.c is not linked into the 32-bit segmented code that the
++ * 32-bit PM entry runs. Works from real/V86 mode, 16-bit PM and 32-bit PM.
++ */
++#define USOS_CRUMB_STEP  0x01
++#define USOS_CRUMB_CALLS 0x03
++#define USOS_CRUMB_FNS   0x05
++#define USOS_STEP_ARMED     0x0
++#define USOS_STEP_ENTER     0x1  // 5307h BX=1 CX=3 entered
++#define USOS_STEP_ACPIEN    0x2  // ACPI_ENABLE written to SMI_CMD
++#define USOS_STEP_SCIEN     0x3  // SCI_EN 1 (now or already)
++#define USOS_STEP_SCITMO    0x4  // SCI_EN still 0 after 1 s
++#define USOS_STEP_STSCLR    0x5  // PM1/GPE0 status cleared, enables 0
++#define USOS_STEP_S5        0x6  // SLP_TYP|SLP_EN written, waiting 2 s
++#define USOS_STEP_HELPER    0x7  // helper ResetSystem posted
++#define USOS_STEP_HLPTMO    0x8  // helper timed out
++#define USOS_STEP_HLPRET    0x9  // helper returned / unavailable
++#define USOS_STEP_FAIL      0xF  // returning AH=60h
++
++static u8
++usos_cmos_rd(u8 index)
++{
++    u32 flags = save_flags();
++    irq_disable();
++    outb(index | NMI_DISABLE_BIT, PORT_CMOS_INDEX);
++    u8 v = inb(PORT_CMOS_DATA);
++    restore_flags(flags);
++    return v;
++}
++
++static void
++usos_cmos_wr(u8 index, u8 val)
++{
++    u32 flags = save_flags();
++    irq_disable();
++    outb(index | NMI_DISABLE_BIT, PORT_CMOS_INDEX);
++    outb(val, PORT_CMOS_DATA);
++    restore_flags(flags);
++}
++
++// Status B bit 2 (DM): 1 = binary, 0 = BCD.
++static int
++usos_cmos_binary(void)
++{
++    return usos_cmos_rd(0x0B) & 0x04;
++}
++
++static void
++usos_crumb_put(u8 index, u8 v)
++{
++    if (!usos_cmos_binary())
++        v = ((v / 10) << 4) | (v % 10);
++    usos_cmos_wr(index, v);
++}
++
++static u8
++usos_crumb_get(u8 index)
++{
++    u8 v = usos_cmos_rd(index);
++    if (!usos_cmos_binary())
++        v = (v >> 4) * 10 + (v & 0x0f);
++    return v;
++}
++
++static void
++usos_crumb_step(u8 step)
++{
++    usos_crumb_put(USOS_CRUMB_STEP, 40 + (step & 0x0f));
++    outb(0xA0 | step, 0x80);
++}
++
++void
++usos_apm_crumb_arm(void)
++{
++    usos_crumb_put(USOS_CRUMB_CALLS, 0);
++    usos_crumb_put(USOS_CRUMB_FNS, 1);
++    usos_crumb_put(USOS_CRUMB_STEP, 40 + USOS_STEP_ARMED);
++}
++
++static void
++usos_crumb_fn(u8 al)
++{
++    u8 bit;
++    switch (al) {
++    case 0x03: bit = 0x01; break;             // 32-bit PM connect
++    case 0x01: case 0x02: bit = 0x02; break;  // real-mode / 16-bit PM connect
++    case 0x05: case 0x06: case 0x08: case 0x0a: case 0x0b: case 0x0d:
++    case 0x0f: bit = 0x04; break;             // runtime calls
++    default: return;
++    }
++    u8 h = usos_crumb_get(USOS_CRUMB_FNS);
++    u8 v = (h >= 1 && h <= 8) ? h - 1 : 0;
++    if (!(v & bit))
++        usos_crumb_put(USOS_CRUMB_FNS, 1 + (v | bit));
++}
++
++static void
++usos_crumb_call(u8 path)
++{
++    u8 m = usos_crumb_get(USOS_CRUMB_CALLS);
++    u8 n = m <= 59 ? m % 15 : 0;
++    if (n < 14)
++        n++;
++    usos_crumb_put(USOS_CRUMB_CALLS, (path & 3) * 15 + n);
++    usos_crumb_step(USOS_STEP_ENTER);
++}
++
+ static void
+ usos_apmoff_mark(u8 path, u8 step, u8 flags)
+ {
+@@ -137,14 +274,17 @@ usos_apmoff_mark(u8 path, u8 step, u8 flags)
+ }
+ 
+ // About ms milliseconds on the ACPI PM timer, else on port 80h reads.
++// USOS 0009: also bounded by a spin count, so a PM timer that does not
++// tick cannot turn the wait into a hang with interrupts off.
+ static void
+ usos_apmoff_wait(u32 ms)
+ {
+     u16 tmr = GET_GLOBAL(usos_pm_tmr);
+     u32 last = tmr ? inl(tmr) : 0, waited = 0, limit = ms * 3580;
++    u32 spins = 0, spin_limit = ms * 4000;
+     if (!tmr)
+         limit = ms * 1000;
+-    while (waited < limit) {
++    while (waited < limit && spins++ < spin_limit) {
+         if (tmr) {
+             u32 now = inl(tmr);
+             waited += (now - last) & 0xffffff;
+@@ -171,46 +311,85 @@ usos_s5_write(void)
+         outw(usos_s5_cnt(inw(b), tb, 1), b);
+ }
+ 
+-// Steps 2-4; returns only when the machine is still on.
++// USOS 0009: before SLP_EN an ACPI OSPM clears WAK_STS and leaves only its
++// wake devices enabled (ACPI 6.x 16.1.6). With no wake devices here: every
++// PM1a and GPE0 status bit cleared (write 1), every enable 0, so a pending
++// event neither aborts the transition nor wakes the board at once (the
++// power button still wakes from S5; PM1b_EVT is not touched).
+ static void
+-usos_apmoff_s5(u8 path, u8 flags)
++usos_s5_quiesce(void)
+ {
+-    u32 a = GET_GLOBAL(acpi_pm1a_cnt);
+-    dprintf(1, "USOS APMOFF: path=s5 from=%d typ=%d/%d s5=%d cnt=%x/%x\n"
+-            , path, GET_GLOBAL(usos_slp_typa), GET_GLOBAL(usos_slp_typb)
+-            , GET_GLOBAL(usos_s5_found), a, GET_GLOBAL(usos_pm1b_cnt));
+-    usos_apmoff_mark(path, 2, flags);
+-    irq_disable();
+-    usos_s5_write();
+-    usos_apmoff_wait(2000);
++    u16 evt = GET_GLOBAL(usos_pm1a_evt), gpe = GET_GLOBAL(usos_gpe0_blk);
++    u8 elen = GET_GLOBAL(usos_pm1_evt_len), glen = GET_GLOBAL(usos_gpe0_len);
++    if (evt && elen >= 4) {
++        outw(0, evt + elen / 2);       // PM1_EN
++        outw(0xffff, evt);             // PM1_STS (write 1 to clear)
++    }
++    u8 i;
++    for (i = 0; gpe && i < glen / 2; i++) {
++        outb(0, gpe + glen / 2 + i);   // GPE0_EN
++        outb(0xff, gpe + i);           // GPE0_STS
++    }
++}
+ 
++// USOS 0009 order: ACPI mode first (SCI_EN = 1 through SMI_CMD, the firmware
++// S5 path every ACPI OS exercises), quiesce, then S5. Returns only when the
++// machine is still on.
++static u8
++usos_apmoff_s5(u8 path)
++{
++    u32 a = GET_GLOBAL(acpi_pm1a_cnt);
+     u16 smi = GET_GLOBAL(usos_smi_cmd);
+-    u8 en = GET_GLOBAL(usos_acpi_enable);
+-    if (a && smi && en && !(inw(a) & 1)) {
+-        dprintf(1, "USOS APMOFF: still on, ACPI enable (%x to %x), S5 again\n"
+-                , en, smi);
++    u8 en = GET_GLOBAL(usos_acpi_enable), flags = 0;
++    irq_disable();
++    if (a && !(inw(a) & 1) && smi && en) {
++        dprintf(1, "USOS APMOFF: ACPI enable (%x to %x)\n", en, smi);
++        usos_crumb_step(USOS_STEP_ACPIEN);
+         flags |= 0x20;
+-        usos_apmoff_mark(path, 3, flags);
+         outb(en, smi);
+         u32 i;
+         for (i = 0; i < 20 && !(inw(a) & 1); i++)
+             usos_apmoff_wait(50);
+-        usos_s5_write();
+-        usos_apmoff_wait(2000);
+     }
+-    dprintf(1, "USOS APMOFF: still on, power-off failed\n");
+-    usos_apmoff_mark(path, 4, flags);
++    usos_crumb_step(a && (inw(a) & 1) ? USOS_STEP_SCIEN : USOS_STEP_SCITMO);
++    usos_s5_quiesce();
++    usos_crumb_step(USOS_STEP_STSCLR);
++    dprintf(1, "USOS APMOFF: path=s5 from=%d typ=%d/%d s5=%d cnt=%x/%x\n"
++            , path, GET_GLOBAL(usos_slp_typa), GET_GLOBAL(usos_slp_typb)
++            , GET_GLOBAL(usos_s5_found), a, GET_GLOBAL(usos_pm1b_cnt));
++    usos_apmoff_mark(path, 2, flags);
++    usos_crumb_step(USOS_STEP_S5);
++    usos_s5_write();
++    usos_apmoff_wait(2000);
++    return flags;
+ }
+ 
++// Last resort, INT 15h and 32-bit PM only (needs a data segment for the
++// mailbox). Moved behind the S5 write: the helper core runs firmware
++// runtime code after a foreign OS owns the machine, the least trusted step.
+ static u8
+-usos_apmoff_helper(u8 path)
++usos_apmoff_helper(u8 path, u8 flags)
+ {
+-    dprintf(1, "USOS APMOFF: path=uefi from=%d (ResetSystem on the helper core)\n"
+-            , path);
+-    usos_apmoff_mark(path, 1, 0);
++    dprintf(1, "USOS APMOFF: still on, path=uefi from=%d (ResetSystem on the"
++            " helper core)\n", path);
++    usos_crumb_step(USOS_STEP_HELPER);
++    usos_apmoff_mark(path, 1, flags);
+     int r = usos_proxy_reset_timed(3);
+     dprintf(1, "USOS APMOFF: helper returned %d\n", r);
+-    return r == -2 ? 0x08 : 0x10;
++    usos_crumb_step(r == -2 ? USOS_STEP_HLPTMO : USOS_STEP_HLPRET);
++    return flags | (r == -2 ? 0x08 : 0x10);
++}
++
++static void
++usos_apmoff(u8 path)
++{
++    usos_crumb_call(path);
++    u8 flags = usos_apmoff_s5(path);
++    if (path != USOS_APMOFF_PM16)
++        flags = usos_apmoff_helper(path, flags);
++    dprintf(1, "USOS APMOFF: still on, power-off failed\n");
++    usos_apmoff_mark(path, 4, flags);
++    usos_crumb_step(USOS_STEP_FAIL);
+ }
+ 
+ // INT 15h (real or V86 mode) and 32-bit flat callers. Returns only when
+@@ -218,8 +397,7 @@ usos_apmoff_helper(u8 path)
+ void
+ apm_shutdown(void)
+ {
+-    u8 flags = usos_apmoff_helper(USOS_APMOFF_INT15);
+-    usos_apmoff_s5(USOS_APMOFF_INT15, flags);
++    usos_apmoff(USOS_APMOFF_INT15);
+ }
+ 
+ // APM Set Power State
+@@ -314,6 +492,7 @@ handle_1553(struct bregs *regs)
+     }
+ 
+     //debug_stub(regs);
++    usos_crumb_fn(regs->al);  // USOS 0009 breadcrumb
+     switch (regs->al) {
+     case 0x00: handle_155300(regs); break;
+     case 0x01: handle_155301(regs); break;
+@@ -340,10 +519,7 @@ handle_apm(struct bregs *regs)
+     // USOS 0008: power-off from the protected-mode interfaces. MODE16 here
+     // is the 16-bit PM entry: no real-mode segments, port I/O only.
+     if (regs->ax == 0x5307 && regs->bx == 1 && regs->cx == 3) {
+-        u8 path = MODE16 ? USOS_APMOFF_PM16 : USOS_APMOFF_PM32, flags = 0;
+-        if (!MODE16)
+-            flags = usos_apmoff_helper(path);
+-        usos_apmoff_s5(path, flags);
++        usos_apmoff(MODE16 ? USOS_APMOFF_PM16 : USOS_APMOFF_PM32);
+         set_code_invalid_silent(regs, 0x60);
+         return;
+     }
+diff -ruN a/seabios/src/fw/biostables.c b/seabios/src/fw/biostables.c
+--- a/seabios/src/fw/biostables.c
++++ b/seabios/src/fw/biostables.c
+@@ -202,6 +202,9 @@ u16 usos_smi_cmd VARFSEG;
+ u8 usos_acpi_enable VARFSEG;
+ u8 usos_slp_typa VARFSEG, usos_slp_typb VARFSEG;
+ u8 usos_s5_found VARFSEG;   // 1 = Name(_S5) package found in the DSDT/SSDT
++// USOS 0009: PM1a event block and GPE0 block for the pre-S5 quiesce.
++u16 usos_pm1a_evt VARFSEG, usos_gpe0_blk VARFSEG;
++u8 usos_pm1_evt_len VARFSEG, usos_gpe0_len VARFSEG;
+ u16 acpi_pm_base = 0xb000;
+ 
+ #define acpi_ga_to_bdf(addr) pci_to_bdf(0, (addr >> 32) & 0xffff, (addr >> 16) & 0xffff)
+@@ -306,6 +309,13 @@ find_acpi_features(void)
+     usos_pm1b_cnt = usos_fadt_port(fadt, le32_to_cpu(fadt->pm1b_cnt_blk), 184);
+     usos_pm_tmr = usos_fadt_port(fadt, pm_tmr, 208);
+     usos_find_s5(fadt);
++    // USOS 0009: event blocks (X_PM1a_EVT_BLK at 148, X_GPE0_BLK at 220).
++    u32 evt = usos_fadt_port(fadt, le32_to_cpu(fadt->pm1a_evt_blk), 148);
++    u32 gpe = usos_fadt_port(fadt, le32_to_cpu(fadt->gpe0_blk), 220);
++    usos_pm1a_evt = evt <= 0xffff ? evt : 0;
++    usos_pm1_evt_len = fadt->pm1_evt_len;
++    usos_gpe0_blk = gpe <= 0xffff ? gpe : 0;
++    usos_gpe0_len = fadt->gpe0_blk_len;
+     if (le32_to_cpu(fadt->smi_cmd) <= 0xffff) {
+         usos_smi_cmd = le32_to_cpu(fadt->smi_cmd);
+         usos_acpi_enable = fadt->acpi_enable;
+diff -ruN a/seabios/src/fw/csm.c b/seabios/src/fw/csm.c
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -214,6 +214,9 @@ handle_csm_0002(struct bregs *regs)
+ 
+         find_acpi_features();
+     }
++    // USOS 0009: arm the CMOS power-off breadcrumbs for this boot.
++    if (CONFIG_APMBIOS)
++        usos_apm_crumb_arm();
+ 
+     // SMBIOS table needs to be copied into the f-seg
+     // XX: OVMF doesn't seem to set SmbiosTableLength so don't check it
+diff -ruN a/seabios/src/util.h b/seabios/src/util.h
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -90,6 +90,9 @@ extern u16 usos_pm_tmr;
+ extern u16 usos_smi_cmd;
+ extern u8 usos_acpi_enable;
+ extern u8 usos_slp_typa, usos_slp_typb, usos_s5_found;
++extern u16 usos_pm1a_evt, usos_gpe0_blk;
++extern u8 usos_pm1_evt_len, usos_gpe0_len;
++void usos_apm_crumb_arm(void);
+ extern u16 acpi_pm_base;
+ void *find_acpi_rsdp(void);
+ void *find_acpi_table(u32 signature);

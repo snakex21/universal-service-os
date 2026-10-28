@@ -1,0 +1,14 @@
+# wlink directives for USOSPID.DRV (tools/build_win9x_support.py adds
+# "file usospid.obj name USOSPID.DRV"). No OpenWatcom runtime: own entry
+# point, only import records from windows.lib.
+format windows dll initglobal
+option modname=USOSPID
+option description 'USOS Windows 95 Setup Product ID helper (GPL-3.0-or-later)'
+option start=__DLLstart_
+option nodefaultlibs
+option stack=0
+option quiet
+libpath '%WATCOM%/lib286/win'
+library windows
+segment type code fixed
+segment type data fixed

@@ -47,6 +47,12 @@ dos_source_mbr_start:
     .byte 16,0
     .word 1,0x7c00,0
     .quad 0
+/* Reserved for the Windows 9x disk timestamp, including after relocation. */
+.org 0xDA
+.global dos_source_timestamp_start, dos_source_timestamp_end
+dos_source_timestamp_start:
+    .skip 6, 0
+dos_source_timestamp_end:
 .org 440
     .long 0
     .word 0

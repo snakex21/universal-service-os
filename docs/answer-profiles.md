@@ -18,7 +18,7 @@ bad values are refused with the field and the line, never the value.
 
 | key | meaning | rule / default |
 |---|---|---|
-| `name` | name in the menu, file stem | 1-32 characters `A-Z a-z 0-9 space . _ -` |
+| `name` | name in the menu; the file stem derives from it (see "Names and files") | 1-32 characters `A-Z a-z 0-9 space . _ -`; unique among profiles offered for a common system |
 | `user` | first local account (administrator), `FullName` / `RegisteredOwner` | required; 1-20 characters `A-Z a-z 0-9 . _ -` and space, not a built-in account |
 | `user2` | optional second administrator | like `user`, different from it |
 | `computer` | computer name | 1-15 characters `A-Z a-z 0-9 -`, not only digits; empty: `USOS-XP` on NT5, a Setup-chosen name (`*`) on 6.x+ |
@@ -40,8 +40,12 @@ bad values are refused with the field and the line, never the value.
 | `edition` | edition Setup installs, for every system without its own | optional, up to 64 ASCII characters; see "Edition" below |
 | `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
-| `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
-| tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`) | default off / `default` / `auto`; see "Tweaks" |
+| `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-9x`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
+| `dos_regional` | MS-DOS 6.22 and Windows 1.x-3.x (`dos.zig`, DOS.INI): `auto` = COUNTRY, code page (DISPLAY.SYS + MODE CON CODEPAGE) from `locale`, as a localized MS-DOS Setup writes them, and the regional text pages of Windows 3.1 Setup (W3PL.KEY) answered; `manual` = nothing written, those pages left to the user | default `auto`; written only as `manual` |
+| `dos_keyb` | MS-DOS: also `KEYB <layout>` from `keyboard` (only a layout of the same code page) | default `no`: KEYB translates in INT 09h, which USB keys under CSMWrap never pass (QEMU usb-kbd without i8042, 2026-10-24); for a PS/2 keyboard |
+| `dos_winsock` | Windows 3.1 / 3.11 / WfW 3.11 (DOS.INI `winsock=yes`; editor row "Winsock (eksperymentalny)" only for those three): experimental USOS Winsock. `tools/dos_win3_menu.sh` `dos_winsock_apply` stages `C:\NET\WIN16` (WINSOCK.DLL, GETHTTP.EXE, TESTLOAD.EXE), `C:\NET\USOSPKTQ.COM`, the queue NETSTART.BAT and `set USOSPKT_QUEUE=1` before its call in the start menu AUTOEXEC; after Setup WINMENU.BAT copies WINSOCK.DLL to `C:\WINDOWS` unless one is there; SETUP.INF gets the icon "USOS Winsock test (GETHTTP)" in the Main group (Setup creates no new groups; log `C:\NET\WIN16\GETHTTP.LOG`, response `.RSP`, staging log `STAGE.LOG`) | default `no`: no DOS.INI line, every staged file as without the option (tools/tests/test_win16_winsock_option.py) |
+| `win9x_setup` | Windows 95 / 98 / Me (`msbatch.zig`; editor row "Instalator Windows 9x", values as `dos_regional`): `auto` = MSBATCH.INF answers Setup's pages (owner, key, time zone, network identification, Express, setup type, startup disk); `manual` = Setup shows its pages (user decision 2026-10-26: automatic is the default up to 2000, manual for XP+). Manual keeps only the modern-PC settings: `;USOS-SETUP=manual` (no phase-1 VM, `tools/w9x_csmwrap_prepare.sh`), `InstallDir=C:\WINDOWS` + `ChangeDir=0`, `NoDirWarn`, `DevicePath=1`, the network protocol defaults, and every `[Install]` section (memory limits, CSMWrap/USB lines, RunOnce, options, add-ons); the menu asks no 95 key (Setup's page does) | default `auto`; written only as `manual` |
+| tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`, `keep`: Windows' own mode, no USOSRES, docs/display-policy.md) | default off / `default` / `auto`; see "Tweaks" |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.
@@ -54,10 +58,15 @@ keys).
 
 `src/flow/answer/applies.zig`. The answer screen lists only the profiles
 offered for its system (`answer_profiles.filter`); every file is still
-read, so a new name never overwrites another system's profile.
+read, so a new name never overwrites another system's profile. When the
+stick holds profiles for other systems, the screen's subtitle ends with
+"Hidden profiles (made for another system): N" (`profile.hidden_other_systems`,
+the loaded files minus those offered here).
 
 - `systems=` set: the listed ids and groups (`windows` = every Windows with
-  a generated answer, `windows-nt5` = 2000/XP/2003/XP x64,
+  a generated answer, 95/98/Me included, `windows-9x` = 95, 98, 98 SE, Me
+  (MSBATCH.INF, [win9x-modern-2026-09-30.md](win9x-modern-2026-09-30.md)),
+  `windows-nt5` = 2000 (Professional and Server)/XP/2003/XP x64,
   `windows-nt6` = Vista and newer, `linux` = Ubuntu, Debian, Fedora).
 - Absent (a profile saved before the field existed): every Windows, never
   Linux. One exception, a read-time default: when the profile's only
@@ -67,8 +76,33 @@ read, so a new name never overwrites another system's profile.
   `edition.windows-vista=Ultimate`) is therefore offered for Vista only.
   Saving a profile in the editor writes `systems=` explicitly.
 - The editor's "Use for" row: "Only <system>" (the default for a new
-  profile), "Every Windows" or "Every Linux installer", "Windows and Linux";
-  a stored list that is none of these is kept and shown as it is.
+  profile, also one imported from `usos-xp.ini`; `profile_editor.edit`
+  picks it when the new profile has no `systems=`), "Every Windows" or
+  "Every Linux installer", "Windows and Linux"; a stored list that is none
+  of these is kept and shown as it is. An existing profile without
+  `systems=` shows its read-time default (usually "Every Windows").
+
+### Names and files
+
+A name must be unique only among profiles offered for a common system
+(`applies.overlaps` on the effective lists: equal ids, a group and one of
+its systems, `windows` and a `windows-*` group; `windows-9x`, `windows-nt5`,
+`windows-nt6` and `linux` share nothing). "Home" with "Only Windows XP" and
+"Home" with "Only Windows 7" may both exist; a second "Home" with "Every
+Windows" is refused ("A profile with this name exists already."). Names are
+compared like file stems: case, space and `.` do not count.
+
+The file is `<stem>.ini` with the stem from `profile.fileStem` (lower case,
+space and `.` -> `-`); when another file holds that stem (a profile of the
+same name for other systems), `profile.uniqueFileStem` appends `-2`, `-3`,
+... (the base shortened to stay within 32 characters): `home.ini`,
+`home-2.ini`. Editing writes back to the file it was read from (its stem is
+free for it; a rename moves the profile to the new name's stem and removes
+the old file); Delete removes the file of the selected row. Existing files
+keep their names; a file whose stem is not the name's (an older or
+hand-made file) is renamed to the name's stem on the next save. Builds
+before 2026-10-22 read numbered files as usual but refuse a second profile
+with the same name in the editor.
 
 ### Missing answers (warnings before the start)
 
@@ -81,6 +115,9 @@ note. The start is not blocked.
 - Server 2008 and newer: the password does not meet the default Server
   policy (7+ characters, three of upper case, lower case, digits,
   symbols): Setup stops on the Administrator password page.
+- Windows 8 / 8.1, Server 2012 / 2012 R2 and Embedded 8.1 Industry: no
+  product key (`key.<id>` or `key`): their Setup has no "I don't have a
+  key" and stops on the product key page.
 
 ### Tweaks
 
@@ -88,7 +125,7 @@ Optional, off by default (nothing in the Win10 defaults suggested
 otherwise). `schema.tweak_support` is the one table of where each tweak is
 rendered; everywhere else the tweak writes nothing, and the editor's
 "Appearance and extras" section offers only the tweaks of its system.
-Windows 2000 has none (no `reg.exe` in its base system).
+Windows 2000 gets `show_extensions`, `show_hidden` and `no_autorun` through usos-reg.exe since 2026-10-12 (no `reg.exe` in its base system; see "Options").
 
 | tweak | XP | 2003 | Vista | 7 | 8 .. 11, Server 2012+ | how |
 |---|---|---|---|---|---|---|
@@ -160,6 +197,185 @@ rendered for the Server releases of the same schema level.
   driver offers that mode. Without a display driver (the VGA driver, e.g.
   XP through CSMWrap without a GOP-capable driver) Windows keeps its basic
   mode; "Automatic" writes nothing.
+  This describes XP/2003. For Windows 2000, NT 3.5/3.51, NT 4 and 95/98/Me,
+  an explicit `display=auto` or one of the existing sizes requests a mode
+  at the first hardware boot/logon; `display_bpp=auto|32|16` chooses depth.
+  An omitted display request keeps the previous defaults. See
+  [display-from-profile-2026-10-20.md](display-from-profile-2026-10-20.md)
+  for validation, fallback and the NT 3.5 miniport rebuild requirement.
+
+### Options (typed, stage 1, 2026-10-12)
+
+`src/flow/answer/options.zig` is the one option table: each option has a
+value type (toggle `no`/`yes`, or a choice whose first value is the default),
+an editor group, and per release the rules that render each value: a
+registry value (`hklm`, `user` = every new user, `default` = `HKU\.DEFAULT`),
+a command, or a native answer element. The editor shows a group and an option
+only where the system renders it (`options.available`), a choice only with the
+values that render there. A value is written to the profile only when it is
+not the default, so older builds still read profiles that do not use them and
+existing profiles render byte for byte as before (goldens). Plan and
+background: [research/profile-options-2026-10-12.md](research/profile-options-2026-10-12.md).
+
+| option | values | 95 | 98/Me | NT 4.0 | 2000 | XP/2003 | Vista/7 | 8.x | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `show_extensions`, `show_hidden` (tweaks) | yes | | yes | | yes | yes | yes | yes | yes | yes |
+| `show_protected` (`Hidden`+`ShowSuperHidden`) | yes | | Me | | yes | yes | yes | yes | yes | yes |
+| `launch_to_pc` (`LaunchTo=1`) | yes | | | | | | | | yes | yes |
+| `end_task` (`TaskbarEndTask`) | yes | | | | | | | | | yes |
+| `no_autorun` (tweak) | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `no_tips` (Welcome / Getting Started, `Tips\Show=0`) | yes | | | yes | yes | | | | | |
+| `taskbar_search` (`SearchboxTaskbarMode`) | hidden, icon, box | | | | | | | | yes | yes |
+| `taskbar_left` (`TaskbarAl=0`, client) | yes | | | | | | | | | yes |
+| `task_view_off`, `bing_search_off` | yes | | | | | | | | yes | yes |
+| `widgets_off` (Feeds / Dsh policy, client) | yes | | | | | | | | yes | yes |
+| `uac_level` (EnableLUA stays on) | no_dim, never | | | | | | yes | yes | yes | yes |
+| `disable_uac` (tweak) | yes | | | | | | yes | | | |
+| `hibernation` (client) | no_fast_startup, off | | | | | | | yes | yes | yes |
+| `no_hibernation` (tweak) | yes | | | | | | client | | | |
+| `system_restore_off` | yes | | | | | XP | client | client | client | client |
+| `numlock` (`InitialKeyboardIndicators`, `.DEFAULT` + new users) | on, off | | | yes | yes | yes | yes | yes | yes | yes |
+| `windows_update` (AU policy) | no_restart, notify, off | | | | yes | yes | yes | yes | yes | yes |
+| `privacy` (consumer features, suggestions, advertising ID, tailored experiences, telemetry minimum; 11: Copilot, Recall) | yes | | | | | | | | yes | yes |
+| `disable_wer` | yes | | | | | | yes | yes | yes | yes |
+| `autologon` | yes | | | | yes | yes | yes | yes | yes | yes |
+| `password_never_expires` (`net accounts /maxpwage:unlimited`) | yes | | | | yes | yes | yes | yes | yes | yes |
+| `workgroup` | name (computer-name rule) | yes | yes | | yes | yes | yes | yes | yes | yes |
+
+Delivery per family:
+
+- **6.x+**: specialize `RunSynchronous` as before. The options' registry
+  values are `reg.exe` operations; several go into one
+  `cmd.exe /c reg add ... & reg add ...` command while it stays within 239
+  characters (room for the `usos-run-hidden.exe` prefix), so a profile with
+  every option stays under 15 KiB (`max_size` 16 KiB; test
+  `every option on stays within the limits`). Default-user values go between
+  the existing `reg load` / `reg unload` of `HKU\USOSDefault`. `autologon`:
+  `Shell-Setup/AutoLogon` (oobeSystem, `LogonCount` 9999999); `workgroup`:
+  `Microsoft-Windows-UnattendedJoin/Identification/JoinWorkgroup`.
+- **NT5**: `workgroup=`, `run=` (only known commands) and `reg=` lines in the
+  rendered settings; the staging writes `[Identification] JoinWorkgroup`,
+  appends the commands to `usos-users.cmd` and stages **usos-reg.exe** with
+  `usos-reg.txt` next to it (`usos_nt5_stage_regset`); `usos-users.cmd` runs
+  it at setup end (`%SystemRoot%\usos-reg.log`) and deletes the set (it can
+  hold the automatic logon password). XP/2003 keep their tweak tokens;
+  2000 (no `reg.exe`) gets `show_extensions`, `show_hidden` and `no_autorun`
+  through usos-reg.exe since this change (golden
+  `tweaks.windows-2000.x86.sif-cmd.txt` updated for that only).
+- **NT 4.0**: `;USOS-REG=` comment lines at the end of `WINNT.SIF`;
+  `nt4_csmwrap_target.sh` writes `C:\USOS\NT4\USOS-REG.TXT` and
+  `USOS-REG.EXE`, `POST.CMD` applies them at the automatic Administrator
+  logon (Default User hive + the Administrator's own HKCU).
+- **95/98/Me**: `[Install] AddReg=...,USOS.Profile` and a `[USOS.Profile]`
+  section (HKCU at Setup time is the single default user; DWORDs as four
+  binary bytes); `workgroup` replaces `Workgroup="WORKGROUP"`.
+
+**usos-reg.exe** (`tools/windows_usos_reg.c`, own GPL code, no C runtime,
+x86, PE 4.0, NT 4.0 SP6 .. 11, `KEY_WOW64_64KEY` under WOW64): applies a set
+file of lines `ROOT\Key|Name|type|data` (ROOT `HKLM`, `USER`, `DEFAULT`; type
+`dword`, `sz`, `expand_sz`, `binary`, `del`). `USER` = the Default User hive
+(found through `ProfileList`, loaded with `RegLoadKey`) plus HKCU when not run
+as LocalSystem. `--dry-run`, `--log FILE`, `--hive FILE`; exit 0 all applied,
+2 some failed, 1 bad set (nothing written). Built by
+`tools/build_windows_usos_reg.py`, in the micro-Linux image as
+`usr/lib/usos/usos-reg.exe`; tests `tools/tests/test_usos_reg.py`. Not used
+on 6.x+: the WORK path has no channel to put a file into the target before
+specialize; stage 2 raised the answer limit instead (64 KiB) and keeps the
+`reg.exe` commands.
+
+**Stage 2 (2026-10-14)**: packs for every family, new group "Apps and
+scripts". Same rules as stage 1 (only where the release renders it, written
+only when set, defaults unchanged).
+
+| option | values | 95 | 98/Me | NT 4.0 | 2000 | XP/2003 | Vista/7 | 8.x | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `classic_context_menu` (Active Setup `USOS-ClassicContextMenu`: per user at first sign-in, the `{86ca1aa0-...}\InprocServer32` override in HKCU Classes) | yes | | | | | | | | | yes |
+| `shortcut_suffix_off` (`Explorer link` = 00000000) | yes | yes | yes | yes | yes | yes | yes | yes | yes | |
+| `desktop_icons` (`HideDesktopIcons`: XP Computer/Documents/Network Places, Vista+ Computer/user/Network/Control Panel) | yes | | | | | yes | yes | yes | yes | yes |
+| `no_tips` (XP/2003: Tour `RunCount=0`, Desktop Cleanup Wizard `NoRun`) | yes | | | yes | yes | yes | | | | |
+| `classic_taskbar` (XP..Vista `TaskbarGlomming=0`; 7..10 small + `TaskbarGlomLevel=2`; 11 `TaskbarGlomLevel=2`, 23H2+) | yes | | | | | yes | yes | yes | yes | yes |
+| `all_tray_icons` (`EnableAutoTray=0`) | yes | | | | | yes | yes | yes | yes | |
+| `boot_to_desktop` (8.1 `StartPage OpenAtLogon=0`; 8/8.1 `EdgeUi` corner + charms hint off) | yes | | | | | | | yes | | |
+| `lock_screen_off` (policy `NoLockScreen`) | yes | | | | | | | yes | yes | yes |
+| `visual_effects` (`MinAnimate`, `DragFullWindows`; 6.x+ also `UserPreferencesMask`, `VisualFXSetting=2`, taskbar/list-view animations, Aero Peek; not XP/2003: their first logon replaced the values in the user's profile, QEMU 2026-10-14) | performance | yes | yes | yes | yes | | yes | yes | yes | yes |
+| `font_smoothing` (`FontSmoothing=2`; XP/2003 ClearType `FontSmoothingType=2`; new users + logon screen) | yes | | | | yes | yes | | | | |
+| `mouse_accel_off` (`MouseSpeed`, `MouseThreshold1/2` = 0) | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `sticky_keys_off` (`StickyKeys Flags=506`) | yes | | | | yes | yes | yes | yes | yes | yes |
+| `hibernation=off` on XP/2003 (`powercfg.exe /hibernate off` at setup end) | off | | | | | yes | (tweak) | yes | yes | yes |
+| `power_profile` (6.x+ `powercfg -setactive SCHEME_MIN/BALANCED/MAX`; XP/2003 `PowerCfg CurrentPowerPolicy` 3 Always On / 0 Home/Office Desk / 5 Max Battery) | high_performance, balanced, power_saver | | | | | yes | yes | yes | yes | yes |
+| `no_sleep` (client: AC standby/hibernate timeouts 0 of the active plan) | yes | | | | | | yes | yes | yes | yes |
+| `last_access_off` (`NtfsDisableLastAccessUpdate=1`; Vista+ default) | yes | | | yes | yes | yes | | | | |
+| `long_paths` (`LongPathsEnabled=1`) | yes | | | | | | | | yes | yes |
+| `search_index_off` (client: `sc config WSearch start= disabled`) | yes | | | | | | yes | yes | yes | yes |
+| `remote_desktop` (`fDenyTSConnections=0`; XP/2003 port 3389 in the firewall's `GloballyOpenPorts`; 6.x+ `netsh advfirewall` rule `USOS-RDP`) | yes | | | | | yes | yes | yes | yes | yes |
+| `firewall_off` (XP/2003 `FirewallPolicy\*Profile EnableFirewall=0`; 6.x+ `netsh advfirewall set allprofiles state off`) | yes | | | | | yes | yes | yes | yes | yes |
+| `server_nags_off` (Server: `ShutdownReasonOn=0`, `DisableCAD=1`; 2003 also Manage Your Server policy) | yes | | | | | 2003 | Server | Server | Server | Server |
+| `ie_esc_off` (Server 2008+: IE ESC Active Setup components `IsInstalled=0`) | yes | | | | | | Server | Server | Server | Server |
+| `disable_wer` on XP/2003 (`PCHealth\ErrorReporting DoReport=0 ShowUI=0`) | yes | | | | | yes | yes | yes | yes | yes |
+| `privacy` adds CEIP off (Vista+), 8.1 advertising ID and web search off | yes | | | | | | yes | yes | yes | yes |
+| `security_center_off` (client: XP/Vista Security Center `*DisableNotify`; 7/8.x `HideSCAHealth`; 10/11 Security and Maintenance toasts) | yes | | | | | XP | yes | yes | yes | yes |
+| `defender_off` (client: policy `DisableAntiSpyware=1`; 10+ Tamper Protection ignores it, not offered) | yes | | | | | | yes | yes | | |
+| `smartscreen_off` (policy `EnableSmartScreen=0`, Explorer `SmartScreenEnabled=Off`) | yes | | | | | | | yes | yes | yes |
+| `device_encryption_off` (`BitLocker PreventDeviceEncryption=1`) | yes | | | | | | | | yes | yes |
+| `remove_apps` (client: provisioned Store apps, PowerShell `Remove-AppxProvisionedPackage` in specialize) | games, bloat | | | | | | | yes | yes | yes |
+| `first_run_off` (IE7+ policy `DisableFirstRunCustomize`; WMP `GroupPrivacyAcceptance`; Edge `HideFirstRunExperience`, `StartupBoostEnabled=0`; not XP/2003: IE6's per-user values were reset at the first logon) | yes | | | | | | yes | yes | yes | yes |
+| `onedrive_off` (client: 8.1 SkyDrive `DisableFileSync`; 10/11 `DisableFileSyncNGSC` + Default User `Run\OneDriveSetup` removed) | yes | | | | | | | 8.1 | yes | yes |
+| `user_script` (see below) | yes | | | | yes | yes | yes | yes | yes | yes |
+
+`remove_apps` vocabulary (USOS's own list, matched with `-match` on the
+package name, case-insensitive): `games` = Xbox*, GamingApp, Solitaire;
+`bloat` = games + Bing* (News, Weather, Search, ...), Zune (Groove, Movies),
+Getstarted (Tips), OfficeHub, MixedReality, 3D Viewer, Print 3D, MSPaint
+(Paint 3D on 10), People, Maps, Skype, Messaging, Clipchamp, Feedback Hub, Get
+Help, Wallet, Phone Link, Power Automate, To Do, Family, Cortana
+(549981C3F5F10), Copilot, Mail/Calendar, Teams, OneNote, Sticky Notes, Voice
+Recorder, Quick Assist, 8.1 Help+Tips and Reading List, Dev Home, Outlook.
+Kept: Store, Store purchase, App Installer, Calculator, Camera, Clock
+(Alarms), Notepad, Paint, Photos, Snipping Tool, Terminal, Security, media
+extensions, frameworks, Widgets, Edge.
+
+**User script hook** (`user_script=yes`): at the first sign-in after Setup,
+`Scripts\first-logon.reg` (imported with `regedit /s`) and then
+`Scripts\first-logon.cmd` (`call`) are run from every drive with the
+USOS_DATA layout (a `Systems` folder), if the stick is still plugged in.
+6.x+: `oobeSystem` Shell-Setup `FirstLogonCommands` (two
+`SynchronousCommand`s; elevated, a console window is visible); 2000/XP/2003:
+two `HKLM\...\RunOnce` values (`USOS1UserReg`, `USOS2UserScript`) written by
+usos-reg.exe at setup end, run at the first sign-in of any user. Not offered
+for 9x (no NTFS) and NT 4.0 (no USB storage). A drive letter without media
+(card reader) may show a "No disk" prompt on XP.
+
+Delivery changes: `autounattend.max_size` 16 -> 64 KiB (all options on: at
+most ~24 KiB; DATA answers were already accepted up to 1 MiB, the hidden
+runner's `--wrap` allocates file size + 64 KiB), `max_commands` 96; the
+usos-reg set has the `binary` type (reg.exe `REG_BINARY`, MSBATCH flag 1);
+NT5 `reg=` lines may hold `%` (the set is data), `run=` knows
+`powercfg.exe /hibernate off`. 6.x+ still uses `reg.exe` in specialize (no
+file channel was needed: the larger answer limit carries the commands), so
+usos-reg.exe stays NT 4.0/NT5. **Fixed**: `profile.write` (the editor's save)
+dropped the typed options and the workgroup before this change.
+
+**QEMU verification (2026-10-12)**, registry read offline after the install:
+
+- Windows 11 Pro (`tools/tests/check_profile_options_w11.py`): all HKLM,
+  `.DEFAULT` and Default-hive values present, all 33 specialize commands exit
+  0, auto logon, hibernation off, workgroup, This PC, End task, left taskbar,
+  no Task view / widgets, hidden + protected files and extensions visible. The
+  per-user `SearchboxTaskbarMode` was rewritten by 11 at the first logon (icon
+  -> box): 11 now also gets the `SearchOnTaskbarMode` policy (not yet re-run).
+  The VM applied the image from WinPE by hand (multi-core VMs hang on this
+  host, Setup refuses one core); specialize and oobeSystem ran as in Setup.
+- XP SP3 (MCE) and 2000 Pro SP4 through the real staging
+  (`tools/tests/run_nt5_profile_options_qemu.py`): every value, auto logon,
+  `net accounts`, `usos-reg.log` 0 failed. XP folds `ShowSuperHidden` into
+  `ShellState` at the first logon (effective). **Workgroup needs a network
+  adapter**: without one Setup ignores `JoinWorkgroup` (X470 I211 has no inbox
+  NT5 driver).
+- NT 4.0 Workstation and 98 SE (`tools/tests/run_profile_options_legacy_qemu.py`,
+  `w9x_creg.py`): all values PASS after two fixes (usos-reg.exe built for i586:
+  NT 4.0 faulted on an SSE `movaps`; the 9x CSMWrap staging overwrote the chosen
+  MSBATCH.INF with the default). NT 4.0: the Administrator's own NumLock value
+  is reset at logoff (new users and the logon screen keep it).
 
 ### Edition
 
@@ -174,6 +390,15 @@ stays. Not found (or the image list unreadable): nothing is written, Setup
 shows its edition list as before, and the summary shows a note ("Edition
 ... is not on this ISO: Setup asks for the edition"); found, the summary
 shows "Edition: <name> (image <n>)".
+
+Server default (2026-10-08, `root.matchEdition`): a Windows Server
+(2008 and later) with no `edition` and no key in the profile installs
+`ServerStandard` (Standard with the full GUI: Full Installation on
+2008 / 2008 R2, Desktop Experience on 2016+) when the ISO has it, so an
+unattended Server install does not stop on the edition list. Media
+without Standard (2012 R2 Foundation / Storage Server) keep Setup's choice,
+which their product key decides. The editor shows the empty value as
+"(Standard - default)" for Server systems.
 
 Matching, in this order:
 
@@ -240,6 +465,26 @@ give byte-identical `WINNT.SIF` and accounts script.
 
 ## Renderers
 
+- **MS-DOS / Windows 1.x-3.x** (`dos.zig`, 2026-10-24): `DOS.INI`
+  (`[dos]` `mode`, `country`, `codepage`, `cpi`, `keyb`, `keybfile`),
+  staged by `stageWin9x` as `\EFI\USOS\answer\DOS.INI` for every DOS-based
+  system (the profile is offered for `ms-dos` and `windows-1-01` ...
+  `windows-wfw-3-11`; the group `windows` includes them, `windows-9x` does
+  not). These systems have no Unattended folder: the UEFI answer screen
+  opens for them with "No answer", their profiles and "+ Add" only, for an
+  ISO and a floppy disk set (`answer_screen.entryFor`; before 2026-10-24
+  it was skipped for them, X470). Table: the MS-DOS 6.22 COUNTRY.TXT country list (Estonian,
+  Latvian, Lithuanian, Ukrainian: no country, nothing written; far east:
+  COUNTRY with 437 only). micro-Linux (`tools/dos_win3_menu.sh`
+  `dos_regional_apply`) writes `COUNTRY=` + `DISPLAY.SYS CON=(EGA,,1)` and
+  `MODE CON CODEPAGE PREPARE/SELECT` (+ `KEYB`) into the MS-DOS start files
+  (INSTALL.BAT appends REGCFG.SYS / REGAUTO.BAT) and into the Windows start
+  menus (a `[common]` block at the end of W3CONFIG / W1CONFIG, the AUTOEXEC
+  lines after `set TEMP=`). The Windows Setup stage itself runs without
+  them. No profile = US defaults, as before. MS-DOS itself has no Setup
+  pages in the USOS flow (SYS + PREPDOS), so `manual` means: nothing
+  written, and the W3PL.KEY answers of the Central European Windows 3.1 /
+  WfW 3.11 Setup pages are not used.
 - **NT5** (`nt5.zig`): the profile as the normalized settings of
   `tools/xp_user_settings.sh` plus `family` (`xp`, `2000`, `2003`),
   `locale`, `input_locale`, `language_group`. The staging loads it in
@@ -248,7 +493,12 @@ give byte-identical `WINNT.SIF` and accounts script.
   (`usos_xp_settings_sif`): 2000 gets `ProductID`, 2003
   `[LicenseFilePrintData] AutoMode=PerServer`, a chosen language
   `[RegionalSettings]`. Partition, PAE and driver keys stay the automatic
-  ones.
+  ones. Windows 2000 Server (`windows-2000-server`, its own key
+  `key.windows-2000-server`) renders the 2000 settings; the staging adds the
+  Server pages when the CD's ProductType is 1 (`w2k_stage.sh`
+  `usos_w2k_server_sif`: licensing Per Server 5, IIS off, one automatic
+  logon, Configure Your Server off;
+  [windows-2000-modern-2026-09-30.md](windows-2000-modern-2026-09-30.md) 9).
 - **6.x+** (`autounattend.zig`): one renderer, per version (Vista/7 schema:
   `NetworkLocation`, no online-account screens; 8+: `HideOnlineAccountScreens`;
   Server: `AdministratorPassword`) and per architecture
@@ -425,7 +675,10 @@ arch=x86
 key=yes
 ```
 
-Not wired: Legacy BIOS (no profile manager in the Core). Vista / Server
+Not wired: Legacy BIOS (no profile manager in the Core); Windows 95/98/Me
+take a profile through the UEFI BIOS mode page instead (rendered to
+`\EFI\USOS\answer\<98SE|98|ME|95>.INF`, read by the Core, removed at the next
+UEFI start). Vista / Server
 2008 take a profile or a DATA answer on UEFI with CSM (wimboot,
 `usos-unattend.xml` in the RAM disk, since 2026-09-28) and without CSM
 (CSMWrap, `\EFI\USOS\answer`): on both the installer merges it with its KMDF

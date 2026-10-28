@@ -1,0 +1,119 @@
+; usosnet9x.inf - USOS own Ethernet driver (usosnet.sys, NDIS 5.0 miniport)
+; for Windows 98 / 98 SE / Me. Intel igb family: I211 (X470 boards), I210,
+; 82576 (QEMU -device igb).
+; Copyright (C) 2026 Maksymilian and the USOS Authors
+; SPDX-License-Identifier: GPL-3.0-or-later
+; Diagnostics: the driver writes UsosnetStage, UsosnetError, ... into the
+; adapter key HKLM\System\CurrentControlSet\Services\Class\Net\00nn at
+; every start, runtime counters go to C:\WINDOWS\NDISLOG.TXT
+; (NdisWriteErrorLogEntry, tags USN1..USN4; tools/nt/usosnet/README.md).
+
+[Version]
+Signature="$CHICAGO$"
+Class=Net
+ClassGUID={4d36e972-e325-11ce-bfc1-08002be10318}
+Provider=%USOS%
+DriverVer=10/20/2026,0.5.0.0
+
+[Manufacturer]
+%Intel%=Intel
+
+[Intel]
+%I211.DeviceDesc%=USOSNETI211.ndi, PCI\VEN_8086&DEV_1539
+%I210.DeviceDesc%=USOSNETI210.ndi, PCI\VEN_8086&DEV_1533
+%I210FL.DeviceDesc%=USOSNETI210FL.ndi, PCI\VEN_8086&DEV_157B
+%82576.DeviceDesc%=USOSNET82576.ndi, PCI\VEN_8086&DEV_10C9
+
+[USOSNETI211.ndi]
+AddReg=USOSNETI211.id.reg, USOSNET.ndi.reg, USOSNET.params.reg
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNETI211.id.reg]
+HKR,Ndi,DeviceID,,"PCI\VEN_8086&DEV_1539"
+
+[USOSNETI210.ndi]
+AddReg=USOSNETI210.id.reg, USOSNET.ndi.reg, USOSNET.params.reg
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNETI210.id.reg]
+HKR,Ndi,DeviceID,,"PCI\VEN_8086&DEV_1533"
+
+[USOSNETI210FL.ndi]
+AddReg=USOSNETI210FL.id.reg, USOSNET.ndi.reg, USOSNET.params.reg
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNETI210FL.id.reg]
+HKR,Ndi,DeviceID,,"PCI\VEN_8086&DEV_157B"
+
+[USOSNET82576.ndi]
+AddReg=USOSNET82576.id.reg, USOSNET.ndi.reg, USOSNET.params.reg
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNET82576.id.reg]
+HKR,Ndi,DeviceID,,"PCI\VEN_8086&DEV_10C9"
+
+[USOSNET.ndi.reg]
+HKR,,DevLoader,,*ndis
+HKR,,DeviceVxDs,,usosnet.sys
+HKR,,EnumPropPages,,"netdi.dll,EnumPropPages"
+HKR,NDIS,LogDriverName,,"USOSNET"
+HKR,NDIS,MajorNdisVersion,1,05
+HKR,NDIS,MinorNdisVersion,1,00
+HKR,Ndi,HelpText,,%HelpText%
+HKR,Ndi\Interfaces,DefUpper,,"ndis3"
+HKR,Ndi\Interfaces,DefLower,,"ethernet"
+HKR,Ndi\Interfaces,UpperRange,,"ndis3"
+HKR,Ndi\Interfaces,LowerRange,,"ethernet"
+HKR,Ndi\Install,ndis3,,"USOSNET.ndis3"
+
+[USOSNET.ndis3]
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNET.params.reg]
+HKR,Ndi\params\PollMode,ParamDesc,,"Poll mode (no interrupt, diagnostics)"
+HKR,Ndi\params\PollMode,type,,enum
+HKR,Ndi\params\PollMode,default,,"0"
+HKR,Ndi\params\PollMode\enum,"0",,"Off"
+HKR,Ndi\params\PollMode\enum,"1",,"On"
+HKR,,PollMode,,"0"
+HKR,Ndi\params\SkipPhy,ParamDesc,,"Skip PHY setup (diagnostics)"
+HKR,Ndi\params\SkipPhy,type,,enum
+HKR,Ndi\params\SkipPhy,default,,"0"
+HKR,Ndi\params\SkipPhy\enum,"0",,"Off"
+HKR,Ndi\params\SkipPhy\enum,"1",,"On"
+HKR,,SkipPhy,,"0"
+HKR,Ndi\params\DebugPort,ParamDesc,,"Debug I/O port (decimal; 233 = E9h in QEMU; 0 = off)"
+HKR,Ndi\params\DebugPort,type,,dword
+HKR,Ndi\params\DebugPort,default,,"0"
+HKR,Ndi\params\DebugPort,min,,"0"
+HKR,Ndi\params\DebugPort,max,,"65535"
+HKR,,DebugPort,,"0"
+HKR,Ndi\params\NetworkAddress,ParamDesc,,"Network Address"
+HKR,Ndi\params\NetworkAddress,type,,edit
+HKR,Ndi\params\NetworkAddress,LimitText,,"12"
+HKR,Ndi\params\NetworkAddress,UpperCase,,"1"
+HKR,Ndi\params\NetworkAddress,optional,,"1"
+HKR,Ndi\params\NetworkAddress,default,,""
+
+[USOSNET.CopyFiles]
+usosnet.sys
+
+[DestinationDirs]
+DefaultDestDir=11
+USOSNET.CopyFiles=11
+
+[SourceDisksNames]
+1=%DiskName%,,0
+
+[SourceDisksFiles]
+usosnet.sys=1
+
+[Strings]
+USOS="Universal Service OS"
+Intel="Intel"
+DiskName="USOS network driver (usosnet)"
+HelpText="USOS own NDIS 5.0 driver for Intel I211 / I210 / 82576 Ethernet."
+I211.DeviceDesc="Intel(R) I211 Gigabit Network Connection (USOS usosnet)"
+I210.DeviceDesc="Intel(R) I210 Gigabit Network Connection (USOS usosnet)"
+I210FL.DeviceDesc="Intel(R) I210 Gigabit Network Connection, flashless (USOS usosnet)"
+82576.DeviceDesc="Intel(R) 82576 Gigabit Network Connection (USOS usosnet)"

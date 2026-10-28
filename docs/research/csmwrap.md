@@ -376,3 +376,781 @@ over three VM runs; staged by `release.go`, pinned in `xp_csmwrap_esp.sh`
 and in the DOS target ESP image. XP and Vista target-ESP boots with and
 without the stick: PASS in QEMU. The blinking-cursor patch mentioned in
 section 7 is still not done (it would be a later build).
+
+## 9. 3.1.2-usos4: the disk CSMWrap was loaded from is 0x80 (2026-10-11, branch `feature/csmwrap-boot-disk`)
+
+usos3 plus patch 0005. CSMWrap's BBS table names controllers only, so every
+disk on the controller CSMWrap was loaded from got priority 0 and SeaBIOS
+broke the tie by port: a bootable disk on a lower port of the same SATA
+controller became 0x80 (design doc csmwrap-integration 13.4). Now CSMWrap
+finds the raw disk whose device path prefixes the loaded image's path and
+tags its BBS entry (IBV1 = "USOS", IBV2 = FNV-1a of its first 512 bytes);
+SeaBIOS reads sector 0 of each hard disk before mapping drives and moves the
+single match in front of the first hard disk, the other disks keep their
+order (0x81, ...). No tag, no match or several matches (cloned disks): the
+order stays as in usos3. Legacy IDE (16-bit-only `DTYPE_ATA`) drives cannot
+be read at that point and keep the usos3 order.
+
+`csmwrapx64.efi` SHA-256
+`e566e5a91c7b880105afbb435e3d8fbecfca748cbf28101ff14d686a47f8e807`, built
+twice in one VM run (identical). Alpine v3.24 dropped python3 3.14.7-r1, the
+pin is now 3.14.8-r0; the unpatched rebuild still gives the
+`upstream_rebuild` hash, so the toolchain output did not change.
+
+Tests: `tools/tests/legacy_bios/run_csmwrap_boot_disk_qemu.py` (OVMF without
+CSM, two raw disks whose MBR code reports which disk is 0x80 and which 0x81
+on the debug console): decoy on port 0 / target on port 1 of one AHCI
+controller, the reverse, decoy on its own controller, target on qemu-xhci
+usb-storage: all `USOS-TARGET USOS-DECOY` with usos4; the usos3 control
+boots the decoy. XP SP3 PL (`run_csmwrap_xp_ovmf.py --decoy`) and 32-bit
+Windows 10 (`qemu_native.py`, `USOS_NATIVE_DECOY_SAME_CONTROLLER=1`) in
+csmwrap-integration 13.4.
+
+## 10. 3.1.2-usos5: ACPI 1.0 view for Windows 2000/XP (2026-10-13, branch `feature/csmwrap-acpi10`)
+
+Patch 0006 (`src/usos_acpi10.c`, own code from the ACPI specification):
+CSMWrap's RSDP copy gets an RSDT built from the XSDT when RsdtAddress is 0 or
+the RSDT is invalid, and a FADT copy with the 32-bit fields filled from the
+X_ fields when they are 0; with `acpi_legacy_fadt = true` in csmwrap.ini
+(written by `tools/xp_csmwrap_esp.sh` only for Windows 2000 with ACPI) the
+RSDT's FADT is cut to revision 1 / 116 bytes for the 2000 ACPI HALs. Binary
+`1207f8cc287372b32cc3ddce2ea4cc67c022a8d7844f7651bff476ca3fb1598b` (with the legacy AML filter: QWord windows above 4 GiB cleared in the DSDT/SSDT copies for 2000), built
+twice identical in the pinned Alpine VM (xxd pin moved to 9.2.1178-r0; the
+unpatched build still matches upstream_rebuild). Details and the q35 A/B:
+docs/windows-2000-acpi-x470-2026-10-12.md, last section.
+
+## 11. 3.1.2-usos6: ACPI mode before the legacy boot, Windows 2000 diagnostic (2026-10-14, branch `feature/w2k-acpi-csmen`)
+
+Patch 0007 (`src/usos_acpien.c`, own code from the ACPI specification and
+the PC CMOS RTC layout; host unit test
+`tools/tests/csmwrap/test_csmwrap_acpien.py`): only with
+`acpi_legacy_fadt = true` (the Windows 2000 ACPI flow), CSMWrap reads
+SMI_CMD / ACPI_ENABLE / PM1a_CNT_BLK / PM_TMR_BLK from the RSDT's FADT
+before ExitBootServices and, after SeaBIOS's Legacy16PrepareToBoot and right
+before Legacy16Boot, switches the machine to ACPI mode (SCI_EN polled for at
+most 3 s on the PM timer) with RTC A/B read before and after. Result: 8
+bytes at physical 0x4F4 (BDA inter-application area) for usosvid 1.2, and a
+`USOS ACPIEN:` serial line. Every other flow runs the usos5 path. Why and
+the reading table: docs/windows-2000-acpi-x470-2026-10-12.md, section
+"Step A". Binary
+`804d5f870c8958067ced48a23b461a69e98da81a645e50750b99d8b7feb4f342`, built
+twice identical in the pinned Alpine VM (same lock as usos5, BUILD_VERSION
+3.1.2-usos6; the unpatched build still matches upstream_rebuild). The
+vendor folder is `tools/vendor/csmwrap/3.1.2-usos6` (release.go, the DOS
+ESP builder, the XP ESP script pin and the tests moved to it; 3.1.2-usos5
+stays as the previous release binary).
+
+## 12. 3.1.2-usos7: APM power-off from every APM interface (2026-10-15, branch `feature/apm-poweroff`)
+
+Why: Windows 98 SE / ME on the X470 end at "Można teraz bezpiecznie wyłączyć
+komputer" (docs/research/win9x-acpi-2026-10-15.md). Two holes in CSMWrap
+3.1.2's APM 5307h power-off: from the 16-bit and 32-bit protected-mode APM
+interfaces (Windows 9x VPOWERD uses the 32-bit one) `apm_shutdown()` called
+`bios_proxy_reset()`, whose mailbox scan loads real-mode segment values
+into `%es` = #GP in protected mode; and the fallback wrote SLP_TYP 0, which
+is S5 on QEMU only (X470 `_S5` = 5, the right PM1a_CNT write is 0x3400).
+SeaBIOS `dprintf` had no output at all in this build (no DEBUG_SERIAL), so
+the "UEFI reset" lines were never visible.
+
+Patch 0008 (own code from the APM 1.2 and ACPI specifications; host unit
+test `tools/tests/csmwrap/test_csmwrap_apmoff.py`, QEMU test
+`tools/tests/csmwrap/run_csmwrap_apmoff_qemu.py`):
+
+1. UEFI `ResetSystem(EfiResetShutdown)` on the helper core through the
+   existing mailbox (`usos_proxy_reset_timed`, 2 s timeout): from INT 15h
+   (real / V86 mode; `%es` = F000h) and from the 32-bit PM interface
+   (through `%gs`, the APM data segment based at the F-segment). The
+   helper-core loop is unchanged. The 16-bit PM interface skips this step.
+2. Direct ACPI S5: SLP_TYPa/b from `Name(_S5, Package(){...})` in the DSDT
+   (else an SSDT), found by a small AML byte parser (`fw/usos_s5.h`), into
+   PM1a_CNT and PM1b_CNT, SLP_EN last (X_ GAS fallbacks for the FADT ports).
+3. Still on after 2 s with SCI_EN = 0: FADT ACPI_ENABLE to SMI_CMD, S5 again.
+4. Still on: the APM call returns AH=60h instead of halting (9x then shows
+   its own "safe to turn off" text, the USOS menu its message).
+
+Known limitation: `_PTS(5)` is not run (no AML interpreter). Boards whose S5
+needs `_PTS` work only through step 1 (the firmware's own ResetSystem).
+
+Diagnostics: "USOS APMOFF:" lines (pm1a/pm1b/pm_tmr/`_S5` at boot, the path
+at power-off) reach the serial port with csmwrap.ini `serial = true`:
+CSMWrap sets CsmwrapFlags bit 0x02 and the new CsmwrapSerialPort field, and
+SeaBIOS's debug output (dprintf level 1) goes to that port; with serial off
+nothing changes. For INT 15h callers 4 bytes at BDA 4FCh-4FFh: `'P'`,
+step<<4 | path (path 1 INT 15h, 2 PM16, 3 PM32; step 1 helper asked, 2 S5
+written, 3 S5 after ACPI enable, 4 gave up), SLP_TYPa | SLP_TYPb<<4, flags
+(bit0 `_S5` found, bit1 PM1a, bit2 PM1b, bit3 helper timeout, bit4 helper
+reset unavailable, bit5 ACPI enable tried). The PM paths cannot write the
+BDA (no flat data segment) and log to serial only.
+
+QEMU (OVMF, TCG, own test MBR, pc and q35): real-mode INT 15h -> `path=uefi
+from=1`, 32-bit PM with paging -> `path=uefi from=3`, 16-bit PM -> `path=s5
+from=2 typ=0/0`: all six runs end with a guest SHUTDOWN. Control with usos6:
+both PM paths reset the guest (the #GP). The X470 values (PM1a_CNT 0x804,
+`_S5` 5, no PM1b) are covered by the host test on the X470 DSDT dump only.
+
+F-segment space: with this patch SeaBIOS's 16-bit + 32-bit segmented code,
+F-segment variables and 32-bit flat runtime code no longer fit in the
+F-segment with room left, so `scripts/layoutrom.py` falls back to its
+minimum allocation zone (BUILD_MIN_BIOSTABLE). Upstream's 2048 bytes did not
+hold the SMBIOS and MP table copies plus one block per AHCI port: the first
+usos7 build lost AHCI port 1 in `run_csmwrap_boot_disk_qemu.py` ("Unable to
+allocate resource at ahci_port_realloc"). Patch 0008 raises the minimum to
+6144 bytes (upstream 3.1.2 had 4320 free); 32-bit flat code moves below the
+F-segment, ROM use 96.0 % of 128 KiB. Boot-disk regression: all six layouts
+PASS; about 4 KiB of F-segment allocation space stays free in QEMU.
+
+Binary `bd91e53aeab1e971362509cfdfbf61fa7d72dba99b66b269d202c52d0da1041e`,
+built twice identical in the pinned Alpine VM (same lock as usos6,
+BUILD_VERSION 3.1.2-usos7; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos7`
+(release.go, the DOS ESP builder, the XP ESP script pin and the tests moved
+to it; 3.1.2-usos6 stays as the previous binary). The next patch 0009 (APM
+power-off order and breadcrumbs, section 13) goes on top of usos7.
+
+## 13. 3.1.2-usos8: APM power-off ACPI mode first, CMOS breadcrumbs (2026-10-15)
+
+Why: with usos7, Windows 98 SE on the X470 stays forever on its "shutting
+down" logo; BOOTLOG.TXT shows 98 got through `EndTerminate = KERNEL`, so the
+hang is inside the 5307h path (docs/research/win9x-acpi-2026-10-15.md, last
+section). The board has no serial port, so nothing recorded which step hung.
+
+Patch 0009 (own code from the APM 1.2 and ACPI specifications and the
+MC146818 register map; reviewed from a draft that was never compiled):
+
+1. Order on every interface: ACPI mode (SCI_EN = 0 -> ACPI_ENABLE to
+   SMI_CMD, at most 1 s), PM1a_EVT/GPE0 status cleared and enables 0
+   (FADT PM1a_EVT_BLK/GPE0_BLK with X_ fallbacks), S5 + 2 s wait, then
+   (INT 15h and 32-bit PM only) the helper-core ResetSystem, then AH=60h.
+2. Waits bounded by the PM timer and by a spin count (4000 port reads per
+   millisecond asked).
+3. CMOS breadcrumbs in the RTC alarm bytes 01h/03h/05h, written as valid
+   alarm times (seconds 40 + step, minutes path * 15 + call count, hours
+   1 + function bitmap) in BCD or binary per Status B, because edk2
+   PcRtcInit resets invalid alarm bytes at every boot; armed (40/0/1) from
+   handle_csm_0002. Own port I/O with interrupts off around each
+   index/data pair: hw/rtc.c is not linked into the 32-bit segmented code
+   (SRC32SEG) the 32-bit PM entry runs, so the draft's rtc_read/rtc_write
+   calls would not link there. Port 80h gets A0h | step.
+4. "USOS APMOFF: path=s5 from=N" is now logged for every path;
+   "path=uefi" only when S5 left the machine on.
+
+Review fixes against the draft: own CMOS I/O instead of hw/rtc.c (link
+error in 32seg, and no interrupt guard), valid alarm encoding instead of
+A0h-AFh (wiped by edk2 firmware), BDA flags kept (ACPI enable tried, helper
+timeout/unavailable), the 0008 header comment updated to the new order,
+dprintf path lines restored for the QEMU test.
+
+Layout (build log): F-segment 16-bit 37344 + 32-bit segmented 4118 +
+F-segment variables 3328 = 44790 bytes, leaving 20746 bytes, so the forced
+allocation zone keeps the full 6144-byte minimum from patch 0008; ROM 127040
+of 131072 bytes used (96.9 %, usos7 96.0 %).
+
+Binary `65df046fc84deb111cb0f867c50dcb7e1971ee3a46890ea353bd0c6174d89a59`,
+built twice identical in the pinned Alpine VM (same lock as usos7,
+BUILD_VERSION 3.1.2-usos8; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos8`;
+release.go, the DOS ESP builder, the XP ESP script pin, third-party.json and
+the tests moved to it; 3.1.2-usos7 stays as the previous binary.
+
+Tests: test_csmwrap_apmoff.py (0008 parser + 0009 wiring: order, bounded
+waits, valid alarm encoding, interrupt guard); run_csmwrap_apmoff_qemu.py
+pc/q35 x real/pm32/pm16 all power off via `path=s5`;
+run_csmwrap_boot_disk_qemu.py all six layouts; apm_breadcrumbs.zig unit
+tests; `--cmos-check` (build B261015-141111-C6FB249D): pc/q35 x
+real/pm32/pm16, the USOS menu reads the record after the power-off and
+writes it to apm-off.txt (record found in the ESP image), all six PASS.
+Hardware: not yet run on the X470.
+
+## 14. 3.1.2-usos9: NVMe INT 13h after an OS stopped the controller (2026-10-15)
+
+Windows 98 SE on the X470 runs from the Micron NVMe: CSMWrap's SeaBIOS
+INT 13h until the VMM starts, then the USOS 9x miniport usosnvme.mpd. The
+APM power-off of 98 lives in real mode: after the VMM returns, WIN.COM
+re-executes itself from disk as `WIN.COM /z`, which shows LOGOS.SYS and then
+calls INT 15h 5300h/5301h/.../5307h. usosnvme resets the controller at its
+start (CC.EN = 0, its own AQA/ASQ/ACQ, usosnvme.c init steps 1-3) and on the
+exit to real mode flushes, sets CC.SHN and disables it (`HwAdapterState`).
+SeaBIOS's admin queue and I/O queue pair 1 were therefore gone, every
+INT 13h read timed out (5 s each), the exec failed and the parent WIN.COM
+printed "It's now safe to turn off your computer" as plain text (X470 with
+usos8: exactly that screen, no LOGOS.SYS; CMOS record: 5301h/5307h never
+called).
+
+Patch 0010 (own code from the NVMe 1.4 base specification; the earlier
+uncompiled draft had a use-after-free of `ctrl->pci`, which is POST-only
+temporary memory): `nvme_runtime_rearm()` runs before every read/write.
+
+| Controller state | Action |
+|---|---|
+| enabled, ready, no SHN requested/reported, not fatal, ASQ/ACQ = SeaBIOS's pages | used as it is (normal case; one config read + register reads) |
+| enabled and ready with another admin queue | a live OS driver owns it: refused at once, nothing written (before: 5 s timeout, and our doorbells could make the controller fetch stale OS slots) |
+| anything else (disabled, not ready, CC.SHN, SHST, CFS) | memory + bus master on, CC = 0, wait RDY 0, admin + I/O queue memory from POST cleared, head/tail/phase and doorbells 0-3 reset, AQA/ASQ/ACQ, CC.EN, wait RDY 1, CREATE I/O CQ 1, CREATE I/O SQ 1 on the same pages; `USOS NVME: re-arm` / `re-armed` on serial |
+
+BAR 0 is read again from PCI config space (an OS may move it; a 64-bit BAR
+above 4 GiB is refused). The BDF is kept in `struct nvme_ctrl`. No runtime
+allocation. After a re-arm every write carries FUA, because SeaBIOS never
+sends FLUSH and an APM power-off follows; the OS driver flushed and shut the
+controller down before it handed it back.
+
+Why not in usosnvme.mpd only: the driver replaces SeaBIOS's admin queue at
+start, and SeaBIOS's I/O queue addresses, tails, heads and phases live in
+SeaBIOS's own memory, so the driver cannot hand the original queues back.
+Keeping the controller enabled at exit would leave the driver's admin queue
+in place, which the new check refuses anyway. usosnvme stays unchanged (its
+flush + CC.SHN is the clean handoff for data on the medium).
+
+Layout: 16-bit and 32-bit segmented code unchanged (patch 0010 is 32-bit
+flat only), so the F-segment allocation zone keeps 20746 bytes free above
+the 6144-byte minimum; 32-bit flat 29066 bytes; ROM 127808 of 131072 bytes
+(97.5 %, usos8 96.9 %).
+
+Binary `07afed185535294065276d02e7ca3c18a04b3a0ca7e8cc3bce38333faafa56b8`,
+built twice identical in the pinned Alpine VM (same lock and toolchain as
+usos8, BUILD_VERSION 3.1.2-usos9; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos9`; the
+pins moved as for usos8; 3.1.2-usos8 stays as the previous binary.
+
+Tests: test_csmwrap_nvme_rearm.py (patch wiring, manifest and pins);
+run_csmwrap_nvme_rearm_qemu.py: OVMF + CSMWrap from QEMU NVMe, a test MBR
+replays usosnvme's register sequence (own admin queue -> INT 13h refused;
+CC.SHN + CC.EN = 0 -> INT 13h read works again, FUA write of LBA 1 to LBA 4
+reaches the image, real-mode APM power-off), pc and q35 PASS; usos8 control:
+the read after the shutdown fails (the X470 symptom). Regression with
+usos9: run_csmwrap_apmoff_qemu.py pc/q35 x real/pm32/pm16 all PASS
+(`path=s5`), run_csmwrap_boot_disk_qemu.py all six layouts PASS,
+run_nvme_freedos_probe.py (FreeDOS from NVMe, write + read back) PASS,
+test_csmwrap_acpi10/acpien/apmoff PASS. Windows 98 itself
+cannot run this path in QEMU (its VMM exit hangs under CSMWrap there,
+docs/research/win9x-acpi-2026-10-15.md). Hardware: not yet run on the X470.
+
+## 15. 3.1.2-usos10: read-only Tick watcher on the helper core, Windows 2000 ACPI diagnostic (2026-10-15)
+
+Windows 2000 SP4 with the ACPI HAL on the X470 stops after kernel phase 1;
+step A (patch 0007) ruled out an SMI rewriting RTC A/B, and usosvid's
+`hb t=--------` cannot tell a missing clock interrupt from starved DPCs.
+Patch 0011 (design and code by Codex, its patch 0008 on usos6; reviewed and
+applied unchanged on top of 0001-0010) lets CSMWrap's hidden helper core
+read KeTickCount once a second, independently of Windows.
+
+Only with `csmwrap.ini acpi_legacy_fadt = true` (the 2000 ACPI flow):
+
+- EFI: ports from the validated RSDT FADT (PM1a_EVT/CNT, PM_TMR, GPE0; GAS
+  System I/O fallback), TSC calibrated on the PM timer (~100 ms, bounded),
+  one EfiReservedMemoryType page below 4 GiB. After `build_e820_map` the page
+  must be wholly E820 type 2 (`usw_e820_reserved`), else the watcher stays
+  off. The address reaches the helper through a private trampoline dword
+  (EDX; the CSMPPrxy ABI is unchanged) and BDA 0x4FC-0x4FF right before
+  Legacy16Boot through patch 0007's page-0 store (only exactly 0x4FC/4).
+  Patch 0008's APM power-off record uses 0x4FC-0x4FF only during an INT 15h
+  power-off, which the 2000 ACPI HAL never calls; usosvid reads 0x4FC once
+  at VidInitialize and validates the page magic.
+- Helper loop (`romlayout.S`): a page address in ESI (> 1) selects watcher
+  mode: `request_pending` is still checked first on every iteration, then
+  `usos_watch_tick` (PAUSE + RDTSC deadline instead of MWAIT); proxy calls
+  record their start and a late flag. A proxied call that never returns stops
+  the watcher too.
+- Sample: Tick and KUSER_SHARED_DATA InterruptTime (physical addresses
+  published by usosvid 1.3), PM1_STS/EN/CNT (16-bit), GPE0 STS/EN (bytewise),
+  PIC IMRs from the data ports; stored in the helper's page range
+  0x100-0x1FF and as 80 characters on VGA text row 24. Reads only: no OUT, no
+  W1C, no SMI_CMD, no CMOS, no IOREGSEL/IOWIN, no LAPIC/IPI.
+- Off: trampoline argument 0, no calibration, page, BDA write or sample; the
+  loop is the usos9 one (code layout differs, function checked by the
+  regression runs below).
+
+Layout: 16bit 37408 (+64) + 32bit segmented 4118 + f-segment vars 3328 =
+44854 bytes, 20682 bytes for the allocation zone (6144 minimum kept);
+32-bit flat 31722 bytes (+2656); ROM 130528 of 131072 bytes (99.6 %): only
+544 bytes are left, so the next SeaBIOS-side addition needs room first (for
+example dropping the watcher once the 2000 ACPI diagnosis is done).
+
+Binary `95a85360a10ff5e657f2636f9eedb3a08dfc02d019f8375558e884692b160d63`,
+built twice identical in one pinned Alpine VM run (same lock and toolchain as
+usos9, BUILD_VERSION 3.1.2-usos10; the unpatched build still matches
+upstream_rebuild). Pins moved to 3.1.2-usos10 as for usos9.
+
+Tests: test_csmwrap_watcher.py (Codex's 15 host cases on usos_watcher.c
+from the patch, UBSan; gate, read-only and BDA-range checks, pins);
+test_csmwrap_acpi10/acpien/apmoff/nvme_rearm PASS. QEMU (not hardware):
+run_csmwrap_apmoff_qemu.py pc/q35 x real/pm32/pm16 PASS,
+run_csmwrap_nvme_rearm_qemu.py pc/q35 PASS, run_csmwrap_boot_disk_qemu.py
+six layouts PASS; 2000 Pro SP4 ACPI on q35 reaches logon with Tick growing
+on the page (docs/windows-2000-acpi-x470-2026-10-12.md). X470 not tested.
+
+## 16. 3.1.2-usos11: HPET and AMD GPIO hidden from Windows 2000, watcher dropped (2026-10-17)
+
+The X470 Windows 2000 ACPI hang is a page fault in the 2000 SP4 acpi.sys
+early boot IRQ arbitration for devices it has no driver for: the HPET
+(PNP0103) and, once that was hidden, the AMD GPIO controller `\_SB.GPIO`
+(AMDI0030, IRQ 7). Codex's diagnostic firmware-13 hid both and the X470
+reached the 2000 desktop (docs/windows-2000-acpi-x470-2026-10-12.md, section
+"2026-10-17").
+
+Series: 0001-0010 unchanged from usos10 + **0012**
+(`0012-w2k-hide-hpet-amd-gpio.patch`, own code from the ACPI 6.5 AML
+grammar). 0011 (the read-only tick watcher, diagnostic) is no longer in the
+series; its file stays in `3.1.2-usos10/patches`. Codex's NMI helper,
+capsule staging, `w2k_nmi_snapshot` / `w2k_acpi_profile` options and Intel
+GPIO rules are not part of usos11.
+
+Patch 0012, only with `csmwrap.ini acpi_legacy_fadt = true`, only in the
+private DSDT/SSDT copies of patch 0006 (RSDT view): a flat Device (NameOp/
+MethodOp terms only) with exactly one `_HID`, at most one `_CID` and exactly
+one `_STA` whose `_HID` or a `_CID` entry is PNP0103, AMDI0030 or AMD0030
+(string, EISA ID integer, `_CID` Package) gets a `_STA` that returns 0, in
+place (Name -> Zero, method body -> Return (Zero) + Noop). Dry run on the
+firmware table first (valid checksum only; a malformed PkgLength makes the
+table count 0), the copy must match the dry run; firmware tables and XSDT
+unchanged; `USOS W2KHIDE` log line, flags 0x200/0x400. On the X470 DSDT the
+result is byte-identical to firmware-13's table (only the two `_STA` bodies
+and the checksum change).
+
+Layout (SeaBIOS identical to usos9 apart from the version string; 0012 is
+EFI-side code): 16bit 37344 + 32bit segmented 4118 + f-segment vars 3328 =
+44790 bytes, **20746 bytes** for the allocation zone (6144 minimum kept);
+32-bit flat 29066; **ROM 127808 of 131072 bytes (97.5 %, 3264 free)**;
+CONFIG_SDCARD on.
+
+Binary `94a93de4b40614bc2c75079e83cfbf23c9629a58016bd98ee0fa446d71872cc8`,
+built twice identical in one pinned Alpine VM run; the unpatched build
+still matches upstream_rebuild `62d617fc...`. xxd 9.2.1178-r0 was superseded
+on the v3.24 branch; pin moved to 9.2.1202-r0 (libexpat in apk-installed.txt
+also moved, 2.8.5 -> 2.9.0; neither changes the upstream binary). Pins moved
+to 3.1.2-usos11 as for usos10.
+
+Tests: test_csmwrap_w2khide.py (new: filter unit cases, truncation/
+corruption fuzz, patched usos_acpi10.c against the full 0006 harness and an
+end-to-end fixup harness, series and pins), test_csmwrap_acpi10/acpien/
+apmoff/nvme_rearm PASS, test_csmwrap_watcher.py now checks the 0011 file in
+3.1.2-usos10 only. QEMU (not hardware): run_csmwrap_apmoff_qemu.py pc/q35 x
+real/pm32/pm16 PASS, run_csmwrap_nvme_rearm_qemu.py pc/q35 PASS,
+run_csmwrap_boot_disk_qemu.py six layouts PASS, 2000 Pro SP4 ACPI on q35
+(installed target, legacy FADT, 8 min) reaches the logon screen, no bugcheck; nothing hidden there (QEMU's HPET has an OperationRegion, not a flat device). X470 with usos11: not run.
+
+Provenance: the device-hiding rule comes from Codex's diagnosis, which used
+the user-supplied NT5 material as a behaviour map (not clean-room); the
+patch 0012 code is ours, from the ACPI specification, without Microsoft code.
+
+## 17. 3.1.2-usos11-int13x: only the boot disk gets a BIOS number (experimental, 2026-10-18)
+
+Patch 0014 (own code), on top of 3.1.2-usos11. When csmwrap.ini has
+`int13_boot_disk_only = true`, CSMWrap tags its boot disk with IBV1 "USOX" (it
+uses the same IBV2 hash as patch 0005). SeaBIOS (`usos_boot_disk_first`) moves the
+one matching disk to 0x80. Then it removes every other `IPL_TYPE_HARDDISK`
+entry before `bcv_prepboot` maps the drives. With no match or with several
+matches, nothing is removed. Without the key, the binary behaves the same as usos11.
+
+Purpose: on the X470, Windows Me on NVMe stops with "cannot find KRNL386.EXE" when a USB stick is
+plugged in. With this key, INT 13h shows exactly one hard disk again, which is the configuration that works.
+Details, the 9x IOS stamp/checksum matching and the X470 kit are in docs/nvme-9x-2026-10-14.md
+("A second BIOS disk"). Binary
+`e0ec207b444962c555b5dc65ccea99938673dca576488166bdc7cd11c8a054be` (the usos1 and repeat
+builds are identical). It is not in the flow and not pinned in xp_csmwrap_esp.sh.
+
+QEMU: `run_csmwrap_boot_disk_qemu.py --only` PASSES on nvme-usb, same-port0, usb-target and
+nvme-target (`USOS-TARGET NO-DRIVE-81`). The same runs without `--only` keep the usos11 order.
+The new layout `nvme-usb` (NVMe target, USB decoy) also PASSES with usos11.
+
+## 18. 3.1.2-usos12: PCI INTx routed to 8259 IRQs for Windows 9x (2026-10-18)
+
+X470, Windows Me on the Micron (CSM off): the USOS usosnet I211 driver installs, but Device
+Manager shows Code 29 ("the BIOS did not assign an IRQ"). Every other PCI device with an
+interrupt pin shows the same code. Cause: the firmware leaves PIC-mode routing empty (Linux on the
+same board: LNKA..LNKH "configured for IRQ 0", FCH PCI_INTR index 0..7 = 0). Interrupt Line holds
+no 8259 IRQ. Windows 9x without ACPI has no IRQ steering miniport for the AMD FCH router (1022:790E),
+so it can only use what the BIOS assigned. CSMWrap's own `pir.c` `$PIR` also had no slots for
+buses without their own `_PRT`. On the X470 that is everything behind the Promontory switch (I211
+on bus 4, Wi-Fi, NVMe). Its secondary-bus lookup also reads nested bridges on the root bus number.
+
+Patch 0015 (own code, `src/usos_pciirq.c` + `src/usos_pciirq_core.inc`), only with csmwrap.ini
+`pci_irq_routing = true`. The 9x flow alone writes it: `w9x_csmwrap_target.sh` →
+`USOS_PCI_IRQ_ROUTING=on` → `xp_csmwrap_esp.sh`. Before `pir_init()` (boot services still up),
+CSMWrap:
+
+- walks every PCI bus from the PNP0A08/PNP0A03 root bridges (`_BBN`), through bridges by secondary
+  bus number and the ACPI child with the matching `_ADR`;
+- resolves each pin through the PIC-mode `_PRT`. uACPI never calls `_PIC`, so `PICM` = 0 and the
+  link packages are returned. Buses without a `_PRT` use the bridge swizzle (pin + device) mod 4;
+- for each used link, keeps a valid `_CRS` IRQ, or sets one with `_SRS`: the `_PRS` template is
+  reduced to one IRQ, 11/10/5/9 first, least loaded, busiest links first, and the result is
+  checked with `_CRS`. If that fails, the link's `_DIS` is called and its functions stay unrouted;
+- writes Interrupt Line and sets ELCR level bits. IRQ 0/1/2/8/13 are never used;
+- has `pir.c` build `$PIR` from that routing: one slot per bus/device with a pin, link 0x80 + n,
+  bitmap = the one IRQ.
+
+APIC-mode routing (a separate FCH register bank), the MADT, the MP table and the ACPI tables are
+unchanged. 3.1.2-usos12 = usos11 (0001-0010, 0012) + 0014 + 0015. It is the new release pin. The
+SeaBIOS side is unchanged from usos11-int13x: ROM 127936/131072, F-segment zone 20746 B. Binary
+`35e4e37dc504aecf811277ec3243b303708a49443b4f35bc1789c2b015d2c4eb`, the same in two VM runs; the
+unpatched build still matches `upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_pciirq.py`: core unit cases on the X470 tree, wiring, pins and the 9x-only gate.
+- `--e2e`: the real glue + uACPI on the host against the X470 DSDT/FADT dump (not in the repo),
+  with a simulated PCI tree and FCH ports. It found that the firmware's `LNKE._SRS` is broken:
+  `FindSetRightBit(PIRE)` instead of its argument, so it stores 0xFF. `_DIS` now handles that
+  case. The result: I211 → LNKB → IRQ 10, NVMe/Wi-Fi → LNKA → IRQ 11.
+- `run_csmwrap_pciirq_qemu.py`: pc + pci-bridge and q35 + root port PASS (B10Eh, Interrupt Line,
+  ELCR). Without the key, the output is identical to usos11-int13x.
+- boot-disk layouts (also `--only`) and apmoff PASS with usos12.
+
+X470 with usos12: not tried. The in-place kit is `me-irq-fix`. The 9x side (whether PCI.VXD takes
+the BIOS IRQs as expected with no miniport) is checked only on the hardware.
+
+## 19. 3.1.2-usos13: USB mouse wheel (0016) and SeaBIOS romfile-only options off (0017) (2026-10-18)
+
+3.1.2-usos13 = 3.1.2-usos12 (0001-0010, 0012, 0014, 0015, byte for byte) + 0016 + 0017. It is the
+new release pin (xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+**0016 USB mouse wheel** (own code: HID 1.11 report descriptors, IBM PS/2 BIOS INT 15h C2xxh, the public
+IntelliMouse knock). SeaBIOS served a USB mouse to INT 15h C2xxh in the HID boot protocol only (3 bytes, no
+wheel). Now `usb_mouse_setup` reads the interface's report descriptor and walks it (buttons 1-3, relative
+X/Y and wheel of the report that has X, report IDs, fields up to 16 bits). With a wheel it sets the report
+protocol and decodes that layout; otherwise the boot protocol as before. The knock (sample rates 200, 100,
+80) gives device ID 3 when a wheel mouse is present; C204h returns the ID; C205h takes package sizes 1-7.
+Consumers: USOSMOUS.DRV (98/98 SE/Me WM_MOUSEWHEEL, commit dfa24a1) and VBADOS VBMOUSE (DOS INT 33h).
+
+Review of the draft (changes made for usos13):
+
+- Composite devices: SeaBIOS configures only the first boot HID interface of a device (usb.c), and
+  SET_PROTOCOL is per interface, so a keyboard interface of the same device stays as it was; the keyboard
+  code path is byte-identical. Packets of other report IDs on the mouse interface (consumer, keyboard-macro
+  reports of gaming mice) are dropped by the ID filter. New: the report protocol is used only when **every**
+  input report of the interface fits in one interrupt packet. A longer vendor report would arrive split, and
+  a continuation packet could start with the mouse report ID and be taken as motion. Such mice stay in the
+  boot protocol.
+- New: one Push level is supported (Push/Pop around feature collections). Nested Push or Pop without Push
+  still keeps the boot protocol.
+- New: the report-descriptor buffer is zeroed before GET_DESCRIPTOR, so a short answer parses as empty
+  items, not stale memory.
+- Kept: the boot-protocol fallback for no wheel, absolute X/Y, long items, descriptors over 1024 bytes,
+  fields over 16 bits, any control-transfer error; values clamped to +-127; HID wheel up (positive) becomes
+  the IntelliMouse negative.
+- Behaviour visible to non-wheel USB mice: C204h answers 00h (standard PS/2 mouse) instead of 0AAh (the BAT
+  code, an upstream bug), and C205h accepts 1-7 as the IBM BIOS does (C205h used to accept 3 only). With 3
+  and no knock, the packets and the handler's Z word (0) are unchanged. i8042 (ps2port.c) is unchanged.
+- Upstream limits that stay: a device whose first boot HID interface is a keyboard gets no BIOS mouse
+  (wireless combo receivers); mice with wMaxPacketSize over 16 are refused.
+
+**0017 SeaBIOS romfile-only options off.** A CSM build has no romfile source: fw_cfg needs
+CONFIG_QEMU_HARDWARE (off for CSM), CBFS and multiboot are coreboot-only; csm.c only adds
+`etc/extra-pci-roots-list`. CONFIG_BOOTSPLASH (`bootsplash.jpg/.bmp`, jpeg.c, bmp.c), CONFIG_SERCON
+(`etc/sercon-port`) and CONFIG_HOST_BIOS_GEOMETRY (`bios-geometry`) never ran under CSMWrap. They are now off
+in `seabios-config`. The VGA text console, INT 14h serial ports and the `serial = true` debug output stay.
+Other default-on options were kept because they serve real hardware or the QEMU tests: ATA (QEMU pc), AHCI,
+NVMe, SD, MegaRAID, floppy, USB UHCI/OHCI/EHCI/xHCI, UAS, LPT, S3 resume, CD-ROM emulation, DEBUG_LEVEL 1
+(serial diagnostics). The virtio/PV SCSI drivers and DEBUG_IO were already off (they need QEMU_HARDWARE).
+
+Layout (build log): **ROM 118688 of 131072 bytes (90.6 %, 12384 free)**. usos12 had 3136 free; with 0016
+alone (draft build) it was 864. F-segment: 16-bit 36032 + 32-bit segmented 4118 + variables 3328 = 43478
+bytes, **22058 bytes** for the allocation zone (6144 minimum kept). 32-bit flat 28522, flat init 41376.
+
+Binary `8798c35d83b3cd254a5a8cae94d2d5fe5e12fc665d6819a36523895f0fb1eec9`, the same in two pinned Alpine VM
+runs (each with its in-guest repeat build). The unpatched build still matches `upstream_rebuild`.
+
+The Windows 2000 diagnostic CSMWrap stays **3.1.2-usos11-diag** (`PINNED_DIAG`, own hash). It is used
+only by the Windows 2000 ACPI diagnostic setup (DATA `w2k-diag.txt`), and that round is closed (2000 PASS
+on the X470, 2026-10-17). Windows 2000 does not use the BIOS mouse (own USB stack) or the 9x
+`pci_irq_routing`, and the diag ESP takes its own binary and patch series from the XP/2000 package. A
+rebuild on usos13 would only add code that 2000 does not reach.
+
+Tests:
+
+- `test_csmwrap_wheel.py`: descriptor walk, decoder and packaging built on the host (zig cc, UBSan) from
+  the archive + 0016. Cases: QEMU usb-mouse, a Logitech-style report ID 2 mouse with 12-bit X/Y, a
+  composite gaming mouse (mouse ID 1 with 16-bit X/Y, consumer ID 2, keyboard ID 3) with foreign packets
+  ignored and values clamped, the same on a 7-byte endpoint (refused), plus a 20-byte vendor report
+  (refused), the wheel in another report (refused), no wheel, absolute, truncated, Push/Pop (one level kept,
+  the report size restored, nested and unbalanced refused), the boot path. Also INT 15h C205h package sizes
+  1/3/4/6 with and without the knock, wiring (keyboard functions identical to upstream, the knock gated on a
+  wheel mouse, C201h reset, C204h ID, the handler's Z word), the 0017 lines, the series and the pins.
+- QEMU with usos13 (2026-10-18): `run_csmwrap_boot_disk_qemu.py` all 7 layouts PASS and `--only` PASS
+  (`NO-DRIVE-81`); `run_csmwrap_apmoff_qemu.py` PASS; `run_csmwrap_pciirq_qemu.py` pc + q35 PASS, key-off
+  output identical to usos12; `run_dos_mouse_probe.py --csmwrap <usos13> --wheel` session PASS (wheel API
+  574Dh, caps 1, sums -3 / +2) and `--mode dosmouse` PASS. The dosmouse mode types `M33TEST` and `EXIT`
+  through QEMU's usb-kbd, so the USB keyboard under SeaBIOS still works. The session probe with usos12 shows
+  no wheel (caps 0, sums 0) PASS.
+
+`tools/build_csmwrap_dos_esp.py` (the BIOS Core DOS installer's CSMWrap ESP image): with 15 long patch
+names, `\CSMWRAP\patches` needs more than the 64 entries of one 2 KiB cluster. The directory now gets two
+contiguous clusters (FAT chain). An independent FAT16 walk of the image read all 15 patches back
+byte for byte.
+
+X470 with usos13: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit`.
+
+## 20. 3.1.2-usos14: USB mouse wheel diagnostics (0018) and more mouse shapes (0019) (2026-10-18)
+
+3.1.2-usos14 = 3.1.2-usos13 (0001-0010, 0012, 0014-0017, byte for byte) + 0018 + 0019. It is the new
+release pin (xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+Why: Windows Me on the X470 with usos13 (Micron, `me-wheel-kit`): the USB mouse moves and clicks, the
+wheel does nothing. The mouse is a Logitech G502 HERO (046D:C08B). Nothing showed whether SeaBIOS had
+taken the report protocol, whether the knock was answered with ID 3, or where the wheel was lost.
+
+**0018 diagnostics record** (own code). SeaBIOS keeps `usb_mouse_diag` in its low memory zone (VARLOW,
+16-byte aligned, 312 bytes, signature `USOS` `MWHL` written at setup, version 1). Per mouse (first 4):
+interface, wMaxPacketSize, report/boot protocol, a reason code, report ID, wDescriptorLength, the parsed
+X/Y/wheel/button layout. Also the first 160 bytes of the first mouse's report descriptor, the IntelliMouse
+ID and the last two sample rates, counters (packets, packets with a nonzero wheel, skipped packets of
+other report IDs) and the last raw packet. `hid_parse_mouse` returns `USB_MD_*` codes instead of -1; every
+decision is the same as in 0016. The record is only written. USOSDBG.EXE 1.4 finds it by scanning
+80000h-FFFFFh in 16-byte steps and shows it in its `WHEEL` lines (docs/win9x-modern-2026-09-30.md 4j).
+
+**0019 more mouse shapes** (own code, generic, no VID/PID logic):
+
+- Report IDs present: input reports of other IDs longer than one packet no longer refuse the mouse.
+  A packet that starts with such an ID is skipped with its (packets - 1) continuation packets, counted
+  from the report length (up to 4 such IDs, up to 127 packets). The mouse report itself must still fit
+  one packet. Without report IDs a longer report is still refused (nothing tells the reports apart).
+- Zero-length packets: a report that fills its last packet exactly may be ended by a ZLP. The xHCI
+  driver then copies its unchanged buffer, so the ZLP reads as the last continuation packet again. After
+  such a report, a byte-identical next packet of the same mouse is skipped (USB_MOUSE_ZLP flag). A real
+  mouse packet equal to a vendor continuation packet is the only false skip.
+- Report descriptors up to 4096 bytes (was 1024), up to 16 input report IDs (was 8).
+- usb.c: when a device's first boot HID interface is a keyboard (wireless receivers, keyboards with a
+  pointing device), the first later boot mouse interface (alternate setting 0) is set up too, with a copy
+  of the device record (same default pipe and address; xHCI endpoint contexts are per endpoint, as for
+  UAS). Keyboards are set up exactly as before. A second keyboard interface is never added (usb-hid.c has
+  one key state). The device counts as configured when the keyboard or that mouse was set up. This
+  closes the "combo receiver gets no BIOS mouse" limit of section 19.
+
+Review of the drafts: 0018 unchanged apart from being split from 0019; 0019 got the ZLP skip, the
+127-packet bound, the per-mouse `maxpacket` and the usb.c part.
+
+Shapes (host test, `test_csmwrap_wheel_diag.py`; only the QEMU descriptor is a byte copy of a published
+one, the others are written to the layouts these families are reported to use, no device dump was found):
+accepted: QEMU usb-mouse; Logitech HERO wired (G502 HERO layout: 16 buttons, 16-bit X/Y, wheel, AC Pan,
+no report ID, 8-byte packets; usos13 already accepts it); Logitech receiver mouse ID 2 with 12-bit X/Y plus
+consumer and system reports; the same with 16-bit X/Y on a 16-byte endpoint; Razer-style 5 buttons 16-bit;
+SteelSeries-style ID 1 with a usage range and vendor feature reports; Microsoft basic; Microsoft Resolution
+Multiplier with Push/Pop and AC Pan; generic 3-button wheel; gaming composite (mouse, consumer, keyboard)
+with a 32-byte vendor input report on 8-byte packets, or a 64-byte one on 16-byte packets (ZLP case).
+Refused (boot protocol, reason code): 9-byte mouse report on an 8-byte endpoint (-7), long report without
+report IDs (-7), wheel in another report than X (-10), absolute X/Y (-8), no wheel (-10), truncated (-1),
+nested Push (-3), Pop without Push (-4), 17 input report IDs (-5). Not handled at all (upstream limit):
+wMaxPacketSize over 16 (no BIOS mouse).
+
+Layout (build log): **ROM 120224 of 131072 bytes (91.7 %, 10848 free)**; F-segment 16-bit 36512 + 32-bit
+segmented 4118 + variables 3328 = 43958 bytes, **21578 bytes** allocation zone (6144 minimum kept); low
+memory 2512; 32-bit flat 28522, flat init 42080.
+
+Binary `12d05612dc647c9c6b387157e15343ae1c7c34bd501f74c6f789566744b93ffe`, the same in two pinned Alpine VM
+runs (each with its in-guest repeat build); the unpatched build still matches `upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_wheel_diag.py`: the archive + 0016 + 0018 + 0019 on the host (zig cc, UBSan): the shapes
+  above, decoding (G502 layout, receiver ID filter), long-report skipping (also a continuation packet that
+  starts with the mouse ID), the ZLP replay, the record layout against USOSDBG.EXE's `MDIAG` (1-, 2- and
+  4-byte packing), every reason code named in USOSDBG, the usb.c interface walk (receiver, vendor
+  interface first, keyboard only, second keyboard, non-boot or alternate mouse, bNumInterfaces bound,
+  truncated), wiring (keyboard functions identical to upstream, the HID branch of configure_usb_device the
+  only usb.c change), series and pins. `test_csmwrap_wheel.py` (0016) still PASS.
+- QEMU with usos14 (2026-10-18): `run_csmwrap_boot_disk_qemu.py` all 7 layouts and `--only` PASS;
+  `run_csmwrap_apmoff_qemu.py` PASS; `run_csmwrap_pciirq_qemu.py` pc + q35 PASS, key-off output identical
+  to usos13; `run_dos_mouse_probe.py --csmwrap <usos14> --wheel` session and `--mode dosmouse` PASS (wheel
+  API 574Dh, caps 1, sums -3 / +2; the dosmouse mode types through QEMU usb-kbd). QEMU has no composite
+  keyboard+mouse HID device, so the usb.c part is host-tested only.
+
+X470 with usos14: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit-v2`.
+
+## 21. 3.1.2-usos15: the USB wheel in the Z word without the knock, INT 15h C2xxh call ring (0020) (2026-10-19)
+
+3.1.2-usos15 = 3.1.2-usos14 (0001-0010, 0012, 0014-0019, byte for byte) + 0020. It is the new release pin
+(xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+Why: Windows Me on the X470 with usos14 (Micron, G502 HERO), USOSLOG/USOSDBG: the USOSMWHL record shows
+the mouse in the report protocol with the wheel at bit 48 (8 bits) and `packets:1076 with wheel:114`, so
+the USB side works; but `ID:0 rates:10,40`, and USOSMOUS.DRV reports `knocks:2 knock answered ID:00
+wheel:off`. Its rate table is right (200/100/80). So after the knock something resets the emulated mouse
+(C201h/C205h set the ID back to 0) and sets rates 10, 40, and 0016 only passes the wheel in the Z word with
+ID 3. Who does it is not known yet (suspected: Windows' own PS/2 mouse support, `*PNP0F0E` / VMOUSE,
+through INT 15h C2xxh); the ring below is there to show it.
+
+**0020** (own code):
+
+- Package size 3 (USOSMOUS.DRV, VBMOUSE's 3-byte mode): the wheel value always goes in the far-call
+  handler's Z word, with or without device ID 3. A standard handler ignores Z; for a mouse without a wheel
+  (boot protocol) z is 0. Package sizes 1/2 (byte stream) and 4-7 (4th byte) are unchanged: the wheel byte
+  only after the knock, so a 3-byte stream reader never gets an extra byte.
+- The USOSMWHL record keeps version 1 and its first 310 bytes (older USOSDBG.EXE reads it as before) and
+  grows to 512 bytes: at +312 magic `C2RG` (0x47523243), +316 a call counter (u16, wraps), +318 the next
+  slot, +320 16 entries of 12 bytes: AX, BX, ES on entry, the caller's CS:IP (the INT's return address),
+  the emulated device ID after the call and the result (0, or 80h | AH with CF set). `handle_15c2` records
+  every AH=C2h call after its switch; the ring is only written.
+
+Layout (build log): **ROM 120576 of 131072 bytes (92.0 %, 10496 free; usos14 10848)**; F-segment 16-bit
+36672 + 32-bit segmented 4118 + variables 3328 = 44118 bytes, **21418 bytes** allocation zone (6144 minimum
+kept); low memory 2704 (usos14 2512); 32-bit flat 28522, flat init 42080.
+
+Binary `329756efef14581c17f1fe5402bcdb157162c234ce715e789d543ce53aa4a8c6` (one pinned Alpine VM run, the
+same in its in-guest repeat build); the unpatched build still matches `upstream_rebuild`.
+
+USOSMOUS.DRV v4 (src/platform/win3/usosmous.c): where the wheel is wanted (98 / 98 SE / Me, Wheel=1) a
+nonzero Z sum is sent as a wheel event also when the knock was not answered with ID 3, and a knock answered
+with another ID is sent once more (once per C205h init). With an older CSMWrap Z stays 0, so nothing changes
+there.
+
+Tests:
+
+- `test_csmwrap_wheel15.py` (host, zig cc, UBSan): package size 3 with ID 0 and 3 gives the wheel in Z;
+  sizes 1, 4 and 7 unchanged (wheel byte only with ID 3); a mouse without a wheel keeps Z 0; the ring
+  layout (+312/+316/+318/+320, 12-byte entries, sizeof 512) and its wrap; wiring (AX/BX taken before the
+  switch, the record call after it, the other C2xxh functions, `handle_mouse` and the setup identical to
+  usos14); series and pins. The usos14 tests (`test_csmwrap_wheel_diag.py`, `test_csmwrap_wheel.py`) and
+  the other csmwrap host tests still PASS.
+- QEMU with usos15 (2026-10-19): `run_dos_mouse_probe.py --csmwrap <usos15> --wheel` session PASS (wheel
+  API 574Dh, sums -3 / +2), `run_csmwrap_pciirq_qemu.py --machine pc` PASS.
+
+X470 with usos15: not tried when this was written. No Windows 9x VM run was made with usos15 either.
+
+## 22. 3.1.2-usos16: USB disk service on channel 1 of the helper core (0021) (2026-10-19)
+
+3.1.2-usos16 is 3.1.2-usos15 (0001-0010, 0012, 0014-0020, byte for byte) plus 0021. It is the new
+release pin: xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py,
+third-party.json.
+
+Why: Windows 95/98/98 SE/Me on the X470 have no xHCI driver, and SeaBIOS is the only xHCI owner.
+0021 lets the 9x miniport USOSUSB.MPD (tools/nt/usosusb9x) send SCSI commands to a USB stick that
+has no BIOS drive number (`int13_boot_disk_only`, 0014). It does this without a second xHCI owner.
+Design and stage plan: docs/usb9x-hotswap-design-2026-10-19.md (sections 1 (A), 3, 7).
+
+**0021** (own code, LGPLv3):
+
+- **Mailbox and helper loop:**
+  - The `CSMPPrxy` mailbox becomes 64-byte aligned. Channel 1 sits at +48: `UDS1`, req_phys,
+    doorbell, done.
+  - Offsets 0-47 and CSMWrap's 48-byte copy of the struct are unchanged.
+  - The helper loop serves channel 0 first. It then calls `usos_uds_service(mailbox + 48)` when
+    doorbell != done, testing this both before and after MONITOR, because the doorbell shares
+    the monitored line.
+- **Request handling (hw/usb-uds.c):**
+  - The request block is copied once from the OS's physical address, then validated. The check
+    is the same code as `uds_req_check()` in src/platform/bios/win9x/usosuds_slot.c.
+  - Ops: ENUM, SCSI (any CDB and direction, automatic REQUEST SENSE), RESET (BOT reset recovery),
+    EJECT, STATUS.
+  - Only the results are written back.
+  - A device with a BIOS hard-disk or CD-ROM number is refused (OWNED).
+- **Device table (usb-msc.c):**
+  - xHCI BOT devices are registered at setup, up to 8.
+  - The control pipe is kept rather than put on the free list, for the reset recovery. On xHCI
+    the free list never released the slot.
+  - `usbdrive_s` moves to usb-msc.h and gets a table index.
+  - VID:PID, the INQUIRY strings and READ CAPACITY(10) are read on the helper core at the first
+    request. POST sends nothing new.
+- **Transport (usb-xhci.c):**
+  - Bulk TDs go to physical buffers. A buffer that crosses a 64 KiB boundary becomes two chained
+    TRBs with ISP.
+  - On every wait pass the code checks:
+    - the capability dword equals its POST value and is not all ones;
+    - USBSTS has neither HCH nor HSE set;
+    - the root port still has CCS.
+  - An unplug therefore ends the request at once (GONE), followed by Disable Slot.
+  - Endpoint recovery: Reset Endpoint, Stop Endpoint, Set TR Dequeue Pointer.
+  - No PCI configuration access from the helper core.
+- **USOSUDSK record** (VARLOW, version 1, 768 bytes, written only):
+  - per device: state, counters, last CDB / CSW / sense / status;
+  - the BIOS disk table;
+  - a ring of the last 16 events.
+  - Decoded by USOSDBG 1.7 `DISK`.
+
+Layout from the build log:
+
+| | usos16 | usos15 |
+|---|---|---|
+| **ROM used** | **126656 of 131072 bytes (96.6 %)** | 120576 |
+| **ROM free** | **4416** | 10496 |
+| 16-bit | 36704 | |
+| 32-bit segmented | 4118 | |
+| 32-bit flat | 33386 | 28522 |
+| flat init | 41984 | |
+| low memory | 3472 | 2704 |
+| F-segment variables | 3744 | 3328 |
+
+Stage 2 needs the fallback from the design: drop MEGASAS / SDCARD.
+
+Binary `5d73385e797697b3207c95632da1307fe9d86a1f61e4fb4c57539cc9a39cbbb4`, from one pinned Alpine VM
+run; the in-guest repeat build gave the same binary. The unpatched build still matches
+`upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_uds16.py` (host):
+  - series and manifest;
+  - the LGPL and GPL request checks are textually equal and give the same verdicts on 40000
+    requests;
+  - both headers give the same layout;
+  - wiring, and no POST traffic;
+  - pins.
+  - The usos15 tests PASS with the pins moved.
+- QEMU with usos16 (2026-10-19), all PASS:
+  - `run_csmwrap_uds_qemu.py` `free` and `owned` (unplug -> GONE in about 0.01 s);
+  - `run_csmwrap_boot_disk_qemu.py` (7 layouts, with and without `--only`);
+  - `run_csmwrap_apmoff_qemu.py`;
+  - `run_csmwrap_pciirq_qemu.py`;
+  - `run_csmwrap_nvme_rearm_qemu.py`.
+- Not rerun: the DOS mouse probe. No QEMU test covers the V86 channel 0 proxy.
+
+X470 with usos16: not tried. No Windows 9x VM run either.
+
+## 23. 3.1.2-usos17: USB stick hot-swap for the USB disk service (0022) (2026-10-19)
+
+3.1.2-usos16 (0001-0021, byte for byte) plus 0022. Experimental, **not the release pin**
+(xp_csmwrap_esp.sh, release.go and lock.json stay on usos16); the Windows Me in-place kit me-usb2
+uses it. Design and details: docs/usb9x-hotswap-design-2026-10-19.md section 8.
+
+0022 (own code, LGPLv3), only with `csmwrap.ini int13_boot_disk_only = true`: a 12 KiB runtime pool
+from ZoneHigh, every xHCI kept running, a port watch on the helper core (about 100 ms, CCS plus a
+CSC latch in `xhci_process_events`) armed by the first channel 1 request, runtime bring-up and
+teardown of bulk-only sticks, table entries re-used with a new generation, EJECT disables the slot.
+Every boot: a media check and exact KiB counters; the USOSUDSK record is version 2 (984 bytes).
+
+| | usos17 | usos16 |
+|---|---|---|
+| **ROM used** | **125504 of 131072 (95.8 %)** | 126656 |
+| **ROM free** | **5568** | 4416 |
+| 16-bit | 34624 | 36704 |
+| 32-bit flat | 36458 | 33386 |
+| flat init | 39392 | 41984 |
+| low memory | 3968 | 3472 |
+| F-segment variables | 3840 | 3744 |
+
+`CONFIG_MEGASAS` and `CONFIG_USB_UHCI` are off in seabios-config (0022) to make room;
+`CONFIG_SDCARD` stays.
+
+Binary `3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d` (pinned VM build, the
+repeat build identical, the unpatched build = `upstream_rebuild`).
+
+Tests: `test_csmwrap_uds17.py` (host); QEMU `run_csmwrap_uds_qemu.py` free (hot-swap with a USB
+keyboard and mouse) and owned PASS. Regressions with this binary (2026-10-19), all PASS:
+run_csmwrap_boot_disk_qemu.py (7 layouts, with and without --only), run_csmwrap_apmoff_qemu.py
+(pc/q35 x real/pm32/pm16), run_csmwrap_pciirq_qemu.py (pc/q35, key on/off),
+run_csmwrap_nvme_rearm_qemu.py (pc, q35), run_dos_mouse_probe.py --wheel. X470 with usos17: not tried.
+
+**Release pin since 2026-10-19:** X470 Windows Me PASS with the me-usb2 kit. `PINNED` in
+xp_csmwrap_esp.sh, release.go, lock.json, run_build_vm.py (20 patches) and third-party.json now
+point to usos17. The 9x flow turns `int13_boot_disk_only` on by default
+(docs/usb9x-hotswap-design-2026-10-19.md section 9).
+
+**Effect on the other flows.** The pin is global. DOS, NT 3.x/4.0, 2000, XP/2003, Vista/7 x86,
+POSReady and the UEFI menu's Legacy BIOS mode all copy the same `EFI\USOS\csmwrap\csmwrapx64.efi`.
+None of them writes `int13_boot_disk_only` into csmwrap.ini, and 0022 depends on it:
+
+- `usos_uds_pool()` is 0, so there is no 12 KiB pool and no extra E820 reservation.
+- `xhci_usos_register()` registers no controller, so an xHCI without devices is stopped as in
+  usos16 (`if (count || xhci->usos_idx)`).
+- The watch never arms, because only the channel 1 service arms it and only USOSUSB.MPD calls
+  that. The helper loop keeps MWAIT.
+
+What stays different everywhere:
+
+1. The SeaBIOS build has no `CONFIG_MEGASAS` (LSI MegaRAID SAS boot) and no `CONFIG_USB_UHCI`.
+   UHCI exists only on chipsets from before about 2011, which have a firmware CSM; the X470 and
+   the Ally have none.
+2. `xhci_process_events` sets a bit in `usos_latch` on a port change event. Outside the watch
+   nobody reads it.
+3. The media check and the exact KiB counters run only for channel 1 requests.
+
+The usos16 regressions, repeated with this binary on 2026-10-19, all PASS. The DOS and V86
+proxy paths (channel 0) are unchanged.

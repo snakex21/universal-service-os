@@ -24,8 +24,13 @@ done
 [ -r "$SCRIPT_DIR/probe_nt5_source.sh" ] || fail 'probe_nt5_source.sh is missing'
 [ -r "$SCRIPT_DIR/xp-nt52-vbr-tail.bin" ] || fail 'xp-nt52-vbr-tail.bin is missing'
 [ -r "$SCRIPT_DIR/xp-nt52-stage2.bin" ] || fail 'xp-nt52-stage2.bin is missing'
-[ -r "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" ] || fail 'Strategy B MBR artifact is missing'
-[ "$(wc -c < "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" | tr -d '[:space:]')" = 440 ] || fail 'Strategy B MBR artifact must be exactly 440 bytes'
+# USOS_XP_MBR_CODE: another 440-byte USOS MBR from this folder (Windows 2000
+# with ACPI: w2k-acpi-mbr-440.bin, legacy_xp_staging.sh); default XP geometry fix.
+XP_MBR_CODE=${USOS_XP_MBR_CODE:-$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin}
+case "$XP_MBR_CODE" in "$SCRIPT_DIR"/xp-geometry-fix-mbr-440.bin|"$SCRIPT_DIR"/w2k-acpi-mbr-440.bin) ;; *) fail 'unsupported USOS_XP_MBR_CODE' ;; esac
+export XP_MBR_CODE
+[ -r "$XP_MBR_CODE" ] || fail 'Strategy B MBR artifact is missing'
+[ "$(wc -c < "$XP_MBR_CODE" | tr -d '[:space:]')" = 440 ] || fail 'Strategy B MBR artifact must be exactly 440 bytes'
 if [ -n "$XP_WINNT_SIF" ]; then
     [ -f "$XP_WINNT_SIF" ] || fail 'selected user WINNT.SIF is missing before XP target write'
 fi
@@ -277,7 +282,7 @@ printf '[XP_TARGET] MBR READBACK PASS xpsetup_entry=%s active=0x80 previous_acti
 
 if [ -n "$XP_WINDOWS_PLAN" ]; then
     export TARGET_DEVICE XP_WINDOWS_PLAN SOURCE_ROOT
-    STRATEGY_B_SHA256=$(sha256sum "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" | awk '{print $1}')
+    STRATEGY_B_SHA256=$(sha256sum "$XP_MBR_CODE" | awk '{print $1}')
     XP_EXPECTED_MBR="$post_mbr" sh "$SCRIPT_DIR/prepare_xp_ntfs_target.sh" || fail 'native NTFS preparation failed'
 else
 XPSETUP_OFFSET_BYTES=$((XPSETUP_START * 512))
@@ -398,12 +403,12 @@ dd if="$mbr_before_strategy" of="$mbr_tail_before" bs=1 skip=440 count=72 2>/dev
 dd if="$post_mbr" of="$mbr_tail_after" bs=1 skip=440 count=72 2>/dev/null || fail 'cannot capture expected MBR tail'
 cmp -s "$mbr_tail_before" "$mbr_tail_after" || fail 'MBR tail changed after XPSETUP creation before Strategy B install'
 
-STRATEGY_B_SHA256=$(sha256sum "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" | awk '{print $1}') || fail 'cannot hash Strategy B MBR artifact'
-dd if="$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" of="$TARGET_DEVICE" bs=440 count=1 conv=notrunc 2>/dev/null || fail 'cannot install Strategy B MBR code'
+STRATEGY_B_SHA256=$(sha256sum "$XP_MBR_CODE" | awk '{print $1}') || fail 'cannot hash Strategy B MBR artifact'
+dd if="$XP_MBR_CODE" of="$TARGET_DEVICE" bs=440 count=1 conv=notrunc 2>/dev/null || fail 'cannot install Strategy B MBR code'
 sync
 dd if="$TARGET_DEVICE" of="$mbr_after_strategy" bs=512 count=1 2>/dev/null || fail 'cannot read back MBR after Strategy B install'
 dd if="$mbr_after_strategy" of="$mbr_code_readback" bs=1 count=440 2>/dev/null || fail 'cannot capture Strategy B MBR code readback'
-cmp -s "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" "$mbr_code_readback" || fail 'Strategy B MBR code readback mismatch'
+cmp -s "$XP_MBR_CODE" "$mbr_code_readback" || fail 'Strategy B MBR code readback mismatch'
 dd if="$mbr_after_strategy" of="$mbr_tail_after" bs=1 skip=440 count=72 2>/dev/null || fail 'cannot capture Strategy B MBR tail readback'
 cmp -s "$mbr_tail_before" "$mbr_tail_after" || fail 'Strategy B changed MBR bytes 440..511'
 [ "$(od -An -tx1 -j 510 -N 2 "$mbr_after_strategy" | tr -d ' \n\r')" = 55aa ] || fail 'Strategy B MBR readback lost 55AA signature'

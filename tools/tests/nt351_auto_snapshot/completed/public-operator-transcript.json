@@ -1,0 +1,50 @@
+{
+  "actions": [
+    {
+      "frame": "operator-01.png",
+      "public_action": "ProgramManager File/Run cmd"
+    },
+    {
+      "frame": "operator-02.png",
+      "public_action": "cd \\usos\\nt3; net start > c351net.log; type c351net.log"
+    },
+    {
+      "frame": "operator-03.png",
+      "public_action": "ipconfig /release >> c351net.log; type c351net.log"
+    },
+    {
+      "frame": "operator-04.png",
+      "public_action": "ipconfig /renew >> c351net.log; ipconfig /all"
+    },
+    {
+      "frame": "operator-05.png",
+      "public_action": "ipconfig /all >> c351net.log; ping -n 3 10.0.2.2 >> c351net.log"
+    },
+    {
+      "frame": "operator-06.png",
+      "public_action": "type c351net.log"
+    },
+    {
+      "frame": "operator-07.png",
+      "public_action": "del usability.txt; testnet.cmd; one90s settle"
+    },
+    {
+      "frame": "operator-08.png",
+      "public_action": "find /i \"dns pass\" usability.txt"
+    },
+    {
+      "frame": "operator-09.png",
+      "public_action": "exit; CtrlAltDelete"
+    },
+    {
+      "frame": "operator-10.png",
+      "public_action": "Tab/Tab/Enter => nativeShutdown dialog"
+    },
+    {
+      "frame": "operator-11.png",
+      "public_action": "Enter; nativeSafe after40s; then explicitFINISH/QMPquit"
+    }
+  ],
+  "future_exact_notification_before_every_action": true,
+  "periodic_progress_queries": false
+}

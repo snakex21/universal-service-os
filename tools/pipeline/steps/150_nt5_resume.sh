@@ -13,6 +13,6 @@ usos_step_150_run() {
     usos_ui_done 'XP - KONTYNUACJA GOTOWA' 'REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF.' || true
     printf '[XP_RESUME] Remove USOS USB, press ENTER, then start target disk.\n'
     if [ -r "$USOS_UI_TTY" ]; then IFS= read -r _resume_poweroff < "$USOS_UI_TTY" || true; else IFS= read -r _resume_poweroff || true; fi
-    poweroff -f
+    sh /usr/lib/usos/stick_release.sh poweroff
     while true; do sleep 3600; done
 }

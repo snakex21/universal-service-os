@@ -1,0 +1,44 @@
+{
+  "scope": "Own diagnostic-only source snapshot; no product driver/hub changes",
+  "helper_sha256": "ce94990ed569aaeccbb68086c02d3e618eb98f512dfca837dcf21660517b6667",
+  "helper_bytes": 46080,
+  "compiled_build": "build15",
+  "all_original_imports_present_PL_EN": true,
+  "import_count": 38,
+  "self_contained_test_plan": {
+    "actual_C_lifecycle": 7,
+    "separate_process": 4,
+    "bounded_message_parser_synthetic": 6,
+    "whole_template_and_diagnostic_fragment": 9,
+    "named_dialog_actual_C": 2,
+    "closed_public_ID_protocol": 10
+  },
+  "self_contained_expected_total": 38,
+  "snapshot_test_execution_pending": false,
+  "compiled_source_sha256": {
+    "page.c": "6d3fb58eb377a423a59b673bc4da3d2dcb0507e655776b7c9d2227bad64c219c",
+    "core.h": "de352ba9abe2e7a03db8ae6296c580658082be2e8884a4c129a4184c8ac12705",
+    "template.h": "400470f682b44fcc72be59689c91beda691f539e57487fcf205d6a1c12bc464a",
+    "message_table.h": "bba3c236b31a1547d8dfd6f7856df637ba4802e7f4539d05ee04c57ac7e124c6",
+    "public_ids.h": "3ba034e63f67fd96a98a0eb402c31f09b1dbcde1598757361da5e4325fca6094",
+    "build.py": "fbef839c932be1a9be9c10c1fcc78d4d2cdcd95c53b74e2fa6a8083183955015"
+  },
+  "snapshot_source_sha256": {
+    "page.c": "6d3fb58eb377a423a59b673bc4da3d2dcb0507e655776b7c9d2227bad64c219c",
+    "core.h": "de352ba9abe2e7a03db8ae6296c580658082be2e8884a4c129a4184c8ac12705",
+    "template.h": "400470f682b44fcc72be59689c91beda691f539e57487fcf205d6a1c12bc464a",
+    "message_table.h": "bba3c236b31a1547d8dfd6f7856df637ba4802e7f4539d05ee04c57ac7e124c6",
+    "public_ids.h": "43c10a6338ceaf7ab40176f690c651da2fee504ce23a9d65699f081eb2225755",
+    "protocol.py": "33411e219f1d380455ba20e8f4dd5a2605e29c4bb81690ce51ef8d991b20e87b"
+  },
+  "snapshot_line_endings": "LF; original compiled hashes kept separately",
+  "runtime09": "complete own file/public-ID frame; no identified modal",
+  "runtime10": "working UART, no identified modal, FINISH/QMPquit0",
+  "runtime11": "oracle available but unmatched static, FINISH/QMPquit0",
+  "runtime12": "public-ID endpoint114.66s; oracle available, unmatched static, FINISH/QMPquit0 after174.67s",
+  "edit_reads": false,
+  "private_frames": false,
+  "desktop_LAN_HID_MSC_pass": false,
+  "self_contained_host_pass": 38,
+  "vm_running": false
+}

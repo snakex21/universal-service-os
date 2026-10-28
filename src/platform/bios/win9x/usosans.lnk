@@ -1,0 +1,13 @@
+# wlink directives for USOSANS.EXE (tools/build_win9x_support.py adds
+# "file usosans.obj name USOSANS.EXE"). Win32 GUI subsystem 4.0 (Windows 95
+# and later), no OpenWatcom runtime: own entry point, import libraries only.
+format windows nt
+runtime windows=4.0
+option modname=USOSANS
+option start=_usos_entry
+option nodefaultlibs
+option stack=64k
+option quiet
+libpath '%WATCOM%/lib386/nt'
+library kernel32, user32, advapi32
+option norelocs

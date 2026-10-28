@@ -13,6 +13,7 @@ pub const SystemEntry = @import("system_entry.zig").SystemEntry;
 pub const SystemFamily = @import("system_family.zig").SystemFamily;
 pub const SystemMediaStatus = @import("system_media_status.zig").SystemMediaStatus;
 pub const systems = @import("systems.zig");
+pub const preparation_block = @import("preparation_block.zig");
 pub const os_profiles = @import("os_profiles.zig");
 pub const utility_boot_methods = @import("utility_boot_methods.zig");
 pub const MediaStatus = @import("media_status.zig").MediaStatus;
@@ -22,6 +23,7 @@ pub const DiscoveredImage = @import("discovered_image.zig").DiscoveredImage;
 pub const image_catalog = @import("image_catalog.zig");
 pub const directory_source = @import("directory_source.zig");
 pub const media_discovery = @import("media_discovery.zig");
+pub const floppy_set = @import("floppy_set.zig");
 pub const utility_catalog = @import("utility_catalog.zig");
 
 test {
@@ -39,6 +41,7 @@ test {
     _ = SystemFamily;
     _ = SystemMediaStatus;
     _ = systems;
+    _ = preparation_block;
     _ = utility_boot_methods;
     _ = MediaStatus;
     _ = Windows11Status;
@@ -47,5 +50,6 @@ test {
     _ = image_catalog;
     _ = directory_source;
     _ = media_discovery;
+    _ = floppy_set;
     _ = utility_catalog;
 }

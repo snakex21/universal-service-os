@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -117,10 +118,14 @@ class StartupSelection(unittest.TestCase):
 
     def test_native_reader_state_has_owned_aligned_stable_storage(self):
         native = (ROOT / 'src/platform/uefi/windows_native_iso.zig').read_text()
-        # inspect, start, the Windows 10/11 inspectModern/startModern and the
-        # Vista CSMWrap prepareCsmwrap (d9abec95), each with its own destroy.
-        self.assertEqual(5, native.count('uefi.pool_allocator.create(BootState)'))
-        self.assertEqual(5, native.count('defer uefi.pool_allocator.destroy(state)'))
+        # inspect, start, the Windows 10/11 inspectModern/startModern, the
+        # Vista CSMWrap prepareCsmwrap (d9abec95) and the x86 CSMWrap paths
+        # (58efdd2, f6840f0): every BootState from the pool, each with its own
+        # deferred destroy.
+        creates = native.count('uefi.pool_allocator.create(BootState)')
+        self.assertGreaterEqual(creates, 5)
+        self.assertEqual(creates, native.count('defer uefi.pool_allocator.destroy(state)'))
+        self.assertEqual(creates, len(re.findall(r'create\(BootState\);\s*defer uefi\.pool_allocator\.destroy\(state\);', native)))
         self.assertNotIn('allocatePool(.loader_data, @sizeOf(BootState))', native)
         self.assertIn('.catalog = &state.catalog, .file = &state.source', native)
         self.assertIn('.catalog = &self.state.catalog, .file = &self.state.donor', native)

@@ -1,0 +1,114 @@
+"""The auxiliary USB inputs must be FAT16 MBR volumes with readable markers."""
+from pathlib import Path
+import importlib.util
+import struct
+import unittest
+import io
+import json
+from types import SimpleNamespace
+
+spec=importlib.util.spec_from_file_location('aux',Path(__file__).with_name('usability_aux.py'))
+aux=importlib.util.module_from_spec(spec);spec.loader.exec_module(aux)
+
+
+class AuxiliaryTests(unittest.TestCase):
+    def test_persistent_block_node_preserves_special_filename_and_restricts_inputs(self):
+        path=Path(__file__).resolve().parent/'comma, Polish ł and space.qcow2'
+        flag,value=aux.usb_block_arguments('hot',path)
+        self.assertEqual(flag,'-blockdev')
+        node=json.loads(value)
+        self.assertEqual(node['node-name'],'usabilityhot')
+        self.assertEqual(node['driver'],'qcow2')
+        self.assertEqual(node['file']['filename'],str(path))
+        for kind,file in (('target',path),('hot',Path('relative.qcow2')),('hot',path.with_suffix('.raw'))):
+            with self.assertRaises(ValueError):aux.usb_block_arguments(kind,file)
+
+    def test_nt5_manual_actions_need_an_exact_post_logon_notification(self):
+        token='USOS_COVERAGE_FIRST_LOGON_'+'a'*32
+        self.assertTrue(aux.manual_test_supported(True,False,token))
+        self.assertFalse(aux.manual_test_supported(True,False,None))
+        self.assertFalse(aux.manual_test_supported(True,False,'unvalidated'))
+        self.assertTrue(aux.logon_notification(token,token+'\r\n'))
+        self.assertFalse(aux.logon_notification(token,'echo '+token+'>COM1'))
+        self.assertFalse(aux.logon_notification(token,'script contains '+token))
+    def test_failure_collection_never_exports_keyed_setup(self):
+        root=Path(__file__).resolve().parents[3]
+        meta={'folder':'Windows NT 4.0','private_profile':False}
+        aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+        for changed in (dict(meta,private_profile=True),dict(meta,folder='Windows XP')):
+            with self.assertRaises(ValueError):aux.validate_failure_collection(True,changed,root/'_assets',root)
+        with self.assertRaises(ValueError):aux.validate_failure_collection(True,meta,root/'outside',root)
+    def test_failure_collection_accepts_exact_nt3_metadata_folders(self):
+        root=Path(__file__).resolve().parents[3]
+        for folder in ('Windows NT 3.1','Windows NT 3.1 Advanced Server',
+                       'Windows NT 3.5','Windows NT 3.5 Server',
+                       'Windows NT 3.51','Windows NT 3.51 Server'):
+            with self.subTest(folder=folder):
+                meta={'folder':folder,'private_profile':False}
+                aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+                with self.assertRaises(ValueError):
+                    aux.validate_failure_collection(True,dict(meta,private_profile=True),root/'_assets',root)
+    def test_failure_collection_requires_explicit_keyless_and_exact_allowlist(self):
+        root=Path(__file__).resolve().parents[3]
+        for meta in ({'folder':'Windows NT 3.51'},
+                     *({'folder':'Windows NT 3.51','private_profile':value} for value in (None,0,'false',True)),
+                     *({'folder':folder,'private_profile':False} for folder in
+                       ('Windows NT 3.51 Other','windows nt 3.51','Windows NT 3.1 Server','Windows XP',None,[]))):
+            with self.subTest(metadata=meta),self.assertRaises(ValueError):
+                aux.validate_failure_collection(True,meta,root/'_assets'/'frozen',root)
+        for assets in (None,root/'outside'):
+            with self.subTest(assets=assets),self.assertRaises(ValueError):
+                aux.validate_failure_collection(True,{'folder':'Windows NT 3.51','private_profile':False},assets,root)
+    def test_disk_mode_uses_the_actual_non_erasing_first_row(self):
+        root=Path(__file__).resolve().parents[3]
+        source=(root/'tools/xp_disk_reset_ui.sh').read_text()
+        self.assertLess(source.index('item=Keep existing partitions'),source.index('item=Format entire disk'))
+        self.assertEqual(aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/xp-disk-mode.txt'),('ret',))
+        self.assertEqual(aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/xp-confirm-menu.state'),('up','ret'))
+        with self.assertRaises(ValueError):aux.framebuffer_menu_keys('[COVERAGE_MENU] /run/new-menu.txt')
+    def test_hid_requests_are_limited_to_owned_devices(self):
+        self.assertEqual(aux.hid_descriptor('keyboard','mouse')['id'],'coveragekbd')
+        self.assertEqual(aux.hid_descriptor('mouse','mouse')['driver'],'usb-mouse')
+        self.assertEqual(aux.hid_descriptor('mouse','tablet')['driver'],'usb-tablet')
+        with self.assertRaises(ValueError):aux.hid_descriptor('host-controller','mouse')
+        with self.assertRaises(ValueError):aux.hid_descriptor('mouse','unknown')
+    def test_closed_or_noninteractive_input_is_rejected_before_vm_creation(self):
+        with self.assertRaises(ValueError):aux.require_operator_channel(True,io.StringIO())
+        with self.assertRaises(ValueError):aux.require_operator_channel(True,SimpleNamespace(closed=True,isatty=lambda:True))
+        aux.require_operator_channel(True,SimpleNamespace(closed=False,isatty=lambda:True))
+        aux.require_operator_channel(False,io.StringIO())
+    def test_82576_is_in_the_actual_driver_and_inf(self):
+        root=Path(__file__).resolve().parents[3]
+        self.assertIn('0x10C9',(root/'tools/nt/usosnet/src/usosnet.c').read_text())
+        self.assertIn('DEV_10C9',(root/'tools/nt/usosnet/inf/usosnet.inf').read_text())
+        self.assertIn('igb,netdev=',','.join(aux.network_arguments('igb')))
+        self.assertEqual(aux.network_arguments('none'),['-nic','none'])
+        with self.assertRaises(ValueError):aux.network_arguments('e1000')
+
+    def test_fat16_geometry_and_file_chain(self):
+        for kind,name in [('boot',b'START   TXT'),('hot',b'HOTPLUG TXT')]:
+            with self.subTest(kind=kind):
+                image=aux.fat16_prefix(kind)
+                self.assertEqual(image[510:512],b'\x55\xaa')
+                self.assertEqual(image[450],6)
+                lba,sectors=struct.unpack_from('<II',image,454);start=lba*512
+                bps,cluster,reserved,fats,root_entries,small,media,fatsecs=struct.unpack_from('<HBHBHHBH',image,start+11)
+                self.assertEqual((bps,small,media),(512,0,0xf8))
+                total=struct.unpack_from('<I',image,start+32)[0]
+                self.assertEqual(total,sectors)
+                rootsecs=(root_entries*32+bps-1)//bps
+                clusters=(total-reserved-fats*fatsecs-rootsecs)//cluster
+                self.assertTrue(4085<=clusters<65525,'Must be FAT16, not FAT12/FAT32')
+                self.assertGreaterEqual(fatsecs*bps//2,clusters+2)
+                first=image[start+reserved*bps:start+(reserved+fatsecs)*bps]
+                second=image[start+(reserved+fatsecs)*bps:start+(reserved+2*fatsecs)*bps]
+                self.assertEqual(first,second)
+                root=start+(reserved+fats*fatsecs)*bps
+                self.assertEqual(image[root:root+11],name)
+                cluster_no,size=struct.unpack_from('<HI',image,root+26)
+                self.assertGreaterEqual(struct.unpack_from('<H',first,cluster_no*2)[0],0xfff8)
+                data=start+(reserved+fats*fatsecs+rootsecs+(cluster_no-2)*cluster)*bps
+                self.assertEqual(image[data:data+size],('USOS disposable USB '+kind+' read test\r\n').encode())
+
+
+if __name__=='__main__':unittest.main()

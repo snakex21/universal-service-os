@@ -20,7 +20,13 @@ param(
     # PE10 donor for Vista / Windows 7 originals: copied to DATA\Programs\USOS\WinPE
     # and recorded in EFI\USOS\winpe-donor.ini, as the installer does.
     [string]$DonorPath = '',
-    [int]$SizeGB = 20
+    [int]$SizeGB = 20,
+    # USOS answer profile (.ini) copied to the ESP as \EFI\USOS\profiles\<name>,
+    # as the menu's profile editor saves it.
+    [string]$ProfilePath = '',
+    # A folder copied as it is into the DATA root (e.g. Systems\Windows\Windows 7\Updates
+    # and ...\Drivers\x86 for the 32-bit Windows 7 USB 3 step).
+    [string]$DataExtraPath = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -53,6 +59,10 @@ try {
     $disk = Get-DiskImage -ImagePath $VhdPath | Get-Disk
     if ($disk.PartitionStyle -ne 'RAW') { throw "new VHD is not RAW: $($disk.PartitionStyle)" }
     Initialize-Disk -Number $disk.Number -PartitionStyle GPT | Out-Null
+    # Like the installer's layout (gpt_buffer_windows.go): no MSR, the ESP is
+    # the first partition. WinPE before Windows 10 1703 (Windows 7, 8.1,
+    # Server 2012 R2) mounts only the first partition of a removable disk.
+    Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue | Where-Object { $_.GptType -eq '{e3c9e316-0b5c-4db8-817d-f92df00215ae}' } | Remove-Partition -Confirm:$false
     $disk = Get-Disk -Number $disk.Number
     $esp = New-Partition -DiskNumber $disk.Number -Size 1GB -GptType $EspType
     $data = New-Partition -DiskNumber $disk.Number -Size (([uint64]$SizeGB - 3) * 1GB) -GptType $BasicDataType
@@ -113,9 +123,18 @@ try {
         $donorSize = (Get-Item -LiteralPath $donorTarget).Length
         [IO.File]::WriteAllText((Join-Path $espRoot 'EFI\USOS\winpe-donor.ini'), "; USOS-managed PE10 donor (test stick)`r`nname=$donorName`r`nsize=$donorSize`r`nsha256=$donorHash`r`n")
     }
+    if ($ProfilePath) {
+        $profiles = Join-Path $espRoot 'EFI\USOS\profiles'
+        New-Item -ItemType Directory -Force -Path $profiles | Out-Null
+        Copy-Item -LiteralPath $ProfilePath -Destination (Join-Path $profiles (Split-Path -Leaf $ProfilePath)) -Force
+    }
     if ($DataDriversPath) {
         & robocopy.exe $DataDriversPath (Join-Path $dataRoot 'Drivers') /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA drivers failed: $LASTEXITCODE" }
+    }
+    if ($DataExtraPath) {
+        & robocopy.exe $DataExtraPath $dataRoot /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA extra files failed: $LASTEXITCODE" }
     }
     Write-Host "[PASS] native stick disk=$diskGuid esp=$espGuid data=$dataGuid work=$workGuid iso=$isoTarget"
 } finally {

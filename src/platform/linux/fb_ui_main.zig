@@ -23,6 +23,27 @@ pub fn main(init: std.process.Init) !u8 {
             const log_path = args.next() orelse return 2;
             return @import("driver_stage.zig").run(source, destination, image, log_path);
         }
+        // tools/dos_csmwrap_target.sh: patch the staged Windows 3.x display
+        // driver(s) and VGA logo (X470 latch fault, src/compat/win3x; no UI).
+        if (std.mem.eql(u8, arg, "--win3x-display")) {
+            return usos.win3x.display_run.run(init.io, init.gpa, args.next() orelse return 2);
+        }
+        // tools/w9x_csmwrap_target.sh: Windows 9x Setup's MINI.CAB (VGA.DRV
+        // latch fix, USB keyboard/mouse bridge for its mini-Windows; no UI).
+        if (std.mem.eql(u8, arg, "--w9x-setup-mini")) {
+            const setup_dir = args.next() orelse return 2;
+            return usos.win3x.w9x_mini.run(init.io, init.gpa, setup_dir, args.next() orelse return 2);
+        }
+        // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
+        if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
+            const bcd = @import("bcd_lowmem.zig");
+            return bcd.run(args.next() orelse return 2, bcd.truncatememory);
+        }
+        // tools/vista_csmwrap_target.sh: testsigning in the x64 staging BCD.
+        if (std.mem.eql(u8, arg, "--bcd-testsigning")) {
+            const bcd = @import("bcd_lowmem.zig");
+            return bcd.run(args.next() orelse return 2, bcd.testsigning);
+        }
     }
 
     // Take ownership of the visible fbdev surface first. As soon as mmap is

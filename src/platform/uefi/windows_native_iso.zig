@@ -38,7 +38,9 @@ noinline fn initBootState(state: *BootState) !void {
 const Iso = struct {
     catalog: *data_volume.Catalog,
     file: *ntfs.File,
-    pub fn size(self: *const Iso) u64 { return self.file.size(); }
+    pub fn size(self: *const Iso) u64 {
+        return self.file.size();
+    }
     pub fn readAt(self: *const Iso, offset: u64, output: []u8) !usize {
         try self.file.readAt(self.catalog.fs, self.catalog.reader(), offset, output);
         return output.len;
@@ -79,7 +81,8 @@ fn openIso(catalog: *data_volume.Catalog, folder: []const u8, name: []const u8, 
     var name_buffer: [255]u16 = undefined;
     var folder_buffer: [64]u16 = undefined;
     if (folder.len > folder_buffer.len) return error.UnsupportedWindowsFolder;
-    const path = [_][]const u16{ wide("Systems"), wide("Windows"), widen(folder, &folder_buffer), wide("Images"), widen(name, &name_buffer) };
+    var category_buffer: [16]u16 = undefined;
+    const path = [_][]const u16{ wide("Systems"), widen(source_config.categoryForFolder(folder), &category_buffer), widen(folder, &folder_buffer), wide("Images"), widen(name, &name_buffer) };
     try ntfs.openFile(catalog.fs, catalog.reader(), &path, file);
 }
 
@@ -146,14 +149,16 @@ pub fn userDriverCountsFor(folder: []const u8) ?[2]usize {
 
 pub const donor_record_path = scanner.donor_record_path;
 pub const DonorRecord = scanner.DonorRecord;
-const parseDonorRecord = scanner.parseDonorRecord;
-
 fn readDonorRecord(root: *uefi.protocol.File) ?DonorRecord {
+    return readDonorRecordFor(root, .x64);
+}
+
+fn readDonorRecordFor(root: *uefi.protocol.File, arch: scanner.DonorArch) ?DonorRecord {
     const file = root.open(wide(donor_record_path), .read, .{}) catch return null;
     defer file.close() catch {};
     var buffer: [1024]u8 = undefined;
     const got = file.read(&buffer) catch return null;
-    return parseDonorRecord(buffer[0..got]);
+    return scanner.parseDonorRecordFor(buffer[0..got], arch);
 }
 
 var record_root: ?*uefi.protocol.File = null;
@@ -170,9 +175,34 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
     const esp = root orelse record_root orelse return;
     const record = readDonorRecord(esp) orelse return;
     if (!std.ascii.eqlIgnoreCase(record.nameSlice(), inspection.donor_name.slice())) return error.Windows10PeDonorNotRecorded;
+    try verifyRecordedDonor(state, inspection, &record, progress);
+}
+
+/// The x86 donor (32-bit Windows 7 / Vista / 2008 without CSM): checked
+/// against the x86_ entry of winpe-donor.ini when it is the recorded donor in
+/// Programs/USOS/WinPE (the shipped PE10_x86_19041_USOS.iso). A user's own
+/// Windows 10 x86 ISO (the Windows 10/Images fallback) has no record: the
+/// structural checks only.
+fn checkX86DonorRecord(state: *BootState, inspection: *const scanner.Inspection, root: ?*uefi.protocol.File, progress: ?*const fn (IsoStage, []const u8) void) !void {
+    const esp = root orelse record_root orelse return;
+    const record = readDonorRecordFor(esp, .x86) orelse return;
+    if (!scanner.x86DonorRecorded(record, inspection)) return;
+    try verifyRecordedDonor(state, inspection, &record, progress);
+}
+
+/// The x86_name of winpe-donor.ini: the donor resolveX86Donor prefers.
+fn recordedX86Name(root: ?*uefi.protocol.File, out: *DonorRecord) ?[]const u8 {
+    const esp = root orelse record_root orelse return null;
+    out.* = readDonorRecordFor(esp, .x86) orelse return null;
+    return out.nameSlice();
+}
+
+/// Size (always) and SHA-256 (with `progress`, right before use) of the
+/// resolved donor against its record.
+fn verifyRecordedDonor(state: *BootState, inspection: *const scanner.Inspection, record: *const DonorRecord, progress: ?*const fn (IsoStage, []const u8) void) !void {
     try openIn(&state.catalog, inspection.donor_directory, inspection.donor_name.slice(), &state.donor);
     const donor_bytes = ntfs.File.size(&state.donor);
-    if (donor_bytes != record.size) return error.Windows10PeDonorCorrupt;
+    try scanner.checkDonorDigest(record, donor_bytes, null);
     const report = progress orelse return;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const chunk = try bs.allocatePool(.loader_data, 8 * 1024 * 1024);
@@ -195,7 +225,7 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
     }
     var digest: [32]u8 = undefined;
     hash.final(&digest);
-    if (!std.mem.eql(u8, &digest, &record.sha256)) return error.Windows10PeDonorCorrupt;
+    try scanner.checkDonorDigest(record, donor_bytes, &digest);
     serial.writeAscii("[WIN7_NATIVE] PE10 donor SHA-256 matches winpe-donor.ini\r\n");
 }
 
@@ -267,6 +297,11 @@ pub const CsmwrapAnswer = union(enum) {
 /// request.ini: DATA-relative paths of the Vista ISO and the PE10 donor, the
 /// DATA system folder and the answer source. No key or password in it.
 pub fn formatCsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, donor_directory: []const u8, donor_name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
+    return formatCsmwrapRequestFor(buffer, "vista-x64-sp2-uefi-csmwrap", folder, name, donor_directory, donor_name, answer);
+}
+
+/// The same request with another step-610 profile (win-nt6-x86-uefi-csmwrap).
+pub fn formatCsmwrapRequestFor(buffer: []u8, comptime profile: []const u8, folder: []const u8, name: []const u8, donor_directory: []const u8, donor_name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
     try source_config.validateName(folder);
     try source_config.validateName(name);
     try source_config.validateName(donor_name);
@@ -284,7 +319,7 @@ pub fn formatCsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, 
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=vista-x64-sp2-uefi-csmwrap\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, dir, donor_name, folder, answer_value });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ profile ++ "\r\niso=Systems/{s}/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ source_config.categoryForFolder(folder), folder, name, dir, donor_name, folder, answer_value });
 }
 
 fn ensureEspDirectory(root: *uefi.protocol.File, path_text: []const u8) !void {
@@ -340,20 +375,126 @@ test "Vista CSMWrap request names DATA-relative paths and the answer source" {
     try std.testing.expectError(error.InvalidImageName, formatCsmwrapRequest(&buffer, "Windows Vista", "a/b.iso", "Programs/USOS/WinPE", "PE10.iso", .none));
 }
 
+// ------------------------------------ 32-bit Windows 7 / Vista / 2008
+// No firmware CSM (win-nt6-x86-uefi-csmwrap, design doc
+// csmwrap-integration.md section 12): the selected 32-bit ISO keeps Setup
+// and install.wim, an x86 PE10 donor (a Windows 10 x86 Setup ISO) is staged
+// on the target by micro-Linux step 610 (the X86_SELF layout of section 11)
+// and runs that Setup in BIOS mode through CSMWrap.
+
+pub const nt6_x86_csmwrap_profile = "win-nt6-x86-uefi-csmwrap";
+
+const X86DonorContext = struct {
+    state: *BootState,
+    pub fn probeX86Donor(self: *X86DonorContext, directory: []const u8, name: []const u8) !usos.wim_setup.Setup {
+        try openIn(&self.state.catalog, directory, name, &self.state.donor);
+        var iso = Iso{ .catalog = &self.state.catalog, .file = &self.state.donor };
+        return scanner.inspectX86Donor(uefi.pool_allocator, &iso);
+    }
+};
+
+/// NT minor version of a Windows 7 / Vista route (1: 7 / 2008 R2, 0: Vista / 2008).
+pub fn nt6Minor(system: *const usos.catalog.SystemEntry) u32 {
+    return if (usos.catalog.os_profiles.traits(system.id).native_uefi == .vista) 0 else 1;
+}
+
+fn inspectNt6X86State(state: *BootState, root: ?*uefi.protocol.File, folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
+    try openIso(&state.catalog, folder, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    const install = try scanner.inspectNt6X86(uefi.pool_allocator, &iso, minor);
+    const selected = scanner.Inspection{ .mode = .original, .selected_setup = install, .boot_setup = install, .nvme_packages = false };
+    var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
+    var context = X86DonorContext{ .state = state };
+    var record: DonorRecord = .{};
+    return scanner.resolveX86Donor(selected, adapter.source(), &context, recordedX86Name(root, &record));
+}
+
+/// The summary's check: the 32-bit ISO and the x86 PE10 donor.
+pub noinline fn inspectNt6X86(folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    const inspection = try inspectNt6X86State(state, null, folder, name, minor);
+    try checkX86DonorRecord(state, &inspection, null, null);
+    return inspection;
+}
+
+/// The ISO and donor checks, then usos-source.ini (the 32-bit ISO: WinPE
+/// mounts it) and request.ini (profile win-nt6-x86-uefi-csmwrap, donor =
+/// the x86 PE10 ISO) in \EFI\USOS\vista-csmwrap for micro-Linux step 610.
+pub noinline fn prepareNt6X86Csmwrap(root: *uefi.protocol.File, folder: []const u8, name: []const u8, minor: u32, answer: CsmwrapAnswer, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    progress(.validating, "Validating the installation ISO and the x86 PE10 donor");
+    const inspection = try inspectNt6X86State(state, root, folder, name, minor);
+    try checkX86DonorRecord(state, &inspection, root, progress);
+    var message: [320]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&message, "[NT6_X86_CSMWRAP] {s}/{s}; NT 6.{d} x86; donor {s}/{s} PE={d}.{d}.{d} x86\r\n", .{ folder, name, minor, inspection.donor_directory, inspection.donor_name.slice(), inspection.boot_setup.major, inspection.boot_setup.minor, inspection.boot_setup.build }) catch "[NT6_X86_CSMWRAP] inspected\r\n");
+    // Reopen the selected ISO (its size goes into the binding).
+    try openIso(&state.catalog, folder, name, &state.source);
+    var config: [544]u8 = undefined;
+    const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
+    var request: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequestFor(&request, nt6_x86_csmwrap_profile, folder, name, inspection.donor_directory, inspection.donor_name.slice(), answer);
+    const settings_store = @import("settings_store.zig");
+    try ensureEspDirectory(root, csmwrap_directory);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\request.ini", text);
+    serial.writeAscii("[NT6_X86_CSMWRAP] request written: ");
+    serial.writeAscii(text);
+}
+
+test "32-bit Windows 7 / Vista request names the x86 PE10 donor" {
+    var buffer: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequestFor(&buffer, nt6_x86_csmwrap_profile, "Windows 7", "w7x86.iso", "Systems/Windows/Windows 10/Images", "w10x86.iso", .profile);
+    try std.testing.expectEqualStrings("version=1\r\nprofile=win-nt6-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 7/Images/w7x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 7\r\nanswer=profile\r\n", text);
+}
+
 // ------------------------------------------------- Windows 10/11 and WinPE
 
 pub const systemFolder = scanner.systemFolder;
+
+/// The Setup WinPE versions the native modern (x64) start runs: 6.3 and 10.0.
+pub fn modernSetupVersion(setup: wim.Setup) bool {
+    return setup.major == 10 or (setup.major == 6 and setup.minor == 3);
+}
+
+/// The x86 CSMWrap path (win-x86-uefi-csmwrap) also takes Windows 8 RTM
+/// (NT 6.2, build 9200, PE 4.0): Setup runs in BIOS mode there, so the x64
+/// native start stays 6.3 / 10 only.
+pub fn modernX86SetupVersion(setup: wim.Setup) bool {
+    return modernSetupVersion(setup) or (setup.major == 6 and setup.minor == 2 and setup.build == 9200);
+}
+
+test "native modern start accepts PE 5.0 (6.3) and PE 10, the x86 path also Windows 8 RTM" {
+    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
+    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 10, .minor = 0, .build = 26100 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
+    try std.testing.expect(modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+    try std.testing.expect(modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
+    // Only the RTM build of 6.2: no pre-release / unknown 6.2 Setup media.
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 8400 }));
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
+    try std.testing.expect(!modernX86SetupVersion(.{ .index = 2, .major = 6, .minor = 0, .build = 6002 }));
+}
 
 pub const ModernInspection = struct {
     setup: wim.Setup,
     install: []const u8,
 };
 
-/// Windows 10/11 Setup media: x64 boot.wim (its declared boot index) of
-/// version 10, BCD and boot.sdi, sources/setup.exe and an install image.
+/// Windows 8.1/10/11 Setup media: x64 boot.wim (its declared boot index) of
+/// version 6.3 (PE 5.0: 8.1, Server 2012 R2, Embedded 8.1) or 10, BCD and
+/// boot.sdi, sources/setup.exe and an install image.
 fn inspectModernIso(iso: anytype) !ModernInspection {
     const setup = try scanner.setupInfo(uefi.pool_allocator, iso);
-    if (setup.major != 10) return error.UnsupportedWindowsSetupVersion;
+    if (!modernSetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
     try scanner.validateBootFiles(iso);
     var node: udf.Node = undefined;
     if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;
@@ -371,6 +512,154 @@ pub noinline fn inspectModern(image_directory: []const u8, name: []const u8) !Mo
     try openIn(&state.catalog, image_directory, name, &state.source);
     var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
     return inspectModernIso(&iso);
+}
+
+// ------------------------------- 32-bit Windows 8.1 / 10 without CSM
+
+/// 32-bit Windows 8.1 / 10 Setup media (win-x86-uefi-csmwrap): x86 boot.wim of
+/// PE 5.0 or 10, BCD, boot.sdi, the BIOS bootmgr, sources/setup.exe and an
+/// install image. The x64 firmware cannot start it: micro-Linux step 610
+/// stages the ISO's own WinPE on the target, which then runs in BIOS mode
+/// through CSMWrap (docs/design/csmwrap-integration.md section 11).
+fn inspectModernX86Iso(iso: anytype) !ModernInspection {
+    const setup = try usos.windows7_iso.setupInfoX86(uefi.pool_allocator, iso);
+    if (!modernX86SetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
+    try scanner.validateBootFiles(iso);
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;
+    if (!try udf.openPath(iso, "bootmgr", &node) or node.is_directory or node.size == 0) return error.InvalidWindowsBootFile;
+    for (usos.image_probe.windows_detect.modern_install_images) |path| {
+        if (try udf.openPath(iso, path, &node) and !node.is_directory and node.size > 0) return .{ .setup = setup, .install = path };
+    }
+    return error.WindowsInstallImageMissing;
+}
+
+pub noinline fn inspectModernX86(image_directory: []const u8, name: []const u8) !ModernInspection {
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    try openIn(&state.catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    return inspectModernX86Iso(&iso);
+}
+
+pub const x86_csmwrap_profile = "win-x86-uefi-csmwrap";
+
+/// 8 / 8.1 / Embedded 8.1 x86 on NVMe needs PE10's setup host (their own PE
+/// stalls at 0% or has no usosnvme package). Default on since the X470 PASS
+/// 2026-10-22: the donor is picked here before the disk is known; micro-Linux
+/// uses it only for an NVMe target (a SATA target keeps 8's own PE). Windows
+/// 10 keeps its PE.
+pub fn modernX86ExternalDonor(setup: wim.Setup, folder: []const u8, nvme_on: bool) bool {
+    if (!nvme_on or setup.major != 6) return false;
+    const windows8 = setup.minor == 2 and setup.build == 9200 and std.mem.eql(u8, folder, "Windows 8");
+    const windows81 = setup.minor == 3 and
+        (std.mem.eql(u8, folder, "Windows 8.1") or std.mem.eql(u8, folder, "Windows Embedded 8.1 Industry"));
+    return windows8 or windows81;
+}
+
+/// Unattended\nvme-off.txt on DATA turns the 32-bit 8.1 / 10 NVMe route off.
+fn modernNvmeOff(state: *BootState, folder: []const u8) !bool {
+    var directory: [160]u8 = undefined;
+    const path = try std.fmt.bufPrint(&directory, "Systems/{s}/{s}/Unattended", .{ source_config.categoryForFolder(folder), folder });
+    var flag: ntfs.File = undefined;
+    openIn(&state.catalog, path, "nvme-off.txt", &flag) catch |err| switch (err) {
+        error.NotFound => return false,
+        else => return err,
+    };
+    return true;
+}
+
+test "modern x86 PE10 donor is confined to Windows 8 / 8.1 folders with the NVMe route on" {
+    const pe8 = wim.Setup{ .index = 2, .major = 6, .minor = 2, .build = 9200 };
+    const pe81 = wim.Setup{ .index = 2, .major = 6, .minor = 3, .build = 9600 };
+    const pe10 = wim.Setup{ .index = 2, .major = 10, .minor = 0, .build = 19041 };
+    try std.testing.expect(modernX86ExternalDonor(pe8, "Windows 8", true));
+    try std.testing.expect(modernX86ExternalDonor(pe81, "Windows 8.1", true));
+    try std.testing.expect(modernX86ExternalDonor(pe81, "Windows Embedded 8.1 Industry", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe8, "Windows 8", false));
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 8.1", false));
+    try std.testing.expect(!modernX86ExternalDonor(pe10, "Windows 10", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 7", true));
+    // The folder and the Setup version must match: no 8.1 PE for a Windows 8 ISO.
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 8", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe8, "Windows 8.1", true));
+}
+
+/// request.ini of the x86 path: the ISO is its own boot source (donor = iso).
+pub fn formatX86CsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
+    try source_config.validateName(folder);
+    try source_config.validateName(name);
+    var answer_text: [300]u8 = undefined;
+    const answer_value = switch (answer) {
+        .none => "none",
+        .profile => "profile",
+        .file => |file| blk: {
+            try source_config.validateName(file);
+            break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
+        },
+    };
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/{s}/{s}/Images/{s}\r\ndonor=Systems/{s}/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ source_config.categoryForFolder(folder), folder, name, source_config.categoryForFolder(folder), folder, name, folder, answer_value });
+}
+
+test "x86 CSMWrap request boots the ISO itself" {
+    var buffer: [512]u8 = undefined;
+    const text = try formatX86CsmwrapRequest(&buffer, "Windows 10", "w10x86.iso", .profile);
+    try std.testing.expectEqualStrings("version=1\r\nprofile=win-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 10/Images/w10x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 10\r\nanswer=profile\r\n", text);
+    try std.testing.expectError(error.InvalidImageName, formatX86CsmwrapRequest(&buffer, "Windows 10", "a/b.iso", .none));
+    const beta = try formatX86CsmwrapRequest(&buffer, "Windows 7 Beta", "beta.iso", .{ .file = "beta.xml" });
+    try std.testing.expect(std.mem.indexOf(u8, beta, "iso=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, beta, "donor=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
+}
+
+/// The ISO checks of the x86 path, then usos-source.ini (the DATA binding
+/// usos-start.cmd mounts the ISO with) and request.ini in
+/// \EFI\USOS\vista-csmwrap for micro-Linux step 610. Nothing is booted here.
+pub noinline fn prepareX86Csmwrap(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer: CsmwrapAnswer, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const folder = try systemFolder(image_directory);
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    progress(.validating, "Reading the selected Windows ISO");
+    try openIn(&state.catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    const inspection = try inspectModernX86Iso(&iso);
+    var message: [256]u8 = undefined;
+    serial.writeAscii(try std.fmt.bufPrint(&message, "[X86_CSMWRAP] {s}\\{s}; PE={d}.{d}.{d} x86 index={d}\r\n", .{ folder, name, inspection.setup.major, inspection.setup.minor, inspection.setup.build, inspection.setup.index }));
+    var config: [544]u8 = undefined;
+    const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
+    var request: [1024]u8 = undefined;
+    const external_pe10 = modernX86ExternalDonor(inspection.setup, folder, true) and !(try modernNvmeOff(state, folder));
+    // No usable donor only closes the NVMe route (micro-Linux stops on an
+    // NVMe pick); 8.1 on SATA still runs from its own PE.
+    const donor_text: ?[]const u8 = if (external_pe10) blk: {
+        progress(.validating, "Validating the x86 PE10 donor for NVMe targets");
+        const selected = scanner.Inspection{ .mode = .original, .selected_setup = inspection.setup, .boot_setup = inspection.setup, .nvme_packages = false };
+        var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
+        var context = X86DonorContext{ .state = state };
+        var record: DonorRecord = .{};
+        const donor = scanner.resolveX86Donor(selected, adapter.source(), &context, recordedX86Name(root, &record)) catch |err| {
+            serial.writeAscii(try std.fmt.bufPrint(&message, "[X86_CSMWRAP] 8.1 NVMe: no x86 PE10 donor ({s}); own PE, NVMe targets refused\r\n", .{@errorName(err)}));
+            break :blk null;
+        };
+        checkX86DonorRecord(state, &donor, root, progress) catch |err| {
+            serial.writeAscii(try std.fmt.bufPrint(&message, "[X86_CSMWRAP] 8.1 NVMe: x86 PE10 donor rejected ({s}); own PE, NVMe targets refused\r\n", .{@errorName(err)}));
+            break :blk null;
+        };
+        serial.writeAscii("[X86_CSMWRAP] 8.1 NVMe route: external x86 PE10 donor (used for NVMe targets)\r\n");
+        break :blk try formatCsmwrapRequestFor(&request, x86_csmwrap_profile, folder, name, donor.donor_directory, donor.donor_name.slice(), answer);
+    } else null;
+    const text = donor_text orelse try formatX86CsmwrapRequest(&request, folder, name, answer);
+    const settings_store = @import("settings_store.zig");
+    try ensureEspDirectory(root, csmwrap_directory);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\request.ini", text);
+    serial.writeAscii("[X86_CSMWRAP] request written: ");
+    serial.writeAscii(text);
 }
 
 /// Starts Windows 10/11 Setup from the selected ISO (`winpe == false`) or a
@@ -449,6 +738,16 @@ fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, o
         switch (item) {
             .support => |support| try addSupport(root, volume, owned, support.path, support.limit_mib),
             .flag => |flag_name| try volume.add(flag_name, usos.flow.plan.flag_content),
+            .unattended_flag => |flag| {
+                var directory: [192]u8 = undefined;
+                const path = try std.fmt.bufPrint(&directory, "Systems/{s}/{s}/Unattended", .{ source_config.categoryForFolder(flag.folder), flag.folder });
+                var marker: ntfs.File = undefined;
+                const present = if (openIn(catalog, path, flag.source, &marker)) |_| true else |err| switch (err) {
+                    error.NotFound => false,
+                    else => return err,
+                };
+                if (present) try volume.add(flag.target, usos.flow.plan.flag_content);
+            },
             .bundled_drivers => |user_folder| {
                 progress(.loading, "Reading optional Windows 7 x64 driver packages");
                 const drivers = try driver_files.loadWithUser(catalog, user_folder);

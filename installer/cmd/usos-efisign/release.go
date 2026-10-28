@@ -40,16 +40,32 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos3 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos18 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
-	// CSMWrap's BBS table, USB included; docs/research/csmwrap.md sections 6
+	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
+	// from as 0x80, an ACPI 1.0 view (RSDT, 32-bit FADT fields) for 2000/XP,
+	// APM power-off that works from 9x (ACPI mode, then S5, the helper's
+	// ResetSystem last) with CMOS breadcrumbs of every step, NVMe INT 13h
+	// again after an OS driver stopped the controller (9x power-off), and
+	// HPET / AMD GPIO devices hidden from Windows 2000 in its legacy
+	// DSDT/SSDT copies (only with csmwrap.ini acpi_legacy_fadt = true),
+	// only the boot disk as a BIOS hard disk (int13_boot_disk_only = true)
+	// PCI INTx routed to 8259 IRQs for Windows 9x (pci_irq_routing =
+	// true, written by the 9x flow only) and the USB mouse wheel through
+	// the BIOS pointing device (IntelliMouse emulation, more mouse report
+	// shapes and a mouse behind a keyboard interface; a diagnostics record;
+	// the wheel in the handler Z word also without the knock; a USB disk
+	// service on the helper core for the 9x miniport USOSUSB.MPD and, only
+	// with int13_boot_disk_only = true, USB stick hot-swap for it; USB
+	// keyboard / mouse replug on root ports, patches 0023-0024);
+	// docs/research/csmwrap.md sections 6
 	// and 7, docs/design/bios-via-csmwrap.md) for XP / Vista without firmware
 	// CSM and for the UEFI menu's "Legacy BIOS mode (CSMWrap)": copied
 	// hash-checked, never signed; the preparers put it on the target's own
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos3"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos18"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -414,8 +430,60 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"banner or UUID line, no 'Booting from ...' lines, no boot-menu prompt or wait),\r\n" +
 		"and on 2026-09-29 (patch 0004): SeaBIOS takes the boot priorities from\r\n" +
 		"CSMWrap's BBS table by PCI address, USB mass storage included, so the drive\r\n" +
-		"CSMWrap was loaded from boots first. Version strings: CSMWrap Version\r\n" +
-		"3.1.2-usos3, SeaBIOS 578d260b-CSMWrap-3.1.2-usos3.\r\n" +
+		"CSMWrap was loaded from boots first, and on 2026-10-11 (patch 0005): CSMWrap\r\n" +
+		"tags the exact disk it was loaded from (hash of its sector 0) and SeaBIOS\r\n" +
+		"makes that disk 0x80 also when other disks share its controller, and on\r\n" +
+		"2026-10-13 (patch 0006): an ACPI 1.0 view for legacy systems on CSMWrap's\r\n" +
+		"RSDP copy (an RSDT built from the XSDT when RsdtAddress is 0 or the RSDT is\r\n" +
+		"invalid; a FADT copy with the 32-bit fields filled from the X_ fields), and on\r\n" +
+		"2026-10-14 (patch 0007, diagnostic, only with csmwrap.ini acpi_legacy_fadt =\r\n" +
+		"true): the switch to ACPI mode (FADT ACPI_ENABLE to SMI_CMD) right before the\r\n" +
+		"legacy boot, with the RTC A/B registers recorded around it, and on 2026-10-15\r\n" +
+		"(patch 0008): APM power-off (5307h) that also works from the protected-mode\r\n" +
+		"APM interfaces (UEFI ResetSystem on the helper core, then a direct ACPI S5\r\n" +
+		"write with SLP_TYP read from the DSDT's \\_S5), and SeaBIOS debug output on the\r\n" +
+		"serial port when csmwrap.ini sets serial = true, and on 2026-10-15 (patch\r\n" +
+		"0009): the power-off order ACPI mode, PM1/GPE0 status cleared, S5, helper\r\n" +
+		"ResetSystem last, bounded waits, every step recorded in the CMOS RTC alarm\r\n" +
+		"bytes for the USOS menu, and on 2026-10-15 (patch 0010): SeaBIOS NVMe\r\n" +
+		"re-arms the controller (admin queue, I/O queue pair 1 in its POST memory)\r\n" +
+		"when an OS left it stopped, writes after that with FUA, and on 2026-10-15\r\n" +
+		"(patch 0011, a diagnostic tick watcher, kept in 3.1.2-usos10 only), and on\r\n" +
+		"2026-10-17 (patch 0012, only with csmwrap.ini acpi_legacy_fadt = true): in the\r\n" +
+		"legacy DSDT/SSDT copies for Windows 2000 the _STA of HPET (PNP0103) and AMD\r\n" +
+		"GPIO (AMDI0030/AMD0030) devices returns 0, on 2026-10-18 (patch 0014, only\r\n" +
+		"with csmwrap.ini int13_boot_disk_only = true): SeaBIOS maps only the disk\r\n" +
+		"CSMWrap was loaded from as a BIOS hard disk, and on 2026-10-18 (patch 0015,\r\n" +
+		"only with csmwrap.ini pci_irq_routing = true, the Windows 9x flow): PCI\r\n" +
+		"INTx routed to 8259 IRQs through the ACPI link devices (_PRT, bridge\r\n" +
+		"swizzle, _SRS), Interrupt Line registers, ELCR and a matching $PIR, and on\r\n" +
+		"2026-10-18 (patch 0016): the USB mouse wheel through the BIOS pointing\r\n" +
+		"device (HID report protocol when the report descriptor has a wheel,\r\n" +
+		"IntelliMouse device ID 3 after the 200/100/80 sample-rate sequence, INT 15h\r\n" +
+		"C205h package sizes 1-7) and (patch 0017) the SeaBIOS options that only act\r\n" +
+		"on romfiles (boot splash, serial console, bios-geometry) turned off, and on\r\n" +
+		"2026-10-18 (patch 0018) a USB mouse wheel diagnostics record in SeaBIOS low\r\n" +
+		"memory (signature USOSMWHL) and (patch 0019) more USB mouse report shapes for\r\n" +
+		"the wheel (long reports of other report IDs, up to 16 IDs) and a boot mouse\r\n" +
+		"interface after a boot keyboard interface of the same device, and on\r\n" +
+		"2026-10-19 (patch 0020) the USB mouse wheel in the INT 15h C207h handler's Z\r\n" +
+		"word for 3-byte packages also without the IntelliMouse sample-rate sequence,\r\n" +
+		"and a ring of the last 16 INT 15h C2xxh calls in the USOSMWHL record, and on\r\n" +
+		"2026-10-19 (patch 0021) a USB disk service on channel 1 of the helper core\r\n" +
+		"(SCSI commands from an OS driver to USB sticks without a BIOS drive number,\r\n" +
+		"BOT reset recovery, fast fail on unplug, a USOSUDSK diagnostics record), and\r\n" +
+		"on 2026-10-19 (patch 0022, only with csmwrap.ini int13_boot_disk_only =\r\n" +
+		"true, the Windows 9x flow) USB stick hot-swap for that service (a port watch\r\n" +
+		"on the helper core, runtime bring-up and teardown of bulk-only sticks, a\r\n" +
+		"media check, record version 2); the SeaBIOS build has no MegaRAID SAS and no\r\n" +
+		"UHCI driver (ROM room), and on 2026-10-23 (patch 0023, written by Codex for\r\n" +
+		"USOS, and patch 0024) USB keyboard / mouse replug: a root-port HID device set\r\n" +
+		"up at POST is brought up again when the same device is plugged into a root\r\n" +
+		"port of the same controller (port watch from the helper loop with the USB\r\n" +
+		"disk service, otherwise from the BIOS timer interrupt; never on a controller\r\n" +
+		"an OS driver took over).\r\n" +
+		"Version strings: CSMWrap Version 3.1.2-usos18, SeaBIOS\r\n" +
+		"578d260b-CSMWrap-3.1.2-usos18.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +

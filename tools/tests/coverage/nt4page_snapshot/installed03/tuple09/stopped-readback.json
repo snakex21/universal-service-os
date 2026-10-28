@@ -1,0 +1,96 @@
+{
+  "service_start": {
+    "i8042prt": 4,
+    "usosusb": 1,
+    "kbdclass": 1,
+    "mouclass": 1,
+    "ndisloop": 2,
+    "tcpip": 2,
+    "dhcp": 2,
+    "lanmanworkstation": 2,
+    "lanmanserver": 4,
+    "browser": 4
+  },
+  "system_sha256": "50b02c078f11254477cf7acd2feb70e727d1a2d6e1141ac540ed6a240b1350c0",
+  "actual_own_pins": {
+    "WINNT/SYSTEM32/DRIVERS/USOSNET4.SYS": {
+      "sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+      "bytes": 21248
+    },
+    "WINNT/SYSTEM32/DRIVERS/USOSUSB.SYS": {
+      "sha256": "3139522926f054946b280c14c962593062817a0ca71170a5aeeb8551a6fab2a1",
+      "bytes": 43648
+    },
+    "USOS/COVERAGE/NT4OBS.EXE": {
+      "sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "bytes": 5632
+    },
+    "USOS/COVERAGE/USOSLOG.EXE": {
+      "sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "bytes": 1024000
+    },
+    "USOS/COVERAGE/FIRSTLO.CMD": {
+      "sha256": "c0f82213bb319445a9ea6d1407608af2b2cec53cbc633a9931ef4802e3bdbedc",
+      "bytes": 206
+    },
+    "USOS/NT4/MSC4TEST.EXE": {
+      "sha256": "75cef5e2e8be39b1cdc3d52a0f414464a86cd85fb0513de1139133fc3ac6429e",
+      "bytes": 5120
+    }
+  },
+  "actual_imports": {
+    "frozen_msc": {
+      "count": 38,
+      "resolved": true
+    },
+    "quiet_msc_helper": {
+      "count": 14,
+      "resolved": true
+    }
+  },
+  "original_modules_sha256": {
+    "ntoskrnl.exe": "8c9e1143aecf56db2570f011cbd056c2c1925e1816940ce3cc700994487f4d84",
+    "hal.dll": "50e00d5bcbdedf4fb1d6c2e2a1ff88e012ecd1ab061ebdcc48ce601f86963eea",
+    "kernel32.dll": "9767952ac7f0cb7e745fb416a1a34b017b5c4076631e2289d97bc8434c72897b"
+  },
+  "observer_status": "TESTNET_DONE",
+  "own_msc_log_sha256": "0a9f495480f5e7b0964878b5537bf65671802d90ec9f7bd4e9c5a89d3894ccb4",
+  "own_msc_log_bytes": 363,
+  "fresh_msc_pass_count": 3,
+  "roundtrip_write_flush_close_pass_count": 1,
+  "roundtrip_readback_pass_count": 2,
+  "own_usb": {
+    "boot": {
+      "sha256": "ed90e0bfdd066c8fe6d889f8d8ac8765df826330e15a2e249d19edd3e5f6aff0",
+      "file": "START.TXT",
+      "payload_matches": true,
+      "marker_matches": true,
+      "root_bpb_label_matches": true,
+      "fat16": true,
+      "mbr_partition_type": 6
+    },
+    "hot": {
+      "sha256": "c7a2f2b0c8aad058ab26e90176abe51660093f6dcc539fbb6e031f5a6def744c",
+      "file": "HOTPLUG.TXT",
+      "payload_matches": true,
+      "marker_matches": true,
+      "root_bpb_label_matches": true,
+      "fat16": true,
+      "mbr_partition_type": 6,
+      "roundtrip_matches": true,
+      "roundtrip_sha256": "003fd2202119eff8ac1e0e241942c8a9ce4ad2465f57339143e3557eb84efe15"
+    }
+  },
+  "closed_target_sha256": "6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743",
+  "base08_sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+  "base08_unchanged": true,
+  "qemu_returncode": 0,
+  "native_observer_completions": {
+    "STARTUP": 0,
+    "HOT": 0,
+    "REPLUG": 0
+  },
+  "actual_first_logon_token": true,
+  "raw_scratch_removed": true,
+  "ms_bytes_exported": false
+}

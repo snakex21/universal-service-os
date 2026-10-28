@@ -3,17 +3,20 @@ from pathlib import Path
 import struct
 import sys
 import unittest
-from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE, UC_HOOK_INTR
+from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE, UC_HOOK_INTR, UC_HOOK_INSN
 from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'tools/tests'))
+import depguard
 from build_dos_reboot import build
 
 
 class DosRestart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.code = build(ROOT, ROOT / 'zig-out/dos-reboot-test').read_bytes()
 
     def run_helper(self, command=b'', pending=(), fail_after=None):
@@ -28,6 +31,7 @@ class DosRestart(unittest.TestCase):
         u.reg_write(UC_X86_REG_EFLAGS, 0x202)
         queue = list(pending)
         events = []
+        ports = []
         stored = 0
 
         def interrupt(uc, number, data):
@@ -62,6 +66,9 @@ class DosRestart(unittest.TestCase):
             else:
                 self.fail(f'Unexpected interrupt {number:x}')
 
+        def port_out(uc, port, size, value, data):
+            ports.append((port, value & 0xff))
+
         def firmware(uc, address, size, data):
             if address == 0xffff0:
                 self.assertEqual(events, ['flush'])
@@ -71,7 +78,11 @@ class DosRestart(unittest.TestCase):
 
         u.hook_add(UC_HOOK_INTR, interrupt)
         u.hook_add(UC_HOOK_CODE, firmware)
-        u.emu_start(base + 0x100, 0x100000, count=10000)
+        u.hook_add(UC_HOOK_INSN, port_out, None, 1, 0, UC_X86_INS_OUT)
+        # The restart path waits two 65536-iteration LOOPs after the CF9h and
+        # 8042 resets (b6cf672) before the FFFF:0000 fallback.
+        u.emu_start(base + 0x100, 0x100000, count=400000)
+        self.ports = ports
         return queue, events
 
     def test_prefill_discards_old_enter_and_never_submits(self):
@@ -84,6 +95,9 @@ class DosRestart(unittest.TestCase):
     def test_restart_flushes_dos_before_entering_bios_post(self):
         for command in (b'', b'   '):
             self.assertEqual(self.run_helper(command)[1], ['flush', 'restart'])
+            # CF9h system then full reset, the 8042 reset line, CMOS 0Fh = 0
+            # (NMI masked), then the reset vector.
+            self.assertEqual(self.ports, [(0xcf9, 0x02), (0xcf9, 0x06), (0x64, 0xfe), (0x70, 0x8f), (0x71, 0x00)])
 
     def test_unknown_arguments_cannot_restart(self):
         for command in (b' /?', b' /X', b' anything', b' /Pextra'):

@@ -7,6 +7,12 @@ for %%e in (COM EXE SYS TXT INI CFG BAT OVL CPI) do call %3\COPYDOS.BAT %1 %2 %%
 for %%e in (GRB VID HLP DLL 386 LST MSG DAT BIN) do call %3\COPYDOS.BAT %1 %2 %%e
 for %%f in (%1\*.??_) do call %3\UNPACK.BAT %%f %2 %1\EXPAND.EXE
 if exist %2\DOSERR.TAG goto failed
+rem The MS-DOS 6.22 names the extension rules below get wrong (PACKING.LST,
+rem C:\DOS after its Setup): .IN_ is also .INF, .PR_ and WNTOOLS.GR_.
+if exist %2\MEMMAKER.IN_ ren %2\MEMMAKER.IN_ MEMMAKER.INF
+if exist %2\DRVSPACE.IN_ ren %2\DRVSPACE.IN_ DRVSPACE.INF
+if exist %2\GRAPHICS.PR_ ren %2\GRAPHICS.PR_ GRAPHICS.PRO
+if exist %2\WNTOOLS.GR_ ren %2\WNTOOLS.GR_ WNTOOLS.GRP
 if exist %2\*.EX_ ren %2\*.EX_ *.EXE
 if exist %2\*.CO_ ren %2\*.CO_ *.COM
 if exist %2\*.SY_ ren %2\*.SY_ *.SYS
@@ -28,6 +34,7 @@ if not exist %2\MEM.EXE goto failed
 if not exist %2\XCOPY.EXE goto failed
 if not exist %2\EDIT.COM goto failed
 if not exist %2\QBASIC.EXE goto failed
+if not exist %2\CHOICE.COM goto failed
 echo READY>%2\READY.TAG
 goto end
 :failed

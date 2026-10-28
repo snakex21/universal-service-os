@@ -1,0 +1,141 @@
+; USOSVESA.INF - generic VESA BIOS (VBE 2.0/3.0) display driver for Windows 95/98/Me
+; MODIFIED by the USOS Authors on 2026-09-30 from vmdisp9x.inf of vmdisp9x 1.2025.0.119
+; (https://github.com/JHRobotics/vmdisp9x, MIT licence, VMDISP9X.TXT): only the VESA
+; model is kept (any PCI display class device), the virtual-machine adapters,
+; OpenGL and 3D entries are removed; NoMemTest="1" is added (2026-10-06, real
+; hardware). Files are unmodified upstream binaries.
+; Copyright 2012-2022, The OS/2 Museum; 2023-2025, Jaroslav Hensl.
+
+[version]
+DriverVer=08/03/2025,4.2025.0.119
+Class=DISPLAY
+signature="$CHICAGO$"
+Provider=%Mfg%
+
+[DestinationDirs]
+DefaultDestDir=11
+VESA.Copy=11
+
+[SourceDisksNames]
+1="USOS VESA driver",,0
+
+[SourceDisksFiles]
+vesamini.drv=1
+vesamini.vxd=1
+vmhal9x.dll=1
+vmhal486.dll=1
+vmdisp9x.dll=1
+
+[Manufacturer]
+%Mfg%=Mfg.VM
+
+[Mfg.VM]
+%VESAPCI.DeviceDesc%=VESA, PCI\CC_0300
+%VESAISA.DeviceDesc%=VESA, *PNP0900
+
+[VESA]
+CopyFiles=VESA.Copy
+DelReg=VM.DelReg
+AddReg=VESA.AddReg,VM.AddReg
+
+[VESA.Copy]
+vesamini.drv,,,0x00000004
+vesamini.vxd,,,0x00000004
+vmhal9x.dll,,,0x00000004
+vmdisp9x.dll,,,0x00000004
+vmhal486.dll,,,0x00000004
+
+[VESA.AddReg]
+HKR,DEFAULT,drv,,vesamini.drv
+HKR,DEFAULT,minivdd,,vesamini.vxd
+HKR,DEFAULT,Mode,,"16,640,480"
+
+[VM.DelReg]
+HKR,,Ver
+HKR,,DevLoader
+HKR,DEFAULT
+HKR,MODES
+HKR,CURRENT
+HKLM,Software\Microsoft\Windows\CurrentVersion\OpenGLdrivers,SOFTWARE
+HKLM,Software\Microsoft\Windows\CurrentVersion\OpenGLdrivers,VMWSVGA
+HKLM,Software\Microsoft\Windows\CurrentVersion\OpenGLdrivers,QEMUFX
+HKLM,Software\Microsoft\Windows\CurrentVersion\Run,Tray3D
+HKLM,Software\vmdisp9x\svga
+HKLM,Software\vmdisp9x\vesa
+
+[VM.AddReg]
+HKR,,Ver,,4.0
+HKR,,DevLoader,,*vdd
+HKR,DEFAULT,vdd,,"*vdd"
+HKR,DEFAULT,RefreshRate,,-1
+HKR,DEFAULT,DDC,,1
+HKR,"MODES\4\640,480",drv,,vga.drv
+HKR,"MODES\4\640,480",vdd,,*vdd
+HKR,"MODES\4\800,600",drv,,supervga.drv
+HKR,"MODES\4\800,600",vdd,,*vdd
+HKR,"MODES\8\640,480"
+HKR,"MODES\8\800,600"
+HKR,"MODES\8\1024,768"
+HKR,"MODES\8\1152,864"
+HKR,"MODES\8\1280,720"
+HKR,"MODES\8\1280,800"
+HKR,"MODES\8\1280,960"
+HKR,"MODES\8\1280,1024"
+HKR,"MODES\8\1400,1050"
+HKR,"MODES\8\1600,1200"
+HKR,"MODES\8\1600,900"
+HKR,"MODES\8\1680,1050"
+HKR,"MODES\8\1920,1080"
+HKR,"MODES\8\1920,1200"
+HKR,"MODES\16\640,480"
+HKR,"MODES\16\800,600"
+HKR,"MODES\16\1024,768"
+HKR,"MODES\16\1152,864"
+HKR,"MODES\16\1280,720"
+HKR,"MODES\16\1280,800"
+HKR,"MODES\16\1280,960"
+HKR,"MODES\16\1280,1024"
+HKR,"MODES\16\1400,1050"
+HKR,"MODES\16\1600,900"
+HKR,"MODES\16\1600,1200"
+HKR,"MODES\16\1680,1050"
+HKR,"MODES\16\1920,1080"
+HKR,"MODES\16\1920,1200"
+HKR,"MODES\24\640,480"
+HKR,"MODES\24\800,600"
+HKR,"MODES\24\1024,768"
+HKR,"MODES\24\1152,864"
+HKR,"MODES\24\1280,720"
+HKR,"MODES\24\1280,800"
+HKR,"MODES\24\1280,960"
+HKR,"MODES\24\1280,1024"
+HKR,"MODES\24\1400,1050"
+HKR,"MODES\24\1600,900"
+HKR,"MODES\24\1600,1200"
+HKR,"MODES\24\1680,1050"
+HKR,"MODES\24\1920,1080"
+HKR,"MODES\24\1920,1200"
+HKR,"MODES\32\640,480"
+HKR,"MODES\32\800,600"
+HKR,"MODES\32\1024,768"
+HKR,"MODES\32\1152,864"
+HKR,"MODES\32\1280,720"
+HKR,"MODES\32\1280,800"
+HKR,"MODES\32\1280,960"
+HKR,"MODES\32\1280,1024"
+HKR,"MODES\32\1400,1050"
+HKR,"MODES\32\1600,900"
+HKR,"MODES\32\1600,1200"
+HKR,"MODES\32\1680,1050"
+HKR,"MODES\32\1920,1080"
+HKR,"MODES\32\1920,1200"
+HKLM,Software\vmdisp9x\vesa,VRAMLimit,,128
+; No VRAM read-back test at boot: on a real card (RX 560 under CSMWrap) it
+; shrank the VRAM size below what 1024x768 and up need, and DIBENG faulted
+; (exception 0D) after a mode change (docs/win9x-modern-2026-09-30.md).
+HKLM,Software\vmdisp9x\vesa,NoMemTest,,"1"
+
+[Strings]
+Mfg="JHRobotics (vmdisp9x, via USOS)"
+VESAPCI.DeviceDesc="VESA PCI Adapter (vmdisp9x)"
+VESAISA.DeviceDesc="VESA ISA Adapter (vmdisp9x)"

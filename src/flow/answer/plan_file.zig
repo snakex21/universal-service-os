@@ -27,11 +27,18 @@ pub const plan_path_posix = "EFI/USOS/answer/usos-plan.ini";
 pub const Format = enum {
     nt5_settings,
     autounattend_xml,
+    /// Windows 95/98/Me: read by the BIOS Core's DOS Setup path.
+    msbatch_inf,
+    /// Windows NT 4.0 / 3.51: WINNT.SIF for the micro-Linux VM install
+    /// (nt4.zig, nt3.zig).
+    nt4_sif,
 
     pub fn fileName(self: Format) []const u8 {
         return switch (self) {
             .nt5_settings => "nt5-settings.ini",
             .autounattend_xml => "autounattend.xml",
+            .msbatch_inf => "MSBATCH.INF",
+            .nt4_sif => "WINNT.SIF",
         };
     }
 };
@@ -47,6 +54,7 @@ pub const Plan = struct {
     format: Format = .autounattend_xml,
     arch: ?Arch = null,
     key: bool = false,
+    beta_clock: []const u8 = "",
 };
 
 pub fn filePathPosix(format: Format, buffer: []u8) ![]const u8 {
@@ -72,6 +80,10 @@ pub fn write(plan: Plan, buffer: []u8) ![]const u8 {
         if (plan.arch) |arch| try w.print("arch={s}\r\n", .{@tagName(arch)});
         try w.print("key={s}\r\n", .{if (plan.key) "yes" else "no"});
     }
+    if (@import("beta_clock.zig").settingFor(plan.system_id, plan.beta_clock).len > 0) {
+        if (!@import("beta_clock.zig").validSetting(plan.beta_clock)) return error.InvalidBetaClock;
+        try w.print("[beta]\r\nclock={s}\r\n", .{plan.beta_clock});
+    }
     return w.buffered();
 }
 
@@ -84,4 +96,13 @@ test "plan file carries the profile, never the key" {
     );
     const none = try write(.{ .os_profile = "windows-work", .system_id = "windows-10", .source = .none }, &buffer);
     try std.testing.expect(std.mem.endsWith(u8, none, "[answer]\r\nsource=none\r\n"));
+}
+
+test "beta clock metadata is explicit and validated" {
+    var buffer: [512]u8 = undefined;
+    const text = try write(.{ .os_profile = "nt3-x86-qemu-csmwrap", .system_id = "windows-nt-3-beta", .source = .none, .beta_clock = "1999-12-11" }, &buffer);
+    try std.testing.expect(std.mem.endsWith(u8, text, "[beta]\r\nclock=1999-12-11\r\n"));
+    try std.testing.expectError(error.InvalidBetaClock, write(.{ .os_profile = "x", .system_id = "windows-nt-3-beta", .source = .none, .beta_clock = "2000-02-30" }, &buffer));
+    const rtm = try write(.{ .os_profile = "x", .system_id = "windows-nt-4", .source = .none, .beta_clock = "auto" }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, rtm, "[beta]") == null);
 }

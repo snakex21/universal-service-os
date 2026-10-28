@@ -37,9 +37,11 @@ ships no Windows images: you bring your own.
 
 ### What you need
 
-- **A USB stick of at least 32 GiB.** The installer rejects smaller
-  devices. Note: a stick sold as "32 GB" is usually slightly smaller than
-  32 GiB and will be rejected. In practice use a **64 GB or bigger** stick.
+- **A USB stick sold as 16 GB or bigger.** The installer rejects devices
+  below 14,000,000,000 bytes (every stick sold as "16 GB" is above that).
+  A 16 GB stick holds USOS and about 7 GiB of images (for example one
+  Windows 7 ISO); WORK takes 6 GiB on sticks below 32 GiB and up to 16 GiB
+  on bigger ones. For several systems use a **64 GB or bigger** stick.
   The installer accepts only devices that Windows reports as removable (the
   RemovableMedia flag); some USB SSDs do not, and they will not show as
   "Ready to use".
@@ -55,11 +57,21 @@ After installation the stick has three partitions:
 |---|---|---|
 | USOS_ESP | FAT32, 1 GiB | USOS boot files, Secure Boot key, settings, logs, profiles, themes |
 | USOS_DATA | NTFS, the rest | your ISO images, drivers, tools |
-| USOS_WORK | NTFS, 1/4 of the stick (12 to 24 GiB) | working space for some Windows installers |
+| USOS_WORK | NTFS, 1/4 of the stick (12 to 16 GiB) | working space for some Windows installers |
 
 ---
 
 ## 2. The installer: install, update, repair, uninstall
+
+The installer is portable. Settings, the AutoPlay restore journal, the
+"key enrolled" markers and downloaded components live in `data` beside the
+EXE; temporary work goes to `data\tmp` and is removed when the installer
+closes. Nothing is created in `%APPDATA%`, `%LOCALAPPDATA%` or `%TEMP%`. Move
+the entire program folder with `data`. The folder must be writable: in a
+read-only place (e.g. Program Files) the installer asks you to move the USOS
+folder (desktop, USB stick) and closes. Settings left by an older version in
+`%APPDATA%\USOS` are copied once into `data`; the old files are left as they
+are.
 
 Start `USOS-Installer-1.0.0.exe` (double-click, accept UAC). The first
 screen, "**What do you want to do?**", has four cards:
@@ -86,12 +98,13 @@ built in.
 3. In the list "Choose a drive for Universal Service OS" click your stick.
    Disks that must not be used stay visible with the reason (for example
    "the disk contains the running Windows system", "the device is smaller
-   than the required 32 GB").
+   than the required 16 GB").
 4. Click **Next**. The "**WARNING - DESTRUCTIVE OPERATION**" screen lists
    the partitions and files that will be deleted. Read it.
-5. Type the confirmation text shown on the left (the stick's model name)
-   exactly, character for character.
-6. Click **ERASE AND INSTALL**.
+5. Tick **I understand that everything on this drive will be erased**.
+6. Click **ERASE AND INSTALL**. The button becomes active once the box is
+   ticked and the screen has been shown for 3 seconds (the countdown is on
+   the button).
 7. Wait. Installation has 9 steps. From step 1 on, it cannot be cancelled.
    **Do not unplug the stick and do not turn off the computer.**
 8. At the end the installer reads the stick back and checks the result. The
@@ -132,8 +145,9 @@ and WORK are not formatted or cleared.
 1. Choose the **Uninstall** card and your stick.
 2. Read the "**WARNING - USOS UNINSTALL**" screen. Everything goes: ESP,
    DATA (with your images) and WORK.
-3. Type the full device model exactly as shown.
-4. Click **START UNINSTALL**.
+3. Tick **I understand that everything on this drive will be erased**.
+4. Click **START UNINSTALL** (active after the tick and a 3-second
+   countdown).
 
 Result: one plain exFAT partition.
 
@@ -153,7 +167,8 @@ The 1.0 release is a set of separate files:
 | File | What it is | Needed |
 |---|---|---|
 | `USOS-Installer-1.0.0.exe` | the installer (contains all of USOS) | always |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | helper WinPE 10 image ("PE10 donor") | for Vista and original Windows 7 ISOs in UEFI mode |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | helper WinPE 10 x64 image ("PE10 donor") | for Vista and original Windows 7 ISOs in UEFI mode |
+| `USOS-1.0.0-WinPE-PE10-x86-donor.zip` | helper WinPE 10 x86 image ("x86 PE10 donor") | for 32-bit Windows 7, Vista and Server 2008 in UEFI mode without CSM |
 | `USOS-1.0.0-XP-package-PL.zip` | Windows XP x86 SP3 UEFI package (Polish) | for XP in UEFI mode |
 | `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI package (English) | for XP in UEFI mode |
 | `USOS-1.0.0-sources.zip` | source code | for reference |
@@ -196,22 +211,34 @@ Get-Content .\SHA256SUMS | ForEach-Object {
 
 If any file shows `BAD`, download it again.
 
-### 3.2 The PE10 donor (Vista and original Windows 7 on UEFI)
+### 3.2 The PE10 donors (Vista and Windows 7 on UEFI)
 
-Windows Vista and original Windows 7 ISOs need a helper WinPE 10 image in
-UEFI mode. Without it the menu blocks these systems on UEFI.
+Two helper WinPE 10 images, one per architecture:
 
-1. Unpack `USOS-1.0.0-WinPE-PE10-donor.zip`. Inside is the folder
-   `Programs\USOS\WinPE\` with the file `PE10_x64_19041_USOS.iso`.
+- **x64** (`PE10_x64_19041_USOS.iso`, in `USOS-1.0.0-WinPE-PE10-donor.zip`):
+  Windows Vista and original Windows 7 ISOs need it in UEFI mode. Without it
+  the menu blocks these systems on UEFI.
+- **x86** (`PE10_x86_19041_USOS.iso`, in
+  `USOS-1.0.0-WinPE-PE10-x86-donor.zip`): 32-bit Windows 7, Vista and
+  Server 2008 need it in UEFI mode without CSM (section 5.1). Without it they
+  can still use your own Windows 10 x86 ISO in
+  `Systems\Windows\Windows 10\Images`.
+
+The full installer contains both and offers them in its **Components** step
+(the online installer downloads them). By hand:
+
+1. Unpack the zip. Inside is the folder `Programs\USOS\WinPE\` with the ISO
+   file.
 2. Copy the `Programs` folder to the **USOS_DATA** partition so that the
-   file ends up at `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`.
-   `Programs\USOS\WinPE\` may hold only one ISO file.
+   file ends up at `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`
+   (or `...\PE10_x86_19041_USOS.iso`). `Programs\USOS\WinPE\` holds one ISO
+   per architecture; a file name with `x86` in it counts as the x86 donor.
 3. Start the installer and run **Update USOS** (section 2.2). The installer
-   then records the image's SHA-256 in `EFI\USOS\winpe-donor.ini` on the ESP
-   and marks the folder hidden and system.
-4. Do not change, move or delete this file. The menu checks its checksum
-   before each use. If the file disappears or changes, the menu blocks Vista
-   and Windows 7 on UEFI and asks you to update again in the installer.
+   then records the SHA-256 of each image in `EFI\USOS\winpe-donor.ini` on
+   the ESP and marks the folder hidden and system.
+4. Do not change, move or delete these files. The menu checks the checksum
+   before each use. If a file disappears or changes, the menu blocks the
+   systems that need it and asks you to update again in the installer.
 
 This folder never shows up in the systems menu.
 
@@ -269,10 +296,14 @@ USOS_DATA\
 │  │  │   └─ Drivers\x64\   (USB 3 / NVMe drivers for Windows 7)
 │  │  ├─ Windows Vista\     Images\   Unattended\
 │  │  ├─ Windows XP\        Images\   Unattended\  (usos-xp.ini, usos-xp.example.ini)
-│  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\
+│  │  ├─ Windows XP Media Center Edition 2005\
+│  │  ├─ Windows XP Tablet PC Edition 2005\
+│  │  ├─ Windows Embedded POSReady 2009\
+│  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\  Windows NT 3.51\  Windows NT 3.5\  Windows NT 3.1\
 │  │  ├─ Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
 │  │  ├─ Windows 3.11\  Windows 3.1\          (Images only)
-│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003
+│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003, Windows NT 4.0 Terminal Server,
+│  │                         Windows NT 3.51 Server, Windows NT 3.5 Server, Windows NT 3.1 Advanced Server
 │  ├─ Linux\
 │  │  ├─ Ubuntu\  Debian\  Fedora\  Linux Mint\  Arch Linux\  openSUSE\
 │  │  ├─ Manjaro\  Kali Linux\  SystemRescue\  GParted Live\  Clonezilla\
@@ -312,6 +343,30 @@ USOS_DATA\
 - If you put a Windows Server image into a client Windows folder (or the
   other way round), the menu tells you the right folder. The image can still
   be started.
+
+#### Floppy disk media
+
+Instead of an ISO you can use a set of floppy disk images. The whole set is
+one folder in `Images`, e.g.:
+
+```
+Systems\Windows\Windows for Workgroups 3.11\Images\WfW 3.11 PL\
+    disk01.img  disk02.img  ...  disk10.img
+```
+
+- The UEFI menu lists the folder as one entry (folder name, `FDD` label,
+  number of disks). It installs exactly like the ISO.
+- Images: `.img`, `.ima`, `.vfd` or `.flp` of a diskette size
+  (160/180/320/360 KB, 720 KB, 1.2 MB, 1.44 MB, 2.88 MB, FAT12). Other files
+  in the folder (e.g. `.txt`) are ignored.
+- Any names; the order is natural (`disk2` before `disk10`; `DISK_1`,
+  `disk01`, `Disk 1 of 10` all work).
+- The files of all diskettes go into one Setup folder. A file found on
+  several diskettes: the first copy is kept; a different content is noted in
+  the preparation log (`EFI\USOS\win9x\prepare.log`).
+- Supported: Windows 1.0x-3.x and Windows for Workgroups 3.11 (UEFI menu, also without CSM;
+  the BIOS menu does not list sets). For other systems the menu shows the set as an
+  unsupported format; use an ISO there.
 
 ### 4.2 Answer files (unattended installation)
 
@@ -361,6 +416,15 @@ overwrite `README.txt`. Nothing else is deleted.
   DOS 8.3 names, no spaces, no non-ASCII characters. Each program may have
   its own subfolder. At least 128 MiB RAM is needed. Output files are gone
   after a restart (RAM disk).
+- **DOS programs for MS-DOS / Windows 1.x-3.x installs**:
+  `Systems\DOS\MS-DOS\Programs\`, copied to `C:\PROGRAMS` (UEFI flow).
+  Windows 3.x icons (optional): a `USOSICON.TXT` in a program's folder with
+  lines `"Name",C:\PROGRAMS\<FOLDER>\FILE.EXE` (8.3 names, ASCII, the file
+  inside that folder; `.EXE`, `.COM`, `.PIF` or `.BAT`) adds them to the
+  Main group when Windows Setup runs. Optional third field, the oldest
+  Windows the program needs: `,3.0`, `,3.1` or `,3.11` (for example
+  `"Netscape",C:\PROGRAMS\NETSCAPE\NETSCAPE.EXE,3.1`: no icon on 3.0). Bad lines are skipped and logged in
+  the preparation log.
 - **EFI tools for the UEFI Shell** (BIOS/VBIOS flashers, GPU testers):
   `Utilities\UEFI Shell\Tools\`. No update is needed after copying. Start
   **Utilities -> UEFI Shell**, then `ls` and the tool's name. DATA is
@@ -438,8 +502,13 @@ Notes on the table:
 - Windows 7 on UEFI with CSM skips UefiSeven. The X470 test was without CSM
   and used the "6in1" ISO (with a newer WinPE). The original SP1 ISO through
   the PE10 donor was not tested on hardware.
-- 32-bit (x86) Windows 10 and 11 are blocked on 64-bit UEFI. Start them in
-  BIOS mode (CSM).
+- 32-bit (x86) Windows 10 and 8.1, and 32-bit Windows 7, Vista and
+  Server 2008, install on 64-bit UEFI without CSM through CSMWrap: USOS
+  prepares an MBR disk and Setup runs in BIOS mode (section 5.1). On the X470
+  this passed for Windows 10, Windows 7, Vista and Web Server 2008 x86, with
+  the user's own Windows 10 x86 ISO as the donor; the shipped x86 PE10 donor
+  (section 3.2) has not been tested on hardware yet. Windows 11 has no 32-bit
+  edition.
 - Windows 2000 does not work on the X470: there is no AHCI driver for NT 5.0.
 - The menu shows a badge next to each system, e.g. "Requires Secure Boot
   off" or "Requires BIOS".
@@ -886,10 +955,11 @@ at all):
 
 | Symptom | What to do |
 |---|---|
-| The installer does not show the stick as "Ready to use" | Read the rejection reason. Most often: too small (below 32 GiB) or not reported as removable. |
+| The installer does not show the stick as "Ready to use" | Read the rejection reason. Most often: too small (below 16 GB) or not reported as removable. |
 | The installer says "The drive is in use" | Close Explorer windows showing the stick and click Retry. |
 | The stick does not start | Run **Repair -> Repair ESP**. |
 | Vista / Windows 7 are blocked on UEFI | PE10 donor missing or changed: section 3.2, then **Update USOS**. |
+| 32-bit Windows 7 / Vista / 2008 are blocked without CSM | x86 PE10 donor missing or changed (and no own Windows 10 x86 ISO): section 3.2, then **Update USOS**. |
 | "Verification failed" at start | The USOS key is missing: section 6. |
 | A system has the badge "Requires Secure Boot off" | Turn Secure Boot off in the BIOS. |
 | A system has the badge "Requires BIOS" | Start the stick in Legacy mode (turn CSM on). |

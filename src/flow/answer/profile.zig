@@ -9,6 +9,7 @@
 //! and the field, never the value (keys and passwords stay out of logs).
 const std = @import("std");
 const tables = @import("tables.zig");
+const options = @import("options.zig");
 
 pub fn Text(comptime capacity: usize) type {
     return struct {
@@ -54,6 +55,15 @@ pub const Field = enum {
     no_network_oobe,
     protect_pc,
     network_location,
+    network,
+    dialup,
+    ip,
+    gateway,
+    dns,
+    home_page,
+    addons_preset,
+    addons_options,
+    addons_exclude,
     disable_wer,
     edition,
     systems,
@@ -64,6 +74,7 @@ pub const Field = enum {
     theme,
     no_balloon_tips,
     display,
+    display_bpp,
     disable_uac,
     no_sidebar,
     no_welcome_center,
@@ -71,6 +82,62 @@ pub const Field = enum {
     show_extensions,
     show_hidden,
     no_autorun,
+    // Typed options (options.zig), stage 1 of the 2026-10-12 plan.
+    show_protected,
+    launch_to_pc,
+    end_task,
+    no_tips,
+    taskbar_search,
+    taskbar_left,
+    task_view_off,
+    widgets_off,
+    bing_search_off,
+    uac_level,
+    hibernation,
+    system_restore_off,
+    numlock,
+    windows_update,
+    privacy,
+    autologon,
+    password_never_expires,
+    workgroup,
+    // Typed options, stage 2 (2026-10-14).
+    classic_context_menu,
+    shortcut_suffix_off,
+    desktop_icons,
+    classic_taskbar,
+    all_tray_icons,
+    boot_to_desktop,
+    lock_screen_off,
+    visual_effects,
+    font_smoothing,
+    mouse_accel_off,
+    sticky_keys_off,
+    power_profile,
+    no_sleep,
+    last_access_off,
+    long_paths,
+    search_index_off,
+    remote_desktop,
+    firewall_off,
+    server_nags_off,
+    ie_esc_off,
+    security_center_off,
+    defender_off,
+    smartscreen_off,
+    device_encryption_off,
+    remove_apps,
+    first_run_off,
+    onedrive_off,
+    user_script,
+    beta_clock,
+    // MS-DOS 6.22 / Windows 1.x-3.x regional settings (dos.zig, 2026-10-24).
+    dos_regional,
+    dos_keyb,
+    // Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (dos.zig, 2026-10-24).
+    dos_winsock,
+    // Windows 95 / 98 / Me: automatic or manual Setup (msbatch.zig, 2026-10-27).
+    win9x_setup,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -113,6 +180,20 @@ pub const NetworkLocation = enum {
 
 /// Theme for new users: XP Windows Classic ([Shell] DefaultThemesOff),
 /// Windows 7 Windows Classic or Windows 7 Basic (Themes/CustomDefaultThemeFile).
+/// MS-DOS 6.22 / Windows 1.x-3.x (dos.zig): `auto` = COUNTRY, code page and
+/// (with dos_keyb) KEYB from the profile's formats and keyboard, and the
+/// regional text pages of Windows 3.1 Setup answered; `manual` = none of it
+/// written or answered, the user picks them.
+pub const DosRegional = enum { auto, manual };
+
+/// Windows 95 / 98 / Me Setup (msbatch.zig): `auto` = MSBATCH.INF answers
+/// Setup's pages from the profile (the default, user decision 2026-10-26);
+/// `manual` = Setup shows its pages and the user answers them (owner,
+/// product key, time zone, network identification, components...), while
+/// MSBATCH.INF keeps only what the modern-PC path needs (C:\WINDOWS, the
+/// USOS drivers next to Setup, memory limits, the USOS fixes and add-ons).
+pub const Win9xSetup = enum { auto, manual };
+
 pub const Theme = enum {
     default,
     classic,
@@ -120,21 +201,27 @@ pub const Theme = enum {
 };
 
 /// XP / Server 2003 [Display]: 32-bit colour at this resolution; auto: unchanged.
+/// keep: USOS never runs USOSRES (no request, no <Display>, no [Display]);
+/// the installation keeps the mode it had before the automatic resolution
+/// (docs/display-policy.md). Last, so the editor's indices stay stable.
 pub const Display = enum {
     auto,
     @"1024x768",
     @"1280x1024",
     @"1920x1080",
+    keep,
 
     pub fn size(self: Display) ?[2]u16 {
         return switch (self) {
-            .auto => null,
+            .auto, .keep => null,
             .@"1024x768" => .{ 1024, 768 },
             .@"1280x1024" => .{ 1280, 1024 },
             .@"1920x1080" => .{ 1920, 1080 },
         };
     }
 };
+
+pub const DisplayBpp = enum { auto, @"32", @"16" };
 
 fn enumByName(comptime E: type, name: []const u8) ?E {
     inline for (@typeInfo(E).@"enum".fields) |f| {
@@ -165,10 +252,11 @@ pub const SystemEdition = struct {
 };
 
 pub const max_system_editions = 8;
-pub const max_file = 4096;
+pub const max_file = 8192;
 
 pub const Profile = struct {
-    /// Name shown in the menu; also the file name stem.
+    /// Name shown in the menu; the file name stem derives from it
+    /// (uniqueFileStem). Unique among profiles sharing a system.
     name: Text(32) = .{},
     user: Text(20) = .{},
     user2: Text(20) = .{},
@@ -209,6 +297,9 @@ pub const Profile = struct {
     protect_pc: ProtectPc = .off,
     /// Vista/7: answer of the network location page (Work: no HomeGroup).
     network_location: NetworkLocation = .work,
+    addons_preset: @import("addons_profile.zig").Preset = .praca,
+    addons_options: Text(512) = .{},
+    addons_exclude: Text(512) = .{},
     /// Vista+: Windows Error Reporting off (ErrorReportingCore/DisableWER).
     disable_wer: bool = false,
     /// Systems that offer this profile (applies.zig): normalized, lower
@@ -224,6 +315,9 @@ pub const Profile = struct {
     theme: Theme = .default,
     no_balloon_tips: bool = false,
     display: Display = .auto,
+    /// Explicit auto differs from an old profile with no display request.
+    display_explicit: bool = false,
+    display_bpp: DisplayBpp = .auto,
     disable_uac: bool = false,
     no_sidebar: bool = false,
     no_welcome_center: bool = false,
@@ -231,6 +325,35 @@ pub const Profile = struct {
     show_extensions: bool = false,
     show_hidden: bool = false,
     no_autorun: bool = false,
+    /// The typed options without a field of their own (options.zig), by
+    /// options.Opt; 0 = the default (unchanged, not written).
+    opts: [options.count]u8 = @splat(0),
+    /// Workgroup (NetBIOS name rule); empty: the release's default.
+    workgroup: Text(15) = .{},
+    /// Empty/off: unchanged; auto: exact detected beta build; or YYYY-MM-DD.
+    beta_clock: Text(10) = .{},
+    /// Legacy LAN defaults; other families ignore these fields.
+    network: @import("network_values.zig").Mode = .on,
+    dialup: @import("network_values.zig").Mode = .off,
+    ip: Text(18) = .{}, // empty = DHCP
+    gateway: Text(15) = .{},
+    dns: Text(47) = .{},
+    home_page: Text(200) = .{}, // empty = about:blank
+    /// MS-DOS / Windows 1.x-3.x regional settings (dos.zig).
+    dos_regional: DosRegional = .auto,
+    /// MS-DOS: also load KEYB with the profile's layout. Off by default:
+    /// KEYB translates in its INT 09h handler, which the keys of a USB
+    /// keyboard under CSMWrap never pass (dos.zig).
+    dos_keyb: bool = false,
+    /// Windows 3.1 / 3.11 / WfW 3.11: stage the experimental USOS Winsock
+    /// (WINSOCK.DLL, USOSPKTQ queue driver, GETHTTP test icon). Off by default.
+    dos_winsock: bool = false,
+    /// Windows 95 / 98 / Me: automatic (MSBATCH.INF answers) or manual Setup.
+    win9x_setup: Win9xSetup = .auto,
+
+    pub fn opt(self: *const Profile, o: options.Opt) u8 {
+        return self.opts[@intFromEnum(o)];
+    }
 
     pub fn flag(self: *Profile, field: Field) ?*bool {
         return switch (field) {
@@ -254,6 +377,8 @@ pub const Profile = struct {
             .show_extensions => &self.show_extensions,
             .show_hidden => &self.show_hidden,
             .no_autorun => &self.no_autorun,
+            .dos_keyb => &self.dos_keyb,
+            .dos_winsock => &self.dos_winsock,
             else => null,
         };
     }
@@ -445,16 +570,43 @@ pub fn checkEdition(value: []const u8) ?Problem {
     return null;
 }
 
-/// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX (letters and digits, any case). Empty = none.
+/// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX (letters and digits, any case), or a
+/// Windows 95 key: OEM ddddd-OEM-ddddddd-ddddd or retail ddd-ddddddd
+/// (keyShape). Empty = none.
 pub fn checkKey(value: []const u8) ?Problem {
     if (value.len == 0) return null;
-    if (value.len != 29) return .bad_key_format;
-    for (value, 0..) |c, i| {
-        if (i % 6 == 5) {
-            if (c != '-') return .bad_key_format;
-        } else if (!std.ascii.isAlphanumeric(c)) return .bad_key_format;
-    }
+    return if (keyShape(value) == null) .bad_key_format else null;
+}
+
+/// The kinds of product keys a profile holds.
+pub const KeyShape = enum {
+    /// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX: Windows 98 and later.
+    five_by_five,
+    /// ddddd-OEM-ddddddd-ddddd: Windows 95 OEM (MSBATCH.INF ProductID).
+    win95_oem,
+    /// ddd-ddddddd: Windows 95 retail (MSBATCH.INF ProductID).
+    win95_retail,
+};
+
+pub fn keyShape(value: []const u8) ?KeyShape {
+    if (matchesPattern(value, "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA")) return .five_by_five;
+    if (matchesPattern(value, "DDDDD-OEM-DDDDDDD-DDDDD")) return .win95_oem;
+    if (matchesPattern(value, "DDD-DDDDDDD")) return .win95_retail;
     return null;
+}
+
+/// A: letter or digit, D: digit, anything else literally (case-insensitive).
+fn matchesPattern(value: []const u8, pattern: []const u8) bool {
+    if (value.len != pattern.len) return false;
+    for (value, pattern) |c, want| {
+        const ok = switch (want) {
+            'A' => std.ascii.isAlphanumeric(c),
+            'D' => std.ascii.isDigit(c),
+            else => std.ascii.toUpper(c) == want,
+        };
+        if (!ok) return false;
+    }
+    return true;
 }
 
 /// Letters and digits in a product key.
@@ -468,7 +620,18 @@ pub const key_symbols = 25;
 /// is what WINNT.SIF ProductKey/ProductID and autounattend.xml take.
 pub fn normalizeKey(value: []const u8, out: *[29]u8) []const u8 {
     var symbols: [key_symbols]u8 = undefined;
-    return renderKey(keySymbols(value, &symbols), out);
+    const have = keySymbols(value, &symbols);
+    // Windows 95 retail: exactly ten digits -> ddd-ddddddd.
+    if (have.len == 10) {
+        for (have) |c| {
+            if (!std.ascii.isDigit(c)) return renderKey(have, out);
+        }
+        @memcpy(out[0..3], have[0..3]);
+        out[3] = '-';
+        @memcpy(out[4..11], have[3..10]);
+        return out[0..11];
+    }
+    return renderKey(have, out);
 }
 
 /// Number of letters and digits typed so far (for the "12/25" hint).
@@ -477,17 +640,150 @@ pub fn keySymbolCount(value: []const u8) usize {
     return keySymbols(value, &symbols).len;
 }
 
+/// Letters and digits in a Windows 95 OEM ID (ddddd-OEM-ddddddd-ddddd).
+pub const oem_key_symbols = 20;
+
+/// Symbols that read as (the start of) a Windows 95 OEM ID: "OEM" from the
+/// sixth symbol on. A 5x5 key never has it (no O or E in its alphabet).
+fn oemShaped(symbols: []const u8) bool {
+    return symbols.len > 5 and std.mem.startsWith(u8, "OEM", symbols[5..@min(8, symbols.len)]);
+}
+
+/// How many letters and digits the key in `value` can have (the "/25" of
+/// the hint): 20 once it reads as a Windows 95 OEM ID, else 25.
+pub fn keySymbolLimit(value: []const u8) usize {
+    var symbols: [key_symbols]u8 = undefined;
+    return if (oemShaped(keySymbols(value, &symbols))) oem_key_symbols else key_symbols;
+}
+
 /// One character typed (or pasted) into a key being edited in
 /// `buf[0..len]` (`buf.len` >= 29): a letter or digit is added in capitals
-/// (up to 25), anything else is ignored; the dashes follow on their own.
+/// (up to 25; up to 20 for a Windows 95 OEM ID, so nothing can follow its
+/// last group), anything else is ignored; the dashes follow on their own.
 /// Returns the new length.
 pub fn keyTyped(buf: []u8, len: usize, c: u8) usize {
     std.debug.assert(buf.len >= 29);
     var symbols: [key_symbols]u8 = undefined;
     const have = keySymbols(buf[0..len], &symbols);
-    if (!std.ascii.isAlphanumeric(c) or have.len == key_symbols) return len;
+    const limit: usize = if (oemShaped(have)) oem_key_symbols else key_symbols;
+    if (!std.ascii.isAlphanumeric(c) or have.len >= limit) return len;
     symbols[have.len] = std.ascii.toUpper(c);
     return rewrite(buf, symbols[0 .. have.len + 1]);
+}
+
+/// How a key field types: `any` (Windows 98 and later: XXXXX-XXXXX-...,
+/// the 95 shapes only as typed in full) or `win95` (Windows 95 and NT 4.0:
+/// only the 10-digit CD key ddd-ddddddd or the OEM ID
+/// ddddd-OEM-ddddddd-ddddd; read from the 950 SETUPX.DLL PIDValidate:
+/// ProductType 1-6 take the ddd-ddddddd key, 7-9 the OEM ID).
+pub const KeyStyle = enum { any, win95 };
+
+/// The key style of a system's key field.
+pub fn keyStyleFor(system_id: []const u8) KeyStyle {
+    if (std.ascii.eqlIgnoreCase(system_id, "windows-95") or @import("nt4.zig").isNt4(system_id)) return .win95;
+    return .any;
+}
+
+/// The key shapes a field of `style` takes, for the help and problem texts
+/// ("{1}" of boot.profile.help.key, "{0}" of ...problem.bad_key_format).
+pub fn keyFormats(style: KeyStyle) []const u8 {
+    return switch (style) {
+        .any => "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
+        .win95 => "xxx-xxxxxxx / xxxxx-OEM-xxxxxxx-xxxxx",
+    };
+}
+
+/// Digits of a Windows 95 / NT 4.0 CD key (ddd-ddddddd).
+pub const cd_key_symbols = 10;
+
+/// `symbols` are the start of a Windows 95 key: up to 10 digits (CD key),
+/// or 5 digits, "OEM" and up to 12 digits (OEM ID).
+fn win95Prefix(symbols: []const u8) bool {
+    if (oemShaped(symbols)) {
+        if (symbols.len > oem_key_symbols) return false;
+        for (symbols, 0..) |c, i| {
+            if ((i < 5 or i >= 8) and !std.ascii.isDigit(c)) return false;
+        }
+        return true;
+    }
+    if (symbols.len > cd_key_symbols) return false;
+    for (symbols) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    return true;
+}
+
+/// A Windows 95 key as typed: ddd-ddddddd (the dash after the third digit)
+/// until it reads as an OEM ID (ddddd-OEM-ddddddd-ddddd). Five digits read
+/// "123-45" until the "O" of "OEM" turns them into "12345-O".
+fn renderKey95(symbols: []const u8, out: *[29]u8) []const u8 {
+    if (oemShaped(symbols) or !win95Prefix(symbols)) return renderKey(symbols, out);
+    if (symbols.len <= 3) {
+        @memcpy(out[0..symbols.len], symbols);
+        return out[0..symbols.len];
+    }
+    @memcpy(out[0..3], symbols[0..3]);
+    out[3] = '-';
+    @memcpy(out[4 .. symbols.len + 1], symbols[3..]);
+    return out[0 .. symbols.len + 1];
+}
+
+fn rewriteFor(buf: []u8, symbols: []const u8, style: KeyStyle) usize {
+    if (style == .any) return rewrite(buf, symbols);
+    var out: [29]u8 = undefined;
+    const text = renderKey95(symbols, &out);
+    @memcpy(buf[0..text.len], text);
+    return text.len;
+}
+
+/// keySymbolLimit for a key field of `style`: a Windows 95 key stops at 10
+/// digits (CD key) or 20 symbols (OEM ID).
+pub fn keySymbolLimitFor(value: []const u8, style: KeyStyle) usize {
+    if (style == .any) return keySymbolLimit(value);
+    var symbols: [key_symbols]u8 = undefined;
+    return if (oemShaped(keySymbols(value, &symbols))) oem_key_symbols else cd_key_symbols;
+}
+
+/// keyTyped for a key field of `style`. `win95`: only what keeps the key
+/// the start of a CD key or an OEM ID (digits, "OEM" after five digits).
+pub fn keyTypedFor(buf: []u8, len: usize, c: u8, style: KeyStyle) usize {
+    if (style == .any) return keyTyped(buf, len, c);
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols + 1]u8 = undefined;
+    var have_buf: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &have_buf);
+    if (!std.ascii.isAlphanumeric(c) or have.len >= key_symbols) return len;
+    @memcpy(symbols[0..have.len], have);
+    symbols[have.len] = std.ascii.toUpper(c);
+    const next = symbols[0 .. have.len + 1];
+    if (!win95Prefix(next)) return len;
+    return rewriteFor(buf, next, style);
+}
+
+/// keyBackspace for a key field of `style`.
+pub fn keyBackspaceFor(buf: []u8, len: usize, style: KeyStyle) usize {
+    if (style == .any) return keyBackspace(buf, len);
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &symbols);
+    if (have.len == 0) return 0;
+    return rewriteFor(buf, have[0 .. have.len - 1], style);
+}
+
+/// normalizeKey for a key field of `style` (a stored ddd-ddddddd or OEM ID
+/// reads the same in both).
+pub fn normalizeKeyFor(value: []const u8, out: *[29]u8, style: KeyStyle) []const u8 {
+    if (style == .any) return normalizeKey(value, out);
+    var symbols: [key_symbols]u8 = undefined;
+    return renderKey95(keySymbols(value, &symbols), out);
+}
+
+/// checkKey for a key field of `style`: `win95` takes only the CD key and
+/// the OEM ID (no 5x5 key). Empty = none (Setup asks).
+pub fn checkKeyFor(value: []const u8, style: KeyStyle) ?Problem {
+    if (style == .any or value.len == 0) return checkKey(value);
+    const shape = keyShape(value) orelse return .bad_key_format;
+    return if (shape == .five_by_five) .bad_key_format else null;
 }
 
 /// Backspace in a key being edited: removes the last letter or digit (so
@@ -513,6 +809,19 @@ fn keySymbols(value: []const u8, out: *[key_symbols]u8) []const u8 {
 }
 
 fn renderKey(symbols: []const u8, out: *[29]u8) []const u8 {
+    // Windows 95 OEM: ddddd-OEM-ddddddd-ddddd (dashes after 5, 8, 15).
+    if (symbols.len > 5 and symbols.len <= 20 and std.mem.startsWith(u8, "OEM", symbols[5..@min(8, symbols.len)])) {
+        var n: usize = 0;
+        for (symbols, 1..) |c, count| {
+            out[n] = c;
+            n += 1;
+            if ((count == 5 or count == 8 or count == 15) and count < 20) {
+                out[n] = '-';
+                n += 1;
+            }
+        }
+        return out[0..n];
+    }
     var n: usize = 0;
     for (symbols, 1..) |c, count| {
         out[n] = c;
@@ -545,6 +854,8 @@ pub fn checkName(value: []const u8) ?Problem {
 
 /// The first problem of a complete profile (null: valid).
 pub fn validate(p: *const Profile) ?Issue {
+    if (!@import("addons_profile.zig").validList(p.addons_options.slice())) return .{ .field = .addons_options, .problem = .bad_choice };
+    if (!@import("addons_profile.zig").validList(p.addons_exclude.slice())) return .{ .field = .addons_exclude, .problem = .bad_choice };
     if (checkName(p.name.slice())) |problem| return .{ .field = .name, .problem = problem };
     if (checkAccount(p.user.slice())) |problem| return .{ .field = .user, .problem = problem };
     if (p.user2.len > 0) {
@@ -562,8 +873,21 @@ pub fn validate(p: *const Profile) ?Issue {
     for (p.system_editions[0..p.system_edition_count]) |*entry| {
         if (checkEdition(entry.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
     }
+    if (checkWorkgroup(p.workgroup.slice())) |problem| return .{ .field = .workgroup, .problem = problem };
+    if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return .{ .field = .beta_clock, .problem = .bad_choice };
+    const net = @import("network_values.zig");
+    if (!net.validIp(p.ip.slice())) return .{ .field = .ip, .problem = .bad_choice };
+    if (!net.validGateway(p.ip.slice(), p.gateway.slice())) return .{ .field = .gateway, .problem = .bad_choice };
+    if (!net.validDns(p.dns.slice())) return .{ .field = .dns, .problem = .bad_choice };
+    if (!net.validHome(p.home_page.slice())) return .{ .field = .home_page, .problem = .bad_choice };
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
+}
+
+/// Workgroup: like a computer name (1-15 characters A-Z a-z 0-9 -, not
+/// only digits). Empty = the release's default (WORKGROUP).
+pub fn checkWorkgroup(value: []const u8) ?Problem {
+    return checkComputer(value);
 }
 
 // ------------------------------------------------------------ parsing
@@ -646,12 +970,22 @@ pub fn parse(text: []const u8, out: *Profile) ParseResult {
 }
 
 /// Group tokens of `systems=` (applies.zig).
-pub const system_groups = [_][]const u8{ "windows", "windows-nt5", "windows-nt6", "linux" };
+pub const system_groups = [_][]const u8{ "windows", "windows-9x", "windows-nt5", "windows-nt6", "linux" };
 /// Linux installers that take a profile (answer_screen.linuxAnswerSystem).
 pub const linux_systems = [_][]const u8{ "ubuntu", "debian", "fedora" };
 
 pub fn knownSystemToken(token: []const u8) bool {
     if (@import("target.zig").familyFor(token) != null) return true;
+    // Windows 95/98/Me ids (MSBATCH.INF systems, no NT family).
+    if (@import("msbatch.zig").releaseFor(token) != null) return true;
+    // Windows NT 4.0 Workstation / Server (nt4.zig).
+    if (@import("nt4.zig").isNt4(token)) return true;
+    // Windows NT 3.51 Workstation / Server (nt3.zig).
+    if (@import("nt3.zig").isNt3(token)) return true;
+    // Windows Embedded POSReady 2009 (posready.zig).
+    if (@import("posready.zig").isPosReady(token)) return true;
+    // MS-DOS and Windows 1.x-3.x (dos.zig).
+    if (@import("dos.zig").isDos(token)) return true;
     for (system_groups ++ linux_systems) |known| {
         if (std.mem.eql(u8, known, token)) return true;
     }
@@ -710,6 +1044,17 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         return null;
     }
     const field = fieldByName(name) orelse return .{ .problem = .unknown_field };
+    if (field == .workgroup) {
+        p.workgroup.set(value) catch return .{ .field = field, .problem = .too_long };
+        return null;
+    }
+    if (options.byKey(name)) |o| {
+        const entry = options.option(o);
+        if (!entry.legacy) {
+            p.opts[@intFromEnum(o)] = options.valueByName(entry, value) orelse return .{ .field = field, .problem = if (entry.isToggle()) .bad_boolean else .bad_choice };
+            return null;
+        }
+    }
     switch (field) {
         .name => p.name.set(value) catch return .{ .field = field, .problem = .too_long },
         .user => p.user.set(value) catch return .{ .field = field, .problem = .too_long },
@@ -729,10 +1074,44 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             if (checkEdition(value)) |problem| return .{ .field = field, .problem = problem };
             p.edition.set(value) catch return .{ .field = field, .problem = .too_long };
         },
+        .beta_clock => {
+            if (!@import("beta_clock.zig").validSetting(value)) return .{ .field = field, .problem = .bad_choice };
+            p.beta_clock.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_preset => p.addons_preset = enumByName(@import("addons_profile.zig").Preset, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_options, .addons_exclude => {
+            if (!@import("addons_profile.zig").validList(value)) return .{ .field = field, .problem = .bad_choice };
+            const target = if (field == .addons_options) &p.addons_options else &p.addons_exclude;
+            target.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .network => p.network = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .dialup => p.dialup = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .ip => {
+            if (!@import("network_values.zig").validIp(value)) return .{ .field = field, .problem = .bad_choice };
+            p.ip.set(if (std.ascii.eqlIgnoreCase(value, "dhcp")) "dhcp" else value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .gateway => {
+            if (value.len > 0 and @import("network_values.zig").address(value) == null) return .{ .field = field, .problem = .bad_choice };
+            p.gateway.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .dns => {
+            if (!@import("network_values.zig").validDns(value)) return .{ .field = field, .problem = .bad_choice };
+            p.dns.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .home_page => {
+            if (!@import("network_values.zig").validHome(value)) return .{ .field = field, .problem = .bad_choice };
+            p.home_page.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
-        .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .dos_regional => p.dos_regional = enumByName(DosRegional, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .win9x_setup => p.win9x_setup = enumByName(Win9xSetup, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .display => {
+            p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice };
+            p.display_explicit = value.len > 0;
+        },
+        .display_bpp => p.display_bpp = if (value.len == 0) .auto else enumByName(DisplayBpp, value) orelse return .{ .field = field, .problem = .bad_choice },
         .systems => {
             var normalized: Text(160) = .{};
             if (normalizeSystems(value, &normalized)) |problem| return .{ .field = field, .problem = problem };
@@ -780,10 +1159,13 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         for (p.system_keys[0..p.system_key_count]) |*entry| try w.print("key.{s}={s}\r\n", .{ entry.system.slice(), entry.key.slice() });
     }
     try w.print("manual_disk={s}\r\nlocal_account={s}\r\nbypass_tpm={s}\r\nbypass_secure_boot={s}\r\nbypass_ram={s}\r\nno_network_oobe={s}\r\n", .{
-        boolText(p.manual_disk),   boolText(p.local_account), boolText(p.bypass_tpm),
-        boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
+        boolText(p.manual_disk),        boolText(p.local_account), boolText(p.bypass_tpm),
+        boolText(p.bypass_secure_boot), boolText(p.bypass_ram),    boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
+    if (p.addons_preset != .praca) try w.print("addons_preset={s}\r\n", .{@tagName(p.addons_preset)});
+    if (p.addons_options.len > 0) try w.print("addons_options={s}\r\n", .{p.addons_options.slice()});
+    if (p.addons_exclude.len > 0) try w.print("addons_exclude={s}\r\n", .{p.addons_exclude.slice()});
     try w.print("edition={s}\r\n", .{p.edition.slice()});
     for (p.system_editions[0..p.system_edition_count]) |*entry| try w.print("edition.{s}={s}\r\n", .{ entry.system.slice(), entry.edition.slice() });
     // Written only when set: a profile without them stays readable by the
@@ -793,7 +1175,26 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         if (p.flagValue(field)) try w.print("{s}=yes\r\n", .{@tagName(field)});
     }
     if (p.theme != .default) try w.print("theme={s}\r\n", .{@tagName(p.theme)});
-    if (p.display != .auto) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display != .auto or p.display_explicit) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display_bpp != .auto) try w.print("display_bpp={s}\r\n", .{@tagName(p.display_bpp)});
+    // Typed options (options.zig) and the workgroup, only when set (the
+    // editor saves through here: before 2026-10-14 they were dropped).
+    if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
+    if (p.beta_clock.len > 0) try w.print("beta_clock={s}\r\n", .{p.beta_clock.slice()});
+    if (p.network == .off) try w.writeAll("network=off\r\n");
+    if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
+    if (p.dos_regional != .auto) try w.print("dos_regional={s}\r\n", .{@tagName(p.dos_regional)});
+    if (p.dos_keyb) try w.writeAll("dos_keyb=yes\r\n");
+    if (p.dos_winsock) try w.writeAll("dos_winsock=yes\r\n");
+    if (p.win9x_setup != .auto) try w.print("win9x_setup={s}\r\n", .{@tagName(p.win9x_setup)});
+    inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
+        if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
+    }
+    for (options.table) |o| {
+        if (o.legacy) continue;
+        const value = p.opts[@intFromEnum(o.opt)];
+        if (value != 0) try w.print("{s}={s}\r\n", .{ o.key(), o.values[value] });
+    }
     return w.buffered();
 }
 
@@ -803,6 +1204,48 @@ pub fn fileStem(name: []const u8, buffer: []u8) []const u8 {
     const n = @min(name.len, buffer.len);
     for (name[0..n], 0..) |c, i| buffer[i] = if (c == ' ' or c == '.') '-' else std.ascii.toLower(c);
     return buffer[0..n];
+}
+
+/// A file stem for `name` that `taken` does not report: fileStem(name), or
+/// with "-2" ... "-99" appended (the base shortened to fit 32 characters)
+/// when another file holds it. Two profiles may share a name when they are
+/// offered for different systems (applies.overlaps), so the name alone no
+/// longer picks the file. Every suffix taken: the plain stem (the caller's
+/// duplicate check refuses the save before that).
+pub fn uniqueFileStem(name: []const u8, context: anytype, comptime taken: fn (@TypeOf(context), []const u8) bool, buffer: *[32]u8) []const u8 {
+    const base = fileStem(name, buffer);
+    if (!taken(context, base)) return base;
+    const base_len = base.len;
+    var number: u8 = 2;
+    while (number < 100) : (number += 1) {
+        var suffix_bytes: [3]u8 = undefined;
+        const suffix = std.fmt.bufPrint(&suffix_bytes, "-{d}", .{number}) catch unreachable;
+        const keep = @min(base_len, buffer.len - suffix.len);
+        // Re-derive the base: an earlier, longer suffix may have overwritten it.
+        _ = fileStem(name[0..@min(name.len, keep)], buffer);
+        @memcpy(buffer[keep .. keep + suffix.len], suffix);
+        const candidate = buffer[0 .. keep + suffix.len];
+        if (!taken(context, candidate)) return candidate;
+    }
+    return fileStem(name, buffer);
+}
+
+test "uniqueFileStem: plain stem when free, numbered when another file holds it" {
+    const Taken = struct {
+        list: []const []const u8,
+        fn has(self: @This(), stem: []const u8) bool {
+            for (self.list) |s| if (std.ascii.eqlIgnoreCase(s, stem)) return true;
+            return false;
+        }
+    };
+    var buffer: [32]u8 = undefined;
+    try std.testing.expectEqualStrings("domowy", uniqueFileStem("Domowy", Taken{ .list = &.{"inny"} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("domowy-2", uniqueFileStem("Domowy", Taken{ .list = &.{"domowy"} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("domowy-3", uniqueFileStem("Domowy", Taken{ .list = &.{ "domowy", "DOMOWY-2" } }, Taken.has, &buffer));
+    // 32-character names: the base is shortened so the suffix fits.
+    const long = "abcdefghijklmnopqrstuvwxyz012345";
+    try std.testing.expectEqualStrings("abcdefghijklmnopqrstuvwxyz0123-2", uniqueFileStem(long, Taken{ .list = &.{long} }, Taken.has, &buffer));
+    try std.testing.expectEqualStrings("abcdefghijklmnopqrstuvwxyz0123-2", uniqueFileStem("ABCDEFGHIJKLMNOPQRSTUVWXYZ012345", Taken{ .list = &.{long} }, Taken.has, &buffer));
 }
 
 // ------------------------------------------------------------ usos-xp.ini
@@ -861,6 +1304,38 @@ pub fn importXpIni(text: []const u8, out: *Profile) ?ParseResult {
 
 // ------------------------------------------------------------ tests
 
+test "network profile round trip validates subnet gateway and data URL" {
+    var p = Profile{};
+    const text = "[profile]\nname=LAN\nuser=Tester\nnetwork=on\ndialup=on\nip=192.168.1.20/24\ngateway=192.168.1.1\ndns=1.1.1.1,8.8.8.8\nhome_page=http://example.test/?a=1&b=2\n";
+    try std.testing.expect(parse(text, &p) == .ok);
+    var buf: [8192]u8 = undefined;
+    const saved = try write(&p, &buf);
+    var q = Profile{};
+    try std.testing.expect(parse(saved, &q) == .ok);
+    try std.testing.expectEqualStrings(p.ip.slice(), q.ip.slice());
+    try std.testing.expectEqualStrings(p.home_page.slice(), q.home_page.slice());
+    try std.testing.expect(q.network == .on and q.dialup == .on);
+    try q.gateway.set("10.0.0.1");
+    try std.testing.expect(validate(&q) != null);
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=DHCP\n", &q) == .ok);
+    try std.testing.expectEqualStrings("dhcp", q.ip.slice());
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=192.168.1.255/24\n", &q) == .invalid);
+}
+
+test "legacy pack choices round trip and reject commands or unknown presets" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=retro\naddons_options=kernelex,rdp51-pl\naddons_exclude=dotnet20\n", &p) == .ok);
+    var buffer: [8192]u8 = undefined;
+    const text = try write(&p, &buffer);
+    var q = Profile{};
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expect(q.addons_preset == .retro);
+    try std.testing.expectEqualStrings("kernelex,rdp51-pl", q.addons_options.slice());
+    try std.testing.expectEqualStrings("dotnet20", q.addons_exclude.slice());
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_options=x&cmd\n", &q) == .invalid);
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=unknown\n", &q) == .invalid);
+}
+
 test "profile round trip keeps every field; keys only with remember_key" {
     var p = Profile{};
     try p.name.set("Dom");
@@ -918,6 +1393,66 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try std.testing.expect(!q.hasAnyKey());
 }
 
+test "profile round trip keeps typed options and the workgroup; every option at its last value fits" {
+    var p = Profile{};
+    try p.name.set("Opcje");
+    try p.user.set("Tester");
+    try p.workgroup.set("LAB");
+    p.opts[@intFromEnum(options.Opt.power_profile)] = 2;
+    p.opts[@intFromEnum(options.Opt.user_script)] = 1;
+    var buffer: [max_file]u8 = undefined;
+    var text = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text, "workgroup=LAB\r\npower_profile=balanced\r\nuser_script=yes\r\n") != null);
+    var q: Profile = undefined;
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
+    try std.testing.expectEqualStrings("LAB", q.workgroup.slice());
+    for (options.table) |o| {
+        if (!o.legacy) p.opts[@intFromEnum(o.opt)] = @intCast(o.values.len - 1);
+    }
+    p.remember_key = true;
+    for (0..max_system_keys) |i| {
+        var name: [32]u8 = undefined;
+        try p.setSystemKey(try std.fmt.bufPrint(&name, "windows-system-{d}", .{i}), "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    }
+    text = try write(&p, &buffer);
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
+}
+
+test "display absent, explicit auto and depth survive profile round trips" {
+    var p: Profile = undefined;
+    var q: Profile = undefined;
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(parse("name=A\nuser=Bob\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expect(std.mem.indexOf(u8, try write(&p, &buffer), "display=") == null);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=auto\ndisplay_bpp=16\n", &p) == .ok);
+    try std.testing.expect(p.display_explicit);
+    const written = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, written, "display=auto\r\ndisplay_bpp=16\r\n") != null);
+    try std.testing.expect(parse(written, &q) == .ok);
+    try std.testing.expect(q.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.@"16", q.display_bpp);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=\ndisplay_bpp=\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.auto, p.display_bpp);
+}
+
+test "display=keep survives profile round trips and has no size" {
+    var p: Profile = undefined;
+    var q: Profile = undefined;
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=keep\n", &p) == .ok);
+    try std.testing.expectEqual(Display.keep, p.display);
+    try std.testing.expect(p.display_explicit);
+    try std.testing.expect(p.display.size() == null);
+    const written = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, written, "display=keep\r\n") != null);
+    try std.testing.expect(parse(written, &q) == .ok);
+    try std.testing.expectEqual(Display.keep, q.display);
+}
+
 test "profile parse errors name the field and line, never the value" {
     var p: Profile = undefined;
     const cases = [_]struct { text: []const u8, field: ?Field, problem: Problem, line: u32 }{
@@ -935,8 +1470,10 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nnetwork_location=office\n", .field = .network_location, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nedition=A<B\n", .field = .edition, .problem = .bad_characters, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nsystems=windows-vista,amiga\n", .field = .systems, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nsystems=windows-9x,windows-96\n", .field = .systems, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ntheme=aero\n", .field = .theme, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ndisplay=800x600\n", .field = .display, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\ndisplay_bpp=24\n", .field = .display_bpp, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nskip_games=maybe\n", .field = .skip_games, .problem = .bad_boolean, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },
@@ -1002,7 +1539,110 @@ test "product key: normalised from any case, with or without dashes and spaces" 
     try std.testing.expectEqualStrings("", normalizeKey("", &out));
     try std.testing.expectEqualStrings("ABCDE-", normalizeKey("abcde", &out));
     try std.testing.expectEqualStrings("ABCDE-F", normalizeKey("abcdef", &out));
+    // Windows 95 keys: OEM and retail.
+    try std.testing.expectEqualStrings("34567-OEM-0012345-12345", normalizeKey("34567oem001234512345", &out));
+    try std.testing.expectEqualStrings("34567-OEM-0012345-12345", normalizeKey("34567-OEM-0012345-12345", &out));
+    try std.testing.expectEqualStrings("12345-OEM-00", normalizeKey("12345oem00", &out));
+    try std.testing.expectEqualStrings("123-4567890", normalizeKey("123 4567890", &out));
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape("34567-OEM-0012345-12345").?);
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape("34567-oem-0012345-12345").?);
+    try std.testing.expectEqual(KeyShape.win95_retail, keyShape("123-4567890").?);
+    try std.testing.expectEqual(KeyShape.five_by_five, keyShape("ABCDE-12345-FGHIJ-67890-KLMNO").?);
+    try std.testing.expect(keyShape("34567-OEM-001234A-12345") == null);
+    try std.testing.expect(checkKey("123-456789") == .bad_key_format);
+    try std.testing.expect(checkKey("123-4567890") == null);
     try std.testing.expectEqual(@as(usize, 12), keySymbolCount("ABCDE-12345-XY"));
+}
+
+test "product key: a Windows 95 field types the 10-digit CD key and the OEM ID" {
+    var buf: [64]u8 = undefined;
+    var len: usize = 0;
+    // Made-up test keys in the documented formats (not real keys).
+    for ("12") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12", buf[0..len]);
+    for ("3") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 10), keySymbolLimitFor(buf[0..len], .win95));
+    for ("4567890") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4567890", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == null);
+    try std.testing.expectEqual(KeyShape.win95_retail, keyShape(buf[0..len]).?);
+    // The eleventh digit and letters are refused.
+    for ("1A-") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4567890", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 10), keySymbolCount(buf[0..len]));
+    len = keyBackspaceFor(&buf, len, .win95);
+    try std.testing.expectEqualStrings("123-456789", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == .bad_key_format);
+    // OEM: five digits, then OEM.
+    len = 0;
+    for ("12345") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-45", buf[0..len]);
+    for ("oem") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12345-OEM-", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolLimitFor(buf[0..len], .win95));
+    for ("0000007543219") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expect(checkKeyFor(buf[0..len], .win95) == null);
+    // "OEM" only after exactly five digits; no other letters.
+    len = 0;
+    for ("1234o") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-4", buf[0..len]);
+    for ("5x") |c| len = keyTypedFor(&buf, len, c, .win95);
+    try std.testing.expectEqualStrings("123-45", buf[0..len]);
+    // Stored keys read the same; a 5x5 key is not a 95 key.
+    var out: [29]u8 = undefined;
+    try std.testing.expectEqualStrings("123-4567890", normalizeKeyFor("1234567890", &out, .win95));
+    try std.testing.expectEqualStrings("123-4567890", normalizeKeyFor("123-4567890", &out, .win95));
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", normalizeKeyFor("12345oem000000754321", &out, .win95));
+    try std.testing.expect(checkKeyFor("ABCDE-12345-FGHIJ-67890-KLMNO", .win95) == .bad_key_format);
+    try std.testing.expect(checkKeyFor("ABCDE-12345-FGHIJ-67890-KLMNO", .any) == null);
+    try std.testing.expect(checkKeyFor("", .win95) == null);
+    try std.testing.expectEqual(KeyStyle.win95, keyStyleFor("windows-95"));
+    try std.testing.expectEqual(KeyStyle.win95, keyStyleFor("windows-nt-4"));
+    try std.testing.expectEqual(KeyStyle.any, keyStyleFor("windows-98-se"));
+    // The any style is unchanged (98/Me 5x5).
+    len = 0;
+    for ("BCDFGHJKMPQRTVWXY2346789B") |c| len = keyTypedFor(&buf, len, c, .any);
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
+}
+
+test "product key: a Windows 95 OEM ID stops at 20 symbols, a 5x5 key at 25" {
+    var buf: [64]u8 = undefined;
+    var len: usize = 0;
+    // Made-up test IDs in the documented formats (not real keys).
+    for ("12345") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    for ("oem0000007") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolLimit(buf[0..len]));
+    for ("54321") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expect(checkKey(buf[0..len]) == null);
+    // X470 2026-10-26: an extra "-1234" was accepted; now refused.
+    for ("-1234") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54321", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 20), keySymbolCount(buf[0..len]));
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape(buf[0..len]).?);
+    len = keyBackspace(&buf, len);
+    try std.testing.expectEqualStrings("12345-OEM-0000007-5432", buf[0..len]);
+    len = keyTyped(&buf, len, '9');
+    try std.testing.expectEqualStrings("12345-OEM-0000007-54329", buf[0..len]);
+    // Back to five digits: no longer OEM-shaped, a 5x5 key types to 25.
+    while (keySymbolCount(buf[0..len]) > 5) len = keyBackspace(&buf, len);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    len = 0;
+    for ("BCDFG-HJKMP-QRTVW-XY234-6789B") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
+    try std.testing.expectEqual(@as(usize, 25), keySymbolLimit(buf[0..len]));
+    try std.testing.expectEqual(KeyShape.five_by_five, keyShape(buf[0..len]).?);
+    len = keyTyped(&buf, len, 'C');
+    try std.testing.expectEqualStrings("BCDFG-HJKMP-QRTVW-XY234-6789B", buf[0..len]);
+    // Retail 95 (ddd-ddddddd) still types and normalizes.
+    len = 0;
+    for ("1234567890") |c| len = keyTyped(&buf, len, c);
+    var out: [29]u8 = undefined;
+    try std.testing.expectEqualStrings("123-4567890", normalizeKey(buf[0..len], &out));
 }
 
 test "product key: typing inserts the dashes, backspace over a dash removes the character before it" {
@@ -1029,3 +1669,17 @@ test "product key: typing inserts the dashes, backspace over a dash removes the 
     try std.testing.expectEqual(@as(usize, 0), keyBackspace(&buf, 0));
 }
 
+test "beta clock profile strict parse, round trip, invalid calendar and injection" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=Beta\nuser=Tester\nbeta_clock=auto\n", &p) == .ok);
+    try std.testing.expectEqualStrings("auto", p.beta_clock.slice());
+    var buffer: [max_file]u8 = undefined;
+    const text = try write(&p, &buffer);
+    var again = Profile{};
+    try std.testing.expect(parse(text, &again) == .ok);
+    try std.testing.expectEqualStrings("auto", again.beta_clock.slice());
+    for ([_][]const u8{ "2001-02-29", "2005-04-31", "2009-01-15;id", "2009-1-15" }) |bad| {
+        var line: [100]u8 = undefined;
+        try std.testing.expect(parse(try std.fmt.bufPrint(&line, "name=Beta\nuser=Tester\nbeta_clock={s}\n", .{bad}), &p) == .invalid);
+    }
+}

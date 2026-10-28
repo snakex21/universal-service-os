@@ -59,6 +59,9 @@ pub const Context = struct {
     system: *const usos.catalog.SystemEntry,
     /// USOS profiles can be handed on for this selection.
     profiles_allowed: bool,
+    /// List the answer files of the Unattended folder (none for MS-DOS /
+    /// Windows 1.x-3.x, which have no folder; answer_screen.entryFor).
+    list_files: bool = true,
     /// Vista on UEFI: the screen shows only the "not supported yet" note.
     answers_unsupported: bool = false,
     /// The image chosen before this screen (the editor lists its editions).
@@ -90,8 +93,10 @@ fn editorImages(context: Context) ?*const usos.flow.answer.editions.List {
 
 pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Context) Result {
     const system = context.system;
-    const directory = system.unattended_directory orelse return .{};
-    const found = discovery.listFilesWithExtension(directory, usos.flow.unattended_policy.extension(system), file_storage[0..]);
+    // No Unattended folder (MS-DOS / Windows 1.x-3.x): profiles only.
+    const directory = system.unattended_directory;
+    if (directory == null and !context.profiles_allowed) return .{};
+    const found = if (directory) |d| (if (context.list_files) discovery.listFilesWithExtension(d, usos.flow.unattended_policy.extension(system), file_storage[0..]) else 0) else 0;
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
     if (context.profiles_allowed) {
         answer_profiles.reload(context.root);
@@ -100,7 +105,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
     }
     const in_first = answer_screen.Input{ .settings_file = settings_name != null, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found, .unsupported = context.answers_unsupported };
     if (!answer_screen.shown(in_first)) return .{};
-    settings = if (settings_name) |name| xp_settings.read(directory, name) else .{};
+    settings = if (settings_name) |name| (if (directory) |d| xp_settings.read(d, name) else .{}) else .{};
 
     var selected: ?usize = null;
     while (true) {
@@ -129,7 +134,8 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
                     @memcpy(stem_copy[0..s.len], s);
                     if (profile_editor.edit(context.root, &p, stem_copy[0..s.len], system.id, system.name, editorImages(context))) |name| selected = rowOfProfile(name);
                 } else if (row == .xp_settings) {
-                    selected = importXp(context, directory, settings_name.?) orelse outcome.index;
+                    // xp_settings rows exist only for XP, which has its folder
+                    selected = importXp(context, directory orelse continue, settings_name.?) orelse outcome.index;
                 }
             },
             .delete => {
@@ -215,7 +221,7 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
     const len = layout.len;
     var selected: usize = @min(initial, len - 1);
     var list: view.ListScreen = undefined;
-    list.openWithHints(view.t(.unattended_title), view.t(.unattended_subtitle), rows[0..len], selected, true, help(selected), hints(selected));
+    list.openWithHints(view.t(.unattended_title), subtitle(context), rows[0..len], selected, true, help(selected), hints(selected));
     traceRows(rows[0..len]);
     while (true) {
         const event = input.readBlocking();
@@ -242,6 +248,22 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
             .ignored => {},
         }
     }
+}
+
+var subtitle_text: [256]u8 = undefined;
+
+/// The subtitle, with a note when profiles on the stick are made for other
+/// systems (`systems=`): they are not listed here, and their names may be
+/// used again for this system.
+fn subtitle(context: Context) []const u8 {
+    const base = view.t(.unattended_subtitle);
+    const hidden = if (context.profiles_allowed) answer_profiles.hidden() else 0;
+    if (hidden == 0) return base;
+    var number: [8]u8 = undefined;
+    var note: [160]u8 = undefined;
+    const count_text = std.fmt.bufPrint(&number, "{d}", .{hidden}) catch return base;
+    const hint = view.format(&note, .profile_hidden_other_systems, &.{count_text});
+    return std.fmt.bufPrint(&subtitle_text, "{s} · {s}", .{ base, hint }) catch base;
 }
 
 fn hints(selected: usize) []const Hint {

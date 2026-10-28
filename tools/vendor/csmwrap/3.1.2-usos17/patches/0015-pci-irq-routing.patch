@@ -1,0 +1,764 @@
+USOS 3.1.2-usos12 patch 0015 (2026-10-18): csmwrap.ini pci_irq_routing
+
+Windows Me on the ASRock X470 (CSM off, CSMWrap SeaBIOS) installs the USOS
+I211 NDIS driver but Device Manager disables the card with Code 29 ("the
+BIOS did not assign an IRQ"); the same for every other PCI device with an
+interrupt pin. Cause: a UEFI board started without CSM routes nothing in
+8259 (PIC) mode - on the X470 the Linux log shows LNKA..LNKH "configured
+for IRQ 0" (FCH PCI_INTR index 0..7 = 0) and the Interrupt Line registers
+are not PIC IRQs. Windows 9x without ACPI has no IRQ steering miniport for
+the AMD FCH router, so it can only use what the BIOS assigned. CSMWrap's
+$PIR (pir.c) also lists only buses that have their own _PRT, so devices
+behind the Promontory switch (the I211 on bus 4, the Wi-Fi, the NVMe) are
+missing from it.
+
+With pci_irq_routing = true in csmwrap.ini (written by the Windows 9x flow
+only), CSMWrap does what a legacy BIOS POST does, before ExitBootServices:
+- walks every PCI bus from the ACPI root bridges (PNP0A08 / PNP0A03,
+  _BBN), following bridges by their secondary bus number and the ACPI child
+  with the matching _ADR;
+- resolves each function's Interrupt Pin through the PIC-mode _PRT (uACPI
+  never calls _PIC, so PICM = 0 and _PRT returns the link packages); buses
+  without a _PRT use the PCI-to-PCI bridge swizzle (pin + device) mod 4 up
+  to the nearest bus that has one;
+- for each link device that is actually used: keeps a valid current IRQ
+  (_CRS, exactly one IRQ that _PRS allows), otherwise programs one with
+  _SRS (the _PRS template reduced to one IRQ; links with dependent functions
+  or without _SRS are left alone) and checks it with _CRS. IRQ choice: 11,
+  10, 5, 9 allowed by _PRS, least loaded first, busiest links first; 3, 7,
+  4, 15, 14, 6, 12 only if _PRS has none of those; never 0, 1, 2, 8, 13;
+- writes the IRQ to the Interrupt Line register (0x3C) of every routed
+  function and sets those IRQs to level in the ELCR (0x4D0 / 0x4D1);
+- pir.c then builds $PIR from this routing: one slot per bus/device with a
+  pin, link value 0x80 + link index, bitmap = the one IRQ programmed.
+Only PIC-mode routing is touched (on AMD FCH the APIC-mode routing is a
+separate register bank); the MADT, the MP table and the ACPI tables are
+not changed. Without the ini key the binary behaves as 3.1.2-usos11-int13x.
+
+Own code from the PCI Local Bus 3.0 / PCI-to-PCI Bridge 1.2 specifications,
+ACPI 6.5 (6.2.13 _PRT, 6.2.16 _SRS, link devices) and PCI BIOS 2.1 ($PIR).
+Applies after 0001-0010, 0012 and 0014, patch -p1 from the top of the
+tree. Part of a MODIFIED CSMWrap made by the USOS project (LGPL-2.1).
+
+diff -ruN a/src/config.c b/src/config.c
+--- a/src/config.c
++++ b/src/config.c
+@@ -375,6 +375,15 @@
+         } else {
+             printf("  warning: invalid value for 'int13_boot_disk_only': %s\n", val);
+         }
++    } else if (streq_nocase(key, "pci_irq_routing")) {
++        /* USOS patch 0015 */
++        bool v;
++        if (parse_bool(val, &v)) {
++            gConfig.pci_irq_routing = v;
++            printf("  pci_irq_routing = %s\n", v ? "true" : "false");
++        } else {
++            printf("  warning: invalid value for 'pci_irq_routing': %s\n", val);
++        }
+     } else if (streq_nocase(key, "vga")) {
+         uint8_t b, d, f;
+         if (parse_pci_address(val, &b, &d, &f)) {
+diff -ruN a/src/config.h b/src/config.h
+--- a/src/config.h
++++ b/src/config.h
+@@ -25,6 +25,8 @@
+     bool acpi_legacy_fadt;
+     /* USOS patch 0014: only the boot disk is a BIOS hard disk (Windows 9x on NVMe) */
+     bool int13_boot_disk_only;
++    /* USOS patch 0015: PCI INTx -> 8259 IRQs, Interrupt Line, ELCR, $PIR (Windows 9x) */
++    bool pci_irq_routing;
+     bool vga_specified;
+     uint8_t vga_bus;
+     uint8_t vga_device;
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -18,6 +18,7 @@
+ #include <oprom.h>
+ #include <usos_acpi10.h>
+ #include <usos_acpien.h>
++#include <usos_pciirq.h>
+ #include <flanterm.h>
+ #include <flanterm_backends/fb.h>
+ 
+@@ -697,6 +698,14 @@
+     /* Build MP table from ACPI MADT (excludes helper core) */
+     mptable_init(&priv);
+ 
++    /*
++     * USOS patch 0015 (csmwrap.ini pci_irq_routing = true, Windows 9x):
++     * route PCI INTx to 8259 IRQs as a legacy BIOS POST does (link _SRS,
++     * Interrupt Line, ELCR); pir_init() then describes that routing.
++     */
++    if (gConfig.pci_irq_routing)
++        usos_pciirq_init();
++
+     /* Build $PIR table from ACPI _PRT for legacy PCI BIOS callers */
+     pir_init(&priv);
+ 
+diff -ruN a/src/pir.c b/src/pir.c
+--- a/src/pir.c
++++ b/src/pir.c
+@@ -13,6 +13,8 @@
+ #include "csmwrap.h"
+ #include "pir.h"
+ #include "io.h"
++#include "config.h"
++#include "usos_pciirq.h"
+ 
+ #include <uacpi/acpi.h>
+ #include <uacpi/namespace.h>
+@@ -310,6 +312,16 @@
+         printf("pir: no ISA bridge found, using host bridge as router\n");
+     }
+ 
++    /* USOS patch 0015: with pci_irq_routing the slots come from the routing
++     * that usos_pciirq_init() programmed (every bus, bridge swizzle, one
++     * fixed IRQ per pin). */
++    _Static_assert(sizeof(struct pir_slot) == 16, "$PIR slot is 16 bytes");
++    if (gConfig.pci_irq_routing) {
++        slot_count = usos_pciirq_fill_pir(slots, MAX_PIR_SLOTS);
++        if (slot_count)
++            goto prt_done;
++    }
++
+     /* Walk _PRT for each bus; group entries by (bus, dev) into slots. */
+     for (size_t bi = 0; bi < pir_buses.count; bi++) {
+         struct pci_bus_info *binfo = &pir_buses.buses[bi];
+diff -ruN a/src/usos_pciirq.c b/src/usos_pciirq.c
+--- a/src/usos_pciirq.c
++++ b/src/usos_pciirq.c
+@@ -0,0 +1,339 @@
++/*
++ * USOS patch 0015: PCI INTx -> 8259 IRQ routing for Windows 9x. See
++ * usos_pciirq.h. Own code; part of CSMWrap 3.1.2-usos12 (MODIFIED by USOS,
++ * LGPL-2.1).
++ */
++#include <efi.h>
++#include <printf.h>
++#include "csmwrap.h"
++#include "io.h"
++#include "usos_pciirq.h"
++
++#include <uacpi/namespace.h>
++#include <uacpi/resources.h>
++#include <uacpi/uacpi.h>
++#include <uacpi/utilities.h>
++
++#include "usos_pciirq_core.inc"
++
++#define ELCR1 0x4D0
++#define ELCR2 0x4D1
++
++static struct pciirq_state st;
++static uacpi_namespace_node *link_node[PCIIRQ_MAX_LINKS];
++static bool active;
++
++static bool func_present(uint8_t bus, uint8_t dev, uint8_t func)
++{
++    return pciConfigReadWord(bus, dev, func, 0x00) != 0xFFFF;
++}
++
++static int link_index(uacpi_namespace_node *node)
++{
++    for (size_t i = 0; i < st.nlinks; i++)
++        if (link_node[i] == node)
++            return (int)i;
++    if (st.nlinks >= PCIIRQ_MAX_LINKS)
++        return -2;
++    link_node[st.nlinks] = node;
++    struct pciirq_link *k = &st.links[st.nlinks];
++    k->prs = 0;
++    k->cur = 0;
++    k->irq = 0;
++    k->settable = false;
++    k->users = 0;
++    return (int)st.nlinks++;
++}
++
++struct child_find {
++    uint64_t adr;
++    uacpi_namespace_node *found;
++};
++
++static uacpi_iteration_decision child_cb(void *user, uacpi_namespace_node *node,
++                                         uacpi_u32 depth)
++{
++    (void)depth;
++    struct child_find *c = user;
++    uacpi_u64 adr;
++    if (uacpi_eval_simple_integer(node, "_ADR", &adr) == UACPI_STATUS_OK
++        && adr == c->adr) {
++        c->found = node;
++        return UACPI_ITERATION_DECISION_BREAK;
++    }
++    return UACPI_ITERATION_DECISION_CONTINUE;
++}
++
++static uacpi_namespace_node *find_child(uacpi_namespace_node *parent,
++                                        uint8_t dev, uint8_t func)
++{
++    if (!parent)
++        return NULL;
++    struct child_find c = { .adr = ((uint64_t)dev << 16) | func, .found = NULL };
++    uacpi_namespace_for_each_child(parent, child_cb, UACPI_NULL,
++                                   UACPI_OBJECT_DEVICE_BIT, 1, &c);
++    return c.found;
++}
++
++static uint8_t visited[256 / 8];
++
++static void walk_bus(uint8_t bus, uacpi_namespace_node *node, int parent,
++                     uint8_t bridge_dev, int depth)
++{
++    if (depth > 16 || st.nbuses >= PCIIRQ_MAX_BUSES || (visited[bus / 8] >> (bus % 8)) & 1)
++        return;
++    visited[bus / 8] |= (uint8_t)(1u << (bus % 8));
++
++    int bi = (int)st.nbuses++;
++    struct pciirq_bus *b = &st.buses[bi];
++    b->bus = bus;
++    b->parent = (int16_t)parent;
++    b->bridge_dev = bridge_dev;
++    b->has_prt = false;
++    b->prt_first = (uint16_t)st.nprt;
++    b->prt_count = 0;
++
++    uacpi_pci_routing_table *prt = NULL;
++    if (node && uacpi_get_pci_routing_table(node, &prt) == UACPI_STATUS_OK && prt) {
++        b->has_prt = true;
++        for (size_t i = 0; i < prt->num_entries && st.nprt < PCIIRQ_MAX_PRT; i++) {
++            uacpi_pci_routing_table_entry *e = &prt->entries[i];
++            if (e->pin > 3)
++                continue;
++            int16_t link = -1;
++            if (e->source) {
++                int li = link_index(e->source);
++                if (li < 0)
++                    continue;
++                link = (int16_t)li;
++            }
++            struct pciirq_prt *r = &st.prt[st.nprt++];
++            r->dev = (uint8_t)((e->address >> 16) & 0x1F);
++            r->pin = e->pin;
++            r->link = link;
++            r->gsi = e->index;
++            b->prt_count++;
++        }
++        uacpi_free_pci_routing_table(prt);
++    }
++
++    for (uint8_t dev = 0; dev < 32; dev++) {
++        for (uint8_t func = 0; func < 8; func++) {
++            if (!func_present(bus, dev, func)) {
++                if (func == 0)
++                    break;
++                continue;
++            }
++            uint8_t hdr = pciConfigReadByte(bus, dev, func, 0x0E);
++            uint8_t pin = pciConfigReadByte(bus, dev, func, 0x3D);
++            if (pin >= 1 && pin <= 4 && st.nfuncs < PCIIRQ_MAX_FUNCS) {
++                struct pciirq_func *f = &st.funcs[st.nfuncs++];
++                f->bus_idx = (int16_t)bi;
++                f->dev = dev;
++                f->func = func;
++                f->pin = pin;
++                f->route = PCIIRQ_NONE;
++            }
++            if ((hdr & 0x7F) == 1) {
++                uint8_t sec = pciConfigReadByte(bus, dev, func, 0x19);
++                if (sec > bus)
++                    walk_bus(sec, find_child(node, dev, func), bi, dev, depth + 1);
++            }
++            if (func == 0 && !(hdr & 0x80))
++                break;
++        }
++    }
++}
++
++static uacpi_iteration_decision root_cb(void *user, uacpi_namespace_node *node,
++                                        uacpi_u32 depth)
++{
++    (void)user;
++    (void)depth;
++    uacpi_u64 bbn = 0;
++    uacpi_eval_simple_integer(node, "_BBN", &bbn);
++    walk_bus((uint8_t)bbn, node, -1, 0, 0);
++    return UACPI_ITERATION_DECISION_CONTINUE;
++}
++
++struct crs_ctx {
++    uint16_t mask;
++    int n;
++};
++
++static uacpi_iteration_decision crs_cb(void *user, uacpi_resource *r)
++{
++    struct crs_ctx *c = user;
++    if (r->type == UACPI_RESOURCE_TYPE_IRQ) {
++        for (uint8_t i = 0; i < r->irq.num_irqs; i++, c->n++)
++            if (r->irq.irqs[i] < 16)
++                c->mask |= (uint16_t)(1u << r->irq.irqs[i]);
++    } else if (r->type == UACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
++        for (uint8_t i = 0; i < r->extended_irq.num_irqs; i++, c->n++)
++            if (r->extended_irq.irqs[i] < 16)
++                c->mask |= (uint16_t)(1u << r->extended_irq.irqs[i]);
++    }
++    return UACPI_ITERATION_DECISION_CONTINUE;
++}
++
++/* _CRS -> the single IRQ in use, 0 if none / disabled / several. */
++static uint8_t link_current(uacpi_namespace_node *node)
++{
++    struct crs_ctx c = { 0, 0 };
++    if (uacpi_for_each_device_resource(node, "_CRS", crs_cb, &c) != UACPI_STATUS_OK)
++        return 0;
++    if (c.n != 1 || !c.mask || (c.mask & (c.mask - 1)))
++        return 0;
++    for (uint8_t q = 1; q < 16; q++)
++        if (c.mask == (1u << q))
++            return q;
++    return 0;
++}
++
++/* _PRS: IRQ bitmap; settable when it holds exactly one IRQ descriptor
++ * (no dependent functions) and the link has _SRS. */
++static void link_possible(uacpi_namespace_node *node, struct pciirq_link *k)
++{
++    uacpi_resources *res = NULL;
++    k->prs = 0;
++    k->settable = false;
++    if (uacpi_get_device_resources(node, "_PRS", &res) != UACPI_STATUS_OK || !res)
++        return;
++    int irq_desc = 0, other = 0;
++    struct crs_ctx c = { 0, 0 };
++    for (uacpi_resource *r = res->entries;
++         (uint8_t *)r < (uint8_t *)res->entries + res->length;
++         r = UACPI_NEXT_RESOURCE(r)) {
++        if (r->type == UACPI_RESOURCE_TYPE_END_TAG)
++            break;
++        if (r->type == UACPI_RESOURCE_TYPE_IRQ || r->type == UACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
++            irq_desc++;
++            crs_cb(&c, r);
++        } else {
++            other++;
++        }
++        if (!r->length)
++            break;
++    }
++    uacpi_free_resources(res);
++    k->prs = c.mask;
++    uacpi_namespace_node *srs = NULL;
++    k->settable = irq_desc == 1 && other == 0
++        && uacpi_namespace_node_find(node, "_SRS", &srs) == UACPI_STATUS_OK && srs;
++}
++
++/* _SRS with the _PRS template reduced to one IRQ, then check _CRS. */
++static bool link_set(uacpi_namespace_node *node, uint8_t irq)
++{
++    uacpi_resources *res = NULL;
++    if (uacpi_get_device_resources(node, "_PRS", &res) != UACPI_STATUS_OK || !res)
++        return false;
++    uacpi_resource *r = res->entries;
++    if (r->type == UACPI_RESOURCE_TYPE_IRQ && r->irq.num_irqs >= 1) {
++        r->irq.num_irqs = 1;
++        r->irq.irqs[0] = irq;
++    } else if (r->type == UACPI_RESOURCE_TYPE_EXTENDED_IRQ && r->extended_irq.num_irqs >= 1) {
++        r->extended_irq.num_irqs = 1;
++        r->extended_irq.irqs[0] = irq;
++    } else {
++        uacpi_free_resources(res);
++        return false;
++    }
++    uacpi_status s = uacpi_set_resources(node, res);
++    uacpi_free_resources(res);
++    if (s == UACPI_STATUS_OK && link_current(node) == irq)
++        return true;
++    /* _SRS failed or _CRS disagrees (X470 LNKE: its _SRS reads PIRE instead
++     * of the argument and stores 0xFF): leave the link disabled through its
++     * own _DIS rather than in whatever state _SRS left it. */
++    if (s != UACPI_STATUS_OK)
++        printf("pciirq: _SRS failed: %s\n", uacpi_status_to_string(s));
++    uacpi_namespace_node *dis = NULL;
++    if (uacpi_namespace_node_find(node, "_DIS", &dis) == UACPI_STATUS_OK && dis)
++        uacpi_eval(node, "_DIS", UACPI_NULL, UACPI_NULL);
++    return false;
++}
++
++static void link_name(uacpi_namespace_node *node, char out[5])
++{
++    uacpi_object_name n = uacpi_namespace_node_name(node);
++    for (int i = 0; i < 4; i++)
++        out[i] = n.text[i];
++    out[4] = 0;
++}
++
++bool usos_pciirq_init(void)
++{
++    active = false;
++    memset(&st, 0, sizeof(st));
++    memset(visited, 0, sizeof(visited));
++    printf("pciirq: routing PCI INTx to 8259 IRQs (pci_irq_routing)\n");
++
++    uacpi_namespace_node *sb = uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SB);
++    if (!sb) {
++        printf("pciirq: no \\_SB, nothing done\n");
++        return false;
++    }
++    const uacpi_char *hids[] = { "PNP0A08", "PNP0A03", UACPI_NULL };
++    uacpi_find_devices_at(sb, hids, root_cb, UACPI_NULL);
++    if (!st.nbuses || !st.nfuncs) {
++        printf("pciirq: no PCI functions with an interrupt pin, nothing done\n");
++        return false;
++    }
++
++    pciirq_resolve_all(&st);
++    for (size_t l = 0; l < st.nlinks; l++) {
++        if (!st.links[l].users)
++            continue;
++        link_possible(link_node[l], &st.links[l]);
++        st.links[l].cur = link_current(link_node[l]);
++    }
++
++    uint8_t want[PCIIRQ_MAX_LINKS];
++    pciirq_choose(&st, want);
++    for (size_t l = 0; l < st.nlinks; l++) {
++        struct pciirq_link *k = &st.links[l];
++        if (!k->users)
++            continue;
++        char nm[5];
++        link_name(link_node[l], nm);
++        if (want[l]) {
++            if (link_set(link_node[l], want[l]))
++                k->irq = want[l];
++            printf("pciirq: %s (%u fn, prs %04x, crs %u) -> IRQ %u%s\n", nm,
++                   k->users, k->prs, k->cur, want[l], k->irq ? "" : " FAILED");
++        } else {
++            printf("pciirq: %s (%u fn, prs %04x) %s IRQ %u\n", nm, k->users,
++                   k->prs, k->irq ? "keeps" : "unrouted,", k->irq);
++        }
++    }
++
++    size_t written = 0, unrouted = 0;
++    for (size_t i = 0; i < st.nfuncs; i++) {
++        struct pciirq_func *f = &st.funcs[i];
++        uint8_t q = pciirq_func_irq(&st, f->route);
++        if (!q) {
++            unrouted++;
++            continue;
++        }
++        pciConfigWriteByte(st.buses[f->bus_idx].bus, f->dev, f->func, 0x3C, q);
++        written++;
++    }
++    uint16_t level = pciirq_level_mask(&st);
++    if (level) {
++        outb(ELCR1, (uint8_t)(inb(ELCR1) | (level & 0xF8)));
++        outb(ELCR2, (uint8_t)(inb(ELCR2) | ((level >> 8) & 0xDE)));
++    }
++    printf("pciirq: %u buses, %u functions with a pin: %u routed, %u unrouted; ELCR level %04x\n",
++           (unsigned)st.nbuses, (unsigned)st.nfuncs, (unsigned)written,
++           (unsigned)unrouted, level);
++    active = written != 0;
++    return active;
++}
++
++size_t usos_pciirq_fill_pir(void *out, size_t max)
++{
++    if (!active)
++        return 0;
++    return pciirq_fill_pir(&st, (uint8_t *)out, max);
++}
+diff -ruN a/src/usos_pciirq.h b/src/usos_pciirq.h
+--- a/src/usos_pciirq.h
++++ b/src/usos_pciirq.h
+@@ -0,0 +1,33 @@
++/*
++ * USOS patch 0015: csmwrap.ini pci_irq_routing = true (Windows 9x flow).
++ *
++ * A legacy BIOS routes PCI INTA#..INTD# to 8259 IRQs during POST and stores
++ * the IRQ in every function's Interrupt Line register; plug-and-play
++ * operating systems without ACPI IRQ routing (Windows 95/98/Me) use that
++ * value when no IRQ steering miniport exists for the chipset. A UEFI board
++ * started without CSM routes nothing in PIC mode (X470: LNKA..LNKH at IRQ 0)
++ * and Windows Me reports "the BIOS did not assign an IRQ" (Code 29) for
++ * every PCI device with an interrupt pin.
++ *
++ * usos_pciirq_init(): walks every PCI bus from the ACPI root bridges,
++ * resolves each function's pin through the PIC-mode _PRT (bridge swizzle
++ * for buses without a _PRT), keeps link devices whose _CRS already holds a
++ * valid IRQ, programs the others with _SRS (an IRQ from _PRS, verified by
++ * _CRS), writes the Interrupt Line registers and sets the ELCR bits (level)
++ * of those IRQs. usos_pciirq_fill_pir() then gives pir.c matching $PIR
++ * slots. Only the 8259 (PIC-mode) routing is touched; APIC-mode routing,
++ * the MADT and the MP table are not. Without the ini key nothing runs.
++ * Own code; part of CSMWrap 3.1.2-usos12 (MODIFIED by USOS, LGPL-2.1).
++ */
++#ifndef USOS_PCIIRQ_H
++#define USOS_PCIIRQ_H
++
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++
++bool usos_pciirq_init(void);
++/* 16-byte $PIR slot records into out (max entries); 0 if init did not run. */
++size_t usos_pciirq_fill_pir(void *out, size_t max);
++
++#endif
+diff -ruN a/src/usos_pciirq_core.inc b/src/usos_pciirq_core.inc
+--- a/src/usos_pciirq_core.inc
++++ b/src/usos_pciirq_core.inc
+@@ -0,0 +1,252 @@
++/*
++ * USOS patch 0015: PCI INTx -> 8259 IRQ routing core (no EFI, no ACPI calls),
++ * shared by src/usos_pciirq.c and the host test harness. Own code from the
++ * PCI Local Bus 3.0 / PCI-to-PCI Bridge 1.2 specifications (INTx swizzle
++ * across bridges), the ACPI 6.5 _PRT / link device rules (6.2.13, 6.2.16)
++ * and the PCI BIOS 2.1 $PIR format; part of CSMWrap 3.1.2-usos12
++ * (MODIFIED by USOS, LGPL-2.1).
++ *
++ * The caller fills buses (with their _PRT rows), functions (with their
++ * Interrupt Pin) and links (with _PRS bitmap and the IRQ from _CRS), then:
++ *   pciirq_resolve_all()  every function -> link or static IRQ
++ *   pciirq_choose()       an IRQ for every used link without a valid one
++ *   pciirq_fill_pir()     $PIR slot records (16 bytes each)
++ */
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++
++#define PCIIRQ_MAX_BUSES 64
++#define PCIIRQ_MAX_PRT 512
++#define PCIIRQ_MAX_FUNCS 512
++#define PCIIRQ_MAX_LINKS 32
++
++/* route encoding: >= 0 link index, PCIIRQ_STATIC(irq) a fixed IRQ, NONE */
++#define PCIIRQ_NONE (-1)
++#define PCIIRQ_STATIC_BASE (-100)
++#define PCIIRQ_STATIC(irq) (PCIIRQ_STATIC_BASE - (int)(irq))
++#define PCIIRQ_IS_STATIC(r) ((r) <= PCIIRQ_STATIC_BASE)
++#define PCIIRQ_STATIC_IRQ(r) (PCIIRQ_STATIC_BASE - (r))
++
++/* IRQs never given to PCI: timer, keyboard, cascade, RTC, FPU. */
++#define PCIIRQ_NEVER ((1u << 0) | (1u << 1) | (1u << 2) | (1u << 8) | (1u << 13))
++
++struct pciirq_prt {
++    uint8_t dev;       /* _PRT Address bits 31:16 */
++    uint8_t pin;       /* 0 = INTA .. 3 = INTD */
++    int16_t link;      /* link index, or -1 for a static GSI */
++    uint32_t gsi;      /* static GSI (Source = 0) */
++};
++
++struct pciirq_bus {
++    uint8_t bus;
++    int16_t parent;    /* bus index of the parent bus, -1 for a root bus */
++    uint8_t bridge_dev;/* device number of our bridge on the parent bus */
++    bool has_prt;      /* an ACPI _PRT exists for this bus */
++    uint16_t prt_first, prt_count;
++};
++
++struct pciirq_func {
++    int16_t bus_idx;
++    uint8_t dev, func;
++    uint8_t pin;       /* config 0x3D: 0 none, 1 = INTA .. 4 = INTD */
++    int route;
++};
++
++struct pciirq_link {
++    uint16_t prs;      /* possible IRQs < 16 from _PRS */
++    uint8_t cur;       /* IRQ from _CRS, 0 = none / disabled */
++    uint8_t irq;       /* final IRQ, 0 = unrouted */
++    bool settable;     /* _PRS has exactly one IRQ descriptor, _SRS exists */
++    uint16_t users;    /* functions routed through this link */
++};
++
++struct pciirq_state {
++    struct pciirq_bus buses[PCIIRQ_MAX_BUSES];
++    size_t nbuses;
++    struct pciirq_prt prt[PCIIRQ_MAX_PRT];
++    size_t nprt;
++    struct pciirq_func funcs[PCIIRQ_MAX_FUNCS];
++    size_t nfuncs;
++    struct pciirq_link links[PCIIRQ_MAX_LINKS];
++    size_t nlinks;
++};
++
++/* Route of (bus, dev, pin 0..3): the bus's own _PRT row if it has a _PRT,
++ * otherwise the bridge swizzle (pin + dev) mod 4 on the parent bus. A bus
++ * with a _PRT but no matching row is unrouted (no guessing). */
++static int pciirq_resolve(const struct pciirq_state *s, int bus_idx,
++                          uint8_t dev, uint8_t pin)
++{
++    for (int depth = 0; depth < PCIIRQ_MAX_BUSES && bus_idx >= 0; depth++) {
++        const struct pciirq_bus *b = &s->buses[bus_idx];
++        if (b->has_prt) {
++            for (size_t i = 0; i < b->prt_count; i++) {
++                const struct pciirq_prt *e = &s->prt[b->prt_first + i];
++                if (e->dev != dev || e->pin != pin)
++                    continue;
++                if (e->link >= 0)
++                    return e->link;
++                if (e->gsi < 16 && !((PCIIRQ_NEVER >> e->gsi) & 1))
++                    return PCIIRQ_STATIC(e->gsi);
++                return PCIIRQ_NONE;
++            }
++            return PCIIRQ_NONE;
++        }
++        pin = (uint8_t)((pin + dev) & 3);
++        dev = b->bridge_dev;
++        bus_idx = b->parent;
++    }
++    return PCIIRQ_NONE;
++}
++
++static void pciirq_resolve_all(struct pciirq_state *s)
++{
++    for (size_t l = 0; l < s->nlinks; l++)
++        s->links[l].users = 0;
++    for (size_t i = 0; i < s->nfuncs; i++) {
++        struct pciirq_func *f = &s->funcs[i];
++        f->route = PCIIRQ_NONE;
++        if (f->pin < 1 || f->pin > 4)
++            continue;
++        f->route = pciirq_resolve(s, f->bus_idx, f->dev, (uint8_t)(f->pin - 1));
++        if (f->route >= 0)
++            s->links[f->route].users++;
++    }
++}
++
++/* Preferred PCI IRQs (free on a PC/AT without ISA cards), then the ones
++ * that may collide with on-board legacy devices (COM, LPT, IDE, floppy,
++ * PS/2 mouse) - used only when _PRS offers nothing better. */
++static const uint8_t pciirq_tier1[] = { 11, 10, 5, 9 };
++static const uint8_t pciirq_tier2[] = { 3, 7, 4, 15, 14, 6, 12 };
++
++static int pciirq_pick(const uint16_t load[16], uint16_t prs,
++                       const uint8_t *tier, size_t n)
++{
++    int best = -1;
++    for (size_t i = 0; i < n; i++) {
++        uint8_t q = tier[i];
++        if (!((prs >> q) & 1) || ((PCIIRQ_NEVER >> q) & 1))
++            continue;
++        if (best < 0 || load[q] < load[best])
++            best = q;
++    }
++    return best;
++}
++
++/* Valid current routing (exactly one usable IRQ in _PRS, as reported by
++ * _CRS) is kept. Every other used link gets the least loaded IRQ of tier 1
++ * allowed by its _PRS (tier 2 only if tier 1 is empty), heaviest links
++ * first, so the busiest links end up on different IRQs. Sets want[] (the
++ * IRQ to program with _SRS, 0 = keep) and returns the number of links that
++ * need _SRS. irq is filled for kept links only; the caller sets it after a
++ * successful _SRS. */
++static size_t pciirq_choose(struct pciirq_state *s, uint8_t want[PCIIRQ_MAX_LINKS])
++{
++    uint16_t load[16] = { 0 };
++    bool done[PCIIRQ_MAX_LINKS] = { false };
++    size_t nset = 0;
++
++    for (size_t l = 0; l < s->nlinks; l++) {
++        struct pciirq_link *k = &s->links[l];
++        want[l] = 0;
++        k->irq = 0;
++        if (!k->users) {
++            done[l] = true;
++            continue;
++        }
++        if (k->cur && k->cur < 16 && ((k->prs >> k->cur) & 1)
++            && !((PCIIRQ_NEVER >> k->cur) & 1)) {
++            k->irq = k->cur;
++            load[k->cur] += k->users;
++            done[l] = true;
++        } else if (!k->settable || !(k->prs & ~PCIIRQ_NEVER)) {
++            done[l] = true;
++        }
++    }
++    for (;;) {
++        int heavy = -1;
++        for (size_t l = 0; l < s->nlinks; l++)
++            if (!done[l] && (heavy < 0 || s->links[l].users > s->links[heavy].users))
++                heavy = (int)l;
++        if (heavy < 0)
++            break;
++        struct pciirq_link *k = &s->links[heavy];
++        done[heavy] = true;
++        int q = pciirq_pick(load, k->prs, pciirq_tier1, sizeof(pciirq_tier1));
++        if (q < 0)
++            q = pciirq_pick(load, k->prs, pciirq_tier2, sizeof(pciirq_tier2));
++        if (q < 0)
++            continue;
++        want[heavy] = (uint8_t)q;
++        load[q] += k->users;
++        nset++;
++    }
++    return nset;
++}
++
++/* Final IRQ of a function, 0 if unrouted. */
++static uint8_t pciirq_func_irq(const struct pciirq_state *s, int route)
++{
++    if (route >= 0)
++        return s->links[route].irq;
++    if (PCIIRQ_IS_STATIC(route))
++        return (uint8_t)PCIIRQ_STATIC_IRQ(route);
++    return 0;
++}
++
++/* ELCR bits for every IRQ given to a PCI function (level, shareable). */
++static uint16_t pciirq_level_mask(const struct pciirq_state *s)
++{
++    uint16_t m = 0;
++    for (size_t i = 0; i < s->nfuncs; i++) {
++        uint8_t q = pciirq_func_irq(s, s->funcs[i].route);
++        if (q)
++            m |= (uint16_t)(1u << q);
++    }
++    return (uint16_t)(m & ~PCIIRQ_NEVER);
++}
++
++/* $PIR slot records (PCI BIOS 2.1, 16 bytes): one per (bus, device) with
++ * at least one function that has an interrupt pin. Each of the 4 pins is
++ * resolved for the device (bridge swizzle included); the link value is
++ * 0x80 + link index, 0xC0 + IRQ for a static IRQ, 0 when unrouted; the
++ * bitmap holds just the IRQ that was programmed, so the table matches the
++ * Interrupt Line registers (the routing is fixed). Returns the count. */
++static size_t pciirq_fill_pir(const struct pciirq_state *s, uint8_t *out, size_t max)
++{
++    size_t n = 0;
++    for (size_t i = 0; i < s->nfuncs; i++) {
++        const struct pciirq_func *f = &s->funcs[i];
++        if (f->pin < 1 || f->pin > 4)
++            continue;
++        uint8_t bus = s->buses[f->bus_idx].bus;
++        uint8_t devfn = (uint8_t)(f->dev << 3);
++        bool seen = false;
++        for (size_t j = 0; j < n; j++)
++            if (out[j * 16] == bus && out[j * 16 + 1] == devfn)
++                seen = true;
++        if (seen)
++            continue;
++        if (n >= max)
++            break;
++        uint8_t *r = out + n * 16;
++        for (int b = 0; b < 16; b++)
++            r[b] = 0;
++        r[0] = bus;
++        r[1] = devfn;
++        for (uint8_t p = 0; p < 4; p++) {
++            int route = pciirq_resolve(s, f->bus_idx, f->dev, p);
++            uint8_t q = pciirq_func_irq(s, route);
++            if (!q)
++                continue;
++            r[2 + p * 3] = route >= 0 ? (uint8_t)(0x80 + route) : (uint8_t)(0xC0 + q);
++            r[3 + p * 3] = (uint8_t)(1u << q);
++            r[4 + p * 3] = (uint8_t)((1u << q) >> 8);
++        }
++        /* r[14] slot number 0 = embedded, r[15] reserved */
++        n++;
++    }
++    return n;
++}

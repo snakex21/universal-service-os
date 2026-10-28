@@ -4,10 +4,14 @@
 #define _WIN32_WINNT 0x0600
 #include <windows.h>
 #include <lm.h>
+#include <wincrypt.h>
 #include "vista_oobe_recovery_policy.h"
 #include "vista_autochk.h"
 static WCHAR windows[MAX_PATH],self[MAX_PATH],file[MAX_PATH];
 static HANDLE log_file=INVALID_HANDLE_VALUE;
+#ifdef USOSWM_VM_EVIDENCE
+static HANDLE setup_background_proof;
+#endif
 static const WCHAR native[]=L"oobe\\windeploy.exe";
 static void report(const char *label,DWORD v){
  DWORD n;char hex[13]="0x00000000\r\n";
@@ -92,11 +96,58 @@ static BOOL evidence(const WCHAR *user){
   if(bytes){if(ReadFile(f,bytes,(DWORD)size.QuadPart,&got,0)&&got==size.QuadPart)ok=vo_completed(bytes,got,encoded);LocalFree(bytes);}
  }CloseHandle(f);return ok;
 }
-static DWORD run(const WCHAR *path){
+static DWORD run(const WCHAR *path,BOOL quiet_console){
  STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
- if(!CreateProcessW(path,0,0,0,FALSE,0,0,0,&si,&pi))return GetLastError();
+ /* The frozen console bootstrap and its console children share one hidden
+  * console. Keep stdout and their logs working; native Windows UI uses the
+  * normal startup path. No changes to the frozen helper binaries. */
+ if(quiet_console){si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;}
+ if(!CreateProcessW(path,0,0,0,FALSE,quiet_console?CREATE_NEW_CONSOLE:0,0,0,&si,&pi))return GetLastError();
  CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,INFINITE)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);return result;
 }
+static void register_testmode_desktop(void){
+#ifdef _WIN64
+ WCHAR helper[MAX_PATH];lstrcpyW(helper,windows);helper[3]=0;lstrcatW(helper,L"USOS\\usoswm\\usoswm-register.exe");
+ if(GetFileAttributesW(helper)==INVALID_FILE_ATTRIBUTES)return;
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ if(CreateProcessW(helper,0,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi)){
+  CloseHandle(pi.hThread);
+  if(WaitForSingleObject(pi.hProcess,20000)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);
+  else {TerminateProcess(pi.hProcess,ERROR_TIMEOUT);WaitForSingleObject(pi.hProcess,10000);result=ERROR_TIMEOUT;}
+  CloseHandle(pi.hProcess);
+ }else result=GetLastError();
+ report("Test-mode desktop: common Startup registration (nonfatal)=",result);
+#endif
+}
+static void start_testmode_setup_background(void){
+#ifdef _WIN64
+ WCHAR helper[MAX_PATH],command[MAX_PATH+32];lstrcpyW(helper,windows);helper[3]=0;lstrcatW(helper,L"USOS\\usoswm\\usoswm.exe");
+ if(GetFileAttributesW(helper)==INVALID_FILE_ATTRIBUTES)return;
+ HANDLE ready=CreateEventW(0,TRUE,FALSE,L"Local\\USOSWM.Setup.Background.Ready");if(!ready)return;ResetEvent(ready);
+ lstrcpyW(command,L"\"");lstrcatW(command,helper);lstrcatW(command,L"\" --setup");
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ if(CreateProcessW(helper,command,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi)){
+  CloseHandle(pi.hThread);HANDLE waits[]={ready,pi.hProcess};DWORD event=WaitForMultipleObjects(2,waits,FALSE,10000);
+  if(event==WAIT_OBJECT_0){result=0;
+#ifdef USOSWM_VM_EVIDENCE
+   DuplicateHandle(GetCurrentProcess(),pi.hProcess,GetCurrentProcess(),&setup_background_proof,SYNCHRONIZE,FALSE,0);
+#endif
+  }
+  else if(event==WAIT_OBJECT_0+1)GetExitCodeProcess(pi.hProcess,&result);
+  else {TerminateProcess(pi.hProcess,ERROR_TIMEOUT);WaitForSingleObject(pi.hProcess,10000);result=ERROR_TIMEOUT;}
+  CloseHandle(pi.hProcess);
+ }else result=GetLastError();
+ CloseHandle(ready);report("Test-mode setup background start (nonfatal)=",result);
+#endif
+}
+#ifdef USOSWM_VM_EVIDENCE
+/* Test-only checkpoint before native deploy/USB. Not present in product builds. */
+static char capture_setup_desktop(const char *event){
+ HANDLE port=CreateFileW(L"\\\\.\\COM1",GENERIC_READ|GENERIC_WRITE,0,0,OPEN_EXISTING,0,0);if(port==INVALID_HANDLE_VALUE)return 0;
+ DCB dcb={sizeof(dcb)};if(GetCommState(port,&dcb)){dcb.BaudRate=115200;dcb.ByteSize=8;dcb.StopBits=ONESTOPBIT;dcb.Parity=NOPARITY;SetCommState(port,&dcb);}
+ DWORD n;WriteFile(port,event,lstrlenA(event),&n,0);char ack=0;ReadFile(port,&ack,1,&n,0);CloseHandle(port);return ack;
+}
+#endif
 /* No boot-time autochk on fixed volumes other than the system volume
  * (vista_autochk.h). Only the untouched Windows default is replaced; the
  * system volume keeps its check (runs only when dirty). Never fatal. */
@@ -124,6 +175,43 @@ static void limit_autochk(void){
  report("Autochk: AutoChkTimeout = 3 s=",e);
  RegCloseKey(key);
 }
+#if defined(USOS_GATE_NATIVE_DEPLOY) || defined(USOS_GATE_NVME_X64)
+/* NVMe target (usos-x86-csmwrap.cmd :nvme put the signed usosnvme package in
+ * C:\USOS\nvme): before specialize, trust the package's per-build
+ * certificate (its private key was deleted at build time, so nothing else can
+ * carry this signature) in the machine's Root + TrustedPublisher stores and
+ * stage the package into the driver store. Specialize then installs usosnvme
+ * on the controller silently; without it NT 6.0 installed the NULL driver
+ * and every later start was STOP 0x7B (docs/nvme-nt6-2026-10-12.md 8-9).
+ * The amd64 NVMe experiment requires success before specialize. */
+static BOOL nvme_stage(void){
+ static WCHAR dir[MAX_PATH],path[MAX_PATH],cmd[3*MAX_PATH];static BYTE cert[8192];
+ lstrcpyW(dir,L"C:\\USOS\\nvme\\");dir[0]=windows[0];
+ lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.inf");
+ if(GetFileAttributesW(path)==INVALID_FILE_ATTRIBUTES)return TRUE;
+ lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.cer");
+ DWORD n=0;HANDLE f=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+ if(f==INVALID_HANDLE_VALUE){report("NVMe: usosnvme.cer not opened=",GetLastError());return FALSE;}
+ BOOL read=ReadFile(f,cert,sizeof(cert),&n,0);CloseHandle(f);
+ if(!read||!n||n==sizeof(cert)){report("NVMe: usosnvme.cer not read=",read?ERROR_INVALID_DATA:GetLastError());return FALSE;}
+ BOOL trusted=TRUE;
+ static const WCHAR *const stores[]={L"Root",L"TrustedPublisher"};
+ for(unsigned i=0;i<2;i++){
+  HCERTSTORE store=CertOpenStore(CERT_STORE_PROV_SYSTEM_W,0,0,CERT_SYSTEM_STORE_LOCAL_MACHINE,stores[i]);
+  DWORD e=0;if(!store)e=GetLastError();
+  else{if(!CertAddEncodedCertificateToStore(store,X509_ASN_ENCODING,cert,n,CERT_STORE_ADD_REPLACE_EXISTING,0))e=GetLastError();CertCloseStore(store,0);}
+  if(e)trusted=FALSE;
+  report(i?"NVMe: certificate -> LocalMachine TrustedPublisher=":"NVMe: certificate -> LocalMachine Root=",e);
+ }
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ lstrcpyW(path,windows);lstrcatW(path,L"\\System32\\pnputil.exe");
+ lstrcpyW(cmd,L"\"");lstrcatW(cmd,path);lstrcatW(cmd,L"\" -a \"");lstrcatW(cmd,dir);lstrcatW(cmd,L"usosnvme.inf\"");
+ if(!CreateProcessW(path,cmd,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi))result=GetLastError();
+ else{CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,120000)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);else{TerminateProcess(pi.hProcess,WAIT_TIMEOUT);result=WAIT_TIMEOUT;}CloseHandle(pi.hProcess);}
+ report("NVMe: pnputil -a usosnvme.inf (driver store) exit=",result);
+ return trusted&&result==0;
+}
+#endif
 void entry(void){
  static OSVERSIONINFOW os={sizeof(os)};
  if(!GetVersionExW(&os)||os.dwMajorVersion!=6||os.dwMinorVersion!=0||os.dwBuildNumber!=6002)ExitProcess(2);
@@ -142,6 +230,22 @@ void entry(void){
  if(!(oobe==1&&child==3)&&!(active==1&&child==0))ExitProcess(3);
  error=put(L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WinSAT",L"MOOBE",2);report("Automatic WinSAT guard readback=",error);if(error)ExitProcess(error);
  limit_autochk();
+#ifdef USOSWM_VM_EVIDENCE
+ capture_setup_desktop("WM_SETUP_GATE_NATIVE\n");
+#endif
+ start_testmode_setup_background();
+ register_testmode_desktop();
+#ifdef USOSWM_VM_EVIDENCE
+ if(capture_setup_desktop("WM_SETUP_GATE_DESKTOP\n")=='F'){
+  /* Explicit fixture-only lifecycle action, never in a product build. */
+  DWORD zero=0;LONG first=RegSetValueExW(setup,L"SystemSetupInProgress",0,REG_DWORD,(BYTE*)&zero,4);
+  LONG second=RegSetValueExW(setup,L"OOBEInProgress",0,REG_DWORD,(BYTE*)&zero,4);RegFlushKey(setup);
+  DWORD waited=setup_background_proof?WaitForSingleObject(setup_background_proof,10000):WAIT_FAILED;
+  capture_setup_desktop(!first&&!second&&waited==WAIT_OBJECT_0?"WM_SETUP_BACKGROUND_CLOSED\n":"WM_SETUP_BACKGROUND_CLOSE_FAILED\n");
+  ExitProcess(first||second||waited!=WAIT_OBJECT_0?1:0);
+ }
+#endif
+ BOOL quiet_console=FALSE;
  if(oobe==1&&child==3){
   static WCHAR name[257];DWORD count=0;BOOL enumerated=account(name,&count),completed=enumerated&&count==1&&evidence(name);
   int decision=enumerated?vo_decide(oobe,child==3,count,completed):-1;
@@ -153,7 +257,18 @@ void entry(void){
   lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
  }else{
   if(!start_watch())ExitProcess(ERROR_NOT_READY);
+#ifdef USOS_GATE_NATIVE_DEPLOY
+  nvme_stage();
+  /* 32-bit Vista / Server 2008 SP2 (usos-x86-csmwrap.cmd, no USB payload):
+   * straight to native windeploy, as on the recovery branch above. */
+  lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
+#else
+#ifdef USOS_GATE_NVME_X64
+  if(!nvme_stage()){report("NVMe64: package staging failed; specialize refused=",ERROR_DRIVER_BLOCKED);ExitProcess(ERROR_DRIVER_BLOCKED);}
+#endif
   lstrcpyW(file,L"C:\\USOS\\usb.exe");file[0]=windows[0];
+  quiet_console=TRUE;
+#endif
  }
- RegCloseKey(setup);DWORD result=run(file);report("Native bootstrap/deploy exit=",result);CloseHandle(log_file);ExitProcess(result);
+ RegCloseKey(setup);DWORD result=run(file,quiet_console);report("Native bootstrap/deploy exit=",result);CloseHandle(log_file);ExitProcess(result);
 }

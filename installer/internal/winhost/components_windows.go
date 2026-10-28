@@ -10,17 +10,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/snakex21/universal-service-os/installer/internal/components"
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
 // Optional components (internal/components) on the stick. The zips reaching
 // here are already verified against SHA256SUMS and the compiled hash list.
-// Installing reuses the existing paths: the WinPE donor goes to
-// DATA\Programs\USOS\WinPE and is recorded by ensureWinpeDonor (the same code
+// Installing reuses the existing paths: the WinPE donors (x64 and x86) go to
+// DATA\Programs\USOS\WinPE and are recorded by ensureWinpeDonor (the same code
 // as install/update/repair); an XP package is installed by the
 // install-xp-package.ps1 shipped inside it, exactly as by hand.
 
@@ -47,33 +47,57 @@ func installComponentAt(espRoot, dataRoot string, id components.ID, zipPath stri
 		log = func(string) {}
 	}
 	switch {
-	case id == components.WinPE:
-		return installWinpeComponent(espRoot, dataRoot, zipPath, log)
+	case id.IsWinPE():
+		return installWinpeComponent(espRoot, dataRoot, id, zipPath, log)
 	case id.IsXP() && storeOnly:
 		return storeXPComponent(dataRoot, id, zipPath, log)
 	case id.IsXP():
 		return installXPComponent(espRoot, zipPath, log)
+	case id == components.LegacyMS:
+		n, err := components.ExtractLegacyMS(zipPath, dataRoot)
+		if err != nil {
+			return fmt.Errorf("copy the legacy pack files to DATA: %w", err)
+		}
+		log(fmt.Sprintf("[COMPONENTS] legacy pack: %d Microsoft redistributables in %s", n, components.LegacyMSDataDir))
+		return nil
+	case id == components.Win7NetIntel:
+		n, err := components.ExtractWin7NetDrivers(zipPath, dataRoot)
+		if err != nil {
+			return fmt.Errorf("unpack the Intel Net drivers to DATA: %w", err)
+		}
+		log(fmt.Sprintf("[COMPONENTS] Net drivers (Intel I211): %d files for %s in %s", n,
+			strings.Join(components.Win7NetIntelArches(dataRoot), "/"), components.Win7NetIntelDataDir("<arch>")))
+		return nil
 	}
 	return fmt.Errorf("unknown component %q", id)
 }
 
-func installWinpeComponent(espRoot, dataRoot, zipPath string, log func(string)) error {
-	if status := components.Inspect(espRoot, dataRoot); status.WinPE {
-		log("[COMPONENTS] WinPE donor already on DATA: " + status.WinPEName)
-	} else {
-		name, err := components.ExtractWinPEDonor(zipPath, dataRoot)
-		if err != nil {
-			return fmt.Errorf("copy the WinPE donor to DATA: %w", err)
+func installWinpeComponent(espRoot, dataRoot string, id components.ID, zipPath string, log func(string)) error {
+	arch := archX64
+	if id == components.WinPEX86 {
+		arch = archX86
+	}
+	status := components.Inspect(espRoot, dataRoot)
+	if status.Present(id) {
+		name := status.WinPEName
+		if arch == archX86 {
+			name = status.WinPEX86Name
 		}
-		log("[COMPONENTS] WinPE donor copied to " + filepath.Join(winpeDonorDir, name))
+		log("[COMPONENTS] WinPE " + string(arch) + " donor already on DATA: " + name)
+	} else {
+		name, err := components.ExtractWinPEDonorFor(id, zipPath, dataRoot)
+		if err != nil {
+			return fmt.Errorf("copy the WinPE %s donor to DATA: %w", arch, err)
+		}
+		log("[COMPONENTS] WinPE " + string(arch) + " donor copied to " + filepath.Join(winpeDonorDir, name))
 	}
 	state, err := ensureWinpeDonor(dataRoot, espRoot)
 	log("WINPE_DONOR " + state.logLine())
 	if err != nil {
 		return err
 	}
-	if state.Ambiguous || state.Corrupt || state.Name == "" {
-		return errors.New("WinPE donor: " + state.logLine())
+	if slot := state.slot(arch); slot.Ambiguous || slot.Corrupt || slot.Name == "" {
+		return errors.New("WinPE " + string(arch) + " donor: " + slot.logLine(arch))
 	}
 	return nil
 }
@@ -143,10 +167,9 @@ func installXPComponent(espRoot, zipPath string, log func(string)) error {
 		espRoot += `\`
 	}
 	// The wrapper turns a thrown error into one unwrapped "ERROR: " line.
-	cmd := exec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", xpInstallWrapper)
+	cmd := hiddenexec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", xpInstallWrapper)
 	cmd.Dir = work
 	cmd.Env = append(os.Environ(), "USOS_XP_SCRIPT="+script, "USOS_XP_ESP="+espRoot)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	output, runErr := cmd.CombinedOutput()
 	for _, line := range strings.Split(strings.ReplaceAll(string(output), "\r", ""), "\n") {
 		if line = strings.TrimSpace(line); line != "" {

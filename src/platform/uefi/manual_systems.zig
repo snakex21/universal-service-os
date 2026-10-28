@@ -85,13 +85,23 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
         switch (navigation.handleSelectable(input.readBlocking(), &selected, count, &list, selectable[0..count])) {
             .activate => {
                 const entry = slots.at(selected) orelse continue;
+                if (usos.catalog.preparation_block.reason(entry.id)) |reason| {
+                    showBackendDisabledNotice(entry, view.tr(reason));
+                    list.redrawFull(selected, shown_help);
+                    continue;
+                }
                 const media = discovery.mediaStatus(entry.image_directory);
+                if (rows_model.biosOnly(entry, firmware)) {
+                    if (media.hasImages()) showBackendDisabledNotice(entry, view.t(.notice_backend_line2)) else showMissingImageNotice(entry);
+                    list.redrawFull(selected, shown_help);
+                    continue;
+                }
                 switch (access(entry, media, firmware).activation()) {
                     .firmware_mismatch, .secure_boot_off_required => {
                         // Selectable so the reason can be read; never launched.
                         var notice_lines: HelpLines = undefined;
                         if (blockedHelp(blockAt(&slots, selected, firmware), &notice_lines, entry)) |help| {
-                            view.notice(entry.name, .warning, .warning, help.title, help.lines);
+                            view.notice(view.tr(entry.name), .warning, .warning, help.title, help.lines);
                             view.waitForAnyKey();
                         }
                         list.redrawFull(selected, shown_help);
@@ -129,6 +139,7 @@ const Block = enum { none, requires_bios, requires_uefi, secure_boot_off };
 
 fn blockAt(slots: *const Slots, index: usize, firmware: usos.firmware.Firmware) Block {
     const entry = slots.at(index) orelse return .none;
+    if (rows_model.biosOnly(entry, firmware)) return .none;
     if (!entry.firmware.accepts(firmware)) return if (entry.firmware == .uefi) .requires_uefi else .requires_bios;
     if (secureBootBlocked(entry, firmware)) return .secure_boot_off;
     return .none;
@@ -172,12 +183,12 @@ pub fn access(entry: *const usos.catalog.SystemEntry, media: usos.catalog.System
 
 pub fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
     const lines = [_][]const u8{ view.t(.notice_no_image_line1), usos.gui.menu_policy.displayImagePath(entry.image_directory) };
-    view.notice(entry.name, .warning, .warning, view.t(.notice_no_image_title), &lines);
+    view.notice(view.tr(entry.name), .warning, .warning, view.t(.notice_no_image_title), &lines);
     view.waitForDismiss();
 }
 
 pub fn showBackendDisabledNotice(entry: *const usos.catalog.SystemEntry, reason: []const u8) void {
     const lines = [_][]const u8{ view.t(.notice_backend_line1), reason };
-    view.notice(entry.name, .info, .neutral, view.t(.system_unavailable), &lines);
+    view.notice(view.tr(entry.name), .info, .neutral, view.t(.system_unavailable), &lines);
     view.waitForDismiss();
 }

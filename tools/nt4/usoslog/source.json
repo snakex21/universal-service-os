@@ -1,0 +1,17 @@
+{
+  "source_commit": "7024a504",
+  "source_directory": "src/platform/bios/win9x",
+  "scope": "Own isolated NT4 logger fork: global DHCP DNS fallback; no NT3 or 9x source/payload modification",
+  "files": {
+    "usoslog.c": "91e7ad081cc1fcb72b01fe1b1d810ff7793774d0b78ff24f1962b42e75e57df8",
+    "usoslog_compat.h": "3b9726c1caa62dd18aa0a4a9e15bc4d5ecb5411f38a42c7ced4872889e9b7995",
+    "usoslog_net.h": "424c5bb6b0497907d3c8d8cc35c049b67aae6a6ba8d6ec15efbab9053b715986",
+    "usoslog_rawicmp.h": "235bf8e7a571b076ce732a14cf42a4701562b5447f5649523d7be5c2aeeada6b",
+    "usoslog_icmp_packet.h": "6cedb41886f7f250bb37d5ad5adb5840a0a35b91f92353b2896b6ba271404d56",
+    "usoslog.lnk": "54ed79da2163bbf23a8f5918a7ada4677162ae898c9de99c4ae0b5403c6a6280",
+    "usoslog_dns_packet.h": "67c2ec8f2f1b542f3074fffe93ebf23f8aab778da9fe967f5331277ddcba874d"
+  },
+  "binary_sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+  "own_patch": "Global Tcpip Parameters NameServer/DhcpNameServer only when adapter DNS list empty; strict DNS matcher unchanged",
+  "derived_from_binary_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7"
+}

@@ -9,6 +9,7 @@ const console = @import("console.zig");
 const file_read = @import("file_read.zig");
 const input = @import("input.zig");
 const input_report = @import("input_report.zig");
+const apm_breadcrumbs = @import("apm_breadcrumbs.zig");
 const pointer = @import("pointer.zig");
 const usb_gamepad = @import("usb_gamepad.zig");
 const serial = @import("serial.zig");
@@ -137,6 +138,9 @@ fn afterFirstFrame() void {
     // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
     boot_timing.mark("input-devices.txt written (after the menu)");
+    // CSMWrap usos8 APM power-off record from CMOS, when a legacy OS tried
+    // to power off since the last boot (EFI\USOS\Logs\apm-off.txt).
+    apm_breadcrumbs.write(root);
     boot_timing.report(root, "boot-timing.txt", serial_before);
 }
 
@@ -984,6 +988,18 @@ fn stageRows(default: []const []const u8, current: u8) []const []const u8 {
     return if (current >= 1 and current <= rows.len) rows else default;
 }
 
+/// How to log on after the installation (English, src/flow/answer/logon.zig):
+/// set at every start (manual_summary.recordLogon), shown on the native
+/// ISO start's progress page (the micro-Linux paths show it from logon.ini).
+var logon_storage: [256]u8 = undefined;
+var logon_line: []const u8 = "";
+
+pub fn setLogonLine(english: []const u8) void {
+    const n = @min(english.len, logon_storage.len);
+    @memcpy(logon_storage[0..n], english[0..n]);
+    logon_line = logon_storage[0..n];
+}
+
 pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStage, detail: []const u8) void {
     const Stage = usos.flow.preparation_boot_progress.DirectIsoStage;
     const rows = stageRows(&Stage.labels, stage.number());
@@ -995,6 +1011,7 @@ pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStag
         .heading = "Starting Windows from ISO",
         .title = rows[stage.number() - 1],
         .detail = detail,
+        .logon = logon_line,
     });
 }
 
@@ -1043,6 +1060,7 @@ fn progress(state: gui.preparation_screen.State) void {
             consoleLine(if (index < state.current) "[OK] " else if (index == state.current) "[..] " else "[  ] ", tr(label), "");
         }
         consoleLine("", trFormat(&buffer, state.detail), "");
+        if (state.logon.len > 0) consoleLine("", trFormat(&buffer, state.logon), "");
         return;
     };
     var clock: [48]u8 = undefined;

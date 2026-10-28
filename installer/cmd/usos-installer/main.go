@@ -12,10 +12,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/snakex21/universal-service-os/installer/internal/autoplay"
 	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 	"github.com/snakex21/universal-service-os/installer/internal/prefs"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/ui"
@@ -25,7 +28,16 @@ import (
 )
 
 func main() {
-	// The saved choice (%APPDATA%\USOS\installer.ini) wins; on first run the
+	// The installer is portable: all state lives in data\ beside the EXE and
+	// nothing is created in the user profile. An unwritable folder (e.g.
+	// Program Files) is reported and the program ends.
+	if err := portable.Init(); err != nil {
+		// Language: a choice saved by an older version is only read.
+		i18n.SetLanguage(prefs.StartupLanguage(portable.LegacyPath(prefs.FileName)))
+		_ = ui.Run(ui.Config{StartupError: i18n.T("installer.startup.portable_not_writable", err.Error())})
+		return
+	}
+	// The saved choice (data\installer.ini beside the EXE) wins; on first run the
 	// Windows display language is preselected. The same language is the one
 	// written to the USOS drive.
 	prefsPath, _ := prefs.DefaultPath()
@@ -36,7 +48,10 @@ func main() {
 		os.Exit(code)
 	}
 
-	if err := run(prefsPath); err != nil {
+	err := run(prefsPath)
+	// Temporary work (data\tmp) is removed when the window closes.
+	_ = portable.Cleanup()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -53,10 +68,32 @@ func run(prefsPath string) error {
 	defer logger.Close()
 	linkedBuild := buildinfo.Current()
 	_ = logger.WriteLine(fmt.Sprintf("INSTALLER BUILD id=%s epoch=%d source_sha256=%s", linkedBuild.Display(), linkedBuild.Epoch, linkedBuild.SourceSHA256))
+	// Helper programs (PowerShell, bcdedit, dism) run without a console
+	// window; their output goes to this log.
+	hiddenexec.SetLog(func(line string) { _ = logger.WriteLine(line) })
+	defer hiddenexec.SetLog(nil)
+	if dataDir, err := portable.DataDir(); err == nil {
+		_ = logger.WriteLine("PORTABLE data=" + dataDir)
+	}
+	for _, name := range portable.Migrated() {
+		_ = logger.WriteLine(`PORTABLE skopiowano z %APPDATA%\USOS: ` + name)
+	}
+	for _, failure := range portable.MigrationErrors() {
+		_ = logger.WriteLine(`WARN kopiowanie z %APPDATA%\USOS: ` + failure)
+	}
+	// AutoPlay is switched off while a target is partitioned; a run that
+	// crashed in that window left a journal, so put the user's setting back.
+	if err := autoplay.RestoreLegacyPending(); err != nil {
+		_ = logger.WriteLine("WARN przywrócenie AutoPlay ze starego dziennika (HKCU): " + err.Error())
+	}
+	if err := autoplay.RestorePending(autoplay.CurrentUser{}); err != nil {
+		_ = logger.WriteLine("WARN przywrócenie AutoPlay po poprzednim uruchomieniu: " + err.Error())
+	}
+	defer func() { _ = autoplay.RestoreAtExit(autoplay.CurrentUser{}) }()
 
 	// The progress screen answers "drive in use" with Retry/Cancel.
 	volumeInUse := &volumelock.Relay{}
-	backend := winhost.Backend{VolumeInUse: volumeInUse.Ask}
+	backend := winhost.Backend{VolumeInUse: volumeInUse.Ask, Log: func(line string) { _ = logger.WriteLine(line) }}
 	installEngine, err := install.NewEngine(backend, logger)
 	if err != nil {
 		return startupError(i18n.T("installer.startup.install_engine_failed", err.Error()))

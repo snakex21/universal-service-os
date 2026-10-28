@@ -48,7 +48,11 @@ def build(root: Path):
                          ('prepare_files.cmd', 'PREPDOS.BAT'), ('copy_group.cmd', 'COPYDOS.BAT'),
                          ('unpack_file.cmd', 'UNPACK.BAT'),
                          ('windows_start.cmd', 'W3START.BAT'), ('windows_menu.cmd', 'WINMENU.BAT'),
-                         ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT')]:
+                         ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT'),
+                         ('windows_early_config.sys', 'W1CONFIG.SYS'), ('windows_early_auto.cmd', 'W1AUTO.BAT'),
+                         ('windows_early_setup.cmd', 'W1SETUP.BAT'),
+                         ('windows_run.cmd', 'WINRUN.BAT'),
+                         ('windows_win30.cmd', 'W30WIN.BAT')]:
         text = (root / 'src/platform/bios/msdos' / source).read_text(encoding='ascii')
         # COMMAND.COM expands arguments before applying its 127-byte line
         # limit. Long FOR lists can silently lose the final loop variable.
@@ -64,12 +68,40 @@ def build(root: Path):
             if len(expanded) > 127:
                 raise ValueError('MS-DOS command line exceeds 127 bytes: ' + source)
         (dos_out / name).write_bytes(text.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii'))
+    # Before Windows 3.x Setup in both modes (INSTALL.BAT): no code page 852
+    # helper in Autostart (src/platform/bios/msdos/windows_inf.bas).
+    (dos_out / 'W3INF.BAS').write_bytes(dos_text((root / 'src/platform/bios/msdos/windows_inf.bas').read_text(encoding='ascii')))
     print('[PASS] MS-DOS support: verified HimemX 3.40, sources, license and DOS helpers')
+    # Network for MS-DOS (INSTALL.BAT -> C:\NET): own packet driver + mTCP.
+    from build_dos_network import build as build_dos_network
+    build_dos_network(root, dos_out)
+    # Windows 3.1 / WfW Winsock, opt-in (answer profile dos_winsock): its own
+    # folder, staged by dos_csmwrap_target.sh only when the option is on.
+    from build_win16_winsock import build_payload as build_winsock16
+    build_winsock16(root, out / 'winsock16')
     build_csmwrap_variants(root, dos_out)
+    # DOS-side texts in the USOS languages (dos.* catalog keys), applied by
+    # micro-Linux at prep time (tools/dos_win3_menu.sh dos_i18n_apply).
+    from build_dos_i18n import build as build_dos_i18n
+    print('[PASS] DOS texts: ' + build_dos_i18n(root).relative_to(root).as_posix())
     build_reboot(root)
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')
     from build_freedos_support import build as build_freedos
     build_freedos(root)
+    # After the MS-DOS support: it reuses USOSKEY and VBADOS from there.
+    from build_win9x_support import build as build_win9x
+    build_win9x(root, out / 'win9x')
+    # CS:IP locator for the early-Windows diagnostic start items (W1AUTO.BAT,
+    # USOSWHER /G); the 8.3 name of USOSWHERE.COM.
+    shutil.copyfile(out / 'win9x/USOSWHERE.COM', dos_out / 'USOSWHER.COM')
+    print('[PASS] MS-DOS support: USOSWHER.COM (early-Windows diagnostics)')
+    # INT 10h on a private stack before WIN.COM of Windows 1.x/2.x (W1AUTO.BAT).
+    shutil.copyfile(out / 'win9x/USOSV10.COM', dos_out / 'USOSV10.COM')
+    print('[PASS] MS-DOS support: USOSV10.COM (INT 10h stack for Windows 1.x/2.x)')
+    # USOSVGAR.COM: one-shot VGA register readback probe before WIN (Windows 3.x
+    # redraw problem on the X470); report in C:\USOS\DIAG\VGAREG.TXT.
+    shutil.copyfile(out / 'win9x/USOSVGAR.COM', dos_out / 'USOSVGAR.COM')
+    print('[PASS] MS-DOS support: USOSVGAR.COM (VGA readback probe for Windows 3.x)')
 
 
 def dos_text(text: str) -> bytes:
@@ -92,7 +124,24 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     temp = 'set TEMP=C:\\TEMP\n'
     if auto.count(temp) != 1:
         raise ValueError('windows_auto.cmd: TEMP line not found once')
-    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
+    # CTTY NUL around VBMOUSE: its VirtualBox/VMware probe lines go to
+    # stderr, which COMMAND.COM cannot redirect; a failure is reported
+    # (errorlevel, text in the menu language via dos_i18n_apply).
+    vbmouse = ('ctty nul\nC:\\DOS\\VBMOUSE.EXE\nctty con\nif not errorlevel 1 goto vbm_done\n'
+               'echo USOS: the DOS mouse driver (VBMOUSE) did not load.\n:vbm_done\n')
+    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + vbmouse + 'C:\\DOS\\USOSKEY.COM\n')))
+    # Windows 1.0x-3.0 start menu (INSTALL.BAT, EARLY.TAG): HIMEM /M:2 in every
+    # menu block that loads HIMEM (the diagnostic items D4/D5 load none).
+    early_config = (msdos / 'windows_early_config.sys').read_text(encoding='ascii')
+    if early_config.count(himem) < 1:
+        raise ValueError('windows_early_config.sys: HIMEM line not found')
+    (dos_out / 'W1CONFIG.CSM').write_bytes(dos_text(early_config.replace(himem, 'DEVICE=C:\\DOS\\HIMEM.SYS /TESTMEM:OFF /M:2\n')))
+    # W1AUTO.BAT loads VBMOUSE and USOSKBC /R itself when present (the
+    # diagnostic items leave some out); the CSMWrap copy is the same text.
+    early_auto = (msdos / 'windows_early_auto.cmd').read_text(encoding='ascii')
+    if 'C:\\DOS\\USOSKBC.COM /R' not in early_auto:
+        raise ValueError('windows_early_auto.cmd: USOSKBC /R not found')
+    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
     (dos_out / 'USOS.SHH').write_bytes(dos_text((msdos / 'windows_setup.shh').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'
@@ -105,7 +154,7 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     shutil.copyfile(vendor / 'vbados-0.67.tar.gz', dos_out / 'VBADOS.TGZ')
     notice = (vendor / 'SOURCES.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + (vendor / 'COPYING').read_text(encoding='ascii')
     (dos_out / 'VBADOS.TXT').write_bytes(dos_text(notice))
-    print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM, W3INI.BAS, VBADOS 0.67')
+    print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM / W1CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM / W1AUTO.CSM, W3INI.BAS, VBADOS 0.67')
     from build_win3_usb_keyboard import build as build_usb_keyboard
     build_usb_keyboard(root, dos_out)
 

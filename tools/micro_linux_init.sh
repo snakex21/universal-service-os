@@ -76,13 +76,31 @@ enable_emergency_input() {
     mdev -s 2>/dev/null || true
 }
 
+# Every write onto the stick ESP goes through usos_stick_write: the ESP is
+# read-only during waits and VM loops (tools/stick_write.sh,
+# tools/tests/test_esp_writes_helper.py).
+if [ -r /usr/lib/usos/stick_write.sh ]; then
+    . /usr/lib/usos/stick_write.sh
+else
+    usos_stick_write() { "$@"; }
+fi
+
 persist_legacy_xp_stop() {
     reason=$1
     case "${LEGACY_ACTION:-}" in xp-staging|windows2000-staging|windows2003-staging|xp64-staging) ;; *) return 0 ;; esac
     [ -r /proc/mounts ] || return 0
     awk '$2 == "/mnt/esp" { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts || return 0
     [ -d /mnt/esp/EFI/USOS ] || return 0
+    # stop() also runs while the ESP is read-only (a menu wait, X470
+    # 2026-10-12): the record goes through usos_stick_write.
     error_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-last-error.txt
+    usos_stick_write persist_legacy_xp_stop_write "$error_file" "$reason" || return 0
+    printf '[MICRO-LINUX] persisted Legacy XP failure to %s\n' "${error_file#/mnt/esp/}"
+}
+
+persist_legacy_xp_stop_write() {
+    error_file=$1
+    reason=$2
     tmp_file="$error_file.tmp"
     {
         printf '[LEGACY_XP_FAILURE]\n'
@@ -96,14 +114,17 @@ persist_legacy_xp_stop() {
         fi
         printf '%s\n' '--- block inventory ---'
         lsblk -bdnpo NAME,TYPE,MODEL,SERIAL,SIZE,PTTYPE,RM,RO 2>/dev/null || true
-    } > "$tmp_file" 2>/dev/null || return 0
-    mv "$tmp_file" "$error_file" 2>/dev/null || return 0
-    sync
-    printf '[MICRO-LINUX] persisted Legacy XP failure to %s\n' "${error_file#/mnt/esp/}"
+    } > "$tmp_file" 2>/dev/null || return 1
+    mv "$tmp_file" "$error_file" 2>/dev/null
 }
 
 stop() {
     persist_legacy_xp_stop "$1" || true
+    # A flow that keeps the stick ESP read-only (tools/stick_write.sh) copies
+    # its tmpfs logs onto it now, in one short read-write window.
+    if command -v usos_stick_flush >/dev/null 2>&1; then
+        usos_stick_flush || true
+    fi
     if command -v usos_ui_fail >/dev/null 2>&1; then
         usos_ui_fail 'Preparation stopped' "$1"
     fi
@@ -111,6 +132,9 @@ stop() {
         usos_ui_restore_cursor
     fi
     printf '[MICRO-LINUX] STOP: %s\n' "$1"
+    # A stopped session usually ends with the power button: leave the stick
+    # volumes clean (read-only) so Windows does not scan the stick later.
+    sh /usr/lib/usos/stick_release.sh ro 2>/dev/null || true
     printf '[MICRO-LINUX] loading emergency keyboard support...\n'
     enable_emergency_input || true
     printf '[MICRO-LINUX] emergency shell available on console\n'
@@ -457,7 +481,7 @@ if [ -f "$XP_TARGET_TEST_INI" ]; then
     umount /mnt/esp || stop 'cannot unmount ESP after XP target preparation'
     sync
     printf '[XP_TARGET_TEST] PREPARED SYNC PASS; rebooting for Legacy chainload\n'
-    reboot -f
+    sh /usr/lib/usos/stick_release.sh reboot
 fi
 
 DEVICE_INI=/mnt/esp/EFI/USOS/usos-device.ini
@@ -619,6 +643,9 @@ if [ "${USOS_WINDOWS_BIOS:-no}" = yes ]; then
     sh /usr/lib/usos/prepare_windows_bios_boot.sh preflight || stop 'Windows BIOS source preflight failed'
 fi
 sh /usr/lib/usos/prepare_work.sh || stop 'prepare_work.sh failed'
+# How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md).
+usos_logon_take /mnt/esp "${SELECTED_SYSTEM:-}" || true
+usos_logon_save /mnt/data "$(usos_logon_dir_of "$SELECTED_ISO")" || true
 if [ "${USOS_WINDOWS_BIOS:-no}" = yes ]; then
     sh /usr/lib/usos/prepare_windows_bios_boot.sh install || stop 'Windows BIOS bootstrap preparation failed'
 fi
@@ -646,4 +673,4 @@ fi
 printf '[MICRO-LINUX] full preparation PASS; rebooting to USOS\n'
 umount /mnt/esp || stop 'cannot unmount ESP'
 sync
-reboot -f
+sh /usr/lib/usos/stick_release.sh reboot

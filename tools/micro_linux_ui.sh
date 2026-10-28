@@ -19,7 +19,10 @@ USOS_UI_HEADING=${USOS_UI_HEADING:-}
 # are mapped onto this list by usos_ui_nt5_stage.
 USOS_UI_NT5=${USOS_UI_NT5:-no}
 case " $(cat /proc/cmdline 2>/dev/null) " in
+    *' usos.legacy_action=xp-staging '*' usos.xp_edition=mce '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP Media Center Edition 2005' ;;
+    *' usos.legacy_action=xp-staging '*' usos.xp_edition=tablet '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP Tablet PC Edition 2005' ;;
     *' usos.legacy_action=xp-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP' ;;
+    *' usos.legacy_action=windows2000-staging '*' usos.w2k_edition=server '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000 Server' ;;
     *' usos.legacy_action=windows2000-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000' ;;
     *' usos.legacy_action=windows2003-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows Server 2003' ;;
     *' usos.legacy_action=xp64-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP x64' ;;
@@ -36,6 +39,21 @@ fi
 USOS_UI_VISTA=${USOS_UI_VISTA:-no}
 case " $(cat /proc/cmdline 2>/dev/null) " in
     *' usos.legacy_action=vista-csmwrap '*) USOS_UI_VISTA=yes; [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows Vista' ;;
+    # Windows 95/98/Me and the DOS family without CSM (step 620): the same
+    # five-stage page. The UEFI menu passes the chosen system's name as
+    # usos.heading= ('_' for spaces; vista_preparation.headingOption), so the
+    # first frame does not say "Windows 9x" for Windows 3.0 or MS-DOS.
+    *' usos.legacy_action=w9x-csmwrap '*)
+        USOS_UI_VISTA=yes
+        if [ -z "$USOS_UI_HEADING" ]; then
+            for usos_ui_word in $(cat /proc/cmdline 2>/dev/null); do
+                case "$usos_ui_word" in
+                    usos.heading=?*) USOS_UI_HEADING=$(printf '%s' "${usos_ui_word#usos.heading=}" | tr '_' ' ') ;;
+                esac
+            done
+            unset usos_ui_word
+        fi
+        [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows' ;;
 esac
 if [ "$USOS_UI_VISTA" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
     USOS_UI_LABELS='Validating installation ISO|Loading the preparation environment|Choosing the target disk|Preparing the disk|Starting Windows Setup'
@@ -266,6 +284,7 @@ usos_ui_render_state() {
         [ -z "$USOS_UI_HEADING" ] || printf 'heading=%s\n' "$USOS_UI_HEADING"
         [ -z "${USOS_UI_NOTICE:-}" ] || printf 'notice=%s\n' "$USOS_UI_NOTICE"
         [ -z "${USOS_UI_ACTION:-}" ] || printf 'action=%s\n' "$USOS_UI_ACTION"
+        [ -z "${USOS_UI_LOGON:-}" ] || printf 'logon=%s\n' "$USOS_UI_LOGON"
         if [ -n "$USOS_UI_LABELS" ]; then
             printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
                 printf 'label=%s\n' "$stage_name"
@@ -406,6 +425,7 @@ usos_ui_notice_continue() {
         printf '\033[2J\033[H\033[?25l\n'
         printf '      \033[1;33m\033[1m%s\033[0m\n\n' "$notice_title"
         printf '      \033[1;37m%s\033[0m\n\n' "$USOS_UI_NOTICE"
+        [ -z "${USOS_UI_LOGON:-}" ] || printf '      \033[1;37m%s\033[0m\n\n' "$USOS_UI_LOGON"
         printf '      \033[1;36m\033[1m[ ENTER ]  %s\033[0m\n\n' "$USOS_UI_ACTION"
     } > "$USOS_UI_TTY" 2>/dev/null || true
     USOS_UI_NOTICE='' USOS_UI_ACTION=''
@@ -505,6 +525,7 @@ usos_ui_console_done() {
         printf '      \033[1;32m\033[1m%s\033[0m\n' "$title"
         [ -n "$detail" ] && printf '      \033[1;37m%s\033[0m\n' "$detail"
         printf '\n'
+        [ -z "${USOS_UI_LOGON:-}" ] || printf '      \033[1;37m%s\033[0m\n\n' "$USOS_UI_LOGON"
         printf '      \033[1;37mREMOVE THE USOS USB DRIVE BEFORE POWERING OFF.\033[0m\n\n'
         printf '      \033[1;36m\033[1m[ ENTER ]  POWER OFF\033[0m\n\n'
         printf '      \033[2mNEXT POWER-ON: BOOT THE TARGET DISK WITHOUT USOS.\033[0m\n'
@@ -514,4 +535,121 @@ usos_ui_console_done() {
 usos_ui_restore_cursor() {
     [ "$USOS_FB_ACTIVE" = yes ] && return 0
     printf '\033[0m\033[?25h' > "$USOS_UI_TTY" 2>/dev/null || true
+}
+
+# How to log on after the installation (src/flow/answer/logon.zig,
+# docs/logon-after-install.md). The UEFI menu writes
+# EFI/USOS/answer/logon.ini for the chosen system: who to log on as, whether
+# the password is blank or set in the answer profile, automatic logon, the
+# English sentence (line=) and its translation (line_local=). It never holds
+# a password.
+#   usos_logon_take ESP [SYSTEM]  copies it to /run (call it while the ESP is
+#                                 still mounted); USOS_UI_LOGON = its line=,
+#                                 which every later page shows (translated
+#                                 by usos-fb-ui). SYSTEM: the catalog id the
+#                                 file must name (a file of another start
+#                                 is ignored).
+#   usos_logon_value KEY          a value of the /run copy
+#   usos_logon_save DATA REL_DIR  DATA/REL_DIR/last-install-login.txt (CR LF,
+#                                 no password); a read-only DATA mount is
+#                                 remounted read-write for this one file.
+#   usos_logon_dir_of IMAGE       the system folder of a DATA-relative image
+#                                 path (Systems/Windows/<folder>).
+USOS_UI_LOGON=${USOS_UI_LOGON:-}
+USOS_LOGON_RUN=${USOS_LOGON_RUN:-/run/usos-logon.ini}
+USOS_LOGON_MOUNTS=${USOS_LOGON_MOUNTS:-/proc/mounts}
+USOS_LOGON_FILE=last-install-login.txt
+
+usos_logon_value() {
+    [ -r "$USOS_LOGON_RUN" ] || return 1
+    awk -v wanted="$1" '
+        { sub(/\r$/, "") }
+        /^\[/ { section = tolower($0); next }
+        section == "[logon]" { eq = index($0, "="); if (eq && tolower(substr($0, 1, eq - 1)) == wanted) { print substr($0, eq + 1); exit } }
+    ' "$USOS_LOGON_RUN"
+}
+
+usos_logon_take() {
+    _lg_ini="${1:-/mnt/esp}/EFI/USOS/answer/logon.ini"
+    USOS_UI_LOGON=''
+    rm -f "$USOS_LOGON_RUN"
+    if [ ! -f "$_lg_ini" ]; then
+        usos_ui_log 'LOGON none (no logon.ini from the menu)'
+        return 1
+    fi
+    cp -f "$_lg_ini" "$USOS_LOGON_RUN" 2>/dev/null || return 1
+    # The NT5 staging knows its family's id only (windows-xp for the MCE and
+    # Tablet entries, windows-2000 for 2000 Server): an edition suffix matches.
+    _lg_system=$(usos_logon_value system | tr '[:upper:]' '[:lower:]')
+    _lg_wanted=$(printf '%s' "${2:-}" | tr '[:upper:]' '[:lower:]')
+    [ -n "$_lg_wanted" ] || _lg_wanted=$_lg_system
+    case "$_lg_system" in
+        "$_lg_wanted" | "$_lg_wanted"-*) ;;
+        *)
+            usos_ui_log "LOGON ignored: logon.ini is for $_lg_system, not $_lg_wanted"
+            rm -f "$USOS_LOGON_RUN"
+            return 1
+            ;;
+    esac
+    USOS_UI_LOGON=$(usos_logon_value line | tr -d '\000-\037')
+    usos_ui_log "LOGON system=$(usos_logon_value system) kind=$(usos_logon_value kind) user=$(usos_logon_value user) domain=$(usos_logon_value domain) password=$(usos_logon_value password) autologon=$(usos_logon_value autologon)"
+    [ -n "$USOS_UI_LOGON" ]
+}
+
+usos_logon_save() {
+    _lg_data=$1
+    _lg_dir=$2
+    [ -r "$USOS_LOGON_RUN" ] || return 0
+    case "$(usos_logon_value kind)" in ''|no_logon) return 0 ;; esac
+    if [ -z "$_lg_dir" ] || [ ! -d "$_lg_data/$_lg_dir" ]; then
+        usos_ui_log "LOGON no DATA folder '$_lg_dir'; $USOS_LOGON_FILE not written"
+        return 1
+    fi
+    _lg_ro=no
+    if awk -v mp="$_lg_data" '$2 == mp && ("," $4 ",") ~ /,ro,/ { found = 1 } END { exit !found }' "$USOS_LOGON_MOUNTS" 2>/dev/null; then
+        _lg_ro=yes
+        if ! mount -o remount,rw "$_lg_data" 2>/dev/null; then
+            usos_ui_log "LOGON DATA stays read-only; $USOS_LOGON_FILE not written"
+            return 1
+        fi
+    fi
+    _lg_line=$(usos_logon_value line)
+    _lg_local=$(usos_logon_value line_local)
+    case "$(usos_logon_value kind):$(usos_logon_value password)" in
+        setup_asks:*) _lg_password='chosen during Windows Setup (USOS does not know it)' ;;
+        answer_file:*) _lg_password="from the answer file $(usos_logon_value file)" ;;
+        *:profile) _lg_password='set in the answer profile (not stored here)' ;;
+        *:file) _lg_password="set in $(usos_logon_value file) (not stored here)" ;;
+        *) _lg_password='none' ;;
+    esac
+    {
+        printf 'USOS: how to log on after the last installation prepared from this folder.\r\n'
+        printf 'Written by the USOS preparation. It never holds a password.\r\n\r\n'
+        printf '%s\r\n' "$_lg_line"
+        [ -z "$_lg_local" ] || [ "$_lg_local" = "$_lg_line" ] || printf '%s\r\n' "$_lg_local"
+        printf '\r\nsystem=%s\r\n' "$(usos_logon_value system)"
+        printf 'user=%s\r\n' "$(usos_logon_value user)"
+        [ -z "$(usos_logon_value domain)" ] || printf 'domain=%s\r\n' "$(usos_logon_value domain)"
+        printf 'password=%s\r\n' "$_lg_password"
+        printf 'autologon=%s\r\n' "$(usos_logon_value autologon)"
+        printf 'prepared=%s\r\n' "$(date -u '+%Y-%m-%d %H:%M UTC' 2>/dev/null)"
+    } > "$_lg_data/$_lg_dir/$USOS_LOGON_FILE.tmp" &&
+        mv -f "$_lg_data/$_lg_dir/$USOS_LOGON_FILE.tmp" "$_lg_data/$_lg_dir/$USOS_LOGON_FILE"
+    _lg_rc=$?
+    rm -f "$_lg_data/$_lg_dir/$USOS_LOGON_FILE.tmp" 2>/dev/null
+    sync
+    [ "$_lg_ro" = no ] || mount -o remount,ro "$_lg_data" 2>/dev/null || usos_ui_log 'LOGON DATA could not be remounted read-only'
+    if [ "$_lg_rc" = 0 ]; then
+        usos_ui_log "LOGON wrote $_lg_dir/$USOS_LOGON_FILE"
+    else
+        usos_ui_log "LOGON cannot write $_lg_dir/$USOS_LOGON_FILE"
+    fi
+    return "$_lg_rc"
+}
+
+usos_logon_dir_of() {
+    _lg_parent=${1%/*}
+    [ "$_lg_parent" != "$1" ] || return 0
+    case "$_lg_parent" in */Images|*/images) _lg_parent=${_lg_parent%/*} ;; esac
+    printf '%s' "$_lg_parent"
 }

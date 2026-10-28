@@ -17,6 +17,15 @@ import tarfile
 import tempfile
 import urllib.request
 
+# Windows Embedded POSReady 2009: the XP x86 X470 driver set (under
+# media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86), as
+# tools/xp_driver_overlay.py SELECTED.
+POSREADY_DRIVERS = (
+    "ACPI/acpi.sys", "Dependencies/ntoskrn8.sys", "Dependencies/storport.sys", "KMDF/wdf01000.sys", "KMDF/wdfldr.sys",
+    "SATA/genahci.sys", "SATA/genahci.inf", "USB3/ksecd8.sys", "USB3/ucx01000.sys", "USB3/usbd8.sys", "USB3/usbhub3.sys",
+    "USB3/usbhub3.inf", "USB3/usbxhci.sys", "USB3/usbxhci.inf", "USB3/wpprecor.sys",
+)
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -271,6 +280,114 @@ def module_dependency_closure(
     return ordered
 
 
+def elf_needed(data: bytes) -> list[str]:
+    """DT_NEEDED sonames of an ELF64 little-endian file ([] for anything else)."""
+    if len(data) < 64 or data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
+        return []
+    u16 = lambda at: int.from_bytes(data[at : at + 2], "little")  # noqa: E731
+    u64 = lambda at: int.from_bytes(data[at : at + 8], "little")  # noqa: E731
+    phoff, phentsize, phnum = u64(32), u16(54), u16(56)
+    loads: list[tuple[int, int, int]] = []
+    dynamic: tuple[int, int] | None = None
+    for index in range(phnum):
+        at = phoff + index * phentsize
+        kind = int.from_bytes(data[at : at + 4], "little")
+        if kind == 1:  # PT_LOAD
+            loads.append((u64(at + 16), u64(at + 8), u64(at + 32)))
+        elif kind == 2:  # PT_DYNAMIC
+            dynamic = (u64(at + 8), u64(at + 32))
+    if dynamic is None:
+        return []
+    needed: list[int] = []
+    strtab = None
+    for at in range(dynamic[0], dynamic[0] + dynamic[1], 16):
+        tag, value = u64(at), u64(at + 8)
+        if tag == 0:
+            break
+        if tag == 1:
+            needed.append(value)
+        elif tag == 5:
+            strtab = value
+    if strtab is None:
+        return []
+    for vaddr, offset, size in loads:
+        if vaddr <= strtab < vaddr + size:
+            strtab = strtab - vaddr + offset
+            break
+    else:
+        raise RuntimeError("ELF string table outside the loaded segments")
+    return [data[strtab + item : data.index(b"\0", strtab + item)].decode("ascii") for item in needed]
+
+
+def qemu9x_entries(
+    lock: dict[str, object], packages: list[tuple[dict[str, object], Path]], base: dict[str, Entry]
+) -> dict[str, Entry]:
+    """The optional Windows 9x phase-1 VM initrd (qemu9x.cpio): QEMU, its
+    firmware and the shared objects it needs that initramfs-usos lacks."""
+    entries: dict[str, Entry] = {}
+    libraries: dict[str, Entry] = {}
+    for record, package in packages:
+        only = record.get("files")
+        mapping = record.get("map") or {}
+        for entry in archive_entries(package):
+            normalized = merged_usr_entry(entry)
+            if normalized is None:
+                continue
+            name = normalized.name
+            if name in mapping:
+                put(entries, Entry(str(mapping[name]), normalized.mode, normalized.data, normalized.link))
+            elif only is not None and name in only:
+                put(entries, normalized)
+            elif name.startswith("usr/lib/") and name.count("/") == 2 and ".so" in name:
+                libraries[name] = normalized
+    binary = str(lock["binary"])
+    if binary not in entries:
+        raise RuntimeError(f"qemu9x: {binary} missing from the pinned packages")
+    for required in ("usr/share/qemu/bios-256k.bin", "usr/share/qemu/vgabios-stdvga.bin",
+                     "usr/share/qemu/keymaps/en-us"):
+        if required not in entries:
+            raise RuntimeError(f"qemu9x: required runtime data missing: {required}")
+
+    def resolve(soname: str) -> Entry | None:
+        name = "usr/lib/" + soname
+        seen = 0
+        while seen < 8:
+            # initramfs-usos already has it (and its own dependencies).
+            if name in base:
+                return base[name] if stat.S_IFMT(base[name].mode) != stat.S_IFLNK else Entry(name, stat.S_IFREG, b"")
+            entry = libraries.get(name)
+            if entry is None:
+                return None
+            put(entries, entry)
+            if stat.S_IFMT(entry.mode) != stat.S_IFLNK:
+                return entry
+            name = str(PurePosixPath(name).parent / entry.link) if not entry.link.startswith("/") else entry.link.lstrip("/")
+            name = name.replace("lib/../", "").replace("usr/usr/", "usr/")
+            if name.startswith("lib/"):
+                name = "usr/" + name
+            seen += 1
+        raise RuntimeError(f"qemu9x: symlink loop for {soname}")
+
+    pending = [entries[binary]]
+    done: set[str] = set()
+    missing: list[str] = []
+    while pending:
+        for soname in elf_needed(pending.pop().data):
+            if soname in done:
+                continue
+            done.add(soname)
+            if soname.startswith("libc.musl") or soname.startswith("ld-musl"):
+                continue
+            target = resolve(soname)
+            if target is None:
+                missing.append(soname)
+            elif target.name in libraries:
+                pending.append(target)
+    if missing:
+        raise RuntimeError(f"qemu9x: unresolved shared objects: {sorted(missing)}")
+    return entries
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-root", type=Path, required=True)
@@ -298,6 +415,10 @@ def main() -> int:
     packages: list[tuple[dict[str, object], Path]] = []
     for record in lock["packages"]:
         packages.append((record, obtain(root, record, packages_dir / str(record["file"]))))
+    qemu9x_lock = lock["qemu9x"]
+    qemu9x_packages = [
+        (record, obtain(root, record, packages_dir / str(record["file"]))) for record in qemu9x_lock["packages"]
+    ]
 
     with tempfile.TemporaryDirectory(prefix="usos-micro-linux-") as temp_name:
         temp = Path(temp_name)
@@ -368,6 +489,8 @@ def main() -> int:
             "kernel/fs/fat/fat.ko",
             "kernel/fs/fat/vfat.ko",
             "kernel/drivers/cdrom/cdrom.ko",
+            # efivarfs: firmware boot entries (tools/uefi_boot_entry.sh).
+            "kernel/fs/efivarfs/efivarfs.ko",
         ]
         selected_modules = module_dependency_closure(
             dependencies, runtime_roots + legacy_ata_roots
@@ -390,8 +513,14 @@ def main() -> int:
             raise RuntimeError(
                 f"Alpine LTS no longer covers required legacy storage modules: {missing_strategic}"
             )
+        # KVM for the Windows 9x phase-1 VM: only in qemu9x.cpio.
+        qemu9x_modules = [
+            module
+            for module in module_dependency_closure(dependencies, list(qemu9x_lock["kernel_modules"]))
+            if module not in selected_modules
+        ]
         module_patterns = tuple(
-            f"modules/{kernel_release}/{module}" for module in selected_modules
+            f"modules/{kernel_release}/{module}" for module in selected_modules + qemu9x_modules
         )
         run_7z(
             seven_zip,
@@ -412,7 +541,11 @@ def main() -> int:
                     source = archive.extractfile(member)
                     systemd_boot = source.read() if source else None
                 continue
+            only = record.get("files")
             for entry in archive_entries(package):
+                # "files": take only these paths (and their folders) from the package.
+                if only is not None and entry.name not in only:
+                    continue
                 normalized = merged_usr_entry(entry)
                 if normalized is not None:
                     put(entries, normalized)
@@ -422,10 +555,13 @@ def main() -> int:
             ("tools/hardware_smart.sh", "usr/lib/usos/hardware_smart.sh"),
             ("tools/hardware_smart_table.awk", "usr/lib/usos/hardware_smart_table.awk"),
             ("tools/hardware_ui.sh", "usr/lib/usos/hardware_ui.sh"),
+            ("tools/stick_release.sh", "usr/lib/usos/stick_release.sh"),
+            ("tools/stick_write.sh", "usr/lib/usos/stick_write.sh"),
             ("tools/partuuid.sh", "usr/lib/usos/partuuid.sh"),
             ("tools/partuuid_diagnostics.sh", "usr/lib/usos/partuuid_diagnostics.sh"),
             ("tools/device_guard.sh", "usr/lib/usos/device_guard.sh"),
             ("tools/target_disk_identity.sh", "usr/lib/usos/target_disk_identity.sh"),
+            ("tools/target_disk_wait.sh", "usr/lib/usos/target_disk_wait.sh"),
             ("tools/target_disk_guard.sh", "usr/lib/usos/target_disk_guard.sh"),
             ("tools/extract.sh", "usr/lib/usos/extract.sh"),
             ("tools/windows_setup_media.sh", "usr/lib/usos/windows_setup_media.sh"),
@@ -439,13 +575,42 @@ def main() -> int:
             ("tools/probe_nt5_source.sh", "usr/lib/usos/probe_nt5_source.sh"),
             ("tools/prepare_nt5_media_markers.sh", "usr/lib/usos/prepare_nt5_media_markers.sh"),
             ("tools/nt5_profile.sh", "usr/lib/usos/nt5_profile.sh"),
+            ("tools/beta_clock.sh", "usr/lib/usos/beta_clock.sh"),
             ("tools/prepare_xp_local_source.sh", "usr/lib/usos/prepare_xp_local_source.sh"),
             ("tools/prepare_xp_target.sh", "usr/lib/usos/prepare_xp_target.sh"),
             ("tools/legacy_xp_staging.sh", "usr/lib/usos/legacy_xp_staging.sh"),
             ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
+            ("tools/w9x_csmwrap_prepare.sh", "usr/lib/usos/w9x_csmwrap_prepare.sh"),
+            ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
+            ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
+            ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
+            ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
+            ("tools/w9x_vesa950.sh", "usr/lib/usos/w9x_vesa950.sh"),
+            ("tools/w9x_pid95.sh", "usr/lib/usos/w9x_pid95.sh"),
+            ("tools/w9x_950_post.sh", "usr/lib/usos/w9x_950_post.sh"),
+            ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
+            ("tools/w9x_firstboot.sh", "usr/lib/usos/w9x_firstboot.sh"),
+            ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
+            ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
+            ("tools/w9x_95_ui.sh", "usr/lib/usos/w9x_95_ui.sh"),
+            ("tools/w9x_95_event_wait.sh", "usr/lib/usos/w9x_95_event_wait.sh"),
+            ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
+            ("tools/floppy_set.sh", "usr/lib/usos/floppy_set.sh"),
+            ("tools/dos_win3_menu.sh", "usr/lib/usos/dos_win3_menu.sh"),
+            ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),
+            ("tools/uefi_boot_entry.sh", "usr/lib/usos/uefi_boot_entry.sh"),
+            ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),
+            ("tools/nt4_qemu_install.sh", "usr/lib/usos/nt4_qemu_install.sh"),
+            ("tools/posready_csmwrap_target.sh", "usr/lib/usos/posready_csmwrap_target.sh"),
+            ("tools/posready_qemu_install.sh", "usr/lib/usos/posready_qemu_install.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
+            ("tools/display_profile.sh", "usr/lib/usos/display_profile.sh"),
+            ("tools/w9x_logon.sh", "usr/lib/usos/w9x_logon.sh"),
+            ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
+            ("tools/nt351_network_setup.sh", "usr/lib/usos/nt351_network_setup.sh"),
+            ("tools/nt35_network_setup.sh", "usr/lib/usos/nt35_network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -455,7 +620,10 @@ def main() -> int:
             ("tools/xp64_selected_partition_uefi_csm.sif", "usr/lib/usos/xp64_selected_partition_uefi_csm.sif"),
             ("tools/nt5_storage_stage.sh", "usr/lib/usos/nt5_storage_stage.sh"),
             ("tools/nt52_usb_stage.sh", "usr/lib/usos/nt52_usb_stage.sh"),
+            ("tools/nt5_usosmpart_stage.sh", "usr/lib/usos/nt5_usosmpart_stage.sh"),
+            ("tools/w2k_stage.sh", "usr/lib/usos/w2k_stage.sh"),
             ("tools/nt5_user_drivers.sh", "usr/lib/usos/nt5_user_drivers.sh"),
+            ("tools/nt5_media_key.sh", "usr/lib/usos/nt5_media_key.sh"),
             ("tools/xp_driver_stage.sh", "usr/lib/usos/xp_driver_stage.sh"),
             ("tools/xp_verify_target.sh", "usr/lib/usos/xp_verify_target.sh"),
             ("tools/xp_drive_letters.awk", "usr/lib/usos/xp_drive_letters.awk"),
@@ -470,6 +638,7 @@ def main() -> int:
             ("tools/xp_detect_system.sh", "usr/lib/usos/xp_detect_system.sh"),
             ("tools/xp_disk_overview.sh", "usr/lib/usos/xp_disk_overview.sh"),
             ("tools/prepare_xp_windows_partition.sh", "usr/lib/usos/prepare_xp_windows_partition.sh"),
+            ("tools/w9x_filesystem.sh", "usr/lib/usos/w9x_filesystem.sh"),
             ("tools/prepare_wimboot.sh", "usr/lib/usos/prepare_wimboot.sh"),
             ("tools/prepare_vhdboot.sh", "usr/lib/usos/prepare_vhdboot.sh"),
             ("tools/work_boot_relocate.sh", "usr/lib/usos/work_boot_relocate.sh"),
@@ -481,6 +650,7 @@ def main() -> int:
             ("tools/pipeline/steps/600_vista_disk_prepare.sh", "usr/lib/usos/pipeline/steps/600_vista_disk_prepare.sh"),
             ("tools/vista_disk_prepare.sh", "usr/lib/usos/vista_disk_prepare.sh"),
             ("tools/pipeline/steps/610_vista_csmwrap.sh", "usr/lib/usos/pipeline/steps/610_vista_csmwrap.sh"),
+            ("tools/pipeline/steps/620_w9x_csmwrap.sh", "usr/lib/usos/pipeline/steps/620_w9x_csmwrap.sh"),
             ("tools/vista_csmwrap_prepare.sh", "usr/lib/usos/vista_csmwrap_prepare.sh"),
             ("tools/vista_csmwrap_target.sh", "usr/lib/usos/vista_csmwrap_target.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),
@@ -488,12 +658,77 @@ def main() -> int:
             payload = (root / source_name).read_bytes().replace(b"\r\n", b"\n")
             put(entries, Entry(target_name, stat.S_IFREG | 0o755, payload))
         put(entries, Entry("usr/bin/usos-fb-ui", stat.S_IFREG | 0o755, framebuffer_ui.read_bytes()))
+        from build_win95_setup_ui import build as build_win95_setup_ui
+        win95_ui = build_win95_setup_ui(root, root / 'zig-out/win95-setup-ui')
+        verify_static_linux_elf(win95_ui)
+        put(entries, Entry('usr/lib/usos/win95-setup-ui', stat.S_IFREG | 0o755, win95_ui.read_bytes()))
+        put(entries, Entry('usr/lib/usos/win95-rfb-events', stat.S_IFREG | 0o755,
+                           win95_ui.with_name('win95-rfb-events').read_bytes()))
+        # Windows NT 4.0 (tools/nt4_csmwrap_target.sh): own GPL builds for NT 4.0.
+        for source_name, target_name in (
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys", "usr/lib/usos/nt4/AHCINT.SYS"),
+            ("tools/w2k/usosrst/bin/nt4/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRST.SYS"),
+            ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
+            ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
+            ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+            # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme): staged only
+            # for an NVMe target (docs/nvme-nt-2026-10-11.md).
+            ("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS"),
+            ("tools/nt/usosnvme/bin/NT351/i386/usosnvme.sys", "usr/lib/usos/nt3/USOSNVME.SYS"),
+            ("tools/nt/usosnvme/bin/NT31/i386/usosnvme.sys", "usr/lib/usos/nt3/USOSNVME31.SYS"),
+            # Windows NT 3.51 (the same target script, \USOS\NT3): own GPL
+            # builds for NT 3.51 (docs/nt351-2026-10-08.md).
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT.SYS"),
+            ("tools/w2k/usosrst/bin/nt351/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST.SYS"),
+            # NT 3.5 (docs/nt35-2026-10-09.md): usosrst without the per-CPU DPC calls.
+            ("tools/w2k/usosrst/bin/nt35/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST35.SYS"),
+            ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
+            ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
+            # VESA miniport, NT 3.x build (build-nt3.cmd; with the CD's own
+            # framebuf.dll, docs/nt3-vesa-2026-10-14.md).
+            ("tools/nt4/usosvbe/bin/nt3/i386/usosvbe.sys", "usr/lib/usos/nt3/USOSVBE.SYS"),
+            # NT 3.1 (docs/nt31-2026-10-09.md): builds for the NT 3.1 kernel,
+            # HAL and ScsiPort (build-nt31.cmd of each driver).
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT31.SYS"),
+            ("tools/w2k/usosrst/bin/nt31/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST31.SYS"),
+            ("tools/nt4/usosusb/bin/nt31/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB31.SYS"),
+            # usosmpart (own GPL USB multi-partition disk filter,
+            # tools/nt/usosmpart): every NT 5 system (nt5_usosmpart_stage.sh).
+            ("tools/nt/usosmpart/bin/i386/usosmpart.sys", "usr/lib/usos/nt5-usosmpart/i386/usosmpart.sys"),
+            ("tools/nt/usosmpart/bin/amd64/usosmpart.sys", "usr/lib/usos/nt5-usosmpart/amd64/usosmpart.sys"),
+        ):
+            put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
+        # Windows Embedded POSReady 2009 (docs/posready-2009-2026-10-10.md):
+        # the answer template, the X470 registry values and the XP path's
+        # community driver set (the files of tools/xp_driver_overlay.py
+        # SELECTED); FIRST.CMD installs them at the first logon in the VM.
+        # Windows Me, stock user USOS: the empty-password list (tools/w9x_logon.sh).
+        put(entries, Entry("usr/lib/usos/w9x/USOSME.PWL", stat.S_IFREG | 0o644, (root / "src/platform/bios/win9x/usosme.pwl").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready_unattended.xml", stat.S_IFREG | 0o644, (root / "tools/posready_unattended.xml").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/X470.REG", stat.S_IFREG | 0o644, (root / "tools/posready_x470.reg").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/FIRST.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_first.cmd").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/LOGON.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_logon.cmd").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/LOGON.REG", stat.S_IFREG | 0o644, (root / "tools/posready_logon.reg").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/LOGON.EXE", stat.S_IFREG | 0o644, (root / "tools/nt/posrlog/bin/i386/posrlog.exe").read_bytes()))
+        posready_drivers = root / "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86"
+        for name in POSREADY_DRIVERS:
+            put(entries, Entry("usr/lib/usos/posready/DRV/" + name.split("/")[1], stat.S_IFREG | 0o644, (posready_drivers / name).read_bytes()))
+        # Own GPL USB multi-partition disk filter; FIRST.CMD registers it.
+        put(entries, Entry("usr/lib/usos/posready/DRV/usosmpart.sys", stat.S_IFREG | 0o644, (root / "tools/nt/usosmpart/bin/i386/usosmpart.sys").read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
         xp_stage2 = root / "zig-out/xp-bios/xp-stage2.bin"
         xp_nt52_vbr = root / "zig-out/xp-bios/xp-nt52-vbr-tail.bin"
         xp_nt52_stage2 = root / "zig-out/xp-bios/xp-nt52-stage2.bin"
         xp_geometry_fix_mbr = root / "zig-out/xp-geometry-fix-mbr/xp-geometry-fix-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr):
+        # NT 3.51: the geometry-fix MBR with the E820 filter (nt3_e820_mbr.S).
+        nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
+        # Its resident hooks (sector 1 of the NT 3.x disk).
+        nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
+        # ReactOS / own BIOS images behind CSMWrap: ELCR MBR (elcr_mbr.S).
+        elcr_mbr = root / "zig-out/xp-geometry-fix-mbr/elcr-mbr-440.bin"
+        # Windows 2000 with ACPI: the USOS_W2K_ACPI build of the geometry MBR.
+        w2k_acpi_mbr = root / "zig-out/xp-geometry-fix-mbr/w2k-acpi-mbr-440.bin"
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr, w2k_acpi_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -552,6 +787,69 @@ def main() -> int:
                 raise RuntimeError("Pinned UefiSeven checksum mismatch: " + filename)
             name = "uefiseven-LICENSE.txt" if filename == "LICENSE.txt" else filename
             put(entries, Entry("usr/lib/usos/" + name, stat.S_IFREG | 0o644, data))
+        # usos-reg.exe (own GPL tool, tools/windows_usos_reg.c): declarative
+        # registry set files for NT 4.0 SP6 .. 11; the XP/2000/2003 and NT 4.0
+        # target scripts run from usr/lib/usos and find it as
+        # "$SCRIPT_DIR/usos-reg.exe" / "$LIB/usos-reg.exe".
+        from build_windows_usos_reg import build as build_usos_reg
+        usos_reg = build_usos_reg(root, root / "zig-out/windows-usos-reg")
+        put(entries, Entry("usr/lib/usos/usos-reg.exe", stat.S_IFREG | 0o644, usos_reg.read_bytes()))
+        from build_windows_usos_res import build as build_usos_res, build_collector as build_vbe_collector, build_nt3
+        usos_res = build_usos_res(root, root / "zig-out/windows-usos-res")
+        put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
+        nt3_post = build_nt3(root)
+        put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        net35 = (root / 'tools/nt/usosnet/bin/i386/usosnet35.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SYS', stat.S_IFREG | 0o644, net35))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net35).hexdigest()+'  USOSNET35.SYS\n').encode('ascii')))
+        logger35 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.EXE', stat.S_IFREG | 0o644, logger35))
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(logger35).hexdigest()+'  USOSLOG35.EXE\n').encode('ascii')))
+        net351 = (root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net351).hexdigest()+'  USOSNET351.SYS\n').encode('ascii')))
+        logger351 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.EXE', stat.S_IFREG | 0o644, logger351))
+        put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(logger351).hexdigest()+'  USOSLOG351.EXE\n').encode('ascii')))
+        res9x_out = root / "zig-out/windows-usos-res/9x"
+        res9x = build_usos_res(root, res9x_out, win9x=True)
+        collector = build_vbe_collector(root, res9x_out)
+        for name, source in (("USOSRES.EXE", res9x), ("USOSVBI.EXE", collector)):
+            put(entries, Entry("usr/lib/usos/w9x-display/"+name, stat.S_IFREG | 0o644, source.read_bytes()))
+        from build_windows_usos_lan import build as build_lan, stage_driver as stage_lan_driver
+        lan_out = root / "zig-out/windows-usos-lan"
+        lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
+        # Same own GUI/no-CRT logger as 9x, staged for the NT4 first-desktop
+        # evidence step. Build just this program, not another complete kit.
+        from build_win9x_support import build_usoslog
+        logger_work = lan_out / "logger-work"
+        logger_work.mkdir(parents=True, exist_ok=True)
+        lan_files.append(build_usoslog(lan_out, logger_work))
+        for file in lan_files:
+            put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        for relative, source in (
+            ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
+            ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
+        ):
+            put(entries, Entry('usr/lib/usos/network/' + relative, stat.S_IFREG | 0o644,
+                               (root / source).read_bytes()))
+        from build_usosadd import build as build_addons_runner
+        from build_legacy_stage import build as build_addons_planner
+        addons_out = root / "zig-out/legacy-pack"
+        addons_runner = build_addons_runner(addons_out)
+        addons_planner = build_addons_planner(root, root / "zig-out/legacy-stage-linux")
+        put(entries, Entry("usr/lib/usos/addons/USOSADD.EXE", stat.S_IFREG | 0o644, addons_runner.read_bytes()))
+        put(entries, Entry("usr/lib/usos/addons/legacy-stage-plan", stat.S_IFREG | 0o755, addons_planner.read_bytes()))
+        from addons.legacy_manifest import Manifest as AddonsManifest, validate as validate_addons
+        if errors := validate_addons(AddonsManifest.load(root / "src/addons/legacy-pack.ini")):
+            raise ValueError("Invalid legacy pack: " + "; ".join(errors))
+        addon_text = (root / "src/addons/legacy-pack.ini").read_text(encoding="utf-8").replace("\r\n", "\n").replace("\n", "\r\n")
+        for addon_lang, codepage in (("PL", "cp1250"), ("EN", "cp1252")):
+            put(entries, Entry("usr/lib/usos/addons/LEGACY." + addon_lang, stat.S_IFREG | 0o644, addon_text.encode(codepage, errors="replace")))
         reader_out = root / "zig-out/windows-source-mount"
         build_source_reader(root, reader_out)
         vendor = root / "tools/vendor/imdisk/2.1.2"
@@ -567,9 +865,31 @@ def main() -> int:
                 filename = prefix + arch + ".exe"
                 put(entries, Entry("usr/lib/usos/" + filename, stat.S_IFREG | 0o644, (reader_out / filename).read_bytes()))
         put(entries, Entry("usr/lib/usos/xp-geometry-fix-mbr-440.bin", stat.S_IFREG | 0o644, geometry_mbr))
+        nt3_mbr = nt3_e820_mbr.read_bytes()
+        if len(nt3_mbr) != 440:
+            raise RuntimeError(f"NT 3.51 E820 MBR code must be 440 bytes: {nt3_e820_mbr}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-mbr-440.bin", stat.S_IFREG | 0o644, nt3_mbr))
+        elcr = elcr_mbr.read_bytes()
+        if len(elcr) != 440:
+            raise RuntimeError(f"ELCR MBR code must be 440 bytes: {elcr_mbr}")
+        put(entries, Entry("usr/lib/usos/elcr-mbr-440.bin", stat.S_IFREG | 0o644, elcr))
+        w2k_mbr = w2k_acpi_mbr.read_bytes()
+        if len(w2k_mbr) != 440:
+            raise RuntimeError(f"Windows 2000 ACPI MBR code must be 440 bytes: {w2k_acpi_mbr}")
+        put(entries, Entry("usr/lib/usos/w2k-acpi-mbr-440.bin", stat.S_IFREG | 0o644, w2k_mbr))
+        nt3_hook = nt3_e820_hook.read_bytes()
+        if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
+            raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-hook-512.bin", stat.S_IFREG | 0o644, nt3_hook))
 
         module_root = modloop_out / "modules" / kernel_release
-        module_files = list(module_root.rglob("*.ko"))
+        qemu9x_module_set = set(qemu9x_modules)
+        qemu9x_module_files = [module_root / module for module in qemu9x_modules]
+        module_files = [
+            module
+            for module in module_root.rglob("*.ko")
+            if module.relative_to(module_root).as_posix() not in qemu9x_module_set
+        ]
         extracted_relative = {
             module.relative_to(module_root).as_posix() for module in module_files
         }
@@ -614,9 +934,30 @@ def main() -> int:
         combined_cpio = newc(entries)
         combined_initramfs = pad_initrd(gzip.compress(combined_cpio, compresslevel=9, mtime=0))
 
+        qemu9x = qemu9x_entries(qemu9x_lock, qemu9x_packages, entries)
+        for module in qemu9x_module_files:
+            if not module.is_file():
+                raise RuntimeError(f"qemu9x module missing from the modloop: {module.name}")
+            put(
+                qemu9x,
+                Entry(
+                    f"usr/lib/modules/{kernel_release}/{module.relative_to(module_root).as_posix()}",
+                    stat.S_IFREG | 0o644,
+                    module.read_bytes(),
+                ),
+            )
+        overlap = sorted(
+            name for name, entry in qemu9x.items()
+            if name in entries and stat.S_IFMT(entry.mode) != stat.S_IFDIR
+        )
+        if overlap:
+            raise RuntimeError(f"qemu9x.cpio would replace initramfs-usos files: {overlap[:5]}")
+        qemu9x_initrd = pad_initrd(gzip.compress(newc(qemu9x), compresslevel=9, mtime=0))
+
         output.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(kernel, output / "vmlinuz-virt")
         (output / "initramfs-usos").write_bytes(combined_initramfs)
+        (output / "qemu9x.cpio").write_bytes(qemu9x_initrd)
         (output / "systemd-bootx64.efi").write_bytes(systemd_boot)
         selected_module_bytes = sum(module.stat().st_size for module in module_files)
         legacy_ata_bytes = sum(
@@ -644,11 +985,19 @@ def main() -> int:
             "base_initramfs_pruned": True,
             "base_firmware_removed": True,
             "simpledrm": "built-in",
+            "qemu9x_sha256": sha256(output / "qemu9x.cpio"),
+            "qemu9x_bytes": len(qemu9x_initrd),
+            "qemu9x_unpacked_bytes": sum(len(entry.data) for entry in qemu9x.values()),
+            "qemu9x_package_count": len(qemu9x_packages),
+            "qemu9x_files": sorted(
+                name for name, entry in qemu9x.items() if stat.S_IFMT(entry.mode) != stat.S_IFDIR
+            ),
         }
         (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         print(f"[PASS] micro-Linux kernel={output / 'vmlinuz-virt'}")
         print(f"[PASS] micro-Linux initramfs={output / 'initramfs-usos'}")
         print(f"[PASS] micro-Linux EFI loader={output / 'systemd-bootx64.efi'}")
+        print(f"[PASS] micro-Linux Windows 9x VM initrd={output / 'qemu9x.cpio'} ({len(qemu9x_initrd)} bytes)")
     return 0
 
 

@@ -1,0 +1,43 @@
+{
+  "scope": "Host/static export and own pin proof only; NT4 native qualification still required",
+  "items": [
+    {
+      "kind": "observer",
+      "file": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-observer-console-build-04\\NT4OBS.EXE",
+      "bytes": 5632,
+      "sha256": "82279b889053a68f42f18fdaeb0a1c0b5a76a00ce21e2685bedb9cb18dc38284",
+      "old_sha256": "37e7a0f69846d9bab18a718f7d66c3fd937f0f35913d2b0eb22f2d7ce4eae0e9",
+      "imports": 23,
+      "identical_imports": true,
+      "gui": true,
+      "pe_subsystem_version": [
+        4,
+        0
+      ]
+    },
+    {
+      "kind": "logger",
+      "file": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-logger-global-dns-build-02\\USOSLOG.EXE",
+      "bytes": 1024000,
+      "sha256": "fe4ffa555e1cc837185156e7b76639d86b14580150663fd310c35ce3807c94c2",
+      "old_sha256": "ff2585043a882065f9598628ac31afdaba356a3d91f3e55d93a36e313e3983b7",
+      "imports": 71,
+      "identical_imports": true,
+      "gui": true,
+      "pe_subsystem_version": [
+        3,
+        10
+      ]
+    }
+  ],
+  "actual_original_modules": {
+    "kernel32.dll": "9767952ac7f0cb7e745fb416a1a34b017b5c4076631e2289d97bc8434c72897b",
+    "advapi32.dll": "1810c7783bcd72a1601bf55a7f5c0561872c07ee10e8b83e1fdca5ff6e99470b",
+    "user32.dll": "b1bde6af1c7abd1962eddc423eae42caeaf5d6e0fd51cbeaf17cee2e5f6c42cc",
+    "ntdll.dll": "0c7980ee93659a6bdf2ace6d416b561627056cf81936c2e59ed4d3a53bf76761",
+    "icmp.dll": "fc039a1ece2d069561cd911c4f10f5ae4269828fd67e2be2cbefdd85f010d498"
+  },
+  "all_static_imports_present": true,
+  "dynamic_icmp_present": true,
+  "private_data_exported": false
+}

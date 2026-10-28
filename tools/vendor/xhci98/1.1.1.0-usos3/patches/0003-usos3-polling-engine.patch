@@ -1,0 +1,374 @@
+diff --git a/src/xhci.h b/src/xhci.h
+index fec6a98..a9783e7 100644
+--- a/src/xhci.h
++++ b/src/xhci.h
+@@ -7889,6 +7889,26 @@ typedef struct _XHCI_EXTENSION {
+      * delete this word then, and put it back on the next single addition.
+      * On x86 it costs 4 bytes and changes nothing else.
+      */
++    /*
++     * MODIFIED (USOS 1.1.1.0-usos3): the polling engine (src/xhci_usos.c).
++     * A periodic kernel timer whose DPC asks usbport for a soft interrupt:
++     * every tick in poll mode (Parameters\PollMode = 1, no interrupt
++     * resource needed), and in interrupt mode only when the event ring holds
++     * events that no claimed interrupt has collected for three ticks.
++     */
++    KTIMER UsosPollTimer;
++    KDPC UsosPollDpc;
++    volatile LONG UsosPollState;    /* 0 off, 1 running, 2 stopping        */
++    volatile LONG UsosPollInDpc;    /* DPC bodies in progress              */
++    ULONG UsosPollTicks;            /* timer DPCs that ran                 */
++    ULONG UsosSoftInts;             /* soft interrupts requested           */
++    ULONG UsosRescues;              /* interrupt mode: stalls rescued      */
++    ULONG UsosLastClaims;           /* InterruptsClaimed at the last tick  */
++    ULONG UsosStallTicks;           /* ticks with events and no claim      */
++    ULONG UsosDirectDpcs;           /* soft interrupt unanswered: direct   */
++    ULONG UsosLastDpcCount;         /* DpcCount at the last soft interrupt */
++    ULONG UsosUnanswered;           /* soft interrupts without a DPC       */
++
+     ULONG TrailingPad;
+ 
+     ULONG TrailingSignature;
+diff --git a/src/xhci_dispatch.c b/src/xhci_dispatch.c
+index 62ce3c7..71b68ed 100644
+--- a/src/xhci_dispatch.c
++++ b/src/xhci_dispatch.c
+@@ -1235,6 +1235,8 @@ static MPSTATUS NTAPI xhciStartController(PVOID miniPortExtension,
+      * reading a trace, not an address anything dereferences.
+      */
+     XhciLogNoteAddress(ext, "start.ok", (ULONG)ext->ResourceBase);
++    /* MODIFIED (USOS 1.1.1.0-usos3): the polling engine (src/xhci_usos.c). */
++    XhciUsosPollStart(ext);
+     /* MODIFIED (USOS 1.1.1.0-usos1): a working start is worth a record too,
+      * so the log shows both controllers of a machine and not only the one
+      * that failed. File sink only; the DebugView behaviour is upstream's. */
+@@ -1278,6 +1280,9 @@ static VOID NTAPI xhciStopController(PVOID miniPortExtension,
+         return;
+     }
+ 
++    /* MODIFIED (USOS 1.1.1.0-usos3): no timer DPC into a quiescing controller. */
++    XhciUsosPollStop(ext);
++
+     if (!XhciStopController(ext)) {
+         /*
+          * Task 11-V.7: flush **before** the fail-closed bugcheck, not after -
+@@ -1482,6 +1487,13 @@ static ULONG NTAPI xhciInterruptDpc(PVOID miniPortExtension,
+     return result;
+ }
+ 
++/* MODIFIED (USOS 1.1.1.0-usos3): the polling engine's direct path, used only
++ * when usbport does not answer its soft interrupts. IRQL: DISPATCH_LEVEL. */
++ULONG XhciUsosRunInterruptDpc(PXHCI_EXTENSION ext)
++{
++    return xhciInterruptDpc(ext, FALSE);
++}
++
+ /*
+  * usbport calls this immediately after StartController returns success, under
+  * MiniportSpinLock. The body is XhciEnableInterrupts in src/xhci_evt.c, which
+@@ -1506,7 +1518,11 @@ static VOID NTAPI xhciEnableInterrupts(PVOID miniPortExtension)
+ 
+     if (xhciExtensionValid(ext)) {
+         ext->InterruptEnables++;
+-        XhciEnableInterrupts(ext);
++        /* MODIFIED (USOS 1.1.1.0-usos3): poll mode has no interrupt to enable;
++         * USBCMD.INTE and IMAN.IE stay down and the timer collects events. */
++        if (!XhciUsosPollMode) {
++            XhciEnableInterrupts(ext);
++        }
+     }
+ }
+ 
+@@ -5253,6 +5269,18 @@ NTSTATUS NTAPI DriverEntry(IN PDRIVER_OBJECT DriverObject,
+             XhciResourcesRequired =
+                 USBPORT6_RESOURCES_MEMORY | USBPORT6_RESOURCES_INTERRUPT;
+         }
++        /*
++         * MODIFIED (USOS 1.1.1.0-usos3): PollMode = 1 registers without the
++         * INTERRUPT flag, so usbport neither requires nor connects an
++         * interrupt (the X470 under the 2000 MPS HAL gives the xHCI functions
++         * none), and the start no longer requires the interrupt resource bit.
++         */
++        XhciUsosReadPollMode(RegistryPath);
++        if (XhciUsosPollMode) {
++            XhciRegPacket.MiniPortFlags &= ~USB_MINIPORT_FLAGS_INTERRUPT;
++            XhciResourcesRequired &= isNt5 ? ~USBPORT_RESOURCES_INTERRUPT
++                                           : ~USBPORT6_RESOURCES_INTERRUPT;
++        }
+         XHCI_DBG_VALUE("resource bits required", XhciResourcesRequired);
+ 
+         /*
+diff --git a/src/xhci_hw.h b/src/xhci_hw.h
+index 93c2352..eb26141 100644
+--- a/src/xhci_hw.h
++++ b/src/xhci_hw.h
+@@ -1713,5 +1713,21 @@ VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count);
+ VOID XhciUsosFileAppendText(const char *text);
+ VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason);
+ VOID XhciUsosFileKick(VOID);
++/*
++ * usos3: the polling engine. XhciUsosPollMode is settled once in DriverEntry
++ * (XhciUsosReadPollMode, PASSIVE_LEVEL) from Services\xhci98\Parameters
++ * PollMode: 1 (default, also when absent) polling only, 0 interrupts with a
++ * stall rescue.
++ * XhciUsosPollStart/Stop: PASSIVE_LEVEL (StartController/StopController).
++ */
++extern ULONG XhciUsosPollMode;
++#ifndef XHCI_HOST_TEST
++VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath);
++#endif
++VOID XhciUsosPollStart(PXHCI_EXTENSION ext);
++VOID XhciUsosPollStop(PXHCI_EXTENSION ext);
++/* The miniport's own InterruptDpc body (src/xhci_dispatch.c), for the
++ * direct path when usbport does not answer a soft interrupt. */
++ULONG XhciUsosRunInterruptDpc(PXHCI_EXTENSION ext);
+ 
+ #endif /* XHCI_HW_H */
+diff --git a/src/xhci_usos.c b/src/xhci_usos.c
+index 4b60d3c..4bdcd97 100644
+--- a/src/xhci_usos.c
++++ b/src/xhci_usos.c
+@@ -28,6 +28,21 @@
+  *    in the file a few seconds later. The file is plain ASCII and can be read
+  *    from another machine with the disk attached.
+  *
++ * 3. (usos3) A polling engine for controllers whose interrupt never arrives:
++ *    on the X470 under Windows 2000's MPS HAL (CSMWrap's MP table has no PCI
++ *    INTx entries) PCI.SYS gives the xHCI functions no interrupt resource at
++ *    all, so usbport refused the start (Code 10). By default (no
++ *    Services\xhci98\Parameters\PollMode = 0) the driver registers without
++ *    the INTERRUPT miniport flag (usbport then neither requires nor connects
++ *    one), keeps USBCMD.INTE and PCI INTx off, and a periodic kernel timer
++ *    asks usbport for a soft interrupt on every tick
++ *    (USBPORT_INVALIDATE_CONTROLLER_SOFT_INTERRUPT), which runs the normal
++ *    InterruptDpc path: the event ring is drained exactly as after a real
++ *    interrupt. If usbport never answers the soft interrupt with a DPC, the
++ *    timer runs the miniport's InterruptDpc body itself. In the default
++ *    interrupt mode the same timer only steps in when the event ring has held
++ *    events for three ticks without a claimed interrupt.
++ *
+  * C89. IRQL requirements are stated per function.
+  */
+ 
+@@ -50,6 +65,7 @@
+ #define USOS_PCI_BAR0            0x10UL
+ #define USOS_PCI_BAR_COUNT       6UL
+ #define USOS_PCI_COMMAND_MSE     0x0002U
++#define USOS_PCI_COMMAND_INTX_OFF 0x0400U
+ #define USOS_PMCSR_STATE_MASK    0x0003U
+ #define USOS_PMCSR_PME_STATUS    0x8000U   /* RW1C - never written as 1 */
+ 
+@@ -156,6 +172,10 @@ ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext)
+     }
+ 
+     wanted = (USHORT)(command | USOS_PCI_COMMAND_MSE | XHCI_PCI_COMMAND_BME);
++    /* usos3 poll mode: the INTx pin stays quiet (nothing would claim it). */
++    if (XhciUsosPollMode) {
++        wanted = (USHORT)(wanted | USOS_PCI_COMMAND_INTX_OFF);
++    }
+     if (wanted != command) {
+         (VOID)XhciWritePciConfig(ext, XHCI_PCI_COMMAND, &wanted,
+                                  sizeof(wanted));
+@@ -500,6 +520,180 @@ VOID XhciUsosFileKick(VOID)
+     ZwClose(thread);
+ }
+ 
++/* ------------------------------------------------------------------ */
++/* The polling engine (usos3)                                          */
++/* ------------------------------------------------------------------ */
++
++#define USOS_POLL_PERIOD_MS     4L      /* rounded up to the clock tick */
++#define USOS_POLL_STALL_TICKS   3UL
++#define USOS_POLL_UNANSWERED    8UL
++
++ULONG XhciUsosPollMode;
++
++/*
++ * DriverEntry, before registration. IRQL: PASSIVE_LEVEL.
++ *
++ * Polling is the DEFAULT of this build (USOS stages usos3 only for Windows
++ * 2000): the interrupt flag is fixed at registration, before any controller's
++ * resources are known, and a registry value cannot be relied on - GUI-mode
++ * Setup restores the SYSTEM hive from system.sav whenever it restarts, and
++ * the X470 lost USB input that way when "Installing devices" restarted both
++ * controllers (2026-10-05). PollMode = 0 (DWORD) turns interrupts back on.
++ */
++VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath)
++{
++    WCHAR buffer[200];
++    UNICODE_STRING path;
++    UNICODE_STRING name;
++    OBJECT_ATTRIBUTES attributes;
++    HANDLE key;
++    UCHAR info[sizeof(KEY_VALUE_PARTIAL_INFORMATION) + sizeof(ULONG)];
++    PKEY_VALUE_PARTIAL_INFORMATION value;
++    ULONG length;
++
++    XhciUsosPollMode = 1;
++    if (registryPath == NULL || registryPath->Buffer == NULL) {
++        return;
++    }
++    path.Buffer = buffer;
++    path.Length = 0;
++    path.MaximumLength = sizeof(buffer);
++    if (!NT_SUCCESS(RtlAppendUnicodeStringToString(&path, registryPath)) ||
++        !NT_SUCCESS(RtlAppendUnicodeToString(&path, L"\\Parameters"))) {
++        return;
++    }
++    InitializeObjectAttributes(&attributes, &path,
++                               OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
++                               NULL, NULL);
++    if (!NT_SUCCESS(ZwOpenKey(&key, KEY_READ, &attributes))) {
++        return;
++    }
++    RtlInitUnicodeString(&name, L"PollMode");
++    value = (PKEY_VALUE_PARTIAL_INFORMATION)info;
++    if (NT_SUCCESS(ZwQueryValueKey(key, &name, KeyValuePartialInformation,
++                                   info, sizeof(info), &length)) &&
++        value->Type == REG_DWORD && value->DataLength == sizeof(ULONG) &&
++        *(PULONG)value->Data == 0) {
++        XhciUsosPollMode = 0;
++    }
++    ZwClose(key);
++}
++
++/* IRQL: DISPATCH_LEVEL (timer DPC). */
++static VOID NTAPI usosPollDpc(PKDPC dpc, PVOID context, PVOID arg1, PVOID arg2)
++{
++    PXHCI_EXTENSION ext;
++    ULONG fire;
++    ULONG claims;
++
++    UNREFERENCED_PARAMETER(dpc);
++    UNREFERENCED_PARAMETER(arg1);
++    UNREFERENCED_PARAMETER(arg2);
++
++    ext = (PXHCI_EXTENSION)context;
++    if (ext == NULL || ext->Signature != XHCI_EXTENSION_SIGNATURE) {
++        return;
++    }
++    InterlockedIncrement(&ext->UsosPollInDpc);
++    if (ext->UsosPollState != 1 || ext->ControllerFailed ||
++        (ext->Flags & XHCI_EXT_FLAG_STARTED) == 0 ||
++        (ext->Flags & XHCI_EXT_FLAG_INITIALIZED) == 0) {
++        InterlockedDecrement(&ext->UsosPollInDpc);
++        return;
++    }
++    ext->UsosPollTicks++;
++    fire = 0;
++    if (XhciUsosPollMode) {
++        fire = 1;
++    } else {
++        claims = ext->InterruptsClaimed;
++        if (XhciEventRingPending(&ext->EventRing) &&
++            claims == ext->UsosLastClaims) {
++            ext->UsosStallTicks++;
++            if (ext->UsosStallTicks >= USOS_POLL_STALL_TICKS) {
++                ext->UsosStallTicks = 0;
++                ext->UsosRescues++;
++                fire = 1;
++            }
++        } else {
++            ext->UsosStallTicks = 0;
++        }
++        ext->UsosLastClaims = claims;
++    }
++    if (fire) {
++        /* Was the previous soft interrupt answered with an InterruptDpc? */
++        if (ext->UsosSoftInts != 0 && ext->DpcCount == ext->UsosLastDpcCount) {
++            ext->UsosUnanswered++;
++        } else {
++            ext->UsosUnanswered = 0;
++        }
++        if (ext->UsosUnanswered >= USOS_POLL_UNANSWERED ||
++            XhciRegPacket.UsbPortInvalidateController == NULL) {
++            ext->UsosDirectDpcs++;
++            (VOID)XhciUsosRunInterruptDpc(ext);
++        } else {
++            ext->UsosSoftInts++;
++            (VOID)XhciRegPacket.UsbPortInvalidateController(
++                ext, USBPORT_INVALIDATE_CONTROLLER_SOFT_INTERRUPT);
++        }
++        ext->UsosLastDpcCount = ext->DpcCount;
++    }
++    InterlockedDecrement(&ext->UsosPollInDpc);
++}
++
++/* After a successful start. IRQL: PASSIVE_LEVEL. */
++VOID XhciUsosPollStart(PXHCI_EXTENSION ext)
++{
++    LARGE_INTEGER due;
++
++    if (ext == NULL) {
++        return;
++    }
++    XhciLogNote(ext, "usos.poll.mode", XhciUsosPollMode);
++    if (ext->UsosPollState == 1) {
++        return;
++    }
++    KeInitializeTimer(&ext->UsosPollTimer);
++    KeInitializeDpc(&ext->UsosPollDpc, usosPollDpc, ext);
++    ext->UsosPollInDpc = 0;
++    ext->UsosLastClaims = ext->InterruptsClaimed;
++    ext->UsosStallTicks = 0;
++    ext->UsosUnanswered = 0;
++    ext->UsosLastDpcCount = ext->DpcCount;
++    InterlockedExchange(&ext->UsosPollState, 1);
++    due.QuadPart = (LONGLONG)USOS_POLL_PERIOD_MS * (LONGLONG)(-10000);
++    (VOID)KeSetTimerEx(&ext->UsosPollTimer, due, USOS_POLL_PERIOD_MS,
++                       &ext->UsosPollDpc);
++}
++
++/* Before the controller is quiesced. IRQL: PASSIVE_LEVEL. */
++VOID XhciUsosPollStop(PXHCI_EXTENSION ext)
++{
++    LARGE_INTEGER wait;
++    ULONG guard;
++
++    if (ext == NULL || ext->UsosPollState != 1) {
++        return;
++    }
++    InterlockedExchange(&ext->UsosPollState, 2);
++    (VOID)KeCancelTimer(&ext->UsosPollTimer);
++    (VOID)KeRemoveQueueDpc(&ext->UsosPollDpc);
++    wait.QuadPart = -10000;     /* 1 ms */
++    for (guard = 0; guard < 1000 && ext->UsosPollInDpc != 0; guard++) {
++        if (KeGetCurrentIrql() == PASSIVE_LEVEL) {
++            (VOID)KeDelayExecutionThread(KernelMode, FALSE, &wait);
++        } else {
++            KeStallExecutionProcessor(1000);
++        }
++    }
++    XhciLogNote(ext, "usos.poll.ticks", ext->UsosPollTicks);
++    XhciLogNote(ext, "usos.poll.softints", ext->UsosSoftInts);
++    XhciLogNote(ext, "usos.poll.direct", ext->UsosDirectDpcs);
++    XhciLogNote(ext, "usos.poll.rescues", ext->UsosRescues);
++    XhciLogNote(ext, "usos.poll.dpcs", ext->DpcCount);
++    InterlockedExchange(&ext->UsosPollState, 0);
++}
++
+ #else /* XHCI_HOST_TEST */
+ 
+ /* The host suite has no PCI, no file system and no threads. */
+@@ -511,5 +705,8 @@ VOID XhciUsosFileAppendText(const char *text) { (void)text; }
+ VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason)
+ { (void)ext; (void)reason; }
+ VOID XhciUsosFileKick(VOID) { }
++ULONG XhciUsosPollMode;
++VOID XhciUsosPollStart(PXHCI_EXTENSION ext) { (void)ext; }
++VOID XhciUsosPollStop(PXHCI_EXTENSION ext) { (void)ext; }
+ 
+ #endif /* XHCI_HOST_TEST */
+diff --git a/src/xhci_version.h b/src/xhci_version.h
+index 0bfc402..44e5ee3 100644
+--- a/src/xhci_version.h
++++ b/src/xhci_version.h
+@@ -52,7 +52,7 @@
+  * XHCI_VER_CSV above; the INF gate refuses a build where it does not. */
+ /* MODIFIED (USOS, 2026-09-29): "-usosN" marks the USOS patch set; the four
+  * integers stay upstream's so nothing that compares them moves. */
+-#define XHCI_VER_STR            "1.1.1.0-usos2"
++#define XHCI_VER_STR            "1.1.1.0-usos3"
+ 
+ /* The release date, in the MM/DD/YYYY form `DriverVer` takes, zero-padded -
+  * the INF gate refuses an unpadded one, because Windows 98's 16-bit parser is

@@ -48,6 +48,7 @@ usos_pipeline_profile_for_action() {
         xp-resume) printf 'nt5-resume' ;;
         vista-disk) printf 'vista-uefi-disk' ;;
         vista-csmwrap) printf 'vista-x64-sp2-uefi-csmwrap' ;;
+        w9x-csmwrap) printf 'w9x-uefi-csmwrap' ;;
         *) return 1 ;;
     esac
 }
@@ -59,8 +60,9 @@ usos_pipeline_steps() {
         nt5-resume) printf '150' ;;
         vista-uefi-disk) printf '600' ;;
         vista-x64-sp2-uefi-csmwrap) printf '610' ;;
+        w9x-uefi-csmwrap) printf '620' ;;
         windows-pe-bios-iso) printf '500 200' ;;
-        iso-work-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
+        iso-work-chainload|win81-bios-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
         *) return 1 ;;
     esac
 }
@@ -73,6 +75,7 @@ usos_pipeline_step_name() {
         500) printf 'windows_pe_bios_request' ;;
         600) printf 'vista_disk_prepare' ;;
         610) printf 'vista_csmwrap' ;;
+        620) printf 'w9x_csmwrap' ;;
         *) return 1 ;;
     esac
 }
@@ -80,7 +83,7 @@ usos_pipeline_step_name() {
 # The selected_method the menu persists for a WORK profile (Backend.method()).
 usos_pipeline_work_method() {
     case "$1" in
-        iso-work-chainload) printf 'chainload' ;;
+        iso-work-chainload|win81-bios-chainload) printf 'chainload' ;;
         wim-wimboot) printf 'wimboot' ;;
         vhd-vhdboot) printf 'vhdboot' ;;
         *) return 1 ;;

@@ -13,11 +13,50 @@ usos_nt5_profile() {
         windows-xp)
             NT5_NAME='Windows XP'
             NT5_TITLE='WINDOWS XP'
+            # XP Media Center Edition 2005 (menu entry windows-xp-mce) and
+            # XP Tablet PC Edition 2005 (windows-xp-tablet): the same flow
+            # from their own DATA folders; the UEFI menu adds
+            # usos.xp_edition=mce|tablet (src/platform/uefi/xp_preparation.zig).
+            case "${USOS_XP_EDITION:-}" in
+                mce | tablet) ;;
+                *)
+                    case " $(cat /proc/cmdline 2>/dev/null) " in
+                        *' usos.xp_edition=mce '*) USOS_XP_EDITION=mce ;;
+                        *' usos.xp_edition=tablet '*) USOS_XP_EDITION=tablet ;;
+                        *) USOS_XP_EDITION= ;;
+                    esac
+                    ;;
+            esac
+            case "$USOS_XP_EDITION" in
+                mce)
+                    NT5_NAME='Windows XP Media Center Edition 2005'
+                    NT5_TITLE='WINDOWS XP MEDIA CENTER EDITION 2005'
+                    ;;
+                tablet)
+                    NT5_NAME='Windows XP Tablet PC Edition 2005'
+                    NT5_TITLE='WINDOWS XP TABLET PC EDITION 2005'
+                    ;;
+            esac
+            export USOS_XP_EDITION
             NT5_INSTALL_DIR=WINDOWS
             ;;
         windows-2000)
             NT5_NAME='Windows 2000'
             NT5_TITLE='WINDOWS 2000'
+            # Windows 2000 Server (menu entry windows-2000-server): the same
+            # flow from its own DATA folder; the UEFI menu adds
+            # usos.w2k_edition=server (src/platform/uefi/xp_preparation.zig).
+            if [ "${USOS_W2K_EDITION:-}" != server ]; then
+                case " $(cat /proc/cmdline 2>/dev/null) " in
+                    *' usos.w2k_edition=server '*) USOS_W2K_EDITION=server ;;
+                    *) USOS_W2K_EDITION= ;;
+                esac
+            fi
+            if [ "$USOS_W2K_EDITION" = server ]; then
+                NT5_NAME='Windows 2000 Server'
+                NT5_TITLE='WINDOWS 2000 SERVER'
+            fi
+            export USOS_W2K_EDITION
             NT5_INSTALL_DIR=WINNT
             NT5_SETUP_DIR=W2K
             ;;
@@ -36,7 +75,79 @@ usos_nt5_profile() {
             ;;
         *) printf '[NT5_PROFILE] Unsupported system: %s\n' "$NT5_SYSTEM" >&2; return 1 ;;
     esac
+    NT5_CATEGORY=Windows
+    case "${USOS_NT5_VARIANT:-}" in
+        whistler|neptune|w2k-beta) ;;
+        *)
+            case " $(cat /proc/cmdline 2>/dev/null) " in
+                *' usos.nt5_variant=whistler '*) USOS_NT5_VARIANT=whistler ;;
+                *' usos.nt5_variant=neptune '*) USOS_NT5_VARIANT=neptune ;;
+                *' usos.nt5_variant=w2k-beta '*) USOS_NT5_VARIANT=w2k-beta ;;
+                *) USOS_NT5_VARIANT= ;;
+            esac ;;
+    esac
+    case "$NT5_SYSTEM:$USOS_NT5_VARIANT" in
+        windows-xp:whistler) NT5_NAME='Windows Whistler'; NT5_CATEGORY=Betas ;;
+        windows-2000:neptune) NT5_NAME='Windows Neptune'; NT5_CATEGORY=Betas ;;
+        windows-2000:w2k-beta) NT5_NAME='Windows 2000 Beta'; NT5_CATEGORY=Betas ;;
+        *:) ;;
+        *) printf '[NT5_PROFILE] STOP mismatched beta/base identity\n' >&2; return 1 ;;
+    esac
+    export NT5_CATEGORY USOS_NT5_VARIANT
     export NT5_SYSTEM NT5_NAME NT5_TITLE NT5_INSTALL_DIR NT5_SOURCE_DIR NT5_SETUP_DIR
+}
+
+# Also used before source discovery/disk selection; keep the source probe's
+# guard as defence for direct calls. No file or device access in this guard.
+usos_nt5_require_supported() {
+    [ -z "${USOS_NT5_VARIANT:-}" ] && return 0
+    printf '[NT5_SOURCE] STOP beta=%s: source-bound driver/loader patches are not validated for this build; no target write occurred\n' "$USOS_NT5_VARIANT" >&2
+    return 1
+}
+
+# Text-only, read-only identity probe. Missing DriverVer stays unknown; it
+# never guesses a build from a filename or treats SetupData 5.0 as Neptune.
+# Kept here so every initramfs containing nt5_profile.sh already has it.
+usos_nt5_source_file() {
+    # Mounted ISO files may use lower/mixed case names; no recursive search.
+    local directory file wanted_dir wanted_file
+    wanted_dir=$(printf '%s' "$2" | tr 'A-Z' 'a-z')
+    wanted_file=$(printf '%s' "$3" | tr 'A-Z' 'a-z')
+    for directory in "$1"/*; do
+        [ -d "$directory" ] || continue
+        [ "$(basename "$directory" | tr 'A-Z' 'a-z')" = "$wanted_dir" ] || continue
+        for file in "$directory"/*; do
+            [ -f "$file" ] || continue
+            [ "$(basename "$file" | tr 'A-Z' 'a-z')" != "$wanted_file" ] || { printf '%s\n' "$file"; return 0; }
+        done
+    done
+}
+usos_nt5_source_metadata() {
+    [ -f "$1" ] || return 0
+    awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+    {
+        line=$0; sub(/;.*/, "", line); line=trim(line)
+        if (line ~ /^\[/) { active=(tolower(line)=="[version]"); next }
+        if (!active) next
+        eq=index(line,"="); if (!eq || tolower(trim(substr(line,1,eq-1)))!="driverver") next
+        count++; value=trim(substr(line,eq+1)); gsub(/"/, "", value)
+        comma=index(value,","); if (!comma) { bad=1; next }
+        value=trim(substr(value,comma+1)); n=split(value,v,".")
+        if(n!=4) bad=1
+        for(i=1;i<=n;i++) if(v[i]!~/^[0-9]+$/ || v[i]+0>65535) bad=1
+    }
+    END {
+        if (!count) exit 0
+        if (count!=1 || bad) exit 1
+        identity="unknown"
+        if(v[1]+0==5 && v[3]+0>0) {
+            if(v[2]+0==50 || (v[2]+0==0 && v[3]+0==5111)) identity="windows-neptune"
+            else if(v[2]+0==1 && v[3]+0<2600) identity="windows-whistler"
+            else if(v[2]+0==0 && v[3]+0<2195) identity="windows-2000-beta"
+        }
+        printf "driver_version=%s\nsource_identity=%s\n",value,identity
+    }' "$1"
 }
 
 # The NT5 preparation from UEFI (installed system boots through the firmware

@@ -29,8 +29,13 @@
 # and the tweaks (src/flow/answer/nt5.zig): tweaks= a comma-separated list
 # of games msn_explorer messenger outlook_express classic_start
 # classic_theme balloons tour extensions hidden autorun, display=WxH
-# (1024x768, 1280x1024, 1920x1080). Both are written only when set, so a
+# (1024x768, 1280x1024, 1920x1080) or keep (no [Display], no USOSRES:
+# Windows' own mode, docs/display-policy.md). Both are written only when set, so a
 # profile without tweaks gives the same WINNT.SIF and accounts script.
+# The typed options (src/flow/answer/options.zig) add workgroup=, repeated
+# run= (a known command) and reg= (a usos-reg set line); usos-users.cmd
+# then runs usos-reg.exe with usos-reg.txt (usos_xp_settings_regset), both
+# staged next to it.
 
 usos_xp_settings_load() {
     _xs_file=$1
@@ -63,7 +68,19 @@ usos_xp_settings_load() {
             key = tolower(trim(substr(line, 1, eq - 1)))
             value = trim(substr(line, eq + 1))
             if (value ~ /^".*"$/ && length(value) >= 2) value = substr(value, 2, length(value) - 2)
-            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display)$/)) { bad("unknown key on line " NR); next }
+            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display|display_bpp|workgroup|reg|run|network|ip|gateway|dns|home_page)$/)) { bad("unknown key on line " NR); next }
+            # Typed options (src/flow/answer/options.zig): repeated reg= / run=.
+            if (key == "reg") {
+                # ROOT\Key|Name|type|data (usos-reg set line); printable ASCII
+                # without " ^ & < > (the set is a data file, never run by
+                # cmd.exe: % stays for the user-script RunOnce command).
+                if (split(value, f, "|") != 4 || f[1] !~ /^(HKLM|USER|DEFAULT)\\[ -~]+$/ || f[3] !~ /^(dword|sz|binary|del)$/ || value ~ /["^&<>]/ || value !~ /^[ -~]+$/) { bad("reg= on line " NR " is not a registry set line"); next }
+                regs[++nreg] = value; next
+            }
+            if (key == "run") {
+                if (value !~ /^(net\.exe accounts \/maxpwage:unlimited|powercfg\.exe \/hibernate off)$/) { bad("run= on line " NR " is not a known command"); next }
+                runs[++nrun] = value; next
+            }
             values[key] = value
         }
         END {
@@ -107,13 +124,29 @@ usos_xp_settings_load() {
                 n = split(tweaks, parts, ",")
                 for (i = 1; i <= n; i++) if (parts[i] !~ /^(games|msn_explorer|messenger|outlook_express|classic_start|classic_theme|balloons|tour|extensions|hidden|autorun)$/) bad("tweaks= has an unknown tweak")
                 display = tolower(values["display"])
-                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080)$/) bad("display= must be 1024x768, 1280x1024 or 1920x1080")
+                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080|keep)$/ && !(family=="2000" && display=="auto")) bad("display= must be 1024x768, 1280x1024, 1920x1080 or keep (2000 also accepts auto)")
+                display_bpp = tolower(values["display_bpp"])
+                if (display_bpp != "" && (family!="2000" || display_bpp !~ /^(auto|16|32)$/)) bad("display_bpp= is only supported for Windows 2000: auto, 16 or 32")
+                workgroup = values["workgroup"]
+                if (workgroup != "" && (length(workgroup) > 15 || workgroup !~ /^[A-Za-z0-9-]+$/ || workgroup ~ /^[0-9]+$/)) bad("workgroup= must be 1-15 characters A-Z a-z 0-9 -, not only digits")
             }
+            for (netkey in values) if (netkey ~ /^(network|ip|gateway|dns|home_page)$/) {
+                if (family!="2000") bad("legacy network settings require Windows 2000");
+                if (values[netkey] ~ /[^ -~]/ || values[netkey] ~ /["\\|]/) bad("invalid network setting");
+            }
+            if (values["network"]!="" && values["network"]!~/^(on|off)$/) bad("network must be on or off");
             if (failed) exit 1
             printf "user=%s\nuser2=%s\ncomputer=%s\norg=%s\nkey=%s\ntimezone=%s\npassword=%s\n", user, user2, computer, org, key, timezone, password
             if (profile != "") printf "family=%s\nlocale=%s\ninput_locale=%s\nlanguage_group=%s\n", family, locale, input, group
+            if (profile!="" && family=="2000" && values["network"]!="") {
+                printf "network=%s\nip=%s\ngateway=%s\ndns=%s\nhome_page=%s\n",values["network"],values["ip"],values["gateway"],values["dns"],values["home_page"];
+            }
             if (profile != "" && tweaks != "") printf "tweaks=%s\n", tweaks
             if (profile != "" && display != "") printf "display=%s\n", display
+            if (profile != "" && display_bpp != "") printf "display_bpp=%s\n", display_bpp
+            if (profile != "" && workgroup != "") printf "workgroup=%s\n", workgroup
+            for (i = 1; i <= nrun; i++) printf "run=%s\n", runs[i]
+            for (i = 1; i <= nreg; i++) printf "reg=%s\n", regs[i]
         }
     ' "$_xs_text" > "$_xs_out.tmp"
     _xs_rc=$?
@@ -174,9 +207,14 @@ usos_xp_settings_sif() {
             # Windows 2000 names the key ProductID.
             if (v["key"] != "") print (v["family"] == "2000" ? "ProductID=" : "ProductKey=") v["key"]
             print "[Identification]"
-            print "JoinWorkgroup=WORKGROUP"
+            print "JoinWorkgroup=" (v["workgroup"] != "" ? v["workgroup"] : "WORKGROUP")
             print "[Networking]"
-            print "InstallDefaultComponents=Yes"
+            if (v["family"]=="2000" && v["network"]=="on") {
+                print "InstallDefaultComponents=No"
+                print "[NetClients]\nMS_MSClient=USOS.MSClient\n[USOS.MSClient]"
+                print "[NetProtocols]\nMS_TCPIP=USOS.TCPIP\n[USOS.TCPIP]"
+                print "[NetServices]"
+            } else print "InstallDefaultComponents=Yes"
             # Profile mode: Server 2003 stops on the licensing page without this.
             if (v["family"] == "2003") { print "[LicenseFilePrintData]"; print "AutoMode=PerServer"; print "AutoUsers=5" }
             if (v["locale"] != "") {
@@ -202,7 +240,7 @@ usos_xp_settings_sif() {
                 if (t["classic_start"]) print "DefaultStartPanelOff=Yes"
                 if (t["classic_theme"]) print "DefaultThemesOff=Yes"
             }
-            if (v["display"] != "") {
+            if (v["display"] != "" && v["display"] != "keep" && v["family"] != "2000") {
                 x = index(v["display"], "x")
                 print "[Display]"
                 print "BitsPerPel=32"
@@ -218,14 +256,30 @@ usos_xp_settings_accounts() {
     _xs_file=$2
     awk -v settings="$_xs_set" '
         BEGIN {
-            while ((getline line < settings) > 0) { eq = index(line, "="); v[substr(line, 1, eq - 1)] = substr(line, eq + 1) }
+            while ((getline line < settings) > 0) {
+                eq = index(line, "="); k = substr(line, 1, eq - 1)
+                if (k == "reg") { nreg++; continue }
+                if (k == "run") { runs[++nrun] = substr(line, eq + 1); continue }
+                v[k] = substr(line, eq + 1)
+            }
             printf "@echo off\r\n"
             printf "rem USOS: local administrator accounts from usos-xp.ini, run hidden by pae.exe at setup end.\r\n"
             printf "set USOS_LOG=%%SystemRoot%%\\usos-users.log\r\n"
             account(v["user"])
             if (v["user2"] != "") account(v["user2"])
             tweaks()
+            options()
             printf "exit /b 0\r\n"
+        }
+        # Typed options (src/flow/answer/options.zig): the commands, then the
+        # registry set (usos-reg.txt, usos_xp_settings_regset) applied by
+        # usos-reg.exe next to this script: HKLM, HKU\.DEFAULT and the Default
+        # User hive. The set may hold the automatic logon password: deleted.
+        function options(   i) {
+            for (i = 1; i <= nrun; i++) printf "%s >> \"%%USOS_LOG%%\" 2>&1\r\n", runs[i]
+            if (!nreg) return
+            printf "\"%%~dp0usos-reg.exe\" --log \"%%SystemRoot%%\\usos-reg.log\" \"%%~dp0usos-reg.txt\" >> \"%%USOS_LOG%%\" 2>&1\r\n"
+            printf "del /f /q \"%%~dp0usos-reg.txt\" >> \"%%USOS_LOG%%\" 2>&1\r\n"
         }
         # Profile tweaks: HKLM directly; the Explorer settings in the Default User
         # hive (every new profile, the accounts above included, is copied from it).
@@ -258,6 +312,17 @@ usos_xp_settings_accounts() {
             printf "for %%%%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%%%G \"%s\" /add >> \"%%USOS_LOG%%\" 2>&1\r\n", name
         }
     ' > "$_xs_file"
+}
+
+# usos_xp_settings_regset SETTINGS FILE
+#   The reg= lines of a rendered profile as the usos-reg set
+#   (tools/windows_usos_reg.c), CRLF. Returns 1 (FILE not written) when the
+#   profile has none.
+usos_xp_settings_regset() {
+    grep -q '^reg=' "$1" || return 1
+    { printf '; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)\r\n'
+      sed -n 's/^reg=//p' "$1" | sed 's/$/\r/'
+    } > "$2"
 }
 
 # usos_xp_custom_sif BASE.SIF USER.SIF

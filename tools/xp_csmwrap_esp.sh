@@ -3,7 +3,7 @@
 # docs/design/csmwrap-integration.md). Runs after prepare_xp_target.sh PASSED
 # on the same target: adds a small FAT16 EFI system partition (MBR type 0xEF)
 # in the space the Windows plan left free at the end of the disk
-# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos3 (a MODIFIED
+# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos18 (a MODIFIED
 # CSMWrap 3.1.2: quiet unless verbose = true, docs/research/csmwrap.md 6 and 7)
 # as \EFI\BOOT\BOOTX64.EFI, its licences, source and patches in \CSMWRAP.
 # The firmware then boots the target through
@@ -17,7 +17,12 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=bbf05216af896e24e5dd9da21d89bd063c17d1dab42f83561abc8cd49844de5f
+PINNED=0188057913ee7b4680027e45c53c45048deb8583c599c3c0672d98748704e0a4
+# Windows 2000 diagnostic setup (USOS_W2K_DIAG=on, DATA w2k-diag.txt):
+# CSMWrap 3.1.2-usos11-diag (usos11 + 0011 tick watcher + 0013 NMI snapshot,
+# tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
+DIAG_DIR=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}/csmwrap-diag
+PINNED_DIAG=a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
@@ -29,11 +34,20 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
-[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos3 hash'
+[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos18 hash'
 for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
 ls "$SRC"/patches/*.patch >/dev/null 2>&1 || fail 'the CSMWrap patches are missing next to CSMWrap'
+EFI_INPUT="$SRC/csmwrapx64.efi"
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    [ "${USOS_W2K_ACPI:-}" = on ] || fail 'the Windows 2000 diagnostic CSMWrap needs ACPI on'
+    [ -r "$DIAG_DIR/csmwrapx64.efi" ] || fail 'the diagnostic CSMWrap is missing from the package'
+    [ "$(sha256sum "$DIAG_DIR/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED_DIAG" ] || fail 'diagnostic CSMWrap does not match the pinned 3.1.2-usos11-diag hash'
+    ls "$DIAG_DIR"/patches/*.patch >/dev/null 2>&1 || fail 'the diagnostic CSMWrap patches are missing'
+    EFI_INPUT="$DIAG_DIR/csmwrapx64.efi"
+    log 'Windows 2000 DIAGNOSTIC CSMWrap 3.1.2-usos11-diag (tick watcher + NMI snapshot)'
+fi
 ls "$SRC"/licenses/*.txt >/dev/null 2>&1 || fail 'the CSMWrap licence notices are missing next to CSMWrap'
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
@@ -78,8 +92,42 @@ verbose=false
 [ ! -e "$VERBOSE_FLAG" ] || verbose=true
 log "csmwrap.ini verbose=$verbose"
 printf 'serial = false\r\nverbose = %s\r\n' "$verbose" > "$ini"
+# Windows 2000 with ACPI on (legacy_xp_staging.sh exports USOS_W2K_ACPI only
+# in the 2000 flow): the RSDT gets an ACPI 1.0 FADT copy (revision 1, 116
+# bytes; CSMWrap 3.1.2-usos11 patch 0006). The 2000 ACPI HALs copy the whole
+# FADT into a 0x84-byte buffer, so a revision 3+ FADT overwrites their
+# MADT/IOAPIC data in HAL phase 0 (black screen). XP and the rest: unchanged.
+if [ "${USOS_W2K_ACPI:-}" = on ]; then
+    printf 'acpi_legacy_fadt = true\r\n' >> "$ini"
+    log 'csmwrap.ini acpi_legacy_fadt=true (Windows 2000 ACPI)'
+fi
+# Windows 9x (w9x_csmwrap_target.sh exports USOS_PCI_IRQ_ROUTING only there):
+# CSMWrap routes PCI INTA#..INTD# to 8259 IRQs, writes Interrupt Line and
+# ELCR and a matching $PIR, as a legacy BIOS POST does (patch 0015). 9x has
+# no IRQ steering for current chipsets, so without it every PCI device with
+# an interrupt pin gets Code 29. XP/2000/Vista and the rest: unchanged.
+if [ "${USOS_PCI_IRQ_ROUTING:-}" = on ]; then
+    printf 'pci_irq_routing = true\r\n' >> "$ini"
+    log 'csmwrap.ini pci_irq_routing=true (Windows 9x PCI IRQs)'
+fi
+# Windows 9x (w9x_csmwrap_target.sh exports USOS_INT13_BOOT_DISK_ONLY only
+# there; on by default since 2026-10-19): only the disk CSMWrap was loaded
+# from gets a BIOS number (patch 0014), so a USB stick never shifts the 9x
+# INT 13h units / drive letters and IOS writes no MBR stamp into it; USB
+# sticks reach Windows through USOSUSB.MPD and the USB disk service, with
+# hot-swap (patch 0022, active only with this key). XP/2000/Vista and the
+# rest never get the key, so 0022 stays idle there (no pool, no port watch,
+# empty controllers stopped as before).
+if [ "${USOS_INT13_BOOT_DISK_ONLY:-}" = on ]; then
+    printf 'int13_boot_disk_only = true\r\n' >> "$ini"
+    log 'csmwrap.ini int13_boot_disk_only=true (Windows 9x: the boot disk is the only BIOS hard disk)'
+fi
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    printf 'w2k_nmi_snapshot = true\r\n' >> "$ini"
+    log 'csmwrap.ini w2k_nmi_snapshot=true (Windows 2000 diagnostic setup)'
+fi
 mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP ::/CSMWRAP/patches ::/CSMWRAP/licenses || fail 'cannot create ESP folders'
-mcopy -i "$image" "$SRC/csmwrapx64.efi" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
+mcopy -i "$image" "$EFI_INPUT" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
 mcopy -i "$image" "$ini" ::/EFI/BOOT/csmwrap.ini || fail 'cannot copy csmwrap.ini'
 for file in $CSMWRAP_FILES; do
     mcopy -i "$image" "$SRC/$file" "::/CSMWRAP/$file" || fail "cannot copy $file"
@@ -88,6 +136,13 @@ for file in "$SRC"/patches/*.patch "$SRC"/licenses/*.txt; do
     sub=${file%/*}; sub=${sub##*/}
     mcopy -i "$image" "$file" "::/CSMWRAP/$sub/${file##*/}" || fail "cannot copy $sub/${file##*/}"
 done
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    # The diagnostic binary's own series (same source archive).
+    mmd -i "$image" ::/CSMWRAP/patches-diag || fail 'cannot create CSMWRAP/patches-diag'
+    for file in "$DIAG_DIR"/patches/*.patch; do
+        mcopy -i "$image" "$file" "::/CSMWRAP/patches-diag/${file##*/}" || fail "cannot copy patches-diag/${file##*/}"
+    done
+fi
 
 le32() {
     v=$1

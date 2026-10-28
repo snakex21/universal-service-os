@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
@@ -104,7 +105,7 @@ func formatPartition(diskNumber uint32, partition install.PartitionRef, gptType,
 	if err != nil {
 		return fmt.Errorf("Windows PowerShell is required for Format-Volume: %w", err)
 	}
-	cmd := exec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", formatPartitionScript)
+	cmd := hiddenexec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", formatPartitionScript)
 	hideValue := "0"
 	if hideDriveLetter {
 		hideValue = "1"
@@ -119,7 +120,7 @@ func formatPartition(diskNumber uint32, partition install.PartitionRef, gptType,
 		"USOS_FORMAT_LABEL="+label,
 		"USOS_FORMAT_HIDE_DRIVE_LETTER="+hideValue,
 	)
-	output, err := cmd.CombinedOutput()
+	output, err := hiddenexec.CombinedOutput("Format-Volume "+label+" PARTUUID="+partition.PartUUID, cmd)
 	if err != nil {
 		return fmt.Errorf("Format-Volume %s PARTUUID=%s: %w: %s", fileSystem, partition.PartUUID, err, strings.TrimSpace(string(output)))
 	}

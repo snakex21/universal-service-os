@@ -33,12 +33,16 @@ DATA = ROOT / 'src' / 'flow' / 'answer' / 'testdata'
 GOLDEN = DATA / 'golden'
 OUT = ROOT / 'zig-out' / 'answer-render-tests'
 TOOL = ROOT / 'zig-out' / 'bin' / 'usos-answer.exe'
-ZIG = ROOT / 'tools' / 'zig' / 'zig.exe'
+ZIG = Path(os.environ.get('USOS_ZIG', ROOT / 'tools' / 'zig' / 'zig.exe'))
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
 # The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
+# Only for this module's shells (env=SH_ENV), never os.environ: pytest imports
+# every test module into one process, and a PATH with another MSYS runtime's
+# sh first breaks the nested `VAR=x sh script` calls of other modules.
+SH_ENV = dict(os.environ)
 if SH:
     # cmp (tools/answer_plan.sh) may only be in Git's usr/bin: second.
-    os.environ['PATH'] = os.pathsep.join([str(Path(SH).parent), r'C:\Program Files\Git\usr\bin', os.environ.get('PATH', '')])
+    SH_ENV['PATH'] = os.pathsep.join([str(Path(SH).parent), r'C:\Program Files\Git\usr\bin', os.environ.get('PATH', '')])
 UPDATE = os.environ.get('USOS_UPDATE_GOLDEN') == '1'
 NS = '{urn:schemas-microsoft-com:unattend}'
 failures: list[str] = []
@@ -73,7 +77,7 @@ def posix(path: Path) -> str:
 
 def sh(command: str) -> subprocess.CompletedProcess:
     lib = posix(ROOT / 'tools' / 'xp_user_settings.sh')
-    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True)
+    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True, env=SH_ENV)
 
 
 def tool(*args: str) -> subprocess.CompletedProcess:
@@ -242,6 +246,10 @@ def check_linux() -> None:
 # independent copy of src/flow/answer/schema.zig tweak_support). Every other
 # system must render byte for byte what it renders without the tweak.
 NT6_ALL = {s for s, _ in NT6}
+# Systems whose USOS answer registers USOSRES (CSMWrap paths: Vista / 7 /
+# 2008 / 2008 R2, and 32-bit 8 / 8.1 / 10 on win-x86-uefi-csmwrap).
+NT6_DISPLAY_HELPER = {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2',
+                      'windows-8', 'windows-8-1', 'windows-10'}
 NT5_BASE = {system: base for system, base, _ in NT5}
 TWEAKS = {
     'skip_games=yes': {'windows-xp', 'windows-vista', 'windows-7'},
@@ -251,14 +259,18 @@ TWEAKS = {
     'theme=classic': {'windows-xp', 'windows-7'},
     'theme=basic': {'windows-7'},
     'no_balloon_tips=yes': {'windows-xp', 'windows-server-2003'},
-    'display=1280x1024': {'windows-xp', 'windows-server-2003'},
+    # 6.x+ since 2026-10-21: Shell-Setup Display; Vista / 7 / 2008 / 2008 R2
+    # also the request comment for the CSMWrap USOSRES staging.
+    'display=1280x1024': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'display_bpp=16': {'windows-2000'} | NT6_DISPLAY_HELPER,
     'disable_uac=yes': {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'},
     'no_sidebar=yes': {'windows-vista', 'windows-7'},
     'no_welcome_center=yes': {'windows-vista'},
     'no_hibernation=yes': {'windows-vista', 'windows-7'},
-    'show_extensions=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
-    'show_hidden=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
-    'no_autorun=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
+    # 2000 since the typed options (2026-10-12): through usos-reg.exe.
+    'show_extensions=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'show_hidden=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'no_autorun=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
 }
 # Text each tweak must bring where it applies (one marker per tweak).
 MARKERS = {
@@ -269,13 +281,14 @@ MARKERS = {
     'theme=classic': ('DefaultThemesOff=Yes', 'classic.theme'),
     'theme=basic': ('basic.theme',),
     'no_balloon_tips=yes': ('EnableBalloonTips',),
-    'display=1280x1024': ('Xresolution=1280',),
+    'display=1280x1024': ('Xresolution=1280', '1280x1024xauto', '<HorizontalResolution>1280</HorizontalResolution>'),
+    'display_bpp=16': ('autox16',),
     'disable_uac=yes': ('<EnableLUA>false</EnableLUA>', '/v EnableLUA /t REG_DWORD /d 0'),
     'no_sidebar=yes': ('TurnOffSidebar',),
     'no_welcome_center=yes': ('WindowsWelcomeCenter',),
     'no_hibernation=yes': ('powercfg.exe -h off',),
     'show_extensions=yes': ('HideFileExt',),
-    'show_hidden=yes': ('/v Hidden ',),
+    'show_hidden=yes': ('/v Hidden ', '|Hidden|dword|1'),
     'no_autorun=yes': ('NoDriveTypeAutoRun',),
 }
 
@@ -289,10 +302,146 @@ def render_any(profile: Path, system: str, arch: str, name: str) -> bytes | None
         return None
     if system in NT5_BASE:
         sif, accounts = nt5_merge(out, NT5_BASE[system], name, True)
-        return sif + b'\n----- usos-users.cmd -----\n' + accounts
+        # The typed options' registry set (usos-reg.txt), when there is one.
+        regset = OUT / (name + '.usos-reg.txt')
+        r = sh(f"usos_xp_settings_regset '{posix(OUT / (name + '.normalized'))}' '{posix(regset)}'")
+        extra = b'\n----- usos-reg.txt -----\n' + regset.read_bytes() if r.returncode == 0 else b''
+        if system == 'windows-2000':
+            normalized = OUT/(name+'.normalized')
+            r = subprocess.run([SH, '-c', f". '{posix(ROOT/'tools/display_profile.sh')}'; usos_display_from_nt5 '{posix(normalized)}'"], capture_output=True, env=SH_ENV)
+            check('2000 display transport '+name, r.returncode == 0, r.stderr.decode(errors='replace'))
+            if r.stdout:
+                extra += b'\n----- DISPLAY.TXT -----\n'+r.stdout.strip()+b'\r\n'
+        return sif + b'\n----- usos-users.cmd -----\n' + accounts + extra
+    if system in LEGACY:
+        return out.read_bytes()
     data = out.read_bytes()
     check_xml(name, data, arch)
     return data
+
+
+# Windows 9x and NT 4.0: MSBATCH.INF / WINNT.SIF straight from the renderer.
+LEGACY = {'windows-95', 'windows-98-se', 'windows-me', 'windows-nt-4'}
+
+
+def option_profile_lines() -> list[str]:
+    """Every typed option at each of its values (src/flow/answer/options.zig)."""
+    lines = []
+    for o in OPTIONS:
+        key, values = o.split('=')
+        for v in values.split('|'):
+            lines.append(f'{key}={v}')
+    return lines + ['workgroup=USOSLAB']
+
+
+# The typed options and their non-default values (options.zig table).
+OPTIONS = [
+    'show_protected=yes', 'launch_to_pc=yes', 'end_task=yes', 'no_tips=yes',
+    'taskbar_search=hidden|icon|box', 'taskbar_left=yes', 'task_view_off=yes', 'widgets_off=yes', 'bing_search_off=yes',
+    'uac_level=no_dim|never', 'hibernation=no_fast_startup|off', 'system_restore_off=yes', 'numlock=on|off',
+    'windows_update=no_restart|notify|off', 'privacy=yes', 'autologon=yes', 'password_never_expires=yes',
+    # Stage 2 (2026-10-14).
+    'classic_context_menu=yes', 'shortcut_suffix_off=yes', 'desktop_icons=yes', 'classic_taskbar=yes', 'all_tray_icons=yes',
+    'boot_to_desktop=yes', 'lock_screen_off=yes', 'visual_effects=performance', 'font_smoothing=yes', 'mouse_accel_off=yes',
+    'sticky_keys_off=yes', 'power_profile=high_performance|balanced|power_saver', 'no_sleep=yes', 'last_access_off=yes',
+    'long_paths=yes', 'search_index_off=yes', 'remote_desktop=yes', 'firewall_off=yes', 'server_nags_off=yes', 'ie_esc_off=yes',
+    'security_center_off=yes', 'defender_off=yes', 'smartscreen_off=yes', 'device_encryption_off=yes',
+    'remove_apps=games|bloat', 'first_run_off=yes', 'onedrive_off=yes', 'user_script=yes',
+]
+
+
+def check_options() -> None:
+    """Typed options: one matrix golden (what each value adds on each
+    system, from the minimal profile), a system where a value renders nothing
+    stays byte for byte the baseline, and one golden per system with every
+    option on (testdata/options.profile.ini)."""
+    import difflib
+    base_text = (DATA / 'minimal.profile.ini').read_text()
+    first: dict[str, str] = {}
+    for s, a in NT6:
+        first.setdefault(s, a)
+    systems = list(first.items()) + [('windows-xp', 'x86'), ('windows-2000', 'x86'), ('windows-server-2003', 'x86'),
+                                     ('windows-nt-4', 'x86'), ('windows-95', 'x86'), ('windows-98-se', 'x86'), ('windows-me', 'x86')]
+    baseline = {s: render_any(DATA / 'minimal.profile.ini', s, a, f'op-base.{s}') for s, a in systems}
+    matrix = []
+    for line in option_profile_lines():
+        profile = OUT / ('op-' + line.replace('=', '-') + '.profile.ini')
+        profile.write_text(base_text + line + '\n')
+        rendered_somewhere = False
+        for system, arch in systems:
+            data = render_any(profile, system, arch, f'op-{line.replace("=", "-")}.{system}')
+            if data is None or baseline[system] is None:
+                continue
+            added = [d for d in difflib.unified_diff(baseline[system].decode().splitlines(), data.decode().splitlines(), lineterm='', n=0)
+                     if d[:1] in '+-' and not d.startswith(('+++', '---'))]
+            rendered_somewhere = rendered_somewhere or bool(added)
+            for d in added:
+                matrix.append(f'{line}\t{system}\t{d}')
+        check(f'option {line} renders somewhere', rendered_somewhere)
+    golden('options.matrix.txt', ('\n'.join(matrix) + '\n').encode())
+    results: dict[str, str] = {}
+    for system, arch in systems:
+        data = render_any(DATA / 'options.profile.ini', system, arch, f'options.{system}.{arch}')
+        if data is None:
+            continue
+        results[system] = data.decode(errors='replace')
+        ext = 'sif-cmd.txt' if system in NT5_BASE else 'inf' if system.startswith('windows-9') or system == 'windows-me' else 'sif' if system == 'windows-nt-4' else 'xml'
+        golden(f'options.{system}.{arch}.{ext}', data)
+        if ext == 'xml':
+            check(f'options.{system}: under 32 KiB (max_size 64 KiB)', len(data) <= 32 * 1024, str(len(data)))
+            check(f'options.{system}: commands within 259 characters', all(len(p.text or '') <= 259 for p in ET.fromstring(data).iter(NS + 'Path')))
+    eleven = results.get('windows-11', '')
+    check('options: 11 auto logon, workgroup, packs', all(k in eleven for k in ('<LogonCount>9999999</LogonCount>', '<JoinWorkgroup>USOSLAB</JoinWorkgroup>', 'TaskbarAl', 'AllowNewsAndInterests', 'DisableAIDataAnalysis', 'powercfg.exe -h off')))
+    check('options: 11 stage 2 (classic menu, appx removal, first-logon script)', all(k in eleven for k in ('USOS-ClassicContextMenu', 'Remove-AppxProvisionedPackage', '<FirstLogonCommands>', 'first-logon.cmd', 'PreventDeviceEncryption')))
+    xp = results.get('windows-xp', '')
+    check('options: XP stage 2 (firewall, RDP port, power scheme, RunOnce script, hibernate)', all(k in xp for k in ('FirewallPolicy\StandardProfile|EnableFirewall|dword|0', '3389:TCP|sz|3389:TCP:*:Enabled:Remote Desktop', 'PowerCfg|CurrentPowerPolicy|sz|3', 'USOS2UserScript|sz|cmd.exe /c for %d', 'powercfg.exe /hibernate off')))
+    w2k = results.get('windows-2000', '')
+    check('options: 2000 through usos-reg.exe', 'usos-reg.exe' in w2k and 'DEFAULT\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2' in w2k and 'JoinWorkgroup=USOSLAB' in w2k)
+    nt4 = results.get('windows-nt-4', '')
+    check('options: NT 4.0 registry set as comments', ';USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\Cdrom|Autorun|dword|0' in nt4)
+    me = results.get('windows-me', '')
+    check('options: Me AddReg section, [USOS.Csm] last', '[USOS.Profile]' in me and me.rstrip().endswith('[USOS.Csm]'))
+    bad = OUT / 'bad-option.ini'
+    bad.write_bytes(b'user=Bob\nfamily=xp\nrun=format c:\n')
+    check('profile mode refuses an unknown run= command', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+    bad.write_bytes(b'user=Bob\nfamily=xp\nreg=HKCU\\Software|A|dword|1\n')
+    check('profile mode refuses a registry line outside HKLM/USER/DEFAULT', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+    bad.write_bytes(b'user=Bob\nreg=HKLM\\Software|A|dword|1\n')
+    check('usos-xp.ini refuses reg=', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415").returncode == 1)
+
+
+def check_display_keep() -> None:
+    """display=keep (docs/display-policy.md): no USOSRES request or
+    registration, no [Display] / <Display>; the keep request only where a
+    staging script reads one (9x / NT 3.5x / NT4, 2000, XP / 2003 settings,
+    the 6.x CSMWrap answers)."""
+    profile = OUT / 'display-keep.profile.ini'
+    profile.write_text((DATA / 'minimal.profile.ini').read_text() + 'display=keep\n')
+    for system, arch, ext in (('windows-vista', 'x86', 'xml'), ('windows-7', 'x86', 'xml'), ('windows-8-1', 'x86', 'xml'),
+                              ('windows-10', 'x86', 'xml'), ('windows-11', 'amd64', 'xml'),
+                              ('windows-xp', 'x86', 'sif-cmd.txt'), ('windows-2000', 'x86', 'sif-cmd.txt'),
+                              ('windows-server-2003', 'x86', 'sif-cmd.txt'),
+                              ('windows-98-se', 'x86', 'MSBATCH.INF'), ('windows-nt-4', 'x86', 'WINNT.SIF')):
+        name = f'display-keep.{system}.{arch}'
+        data = render_any(profile, system, arch, name)
+        if data is None:
+            continue
+        golden(f'{name}.{ext}', data)
+        text = data.decode(errors='replace')
+        # NT4's own [Display] (640x480x8 for Setup) is the renderer's base, with or without a request.
+        check(f'display=keep: no USOSRES / Display on {system}', 'USOSRES' not in text and '<Display>' not in text
+              and ('[Display]' not in text or system == 'windows-nt-4'))
+        if system in NT6_DISPLAY_HELPER:
+            check(f'display=keep: keep request on {system}', '<!-- USOS-DISPLAY=keepxauto -->\n<unattend' in text and 'icacls' not in text)
+        elif system == 'windows-11':
+            check('display=keep: nothing on 11', 'USOS-DISPLAY' not in text)
+        elif system == 'windows-2000':
+            check('display=keep: 2000 keep request', '----- DISPLAY.TXT -----\nkeepxauto\r\n' in text)
+        elif system in NT5_BASE:
+            normalized = (OUT / (name + '.normalized')).read_text()
+            check(f'display=keep: {system} settings keep', 'display=keep\n' in normalized)
+        else:
+            check(f'display=keep: {system} keep request', text.endswith(';USOS-DISPLAY=keepxauto\r\n'))
 
 
 def check_tweaks() -> None:
@@ -328,7 +477,7 @@ def check_tweaks() -> None:
         golden(f'tweaks.{system}.{arch}.{"sif-cmd.txt" if system in NT5_BASE else "xml"}', data)
         text = data.decode()
         for tweak, where in TWEAKS.items():
-            if tweak == 'theme=basic' or tweak.startswith('display='):
+            if tweak == 'theme=basic' or tweak.startswith(('display=', 'display_bpp=')):
                 continue
             present = any(m in text for m in MARKERS[tweak])
             check(f'all tweaks: {tweak} {"on" if system in where else "absent"} on {system}', present == (system in where))
@@ -358,7 +507,8 @@ def main() -> int:
     if SH is None:
         print('sh not found')
         return 1
-    build = subprocess.run([str(ZIG), 'build', '--cache-dir', str(ROOT / 'tools' / 'cache' / 'zig'), 'answer-tool'], cwd=ROOT)
+    build = subprocess.run([str(ZIG), 'build', '--cache-dir', str(ROOT / 'tools' / 'cache' / 'zig'),
+                            '--global-cache-dir', str(ROOT/'tools/cache/zig-global'), 'answer-tool'], cwd=ROOT)
     if build.returncode != 0:
         print('FAIL zig build answer-tool')
         return 1
@@ -488,7 +638,7 @@ def main() -> int:
     lib = posix(ROOT / 'tools' / 'xp_user_settings.sh')
     plan_cmd = subprocess.run([SH, '-c', f"USOS_XP_SETTINGS_OUT='{posix(OUT / 'plan.normalized')}'; . '{lib}'; "
                                f"usos_xp_settings_select x '{posix(OUT / 'source')}' '' plan '{posix(esp / 'usos-plan.ini')}' 2>&1; echo rc=$? settings=$XP_USER_SETTINGS"],
-                              capture_output=True)
+                              capture_output=True, env=SH_ENV)
     out = plan_cmd.stdout.decode(errors='replace')
     check('plan: rendered settings consumed', 'profile "Dom" active' in out and 'rc=0' in out and 'family=xp' in out and 'plan.normalized' in out, out)
     check('plan: rendered file deleted from the ESP', not (esp / 'nt5-settings.ini').exists())
@@ -496,23 +646,25 @@ def main() -> int:
     check('plan: normalized settings equal the direct load', (OUT / 'plan.normalized').read_bytes() == (OUT / 'full.windows-xp.normalized').read_bytes())
     plan_cmd = subprocess.run([SH, '-c', f"USOS_XP_SETTINGS_OUT='{posix(OUT / 'plan2.normalized')}'; . '{lib}'; "
                                f"usos_xp_settings_select x '{posix(OUT / 'source')}' '' plan '{posix(esp / 'usos-plan.ini')}' 2>&1"],
-                              capture_output=True)
+                              capture_output=True, env=SH_ENV)
     check('plan: missing rendered file stops before any write', plan_cmd.returncode == 1 and b'STOP' in plan_cmd.stdout)
 
     ap = posix(ROOT / 'tools' / 'answer_plan.sh')
     shutil.copy(OUT / 'full.windows-10.amd64.xml', esp / 'autounattend.xml')
     (esp / 'usos-plan.ini').write_bytes(b'[plan]\r\nversion=1\r\nprofile=windows-work\r\nsystem=windows-10\r\n[answer]\r\nsource=profile\r\nname=Dom\r\nformat=autounattend_xml\r\nfile=EFI/USOS/answer/autounattend.xml\r\narch=amd64\r\nkey=yes\r\n')
     taken = OUT / 'taken' / 'Autounattend.xml'
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: file taken', r.returncode == 0 and taken.read_bytes() == (OUT / 'full.windows-10.amd64.xml').read_bytes(), r.stdout.decode(errors='replace'))
     check('WORK plan: rendered file deleted from the ESP', not (esp / 'autounattend.xml').exists())
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: refuses a missing rendered file', r.returncode == 1)
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' nt5_settings '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' nt5_settings '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: refuses another format', r.returncode == 1)
 
     check_linux()
     check_tweaks()
+    check_display_keep()
+    check_options()
 
     # Architecture-mismatch warning on a user's (Schneegans) amd64-only file.
     for candidate in (ROOT / 'zig-out' / 'usb' / 'Systems' / 'Windows' / 'Windows 11' / 'Unattended').glob('*.xml') if (ROOT / 'zig-out' / 'usb').exists() else []:

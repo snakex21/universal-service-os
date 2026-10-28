@@ -93,3 +93,56 @@ usos_nt5_user_drivers_sif() {
         END { if (!done) exit 3 }
     '
 }
+
+usos_nt5_oem_pnp_preinstall() {
+    # stdin SIF -> stdout SIF. Text-mode Setup appends [Unattended]
+    # OemPnPDriversPath to HKLM\...\CurrentVersion DevicePath ONLY when
+    # OemPreinstall=Yes (XP / Server 2003 / 2000 alike); with No the key is
+    # parsed but never reaches the PnP search path. X470 2026-10-22, XP SP3:
+    # OemPnPDriversPath="USOS\Drivers\USOSNET" + OemPreinstall=No ->
+    # DevicePath stayed "%SystemRoot%\inf", setupapi.log 0xe0000228 for
+    # PCI\VEN_8086&DEV_1539 in GUI Setup, null driver; the same INF from
+    # Device Manager installed and started.
+    # So: an answer with OemPnPDriversPath gets OemPreinstall=Yes (no $OEM$
+    # tree needed: the packages already lie on C:). Preinstall would show the
+    # Regional / Welcome pages the plain unattended run skips, so missing
+    # OEMSkipRegional / OemSkipWelcome are added as 1 (existing values stay).
+    # An answer without OemPnPDriversPath, or already Yes, passes unchanged
+    # (byte for byte: cat, not awk, which may drop CRs on a host).
+    _op_tmp=${TMPDIR:-/tmp}/usos-oem-pnp.$$
+    cat > "$_op_tmp" || { rm -f "$_op_tmp"; return 1; }
+    # exit 0 = needs OemPreinstall=Yes
+    if awk '
+        { line = tolower($0); sub(/\r$/, "", line) }
+        line ~ /^\[/ { section = line }
+        section == "[unattended]" && line ~ /^oempnpdriverspath[ \t]*=/ { pnp = 1 }
+        section == "[unattended]" && line ~ /^oempreinstall[ \t]*=[ \t]*"?yes"?[ \t]*$/ { yes = 1 }
+        END { exit (pnp && !yes) ? 0 : 1 }' "$_op_tmp"; then
+        awk '
+            { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line)
+              if (low ~ /^\[/) section = low
+              if (section == "[guiunattended]" && low ~ /^oemskipregional[ \t]*=/) regional = 1
+              if (section == "[guiunattended]" && low ~ /^oemskipwelcome[ \t]*=/) welcome = 1
+              if (low == "[guiunattended]") gui = 1 }
+            END {
+              section = ""
+              for (i = 1; i <= n; i++) {
+                low = tolower(lines[i])
+                if (low ~ /^\[/) section = low
+                if (section == "[unattended]" && low ~ /^oempreinstall[ \t]*=/) continue
+                print lines[i] "\r"
+                if (low == "[unattended]") print "OemPreinstall=Yes\r"
+                if (low == "[guiunattended]") {
+                  if (!regional) print "OEMSkipRegional=1\r"
+                  if (!welcome) print "OemSkipWelcome=1\r"
+                }
+              }
+              if (!gui) print "[GuiUnattended]\r\nOEMSkipRegional=1\r\nOemSkipWelcome=1\r"
+            }' "$_op_tmp"
+    else
+        cat "$_op_tmp"
+    fi
+    _op_rc=$?
+    rm -f "$_op_tmp"
+    return "$_op_rc"
+}

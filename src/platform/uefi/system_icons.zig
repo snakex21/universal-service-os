@@ -84,6 +84,34 @@ pub fn get(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemE
     return null;
 }
 
+/// A built-in icon by id (media/UI/Icons/Systems/<id>.png): bios-ui.bin
+/// first, then the PNG on the ESP. Used for category tiles (macOS).
+pub fn builtin(root: *std.os.uefi.protocol.File, id: []const u8) ?*const usos.gui.RgbaImage {
+    for (&entries) |*entry| {
+        if (entry.state == .empty or !entry.matches(id)) continue;
+        return if (entry.state == .ready) &entry.image else null;
+    }
+    for (&entries) |*entry| {
+        if (entry.state != .empty) continue;
+        if (!entry.setId(id)) {
+            entry.state = .missing;
+            return null;
+        }
+        entry.state = .missing;
+        if (builtinPack(root)) |pack| {
+            if (pack.icon(id, &entry.image.pixels)) entry.state = .ready;
+        }
+        if (entry.state != .ready) {
+            var path_buffer: [260]u8 = undefined;
+            if (buildBuiltinPath(id, &path_buffer)) |builtin_path| {
+                if (decodePath(root, builtin_path, &entry.image)) entry.state = .ready;
+            }
+        }
+        return if (entry.state == .ready) &entry.image else null;
+    }
+    return null;
+}
+
 const PackState = enum { unread, ready, unavailable };
 var pack_state: PackState = .unread;
 var icon_pack: usos.gui.ui_pack.Pack = undefined;

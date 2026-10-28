@@ -165,8 +165,8 @@ Kontroller en nedlasting med `certutil -hashfile USOS-Installer-1.0.0.exe SHA256
    som selges som «32 GB», er som regel for liten). **Alt på den blir
    slettet.**
 2. Kjør `USOS-Installer-1.0.0.exe` på en Windows-PC (den ber om
-   administratorrettigheter), velg **Installasjon**, velg minnepennen, skriv
-   inn bekreftelsesteksten og klikk på **SLETT OG INSTALLER**.
+   administratorrettigheter), velg **Installasjon**, velg minnepennen,
+   kryss av i bekreftelsesboksen og klikk på **SLETT OG INSTALLER**.
 3. Kopier ISO-bildene dine til DATA-partisjonen, i mappen `Images` for det
    aktuelle systemet, f.eks. `Systems\Windows\Windows 11\Images\`.
 4. Valgfritt: for Vista eller original Windows 7 på UEFI kopierer du mappen

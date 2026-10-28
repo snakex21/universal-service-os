@@ -229,7 +229,9 @@ static int run(void){
  unsigned n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-32)return error("invalid executable path");while(n&&base[n-1]!='\\')n--;base[n]=0;
  if(!n||!source_config())return error("missing or invalid source identity");
  unsigned found=0,selected=0;uint64_t selected_offset=0,selected_length=0;
- for(unsigned i=0;i<64;i++){
+ /* Up to 256 disks: WinPE 5.0 (8.1 / Server 2012 R2) on QEMU's NVMe
+  * controller listed 255 empty namespace disks, the stick came after them. */
+ for(unsigned i=0;i<256;i++){
   wcopy(path,L"\\\\.\\PhysicalDrive");append_num(path,i);
   disk=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);if(disk==INVALID_HANDLE_VALUE)continue;
   STORAGE_PROPERTY_QUERY query;BYTE *z=(BYTE*)&query;for(unsigned j=0;j<sizeof(query);j++)z[j]=0;query.PropertyId=StorageDeviceProperty;query.QueryType=PropertyStandardQuery;

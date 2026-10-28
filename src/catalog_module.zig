@@ -13,6 +13,9 @@ pub const SystemEntry = @import("catalog/system_entry.zig").SystemEntry;
 pub const SystemFamily = @import("catalog/system_family.zig").SystemFamily;
 pub const SystemMediaStatus = @import("catalog/system_media_status.zig").SystemMediaStatus;
 pub const systems = @import("catalog/systems.zig");
+// In this module because it reads the catalog table (DATA category per folder): the
+// Legacy Core imports it as @import("catalog").windows_iso_config, never by path.
+pub const windows_iso_config = @import("platform/bios/windows_iso_config.zig");
 pub const os_profiles = @import("catalog/os_profiles.zig");
 pub const utility_boot_methods = @import("catalog/utility_boot_methods.zig");
 pub const MediaStatus = @import("catalog/media_status.zig").MediaStatus;
@@ -25,6 +28,7 @@ pub const iso9660 = @import("image_probe/iso9660.zig");
 pub const linux_iso = @import("flow/linux_iso/root.zig");
 pub const directory_source = @import("catalog/directory_source.zig");
 pub const media_discovery = @import("catalog/media_discovery.zig");
+pub const floppy_set = @import("catalog/floppy_set.zig");
 pub const utility_catalog = @import("catalog/utility_catalog.zig");
 pub const boot_method_model = @import("gui/boot_method_model.zig");
 pub const unattended_policy = @import("flow/unattended_policy.zig");

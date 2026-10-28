@@ -31,6 +31,8 @@ pub const Key = enum(u16) {
     category_beta_desc,
     category_dos_desc,
     category_linux_desc,
+    category_others,
+    category_others_desc,
     category_power,
     category_power_desc,
     category_utilities,
@@ -191,6 +193,7 @@ pub const Key = enum(u16) {
     method_auto_msdos,
     method_auto_slitaz,
     method_auto_vhdboot,
+    method_auto_w9x_uefi,
     method_auto_wimboot,
     method_auto_win2000,
     method_auto_windows_setup,
@@ -288,6 +291,7 @@ pub const Key = enum(u16) {
     system_copy_to,
     system_image_count,
     system_no_image,
+    system_other_os,
     system_ready,
     system_requires_bios,
     system_requires_bios_detail,
@@ -331,6 +335,8 @@ pub const Key = enum(u16) {
     verify_vm,
     wait,
     wait_usb,
+    win9x_key_subtitle,
+    win9x_key_title,
     action_blocked,
     action_chainload,
     action_efi,
@@ -344,14 +350,18 @@ pub const Key = enum(u16) {
     bios_mode_note_cpu,
     bios_mode_note_restart,
     bios_mode_note_video,
+    bios_mode_profile_detail,
     bios_mode_question,
     bios_mode_secure_boot_line1,
     bios_mode_secure_boot_line2,
     bios_mode_start,
     bios_mode_starting,
+    category_macos_addon,
+    category_macos_desc,
     chainload_line1,
     chainload_line2,
     chainload_title,
+    donor_x86_missing,
     efi_line1,
     efi_title,
     error_catalog_line1,
@@ -395,6 +405,8 @@ pub const Key = enum(u16) {
     help_win7_wimboot_line1,
     help_win7_wimboot_line2,
     help_win7_wimboot_title,
+    iso_checking_helper,
+    iso_checking_helper_percent,
     iso_drivers,
     iso_external_pe,
     iso_hybrid_pe,
@@ -405,6 +417,14 @@ pub const Key = enum(u16) {
     iso_stage_3,
     iso_title,
     iso_validating,
+    macos_addon_heading,
+    macos_addon_line1,
+    macos_addon_line2,
+    macos_addon_line3,
+    macos_addon_title,
+    media_floppy_set,
+    media_floppy_set_hint,
+    media_floppy_set_unsupported,
     notice_backend_line1,
     notice_backend_line2,
     power_firmware,
@@ -432,21 +452,45 @@ pub const Key = enum(u16) {
     profile_editor_subtitle,
     profile_editor_subtitle_linux,
     profile_editor_title,
+    profile_field_all_tray_icons,
+    profile_field_autologon,
+    profile_field_bing_search_off,
+    profile_field_boot_to_desktop,
     profile_field_bypass_ram,
     profile_field_bypass_secure_boot,
     profile_field_bypass_tpm,
+    profile_field_classic_context_menu,
     profile_field_classic_start,
+    profile_field_classic_taskbar,
     profile_field_computer,
+    profile_field_defender_off,
+    profile_field_desktop_icons,
+    profile_field_device_encryption_off,
     profile_field_disable_uac,
     profile_field_disable_wer,
     profile_field_display,
+    profile_field_display_bpp,
+    profile_field_dos_keyb,
+    profile_field_dos_regional,
+    profile_field_dos_winsock,
     profile_field_edition,
+    profile_field_end_task,
+    profile_field_firewall_off,
+    profile_field_first_run_off,
+    profile_field_font_smoothing,
+    profile_field_hibernation,
     profile_field_hide_outlook_express,
+    profile_field_ie_esc_off,
     profile_field_key,
     profile_field_keyboard,
     profile_field_language,
+    profile_field_last_access_off,
+    profile_field_launch_to_pc,
     profile_field_local_account,
     profile_field_locale,
+    profile_field_lock_screen_off,
+    profile_field_long_paths,
+    profile_field_mouse_accel_off,
     profile_field_name,
     profile_field_network_location,
     profile_field_no_autorun,
@@ -454,34 +498,85 @@ pub const Key = enum(u16) {
     profile_field_no_hibernation,
     profile_field_no_network,
     profile_field_no_sidebar,
+    profile_field_no_sleep,
+    profile_field_no_tips,
     profile_field_no_welcome_center,
+    profile_field_numlock,
+    profile_field_onedrive_off,
     profile_field_org,
     profile_field_password,
+    profile_field_password_never_expires,
+    profile_field_power_profile,
+    profile_field_privacy,
     profile_field_protect_pc,
     profile_field_remember_key,
+    profile_field_remote_desktop,
+    profile_field_remove_apps,
+    profile_field_search_index_off,
+    profile_field_security_center_off,
+    profile_field_server_nags_off,
+    profile_field_shortcut_suffix_off,
     profile_field_show_extensions,
     profile_field_show_hidden,
+    profile_field_show_protected,
     profile_field_skip_games,
     profile_field_skip_msn,
+    profile_field_smartscreen_off,
+    profile_field_sticky_keys_off,
+    profile_field_system_restore_off,
     profile_field_systems,
+    profile_field_task_view_off,
+    profile_field_taskbar_left,
+    profile_field_taskbar_search,
     profile_field_theme,
     profile_field_timezone,
+    profile_field_uac_level,
     profile_field_user,
     profile_field_user2,
+    profile_field_user_script,
+    profile_field_visual_effects,
+    profile_field_widgets_off,
+    profile_field_win9x_setup,
+    profile_field_windows_update,
+    profile_field_workgroup,
     profile_file_detail,
+    profile_help_all_tray_icons,
+    profile_help_autologon,
+    profile_help_bing_search_off,
+    profile_help_boot_to_desktop,
     profile_help_bypass,
+    profile_help_classic_context_menu,
     profile_help_classic_start,
+    profile_help_classic_taskbar,
     profile_help_computer,
+    profile_help_defender_off,
+    profile_help_desktop_icons,
+    profile_help_device_encryption_off,
     profile_help_disable_uac,
     profile_help_disable_wer,
     profile_help_display,
+    profile_help_display_legacy,
+    profile_help_dos_keyb,
+    profile_help_dos_regional,
+    profile_help_dos_winsock,
     profile_help_edition,
+    profile_help_end_task,
+    profile_help_firewall_off,
+    profile_help_first_run_off,
+    profile_help_font_smoothing,
+    profile_help_hibernation,
     profile_help_hide_outlook_express,
+    profile_help_ie_esc_off,
     profile_help_key,
     profile_help_keyboard,
     profile_help_language,
+    profile_help_last_access_off,
+    profile_help_launch_to_pc,
     profile_help_local_account,
     profile_help_locale,
+    profile_help_lock_screen_off,
+    profile_help_long_paths,
+    profile_help_mouse_accel_off,
     profile_help_name,
     profile_help_network_location,
     profile_help_no_autorun,
@@ -489,20 +584,48 @@ pub const Key = enum(u16) {
     profile_help_no_hibernation,
     profile_help_no_network,
     profile_help_no_sidebar,
+    profile_help_no_sleep,
+    profile_help_no_tips,
     profile_help_no_welcome_center,
+    profile_help_numlock,
+    profile_help_onedrive_off,
     profile_help_org,
     profile_help_password,
+    profile_help_password_never_expires,
+    profile_help_power_profile,
+    profile_help_privacy,
     profile_help_protect_pc,
     profile_help_remember_key,
+    profile_help_remote_desktop,
+    profile_help_remove_apps,
+    profile_help_search_index_off,
+    profile_help_security_center_off,
+    profile_help_server_nags_off,
+    profile_help_shortcut_suffix_off,
     profile_help_show_extensions,
     profile_help_show_hidden,
+    profile_help_show_protected,
     profile_help_skip_games,
     profile_help_skip_msn,
+    profile_help_smartscreen_off,
+    profile_help_sticky_keys_off,
+    profile_help_system_restore_off,
     profile_help_systems,
+    profile_help_task_view_off,
+    profile_help_taskbar_left,
+    profile_help_taskbar_search,
     profile_help_theme,
     profile_help_timezone,
+    profile_help_uac_level,
     profile_help_user,
     profile_help_user2,
+    profile_help_user_script,
+    profile_help_visual_effects,
+    profile_help_widgets_off,
+    profile_help_win9x_setup,
+    profile_help_windows_update,
+    profile_help_workgroup,
+    profile_hidden_other_systems,
     profile_key_delete,
     profile_key_edit,
     profile_key_import,
@@ -522,16 +645,36 @@ pub const Key = enum(u16) {
     profile_row_help,
     profile_save,
     profile_save_failed,
+    profile_section_accounts,
+    profile_section_apps,
+    profile_section_explorer,
     profile_section_extras,
+    profile_section_system,
+    profile_section_taskbar,
+    profile_section_updates,
     profile_summary,
     profile_value_auto,
+    profile_value_display_keep,
+    profile_value_display_native,
+    profile_value_dos_regional_auto,
+    profile_value_dos_regional_manual,
     profile_value_edition_manual,
+    profile_value_edition_server_default,
+    profile_value_hibernation_no_fast_startup,
+    profile_value_hibernation_off,
     profile_value_network_home,
     profile_value_network_public,
     profile_value_network_work,
+    profile_value_numlock_off,
+    profile_value_numlock_on,
+    profile_value_power_profile_balanced,
+    profile_value_power_profile_high_performance,
+    profile_value_power_profile_power_saver,
     profile_value_protect_off,
     profile_value_protect_recommended,
     profile_value_protect_updates,
+    profile_value_remove_apps_bloat,
+    profile_value_remove_apps_games,
     profile_value_same_language,
     profile_value_same_locale,
     profile_value_setup_asks,
@@ -539,9 +682,19 @@ pub const Key = enum(u16) {
     profile_value_systems_linux,
     profile_value_systems_only,
     profile_value_systems_windows,
+    profile_value_taskbar_search_box,
+    profile_value_taskbar_search_hidden,
+    profile_value_taskbar_search_icon,
     profile_value_theme_basic,
     profile_value_theme_classic,
     profile_value_theme_default,
+    profile_value_uac_level_never,
+    profile_value_uac_level_no_dim,
+    profile_value_unchanged,
+    profile_value_visual_effects_performance,
+    profile_value_windows_update_no_restart,
+    profile_value_windows_update_notify,
+    profile_value_windows_update_off,
     profile_xp_ini_detail,
     server_belongs_in,
     server_blocked_ia64,
@@ -569,6 +722,7 @@ pub const Key = enum(u16) {
     summary_esp_guard,
     summary_esp_guard_label,
     summary_image,
+    summary_image_disk,
     summary_inf_count,
     summary_iso_case,
     summary_iso_inspection,
@@ -576,6 +730,9 @@ pub const Key = enum(u16) {
     summary_native_case,
     summary_no_answer_files,
     summary_no_drivers,
+    summary_nt3_limits,
+    summary_nt4_csmwrap,
+    summary_nt4_limits,
     summary_nt52_limits,
     summary_preparation,
     summary_secure_boot_badge,
@@ -601,11 +758,17 @@ pub const Key = enum(u16) {
     summary_vista_support,
     summary_vista_usb,
     summary_w2k_limits,
+    summary_w2k_server_limits,
+    summary_w9x_csmwrap,
+    summary_w9x_disk,
+    summary_win_early_limits,
     summary_xp_csmwrap,
     summary_xp_disk,
+    summary_xp_mce_limits,
     summary_xp_preparation,
     summary_xp_sif_merged,
     summary_xp_source,
+    summary_xp_tablet_limits,
     theme_edit_blocked,
     theme_edit_cancel,
     theme_edit_contrast_bad,
@@ -672,6 +835,7 @@ pub const Key = enum(u16) {
     xp_prep_copy_verify,
     xp_prep_environment,
     xp_prep_loading,
+    xp_prep_package_missing,
     xp_prep_starting,
 };
 
@@ -706,6 +870,8 @@ pub const hashes = [_]u32{
     0x50adb2ee, // category.beta.desc
     0xc4dcd124, // category.dos.desc
     0xf91b310c, // category.linux.desc
+    0xfffaabfa, // category.others
+    0x387e901d, // category.others.desc
     0x47a1786e, // category.power
     0x3595e4b1, // category.power.desc
     0x0443aa4f, // category.utilities
@@ -866,6 +1032,7 @@ pub const hashes = [_]u32{
     0xdf251230, // method.auto_msdos
     0xdc54235f, // method.auto_slitaz
     0xd0d5afbc, // method.auto_vhdboot
+    0x66f6edd4, // method.auto_w9x_uefi
     0xaaec70e9, // method.auto_wimboot
     0x1fcc2a9a, // method.auto_win2000
     0xabbaa3a1, // method.auto_windows_setup
@@ -963,6 +1130,7 @@ pub const hashes = [_]u32{
     0x6fd0eb35, // system.copy_to
     0x4961b793, // system.image_count
     0x2a578ca3, // system.no_image
+    0xf0809b5b, // system.other_os
     0xd3048155, // system.ready
     0xab6c36c8, // system.requires_bios
     0x47e54d83, // system.requires_bios.detail
@@ -1006,6 +1174,8 @@ pub const hashes = [_]u32{
     0xd32c94ef, // verify.vm
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
+    0x8382ff82, // win9x_key.subtitle
+    0xc186cf80, // win9x_key.title
     0xb9a53ded, // action.blocked
     0x67542164, // action.chainload
     0x4743492f, // action.efi
@@ -1019,14 +1189,18 @@ pub const hashes = [_]u32{
     0xc6026856, // bios_mode.note.cpu
     0x33394f47, // bios_mode.note.restart
     0x643e4f67, // bios_mode.note.video
+    0x9761d865, // bios_mode.profile_detail
     0xfd68991e, // bios_mode.question
     0xc1a2d4cf, // bios_mode.secure_boot.line1
     0xc2a2d662, // bios_mode.secure_boot.line2
     0x2fc0f46e, // bios_mode.start
     0xa26e99a2, // bios_mode.starting
+    0x2e3ef382, // category.macos.addon
+    0x09fbd55d, // category.macos.desc
     0xfc4d4ef9, // chainload.line1
     0xf94d4a40, // chainload.line2
     0xb38e898e, // chainload.title
+    0xf1c6b01c, // donor.x86_missing
     0x23541dfa, // efi.line1
     0xf4cad9b1, // efi.title
     0x35820aab, // error.catalog.line1
@@ -1070,6 +1244,8 @@ pub const hashes = [_]u32{
     0x4bf3a4b0, // help.win7_wimboot.line1
     0x4ef3a969, // help.win7_wimboot.line2
     0xc579f0eb, // help.win7_wimboot.title
+    0xcf4359c5, // iso.checking_helper
+    0xb8569c67, // iso.checking_helper_percent
     0x646697d7, // iso.drivers
     0x2482ded7, // iso.external_pe
     0x244161e4, // iso.hybrid_pe
@@ -1080,6 +1256,14 @@ pub const hashes = [_]u32{
     0xd564eb19, // iso.stage.3
     0x1fdc1e96, // iso.title
     0xd22ab261, // iso.validating
+    0xc387b6f2, // macos.addon.heading
+    0x55ec5d5d, // macos.addon.line1
+    0x52ec58a4, // macos.addon.line2
+    0x53ec5a37, // macos.addon.line3
+    0x477ce35a, // macos.addon.title
+    0x65b5132e, // media.floppy_set
+    0x1a966db2, // media.floppy_set_hint
+    0xfc63ebaa, // media.floppy_set_unsupported
     0x48a2a970, // notice.backend.line1
     0x4ba2ae29, // notice.backend.line2
     0x69b9a301, // power.firmware
@@ -1107,21 +1291,45 @@ pub const hashes = [_]u32{
     0x6f2b3c09, // profile.editor.subtitle
     0x39676f88, // profile.editor.subtitle_linux
     0xde080639, // profile.editor.title
+    0x4a8eeaaf, // profile.field.all_tray_icons
+    0xd73398b0, // profile.field.autologon
+    0xf8ca5d3b, // profile.field.bing_search_off
+    0xe6ac3ddd, // profile.field.boot_to_desktop
     0x49862935, // profile.field.bypass_ram
     0x1513f82f, // profile.field.bypass_secure_boot
     0x50329252, // profile.field.bypass_tpm
+    0x31230c8c, // profile.field.classic_context_menu
     0xa13d2795, // profile.field.classic_start
+    0xcd40676f, // profile.field.classic_taskbar
     0xa6b11e2b, // profile.field.computer
+    0xcc2df34b, // profile.field.defender_off
+    0x0ffea3e3, // profile.field.desktop_icons
+    0x5dad803e, // profile.field.device_encryption_off
     0x67b0880e, // profile.field.disable_uac
     0x8015202b, // profile.field.disable_wer
     0xe8e3e9d4, // profile.field.display
+    0x724f2711, // profile.field.display_bpp
+    0xc49c37ba, // profile.field.dos_keyb
+    0xf5438598, // profile.field.dos_regional
+    0x78e1a8a1, // profile.field.dos_winsock
     0x9c409bd4, // profile.field.edition
+    0x90ff1671, // profile.field.end_task
+    0xc81dad84, // profile.field.firewall_off
+    0x3ece2ea0, // profile.field.first_run_off
+    0x5d67c52a, // profile.field.font_smoothing
+    0x80abb369, // profile.field.hibernation
     0xf69d863d, // profile.field.hide_outlook_express
+    0xa465aa40, // profile.field.ie_esc_off
     0x1d1b0b5d, // profile.field.key
     0x40eff7a3, // profile.field.keyboard
     0x7890b224, // profile.field.language
+    0xf022e8a3, // profile.field.last_access_off
+    0xd799a139, // profile.field.launch_to_pc
     0x06522829, // profile.field.local_account
     0x383d1338, // profile.field.locale
+    0xced43908, // profile.field.lock_screen_off
+    0xfc4a77f7, // profile.field.long_paths
+    0x89b5290c, // profile.field.mouse_accel_off
     0x8dd802a5, // profile.field.name
     0x805be4da, // profile.field.network_location
     0x2852f76e, // profile.field.no_autorun
@@ -1129,34 +1337,85 @@ pub const hashes = [_]u32{
     0xa22f6351, // profile.field.no_hibernation
     0xe80859fc, // profile.field.no_network
     0x1cafbf72, // profile.field.no_sidebar
+    0x1ee91b21, // profile.field.no_sleep
+    0xaccf34a4, // profile.field.no_tips
     0xc6afb682, // profile.field.no_welcome_center
+    0x73371209, // profile.field.numlock
+    0x2f36a574, // profile.field.onedrive_off
     0x7cebcb94, // profile.field.org
     0x367e27db, // profile.field.password
+    0xc81462fd, // profile.field.password_never_expires
+    0xee7b677d, // profile.field.power_profile
+    0x48b024de, // profile.field.privacy
     0xf251a013, // profile.field.protect_pc
     0xf04168d9, // profile.field.remember_key
+    0x70552717, // profile.field.remote_desktop
+    0x53cd8a03, // profile.field.remove_apps
+    0x01223247, // profile.field.search_index_off
+    0x7bb60226, // profile.field.security_center_off
+    0xe105f31f, // profile.field.server_nags_off
+    0x9363f8d6, // profile.field.shortcut_suffix_off
     0x228b6a96, // profile.field.show_extensions
     0x57fc2cd0, // profile.field.show_hidden
+    0x98a107f2, // profile.field.show_protected
     0xea43708d, // profile.field.skip_games
     0xf47b87f8, // profile.field.skip_msn
+    0x2ee91f95, // profile.field.smartscreen_off
+    0xde3bb504, // profile.field.sticky_keys_off
+    0xbc33fc7c, // profile.field.system_restore_off
     0x66eb02dc, // profile.field.systems
+    0xf7ee62db, // profile.field.task_view_off
+    0xfd6664fc, // profile.field.taskbar_left
+    0x260b778d, // profile.field.taskbar_search
     0xacd6085f, // profile.field.theme
     0xc97f214d, // profile.field.timezone
+    0xa8ce7478, // profile.field.uac_level
     0xa0db31f9, // profile.field.user
     0x040f6291, // profile.field.user2
+    0x813657d9, // profile.field.user_script
+    0xf0f12e9b, // profile.field.visual_effects
+    0xc8544321, // profile.field.widgets_off
+    0x4d2afeef, // profile.field.win9x_setup
+    0x9ca4635d, // profile.field.windows_update
+    0xc6e00a62, // profile.field.workgroup
     0x39ab14e9, // profile.file.detail
+    0x3dc6f88a, // profile.help.all_tray_icons
+    0xd04313ef, // profile.help.autologon
+    0x29c9462c, // profile.help.bing_search_off
+    0x153946e6, // profile.help.boot_to_desktop
     0x0922c403, // profile.help.bypass
+    0xa4b78999, // profile.help.classic_context_menu
     0x2218a4ea, // profile.help.classic_start
+    0x4249b520, // profile.help.classic_taskbar
     0x46264466, // profile.help.computer
+    0x50365282, // profile.help.defender_off
+    0x8ebbbf90, // profile.help.desktop_icons
+    0xd6703e91, // profile.help.device_encryption_off
     0x8b080fad, // profile.help.disable_uac
     0xa0ced3e4, // profile.help.disable_wer
     0xdfc03dcf, // profile.help.display
+    0x2158e6ff, // profile.help.display_legacy
+    0x1a0b63c3, // profile.help.dos_keyb
+    0x3f668a55, // profile.help.dos_regional
+    0xf90fae82, // profile.help.dos_winsock
     0xbe0d347f, // profile.help.edition
+    0xbd1a9960, // profile.help.end_task
+    0x179d8dad, // profile.help.firewall_off
+    0x7ef2f1e7, // profile.help.first_run_off
+    0x7184bf9f, // profile.help.font_smoothing
+    0x1ffa8922, // profile.help.hibernation
     0x08ba0e0c, // profile.help.hide_outlook_express
+    0xb197380d, // profile.help.ie_esc_off
     0xcca2e39e, // profile.help.key
     0x10f18736, // profile.help.keyboard
     0x8e773749, // profile.help.language
+    0x90ba1edc, // profile.help.last_access_off
+    0xd336c9e0, // profile.help.launch_to_pc
     0x7425bece, // profile.help.local_account
     0x69474139, // profile.help.locale
+    0x9a58d7af, // profile.help.lock_screen_off
+    0x70fb1c0e, // profile.help.long_paths
+    0x811705ef, // profile.help.mouse_accel_off
     0x33f53224, // profile.help.name
     0x6dc95247, // profile.help.network_location
     0x7e4da903, // profile.help.no_autorun
@@ -1164,20 +1423,48 @@ pub const hashes = [_]u32{
     0x65b474ac, // profile.help.no_hibernation
     0x7cf8eb69, // profile.help.no_network
     0xdda310d3, // profile.help.no_sidebar
+    0xe4b139ec, // profile.help.no_sleep
+    0x5f0f6607, // profile.help.no_tips
     0x69a6ce19, // profile.help.no_welcome_center
+    0xcace29b2, // profile.help.numlock
+    0x43b1007d, // profile.help.onedrive_off
     0x324f097b, // profile.help.org
     0xfc88614e, // profile.help.password
+    0xc7adad6c, // profile.help.password_never_expires
+    0x00dbbdce, // profile.help.power_profile
+    0xe1caa001, // profile.help.privacy
     0x4d51ba86, // profile.help.protect_pc
     0xa2076c1c, // profile.help.remember_key
+    0x704b2036, // profile.help.remote_desktop
+    0x43a775e4, // profile.help.remove_apps
+    0x5dced986, // profile.help.search_index_off
+    0x2e1f9505, // profile.help.security_center_off
+    0x14515e88, // profile.help.server_nags_off
+    0x24dac951, // profile.help.shortcut_suffix_off
     0xa9724261, // profile.help.show_extensions
     0x2872a44f, // profile.help.show_hidden
+    0x938b1dcf, // profile.help.show_protected
     0xe0f94590, // profile.help.skip_games
     0xfb1b5659, // profile.help.skip_msn
+    0xbff72c6e, // profile.help.smartscreen_off
+    0x32d6c0d3, // profile.help.sticky_keys_off
+    0xfdb1b2a1, // profile.help.system_restore_off
     0xd953794f, // profile.help.systems
+    0x2d7feb38, // profile.help.task_view_off
+    0x45b638e9, // profile.help.taskbar_left
+    0x4dee8c84, // profile.help.taskbar_search
     0x65191388, // profile.help.theme
     0xf3284598, // profile.help.timezone
+    0xdbb03237, // profile.help.uac_level
     0xb1ef9f14, // profile.help.user
     0x423788d2, // profile.help.user2
+    0xd135a07e, // profile.help.user_script
+    0xed125ac2, // profile.help.visual_effects
+    0xe2dec316, // profile.help.widgets_off
+    0x79ef77a4, // profile.help.win9x_setup
+    0xa6ae3d48, // profile.help.windows_update
+    0xe79573c5, // profile.help.workgroup
+    0xe8f04310, // profile.hidden_other_systems
     0x5f1c9d40, // profile.key.delete
     0x4c0a173f, // profile.key.edit
     0x4ce11c3a, // profile.key.import
@@ -1197,16 +1484,36 @@ pub const hashes = [_]u32{
     0x134a2641, // profile.row.help
     0x4c6f4f3d, // profile.save
     0x9f87b247, // profile.save_failed
+    0xe88e7367, // profile.section.accounts
+    0xc6750597, // profile.section.apps
+    0x45c4b98c, // profile.section.explorer
     0xd52428ac, // profile.section.extras
+    0x96551582, // profile.section.system
+    0x9c49cdcb, // profile.section.taskbar
+    0x5843572b, // profile.section.updates
     0xea748758, // profile.summary
     0x803f740e, // profile.value.auto
+    0x832851bb, // profile.value.display_keep
+    0x039b88e1, // profile.value.display_native
+    0x40b0f6a7, // profile.value.dos_regional_auto
+    0xd0001bfe, // profile.value.dos_regional_manual
     0x74eb2ac4, // profile.value.edition_manual
+    0xf324f363, // profile.value.edition_server_default
+    0x2429db7f, // profile.value.hibernation_no_fast_startup
+    0xbb954da2, // profile.value.hibernation_off
     0x94a66e59, // profile.value.network_home
     0x0742279f, // profile.value.network_public
     0xce89b51b, // profile.value.network_work
+    0x5f811626, // profile.value.numlock_off
+    0x723274cc, // profile.value.numlock_on
+    0x26de64f1, // profile.value.power_profile_balanced
+    0x0d186414, // profile.value.power_profile_high_performance
+    0xc76cfcd8, // profile.value.power_profile_power_saver
     0x7de03296, // profile.value.protect_off
     0x6c457fe8, // profile.value.protect_recommended
     0x9310ce39, // profile.value.protect_updates
+    0x43b465e7, // profile.value.remove_apps_bloat
+    0x1d4595fa, // profile.value.remove_apps_games
     0x5f697fae, // profile.value.same_language
     0x9a227b9e, // profile.value.same_locale
     0x791012ad, // profile.value.setup_asks
@@ -1214,9 +1521,19 @@ pub const hashes = [_]u32{
     0xd11c4254, // profile.value.systems_linux
     0x95a3a608, // profile.value.systems_only
     0xfc2781a3, // profile.value.systems_windows
+    0xbb634288, // profile.value.taskbar_search_box
+    0xc4651757, // profile.value.taskbar_search_hidden
+    0x4a133df6, // profile.value.taskbar_search_icon
     0x84c34547, // profile.value.theme_basic
     0xcb765071, // profile.value.theme_classic
     0x87382378, // profile.value.theme_default
+    0x88cf19a0, // profile.value.uac_level_never
+    0xe0354d18, // profile.value.uac_level_no_dim
+    0x9c0a3a46, // profile.value.unchanged
+    0x187248c1, // profile.value.visual_effects_performance
+    0x98559c24, // profile.value.windows_update_no_restart
+    0xe3ca47d6, // profile.value.windows_update_notify
+    0xc92a07f8, // profile.value.windows_update_off
     0x8b09c640, // profile.xp_ini.detail
     0x50256306, // server.belongs_in
     0xb1aaa349, // server.blocked_ia64
@@ -1244,6 +1561,7 @@ pub const hashes = [_]u32{
     0xf810572f, // summary.esp_guard
     0x4e8be16e, // summary.esp_guard_label
     0xc7a77b9c, // summary.image
+    0xea3000f0, // summary.image_disk
     0xfbb93592, // summary.inf_count
     0xa67ee0dd, // summary.iso_case
     0x23a9357f, // summary.iso_inspection
@@ -1251,6 +1569,9 @@ pub const hashes = [_]u32{
     0x25344415, // summary.native_case
     0x34dc4dbb, // summary.no_answer_files
     0xe8143028, // summary.no_drivers
+    0x5c465adb, // summary.nt3_limits
+    0x298a1e85, // summary.nt4_csmwrap
+    0xd78afc14, // summary.nt4_limits
     0xeefafc17, // summary.nt52_limits
     0x92637c78, // summary.preparation
     0xb2783d3b, // summary.secure_boot_badge
@@ -1276,11 +1597,17 @@ pub const hashes = [_]u32{
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xf657c7a8, // summary.w2k_limits
+    0xde1ce3fc, // summary.w2k_server_limits
+    0xb1cdcd1f, // summary.w9x_csmwrap
+    0xdb6f9367, // summary.w9x_disk
+    0x7dcf30c0, // summary.win_early_limits
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
+    0xf5c65f1c, // summary.xp_mce_limits
     0xedd282b9, // summary.xp_preparation
     0xa87889c3, // summary.xp_sif_merged
     0x6dfb98bd, // summary.xp_source
+    0x011e67b5, // summary.xp_tablet_limits
     0x1a62b0c1, // theme_edit.blocked
     0xbe71b5e9, // theme_edit.cancel
     0xf3bd28a8, // theme_edit.contrast.bad
@@ -1347,6 +1674,7 @@ pub const hashes = [_]u32{
     0x8a502c84, // xp_prep.copy_verify
     0xe5b1ef16, // xp_prep.environment
     0x6e3859d3, // xp_prep.loading
+    0x2faf0730, // xp_prep.package_missing
     0xb07b1d15, // xp_prep.starting
 };
 
@@ -1681,6 +2009,170 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -2026,7 +2518,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 329;
+pub const bios_count = 335;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2058,6 +2550,8 @@ pub const english = [_][]const u8{
     "Whistler, Longhorn and other builds",
     "DOS systems and legacy boot images",
     "Linux installers and live systems",
+    "Other systems",
+    "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS and your own images",
     "Power",
     "Restart, shut down or enter firmware setup",
     "Utilities",
@@ -2093,13 +2587,13 @@ pub const english = [_][]const u8{
     "Patcher9x / RAM fix",
     "The system and partitions stay. Changed files are backed up first.",
     "Repairs the installation in C:\\WINDOWS, also after the first restart.",
-    "Windows 98 RAM repair",
+    "Windows 95/98/Me RAM repair",
     "The remaining space stays unallocated.",
     "Existing partitions on this disk will be deleted.",
     "Size of the new partition",
-    "New Windows 98 SE installation",
-    "Repair RAM support in an installed Windows 98",
-    "Install Windows 98 or repair its support for more RAM",
+    "New Windows 95/98/Me installation",
+    "Repair RAM support in an installed Windows 95/98/Me",
+    "Install Windows 95/98/Me or repair its support for more RAM",
     "Blocked",
     "Switch it on to try again.",
     "built-in",
@@ -2218,6 +2712,7 @@ pub const english = [_][]const u8{
     "Automatic (MS-DOS / Windows 3.x)",
     "Automatic (SliTaz Live)",
     "Automatic (VHDBoot)",
+    "Automatic (UEFI preparation / DOS Setup via CSMWrap)",
     "Automatic (WIMBoot)",
     "Automatic (Windows 2000 Setup)",
     "Automatic (Windows Setup)",
@@ -2315,6 +2810,7 @@ pub const english = [_][]const u8{
     "Copy images to {0}",
     "Images: {0}",
     "No image",
+    "Other system (own image)",
     "Ready",
     "Requires BIOS",
     "This system starts only in BIOS mode; USOS is running in UEFI mode.",
@@ -2358,6 +2854,8 @@ pub const english = [_][]const u8{
     "Tested in a virtual machine",
     "Please wait",
     "Please wait - keep the USB drive connected",
+    "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
+    "Enter the {0} product key",
     "Start is not possible with these settings",
     "Prepare and chainload",
     "Start the EFI application",
@@ -2369,16 +2867,20 @@ pub const english = [_][]const u8{
     "Start WinPE",
     "Prepare the Windows XP installation",
     "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
-    "Opens the USOS BIOS menu (FreeDOS, MS-DOS, Windows 3.x). A restart returns to UEFI.",
+    "Opens the USOS BIOS menu (DOS, Windows 3.x, 95/98/Me). A restart returns to UEFI.",
     "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
+    "Also gives this answer profile to Windows 95/98/Me Setup",
     "Switch this PC to BIOS mode until the next restart?",
     "CSMWrap is not signed, so Secure Boot blocks it.",
     "Turn Secure Boot off in the firmware settings to use the BIOS mode.",
     "Start BIOS mode",
     "Starting the BIOS mode (CSMWrap)...",
+    "Requires the macOS add-on",
+    "macOS on a PC via OpenCore (optional add-on)",
     "Boot media preparation is complete.",
     "Starting EFI/BOOT from the prepared WORK partition...",
     "Starting chained bootloader",
+    "WinPE x86 helper image missing (needed for 32-bit Windows 7/Vista). Add it in the USOS installer (Components) or add a Windows 10 x86 ISO.",
     "Transferring control through UEFI LoadImage/StartImage...",
     "Starting EFI application",
     "USOS could not open the NTFS USOS_DATA volume.",
@@ -2422,6 +2924,8 @@ pub const english = [_][]const u8{
     "Detects the installer version and starts it directly from ISO in UEFI.",
     "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
     "Windows ISO - WIMBoot UEFI",
+    "Checking the WinPE helper image",
+    "Checking the WinPE helper image: {0}%",
     "Reading optional Windows 7 x64 driver packages",
     "Starting external PE10; the install source remains the selected Windows ISO",
     "Starting the hybrid ISO's own WinPE and Setup",
@@ -2432,6 +2936,14 @@ pub const english = [_][]const u8{
     "Starting Windows Setup",
     "Starting Windows from ISO",
     "Validating the installation ISO and resolving the boot source",
+    "The macOS add-on is not installed",
+    "macOS support is an optional add-on, separate from the main USOS release.",
+    "It starts macOS from your own OpenCore files on the DATA partition (Systems\\macOS).",
+    "Once the add-on is installed, this tile lists its macOS entries.",
+    "macOS add-on",
+    "Floppy disk set: {0} disks",
+    "Floppy disk sets work for Windows 1.0x-3.x and Windows for Workgroups. Use an ISO for this system.",
+    "Floppy disk set - not supported for this system",
     "No implemented boot backend supports this selection.",
     "This system stays visible because its backend is planned.",
     "Firmware setup (BIOS/UEFI)",
@@ -2459,21 +2971,45 @@ pub const english = [_][]const u8{
     "One profile for every Windows: USOS writes the answer file when the installation starts",
     "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
     "Answer profile",
+    "Show all notification icons",
+    "Sign in automatically",
+    "No web results in search",
+    "Start on the desktop",
     "Windows 11: skip the RAM check",
     "Windows 11: skip the Secure Boot check",
     "Windows 11: skip the TPM check",
+    "Classic right-click menu",
     "Classic Start menu",
+    "Classic taskbar buttons",
     "Computer name",
+    "Turn off Windows Defender",
+    "Desktop icons",
+    "No automatic device encryption",
     "Turn off UAC",
     "Turn off error reporting",
     "Screen resolution",
+    "Color depth",
+    "DOS: keyboard layout (KEYB)",
+    "DOS settings",
+    "Winsock (experimental)",
     "Edition",
+    "End task in the taskbar menu",
+    "Turn off the firewall",
+    "Skip browser and player first run",
+    "Smooth screen fonts",
+    "Hibernation and Fast startup",
     "Hide Outlook Express",
+    "Turn off IE Enhanced Security",
     "Product key ({0})",
     "Keyboard",
     "Windows language",
+    "No last-access time stamps",
+    "Open Explorer to This PC",
     "Local account",
     "Formats",
+    "Turn off the lock screen",
+    "Long file paths",
+    "Turn off mouse acceleration",
     "Profile name",
     "Vista/7: network location",
     "Turn off AutoRun",
@@ -2481,34 +3017,85 @@ pub const english = [_][]const u8{
     "Turn off hibernation",
     "Windows 11: set up without network",
     "Turn off Sidebar and gadgets",
+    "Never sleep on mains power",
+    "Turn off the welcome window",
     "No Welcome Center",
+    "NumLock at startup",
+    "Turn off OneDrive",
     "Organization",
     "Password",
+    "Passwords never expire",
+    "Power plan",
+    "Privacy settings",
     "Protection and updates",
     "Remember the key on this stick",
+    "Allow Remote Desktop",
+    "Remove preinstalled apps",
+    "Turn off search indexing",
+    "No security alerts",
+    "Quiet server sign-in",
+    "No \"Shortcut\" in shortcut names",
     "Show file extensions",
     "Show hidden files",
+    "Show protected system files",
     "No games",
     "No MSN Explorer and Messenger",
+    "Turn off SmartScreen",
+    "No Sticky Keys shortcut",
+    "Turn off System Restore",
     "Use for",
+    "Hide the Task view button",
+    "Taskbar aligned left",
+    "Search on the taskbar",
     "Theme",
     "Time zone",
+    "User Account Control",
     "User name",
     "Second user",
+    "Run my script at first sign-in",
+    "Visual effects",
+    "Turn off widgets",
+    "Windows 9x Setup",
+    "Automatic updates",
+    "Workgroup",
     "Answer file from the Unattended folder, used as it is",
+    "Every icon in the notification area stays visible; inactive icons are not hidden (for every new user).",
+    "The first user signs in automatically at every start. The password is stored on the stick and in the installed system.",
+    "Searching from Start or the taskbar shows only local results, no Bing suggestions (for every new user).",
+    "Windows 8.1 opens the desktop instead of the Start screen; the top-left hot corner and the charms hint are off (for every new user).",
     "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
+    "Explorer shows the full right-click menu at once instead of the short Windows 11 menu (set for every user at their first sign-in).",
     "XP: the Windows 2000 style Start menu for new users.",
+    "Taskbar buttons are never combined and show their labels; small buttons where the system has them (for every new user).",
     "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
+    "Windows Defender does not run (Vista, 7, 8 and 8.1; policy for the whole computer). Install other protection.",
+    "Computer, the user's files, Network and Control Panel are shown on the desktop next to the Recycle Bin (for every new user).",
+    "Windows does not encrypt the system disk with BitLocker on its own, so other systems and USOS can still read it.",
     "Vista and 7: User Account Control off. Less safe: every program of an administrator runs with full rights.",
     "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
-    "XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Automatic: unchanged; without a display driver (the VGA driver, e.g. through CSMWrap) Windows keeps its basic mode.",
+    "Vista, 7, Server 2008, 2008 R2 and 32-bit 8, 8.1 and 10 without CSM (CSMWrap): Automatic picks the monitor's native mode (EDID), otherwise the highest mode, at the first sign-in on the real hardware. A fixed value also goes to Windows Setup (all 6.x+ versions; a mode the driver lacks is ignored). XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Windows default: USOS does not change the resolution after installation.",
+    "Applied after installation on the real hardware. Automatic chooses the monitor's native mode (EDID), otherwise the highest mode (Windows 9x: at most 1920x1080); unavailable modes fall back safely. Automatic (monitor native) works the same way. Color depth: automatic prefers 32-bit where available, otherwise 16-bit. Windows default: USOS does not change the resolution after installation.",
+    "Loads KEYB with the profile's layout. PS/2 keyboard only: a USB keyboard on a PC without CSM keeps the US layout in DOS.",
+    "MS-DOS and Windows 1.x-3.x: country, code page and keyboard from the formats and keyboard above. Manual: nothing is set, Windows 3.1 Setup asks.",
+    "Windows 3.1, 3.11 and WfW 3.11: installs the USOS WINSOCK.DLL, the network driver with the Windows queue and the \"USOS Winsock test\" group (GETHTTP). Off: installation as before.",
     "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
+    "Right-clicking a taskbar button offers End task (for every new user).",
+    "Windows Firewall is off for every network type. Only for computers behind another firewall or for tests.",
+    "Internet Explorer, Microsoft Edge and Windows Media Player start without their first-run wizards; Edge does not preload at startup.",
+    "The edges of screen fonts are smoothed; Windows XP and Server 2003 use ClearType (for every new user).",
+    "Turn off Fast startup (a full shutdown every time), or hibernation altogether, which also ends Fast startup.",
     "XP and Server 2003: the Outlook Express shortcuts are removed; the program itself stays.",
-    "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
+    "Server: Internet Explorer Enhanced Security Configuration is off for administrators and users. Less protection when browsing.",
+    "Product key for {0} ({1}). Empty: Setup asks for it or offers the edition list.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
+    "NTFS does not record the last-access time of a file on every read (fewer disk writes).",
+    "File Explorer opens on This PC instead of Home or Quick access (for every new user).",
     "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
     "Date, time, number and currency formats.",
+    "Windows goes straight to the sign-in screen without the lock screen picture (policy for the whole computer; Home editions may ignore it).",
+    "Programs that support it may use file paths longer than 260 characters.",
+    "The pointer moves exactly as far as the mouse, without pointer acceleration (Enhance pointer precision) (for every new user).",
     "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
     "Vista and 7: answer to the network location page. Work or Home: a private network; Public: the strictest firewall.",
     "AutoRun and AutoPlay stay off on every drive, USB sticks and CDs included (NoDriveTypeAutoRun).",
@@ -2516,20 +3103,48 @@ pub const english = [_][]const u8{
     "Vista and 7: no hibernation and no hybrid sleep; the disk space of hiberfil.sys is freed.",
     "Windows 11: finish the setup without a network connection (BypassNRO).",
     "Vista: Windows Sidebar, 7: desktop gadgets, turned off by policy.",
+    "While plugged in, the computer never goes to sleep or hibernates by itself; the screen still turns off.",
+    "The Welcome or Getting Started window does not open at logon (for every new user).",
     "Vista: the Welcome Center does not open at every logon.",
+    "NumLock on or off at the logon screen and for every new user.",
+    "OneDrive (SkyDrive on Windows 8.1) cannot be used to store or sync files (policy for the whole computer).",
     "Optional: up to 64 characters, without \" % ^ & | < >",
     "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
+    "Local account passwords do not expire (maximum password age: unlimited).",
+    "The active power plan of the computer (Windows XP and Server 2003: Always On, Home/Office Desk or Max Battery).",
+    "Suggestions, consumer apps, advertising ID, tailored experiences, Copilot and Recall off; diagnostic data at the lowest level the edition allows.",
     "Answer to the \"Help protect Windows\" page (Vista and newer). Off: no automatic updates until you turn them on.",
     "Off: the key is used until this computer restarts and is never written to the stick.",
+    "Other computers may connect with Remote Desktop (Professional and Server editions); the firewall lets TCP port 3389 in. Set a password.",
+    "Removes Store apps for new users. Most extra apps also removes news, weather, Mail, People, Maps, Skype, Teams, Tips, Copilot and similar; Store, Calculator, Photos, Notepad, Paint and Terminal stay.",
+    "The Windows Search service is disabled: fewer disk writes, slower searches.",
+    "Security Center or Action Center does not warn about the firewall, virus protection and updates.",
+    "Server: no shutdown reason prompt, no Ctrl+Alt+Del at the sign-in screen, no Manage Your Server window (2003).",
+    "New shortcuts are named without \"Shortcut to\" or \"- Shortcut\" (for every new user).",
     "Explorer shows file name extensions such as .exe (for every new user).",
     "Explorer shows hidden files and folders (for every new user); protected system files stay hidden.",
+    "Explorer also shows hidden files and the protected operating system files (for every new user).",
     "XP: the games are not installed. Vista and 7: the Games feature is turned off during Setup.",
     "XP and Server 2003: MSN Explorer and Windows Messenger are not installed.",
+    "Downloaded programs start without the SmartScreen reputation check (policy for the whole computer).",
+    "Pressing Shift five times neither turns on Sticky Keys nor asks about it (for every new user).",
+    "No restore points are created (saves disk space; no rollback after a bad driver or update).",
     "The systems whose answer screen offers this profile. Profiles saved without this setting are offered for every Windows, never for Linux.",
+    "The taskbar has no Task view button (for every new user).",
+    "Start and the taskbar buttons sit on the left, as in earlier Windows (for every new user).",
+    "How the taskbar shows search: hidden, an icon only or a search box (for every new user).",
     "Theme of new users. XP: Windows Classic instead of Luna. 7: Windows Classic or Windows 7 Basic.",
     "Automatic: the default of the installation media.",
+    "How administrators are asked to confirm changes; User Account Control itself stays on.",
     "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
     "Optional second administrator account.",
+    "At the first sign-in Windows runs Scripts\\first-logon.reg and Scripts\\first-logon.cmd from the USOS_DATA partition if the stick is still plugged in.",
+    "Best performance turns off animations, shadows and window contents while dragging (for every new user).",
+    "No widgets board or news and interests on the taskbar (policy for the whole computer).",
+    "Windows 95, 98 and Me: automatic answers Setup's pages from this profile. Manual: Setup shows all its pages (owner, product key, time zone, network); the USOS fixes and add-ons stay.",
+    "Automatic Updates policy: no restart while someone is signed in, notify before downloading, or off.",
+    "The workgroup of the computer: up to 15 letters, digits and dashes. Empty: WORKGROUP.",
+    "Hidden profiles (made for another system): {0}",
     "Delete",
     "Edit",
     "Import",
@@ -2538,7 +3153,7 @@ pub const english = [_][]const u8{
     "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
     "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",
     "It contains characters that are not allowed here.",
-    "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
+    "A product key has the form {0}.",
     "A profile with this name exists already.",
     "This field is required.",
     "A computer name cannot be only digits.",
@@ -2549,16 +3164,36 @@ pub const english = [_][]const u8{
     "A USOS profile, turned into the answer file for this Windows when the installation starts. The target disk is always chosen in Setup.",
     "Save",
     "The profile could not be saved on the stick:",
+    "Accounts and network",
+    "Apps and scripts",
+    "Explorer",
     "Appearance and extras",
+    "System",
+    "Taskbar and Start",
+    "Updates and privacy",
     "Profile {0}: {1} ({2})",
     "Automatic",
+    "Windows default",
+    "Automatic (monitor native)",
+    "Automatic from the profile",
+    "Manual in the installer",
     "Type manually\xe2\x80\xa6",
+    "(Standard - default)",
+    "Fast startup off",
+    "Hibernation off",
     "Home",
     "Public",
     "Work",
     "Off",
+    "On",
+    "Balanced",
+    "High performance",
+    "Power saver",
+    "Off",
     "Recommended settings",
     "Important updates only",
+    "Most extra apps",
+    "Games and Xbox",
     "Same as the language",
     "Same as the formats",
     "(Setup asks)",
@@ -2566,9 +3201,19 @@ pub const english = [_][]const u8{
     "Every Linux installer",
     "Only {0}",
     "Every Windows",
+    "Search box",
+    "Hidden",
+    "Icon only",
     "Windows 7 Basic",
     "Windows Classic",
     "Default",
+    "Never notify",
+    "Ask without dimming the screen",
+    "Unchanged",
+    "Best performance",
+    "No automatic restart",
+    "Notify before download",
+    "Off",
     "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
     "Belongs in Systems\\Windows\\{0}",
     "Itanium (IA64) image - it does not start on this PC",
@@ -2596,6 +3241,7 @@ pub const english = [_][]const u8{
     "Written to the target disk; the USOS stick's ESP is checked",
     "Boot files",
     "Image",
+    "Experimental: USOS writes this image to the target disk; the disk then starts by itself (CSMWrap is added when the image has no UEFI loader)",
     "INF files: {0}; Windows checks the hardware match",
     "ISO case",
     "ISO inspection",
@@ -2603,6 +3249,9 @@ pub const english = [_][]const u8{
     "Windows Setup straight from the ISO (no copy to WORK)",
     "None found in {0}",
     "None in Drivers/x64; target USB 3 may be unavailable",
+    "Windows NT 3.51: use a PS/2 keyboard (no USB input yet); display 640x480.",
+    "Without CSM (experimental): the whole installation runs in a virtual machine on this PC; the finished system then starts through CSMWrap",
+    "Windows NT 4.0: use a PS/2 keyboard (no USB input yet); display 640x480; needs SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack on DATA.",
     "NT 5.2 (experimental): AHCI through GenAHCI on the system's StorPort; no NVMe/USB 3 driver in Setup",
     "Preparation",
     "Requires Secure Boot off",
@@ -2628,11 +3277,17 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
+    "Windows 2000 Server (experimental): the Windows 2000 path; answers Per Server licensing (5), workgroup, IIS off; product key from the answer profile; a CD without SP4 has no USB 2.0 stack (no USB keyboard/mouse)",
+    "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
+    "Selected and confirmed in the next graphical screen; the whole disk is erased",
+    "Windows 1.0x-3.0: answer the questions of the original Setup with the keyboard (a USB keyboard works there); in Setup pick VGA (EGA for 1.0x) and the IBM PS/2 mouse. Inside these Windows versions use a PS/2 keyboard (no USB keyboard bridge yet). Needs MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images on DATA.",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
+    "Windows XP Media Center Edition 2005 (experimental): the Windows XP path; needs the one-disc media with CMPNENTS (Media Center components); product key from the answer profile, else from the disc's own WINNT.SIF",
     "UEFI; installed XP requires firmware CSM and MBR",
     "{0} (merged into the automatic answer)",
     "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
+    "Windows XP Tablet PC Edition 2005 (experimental): the Windows XP path; needs the one-disc media with CMPNENTS (Tablet PC components); Tablet PC product key from the answer profile",
     "Fix the contrast first: {0}",
     "Cancel",
     "Too little contrast: {0}",
@@ -2688,7 +3343,7 @@ pub const english = [_][]const u8{
     "Theme {0} saved on the stick and in use.",
     "Base theme, element, colour: the preview and the contrast check follow every change",
     "Theme editor",
-    "USOS BIOS menu on this UEFI PC: FreeDOS, MS-DOS, Windows 3.x",
+    "USOS BIOS menu on this UEFI PC: DOS, Windows 3.x, 95/98/Me",
     "Unavailable: Secure Boot is on",
     "Legacy BIOS mode (CSMWrap)",
     "Command line for EFI tools (flashers, testers) from DATA",
@@ -2699,5 +3354,6 @@ pub const english = [_][]const u8{
     "Copying and verifying files",
     "Loading the preparation environment",
     "Loading the micro-Linux kernel from the USB drive",
+    "Windows XP package (EFI\\USOS-XP) is not on this USB drive. Without it, Windows XP cannot be installed from the UEFI menu. You can add it later with Update USOS or Repair.",
     "The kernel is loading the XP environment; the disk selection follows",
 };

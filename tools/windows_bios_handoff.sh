@@ -26,7 +26,7 @@ native)
         sync
         umount /mnt/esp || fail 'Cannot close ESP before Windows boot'
         sync
-        reboot -f
+        sh /usr/lib/usos/stick_release.sh reboot
         fail 'Native restart returned unexpectedly'
         ;;
     *) fail 'Expected preflight or start' ;;

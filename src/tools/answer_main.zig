@@ -74,7 +74,7 @@ pub fn main(init: std.process.Init) !u8 {
             }
         }
         var buffer: [answer.autounattend.max_size]u8 = undefined;
-        const rendered = (try answer.render(&p, system_id, arch, key, if (images_path != null) &images else null, &buffer)) orelse {
+        const rendered = (try answer.render(&p, system_id, arch, key, if (images_path != null) &images else null, false, &buffer)) orelse {
             std.debug.print("no generated answer for {s}\n", .{system_id});
             return 1;
         };

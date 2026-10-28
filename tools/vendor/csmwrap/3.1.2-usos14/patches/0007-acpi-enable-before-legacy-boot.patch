@@ -1,0 +1,506 @@
+USOS 3.1.2-usos6 patch 7/7 (2026-10-14): ACPI mode enabled before the legacy boot (diagnostic, Windows 2000 ACPI flow only)
+
+Windows 2000's acpi.sys switches the machine from legacy to ACPI mode
+itself: when PM1a_CNT.SCI_EN is 0 it writes FADT.ACPI_ENABLE to
+FADT.SMI_CMD and polls SCI_EN; when SCI_EN is already 1 it sends no SMI.
+On the X470 (AMI) the 2000 ACPI HAL's RTC IRQ 8 clock stops after kernel
+phase 1; one hypothesis (outside review of the SP4 binaries, 2026-10-14)
+is that the firmware's ACPI-enable SMI changes RTC/FCH state. This patch
+lets CSMWrap do the legacy to ACPI transition the way the ACPI
+specification describes it (6.5: 4.8.2.1 SCI_EN, 5.2.9 SMI_CMD /
+ACPI_ENABLE / PM1a_CNT_BLK / PM_TMR_BLK, 16.3.1) as the last step before
+Legacy16Boot, after SeaBIOS's PrepareToBoot has programmed the RTC, and
+records the RTC status registers A and B around it:
+
+  - only with csmwrap.ini acpi_legacy_fadt = true (written by
+    tools/xp_csmwrap_esp.sh only for Windows 2000 with ACPI); every other
+    flow runs the same code path as 3.1.2-usos5;
+  - the FADT is the one the RSDT lists (the ACPI 1.0 copy patch 0006
+    gives 2000), read before ExitBootServices: SMI_CMD, ACPI_ENABLE,
+    PM1a_CNT_BLK and PM_TMR_BLK (32-bit fields, else X_ GAS in System
+    I/O), Flags TMR_VAL_EXT / HW_REDUCED_ACPI;
+  - RTC A/B read through index 70h with the NMI-disable bit (register C
+    is never read); SCI_EN 1 -> 'a'; else out SMI_CMD, ACPI_ENABLE and
+    SCI_EN polled for at most 3 s on the PM timer (8,000,000 polls cap)
+    -> 'o' / 't'; no usable fields -> 'n';
+  - result in the BIOS data area's inter-application communication area,
+    physical 0x4F4-0x4FB (SeaBIOS leaves 0x4F0-0x4FF alone; 0x4F0-0x4F3
+    are the USOS MBR's slots): 'A' 'E' status, RTC A before, RTC A after,
+    RTC B before, RTC B after, PM1a_CNT low byte after; 's' is stored
+    before the SMI (a machine that never returns from it keeps 's'); the
+    store goes through the firmware's identity page tables with CR0.WP
+    cleared and the entry for VA 0 made present for the store only;
+  - logged as "USOS ACPIEN: ..." (the result line goes to serial only:
+    SeaBIOS owns the screen by then).
+
+SeaBIOS can still change RTC B after this point: INT 15h AH=83h/86h and
+its thread preemption toggle the periodic-interrupt bit (rtc_use /
+rtc_release), and INT 1Ah AH=03h/05h/06h/07h rewrite B. The Windows 2000
+HAL programs A and B itself in HAL phase 1.
+
+New src/usos_acpien.c (own code, no EFI dependency: port I/O through ops,
+host unit test tools/tests/csmwrap/test_csmwrap_acpien.py),
+src/usos_acpien.h, src/usos_acpien_efi.c (glue). Applies to CSMWrap 3.1.2
+(808ac8e) with its seabios submodule (578d260b) after patches 0001-0006,
+patch -p1 from the top of the tree. Part of CSMWrap 3.1.2-usos6, a
+MODIFIED version made by the USOS project (LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -17,6 +17,7 @@
+ #include <config.h>
+ #include <oprom.h>
+ #include <usos_acpi10.h>
++#include <usos_acpien.h>
+ #include <flanterm.h>
+ #include <flanterm_backends/fb.h>
+ 
+@@ -642,6 +643,13 @@
+      * 1.0 FADT (revision 1, 116 bytes). */
+     usos_acpi10_efi_fixup(rsdp_copy, gConfig.acpi_legacy_fadt);
+ 
++    /* USOS patch 0007 (diagnostic, Windows 2000 ACPI flow only: csmwrap.ini
++     * acpi_legacy_fadt = true): read SMI_CMD / ACPI_ENABLE / PM1a_CNT /
++     * PM_TMR from the RSDT's FADT now; the switch to ACPI mode itself runs
++     * right before Legacy16Boot. */
++    if (gConfig.acpi_legacy_fadt)
++        usos_acpien_efi_prepare(rsdp_copy);
++
+     /* Initialize BIOS proxy (find mailbox and helper entry in CSM binary) */
+     if (bios_proxy_init(Csm16_bin, sizeof(Csm16_bin), rsdp_copy) != 0) {
+         panic("BIOS proxy initialization failed\n");
+@@ -857,6 +865,12 @@
+                         NULL,
+                         0);
+ 
++    /* USOS patch 0007: legacy -> ACPI mode (FADT ACPI_ENABLE to SMI_CMD,
++     * SCI_EN polled on the PM timer) after SeaBIOS's PrepareToBoot, which
++     * programs the RTC, as the last step before the boot; RTC A/B before
++     * and after are kept at 0x4F4 for usosvid. No-op unless armed above. */
++    usos_acpien_efi_run();
++
+     memset(&Regs, 0, sizeof(EFI_IA32_REGISTER_SET));
+     Regs.X.AX = Legacy16Boot;
+     // No arguments?
+diff -ruN a/src/usos_acpien.c b/src/usos_acpien.c
+--- a/src/usos_acpien.c
++++ b/src/usos_acpien.c
+@@ -0,0 +1,180 @@
++/*
++ * USOS patch 0007: ACPI mode enabled before the legacy boot (diagnostic).
++ * See usos_acpien.h. Own code from the public ACPI specification;
++ * part of CSMWrap 3.1.2-usos6 (MODIFIED by USOS, LGPL-2.1).
++ */
++#include "usos_acpien.h"
++
++/* FADT offsets (ACPI 6.5 table 5.9). */
++#define FADT_SMI_CMD 48u
++#define FADT_ACPI_ENABLE 52u
++#define FADT_PM1A_CNT_BLK 64u
++#define FADT_PM_TMR_BLK 76u
++#define FADT_FLAGS 112u
++#define FADT_X_PM1A_CNT_BLK 172u
++#define FADT_X_PM_TMR_BLK 208u
++#define FLAG_TMR_VAL_EXT (1u << 8)
++#define FLAG_HW_REDUCED (1u << 20)
++#define GAS_SYSTEM_IO 1u
++#define PM1_SCI_EN 0x0001u
++
++#define CMOS_INDEX 0x70u
++#define CMOS_DATA 0x71u
++#define CMOS_NMI_OFF 0x80u
++#define RTC_A 0x0Au
++#define RTC_B 0x0Bu
++
++static uint32_t rd32(const uint8_t *p)
++{
++    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
++}
++
++static uint64_t rd64(const uint8_t *p)
++{
++    return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
++}
++
++static uint8_t sum8(const uint8_t *p, uint32_t len)
++{
++    uint8_t s = 0;
++    for (uint32_t i = 0; i < len; i++)
++        s = (uint8_t)(s + p[i]);
++    return s;
++}
++
++/* 32-bit block address, else the X_ GAS (System I/O); 0 when neither is an
++ * I/O port below 64 KiB. */
++static uint16_t io_block(const uint8_t *fadt, uint32_t len, uint32_t off32, uint32_t off_x)
++{
++    if (len >= off32 + 4) {
++        uint32_t a = rd32(fadt + off32);
++        if (a != 0)
++            return a < 0x10000u ? (uint16_t)a : 0;
++    }
++    if (len >= off_x + 12 && fadt[off_x] == GAS_SYSTEM_IO) {
++        uint64_t a = rd64(fadt + off_x + 4);
++        if (a != 0 && a < 0x10000u)
++            return (uint16_t)a;
++    }
++    return 0;
++}
++
++bool usos_acpien_parse_fadt(const uint8_t *fadt, uint32_t len, struct usos_acpien_fadt *out)
++{
++    struct usos_acpien_fadt f = { 0, 0, 0, 0, false, false };
++    *out = f;
++    if (fadt == NULL || len < 36 || fadt[0] != 'F' || fadt[1] != 'A' || fadt[2] != 'C' || fadt[3] != 'P')
++        return false;
++    if (len >= FADT_ACPI_ENABLE + 1) {
++        uint32_t smi = rd32(fadt + FADT_SMI_CMD);
++        f.smi_cmd = smi < 0x10000u ? (uint16_t)smi : 0;
++        f.acpi_enable = fadt[FADT_ACPI_ENABLE];
++    }
++    f.pm1a_cnt = io_block(fadt, len, FADT_PM1A_CNT_BLK, FADT_X_PM1A_CNT_BLK);
++    f.pm_tmr = io_block(fadt, len, FADT_PM_TMR_BLK, FADT_X_PM_TMR_BLK);
++    if (len >= FADT_FLAGS + 4) {
++        uint32_t flags = rd32(fadt + FADT_FLAGS);
++        f.tmr_32bit = (flags & FLAG_TMR_VAL_EXT) != 0;
++        f.hw_reduced = (flags & FLAG_HW_REDUCED) != 0;
++    }
++    *out = f;
++    return true;
++}
++
++uint64_t usos_acpien_find_fadt(void *(*map)(void *ctx, uint64_t phys, uint32_t len),
++                               void *ctx, const void *rsdp_v, uint32_t *fadt_len)
++{
++    const uint8_t *rsdp = rsdp_v;
++    *fadt_len = 0;
++    if (rsdp == NULL || sum8(rsdp, 20) != 0)
++        return 0;
++    uint32_t rsdt_addr = rd32(rsdp + 16);
++    if (rsdt_addr == 0)
++        return 0;
++    const uint8_t *h = map(ctx, rsdt_addr, 36);
++    if (h == NULL || h[0] != 'R' || h[1] != 'S' || h[2] != 'D' || h[3] != 'T')
++        return 0;
++    uint32_t len = rd32(h + 4);
++    if (len < 36 || len > 36 + 4 * 256)
++        return 0;
++    const uint8_t *rsdt = map(ctx, rsdt_addr, len);
++    if (rsdt == NULL)
++        return 0;
++    for (uint32_t off = 36; off + 4 <= len; off += 4) {
++        uint32_t a = rd32(rsdt + off);
++        const uint8_t *t = a ? map(ctx, a, 36) : NULL;
++        if (t == NULL || t[0] != 'F' || t[1] != 'A' || t[2] != 'C' || t[3] != 'P')
++            continue;
++        uint32_t tl = rd32(t + 4);
++        if (tl < 36 || tl > 4096)
++            continue;
++        *fadt_len = tl;
++        return a;
++    }
++    return 0;
++}
++
++static uint8_t rtc_read(const struct usos_acpien_io *io, uint8_t reg)
++{
++    io->outb(io->ctx, CMOS_INDEX, (uint8_t)(CMOS_NMI_OFF | reg));
++    return io->inb(io->ctx, CMOS_DATA);
++}
++
++static uint32_t pm_timer(const struct usos_acpien_io *io, const struct usos_acpien_fadt *f)
++{
++    uint32_t v = io->inl(io->ctx, f->pm_tmr);
++    return f->tmr_32bit ? v : (v & 0x00FFFFFFu);
++}
++
++void usos_acpien_run(const struct usos_acpien_io *io, const struct usos_acpien_fadt *f,
++                     struct usos_acpien_result *r)
++{
++    r->status = USOS_ACPIEN_NA;
++    r->ticks = 0;
++    r->polls = 0;
++    r->pm1a_cnt_before = r->pm1a_cnt_after = 0;
++    r->rtc_a_before = rtc_read(io, RTC_A);
++    r->rtc_b_before = rtc_read(io, RTC_B);
++
++    if (f->pm1a_cnt != 0 && !f->hw_reduced) {
++        uint16_t cnt = io->inw(io->ctx, f->pm1a_cnt);
++        r->pm1a_cnt_before = cnt;
++        if (cnt & PM1_SCI_EN) {
++            r->status = USOS_ACPIEN_ALREADY;
++        } else if (f->smi_cmd != 0 && f->acpi_enable != 0) {
++            uint32_t mask = f->tmr_32bit ? 0xFFFFFFFFu : 0x00FFFFFFu;
++            uint32_t start = f->pm_tmr ? pm_timer(io, f) : 0;
++            io->outb(io->ctx, f->smi_cmd, f->acpi_enable);
++            r->status = USOS_ACPIEN_TIMEOUT;
++            for (r->polls = 1; r->polls <= USOS_ACPIEN_MAX_POLLS; r->polls++) {
++                cnt = io->inw(io->ctx, f->pm1a_cnt);
++                if (f->pm_tmr)
++                    r->ticks = (pm_timer(io, f) - start) & mask;
++                if (cnt & PM1_SCI_EN) {
++                    r->status = USOS_ACPIEN_OK;
++                    break;
++                }
++                if (r->ticks >= USOS_ACPIEN_TIMEOUT_TICKS)
++                    break;
++            }
++            if (r->polls > USOS_ACPIEN_MAX_POLLS)
++                r->polls = USOS_ACPIEN_MAX_POLLS;
++        }
++        r->pm1a_cnt_after = io->inw(io->ctx, f->pm1a_cnt);
++    }
++
++    r->rtc_a_after = rtc_read(io, RTC_A);
++    r->rtc_b_after = rtc_read(io, RTC_B);
++}
++
++void usos_acpien_bytes(const struct usos_acpien_result *r, uint8_t out[USOS_ACPIEN_RESULT_LEN])
++{
++    out[0] = 'A';
++    out[1] = 'E';
++    out[2] = r->status;
++    out[3] = r->rtc_a_before;
++    out[4] = r->rtc_a_after;
++    out[5] = r->rtc_b_before;
++    out[6] = r->rtc_b_after;
++    out[7] = (uint8_t)r->pm1a_cnt_after;
++}
+diff -ruN a/src/usos_acpien.h b/src/usos_acpien.h
+--- a/src/usos_acpien.h
++++ b/src/usos_acpien.h
+@@ -0,0 +1,110 @@
++/*
++ * USOS patch 0007: ACPI mode enabled before the legacy boot (diagnostic,
++ * Windows 2000 ACPI flow only).
++ *
++ * Windows 2000's acpi.sys switches the machine from legacy to ACPI mode
++ * itself: when PM1a_CNT.SCI_EN is 0 it writes FADT.ACPI_ENABLE to
++ * FADT.SMI_CMD and polls SCI_EN. On the X470 (AMI) the 2000 ACPI HAL loses
++ * its RTC IRQ 8 clock at that point (hypothesis, 2026-10-14). When SCI_EN
++ * is already 1 the OS does not send that SMI. This file does the legacy to
++ * ACPI transition the way the ACPI specification describes it (6.5,
++ * 4.8.2.1 SCI_EN, 5.2.9 FADT SMI_CMD/ACPI_ENABLE/PM1a_CNT_BLK/PM_TMR_BLK,
++ * 16.3.1), as the last step before CSMWrap hands over to the legacy boot,
++ * and records the MC146818 RTC status registers A and B around it:
++ *
++ *   1. read RTC A and B (index 70h with the NMI-disable bit, data 71h;
++ *      register C is never read: reading it clears pending interrupts);
++ *   2. SCI_EN already 1 -> 'a'; no usable SMI_CMD / ACPI_ENABLE /
++ *      PM1a_CNT_BLK, or a hardware-reduced FADT -> 'n'; otherwise
++ *      out SMI_CMD, ACPI_ENABLE and poll SCI_EN for at most 3 s on the PM
++ *      timer (24- or 32-bit, FADT TMR_VAL_EXT; a poll cap when the timer
++ *      is missing or stuck) -> 'o' (SCI_EN became 1) or 't' (timeout);
++ *   3. read RTC A and B again, and PM1a_CNT.
++ *
++ * Written by the USOS project from the public ACPI specification and the
++ * PC CMOS RTC register layout; no EFI dependency (port I/O through ops), so
++ * the same file builds on a host for unit tests. Part of CSMWrap
++ * 3.1.2-usos6, a MODIFIED version of CSMWrap (LGPL-2.1).
++ */
++#ifndef USOS_ACPIEN_H
++#define USOS_ACPIEN_H
++
++#include <stdint.h>
++#include <stddef.h>
++#include <stdbool.h>
++
++/* PM timer: 3.579545 MHz; 3 s. */
++#define USOS_ACPIEN_TIMEOUT_TICKS 10738635u
++/* Poll cap (no PM timer, or a stuck one). */
++#define USOS_ACPIEN_MAX_POLLS 8000000u
++
++/* Physical address of the result bytes: BIOS data area inter-application
++ * communication area 0040:00F0-00FF (0x4F0-0x4FF; no BIOS uses it, SeaBIOS
++ * included; 0x4F0-0x4F3 are the USOS MBR's slots). */
++#define USOS_ACPIEN_RESULT_PHYS 0x4F4u
++#define USOS_ACPIEN_RESULT_LEN 8u
++
++/* Status byte. */
++#define USOS_ACPIEN_OK       'o'  /* SCI_EN 0 -> SMI sent -> SCI_EN 1 */
++#define USOS_ACPIEN_TIMEOUT  't'  /* SMI sent, SCI_EN still 0 after 3 s */
++#define USOS_ACPIEN_ALREADY  'a'  /* SCI_EN was already 1, no SMI sent */
++#define USOS_ACPIEN_NA       'n'  /* no usable FADT fields, nothing sent */
++#define USOS_ACPIEN_STARTED  's'  /* written before the SMI, replaced after */
++
++/* The FADT fields the transition needs (I/O ports; 0 = not usable). */
++struct usos_acpien_fadt {
++    uint16_t smi_cmd;
++    uint8_t acpi_enable;
++    uint16_t pm1a_cnt;
++    uint16_t pm_tmr;
++    bool tmr_32bit;     /* FADT Flags bit 8 TMR_VAL_EXT */
++    bool hw_reduced;    /* FADT Flags bit 20 HW_REDUCED_ACPI */
++};
++
++struct usos_acpien_io {
++    void *ctx;
++    uint8_t (*inb)(void *ctx, uint16_t port);
++    uint16_t (*inw)(void *ctx, uint16_t port);
++    uint32_t (*inl)(void *ctx, uint16_t port);
++    void (*outb)(void *ctx, uint16_t port, uint8_t val);
++};
++
++struct usos_acpien_result {
++    uint8_t status;
++    uint8_t rtc_a_before, rtc_a_after;
++    uint8_t rtc_b_before, rtc_b_after;
++    uint16_t pm1a_cnt_before, pm1a_cnt_after;
++    uint32_t ticks;     /* PM timer ticks from the SMI to SCI_EN / timeout */
++    uint32_t polls;
++};
++
++/*
++ * Fields from a FADT of len bytes (any revision): the 32-bit block
++ * addresses, else the X_ GAS when it is System I/O below 64 KiB.
++ * Returns true when the table is a FADT (signature "FACP").
++ */
++bool usos_acpien_parse_fadt(const uint8_t *fadt, uint32_t len, struct usos_acpien_fadt *out);
++
++/*
++ * The FADT the RSDT lists (the one a legacy OS such as Windows 2000 reads),
++ * found from an RSDP through map(ctx, phys, len); 0 when there is none.
++ */
++uint64_t usos_acpien_find_fadt(void *(*map)(void *ctx, uint64_t phys, uint32_t len),
++                               void *ctx, const void *rsdp, uint32_t *fadt_len);
++
++/* The transition (steps 1-3 above). */
++void usos_acpien_run(const struct usos_acpien_io *io, const struct usos_acpien_fadt *f,
++                     struct usos_acpien_result *r);
++
++/*
++ * The 8 result bytes stored at USOS_ACPIEN_RESULT_PHYS:
++ *   'A' 'E' status, RTC A before, RTC A after, RTC B before, RTC B after,
++ *   PM1a_CNT low byte after.
++ */
++void usos_acpien_bytes(const struct usos_acpien_result *r, uint8_t out[USOS_ACPIEN_RESULT_LEN]);
++
++/* CSMWrap glue (usos_acpien_efi.c). */
++void usos_acpien_efi_prepare(const void *rsdp_copy);   /* before ExitBootServices */
++void usos_acpien_efi_run(void);                        /* right before Legacy16Boot */
++
++#endif
+diff -ruN a/src/usos_acpien_efi.c b/src/usos_acpien_efi.c
+--- a/src/usos_acpien_efi.c
++++ b/src/usos_acpien_efi.c
+@@ -0,0 +1,119 @@
++/*
++ * USOS patch 0007: CSMWrap glue for usos_acpien.c (identity-mapped memory,
++ * port I/O, CSMWrap's printf: screen with verbose = true while CSMWrap
++ * still owns it, serial with serial = true).
++ * Part of CSMWrap 3.1.2-usos6 (MODIFIED by USOS, LGPL-2.1).
++ */
++#include <efi.h>
++#include <csmwrap.h>
++#include <printf.h>
++#include <io.h>
++#include "usos_acpien.h"
++
++static struct usos_acpien_fadt g_fadt;
++static bool g_armed;
++
++static void *map_identity(void *ctx, uint64_t phys, uint32_t len)
++{
++    (void)ctx;
++    (void)len;
++    return (void *)(uintptr_t)phys;
++}
++
++static uint8_t io_inb(void *ctx, uint16_t port) { (void)ctx; return inb(port); }
++static uint16_t io_inw(void *ctx, uint16_t port) { (void)ctx; return inw(port); }
++static uint32_t io_inl(void *ctx, uint16_t port) { (void)ctx; return inl(port); }
++static void io_outb(void *ctx, uint16_t port, uint8_t val) { (void)ctx; outb(port, val); }
++
++/*
++ * Page 0 (the BIOS data area) through the firmware's identity page tables,
++ * which may leave VA 0 not present (NULL pointer detection) or read-only:
++ * the store runs with interrupts off, CR0.WP cleared, and the entry that
++ * maps VA 0 marked present + writable (identity, physical 0) for the store
++ * only, then restored.
++ */
++#define PTE_P 0x1ull
++#define PTE_RW 0x2ull
++#define PTE_PS 0x80ull
++#define PTE_ADDR 0x000FFFFFFFFFF000ull
++
++static volatile uint64_t *page0_entry(void)
++{
++    uint64_t cr3, cr4;
++    asm volatile ("mov %%cr3, %0" : "=r"(cr3));
++    asm volatile ("mov %%cr4, %0" : "=r"(cr4));
++    volatile uint64_t *t = (volatile uint64_t *)(uintptr_t)(cr3 & PTE_ADDR);
++    for (int level = (cr4 & (1ull << 12)) ? 5 : 4; level > 1; level--) {
++        uint64_t e = t[0];
++        if (!(e & PTE_P))
++            return NULL;
++        if (level <= 3 && (e & PTE_PS))
++            return &t[0];
++        t = (volatile uint64_t *)(uintptr_t)(e & PTE_ADDR);
++    }
++    return &t[0];
++}
++
++static bool page0_store(uint32_t phys, const uint8_t *src, unsigned n)
++{
++    volatile uint64_t *e = page0_entry();
++    if (e == NULL)
++        return false;
++    uint64_t old = *e, cr0;
++    asm volatile ("mov %%cr0, %0" : "=r"(cr0));
++    asm volatile ("mov %0, %%cr0" :: "r"(cr0 & ~(1ull << 16)) : "memory");
++    if ((old & (PTE_P | PTE_RW)) != (PTE_P | PTE_RW)) {
++        *e = (old & ~PTE_ADDR) | PTE_P | PTE_RW;
++        asm volatile ("invlpg (%0)" :: "r"((uintptr_t)0) : "memory");
++    }
++    uintptr_t a = phys;
++    asm volatile ("" : "+r"(a));        /* a fixed low address, not NULL */
++    volatile uint8_t *dst = (volatile uint8_t *)a;
++    for (unsigned i = 0; i < n; i++)
++        dst[i] = src[i];
++    if (*e != old) {
++        *e = old;
++        asm volatile ("invlpg (%0)" :: "r"((uintptr_t)0) : "memory");
++    }
++    asm volatile ("mov %0, %%cr0" :: "r"(cr0) : "memory");
++    return true;
++}
++
++void usos_acpien_efi_prepare(const void *rsdp_copy)
++{
++    uint32_t len = 0;
++    uint64_t fadt = usos_acpien_find_fadt(map_identity, NULL, rsdp_copy, &len);
++    if (fadt == 0 || !usos_acpien_parse_fadt((const uint8_t *)(uintptr_t)fadt, len, &g_fadt)) {
++        printf("USOS ACPIEN: no FADT in the RSDT, ACPI enable before boot off\n");
++        return;
++    }
++    g_armed = true;
++    printf("USOS ACPIEN: armed (FADT %x len %u): SMI_CMD %x ACPI_ENABLE %x PM1a_CNT %x PM_TMR %x/%u%s\n",
++           (unsigned)fadt, (unsigned)len, (unsigned)g_fadt.smi_cmd, (unsigned)g_fadt.acpi_enable,
++           (unsigned)g_fadt.pm1a_cnt, (unsigned)g_fadt.pm_tmr, g_fadt.tmr_32bit ? 32u : 24u,
++           g_fadt.hw_reduced ? " HW_REDUCED" : "");
++}
++
++void usos_acpien_efi_run(void)
++{
++    if (!g_armed)
++        return;
++    /* 'A' 'E' 's': stored before the SMI, so a machine that never comes
++     * back from it is told apart from one that never ran this code. */
++    uint8_t bytes[USOS_ACPIEN_RESULT_LEN] = { 'A', 'E', USOS_ACPIEN_STARTED, 0, 0, 0, 0, 0 };
++    bool stored = page0_store(USOS_ACPIEN_RESULT_PHYS, bytes, USOS_ACPIEN_RESULT_LEN);
++
++    struct usos_acpien_io io = { NULL, io_inb, io_inw, io_inl, io_outb };
++    struct usos_acpien_result r;
++    usos_acpien_run(&io, &g_fadt, &r);
++
++    usos_acpien_bytes(&r, bytes);
++    stored = stored && page0_store(USOS_ACPIEN_RESULT_PHYS, bytes, USOS_ACPIEN_RESULT_LEN);
++
++    printf("USOS ACPIEN: status %c, PM1a_CNT %x->%x, %u PM ticks, %u polls, RTC A %x->%x, RTC B %x->%x (%s %x)\n",
++           r.status, (unsigned)r.pm1a_cnt_before, (unsigned)r.pm1a_cnt_after,
++           (unsigned)r.ticks, (unsigned)r.polls,
++           (unsigned)r.rtc_a_before, (unsigned)r.rtc_a_after,
++           (unsigned)r.rtc_b_before, (unsigned)r.rtc_b_after,
++           stored ? "stored at" : "NOT stored, page 0 unmapped:", USOS_ACPIEN_RESULT_PHYS);
++}

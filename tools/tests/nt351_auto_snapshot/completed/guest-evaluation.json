@@ -1,0 +1,284 @@
+{
+  "case": "nt351-client-auto-fresh01",
+  "scope": "Exact normal fresh351 Workstation EN PROFILE route; PS2 allowed",
+  "fresh_normal_usos_desktop": "PASS",
+  "client_no_sharing_policy": "PASS",
+  "native_lan": "PASS",
+  "source_archive_sha256": "24adda13744589cacebf6a75e21bf8999465b5637235ce55b0cf3a7578aa7975",
+  "source_iso_sha256": "b9d0e8417c1f502d1de22c249401b593be2a7fe59524b27a624dfa8dedaa099c",
+  "actual_version": "Windows NT3.51 build1057 Workstation EN",
+  "driver_sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+  "driver_bytes": 17024,
+  "post_sha256": "615f6d6b49b3c53df62603b804195f80c0d431dad4b2d88145ece1ad166ed48b",
+  "post_bytes": 30208,
+  "post_original351_imports": 50,
+  "post_subsystem": [
+    3,
+    10
+  ],
+  "actual_native_workstation_running": true,
+  "actual_native_server_browser_absent": true,
+  "stopped_policy": {
+    "selected": {
+      "current": 1,
+      "default": 1
+    },
+    "services": {
+      "1": {
+        "Browser": {
+          "present": true,
+          "start": 4,
+          "type": 32
+        },
+        "LanmanServer": {
+          "present": true,
+          "start": 4,
+          "type": 32
+        },
+        "LanmanWorkstation": {
+          "present": true,
+          "start": 2,
+          "type": 32
+        },
+        "Tcpip": {
+          "present": true,
+          "start": 3,
+          "type": 1
+        },
+        "NDISLoop": {
+          "present": true,
+          "start": 2,
+          "type": 1
+        },
+        "usosnt3": {
+          "present": true,
+          "start": 4,
+          "type": 16
+        }
+      }
+    }
+  },
+  "independent_exact_public_policy_records": {
+    "CLNT351.REQ": {
+      "present": true,
+      "bytes": 30,
+      "sha256": "cf4b2cf2c614e78c7377a5dc8266721d9efef556c0ed09b58ee4dd8b17f0dfdf",
+      "matches_exact_public_record": true
+    },
+    "CLNT351.LOG": {
+      "present": true,
+      "bytes": 223,
+      "sha256": "86679faa05d789e84b9e01602f3bf636b3af7d4100e8a3e99c5f20e3ccd7f183",
+      "matches_exact_public_record": true
+    },
+    "CLNT351.ERR": {
+      "present": false
+    }
+  },
+  "first_collector_typo_retained": true,
+  "first_collector_missing_records": [
+    "CLNT3511.REQ",
+    "CLNT3511.LOG",
+    "CLNT3511.ERR"
+  ],
+  "recovery": "Bounded stopped FAT RAM-only exact public records; no new VM",
+  "native_dhcp_release_renew": true,
+  "address": "10.0.2.15",
+  "mask": "255.255.255.0",
+  "gateway": "10.0.2.2",
+  "dns": "10.0.2.3",
+  "native_ping": [
+    {
+      "comparison": "=",
+      "milliseconds": 10
+    },
+    {
+      "comparison": "<",
+      "milliseconds": 10
+    },
+    {
+      "comparison": "<",
+      "milliseconds": 10
+    }
+  ],
+  "native_ping_all_strictly_under10ms": false,
+  "matched_guest_icmp_ms": 0,
+  "strict_fixed_dns": [
+    "[NET] UDP DNS 1.1.1.1 (fixed): reply after 80 ms from 1.1.1.1:53: 46 bytes DNS PASS dns_match=1 id=D69F question=frogfind.com A=64.227.13.248",
+    "[NET] UDP DNS 8.8.8.8 (fixed): reply after 50 ms from 8.8.8.8:53: 46 bytes DNS PASS dns_match=1 id=DFE6 question=frogfind.com A=64.227.13.248",
+    "[NET] TCP DNS 1.1.1.1:53: connected in 40 ms, reply: 46 bytes DNS PASS dns_match=1 id=BE54 question=frogfind.com A=64.227.13.248"
+  ],
+  "native_configured_resolution": true,
+  "configured_dns_matched_packet_claim": false,
+  "http_68k200": true,
+  "preserved_negative_probe_lines": [
+    "[NET] UDP DNS 10.0.2.2 (gateway): query 30 bytes sent, NO REPLY in 3000 ms",
+    "[NET] TCP connect 10.0.2.2:80: connect TIMEOUT after 4006 ms",
+    "[NET]   HTTP 64.227.13.248:80: connect TIMEOUT after 4006 ms"
+  ],
+  "strict_same_xid_dora": false,
+  "actual_dhcp_packets": [
+    {
+      "record": 4,
+      "packet": {
+        "kind": 1,
+        "xid": 153218104,
+        "yiaddr": "0.0.0.0",
+        "server": null,
+        "requested": null,
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 5,
+      "packet": {
+        "kind": 2,
+        "xid": 153218104,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 6,
+      "packet": {
+        "kind": 3,
+        "xid": 242821687,
+        "yiaddr": "0.0.0.0",
+        "server": "10.0.2.2",
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 7,
+      "packet": {
+        "kind": 5,
+        "xid": 242821687,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 29,
+      "packet": {
+        "kind": 1,
+        "xid": 2552760066,
+        "yiaddr": "0.0.0.0",
+        "server": null,
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 30,
+      "packet": {
+        "kind": 2,
+        "xid": 2552760066,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    },
+    {
+      "record": 31,
+      "packet": {
+        "kind": 3,
+        "xid": 118602064,
+        "yiaddr": "0.0.0.0",
+        "server": "10.0.2.2",
+        "requested": "10.0.2.15",
+        "lease_seconds": 0,
+        "routers": [],
+        "dns": []
+      }
+    },
+    {
+      "record": 32,
+      "packet": {
+        "kind": 5,
+        "xid": 118602064,
+        "yiaddr": "10.0.2.15",
+        "server": "10.0.2.2",
+        "requested": null,
+        "lease_seconds": 86400,
+        "routers": [
+          "10.0.2.2"
+        ],
+        "dns": [
+          "10.0.2.3"
+        ]
+      }
+    }
+  ],
+  "capture": {
+    "bytes": 26849,
+    "frames": 99,
+    "sha256": "134b9e769bb51459b1d372710024de0d93ccb582aaf8a0bc68a0f0a3fe5321c2",
+    "controlled_boundary_reset_accepted": true
+  },
+  "native_safe_frame": "operator-11.png",
+  "qemu_returncode": 0,
+  "parent_returncode": 0,
+  "independent_driver_readbacks": 2,
+  "outer_hardware_argv_matches_previous_fresh351": true,
+  "all_old_cache_files_unchanged": true,
+  "all_other_candidate_cache_files_identical": true,
+  "initrd_sha256": "91c1d72c8d1718cb47e313076cae27c0b21494a0a4ab42c508aca90fa4451c64",
+  "effective_entries": 832,
+  "changed_entries": 3,
+  "unchanged_entries": 829,
+  "elapsed_seconds": 2612.14,
+  "retained": {
+    "target-retained.qcow2": {
+      "bytes": 204931072,
+      "sha256": "915f6945b90cd9fb627160b22136c54bedecfed6d4ef8e8d323e0d626c9e067e"
+    },
+    "stick-retained.qcow2": {
+      "bytes": 512622592,
+      "sha256": "02e993d2a08cd5797e116077aeed37b432e293aa411ee2a6dc8fd633da4c9ff3"
+    },
+    "vars-retained.fd": {
+      "bytes": 540672,
+      "sha256": "c47156ab8bba0fd8f0ce8de10ce2170ed0613c97cee0f41e3e5024b7e4b13740"
+    }
+  },
+  "original_fresh351_running_server_browser_failure_preserved": true,
+  "NT35_POST615_runtime_qualified": false,
+  "NT35_frozen_other_tuple": "d94/POST87cb, independent agent",
+  "limits": [
+    "No freshDEFAULT/USER/Server/NT31 qualification",
+    "No USB isolation/replug/MSC retest",
+    "No physical X470/I211/SMP/fullIRQroute/fullrelease claim",
+    "First native ping10ms, other two<10ms",
+    "Fixed strict DNS separate from native configured resolver; no configured-peer strictpacket claim"
+  ]
+}

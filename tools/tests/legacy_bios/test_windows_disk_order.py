@@ -3,6 +3,8 @@ from pathlib import Path
 import os,struct,subprocess,sys,unittest
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'zig-out/int13-python'))
+sys.path.insert(0,str(ROOT/'tools/tests'))
+import depguard
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_16,UC_HOOK_CODE
 from unicorn.x86_const import *
 OUT=ROOT/'zig-out/windows-disk-order'
@@ -17,7 +19,9 @@ def build():
 
 class DiskOrder(unittest.TestCase):
  @classmethod
- def setUpClass(cls):cls.blob=build();assert len(cls.blob)==512
+ def setUpClass(cls):
+  depguard.require_zig()
+  cls.blob=build();assert len(cls.blob)==512
  def vm(self,boot=0x80,count=2):
   u=Uc(UC_ARCH_X86,UC_MODE_16);u.mem_map(0,0x100000)
   blob=bytearray(self.blob);blob[0x1fa]=boot;struct.pack_into('<H',blob,0x1fc,0x300)

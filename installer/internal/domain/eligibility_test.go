@@ -25,7 +25,10 @@ func TestEligibility(t *testing.T) {
 		{"eligible removable disk", func(*Disk) {}, true},
 		{"reject fixed disk", func(d *Disk) { d.Removable = false }, false},
 		{"reject system disk", func(d *Disk) { d.SystemDisk = true }, false},
-		{"reject undersized disk", func(d *Disk) { d.SizeBytes = 31 * layout.GiB }, false},
+		{"reject undersized disk", func(d *Disk) { d.SizeBytes = 8 * layout.GiB }, false},
+		{"reject just below minimum", func(d *Disk) { d.SizeBytes = layout.MinimumDiskBytes - 512 }, false},
+		{"accept 16 GB stick", func(d *Disk) { d.SizeBytes = 15_376_000_000 }, true},
+		{"accept 32 GB stick", func(d *Disk) { d.SizeBytes = 30_752_000_000 }, true},
 		{"reject missing model", func(d *Disk) { d.Model = "" }, false},
 		{"reject missing serial", func(d *Disk) { d.Serial = "" }, false},
 	}

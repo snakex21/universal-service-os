@@ -33,6 +33,7 @@ pub const gui = struct {
     pub const usb_gamepad = @import("gui/usb_gamepad.zig");
     pub const handheld = @import("gui/handheld.zig");
     pub const ui = @import("gui/ui.zig");
+    pub const arch_badge = @import("gui/arch_badge.zig");
     pub const menu_screens = @import("gui/menu_screens.zig");
     pub const form = @import("gui/form.zig");
     pub const osk = @import("gui/osk.zig");
@@ -44,6 +45,7 @@ pub const gui = struct {
     pub const font_pack = @embedFile("gui/fonts/usos-font.bin");
 };
 pub const dos = @import("compat/dos/root.zig");
+pub const win3x = @import("compat/win3x/root.zig");
 pub const device_guard = @import("device_guard/check.zig");
 pub const storage = struct {
     pub const random_reader = @import("storage/random_reader.zig");
@@ -54,11 +56,13 @@ pub const storage = struct {
 pub const image_probe = struct {
     pub const probe = @import("image_probe/probe.zig");
     pub const random_access = @import("image_probe/random_access.zig");
+    pub const read_cache = @import("image_probe/read_cache.zig");
     pub const udf = @import("image_probe/udf.zig");
     pub const iso9660 = @import("image_probe/iso9660.zig");
     pub const optical_fs = @import("image_probe/optical_fs.zig");
     pub const windows_detect = @import("image_probe/windows_detect.zig");
     pub const windows_media = @import("image_probe/windows_media.zig");
+    pub const windows_legacy_media = @import("image_probe/windows_legacy_media.zig");
     pub const pe_loader = @import("image_probe/pe_loader.zig");
 };
 pub const catalog = @import("catalog/root.zig");
@@ -87,6 +91,8 @@ pub const flow = struct {
     pub const driver_manifest = @import("flow/driver_manifest.zig");
     pub const inf_package = @import("flow/inf_package.zig");
     pub const acpi_dump = @import("flow/acpi_dump.zig");
+    pub const acpi_raw = @import("flow/acpi_raw.zig");
+    pub const display_edid = @import("flow/display_edid.zig");
     pub const linux_iso = @import("flow/linux_iso/root.zig");
 };
 pub const selftest = struct {
@@ -98,6 +104,7 @@ pub const selftest = struct {
 
 test {
     _ = @import("flow/routing_golden_test.zig");
+    _ = win3x;
     _ = @import("catalog/os_profiles.zig");
     _ = @import("flow/xp_settings_summary.zig");
     _ = @import("flow/answer_screen.zig");
@@ -105,6 +112,7 @@ test {
     _ = @import("flow/linux_iso/root.zig");
     _ = @import("gui/form.zig");
     _ = @import("gui/osk.zig");
+    _ = @import("gui/arch_badge.zig");
     _ = @import("flow/plan.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");
@@ -160,6 +168,7 @@ test {
     _ = dos;
     _ = image_probe.probe;
     _ = image_probe.windows_media;
+    _ = image_probe.windows_legacy_media;
     _ = windows7_iso;
     _ = @import("windows7_iso_test.zig");
     _ = i18n;
@@ -169,6 +178,7 @@ test {
     _ = storage.fat32;
     _ = storage.ntfs;
     _ = image_probe.random_access;
+    _ = image_probe.read_cache;
     _ = image_probe.udf;
     _ = image_probe.iso9660;
     _ = image_probe.optical_fs;
@@ -213,6 +223,8 @@ test {
     _ = flow.driver_manifest;
     _ = flow.inf_package;
     _ = flow.acpi_dump;
+    _ = flow.acpi_raw;
+    _ = flow.display_edid;
     _ = selftest.Case;
     _ = selftest.Report;
     _ = @import("selftest/runner.zig");

@@ -22,6 +22,8 @@ vista_prepare_log() {
 }
 
 usos_vista_disk_prepare() {
+    # The previous run's log stays as vista-disk-prepare.log.previous.
+    mv -f /mnt/esp/EFI/USOS/vista-disk-prepare.log /mnt/esp/EFI/USOS/vista-disk-prepare.log.previous 2>/dev/null || true
     : > /mnt/esp/EFI/USOS/vista-disk-prepare.log 2>/dev/null || true
     for tool in sfdisk mkfs.fat lsblk dd blockdev sync awk; do
         command -v "$tool" >/dev/null 2>&1 || stop "$tool is required for the Vista disk preparation"
@@ -29,6 +31,8 @@ usos_vista_disk_prepare() {
     [ -d /sys/firmware/efi ] || stop 'Vista disk preparation requires UEFI'
     [ -r /usr/lib/usos/target_disk_identity.sh ] || stop 'target_disk_identity.sh is missing'
     . /usr/lib/usos/target_disk_identity.sh
+    [ -r /usr/lib/usos/target_disk_wait.sh ] || stop 'target_disk_wait.sh is missing'
+    . /usr/lib/usos/target_disk_wait.sh
     [ -r /usr/lib/usos/xp_confirmation_ui.sh ] || stop 'xp_confirmation_ui.sh is missing'
     . /usr/lib/usos/xp_confirmation_ui.sh
     NT5_TITLE='WINDOWS VISTA'
@@ -42,12 +46,9 @@ usos_vista_disk_prepare() {
     CANDIDATES=/run/vista-candidates
     : > "$CANDIDATES"
     index=0
-    # Storage drivers may still be probing: wait briefly for a non-USOS disk.
-    for attempt in 1 2 3 4 5 6 7 8 9 10; do
-        mdev -s 2>/dev/null || true
-        lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2 == "disk" { print $1 }' | grep -qv "^$USOS_DISK_DEVICE\$" && break
-        sleep 1
-    done
+    # Storage drivers may still be probing: wait for a non-USOS disk (10 s; up
+    # to 60 s while an NVMe controller has no disk yet, tools/target_disk_wait.sh).
+    usos_target_disk_wait "$USOS_DISK_DEVICE" vista_prepare_log 3 5 || true
     for candidate in $(lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2 == "disk" { print $1 }'); do
         ro=$(lsblk -dnro RO "$candidate" 2>/dev/null | head -n 1 || true)
         if [ "$candidate" = "$USOS_DISK_DEVICE" ]; then
@@ -60,6 +61,12 @@ usos_vista_disk_prepare() {
             vista_prepare_log "DISK $candidate ACCEPT index=$index model=$(usos_disk_model "$candidate" || true) size=$(usos_disk_size "$candidate" || true)"
         fi
     done
+    if [ "$index" -eq 0 ]; then
+        # X470 2026-10-13: the log said only "REJECT USOS stick"; keep the
+        # disks, PCI storage controllers and kernel messages for the report.
+        usos_target_disk_report | usos_stick_write usos_esp_append /mnt/esp/EFI/USOS/vista-disk-prepare.log || true
+        stop "$(usos_target_disk_stop)"
+    fi
     [ "$index" -gt 0 ] || stop 'No target disk found (only the USOS stick). No disk was changed.'
 
     while :; do
@@ -70,7 +77,9 @@ usos_vista_disk_prepare() {
         size=$(usos_disk_size "$TARGET_DEVICE")
         screen=/run/vista-disk-confirm.txt
         {
-            printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n\n' "$model" "$serial" "$((size / 1073741824))"
+            printf 'Disk: %s\n' "$model"
+            usos_disk_type_line "$TARGET_DEVICE"
+            printf 'S/N: %s\nSize: %s GiB\n\n' "$serial" "$((size / 1073741824))"
             printf 'All partitions, systems and files on this disk will be erased.\n'
             printf 'USOS creates an EFI partition and leaves the rest free. In Vista Setup select the unallocated space.\n'
         } > "$screen"
@@ -125,9 +134,6 @@ usos_vista_disk_prepare() {
     # already renamed into place and synced. Restart through the kernel.
     sync
     sleep 3
-    reboot -f 2>/dev/null || true
-    sleep 3
-    echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true
-    echo b > /proc/sysrq-trigger 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }

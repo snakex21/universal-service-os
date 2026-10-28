@@ -1,0 +1,14 @@
+# wlink directives for USOSP1.DRV (tools/build_win9x_support.py adds
+# "file usosp1.obj name USOSP1.DRV"). No OpenWatcom runtime: own entry
+# point, only import records from windows.lib.
+format windows dll initglobal
+option modname=USOSP1
+option description 'USOS Windows Me Setup phase 1 end fixes (GPL-3.0-or-later)'
+option start=__DLLstart_
+option nodefaultlibs
+option stack=0
+option quiet
+libpath '%WATCOM%/lib286/win'
+library windows
+segment type code fixed
+segment type data fixed

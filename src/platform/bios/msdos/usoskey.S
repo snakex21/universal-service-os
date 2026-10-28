@@ -1,5 +1,5 @@
 /*
- * USOSKEY.COM - USB keyboard bridge for Windows 3.x under CSMWrap.
+ * USOSKEY.COM - USB keyboard (and mouse) bridge for Windows under CSMWrap.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
  * Under CSMWrap (UEFI PC without a CSM) the keyboard is USB and SeaBIOS
@@ -22,6 +22,46 @@
  *       capture only while it is nonzero (about 1 s without a poll)
  *   +10 dropped (ring full)  +12 captured  +14 passed
  *   +80 forced / +82 refused: USOSKEY.DRV's VKD_API_Force_Key counters
+ *   version 2 (diagnostics for USOSDBG.EXE, src/platform/bios/win9x):
+ *   +84 polls: USOSKEY.DRV timer polls (the DRV writes it only from v2 on)
+ *   +86 last INT 15h/4Fh byte (AL), +87 its in9 state
+ *   +88 INT 08h hits seen in the real-mode/V86 vector chain (dword)
+ *   +92 INT 1Ch hits (dword)    +96 INT 15h/4Fh calls, all (dword)
+ *   +100 INT 15h/4Fh calls not from INT 09h, i.e. USB (dword)
+ *   +104 SS:SP (+104 SP, +106 SS) at the last INT 08h
+ *   +108 SS:SP (+108 SP, +110 SS) at the last USB INT 15h/4Fh
+ *   version 3 (2026-10-06 X470 98 SE: Ctrl+C/V/Z dead, F5 once):
+ *   +112 INT 16h guard counters, 10 words: [0] AH=00h chained, [1] AH=01h
+ *        answered (BIOS buffer empty), [2] AH=01h chained (key waiting),
+ *        [3] AH=02h answered, [4] AH=10h chained, [5] AH=11h answered,
+ *        [6] AH=11h chained, [7] AH=12h answered, [8] other AH chained,
+ *        all while the consumer is alive; [9] any INT 16h while it is not
+ *   +132 AX, +134 IP, +136 CS of the last INT 16h while alive
+ *   +138 keybd_event log sequence (USOSKEY.DRV): entry = seq & 31
+ *   +140 32 entries of 8 bytes, written by USOSKEY.DRV: VK, AH (80h key
+ *        up), scan (BL), BH (1 = extended), Ctrl and Shift as the driver
+ *        had sent them (80h down; GetAsyncKeyState until 2026-10-06, not
+ *        safe at interrupt time), 0040:0017 and 0040:0018 after the call
+ *   version 4 (USB mouse for USOSMOUS.DRV, src/platform/win3/usosmous.c):
+ *   +396 mouse ring head (TSR)  +397 tail (consumer)  ring of 32 packets
+ *        of 4 bytes (status, X, Y, Z) at +420; Z is the low byte of the
+ *        handler's Z word: the IntelliMouse wheel byte (up negative) from
+ *        CSMWrap patch 0016 once USOSMOUS.DRV sent the knock, else 0
+ *   +398 mouse alive: set by USOSMOUS.DRV on every poll, INT 1Ch counts it
+ *        down; packets are stored only while it is nonzero
+ *   +399 registration state (written by USOSMOUS.DRV)
+ *   +400 offset of the mouse callback in this segment (mcb)
+ *   +402 packets dropped (ring full)  +404 packets ignored (no consumer)
+ *   +406 USOSMOUS.DRV polls  +408 packets seen (dword)
+ *   +412 last packet (status, X, Y, Z)
+ *   +416 USOSMOUS.DRV event procedure calls  +418 its last BIOS error
+ * The mouse callback (mcb) is what USOSMOUS.DRV registers with INT 15h
+ * AX=C207h: SeaBIOS (CSMWrap) serves a USB boot-protocol mouse as the BIOS
+ * PS/2 pointing device and far-calls the handler from its USB poll (INT 08h)
+ * with status, X, Y and Z words on the stack (seabios/src/mouse.c). The
+ * handler only stores the packet; it is registered only while USOSMOUS.DRV
+ * is enabled and lives in this TSR (loaded before Windows: the same memory
+ * in every VM).
  * Built with tools/build_win3_usb_keyboard.py (zig cc, linked at 0100h).
  */
 .intel_syntax noprefix
@@ -34,7 +74,7 @@ _start:
     .p2align 1
 shared:
     .ascii "USKY"
-    .word 1
+    .word 4
 head:    .byte 0
 tail:    .byte 0
 alive:   .byte 0
@@ -45,12 +85,53 @@ passed:  .word 0
 ring:    .space 64
 forced:  .word 0                  /* written by USOSKEY.DRV (diagnostics) */
 refused: .word 0
+polls:   .word 0                  /* written by USOSKEY.DRV (v2) */
+last4f:  .byte 0
+last4f9: .byte 0
+c08:     .long 0
+c1c:     .long 0
+c4f:     .long 0
+c4fusb:  .long 0
+sp08:    .word 0
+ss08:    .word 0
+sp4f:    .word 0
+ss4f:    .word 0
+c16:     .space 20                /* v3: INT 16h guard counters */
+last16ax: .word 0
+last16ip: .word 0
+last16cs: .word 0
+evseq:   .word 0                  /* v3: written by USOSKEY.DRV */
+evlog:   .space 256
+mhead:   .byte 0                  /* v4: USB mouse */
+mtail:   .byte 0
+malive:  .byte 0
+mstate:  .byte 0                  /* written by USOSMOUS.DRV */
+mcbofs:  .word mcb
+mdropped: .word 0
+mignored: .word 0
+mpolls:  .word 0                  /* written by USOSMOUS.DRV */
+mpackets: .long 0
+mlast:   .space 4
+mevents: .word 0                  /* written by USOSMOUS.DRV */
+merr:    .word 0                  /* written by USOSMOUS.DRV */
+mring:   .space 128
 in9:     .byte 0
          .byte 0
+old08:   .long 0
 old09:   .long 0
 old15:   .long 0
 old1c:   .long 0
 old2f:   .long 0
+old16:   .long 0
+
+/* INT 08h: count the timer ticks that reach the real-mode/V86 chain. */
+int08:
+    inc dword ptr cs:[c08]
+    mov word ptr cs:[sp08], sp
+    mov word ptr cs:[ss08], ss
+    .att_syntax prefix
+    ljmpw *%cs:old08
+    .intel_syntax noprefix
 
 /* INT 09h: mark keyboard-IRQ context, so INT 15h/4Fh from it passes. */
 int09:
@@ -62,12 +143,98 @@ int09:
     dec byte ptr cs:[in9]
     iret
 
-/* INT 1Ch: the consumer's heartbeat runs down. */
+/* INT 16h guard. SeaBIOS's handle_16 (kbd.c) runs set_leds() first, then
+ * yield() for AH=01h/02h/11h/12h; KEYBOARD.DRV of Windows 9x calls INT 16h
+ * whenever a key gives no character (F5, Ctrl, ...). While Windows owns the
+ * keyboard (consumer alive) the shift-status and empty-buffer checks are
+ * answered here from the BIOS data area without entering SeaBIOS; a waiting
+ * key (DOS box: VKD's INT 09h filled the buffer) and everything else go
+ * down the chain. In plain DOS (not alive) the guard does nothing. */
+int16:
+    cmp byte ptr cs:[alive], 0
+    jne 1f
+    inc word ptr cs:[c16 + 18]
+    jmp chain16
+1:  push bp
+    mov bp, sp
+    push ds
+    push bx
+    mov word ptr cs:[last16ax], ax
+    mov bx, word ptr [bp + 2]
+    mov word ptr cs:[last16ip], bx
+    mov bx, word ptr [bp + 4]
+    mov word ptr cs:[last16cs], bx
+    mov bx, 0x40
+    mov ds, bx
+    cmp ah, 0x02
+    je g02
+    cmp ah, 0x12
+    je g12
+    cmp ah, 0x01
+    je g01
+    cmp ah, 0x11
+    je g11
+    mov bx, 0
+    cmp ah, 0x00
+    je gchain
+    mov bx, 8
+    cmp ah, 0x10
+    je gchain
+    mov bx, 16
+gchain:
+    inc word ptr cs:[c16 + bx]
+    pop bx
+    pop ds
+    pop bp
+chain16:
+    .att_syntax prefix
+    ljmpw *%cs:old16
+    .intel_syntax noprefix
+g02:
+    mov al, byte ptr ds:[0x17]
+    mov bx, 6
+    jmp gdone
+g12:
+    mov al, byte ptr ds:[0x18]
+    and al, 0xf3
+    mov ah, byte ptr ds:[0x96]
+    and ah, 0x0c
+    or ah, al
+    mov al, byte ptr ds:[0x17]
+    mov bx, 14
+    jmp gdone
+g01:
+    mov bx, 2
+    jmp gpeek
+g11:
+    mov bx, 10
+gpeek:
+    push ax
+    mov ax, word ptr ds:[0x1a]
+    cmp ax, word ptr ds:[0x1c]
+    pop ax
+    je gempty
+    add bx, 2                       /* key waiting: SeaBIOS returns it */
+    jmp gchain
+gempty:
+    or byte ptr [bp + 6], 0x40      /* ZF set in the caller's FLAGS: no key */
+gdone:
+    inc word ptr cs:[c16 + bx]
+    pop bx
+    pop ds
+    pop bp
+    iret
+
+/* INT 1Ch: the consumers' heartbeats run down. */
 int1c:
+    inc dword ptr cs:[c1c]
     cmp byte ptr cs:[alive], 0
     je 1f
     dec byte ptr cs:[alive]
-1:  .att_syntax prefix
+1:  cmp byte ptr cs:[malive], 0
+    je 2f
+    dec byte ptr cs:[malive]
+2:  .att_syntax prefix
     ljmpw *%cs:old1c
     .intel_syntax noprefix
 
@@ -91,10 +258,19 @@ int15:
     /* No CF test on entry: SeaBIOS's USB path (call16 on CSMWrap's helper
      * core) arrives with CF clear and relies on the BIOS's own AH=4Fh
      * handler to set it; passed bytes go down the chain unchanged. */
-    cmp byte ptr cs:[alive], 0
-    je pass15
+    inc dword ptr cs:[c4f]
+    mov byte ptr cs:[last4f], al
+    push ax
+    mov al, byte ptr cs:[in9]
+    mov byte ptr cs:[last4f9], al
+    pop ax
     cmp byte ptr cs:[in9], 0
     jne pass15                      /* came through INT 09h: 8042 / VKD */
+    inc dword ptr cs:[c4fusb]
+    mov word ptr cs:[sp4f], sp
+    mov word ptr cs:[ss4f], ss
+    cmp byte ptr cs:[alive], 0
+    je pass15
     push bx
     push si
     mov bl, byte ptr cs:[head]
@@ -126,6 +302,58 @@ chain15:
     ljmpw *%cs:old15
     .intel_syntax noprefix
 
+/* Mouse callback (INT 15h C207h handler), far-called by the BIOS with
+ * [SP+4] Z, [SP+6] Y, [SP+8] X, [SP+10] status (the caller pops them).
+ * Stores the packet (Z: wheel byte, 0 from a BIOS without it) while
+ * USOSMOUS.DRV polls; no other side effects. */
+mcb:
+    push bp
+    mov bp, sp
+    push ax
+    push bx
+    push si
+    inc dword ptr cs:[mpackets]
+    mov al, byte ptr [bp + 12]
+    mov byte ptr cs:[mlast], al
+    mov al, byte ptr [bp + 10]
+    mov byte ptr cs:[mlast + 1], al
+    mov al, byte ptr [bp + 8]
+    mov byte ptr cs:[mlast + 2], al
+    mov al, byte ptr [bp + 6]
+    mov byte ptr cs:[mlast + 3], al
+    cmp byte ptr cs:[malive], 0
+    je mcb_ignored
+    mov bl, byte ptr cs:[mhead]
+    mov bh, bl
+    inc bh
+    and bh, 31
+    cmp bh, byte ptr cs:[mtail]
+    je mcb_full
+    mov si, bx
+    and si, 0x00ff
+    shl si, 2
+    mov al, byte ptr [bp + 12]
+    mov byte ptr cs:[mring + si], al
+    mov al, byte ptr [bp + 10]
+    mov byte ptr cs:[mring + si + 1], al
+    mov al, byte ptr [bp + 8]
+    mov byte ptr cs:[mring + si + 2], al
+    mov al, byte ptr [bp + 6]
+    mov byte ptr cs:[mring + si + 3], al
+    mov byte ptr cs:[mhead], bh
+    jmp mcb_done
+mcb_full:
+    inc word ptr cs:[mdropped]
+    jmp mcb_done
+mcb_ignored:
+    inc word ptr cs:[mignored]
+mcb_done:
+    pop si
+    pop bx
+    pop ax
+    pop bp
+    .byte 0xcb                      /* retf (16-bit far return) */
+
 resident_end:
 
 /* ---------------------------------------------------------------- install */
@@ -142,6 +370,10 @@ install:
     mov ax, 0x4c00
     int 0x21
 1:
+    mov ax, 0x3508
+    int 0x21
+    mov word ptr [old08], bx
+    mov word ptr [old08 + 2], es
     mov ax, 0x3509
     int 0x21
     mov word ptr [old09], bx
@@ -158,8 +390,15 @@ install:
     int 0x21
     mov word ptr [old2f], bx
     mov word ptr [old2f + 2], es
+    mov ax, 0x3516
+    int 0x21
+    mov word ptr [old16], bx
+    mov word ptr [old16 + 2], es
     push cs
     pop ds
+    mov dx, offset int08
+    mov ax, 0x2508
+    int 0x21
     mov dx, offset int09
     mov ax, 0x2509
     int 0x21
@@ -171,6 +410,9 @@ install:
     int 0x21
     mov dx, offset int2f
     mov ax, 0x252f
+    int 0x21
+    mov dx, offset int16
+    mov ax, 0x2516
     int 0x21
     /* Free the environment copy; keep the PSP and the resident part. */
     mov es, word ptr [0x2c]
@@ -186,6 +428,6 @@ install:
     int 0x21
 
 msg_ok:
-    .ascii "USOSKEY: USB keyboard bridge for Windows 3.x installed (CSMWrap).\r\n$"
+    .ascii "USOSKEY: USB keyboard and mouse bridge for Windows installed (CSMWrap).\r\n$"
 msg_already:
     .ascii "USOSKEY: already installed.\r\n$"

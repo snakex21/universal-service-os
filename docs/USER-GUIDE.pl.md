@@ -37,10 +37,12 @@ dołącza żadnych obrazów Windows: przynosisz własne.
 
 ### Co jest potrzebne
 
-- **Pendrive USB o pojemności co najmniej 32 GiB.** Instalator odrzuca
-  mniejsze urządzenia. Uwaga: pendrive opisany na opakowaniu jako „32 GB”
-  ma zwykle trochę mniej niż 32 GiB i zostanie odrzucony. W praktyce
-  wybierz pendrive **64 GB lub większy**. Instalator przyjmuje tylko
+- **Pendrive USB opisany jako 16 GB lub większy.** Instalator odrzuca
+  urządzenia poniżej 14 000 000 000 bajtów (każdy pendrive sprzedawany
+  jako „16 GB” ma więcej). Pendrive 16 GB mieści USOS i około 7 GiB
+  obrazów (np. jedno ISO Windows 7); WORK zajmuje 6 GiB na pendrive'ach
+  poniżej 32 GiB i do 16 GiB na większych. Na kilka systemów wybierz
+  pendrive **64 GB lub większy**. Instalator przyjmuje tylko
   urządzenia zgłaszane przez Windows jako wymienne (flaga RemovableMedia);
   niektóre dyski USB SSD tego nie robią i nie pojawią się jako „Gotowe”.
 - **Cała zawartość pendrive'a zostanie skasowana** przy instalacji.
@@ -55,11 +57,21 @@ Po instalacji pendrive ma trzy partycje:
 |---|---|---|
 | USOS_ESP | FAT32, 1 GiB | pliki startowe USOS, klucz Secure Boot, ustawienia, logi, profile, motywy |
 | USOS_DATA | NTFS, reszta miejsca | Twoje obrazy ISO, sterowniki, narzędzia |
-| USOS_WORK | NTFS, 1/4 pendrive'a (12 do 24 GiB) | miejsce robocze dla niektórych instalatorów Windows |
+| USOS_WORK | NTFS, 1/4 pendrive'a (12 do 16 GiB) | miejsce robocze dla niektórych instalatorów Windows |
 
 ---
 
 ## 2. Instalator: instalacja, aktualizacja, naprawa, deinstalacja
+
+Instalator jest przenośny. Ustawienia, dziennik przywracania AutoPlay,
+znaczniki „klucz zapisany” i pobrane komponenty znajdują się w `data` obok
+EXE; pliki tymczasowe trafiają do `data\tmp` i są usuwane po zamknięciu
+instalatora. Nic nie powstaje w `%APPDATA%`, `%LOCALAPPDATA%` ani `%TEMP%`.
+Przenoś cały folder programu razem z `data`. Folder musi umożliwiać zapis: w
+miejscu tylko do odczytu (np. Program Files) instalator prosi o przeniesienie
+folderu USOS (pulpit, pendrive) i kończy pracę. Ustawienia starszej wersji z
+`%APPDATA%\USOS` są jednorazowo kopiowane do `data`; stare pliki zostają bez
+zmian.
 
 Uruchom `USOS-Installer-1.0.0.exe` (dwukrotne kliknięcie, zgoda UAC).
 Na pierwszym ekranie „**Co chcesz zrobić?**” są cztery karty:
@@ -85,12 +97,13 @@ Na górze okna możesz wybrać język. Wybrany język trafia też na pendrive
 3. Na liście „Wybierz nośnik dla Universal Service OS” kliknij swój
    pendrive. Dyski, których nie wolno użyć, są widoczne z powodem odrzucenia
    (np. „dysk zawiera uruchomiony system Windows”, „urządzenie ma mniej niż
-   wymagane 32 GB”).
+   wymagane 16 GB”).
 4. Kliknij **Dalej**. Pojawi się ekran „**UWAGA - OPERACJA NISZCZĄCA**”
    z listą partycji i plików, które zostaną usunięte. Przeczytaj ją.
-5. Wpisz dokładnie, znak w znak, tekst potwierdzenia pokazany po lewej
-   (nazwę modelu pendrive'a).
-6. Kliknij **ROZPOCZNIJ KASOWANIE I INSTALACJĘ**.
+5. Zaznacz **Rozumiem, że wszystko na tym dysku zostanie usunięte**.
+6. Kliknij **ROZPOCZNIJ KASOWANIE I INSTALACJĘ**. Przycisk staje się
+   aktywny po zaznaczeniu pola i 3 sekundach od wyświetlenia ekranu
+   (odliczanie widać na przycisku).
 7. Czekaj. Instalacja ma 9 kroków. Od kroku 1 nie da się już przerwać.
    **Nie odłączaj pendrive'a i nie wyłączaj komputera.**
 8. Na końcu instalator sam czyta pendrive i sprawdza wynik. Ekran końcowy
@@ -131,8 +144,9 @@ DATA i WORK nie są formatowane ani czyszczone.
 1. Wybierz kartę **Deinstalacja** i swój pendrive.
 2. Przeczytaj ekran „**UWAGA - DEINSTALACJA USOS**”. Zniknie wszystko:
    ESP, DATA (z obrazami) i WORK.
-3. Wpisz pełny model urządzenia dokładnie tak, jak jest pokazany.
-4. Kliknij **ROZPOCZNIJ DEINSTALACJĘ**.
+3. Zaznacz **Rozumiem, że wszystko na tym dysku zostanie usunięte**.
+4. Kliknij **ROZPOCZNIJ DEINSTALACJĘ** (aktywny po zaznaczeniu pola
+   i 3-sekundowym odliczaniu).
 
 Wynik: jedna zwykła partycja exFAT.
 
@@ -152,7 +166,8 @@ Wydanie 1.0 to kilka osobnych plików:
 | Plik | Co to jest | Czy potrzebny |
 |---|---|---|
 | `USOS-Installer-1.0.0.exe` | instalator (zawiera cały USOS) | zawsze |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | pomocniczy obraz WinPE 10 („dawca PE10”) | dla Visty i oryginalnych ISO Windows 7 w trybie UEFI |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | pomocniczy obraz WinPE 10 x64 („dawca PE10”) | dla Visty i oryginalnych ISO Windows 7 w trybie UEFI |
+| `USOS-1.0.0-WinPE-PE10-x86-donor.zip` | pomocniczy obraz WinPE 10 x86 („dawca PE10 x86”) | dla 32-bitowych Windows 7, Visty i Server 2008 w trybie UEFI bez CSM |
 | `USOS-1.0.0-XP-package-PL.zip` | pakiet Windows XP x86 SP3 dla UEFI (polski) | dla XP w trybie UEFI |
 | `USOS-1.0.0-XP-package-EN.zip` | pakiet Windows XP x86 SP3 dla UEFI (angielski) | dla XP w trybie UEFI |
 | `USOS-1.0.0-sources.zip` | kod źródłowy | nie do używania, do wglądu |
@@ -196,22 +211,34 @@ Get-Content .\SHA256SUMS | ForEach-Object {
 
 Jeśli przy którymkolwiek pliku jest `BLAD`, pobierz go ponownie.
 
-### 3.2 Dawca PE10 (Vista i oryginalny Windows 7 w UEFI)
+### 3.2 Dawcy PE10 (Vista i Windows 7 w UEFI)
 
-Windows Vista oraz oryginalne ISO Windows 7 potrzebują w trybie UEFI
-pomocniczego obrazu WinPE 10. Bez niego menu zablokuje te systemy w UEFI.
+Dwa pomocnicze obrazy WinPE 10, po jednym na architekturę:
 
-1. Rozpakuj `USOS-1.0.0-WinPE-PE10-donor.zip`. W środku jest folder
-   `Programs\USOS\WinPE\` z plikiem `PE10_x64_19041_USOS.iso`.
+- **x64** (`PE10_x64_19041_USOS.iso`, w `USOS-1.0.0-WinPE-PE10-donor.zip`):
+  potrzebują go Windows Vista oraz oryginalne ISO Windows 7 w trybie UEFI.
+  Bez niego menu zablokuje te systemy w UEFI.
+- **x86** (`PE10_x86_19041_USOS.iso`, w
+  `USOS-1.0.0-WinPE-PE10-x86-donor.zip`): potrzebują go 32-bitowe Windows 7,
+  Vista i Server 2008 w trybie UEFI bez CSM (rozdział 5.1). Bez niego mogą
+  nadal użyć Twojego własnego ISO Windows 10 x86 w
+  `Systems\Windows\Windows 10\Images`.
+
+Pełny instalator zawiera oba i proponuje je w kroku **Komponenty** (instalator
+online je pobiera). Ręcznie:
+
+1. Rozpakuj zip. W środku jest folder `Programs\USOS\WinPE\` z plikiem ISO.
 2. Skopiuj folder `Programs` na partycję **USOS_DATA** tak, żeby plik
-   leżał w `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`.
-   W `Programs\USOS\WinPE\` może być tylko jeden plik ISO.
+   leżał w `DATA:\Programs\USOS\WinPE\PE10_x64_19041_USOS.iso`
+   (albo `...\PE10_x86_19041_USOS.iso`). W `Programs\USOS\WinPE\` jest jeden
+   plik ISO na architekturę; plik z `x86` w nazwie liczy się jako dawca x86.
 3. Uruchom instalator i wykonaj **Aktualizuj USOS** (rozdział 2.2).
-   Instalator zapisze wtedy sumę SHA-256 obrazu w `EFI\USOS\winpe-donor.ini`
-   na ESP i oznaczy folder jako ukryty i systemowy.
-4. Nie zmieniaj, nie przenoś i nie usuwaj tego pliku. Menu sprawdza jego sumę
+   Instalator zapisze wtedy sumę SHA-256 każdego obrazu w
+   `EFI\USOS\winpe-donor.ini` na ESP i oznaczy folder jako ukryty i systemowy.
+4. Nie zmieniaj, nie przenoś i nie usuwaj tych plików. Menu sprawdza sumę
    przed każdym użyciem. Jeśli plik zniknie albo się zmieni, menu zablokuje
-   Vistę i Windows 7 w UEFI i poprosi o ponowną aktualizację w instalatorze.
+   systemy, które go potrzebują, i poprosi o ponowną aktualizację w
+   instalatorze.
 
 Ten folder nie pojawia się w menu systemów.
 
@@ -273,10 +300,14 @@ USOS_DATA\
 │  │  │   └─ Drivers\x64\   (sterowniki USB 3 / NVMe dla Windows 7)
 │  │  ├─ Windows Vista\     Images\   Unattended\
 │  │  ├─ Windows XP\        Images\   Unattended\  (usos-xp.ini, usos-xp.example.ini)
-│  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\
+│  │  ├─ Windows XP Media Center Edition 2005\
+│  │  ├─ Windows XP Tablet PC Edition 2005\
+│  │  ├─ Windows Embedded POSReady 2009\
+│  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\  Windows NT 3.51\  Windows NT 3.5\  Windows NT 3.1\
 │  │  ├─ Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
 │  │  ├─ Windows 3.11\  Windows 3.1\          (tylko Images)
-│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003
+│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003, Windows NT 4.0 Terminal Server,
+│  │                         Windows NT 3.51 Server, Windows NT 3.5 Server, Windows NT 3.1 Advanced Server
 │  ├─ Linux\
 │  │  ├─ Ubuntu\  Debian\  Fedora\  Linux Mint\  Arch Linux\  openSUSE\
 │  │  ├─ Manjaro\  Kali Linux\  SystemRescue\  GParted Live\  Clonezilla\
@@ -315,6 +346,30 @@ USOS_DATA\
   1 MiB, tylko PNG.
 - Jeśli wrzucisz obraz Windows Server do folderu zwykłego Windows (albo
   odwrotnie), menu podpowie właściwy folder. Obraz i tak da się uruchomić.
+
+#### Media z dyskietek
+
+Zamiast ISO można dać zestaw obrazów dyskietek. Cały zestaw to jeden
+folder w `Images`, np.:
+
+```
+Systems\Windows\Windows for Workgroups 3.11\Images\WfW 3.11 PL\
+    disk01.img  disk02.img  ...  disk10.img
+```
+
+- Menu UEFI pokazuje folder jako jedną pozycję (nazwa folderu, oznaczenie
+  `FDD`, liczba dyskietek). Instalacja przebiega tak samo jak z ISO.
+- Obrazy: `.img`, `.ima`, `.vfd` lub `.flp` o rozmiarze dyskietki
+  (160/180/320/360 KB, 720 KB, 1,2 MB, 1,44 MB, 2,88 MB, FAT12). Inne pliki
+  w folderze (np. `.txt`) są pomijane.
+- Nazwy są dowolne; kolejność jest naturalna (`disk2` przed `disk10`,
+  `DISK_1`, `disk01`, `Disk 1 of 10` działają tak samo).
+- Pliki ze wszystkich dyskietek trafiają do jednego folderu instalacyjnego.
+  Gdy ten sam plik jest na kilku dyskietkach, zostaje pierwsza kopia; różna
+  treść jest zapisana w logu przygotowania (`EFI\USOS\win9x\prepare.log`).
+- Obsługiwane: Windows 1.0x–3.x i Windows for Workgroups 3.11 (menu UEFI, także bez CSM;
+  menu BIOS nie pokazuje zestawów). Dla innych systemów menu pokazuje zestaw jako
+  „nieobsługiwany format”; dla nich użyj ISO.
 
 ### 4.2 Pliki odpowiedzi (instalacja nienadzorowana)
 
@@ -364,6 +419,16 @@ brakujące foldery i nadpisują `README.txt`. Nic innego nie jest usuwane.
   Nazwy DOS 8.3, bez spacji i polskich znaków. Każdy program może mieć
   swój podfolder. Wymagane co najmniej 128 MiB RAM. Pliki wynikowe znikają
   po restarcie (dysk RAM).
+- **Programy DOS dla instalacji MS-DOS / Windows 1.x-3.x**:
+  `Systems\DOS\MS-DOS\Programs\`, kopiowane do `C:\PROGRAMS` (ścieżka UEFI).
+  Ikony w Windows 3.x (opcjonalnie): plik `USOSICON.TXT` w folderze
+  programu z wierszami `"Nazwa",C:\PROGRAMS\<FOLDER>\PLIK.EXE` (nazwy 8.3,
+  ASCII, plik w tym folderze; `.EXE`, `.COM`, `.PIF` albo `.BAT`) dodaje je
+  do grupy Main podczas Instalatora Windows. Opcjonalne trzecie pole to
+  najstarszy Windows, którego program wymaga: `,3.0`, `,3.1` albo `,3.11`
+  (np. `"Netscape",C:\PROGRAMS\NETSCAPE\NETSCAPE.EXE,3.1`: bez ikony
+  w 3.0). Błędne wiersze są pomijane
+  i zapisywane w logu przygotowania.
 - **Narzędzia EFI dla powłoki UEFI** (flashery BIOS/VBIOS, testery GPU):
   `Utilities\UEFI Shell\Tools\`. Po skopiowaniu nie trzeba aktualizacji.
   Uruchom: **Narzędzia -> Powłoka UEFI**, potem `ls` i nazwę narzędzia.
@@ -441,8 +506,13 @@ Uwagi do tabeli:
 - Windows 7 z CSM w UEFI omija UefiSeven. Test na X470 dotyczył trybu bez
   CSM i obrazu „6in1” (z nowszym WinPE). Oryginalne ISO SP1 przez dawcę PE10
   nie było testowane na sprzęcie.
-- Windows 10 i 11 w wersji x86 (32-bit) są zablokowane na 64-bitowym UEFI.
-  Uruchom je w trybie BIOS (CSM).
+- 32-bitowe (x86) Windows 10 i 8.1 oraz 32-bitowe Windows 7, Vista
+  i Server 2008 instalują się na 64-bitowym UEFI bez CSM przez CSMWrap: USOS
+  przygotowuje dysk MBR, a Instalator działa w trybie BIOS (rozdział 5.1).
+  Na X470 przeszły Windows 10, Windows 7, Vista i Web Server 2008 x86, z
+  własnym ISO Windows 10 x86 użytkownika jako dawcą; dostarczany dawca PE10
+  x86 (rozdział 3.2) nie był jeszcze testowany na sprzęcie. Windows 11 nie
+  ma wersji 32-bitowej.
 - Windows 2000 na X470 nie działa: brak sterownika AHCI dla NT 5.0.
 - Menu przy każdym systemie pokazuje odznakę, np. „Wymaga wyłączenia
   Secure Boot” albo „Wymaga BIOS”.
@@ -887,10 +957,11 @@ prawdziwym sprzęcie** (albo wcale):
 
 | Objaw | Co zrobić |
 |---|---|
-| Instalator nie widzi pendrive'a jako „Gotowe” | Przeczytaj powód odrzucenia. Najczęściej: za mały (poniżej 32 GiB) albo nie zgłasza się jako wymienny. |
+| Instalator nie widzi pendrive'a jako „Gotowe” | Przeczytaj powód odrzucenia. Najczęściej: za mały (poniżej 16 GB) albo nie zgłasza się jako wymienny. |
 | Instalator pisze „Nośnik jest używany” | Zamknij okna Eksploratora pokazujące pendrive i kliknij Ponów. |
 | Pendrive nie startuje | Uruchom **Naprawa -> Napraw ESP**. |
 | W UEFI Vista / Windows 7 są zablokowane | Brak lub zmiana dawcy PE10: rozdział 3.2, potem **Aktualizuj USOS**. |
+| Bez CSM 32-bitowe Windows 7 / Vista / 2008 są zablokowane | Brak lub zmiana dawcy PE10 x86 (i brak własnego ISO Windows 10 x86): rozdział 3.2, potem **Aktualizuj USOS**. |
 | „Verification failed” przy starcie | Brak klucza USOS: rozdział 6. |
 | System ma odznakę „Wymaga wyłączenia Secure Boot” | Wyłącz Secure Boot w BIOS. |
 | System ma odznakę „Wymaga BIOS” | Uruchom pendrive w trybie Legacy (włącz CSM). |

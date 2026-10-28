@@ -10,16 +10,21 @@
 //! wimboot RAM disk. clearRendered() removes rendered files left behind
 //! (they may carry a key or a password) before any start.
 //!
-//! Every file is loaded (names stay unique across systems), but the
-//! manager sees only the profiles offered for its system (`systems=`,
-//! answer.applies): len/get/stem/find work on that filtered list.
+//! Every file is loaded, but the manager sees only the profiles offered for
+//! its system (`systems=`, answer.applies): len/get/stem/find work on that
+//! filtered list. A name is unique only among profiles offered for a
+//! common system (applies.overlaps), so the file stem is the name's stem
+//! or, when another file holds that, the stem with "-2", "-3"... (the
+//! stem of a loaded profile is always the one of its file).
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
 const directory_scan = @import("directory_scan.zig");
+const data_volume = @import("data_volume.zig");
 const file_read = @import("file_read.zig");
 const settings_store = @import("settings_store.zig");
 const serial = @import("serial.zig");
+const ntfs = usos.storage.ntfs;
 
 const answer = usos.flow.answer;
 pub const Profile = answer.Profile;
@@ -39,6 +44,9 @@ var loaded_count: usize = 0;
 /// Indices into `loaded` of the profiles offered for `filter_system`.
 var visible: [max]usize = undefined;
 var count: usize = 0;
+/// Loaded profiles not offered for `filter_system` (the answer screen's
+/// "hidden" note).
+var hidden_count: usize = 0;
 var filter_storage: [48]u8 = undefined;
 var filter_system: ?[]const u8 = null;
 /// Keys typed this boot without remember_key, by file stem.
@@ -68,24 +76,58 @@ pub fn filter(system_id: ?[]const u8) void {
     applyFilter();
 }
 
+/// Profiles on the stick made for other systems (not in the list).
+pub fn hidden() usize {
+    return hidden_count;
+}
+
 fn applyFilter() void {
     count = 0;
+    hidden_count = 0;
     for (0..loaded_count) |i| {
-        if (filter_system) |id| if (!answer.applies.appliesTo(&loaded[i], id)) continue;
+        if (filter_system) |id| if (!answer.applies.appliesTo(&loaded[i], id)) {
+            hidden_count += 1;
+            continue;
+        };
         if (count == max) break;
         visible[count] = i;
         count += 1;
     }
 }
 
-/// The stem of any profile file (offered here or not) with the file stem
-/// of `name`: a new name must not overwrite another system's profile.
-pub fn stemInUse(name: []const u8) ?[]const u8 {
+/// Another profile (offered here or not) has the name of `name` (same
+/// file stem: case, space and '.' do not count) and shares a system with
+/// `scope` (its `systems=`): the answer screen of that system would list
+/// both. `own_stem`: the file being edited (not counted).
+pub fn nameTaken(name: []const u8, scope: *const Profile, own_stem: ?[]const u8) bool {
     const wanted = stemOf(name);
-    for (stems[0..loaded_count]) |*s| {
-        if (std.ascii.eqlIgnoreCase(s.slice(), wanted.slice())) return s.slice();
+    for (0..loaded_count) |i| {
+        if (own_stem) |own| if (std.ascii.eqlIgnoreCase(stems[i].slice(), own)) continue;
+        if (!std.ascii.eqlIgnoreCase(stemOf(loaded[i].name.slice()).slice(), wanted.slice())) continue;
+        if (answer.applies.overlaps(&loaded[i], scope)) return true;
     }
-    return null;
+    return false;
+}
+
+const StemOwner = struct {
+    /// The file being replaced (its stem is free for the new one).
+    own: ?[]const u8,
+    fn taken(self: StemOwner, candidate: []const u8) bool {
+        for (stems[0..loaded_count]) |*s| {
+            if (self.own) |own| if (std.ascii.eqlIgnoreCase(s.slice(), own)) continue;
+            if (std.ascii.eqlIgnoreCase(s.slice(), candidate)) return true;
+        }
+        return false;
+    }
+};
+
+/// The file stem for `name`: its own stem, or a numbered one when a profile
+/// of another system (same name, no common system) holds that file.
+fn fileStemFor(name: []const u8, previous_stem: ?[]const u8) Stem {
+    var buffer: [32]u8 = undefined;
+    var result = Stem{};
+    result.set(answer.profile.uniqueFileStem(name, StemOwner{ .own = previous_stem }, StemOwner.taken, &buffer)) catch {};
+    return result;
 }
 
 fn stemOf(name: []const u8) Stem {
@@ -95,11 +137,12 @@ fn stemOf(name: []const u8) Stem {
     return result;
 }
 
-/// Index (in the filtered list) of a profile whose file stem equals that of `name`.
+/// Index (in the filtered list) of the profile named `name` (compared as
+/// file stems; names are unique among the profiles of one system).
 pub fn find(name: []const u8) ?usize {
     const wanted = stemOf(name);
     for (visible[0..count], 0..) |i, index| {
-        if (std.ascii.eqlIgnoreCase(stems[i].slice(), wanted.slice())) return index;
+        if (std.ascii.eqlIgnoreCase(stemOf(loaded[i].name.slice()).slice(), wanted.slice())) return index;
     }
     return null;
 }
@@ -180,14 +223,15 @@ fn deleteFile(root: *uefi.protocol.File, path: []const u8) void {
     } else |_| {}
 }
 
-/// Writes `profile` (replacing the file of `previous_stem` after a rename)
+/// Writes `profile` to the file of fileStemFor (replacing the file of
+/// `previous_stem`, which keeps its stem unless the name changed)
 /// and keeps a session copy of keys that are not remembered.
 pub fn save(root: *uefi.protocol.File, profile: *const Profile, previous_stem: ?[]const u8) !void {
     if (answer.profile.validate(profile)) |_| return error.InvalidProfile;
     try ensureDirectory(root, directory);
     var bytes: [answer.profile.max_file]u8 = undefined;
     const text = try answer.profile.write(profile, &bytes);
-    const new_stem = stemOf(profile.name.slice());
+    const new_stem = fileStemFor(profile.name.slice(), previous_stem);
     var path: [96]u8 = undefined;
     try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}.ini", .{ directory, new_stem.slice() }), text);
     if (previous_stem) |old| {
@@ -261,7 +305,49 @@ pub fn images() ?*const answer.editions.List {
 
 /// The answer rendered in memory (valid until the next render).
 pub fn render(profile: *const Profile, system_id: []const u8, arch: answer.Arch) !answer.Rendered {
-    return (try answer.render(profile, system_id, arch, null, images(), &rendered)) orelse error.NoGeneratedAnswer;
+    return (try answer.render(profile, system_id, arch, null, images(), fastStartupOn(system_id), &rendered)) orelse error.NoGeneratedAnswer;
+}
+
+/// <system's Unattended folder on DATA>\fast-startup-on.txt (for example
+/// DATA\Systems\Windows\Windows 10\Unattended): the user keeps Windows' own
+/// Fast Startup for this version (docs/ds-fast-startup-2026-10-22.md). The
+/// folder is the catalog entry's own, so Embedded 8.1 Industry and routed
+/// variants use theirs. Unreadable DATA or a version without Fast Startup:
+/// false, so the answer disables it where it applies (clients 8 / 8.1 / 10 /
+/// 11; the Server SKUs hide Fast Startup, see answer.hiberboot).
+fn fastStartupOn(system_id: []const u8) bool {
+    const family = answer.target.familyFor(system_id) orelse return false;
+    switch (family) {
+        .windows_8, .windows_8_1, .windows_10, .windows_11 => {},
+        else => return false,
+    }
+    const system = usos.catalog.systems.findById(system_id) orelse return false;
+    const unattended = system.unattended_directory orelse return false;
+    // NTFS path components (openFile looks each one up in its parent).
+    var storage: [192]u16 = undefined;
+    var slices: [8][]const u16 = undefined;
+    var components: usize = 0;
+    var at: usize = 0;
+    var parts = std.mem.tokenizeScalar(u8, unattended, '\\');
+    var done = false;
+    while (!done) {
+        const part = parts.next() orelse blk: {
+            done = true;
+            break :blk "fast-startup-on.txt";
+        };
+        if (components == slices.len or at + part.len > storage.len) return false;
+        for (part, 0..) |ch, i| storage[at + i] = ch;
+        slices[components] = storage[at .. at + part.len];
+        at += part.len;
+        components += 1;
+    }
+    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return false;
+    defer uefi.pool_allocator.destroy(catalog);
+    catalog.* = data_volume.openCatalog() catch return false;
+    var file: ntfs.File = undefined;
+    ntfs.openFile(catalog.fs, catalog.reader(), slices[0..components], &file) catch return false;
+    serial.writeAscii("[PROFILE] fast-startup-on.txt on DATA: Windows keeps its Fast Startup\n");
+    return true;
 }
 
 /// Removes rendered answers and the plan left on the ESP by an earlier
@@ -272,6 +358,65 @@ pub fn clearRendered(root: *uefi.protocol.File) void {
         deleteFile(root, plan_file.filePathEsp(format, &path) catch continue);
     }
     deleteFile(root, plan_file.plan_path);
+    clearWin9x(root);
+}
+
+/// The MSBATCH.INF files of stageWin9x: the BIOS mode read them before the
+/// restart that brought the menu back, so every UEFI start removes them.
+pub fn clearWin9x(root: *uefi.protocol.File) void {
+    var path: [96]u8 = undefined;
+    for (answer.msbatch.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+    for (answer.nt4.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+    for (answer.nt3.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+    for (answer.posready.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+    for (answer.dos.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+}
+
+/// Windows 95/98/Me through the BIOS mode (docs/win9x-modern-2026-09-30.md):
+/// MSBATCH.INF for every 9x system, \EFI\USOS\answer\<98SE|98|ME|95>.INF,
+/// which the BIOS Core's DOS Setup path copies into its RAM disk. The next
+/// UEFI start removes them (clearRendered).
+pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
+    clearRendered(root);
+    try ensureDirectory(root, "\\EFI\\USOS");
+    try ensureDirectory(root, plan_file.directory);
+    var path: [96]u8 = undefined;
+    for (answer.msbatch.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // Windows NT 4.0 (same micro-Linux step 620): NT4.SIF / NT4S.SIF.
+    for (answer.nt4.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // Windows NT 3.51 / 3.5 / 3.1 (same step 620): NT351.SIF / NT351S.SIF, NT35.SIF / NT35S.SIF, NT31.SIF / NT31S.SIF.
+    for (answer.nt3.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // Windows Embedded POSReady 2009 (same step 620): POSR.SIF.
+    for (answer.posready.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, false, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // MS-DOS / Windows 1.x-3.x (same step 620): DOS.INI, the regional settings.
+    for (answer.dos.staged) |entry| {
+        const bytes = try answer.dos.render(profile, &rendered);
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), bytes);
+    }
+    var line: [96]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&line, "[PROFILE] staged {s} for Windows 95/98/Me\n", .{profile.name.slice()}) catch "[PROFILE] staged 9x\n");
 }
 
 /// Renders `profile` for the system and writes usos-plan.ini with the
@@ -293,6 +438,7 @@ pub fn stage(root: *uefi.protocol.File, profile: *const Profile, system_id: []co
         .format = result.format,
         .arch = if (result.format == .autounattend_xml) arch else null,
         .key = profile.keyFor(system_id).len > 0,
+        .beta_clock = profile.beta_clock.slice(),
     }, &plan_bytes);
     try settings_store.replaceFile(root, plan_file.plan_path, plan);
     var line: [160]u8 = undefined;
@@ -300,7 +446,32 @@ pub fn stage(root: *uefi.protocol.File, profile: *const Profile, system_id: []co
     return result.format;
 }
 
+/// \EFI\USOS\answer\logon.ini for the chosen system (src/flow/answer/logon.zig):
+/// written at every start (no password in it, so clearRendered keeps it);
+/// removed when the system has no logon prompt. Failures only reach the
+/// serial log: the hint never blocks a start.
+pub fn writeLogon(root: *uefi.protocol.File, system_id: []const u8, logon: answer.logon.Logon, english: []const u8, local: []const u8) void {
+    if (logon.kind == .no_logon) {
+        deleteFile(root, answer.logon.path);
+        return;
+    }
+    var bytes: [1024]u8 = undefined;
+    const text = answer.logon.writeIni(logon, system_id, english, local, &bytes) catch {
+        deleteFile(root, answer.logon.path);
+        serial.writeAscii("[LOGON] logon.ini too long; not written\n");
+        return;
+    };
+    ensureDirectory(root, "\\EFI\\USOS") catch {};
+    ensureDirectory(root, plan_file.directory) catch {};
+    settings_store.replaceFile(root, answer.logon.path, text) catch {
+        serial.writeAscii("[LOGON] cannot write logon.ini\n");
+        return;
+    };
+    var line: [160]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&line, "[LOGON] {s} kind={s} password={s} autologon={s}\n", .{ system_id, @tagName(logon.kind), @tagName(logon.password), if (logon.autologon) "yes" else "no" }) catch "[LOGON] written\n");
+}
+
 /// usos-plan.ini for the wimboot RAM disk (same content as on the ESP).
 pub fn planText(profile: *const Profile, system_id: []const u8, arch: answer.Arch, os_profile: []const u8, buffer: []u8) ![]const u8 {
-    return plan_file.write(.{ .os_profile = os_profile, .system_id = system_id, .source = .profile, .name = profile.name.slice(), .format = .autounattend_xml, .arch = arch, .key = profile.keyFor(system_id).len > 0 }, buffer);
+    return plan_file.write(.{ .os_profile = os_profile, .system_id = system_id, .source = .profile, .name = profile.name.slice(), .format = .autounattend_xml, .arch = arch, .key = profile.keyFor(system_id).len > 0, .beta_clock = profile.beta_clock.slice() }, buffer);
 }

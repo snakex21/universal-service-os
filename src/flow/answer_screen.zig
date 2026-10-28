@@ -136,6 +136,76 @@ test "Vista without firmware CSM is the CSMWrap preparation" {
     try std.testing.expect(!vistaCsmwrap(systems.findById("windows-xp").?, .iso, .automatic, .uefi, false));
 }
 
+/// How the start of a selection reaches the answer screen (manual_app).
+pub const Entry = struct {
+    /// Open the answer-screen manager at all (else straight to the summary).
+    enter: bool,
+    /// List the answer files of the system's Unattended folder.
+    list_files: bool,
+    /// Offer the USOS profiles (profileCapable or Vista via CSMWrap).
+    profiles_allowed: bool,
+};
+
+/// A system with an Unattended folder enters the screen for an ISO / WIM
+/// image, as before. MS-DOS and Windows 1.x-3.x have no Unattended folder
+/// (their answer is the DOS.INI rendered from a profile), so they enter it
+/// whenever profiles apply, also for a floppy disk set: "No answer", their
+/// profiles and "+ Add" (X470 2026-10-24: the screen never opened for them,
+/// so a DOS profile, e.g. dos_winsock, could not be chosen).
+pub fn entryFor(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: Firmware, csm_present: bool) Entry {
+    const profiles = profileCapable(system, image, method, firmware) or vistaCsmwrap(system, image, method, firmware, csm_present);
+    const files = system.unattended_directory != null and (image == .iso or image == .wim);
+    return .{
+        .enter = files or (system.unattended_directory == null and profiles),
+        .list_files = files,
+        .profiles_allowed = profiles,
+    };
+}
+
+test "MS-DOS and Windows 1.x-3.x enter the answer screen with profiles only" {
+    const systems = @import("../catalog/systems.zig");
+    const cases = [_]struct { id: []const u8, image: ImageKind }{
+        .{ .id = "windows-3-1", .image = .iso },       .{ .id = "windows-3-1", .image = .floppy_set },
+        .{ .id = "windows-3-11", .image = .iso },      .{ .id = "windows-wfw-3-11", .image = .iso },
+        .{ .id = "windows-wfw-3-11", .image = .floppy_set }, .{ .id = "ms-dos", .image = .iso },
+        .{ .id = "windows-3-0", .image = .iso },
+    };
+    for (cases) |case| {
+        const system = systems.findById(case.id).?;
+        try std.testing.expect(system.unattended_directory == null);
+        const e = entryFor(system, case.image, .automatic, .uefi, false);
+        try std.testing.expect(e.enter and e.profiles_allowed and !e.list_files);
+        // "No answer", the matching profiles, "+ Add"; no answer files
+        const in = Input{ .settings_file = os_profiles.traits(system.id).settings_file != null, .profiles_allowed = e.profiles_allowed, .profiles = 2, .files = 0 };
+        try std.testing.expect(shown(in));
+        const l = layout(in);
+        try std.testing.expectEqualSlices(Row, &.{ .no_answer, .profile, .profile, .add }, l.slice());
+        try std.testing.expectEqual(@as(usize, 0), l.default);
+        try std.testing.expectEqual(@as(?usize, 1), l.choice(2, &.{}).profile);
+        try std.testing.expectEqual(@as(?usize, null), l.choice(0, &.{}).profile);
+        // the start stages a chosen profile as DOS.INI (win9x_uefi -> stageWin9x)
+        try std.testing.expectEqual(preparation_capability.Backend.win9x_uefi, preparation_capability.resolveForFirmware(system, case.image, .automatic, .uefi).?);
+    }
+    // BIOS Core path: no profiles, no screen
+    const dos_bios = entryFor(systems.findById("ms-dos").?, .iso, .automatic, .bios, false);
+    try std.testing.expect(!dos_bios.enter);
+}
+
+test "systems with an Unattended folder enter the screen as before" {
+    const systems = @import("../catalog/systems.zig");
+    for ([_][]const u8{ "windows-xp", "windows-98-se", "windows-95", "windows-nt-4", "windows-7", "windows-10" }) |id| {
+        const system = systems.findById(id).?;
+        if (system.unattended_directory == null) continue;
+        const iso = entryFor(system, .iso, .automatic, .uefi, true);
+        try std.testing.expect(iso.enter and iso.list_files);
+        try std.testing.expectEqual(profileCapable(system, .iso, .automatic, .uefi), iso.profiles_allowed);
+        // other image kinds: still straight to the summary
+        const img = entryFor(system, .img, .automatic, .uefi, true);
+        try std.testing.expect(!img.enter and !img.list_files);
+    }
+    try std.testing.expect(systems.findById("windows-xp").?.unattended_directory != null);
+}
+
 /// Whether the screen is shown at all.
 pub fn shown(in: Input) bool {
     return in.unsupported or in.settings_file or in.profiles_allowed or in.files > 0;
@@ -183,11 +253,18 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
         const linux_backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
         return linux_backend == .linux_iso and firmware == .uefi;
     }
-    if (answer_target.familyFor(system.id) == null) return false;
-    if (image != .iso and image != .wim) return false;
+    // Windows 95/98/Me have no NT family: MSBATCH.INF (answer/msbatch.zig).
+    // Windows NT 4.0 / 3.51: WINNT.SIF (answer/nt4.zig, answer/nt3.zig).
+    if (answer_target.familyFor(system.id) == null and @import("answer/msbatch.zig").releaseFor(system.id) == null and
+        !@import("answer/nt4.zig").isNt4(system.id) and !@import("answer/nt3.zig").isNt3(system.id) and
+        !@import("answer/posready.zig").isPosReady(system.id) and !@import("answer/dos.zig").isDos(system.id)) return false;
+    // MS-DOS / Windows 1.x-3.x: DOS.INI (answer/dos.zig), also from a floppy disk set.
+    const dos_set = image == .floppy_set and @import("answer/dos.zig").isDos(system.id);
+    if (image != .iso and image != .wim and !dos_set) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
         .xp_uefi_staging => true,
+        .win9x_uefi => true,
         .windows_iso => true,
         .chainload, .wimboot => true,
         else => false,
@@ -201,6 +278,22 @@ pub fn linuxAnswerSystem(system_id: []const u8) bool {
         if (std.mem.eql(u8, id, system_id)) return true;
     }
     return false;
+}
+
+test "Windows 95/98/Me offer answer profiles on the UEFI path (MSBATCH.INF)" {
+    const systems = @import("../catalog/systems.zig");
+    for ([_][]const u8{ "windows-95", "windows-98", "windows-98-se", "windows-me" }) |id| {
+        try std.testing.expect(profileCapable(systems.findById(id).?, .iso, .automatic, .uefi));
+    }
+    // MS-DOS and Windows 1.x-3.x on UEFI (w9x-uefi-csmwrap): DOS.INI; the BIOS Core path takes none.
+    for ([_][]const u8{ "ms-dos", "windows-3-11", "windows-3-1", "windows-wfw-3-11", "windows-3-0", "windows-1-01" }) |id| {
+        try std.testing.expect(profileCapable(systems.findById(id).?, .iso, .automatic, .uefi));
+    }
+    try std.testing.expect(!profileCapable(systems.findById("ms-dos").?, .iso, .automatic, .bios));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-4").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-4-server").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-3-51").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-3-51-server").?, .iso, .automatic, .uefi));
 }
 
 test "Linux profiles only for Ubuntu, Debian and Fedora ISOs on UEFI" {

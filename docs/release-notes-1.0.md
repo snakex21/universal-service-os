@@ -97,6 +97,107 @@ adds the full and online installers described under
   MOK-signed TouchI2cDxe v1.3.1-usos1, which is loaded only on matching
   SMBIOS. Pad buttons work, and the footer shows dynamic A/B hints.
 
+## Nowe od RC / New since the RC
+
+Zmiany po pierwszym release candidate (`B260928-214844-A6711A1F`). Każdy punkt
+ma własny raport w `docs/`. / Changes after the first release candidate; each
+item has its own report in `docs/`.
+
+### Po polsku
+
+- **Vista x64 na NVMe.** Vista i Server 2008 SP2 x64 instalują się i startują z
+  NVMe (test-signed `usosnvme` amd64, 64-bit PRP, DMA powyżej 4 GB); X470 PASS
+  2026-10-21. System działa w trybie testowym, a napis "Test Mode" jest
+  zasłonięty przez usoswm. Szczegóły i odrzucona ścieżka MUI:
+  [vista-x64-nvme-2026-10-21.md](vista-x64-nvme-2026-10-21.md),
+  [vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md).
+- **Win7 x64 na NVMe z oryginalnego ISO.** Setup 6.1 przyjmuje dysk NVMe:
+  uruchamia się z kopii `sources` w RAM, której `hwcompat.txt` zawiera
+  `PCI\CC_010802`, a zainstalowany system dostaje `stornvme`; X470 PASS z
+  oryginalnego ISO Windows 7 SP1 PL x64. Szczegóły:
+  [w7x64-nvme-setup-2026-10-21.md](w7x64-nvme-setup-2026-10-21.md).
+- **Windows 8, 8.1 i 10 x86 na NVMe domyślnie.** Trasa
+  `win-x86-uefi-csmwrap` jest włączona bez flagi (8/8.1 biorą zewnętrzny donor
+  PE10 tylko dla celu NVMe); pusty `Unattended\nvme-off.txt` na DATA ją
+  wyłącza. X470 PASS (Embedded 8.1 Industry Pro x86, Windows 10 22H2 x86).
+  Szczegóły: [nvme-nt6-2026-10-12.md](nvme-nt6-2026-10-12.md), sekcje 18-19.
+- **Automatyczna natywna rozdzielczość.** USOSRES przy pierwszym logowaniu
+  ustawia natywny tryb monitora z EDID, a bez EDID najwyższy dostępny - dla
+  rodzin NT6 na CSMWrap i dla NT5 (XP, 2003, POSReady, Vista/2008 x64). Win7
+  x64 zostaje przy 1024x768; dwutrybowy wariant włącza
+  `Unattended\native-res-on.txt`. Wyłączenie automatu = jawna wartość
+  `display=WxH` w profilu/pliku odpowiedzi (wtedy idzie `<Display>`), a nie
+  flaga DATA. Opis: [display-policy.md](display-policy.md),
+  [w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md).
+- **Ukryta partycja CSMWRAP.** Po instalacji Vista / 7 / 2008 / 8.1 / 10
+  (32-bit) i Vista / 2008 x64 nie dostają litery dysku dla 64 MiB ESP CSMWrap:
+  wpis "bez litery" w offline `MountedDevices` przed pierwszym startem; MBR,
+  typ 0xEF i łańcuch bootowania bez zmian. Szczegóły:
+  [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
+- **Fast Startup wyłączony w 8 / 8.1 / 10 / 11.** Instalacje USOS zapisują
+  `HiberbootEnabled=0`, żeby wyłączony system nie zostawiał zahibernowanego
+  NTFS (dyski wędrują między komputerami). Pusty
+  `Unattended\fast-startup-on.txt` zostawia ustawienie Windowsa. Szczegóły:
+  [ds-fast-startup-2026-10-22.md](ds-fast-startup-2026-10-22.md).
+- **Huby USB i pendrive'y w usosusb.** Własny sterownik xHCI (`usosusb
+  1.3-nt6` dla Vista / 2008 / Win7 x86, `1.3-nt4` dla NT4) obsługuje huby USB
+  2.0 / 3.x, urządzenia za hubem, hot plug i pendrive'y (bulk-only); X470 PASS
+  dla klawiatury, myszy i sticka na Win7 x86, huby na razie tylko w QEMU.
+  Szczegóły: [usosusb-hubs-2026-10-21.md](usosusb-hubs-2026-10-21.md).
+- **Nowe znane ograniczenia.** Win7 x64 bez sterownika karty zostaje przy
+  1024x768; wielopartycyjny pendrive pokazuje w Win7 x64 tylko pierwszą
+  partycję (Vista x64 dostała `usosmpart`); CSMWrap rezerwuje 1 wątek CPU
+  (Vista x64 na X470 widzi 15/16). Szerszy obraz: punkty "Known issues" niżej
+  oraz [display-policy.md](display-policy.md).
+
+### In English
+
+- **Vista x64 on NVMe.** Vista and Server 2008 SP2 x64 install and boot from
+  NVMe (test-signed amd64 `usosnvme`, 64-bit PRP, DMA above 4 GB); X470 PASS
+  2026-10-21. The system runs in test mode and the "Test Mode" text is covered
+  by usoswm. Details and the rejected MUI route:
+  [vista-x64-nvme-2026-10-21.md](vista-x64-nvme-2026-10-21.md),
+  [vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md).
+- **Win7 x64 on NVMe from the original ISO.** Setup 6.1 accepts the NVMe disk:
+  it runs from a RAM copy of `sources` whose `hwcompat.txt` lists
+  `PCI\CC_010802`, and the installed system gets `stornvme`; X470 PASS from the
+  original Windows 7 SP1 PL x64 ISO. Details:
+  [w7x64-nvme-setup-2026-10-21.md](w7x64-nvme-setup-2026-10-21.md).
+- **Windows 8, 8.1 and 10 x86 on NVMe by default.** The
+  `win-x86-uefi-csmwrap` route needs no flag (8/8.1 take the external PE10
+  donor for an NVMe target only); an empty `Unattended\nvme-off.txt` on DATA
+  turns it off. X470 PASS (Embedded 8.1 Industry Pro x86, Windows 10 22H2
+  x86). Details: [nvme-nt6-2026-10-12.md](nvme-nt6-2026-10-12.md), sections
+  18-19.
+- **Automatic native resolution.** At the first logon USOSRES selects the
+  monitor's native mode from EDID, else the highest mode, for the NT6 CSMWrap
+  families and for NT5 (XP, 2003, POSReady, Vista/2008 x64). Win7 x64 stays at
+  1024x768; the two-mode variant is enabled by `Unattended\native-res-on.txt`.
+  Switching the automatic off means an explicit `display=WxH` in the
+  profile/answer (that writes `<Display>`), not a DATA flag. See
+  [display-policy.md](display-policy.md),
+  [w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md).
+- **Hidden CSMWRAP partition.** After Setup, Vista / 7 / 2008 / 8.1 / 10
+  (32-bit) and Vista / 2008 x64 get no drive letter for the 64 MiB CSMWrap
+  ESP: a no-letter entry in the offline `MountedDevices` before the first
+  boot; MBR, type 0xEF and the boot chain are unchanged. Details:
+  [csmwrap-esp-letter-2026-10-22.md](csmwrap-esp-letter-2026-10-22.md).
+- **Fast Startup off in 8 / 8.1 / 10 / 11.** USOS installs write
+  `HiberbootEnabled=0` so a shutdown leaves no hibernated NTFS volume (the
+  disks move between computers). An empty `Unattended\fast-startup-on.txt`
+  keeps Windows' own setting. Details:
+  [ds-fast-startup-2026-10-22.md](ds-fast-startup-2026-10-22.md).
+- **USB hubs and flash drives in usosusb.** The own xHCI driver (`usosusb
+  1.3-nt6` for Vista / 2008 / Win7 x86, `1.3-nt4` for NT4) handles USB 2.0 /
+  3.x hubs, devices behind a hub, hot plug and bulk-only flash drives; X470
+  PASS for keyboard, mouse and a stick on Win7 x86, hubs in QEMU only so far.
+  Details: [usosusb-hubs-2026-10-21.md](usosusb-hubs-2026-10-21.md).
+- **New known limitations.** Win7 x64 without a GPU driver stays at 1024x768;
+  a multi-partition stick shows only its first partition in Win7 x64 (Vista
+  x64 got `usosmpart`); CSMWrap reserves 1 CPU thread (Vista x64 on the X470
+  sees 15/16). Wider picture: "Known issues" below and
+  [display-policy.md](display-policy.md).
+
 ## Supported systems
 
 Legend: **HW** = tested on real hardware (machines listed below), **VM** =
@@ -131,7 +232,7 @@ modes. Windows XP, Vista and 7 always need Secure Boot off.
 
 ## Hardware-tested configurations
 
-**ASRock X470 (Taichi), Ryzen 7 5700X, Radeon RX 560, AMI Aptio.** Test
+**ASRock X470 Master SLI/ac, Ryzen 7 5700X, Radeon RX 560, AMI Aptio.** Test
 disks: Intel SSD 120 GB and Biostar S100 120 GB (SATA). Monitor: BenQ over
 HDMI. This is the main UEFI test target.
 
@@ -183,6 +284,7 @@ not been started on physical hardware.
 | `USOS-Installer-1.0.0.exe` | **Full installer** (all-in-one, works offline). The whole stick payload (install, update, repair, uninstall) plus the WinPE donor and both XP packages below. Its **Components** step, after Install, Update and Repair, copies them straight to the stick: WinPE and the XP package in the installer language are preselected, the other language can be chosen or kept on DATA, and everything can be skipped. Each embedded zip is checked against the SHA-256 list compiled into the installer. |
 | `USOS-Installer-1.0.0-online.exe` | **Online installer** (small download). The same program without the embedded components: its Components step downloads the WinPE donor and XP packages from this GitHub release when needed (progress, resume, retry), and each download must match both `SHA256SUMS` and the compiled SHA-256 list. "I already have the file" takes a zip from disk, verified the same way. |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor (`PE10_x64_19041_USOS.iso`, WinPE 10 x64 with Setup, no install image). Vista and original Windows 7 need it on UEFI, and Vista needs it without CSM. Included in the full installer; this zip is for manual or offline use: copy its `Programs` folder to the root of `USOS_DATA` (the file lands in `Programs\USOS\WinPE`), then run the installer's Update: it records the SHA-256 in `EFI\USOS\winpe-donor.ini`. |
+| `USOS-1.0.0-WinPE-PE10-x86-donor.zip` | x86 PE10 donor (`PE10_x86_19041_USOS.iso`, WinPE 10 x86 with Setup and the BIOS `bootmgr`, no install image; unmodified files of a Windows 10 22H2 x86 ISO). 32-bit Windows 7, Vista and Server 2008 use it on UEFI without CSM (CSMWrap), so no own Windows 10 x86 ISO is needed any more (it still works as a fallback). Included in the full installer; by hand, the same as the x64 donor: both ISOs live side by side in `Programs\USOS\WinPE`, and `EFI\USOS\winpe-donor.ini` records both. X470 PASS 2026-10-21: fresh Windows 7 SP1 PL x86 install from the Kingston stick with this bundled donor (USB through the usosusb fallback plus the drive notifier for stick letters). |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | XP x86 SP3 UEFI package (micro-Linux preparation, driver bundle, `pae.exe`). Each one works with **exactly one** original ISO: PL `pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso` or EN `en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso` (SHA-256 allowlist). Included in the full installer; by hand, the included `install-xp-package.ps1` (run as administrator) installs it to `EFI\USOS-XP` on the stick's ESP. Only one package can be installed at a time. The release packages carry no Server 2003 driver bundle. |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | Sources of the third-party components that are available locally (among them the modified CSMWrap 3.1.2-usos1 with SeaBIOS and its patches), and the written offer with the upstream source locations for the other (L)GPL components. USOS's own source is the git repository. |
 | `LICENSE.txt`, `NOTICE.txt`, `CONTRIBUTING.md` | USOS's own licence (GPL-3.0-or-later), copyright notice and contribution terms. |

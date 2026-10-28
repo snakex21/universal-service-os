@@ -1,0 +1,47 @@
+{
+  "version": "3.1.2-usos11-diag",
+  "status": "DIAGNOSTIC variant (2026-10-17), Windows 2000 ACPI flow only when DATA ...\\Unattended\\w2k-diag.txt (or nmi-snapshot.txt) exists; carried in the XP/2000 package (usr/lib/usos/w2k-drivers/csmwrap-diag), pinned in tools/xp_csmwrap_esp.sh (PINNED_DIAG). Not the release binary.",
+  "naming": "3.1.2-usos11-diag = 3.1.2-usos11 (0001-0010, 0012) + 0011 (read-only tick watcher, from 3.1.2-usos10) + 0013 (one-shot BSP NMI snapshot, Codex, firmware-13 code without its ACPI filter parts); csmwrap.ini w2k_nmi_snapshot = true arms 0013; CONFIG_SDCARD off in this variant only.",
+  "source_archive": {
+    "file": "../3.1.2-src/csmwrap-3.1.2-src.tar.xz",
+    "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72",
+    "note": "unpatched 3.1.2 tree with all submodules and seabios/.version (shared with 3.1.2-usos1); the usos3 source is this archive plus patches/*.patch applied in order with patch -p1"
+  },
+  "base": {
+    "url": "https://github.com/CSMWrap/CSMWrap",
+    "tag": "3.1.2",
+    "commit": "808ac8ea5393db9052044fb0f74aa55e0d719afc",
+    "seabios_url": "https://github.com/CSMWrap/seabios-csmwrap",
+    "seabios_commit": "578d260b94f62150bf6ab9149784287bd1154f06",
+    "submodules": "submodules.txt (all pinned in tools/csmwrap_build/lock.json)"
+  },
+  "patches": {
+    "0001-csmwrap-logo-only-when-verbose.patch": "7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8",
+    "0002-quiet-flag-no-seabios-banner-or-boot-messages.patch": "9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d",
+    "0003-seabios-no-boot-menu-when-quiet.patch": "e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790",
+    "0004-seabios-csm-bbs-priority-by-pci-address.patch": "7b85e08e2f554066c3c092813aaaa784486332df3cbfd0dafca15b44d2b0d9b3",
+    "0005-boot-disk-by-sector0-hash.patch": "3433a2323e333a70196440070540ed65b9f5697e00fbc54a794c6c51ba2264fd",
+    "0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch": "17f0675395b70ab4ce63ad6ef6882524dfda4a603e030dae5900bd9ebf4e1d9c",
+    "0007-acpi-enable-before-legacy-boot.patch": "be231170e2401dfd3b67089eafb2f9b765bda2c60c9a711815455963f0bc194e",
+    "0008-apm-poweroff.patch": "ad16991640f1a50ac2467f77296b36f13323693130e2c26c6ef16ef706404699",
+    "0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch": "37819d6e41989e69405c8d119a2e7e8a0ae86567f85a46ea2a48fca238e47f76",
+    "0010-nvme-runtime-rearm.patch": "847f9d05a580d20d749f362e6e6f917dbbca12101554c6a345a7f9eaaaa211e0",
+    "0011-w2k-acpi-tick-watcher.patch": "eede4cb13318cd6df8d42eafb52c66c542e4f165d9524269ff06c803e92d21a9",
+    "0012-w2k-hide-hpet-amd-gpio.patch": "731168d73bb6855fb40b53ee6f1874a6a8d28997ff5e38d6d993a27668d36d6c",
+    "0013-w2k-diag-nmi-snapshot.patch": "2f5052eef3b6ce0312f70cfc414488e204d0c452ab4b77913b02d7fc659757fc"
+  },
+  "files": {
+    "csmwrapx64.efi": "a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d"
+  },
+  "upstream_rebuild": {
+    "note": "the same source and toolchain built WITHOUT patches in each run: matches 3.1.2-usos1/manifest.json upstream_rebuild",
+    "sha256": "62d617fc02e0bf983f4d62c7f9a95d31bcfd4b049d3b0bc46b988434502856da"
+  },
+  "build": {
+    "command": "python tools/csmwrap_build/run_build_vm.py --work zig-out/csmwrap-build/vm-usos11-diag --patches tools/vendor/csmwrap/3.1.2-usos11-diag/patches --usos-version 3.1.2-usos11-diag",
+    "toolchain": "same lock and Alpine VM as 3.1.2-usos11 (toolchain.txt / apk-installed.txt there)",
+    "repeatable": "built twice identical in one VM run on 2026-10-17; the unpatched build matches upstream_rebuild"
+  },
+  "layout": "SeaBIOS: 16bit 37408 + 32bit segmented 4118 + f-segment vars 3328 = 44854 bytes, 20682 bytes allocation zone (6144 minimum kept); ROM 130656 of 131072 (99.7 %, 416 free)",
+  "provenance": "patch 0011 and 0013: design and code by Codex (reviewed for USOS, used only for diagnosis); earlier Codex rounds used the user-supplied NT5 material as a behaviour map; no Microsoft code."
+}

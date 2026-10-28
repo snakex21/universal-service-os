@@ -1,0 +1,432 @@
+#!/bin/sh
+# Custom OS from the UEFI menu (profile custom-image-uefi, experimental;
+# docs/custom-os-2026-10-11.md): Haiku, FreeBSD, ReactOS, KolibriOS, FreeDOS,
+# OpenBSD, NetBSD, 9front, Redox and "bring your own image". Called by tools/w9x_csmwrap_prepare.sh (step
+# 620) after the user picked and confirmed the disk.
+#
+# The official image is a hybrid disk image (Haiku anyboot ISO, FreeBSD
+# disc1/memstick, ReactOS ISO, KolibriOS raw image, FreeDOS FullUSB image):
+# its first bytes are a partition table. USOS writes it unchanged to the
+# start of $TARGET_DEVICE, then
+#   - GPT image: moves the backup GPT to the real disk end (sfdisk);
+#   - image with an EFI system partition: the firmware boots the disk's own
+#     UEFI loader;
+#   - MBR image without one (BIOS only): adds the CSMWrap ESP in a free MBR
+#     slot at the disk end (tools/xp_csmwrap_esp.sh), CSMWrap's SeaBIOS boots
+#     the disk as 0x80;
+#   - ReactOS / own BIOS image: the ELCR MBR in front of the image's MBR
+#     (kept at LBA 1), so PCI interrupts are level-triggered as on a real
+#     BIOS (ReactOS stops with 0x7B behind CSMWrap otherwise);
+#   - every image: a firmware boot entry named after the system, appended to
+#     BootOrder and set as BootNext (tools/uefi_boot_entry.sh, efivarfs);
+#   - FreeDOS FullUSB: SETUP.BAT -> SETUP.OFF so the disk starts into the
+#     FreeDOS prompt instead of the installer (which aborts on its own disk);
+#     the package repository stays on the disk (FDIMPLES); C:\NET gets the
+#     MS-DOS flow's network (USOSPKT.COM + mTCP) and FDAUTO.BAT one guarded
+#     call of C:\NET\NETSTART.BAT (freedos_net); C:\USOS gets the MS-DOS
+#     flow's INT 33h mouse driver VBMOUSE.EXE and FDAUTO.BAT one guarded
+#     line that loads it (freedos_mouse).
+# An image that cannot start from a hard disk (CD-only ISO such as TempleOS:
+# no partition table and no boot code in sector 0) is refused before any
+# write. Writes ONLY $TARGET_DEVICE; the rest of the disk stays unallocated.
+set -eu
+
+TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
+IMAGE=${IMAGE_SOURCE:?IMAGE_SOURCE is required}
+SYSTEM=${IMAGE_SYSTEM:-other-os}
+LIB=${USOS_LIB_DIR:-/usr/lib/usos}
+ESP_TAIL=133120
+# The verdict for the caller (written before any disk change).
+RESULT=${IMAGE_RESULT_FILE:-/run/image-disk.result}
+
+log() { printf '[IMAGE_DISK] %s\n' "$*"; }
+fail() { printf '[IMAGE_DISK] STOP: %s\n' "$1" >&2; printf 'stop=%s\n' "$1" > "$RESULT" 2>/dev/null || true; exit 1; }
+
+MTOOLS_SKIP_CHECK=1
+export MTOOLS_SKIP_CHECK
+for tool in dd od awk blockdev sync wc sha256sum; do
+    command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
+done
+[ -r "$IMAGE" ] || fail "missing: $IMAGE"
+if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
+    fail 'a partition of the selected disk is mounted; no disk was changed'
+fi
+
+u8() { od -An -tu1 -j"$2" -N1 "$1" | tr -d ' \n'; }
+u32() { od -An -tu4 -j"$2" -N4 "$1" | tr -d ' \n'; }
+
+# Size in bytes without reading the file: BusyBox `wc -c` reads all of it
+# (the 1.4 GB Haiku ISO from the stick took long on the X470, 2026-10-12).
+# A block device (tests: the image on a virtio disk) through blockdev.
+usos_file_bytes() {
+    if [ -b "$1" ]; then
+        blockdev --getsize64 "$1"
+    elif stat -L -c %s "$1" 2>/dev/null; then
+        :
+    else
+        wc -c < "$1" | tr -d ' '
+    fi
+}
+
+work=/run/image-disk
+rm -rf "$work"
+mkdir -p "$work"
+head="$work/head.bin"
+dd if="$IMAGE" of="$head" bs=512 count=64 2>/dev/null || fail 'cannot read the image'
+image_bytes=$(usos_file_bytes "$IMAGE") || fail 'cannot read the image size'
+[ "$image_bytes" -ge 32768 ] || fail 'the image is too small to be a disk image'
+
+# ---------------------------------------------------------------- classify
+signature=$(od -An -tx1 -j510 -N2 "$head" | tr -d ' \n')
+gpt=no
+[ "$(dd if="$head" bs=1 skip=512 count=8 2>/dev/null)" = 'EFI PART' ] && gpt=yes
+mbr_esp=no
+mbr_bios=no
+free_slot=no
+boot_code=$(od -An -tx1 -N440 "$head" | tr -d ' \n' | tr -d 0)
+if [ "$signature" = 55aa ]; then
+    for slot in 0 1 2 3; do
+        type=$(u8 "$head" $((446 + 16 * slot + 4)))
+        case "$type" in
+            0) free_slot=yes ;;
+            239) mbr_esp=yes ;;
+            238) ;;
+            *) mbr_bios=yes ;;
+        esac
+    done
+fi
+gpt_esp=no
+if [ "$gpt" = yes ]; then
+    entries_lba=$(u32 "$head" $((512 + 72)))
+    count=$(u32 "$head" $((512 + 80)))
+    entry_size=$(u32 "$head" $((512 + 84)))
+    [ "$entries_lba" -ge 2 ] && [ "$entries_lba" -lt 64 ] && [ "$entry_size" -ge 128 ] || fail 'the image has an unexpected GPT'
+    [ "$count" -le 256 ] || count=256
+    i=0
+    while [ "$i" -lt "$count" ]; do
+        off=$((entries_lba * 512 + i * entry_size))
+        [ $((off + 16)) -le 32768 ] || break
+        guid=$(od -An -tx1 -j"$off" -N16 "$head" | tr -d ' \n')
+        # C12A7328-F81F-11D2-BA4B-00A0C93EC93B (EFI system partition)
+        [ "$guid" != 28732ac11ff8d211ba4b00a0c93ec93b ] || gpt_esp=yes
+        i=$((i + 1))
+    done
+fi
+uefi=no
+[ "$mbr_esp" = no ] && [ "$gpt_esp" = no ] || uefi=yes
+mode=''
+if [ "$uefi" = yes ]; then
+    mode=uefi
+elif [ "$signature" = 55aa ] && [ -n "$boot_code" ] && [ "$gpt" = no ]; then
+    # BIOS-only MBR image (ReactOS isohybrid, FreeDOS FullUSB).
+    [ "$free_slot" = yes ] || fail 'this BIOS image uses all four MBR slots; there is no room for the CSMWrap partition'
+    mode=csmwrap
+else
+    fail 'this image cannot start from a hard disk (a CD-only ISO without a hybrid partition table, or a GPT image without an EFI system partition); see docs/custom-os-2026-10-11.md'
+fi
+
+size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
+total=$((size / 512))
+image_sectors=$(( (image_bytes + 511) / 512 ))
+limit=$total
+[ "$mode" != csmwrap ] || limit=$(( (total - ESP_TAIL + 2047) / 2048 * 2048 ))
+[ "$image_sectors" -le "$limit" ] || fail 'the selected disk is too small for this image; no disk was changed'
+[ "$mode" != csmwrap ] || [ "$total" -le 4294967295 ] || fail 'the selected disk is larger than 2 TiB (MBR); no disk was changed'
+log "system=$SYSTEM image_bytes=$image_bytes mode=$mode gpt=$gpt mbr_esp=$mbr_esp gpt_esp=$gpt_esp disk_sectors=$total"
+printf 'mode=%s\n' "$mode" > "$RESULT"
+
+# ---------------------------------------------------------------- the disk
+# What firmware entries can name the disk by now (old GPT PARTUUIDs, old MBR
+# signature + partitions), read before the write: the new boot entry deletes
+# the entries of the system that was on the disk (X470 2026-10-12: FreeBSD
+# written over Haiku restarted into Haiku's old entry).
+stale_ids="$work/stale-ids.txt"
+: > "$stale_ids"
+if [ -r "$LIB/uefi_boot_entry.sh" ]; then
+    TARGET_DEVICE=$TARGET_DEVICE sh "$LIB/uefi_boot_entry.sh" ids > "$stale_ids" 2>/dev/null || : > "$stale_ids"
+    log "previous layout: $(wc -l < "$stale_ids" | tr -d ' ') partition id(s) for stale boot entries"
+fi
+# Old partition tables at both ends go first (a stale backup GPT at the disk
+# end would make the firmware or the OS see the old layout).
+dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
+dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'
+dd if="$IMAGE" of="$TARGET_DEVICE" bs=4M conv=notrunc,fsync 2>/dev/null || fail 'cannot write the image to the disk'
+sync
+blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
+
+# Read-back: the first and the last 4 MiB of the image.
+chunk=8192
+[ "$image_sectors" -ge "$chunk" ] || chunk=$image_sectors
+a=$(dd if="$IMAGE" bs=512 count="$chunk" 2>/dev/null | sha256sum | awk '{print $1}')
+b=$(dd if="$TARGET_DEVICE" bs=512 count="$chunk" 2>/dev/null | sha256sum | awk '{print $1}')
+[ "$a" = "$b" ] || fail 'read-back: the disk start differs from the image'
+tail_skip=$((image_bytes / 512 - chunk))
+if [ "$tail_skip" -gt 0 ]; then
+    a=$(dd if="$IMAGE" bs=512 skip="$tail_skip" count="$chunk" 2>/dev/null | sha256sum | awk '{print $1}')
+    b=$(dd if="$TARGET_DEVICE" bs=512 skip="$tail_skip" count="$chunk" 2>/dev/null | sha256sum | awk '{print $1}')
+    [ "$a" = "$b" ] || fail 'read-back: the image end differs on the disk'
+fi
+log 'image written, read-back PASS'
+
+if [ "$gpt" = yes ]; then
+    # The image's backup GPT sits at the image end; move it to the disk end.
+    if command -v sfdisk >/dev/null 2>&1; then
+        sfdisk --relocate gpt-bak-std "$TARGET_DEVICE" >/dev/null 2>&1 && log 'backup GPT moved to the disk end' ||
+            log 'backup GPT not moved (sfdisk refused); the primary GPT stays valid'
+    fi
+fi
+
+# GPT image with a hybrid MBR (KolibriOS raw image: slot 1 = EF ESP, slot 2 =
+# EE over LBA 1-2047, disk signature 0): firmware that reads the MBR first
+# sees an MBR disk with an MBR ESP, so the boot entry's GPT HD() node
+# (uefi_boot_entry.sh) never matches and the entry is skipped (X470,
+# B261012-154207: KolibriOS not started first, Haiku's MBR image was). EDK2
+# takes the GPT whenever an EE slot starts at LBA 1, so QEMU did not show it.
+# UEFI mode needs only the GPT: the partition table area becomes the
+# protective MBR of UEFI 2.x 5.2.3 (one EE slot from LBA 1 over the disk),
+# the boot code stays. GPT images with a protective MBR are not touched.
+pmbr_fix() {
+    hybrid=no
+    for slot in 0 1 2 3; do
+        case "$(u8 "$head" $((446 + 16 * slot + 4)))" in 0|238) ;; *) hybrid=yes ;; esac
+    done
+    [ "$hybrid" = yes ] || return 0
+    pmbr_size=$((total - 1))
+    [ "$pmbr_size" -le 4294967295 ] || pmbr_size=4294967295
+    pmbr="$work/pmbr.bin"
+    # 00 | CHS 00 02 00 | EE | CHS FF FF FF | LBA 1 | size, then three empty slots.
+    printf '\000\000\002\000\356\377\377\377\001\000\000\000' > "$pmbr"
+    printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $((pmbr_size & 255)) $((pmbr_size >> 8 & 255)) $((pmbr_size >> 16 & 255)) $((pmbr_size >> 24 & 255)))" >> "$pmbr"
+    dd if=/dev/zero bs=48 count=1 2>/dev/null >> "$pmbr"
+    [ "$(wc -c < "$pmbr" | tr -d ' ')" = 64 ] || fail 'internal error: protective MBR size'
+    dd if="$pmbr" of="$TARGET_DEVICE" bs=1 seek=446 count=64 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the protective MBR'
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=446 count=64 2>/dev/null | sha256sum | awk '{print $1}')" = "$(sha256sum < "$pmbr" | awk '{print $1}')" ] ||
+        fail 'read-back: the protective MBR differs'
+    log "hybrid MBR replaced by a protective MBR (EE, LBA 1, $pmbr_size sectors): the firmware uses the GPT"
+}
+if [ "$gpt" = yes ] && [ "$mode" = uefi ]; then
+    pmbr_fix
+fi
+
+# FreeDOS FullUSB: start into DOS, not into the installer on its own disk.
+freedos_fix() {
+    lba=$(u32 "$head" $((446 + 8)))
+    type=$(u8 "$head" $((446 + 4)))
+    case "$type" in 6|11|12|14) ;; *) return 0 ;; esac
+    command -v mren >/dev/null 2>&1 || { log 'mren missing: FreeDOS keeps its installer'; return 0; }
+    part="$TARGET_DEVICE@@$((lba * 512))"
+    mdir -i "$part" ::/KERNEL.SYS >/dev/null 2>&1 || return 0
+    if mdir -i "$part" ::/SETUP.BAT >/dev/null 2>&1; then
+        mren -i "$part" ::/SETUP.BAT ::/SETUP.OFF || fail 'cannot switch FreeDOS from its installer to the prompt'
+        log 'FreeDOS: SETUP.BAT renamed to SETUP.OFF (starts into the prompt)'
+    fi
+    freedos_mouse "$part"
+    freedos_net "$part"
+}
+
+# One guarded FDAUTO.BAT line and its rem, once, right before the installer
+# check (after the FDNET line, before FreeDOS's welcome text); that check
+# missing: at the end. Text through ENVIRON, not awk -v or awk strings
+# (backslashes). Every line ends CRLF (a trailing CR removed first: some awks
+# drop it on read). Written back and read back.
+# freedos_auto_add PART TAG REM LINE; returns 1 if LINE is already there.
+freedos_auto_add() {
+    fa_dir="$work/fdauto-$2"
+    rm -rf "$fa_dir"; mkdir -p "$fa_dir" || fail 'internal error: FDAUTO.BAT work folder'
+    mcopy -n -i "$1" ::/FDAUTO.BAT "$fa_dir/old" || fail 'FreeDOS: cannot read FDAUTO.BAT'
+    if tr -d '\r' < "$fa_dir/old" | grep -qxF "$4"; then
+        return 1
+    fi
+    FA_REM=$3 FA_LINE=$4 awk '
+        BEGIN { cr = sprintf("%c", 13); rem = ENVIRON["FA_REM"]; line = ENVIRON["FA_LINE"] }
+        { sub(cr "$", "") }
+        !done && tolower($0) ~ /^if not exist setup\.bat goto done/ { print rem cr; print line cr; done = 1 }
+        { print $0 cr }
+        END { if (!done) { print rem cr; print line cr } }
+    ' "$fa_dir/old" > "$fa_dir/new" || fail 'internal error: FDAUTO.BAT'
+    mcopy -o -i "$1" "$fa_dir/new" ::/FDAUTO.BAT || fail 'FreeDOS: cannot write FDAUTO.BAT'
+    mcopy -n -i "$1" ::/FDAUTO.BAT "$fa_dir/chk" || fail 'FreeDOS: cannot read back FDAUTO.BAT'
+    [ "$(sha256sum < "$fa_dir/chk")" = "$(sha256sum < "$fa_dir/new")" ] || fail 'read-back: FDAUTO.BAT differs'
+    return 0
+}
+
+# FreeDOS mouse (docs/freedos-input-2026-10-23.md): the FullUSB FDAUTO.BAT
+# loads no INT 33h driver (CTMOUSE is only a package in PACKAGES\BASE), so
+# no DOS program sees the mouse (X470 B261023-130119: no pointer in FreeDOS
+# EDIT, whose only mouse access is INT 33h). The MS-DOS flow (X470 PASS)
+# loads VBADOS VBMOUSE.EXE (GPL-2.0+, docs/dos-mouse-2026-10-18.md), which
+# reads the mouse only through INT 15h C2xxh, i.e. CSMWrap's SeaBIOS USB
+# mouse. The same files from the stick's EFI\USOS\dos-native\msdos into
+# C:\USOS, one guarded line in FDAUTO.BAT. No mouse: VBMOUSE says so and
+# stays out; FreeDOS boots on.
+DOS_MOUSE_FILES='VBMOUSE.EXE VBADOS.TXT'
+DOS_MOUSE_LINE='if exist C:\USOS\VBMOUSE.EXE C:\USOS\VBMOUSE.EXE'
+freedos_mouse() {
+    part=$1
+    for tool in mcopy mmd; do
+        command -v "$tool" >/dev/null 2>&1 || { log "FreeDOS mouse: $tool missing, no VBMOUSE"; return 0; }
+    done
+    for name in $DOS_MOUSE_FILES; do
+        [ -r "$DOS_NET_DIR/$name" ] || { log "FreeDOS mouse: $DOS_NET_DIR/$name missing, no VBMOUSE"; return 0; }
+    done
+    mdir -i "$part" ::/USOS >/dev/null 2>&1 || mmd -i "$part" ::/USOS || fail 'FreeDOS: cannot create C:\USOS'
+    rm -rf "$work/fdmouse"; mkdir -p "$work/fdmouse" || fail 'internal error: FreeDOS mouse work folder'
+    for name in $DOS_MOUSE_FILES; do
+        mcopy -o -i "$part" "$DOS_NET_DIR/$name" "::/USOS/$name" || fail "FreeDOS: cannot copy $name to C:\\USOS"
+        mcopy -n -i "$part" "::/USOS/$name" "$work/fdmouse/$name" || fail "FreeDOS: cannot read back C:\\USOS\\$name"
+        [ "$(sha256sum < "$work/fdmouse/$name")" = "$(sha256sum < "$DOS_NET_DIR/$name")" ] || fail "read-back: C:\\USOS\\$name differs"
+    done
+    if freedos_auto_add "$part" mouse 'rem USOS mouse: VBMOUSE (INT 33h on the BIOS mouse, USB under CSMWrap)' "$DOS_MOUSE_LINE"; then
+        log 'FreeDOS mouse: C:\USOS\VBMOUSE.EXE staged, FDAUTO.BAT loads it, read-back PASS'
+    else
+        log 'FreeDOS mouse: C:\USOS\VBMOUSE.EXE staged; FDAUTO.BAT already loads it'
+    fi
+}
+
+# FreeDOS network (docs/freedos-net-2026-10-23.md): the MS-DOS flow's C:\NET
+# (USOSPKT.COM own igb packet driver + mTCP, tools/build_dos_network.py)
+# from the stick's EFI\USOS\dos-native\msdos into C:\NET of the written
+# FreeDOS disk, and one guarded call in FDAUTO.BAT. The FullUSB disk IS the
+# final system (its installer never runs, SETUP.OFF above), so the files stay.
+# The image's FDAUTO.BAT only calls FDNET.BAT if that package is installed
+# (it is not on FullUSB): no second packet driver. No NIC / no DHCP answer:
+# NETSTART.BAT returns at once / after two 6 s tries, FreeDOS boots on.
+DOS_NET_DIR=${USOS_DOS_NET_DIR:-/mnt/esp/EFI/USOS/dos-native/msdos}
+DOS_NET_FILES='USOSPKT.COM NETSTART.BAT MTCP.DEF MTCP.TXT MTCPSRC.ZIP DHCP.EXE PING.EXE HTGET.EXE FTP.EXE TELNET.EXE SNTP.EXE NC.EXE DNSTEST.EXE PKTTOOL.EXE'
+DOS_NET_CALL='if exist C:\NET\USOSPKT.COM call C:\NET\NETSTART.BAT'
+freedos_net() {
+    part=$1
+    for tool in mcopy mmd; do
+        command -v "$tool" >/dev/null 2>&1 || { log "FreeDOS network: $tool missing, no C:\\NET"; return 0; }
+    done
+    for name in $DOS_NET_FILES; do
+        [ -r "$DOS_NET_DIR/$name" ] || { log "FreeDOS network: $DOS_NET_DIR/$name missing, no C:\\NET"; return 0; }
+    done
+    mdir -i "$part" ::/NET >/dev/null 2>&1 || mmd -i "$part" ::/NET || fail 'FreeDOS: cannot create C:\NET'
+    rm -rf "$work/fdnet"; mkdir -p "$work/fdnet" || fail 'internal error: FreeDOS network work folder'
+    for name in $DOS_NET_FILES; do
+        mcopy -o -i "$part" "$DOS_NET_DIR/$name" "::/NET/$name" || fail "FreeDOS: cannot copy $name to C:\\NET"
+        mcopy -n -i "$part" "::/NET/$name" "$work/fdnet/$name" || fail "FreeDOS: cannot read back C:\\NET\\$name"
+        [ "$(sha256sum < "$work/fdnet/$name")" = "$(sha256sum < "$DOS_NET_DIR/$name")" ] || fail "read-back: C:\\NET\\$name differs"
+    done
+    if ! freedos_auto_add "$part" net 'rem USOS network: C:\NET\NETSTART.BAT (USOSPKT + mTCP DHCP)' "$DOS_NET_CALL"; then
+        log 'FreeDOS network: C:\NET staged; FDAUTO.BAT already calls NETSTART.BAT'
+        return 0
+    fi
+    log 'FreeDOS network: C:\NET staged (USOSPKT + mTCP), FDAUTO.BAT calls NETSTART.BAT, read-back PASS'
+}
+case "$SYSTEM" in freedos) freedos_fix ;; esac
+sync
+blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
+
+if [ "$gpt" = no ] && [ "$(dd if="$TARGET_DEVICE" bs=1 skip=$((17 * 2048 + 7)) count=23 2>/dev/null)" = 'EL TORITO SPECIFICATION' ]; then
+    # Hybrid ISO with an MBR (ReactOS, Haiku anyboot): the UEFI partition
+    # driver (EDK2 OVMF, QEMU 2026-10-11) sees the El Torito boot record
+    # first, makes the whole disk a CD-ROM and never reads the MBR, so the
+    # CSMWrap ESP stays invisible and the image's own ESP is no HD()
+    # partition the firmware boot entry (uefi_boot_entry.sh) could name.
+    # On a hard disk the record has no use (CD boot only; the OS reads the
+    # primary volume descriptor at sector 16): one byte of its identifier
+    # changes, 'EL TORITO' -> 'XL TORITO'.
+    printf 'X' | dd of="$TARGET_DEVICE" bs=1 seek=$((17 * 2048 + 7)) count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot hide the El Torito record'
+    log 'hybrid ISO: El Torito boot record hidden (UEFI sees the MBR and its EFI system partition)'
+fi
+if [ "$mode" = csmwrap ]; then
+    TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
+fi
+
+# ReactOS / own BIOS image behind CSMWrap: CSMWrap's SeaBIOS (CSM mode) leaves
+# the 8259 ELCR at 00/00, so PCI interrupts look edge-triggered and ReactOS's
+# disk driver never sees its (level) AHCI interrupt: STOP 0x7B (QEMU
+# 2026-10-11). The ELCR MBR (src/platform/bios/reactos/elcr_mbr.S) marks the
+# PCI IRQs level-triggered and chains to the image's own MBR, kept unchanged
+# at LBA 1. Only when LBA 1 is empty (ISO system area); FreeDOS does not need it.
+elcr_fix() {
+    stub="$LIB/elcr-mbr-440.bin"
+    [ -r "$stub" ] || { log 'elcr-mbr-440.bin missing: the image MBR stays (0x7B risk behind CSMWrap)'; return 0; }
+    [ "$(wc -c < "$stub" | tr -d ' ')" = 440 ] || fail 'internal error: ELCR MBR size'
+    if [ -n "$(dd if="$TARGET_DEVICE" bs=512 skip=1 count=1 2>/dev/null | od -An -v -tx1 | tr -d ' \n0')" ]; then
+        log 'LBA 1 is in use by the image: no ELCR MBR'
+        return 0
+    fi
+    orig="$work/mbr-image.bin"
+    dd if="$TARGET_DEVICE" of="$orig" bs=512 count=1 2>/dev/null || fail 'cannot read the MBR'
+    dd if="$orig" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot keep the image MBR at LBA 1'
+    dd if="$stub" of="$TARGET_DEVICE" bs=440 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the ELCR MBR'
+    sync
+    a=$( { cat "$stub"; dd if="$orig" bs=1 skip=440 count=72 2>/dev/null; cat "$orig"; } | sha256sum | awk '{print $1}')
+    b=$(dd if="$TARGET_DEVICE" bs=512 count=2 2>/dev/null | sha256sum | awk '{print $1}')
+    [ "$a" = "$b" ] || fail 'read-back: the ELCR MBR or the kept image MBR differs'
+    log 'ELCR MBR written (PCI IRQs level-triggered); the image MBR kept at LBA 1, read-back PASS'
+}
+if [ "$mode" = csmwrap ]; then
+    case "$SYSTEM" in reactos|other-os) elcr_fix ;; esac
+fi
+sync
+blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
+
+# MBR disk signature (UEFI HD() node, signature type 1): the firmware boot
+# entry names an MBR partition only by this 32-bit value at 0x1B8. Most
+# images ship 0 (OpenBSD, 9front, Haiku, FreeDOS), which names no disk: the
+# X470 AMI firmware showed the OpenBSD entry as "drive not present"
+# (B261012-154207), and two such disks look alike. A signature of 0, or one
+# another disk in this PC already has, becomes a random nonzero one unused on
+# this PC. Only bytes 440-443 change (boot code ends at 440; the partition
+# table stays); GPT disks are named by PARTUUID and are not touched.
+hex4() { od -An -v -tx1 | tr -d ' \n'; }
+mbr_sig_others() {
+    for dev in /sys/block/*; do
+        name=${dev##*/}
+        case "$name" in loop*|ram*|zram*|sr*|fd*|dm-*|md*) continue ;; esac
+        [ "/dev/$name" != "$TARGET_DEVICE" ] || continue
+        [ -b "/dev/$name" ] || continue
+        dd if="/dev/$name" bs=512 count=1 2>/dev/null | dd bs=1 skip=440 count=4 2>/dev/null | hex4
+        echo
+    done
+}
+mbr_signature_fix() {
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=510 count=2 2>/dev/null | hex4)" = 55aa ] || return 0
+    sig=$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | hex4)
+    others=$(mbr_sig_others 2>/dev/null || true)
+    if [ "$sig" != 00000000 ] && ! echo "$others" | grep -qx "$sig"; then
+        log "MBR disk signature $sig kept (unique on this PC)"
+        return 0
+    fi
+    tries=0
+    while :; do
+        tries=$((tries + 1))
+        [ "$tries" -le 16 ] || fail 'cannot pick a unique MBR disk signature'
+        new=$(dd if=/dev/urandom bs=4 count=1 2>/dev/null | hex4)
+        [ "${#new}" = 8 ] && [ "$new" != 00000000 ] || continue
+        echo "$others" | grep -qx "$new" || break
+    done
+    printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $((0x$(echo "$new" | cut -c1-2))) $((0x$(echo "$new" | cut -c3-4))) $((0x$(echo "$new" | cut -c5-6))) $((0x$(echo "$new" | cut -c7-8))))" > "$work/sig.bin"
+    [ "$(wc -c < "$work/sig.bin" | tr -d ' ')" = 4 ] || fail 'internal error: MBR signature size'
+    dd if="$work/sig.bin" of="$TARGET_DEVICE" bs=1 seek=440 count=4 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR disk signature'
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | hex4)" = "$new" ] || fail 'read-back: the MBR disk signature differs'
+    log "MBR disk signature $sig -> $new (the firmware boot entry names the disk by it)"
+}
+if [ "$gpt" = no ]; then
+    mbr_signature_fix
+    sync
+    blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
+fi
+
+# Firmware boot entry named after the system (BootOrder + BootNext): the
+# restart after the flow starts this disk, and the entry stays in the
+# firmware boot menu (Haiku had none on the X470, 2026-10-12). Not fatal:
+# without it the firmware still finds \EFI\BOOT\BOOTX64.EFI by its
+# removable-media scan.
+if [ -r "$LIB/uefi_boot_entry.sh" ]; then
+    entry_log="$work/boot-entry.log"
+    if TARGET_DEVICE=$TARGET_DEVICE ENTRY_NAME="${IMAGE_TITLE:-$SYSTEM}" STALE_IDS_FILE="$stale_ids" sh "$LIB/uefi_boot_entry.sh" add > "$entry_log" 2>&1; then
+        cat "$entry_log"
+        grep '^boot_entry=' "$entry_log" >> "$RESULT" || true
+    else
+        cat "$entry_log"
+        log 'no firmware boot entry written; the disk still starts through the firmware removable-media path'
+    fi
+else
+    log 'uefi_boot_entry.sh missing: no firmware boot entry'
+fi
+log "PASS target=$TARGET_DEVICE mode=$mode; next boot: $([ "$mode" = uefi ] && echo "the disk's own UEFI loader" || echo 'CSMWrap -> SeaBIOS -> the image MBR')"

@@ -28,6 +28,11 @@ def build(root: Path) -> None:
             raise ValueError('FreeDOS startup line too long: '+src)
         (out/dest).write_bytes(content.replace('\r\n','\n').replace('\n','\r\n').encode('ascii'))
     shutil.copyfile(root/'zig-out/dos-native/msdos/REBOOT.COM',out/'REBOOT.COM')
+    # USB mouse for DOS programs (docs/dos-mouse-2026-10-18.md): VBADOS 0.67
+    # VBMOUSE.EXE (GPL-2.0+, checked by the MS-DOS support build) and its
+    # notice; the source archive is EFI/USOS/dos-native/msdos/VBADOS.TGZ.
+    for name in ('VBMOUSE.EXE','VBADOS.TXT'):
+        shutil.copyfile(root/'zig-out/dos-native/msdos'/name,out/name)
     shutil.copyfile(vendor/'manifest.json',out/'manifest.json')
     print('[PASS] FreeDOS 1.4 kernel, FreeCOM, Doszip and complete source packages verified')
 

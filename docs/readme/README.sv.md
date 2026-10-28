@@ -166,8 +166,8 @@ Kontrollera en nedladdning med `certutil -hashfile USOS-Installer-1.0.0.exe SHA2
 1. Skaffa ett USB-minne på **minst 32 GiB** (i praktiken 64 GB; ett minne
    som säljs som ”32 GB” är oftast för litet). **Allt på det raderas.**
 2. Kör `USOS-Installer-1.0.0.exe` på en Windows-dator (programmet ber om
-   administratörsbehörighet), välj **Installation**, välj minnet, skriv
-   bekräftelsetexten och klicka på **RADERA OCH INSTALLERA**.
+   administratörsbehörighet), välj **Installation**, välj minnet, markera
+   bekräftelserutan och klicka på **RADERA OCH INSTALLERA**.
 3. Kopiera dina ISO-avbilder till DATA-partitionen, till mappen `Images`
    för respektive system, t.ex. `Systems\Windows\Windows 11\Images\`.
 4. Valfritt: för Vista eller original-Windows 7 på UEFI kopierar du mappen

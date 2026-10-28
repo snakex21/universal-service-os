@@ -15,6 +15,7 @@
 //! editions (Standard, Datacenter, ... as Core or Desktop Experience), the
 //! Windows version (for the "belongs in folder X" hint) and IA64 images.
 const std = @import("std");
+pub const release = @import("windows_release.zig");
 
 pub const Arch = enum {
     unknown,
@@ -61,6 +62,8 @@ pub const ServerEdition = enum(u4) {
     foundation,
     storage,
     hyperv,
+    /// Windows Home Server 2011 (ServerHomePremium / ServerHomeStandard).
+    home,
     other,
 
     pub fn label(self: ServerEdition) []const u8 {
@@ -73,6 +76,7 @@ pub const ServerEdition = enum(u4) {
             .foundation => "Foundation",
             .storage => "Storage",
             .hyperv => "Hyper-V Server",
+            .home => "Home Server",
             .other => "Other",
         };
     }
@@ -100,6 +104,17 @@ pub const Install = struct {
     major: u16 = 0,
     minor: u16 = 0,
     build: u32 = 0,
+    /// The stock WES7 and POSReady 7 images both say Embedded; this flag
+    /// deliberately does not pretend their WIM metadata distinguishes them.
+    embedded7: bool = false,
+    embedded81: bool = false,
+    arch: Arch = .unknown,
+    language: [16]u8 = @splat(0),
+    language_len: u8 = 0,
+
+    pub fn languageTag(self: *const Install) []const u8 {
+        return self.language[0..self.language_len];
+    }
 
     pub fn serverOnly(self: Install) bool {
         return self.known and self.server and !self.client;
@@ -256,6 +271,26 @@ fn tagText(entry: []const u8, comptime tag: []const u8) ?[]const u8 {
     return std.mem.trim(u8, entry[start..stop], " \t\r\n");
 }
 
+fn nonEmpty(text: ?[]const u8) ?[]const u8 {
+    const value = text orelse return null;
+    return if (value.len == 0) null else value;
+}
+
+/// INSTALLATIONTYPE for media written before the tag existed (Server 2008,
+/// whose Core image keeps the plain FLAGS id, e.g. SERVERWEB): "Server Core"
+/// when a PRODUCTTYPE ServerNT image says so in its display name ("...
+/// (Server Core Installation)", "(instalacja Server Core)"); otherwise null
+/// and the EDITIONID / FLAGS rules decide.
+fn legacyInstallationType(entry: []const u8) ?[]const u8 {
+    const product_type = tagText(entry, "PRODUCTTYPE") orelse return null;
+    if (!std.ascii.eqlIgnoreCase(product_type, "ServerNT")) return null;
+    const tail = if (std.mem.indexOf(u8, entry, "</WINDOWS>")) |w| entry[w..] else entry;
+    for ([_]?[]const u8{ tagText(tail, "DISPLAYNAME"), tagText(tail, "NAME") }) |name| {
+        if (name) |text| if (std.ascii.indexOfIgnoreCase(text, "Server Core") != null) return "Server Core";
+    }
+    return null;
+}
+
 fn tagNumber(entry: []const u8, comptime tag: []const u8) ?u32 {
     return std.fmt.parseInt(u32, tagText(entry, tag) orelse return null, 10) catch null;
 }
@@ -285,7 +320,10 @@ pub fn serverEdition(edition_id: []const u8) ?ServerEdition {
         .{ .prefix = "Solution", .edition = .essentials },
         .{ .prefix = "Essentials", .edition = .essentials },
         .{ .prefix = "Foundation", .edition = .foundation },
+        // Server 2012 / 2012 R2 Foundation: ServerWinFoundation.
+        .{ .prefix = "WinFoundation", .edition = .foundation },
         .{ .prefix = "Storage", .edition = .storage },
+        .{ .prefix = "Home", .edition = .home },
     };
     for (known) |item| if (startsWithIgnoreCase(name, item.prefix)) return item.edition;
     return .other;
@@ -316,11 +354,25 @@ pub fn parseInstall(xml: []u8) !Install {
             info.major = @intCast(@min(tagNumber(entry, "MAJOR") orelse 0, std.math.maxInt(u16)));
             info.minor = @intCast(@min(tagNumber(entry, "MINOR") orelse 0, std.math.maxInt(u16)));
             info.build = tagNumber(entry, "BUILD") orelse 0;
+            if (tagText(entry, "LANGUAGE")) |language| {
+                const n = @min(language.len, info.language.len);
+                @memcpy(info.language[0..n], language[0..n]);
+                info.language_len = @intCast(n);
+            }
         }
+        const arch = Arch.fromWim(tagNumber(entry, "ARCH") orelse 0xffffffff);
+        if (info.arch == .unknown) info.arch = arch else if (arch != .unknown and info.arch != arch) info.arch = .multi;
         info.images +|= 1;
         if (tagNumber(entry, "ARCH") == 6) info.ia64 = true;
-        const edition_id = tagText(entry, "EDITIONID") orelse "";
-        const installation_type = tagText(entry, "INSTALLATIONTYPE");
+        // Vista / Server 2008 media have no <EDITIONID> and no
+        // <INSTALLATIONTYPE>: <FLAGS> holds the id (SERVERWEB) and
+        // <PRODUCTTYPE> ServerNT says Server (as flow/answer/editions.zig).
+        const edition_id = nonEmpty(tagText(entry, "EDITIONID")) orelse nonEmpty(tagText(entry, "FLAGS")) orelse "";
+        if (startsWithIgnoreCase(edition_id, "Embedded")) {
+            info.embedded7 = info.embedded7 or (info.major == 6 and info.minor == 1);
+            info.embedded81 = info.embedded81 or (info.major == 6 and info.minor == 3);
+        }
+        const installation_type = tagText(entry, "INSTALLATIONTYPE") orelse legacyInstallationType(entry);
         const server_type = if (installation_type) |kind| startsWithIgnoreCase(kind, "Server") else false;
         // INSTALLATIONTYPE Client wins: Windows 10 Enterprise multi-session
         // is EDITIONID ServerRdsh on a client Setup.
@@ -363,10 +415,15 @@ pub fn formatEditions(install: Install, buffer: []u8, core_label: []const u8, de
 pub fn suggestedFolder(install: Install) ?[]const u8 {
     if (!install.known or (install.server and install.client)) return null;
     const server = install.server;
+    if (!server) {
+        if (release.betaId(.{ .major = install.major, .minor = install.minor, .build = install.build })) |id| return release.betaFolder(id);
+        if (install.embedded7) return "Windows Embedded Standard 7";
+        if (install.embedded81) return "Windows Embedded 8.1 Industry";
+    }
     return switch (install.major) {
         6 => switch (install.minor) {
             0 => if (server) "Windows Server 2008" else "Windows Vista",
-            1 => if (server) "Windows Server 2008 R2" else "Windows 7",
+            1 => if (!server) "Windows 7" else if (install.core | install.desktop == ServerEdition.home.bit()) "Windows Home Server 2011" else "Windows Server 2008 R2",
             2 => if (server) "Windows Server 2012" else "Windows 8",
             3 => if (server) "Windows Server 2012 R2" else "Windows 8.1",
             else => null,
@@ -546,6 +603,18 @@ test "Server 2008 R2: Core comes from the EDITIONID suffix too" {
     try std.testing.expectEqualStrings("Standard (Core), Standard (Desktop Experience)", formatEditions(install, &buffer, "Core", "Desktop Experience"));
 }
 
+test "Server 2008 (no EDITIONID): FLAGS and PRODUCTTYPE make it Server media" {
+    // Windows Web Server 2008 SP2: FLAGS SERVERWEB on both images, the Core
+    // image only says "Server Core" in its name.
+    const install = try fixtureInstall("install-server-2008-web.xml");
+    try std.testing.expect(install.serverOnly());
+    try std.testing.expectEqual(ServerEdition.web.bit(), install.desktop);
+    try std.testing.expectEqual(ServerEdition.web.bit(), install.core);
+    try std.testing.expectEqualStrings("Windows Server 2008", suggestedFolder(install).?);
+    try std.testing.expectEqual(FolderHint.none, folderHint(install, true));
+    try std.testing.expectEqual(FolderHint.server_in_client_folder, folderHint(install, false));
+}
+
 test "IA64 Server 2008 R2 media is blocked on every firmware" {
     const install = try fixtureInstall("install-server-2008-r2-ia64.xml");
     try std.testing.expect(install.ia64 and install.server);
@@ -592,6 +661,12 @@ test "edition ids and version folders" {
     try std.testing.expectEqual(ServerEdition.foundation, serverEdition("ServerFoundation").?);
     try std.testing.expectEqual(ServerEdition.storage, serverEdition("ServerStorageStandard").?);
     try std.testing.expectEqual(ServerEdition.other, serverEdition("ServerAzureStackHCICor").?);
+    try std.testing.expectEqual(ServerEdition.home, serverEdition("ServerHomePremium").?);
+    try std.testing.expectEqual(ServerEdition.foundation, serverEdition("ServerWinFoundation").?);
+    // Windows Home Server 2011 (6.1, ServerHomePremium only): its own folder.
+    const whs = Install{ .known = true, .server = true, .major = 6, .minor = 1, .build = 7601, .images = 1, .desktop = ServerEdition.home.bit() };
+    try std.testing.expectEqualStrings("Windows Home Server 2011", suggestedFolder(whs).?);
+    try std.testing.expectEqual(FolderHint.none, folderHint(whs, true));
     try std.testing.expect(serverEdition("Professional") == null);
     try std.testing.expect(serverEdition("Enterprise") == null);
     const Case = struct { server: bool, major: u16, minor: u16, build: u32, folder: ?[]const u8 };
@@ -613,4 +688,75 @@ test "edition ids and version folders" {
     }
     var empty = [_]u8{ 0xff, 0xfe, '<', 0, 'W', 0, '>', 0 };
     try std.testing.expectError(error.InvalidWimXml, parseInstall(&empty));
+}
+
+/// The two stock IBW images have identical Embedded WIM identities. A
+/// POSReady-specific volume label is a hint; absent it we keep the ambiguity.
+pub fn suggestedFolderWithLabel(install: Install, label: []const u8) ?[]const u8 {
+    if (install.embedded7 and std.ascii.indexOfIgnoreCase(label, "POSREADY") != null)
+        return "Windows Embedded POSReady 7";
+    return suggestedFolder(install);
+}
+
+test "real scalar metadata in synthetic multi-edition fixtures" {
+    const cases = .{
+        .{ "testdata/variants/wes7-x64.xml", 1, Arch.x64, "", "Windows Embedded Standard 7" },
+        .{ "testdata/variants/wes7-x86.xml", 1, Arch.x86, "", "Windows Embedded Standard 7" },
+        .{ "testdata/variants/posready7-x64.xml", 1, Arch.x64, "en-US", "Windows Embedded Standard 7" },
+        .{ "testdata/variants/seven7000.xml", 4, Arch.x64, "en-US", "Windows 7 Beta" },
+        .{ "testdata/variants/seven6in1.xml", 6, Arch.x64, "pl-PL", "Windows 7" },
+        .{ "testdata/variants/ten-multi.xml", 15, Arch.x86, "pl-PL", "Windows 10" },
+        .{ "testdata/variants/server2008r2.xml", 8, Arch.x64, "pl-PL", "Windows Server 2008 R2" },
+        .{ "testdata/variants/storage2012r2.xml", 3, Arch.x64, "pl-PL", "Windows Server 2012 R2" },
+        .{ "testdata/variants/embedded81-x86.xml", 2, Arch.x86, "pl-PL", "Windows Embedded 8.1 Industry" },
+        .{ "testdata/variants/embedded81-x64.xml", 2, Arch.x64, "pl-PL", "Windows Embedded 8.1 Industry" },
+    };
+    inline for (cases) |row| {
+        const install = try fixtureInstall(row[0]["testdata/".len..]);
+        try std.testing.expectEqual(@as(u16, row[1]), install.images);
+        try std.testing.expectEqual(row[2], install.arch);
+        try std.testing.expectEqualStrings(row[3], install.languageTag());
+        try std.testing.expectEqualStrings(row[4], suggestedFolder(install).?);
+    }
+    const server = try fixtureInstall("variants/server2008r2.xml");
+    const mask = ServerEdition.standard.bit() | ServerEdition.enterprise.bit() | ServerEdition.datacenter.bit() | ServerEdition.web.bit();
+    try std.testing.expectEqual(mask, server.core);
+    try std.testing.expectEqual(mask, server.desktop);
+    try std.testing.expect((try fixtureInstall("variants/ten-multi.xml")).clientOnly());
+    try std.testing.expectEqualStrings("Windows Embedded POSReady 7", suggestedFolderWithLabel(try fixtureInstall("variants/posready7-x64.xml"), "POSREADY 7 64BIT BOOTABLE IBS").?);
+}
+
+/// Unique available Setup UI language from lang.ini. A zero entry names a
+/// language not in this boot image. This is not proof of installed OS packs.
+pub fn languageFromIni(text: []const u8) ?[]const u8 {
+    var active = false;
+    var found: ?[]const u8 = null;
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    while (lines.next()) |raw| {
+        const end = std.mem.indexOfScalar(u8, raw, ';') orelse raw.len;
+        const line = std.mem.trim(u8, raw[0..end], " \t\r");
+        if (line.len == 0) continue;
+        if (line[0] == '[') {
+            active = std.ascii.eqlIgnoreCase(line, "[Available UI Languages]");
+            continue;
+        }
+        if (!active) continue;
+        const eq = std.mem.indexOfScalar(u8, line, '=') orelse continue;
+        const value = std.fmt.parseInt(u32, std.mem.trim(u8, line[eq + 1 ..], " \t"), 10) catch continue;
+        if (value == 0) continue;
+        const name = std.mem.trim(u8, line[0..eq], " \t");
+        if (name.len < 2 or name.len > 15) continue;
+        for (name) |c| if (!std.ascii.isAlphanumeric(c) and c != '-') return null;
+        if (found) |previous| {
+            if (!std.ascii.eqlIgnoreCase(previous, name)) return null;
+        }
+        found = name;
+    }
+    return found;
+}
+
+test "WES7 lang.ini has only one nonzero UI language; missing WIM language stays unknown" {
+    try std.testing.expectEqualStrings("en-US", languageFromIni(@embedFile("testdata/variants/wes7-lang.ini")).?);
+    try std.testing.expect(languageFromIni("[Available UI Languages]\nen-US=1\npl-PL=3\n") == null);
+    try std.testing.expect(languageFromIni("[Available UI Languages]\npl-PL=0\n") == null);
 }

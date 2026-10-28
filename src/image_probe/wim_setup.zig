@@ -62,6 +62,16 @@ pub fn hasModernX64Setup(xml: []u8) !bool {
 }
 
 pub fn detectX64Setup(xml: []u8, index: u32) !Setup {
+    return detectSetupArch(xml, index, 9);
+}
+
+/// 32-bit Setup WinPE (WIM ARCH 0): Windows 8.1 / 10 x86 without CSM
+/// (win-x86-uefi-csmwrap), started in BIOS mode through CSMWrap.
+pub fn detectX86Setup(xml: []u8, index: u32) !Setup {
+    return detectSetupArch(xml, index, 0);
+}
+
+fn detectSetupArch(xml: []u8, index: u32, want_arch: u32) !Setup {
     if (xml.len % 2 != 0 or xml.len < 4 or xml[0] != 0xff or xml[1] != 0xfe) return error.InvalidWimXml;
     const length = xml.len / 2 - 1;
     for (0..length) |i| xml[i] = if (xml[3 + 2 * i] == 0) xml[2 + 2 * i] else '?';
@@ -75,7 +85,7 @@ pub fn detectX64Setup(xml: []u8, index: u32) !Setup {
     if (std.mem.indexOf(u8, entry[1..], "<IMAGE") != null or
         std.mem.indexOf(u8, rest[end + 8 ..], tag) != null) return error.InvalidWimXml;
     const arch = try number(entry, "ARCH");
-    if (arch != 9) return error.WindowsSetupRequiresX64;
+    if (arch != want_arch) return if (want_arch == 9) error.WindowsSetupRequiresX64 else error.WindowsSetupRequiresX86;
     const major = try number(entry, "MAJOR");
     const minor = try number(entry, "MINOR");
     if (major < 6 or (major == 6 and minor == 0)) return error.UnsupportedWindowsSetupVersion;
@@ -120,6 +130,32 @@ pub fn inspectVistaSp2Install(xml: []u8) !InstallInfo {
     return inspectInstall(xml, true);
 }
 
+/// 32-bit Windows 7 / Vista / Server 2008 without firmware CSM
+/// (win-nt6-x86-uefi-csmwrap): every install image is x86 (ARCH 0) NT 6.`minor`
+/// (1: Windows 7, 0: Vista / Server 2008, any service pack).
+pub fn inspectNt6X86Install(xml: []u8, minor: u32) !InstallInfo {
+    return inspectInstallArch(xml, 0, minor, false);
+}
+
+test "32-bit NT 6.0 / 6.1 route accepts only all-x86 install images of that version" {
+    const cases = [_]struct { arch: u32, minor: u32, want: u32, ok: bool }{
+        .{ .arch = 0, .minor = 1, .want = 1, .ok = true },
+        .{ .arch = 0, .minor = 0, .want = 0, .ok = true },
+        .{ .arch = 9, .minor = 1, .want = 1, .ok = false },
+        .{ .arch = 0, .minor = 0, .want = 1, .ok = false },
+        .{ .arch = 0, .minor = 2, .want = 1, .ok = false },
+    };
+    for (cases) |c| {
+        var ascii: [400]u8 = undefined;
+        const text = try std.fmt.bufPrint(&ascii, "<WIM><IMAGE INDEX=\"1\"><ARCH>{d}</ARCH><MAJOR>6</MAJOR><MINOR>{d}</MINOR><BUILD>6002</BUILD></IMAGE></WIM>", .{ c.arch, c.minor });
+        var bytes: [802]u8 = undefined;
+        bytes[0] = 0xff; bytes[1] = 0xfe;
+        for (text, 0..) |ch, i| { bytes[2 + i * 2] = ch; bytes[3 + i * 2] = 0; }
+        const ok = if (inspectNt6X86Install(bytes[0 .. 2 + text.len * 2], c.want)) |info| info.count == 1 else |_| false;
+        try std.testing.expectEqual(c.ok, ok);
+    }
+}
+
 test "Vista donor route accepts only all-SP2-x64 install images" {
     const cases = [_]struct { arch: u32, minor: u32, build: u32, ok: bool }{
         .{ .arch = 9, .minor = 0, .build = 6002, .ok = true },
@@ -140,6 +176,10 @@ test "Vista donor route accepts only all-SP2-x64 install images" {
 }
 
 fn inspectInstall(xml: []u8, vista: bool) !InstallInfo {
+    return inspectInstallArch(xml, 9, @as(u32, if (vista) 0 else 1), vista);
+}
+
+fn inspectInstallArch(xml: []u8, want_arch: u32, want_minor: u32, vista: bool) !InstallInfo {
     if (xml.len < 4 or xml.len % 2 != 0 or xml[0] != 0xff or xml[1] != 0xfe) return error.InvalidWimXml;
     const length = xml.len / 2 - 1;
     for (0..length) |i| xml[i] = if (xml[3 + i * 2] == 0) xml[2 + i * 2] else '?';
@@ -158,9 +198,9 @@ fn inspectInstall(xml: []u8, vista: bool) !InstallInfo {
         const entry = rest[0..end];
         // A nested/unclosed IMAGE must not hide an unsupported edition.
         if (std.mem.indexOf(u8, entry[1..], "<IMAGE") != null) return error.InvalidWimXml;
-        if (try number(entry, "ARCH") != 9 or try number(entry, "MAJOR") != 6 or
-            try number(entry, "MINOR") != @as(u32, if (vista) 0 else 1))
-            return if (vista) error.VistaRequiresSp2X64 else error.UnsupportedWindows7InstallTarget;
+        if (try number(entry, "ARCH") != want_arch or try number(entry, "MAJOR") != 6 or
+            try number(entry, "MINOR") != want_minor)
+            return if (want_arch == 0) error.UnsupportedNt6X86InstallTarget else if (vista) error.VistaRequiresSp2X64 else error.UnsupportedWindows7InstallTarget;
         const build = if (std.mem.indexOf(u8, entry, "<BUILD>") != null) try number(entry, "BUILD") else 0;
         if (vista and build != 6002) return error.VistaRequiresSp2X64;
         info.sp1 = info.sp1 and build == 7601;

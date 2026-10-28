@@ -1,0 +1,723 @@
+USOS 3.1.2-usos10 patch 11/11 (2026-10-15): read-only KeTickCount watcher on the BIOS helper core (diagnostic, Windows 2000 ACPI flow only)
+
+Windows 2000 SP4 with the ACPI HAL on the ASRock X470 (no CSM) reaches
+kernel phase 1 (usosvid row 11) and then stalls; usosvid's heartbeat never
+draws. Step A (patch 0007) ruled out an SMI rewriting RTC A/B. This patch
+answers the next question independently of Windows DPCs: does KeTickCount
+(the clock interrupt) still advance?
+
+Only with csmwrap.ini acpi_legacy_fadt = true (written only for the
+Windows 2000 ACPI flow, tools/xp_csmwrap_esp.sh); otherwise the trampoline
+argument is 0 and the helper keeps the old MWAIT/PAUSE loop.
+
+- EFI (src/usos_watcher_efi.c): validated FADT (the RSDT copy found as in
+  patch 0007) -> PM1a_EVT/PM1a_CNT/PM_TMR/GPE0 ports (legacy fields, GAS
+  System I/O fallback); TSC calibrated against the PM timer (~100 ms,
+  bounded); one 4 KiB EfiReservedMemoryType page below 4 GiB; after
+  build_e820_map the page must be wholly covered by E820 type 2 entries
+  (usw_e820_reserved) or the watcher stays off; its PA goes to the helper
+  through a private trampoline dword (EDX), not through CSMPPrxy, and to BDA
+  0x4FC-0x4FF right before Legacy16Boot (0x4F4-0x4FB = step A untouched).
+- Helper (seabios/src/romlayout.S, usos_watch.c): PAUSE + RDTSC deadline
+  instead of MWAIT; request_pending is checked on every iteration and served
+  before the next sample (CSMPPrxy ABI unchanged). About once a second: Tick
+  low and KUSER_SHARED_DATA InterruptTime low (physical addresses published
+  by usosvid 1.3), PM1_STS/PM1_EN/PM1_CNT, GPE0 STS/EN (bytewise), PIC IMRs
+  (data ports), written to the page (helper range 0x100-0x1FF) and as one
+  80-column line on VGA text row 24.
+- Reads only: no OUT/W1C, no SMI_CMD, no EOI/OCW, no IOREGSEL/IOWIN, no CMOS,
+  no LAPIC/IPI. Writes: the reserved page and VGA row 24.
+- If a proxied BIOS function never returns, the watcher stops with it.
+
+Design, code and QEMU q35 runs by Codex (2026-10-15, as its patch 0008 on
+usos6); applied unchanged on top of usos9 patches 0001-0010 for usos10.
+Own code: shared/EFI parts LGPL-2.1-or-later, SeaBIOS part LGPL-3.0-or-later.
+No Microsoft code in the patch. KeTickCount/KUSER_SHARED_DATA offsets come
+from the DDK headers and the SP4 binaries; the earlier diagnosis rounds also
+used the user-supplied NT5 source material as a map of HAL/kernel behaviour,
+so this is not a clean-room claim (docs/windows-2000-acpi-x470-2026-10-12.md).
+
+diff --git a/seabios/Makefile b/seabios/Makefile
+index 13a3362..d78932f 100644
+--- a/seabios/Makefile
++++ b/seabios/Makefile
+@@ -34,7 +34,7 @@ SRCBOTH=misc.c stacks.c output.c string.c block.c cdrom.c disk.c	\
+     hw/ramdisk.c hw/lsi-scsi.c hw/esp-scsi.c hw/megasas.c		\
+     hw/mpt-scsi.c
+ SRC16=$(SRCBOTH)
+-SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c x86.c		\
++SRC32FLAT=$(SRCBOTH) usos_watch.c post.c e820map.c malloc.c romfile.c x86.c		\
+     optionroms.c pmm.c font.c boot.c bootsplash.c jpeg.c bmp.c		\
+     tcgbios.c sha1.c hw/pcidevice.c hw/ahci.c hw/pvscsi.c		\
+     hw/usb-xhci.c hw/usb-hub.c hw/sdcard.c fw/coreboot.c		\
+diff --git a/seabios/src/romlayout.S b/seabios/src/romlayout.S
+index bcbd826..669c83c 100644
+--- a/seabios/src/romlayout.S
++++ b/seabios/src/romlayout.S
+@@ -474,6 +474,9 @@ bios_proxy_helper_16_entry:
+         // EBX = mailbox address, ESI = helper_ready address (from trampoline)
+         movl %ebx, %ebp             // EBP = mailbox address (use as base register)
+ 
++        // Extra private trampoline argument; CSMPPrxy mailbox ABI unchanged.
++        pushl %edx
++
+         // Clear request_pending before entering loop
+         movl $0, 8(%ebp)
+ 
+@@ -506,9 +509,15 @@ bios_proxy_helper_16_entry:
+         cpuid
+         xorl %esi, %esi                 // Default: no mwait
+         testl $(1 << 3), %ecx
+-        jz .Lhelper_first_check
++        jz .Lusw_config
+         movl $1, %esi                   // mwait supported
+ 
++.Lusw_config:
++        popl %edx
++        testl %edx, %edx
++        jz .Lhelper_first_check
++        movl %edx, %esi   // page PA (>1); otherwise ESI retains MWAIT flag 0/1
++
+ .Lhelper_first_check:
+         // Check mailbox once before signalling ready, so that by the time
+         // the main core sees the flag, we are guaranteed to be polling.
+@@ -522,6 +531,9 @@ bios_proxy_helper_16_entry:
+         cmpl $0, 8(%ebp)
+         jne .Lhelper_handle_request
+ 
++        cmpl $1, %esi
++        ja .Lusw_tick
++
+         // Check if we should use mwait or pause
+         testl %esi, %esi
+         jz .Lhelper_do_pause
+@@ -542,6 +554,13 @@ bios_proxy_helper_16_entry:
+         mwait
+         jmp .Lhelper_poll_loop
+ 
++.Lusw_tick:
++        pushal
++        movl %esi, %eax
++        calll _cfunc32flat_usos_watch_tick - BUILD_BIOS_ADDR
++        popal
++        // Check pending again on the next iteration; PAUSE never sleeps.
++
+ .Lhelper_do_pause:
+         pause
+         jmp .Lhelper_poll_loop
+@@ -557,6 +576,13 @@ bios_proxy_helper_16_entry:
+         //  28: result (4 bytes)
+         //  32: helper_core_id (4 bytes) - DO NOT OVERWRITE
+ 
++        cmpl $1, %esi
++        jbe .Lusw_dispatch
++        pushal
++        movl %esi, %eax
++        calll _cfunc32flat_usos_watch_proxy_enter - BUILD_BIOS_ADDR
++        popal
++.Lusw_dispatch:
+         // Load function pointer and args (regparm=3: EAX, EDX, ECX)
+         movl 12(%ebp), %edi
+         movl 24(%ebp), %ecx
+@@ -566,6 +592,13 @@ bios_proxy_helper_16_entry:
+         // Call the function (ESI is callee-saved, so mwait flag preserved)
+         calll *%edi
+ 
++        cmpl $1, %esi
++        jbe .Lusw_result
++        pushal
++        movl %esi, %eax
++        calll _cfunc32flat_usos_watch_proxy_leave - BUILD_BIOS_ADDR
++        popal
++.Lusw_result:
+         // Store result and signal completion
+         movl %eax, 28(%ebp)
+         movl $0, 8(%ebp)
+diff --git a/seabios/src/usos_watch.c b/seabios/src/usos_watch.c
+new file mode 100644
+index 0000000..64fa0ae
+--- /dev/null
++++ b/seabios/src/usos_watch.c
+@@ -0,0 +1,46 @@
++/* USOS helper-side observer. Own code, LGPLv3-or-later (SeaBIOS).
++ * Persistent writes: own page 20..27/100..1ff and VGA row 24 only.
++ * The caller's normal stack is temporary; no mutable firmware globals. */
++#include "types.h"
++#include "../../src/usos_watcher.c"
++static u64 usw_helper_tsc(void) {
++    u32 a,d;asm volatile("lfence; rdtsc":"=a"(a),"=d"(d)::"memory");
++    return (u64)a|((u64)d<<32);
++}
++static usw_u32 usw_phys32(void *ctx,usw_u32 pa) {
++    (void)ctx;return *(volatile usw_u32 *)pa;
++}
++static usw_u8 usw_port8(void *ctx,usw_u16 p) {
++    usw_u8 v;(void)ctx;asm volatile("inb %w1,%0":"=a"(v):"d"(p));return v;
++}
++static usw_u16 usw_port16(void *ctx,usw_u16 p) {
++    usw_u16 v;(void)ctx;asm volatile("inw %w1,%0":"=a"(v):"d"(p));return v;
++}
++void VISIBLE32FLAT usos_watch_tick(u32 pa) {
++    volatile usw_u8 *m=(void *)pa;u64 now=usw_helper_tsc(),hz,next;
++    if(!usw_header_valid(m,USW_SIZE)) return;
++    hz=usw_load64(m,USW_FREQ);next=usw_load64(m,USW_NEXT);
++    if(!hz) return;
++    if(!next) {
++        usw_store64(m,USW_START,now);usw_store64(m,USW_NEXT,now+hz);
++        return;
++    }
++    if(now<next) return;
++    struct usw_sample s;char line[80];
++    struct usw_ops ops={0,usw_phys32,usw_port8,usw_port16};
++    usw_collect(m,&ops,now,&s);usw_format(&s,line);usw_save(m,&s,line);
++    volatile u16 *v=(void *)(0xB8000+24*160);
++    for(unsigned i=0;i<80;i++) v[i]=(u16)(0x0E00|(u8)line[i]);
++    usw_store64(m,USW_LAST,now);
++    usw_store64(m,USW_NEXT,now+hz); /* no catch-up burst after a proxy delay */
++    usw_store32(m,USW_LATE,0);
++}
++void VISIBLE32FLAT usos_watch_proxy_enter(u32 pa) {
++    volatile usw_u8 *m=(void *)pa;
++    usw_store64(m,USW_PROXY_START,usw_helper_tsc());
++}
++void VISIBLE32FLAT usos_watch_proxy_leave(u32 pa) {
++    volatile usw_u8 *m=(void *)pa;u64 now=usw_helper_tsc();
++    if(now>usw_load64(m,USW_NEXT)) usw_store32(m,USW_LATE,1);
++    usw_store32(m,USW_PROXY_COUNT,usw_load32(m,USW_PROXY_COUNT)+1);
++}
+diff --git a/src/ap_trampoline.asm b/src/ap_trampoline.asm
+index 6822c51..399a70d 100644
+--- a/src/ap_trampoline.asm
++++ b/src/ap_trampoline.asm
+@@ -186,6 +186,7 @@ ap_trampoline_start:
+     mov ebx, [0x7000 + trampoline_mailbox - ap_trampoline_start]
+     mov esp, [0x7000 + trampoline_stack - ap_trampoline_start]
+     mov esi, (0x7000 + trampoline_helper_ready - ap_trampoline_start)
++    mov edx, [0x7000 + trampoline_watcher - ap_trampoline_start]
+ 
+     ; Far jump to SeaBIOS 16-bit entry point (segment:offset)
+     jmp far [0x7000 + trampoline_target16 - ap_trampoline_start]
+@@ -204,6 +205,8 @@ trampoline_target16:
+     dw 0        ; offset
+     dw 0        ; segment
+ 
++trampoline_watcher: dd 0
++
+ trampoline_helper_ready:
+     dd 0
+ 
+@@ -228,4 +231,7 @@ ap_trampoline_target16_offset: dd (trampoline_target16 - ap_trampoline_start)
+ global ap_trampoline_helper_ready_offset
+ ap_trampoline_helper_ready_offset: dd (trampoline_helper_ready - ap_trampoline_start)
+ 
++global ap_trampoline_watcher_offset
++ap_trampoline_watcher_offset: dd (trampoline_watcher - ap_trampoline_start)
++
+ section .note.GNU-stack noalloc noexec nowrite progbits
+diff --git a/src/bios_proxy.c b/src/bios_proxy.c
+index 7708bf7..aa218fc 100644
+--- a/src/bios_proxy.c
++++ b/src/bios_proxy.c
+@@ -9,6 +9,7 @@
+ #include <efi.h>
+ #include <csmwrap.h>
+ #include <config.h>
++#include <usos_watcher_efi.h>
+ #include <io.h>
+ #include <time.h>
+ #include <uacpi/uacpi.h>
+@@ -179,6 +180,7 @@ extern uint32_t ap_trampoline_mailbox_offset;
+ extern uint32_t ap_trampoline_stack_offset;
+ extern uint32_t ap_trampoline_target16_offset;
+ extern uint32_t ap_trampoline_helper_ready_offset;
++extern uint32_t ap_trampoline_watcher_offset;
+ 
+ /*
+  * Create AP trampoline code at AP_TRAMPOLINE_ADDR
+@@ -198,6 +200,8 @@ static void create_ap_trampoline(uint32_t target16_addr, uint32_t mailbox_addr,
+     memcpy(tramp, ap_trampoline_start, size);
+     *(uint32_t *)(tramp + ap_trampoline_mailbox_offset) = mailbox_addr;
+     *(uint32_t *)(tramp + ap_trampoline_stack_offset) = stack_top;
++    *(uint32_t *)(tramp + ap_trampoline_watcher_offset) =
++        gConfig.acpi_legacy_fadt ? usos_watcher_helper_pa() : 0;
+     /* Far pointer: offset first, then segment (little-endian) */
+     *(uint16_t *)(tramp + ap_trampoline_target16_offset) = target_offset;
+     *(uint16_t *)(tramp + ap_trampoline_target16_offset + 2) = target_segment;
+diff --git a/src/csmwrap.c b/src/csmwrap.c
+index f15174f..3116832 100644
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -18,6 +18,7 @@
+ #include <oprom.h>
+ #include <usos_acpi10.h>
+ #include <usos_acpien.h>
++#include <usos_watcher_efi.h>
+ #include <flanterm.h>
+ #include <flanterm_backends/fb.h>
+ 
+@@ -649,6 +650,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+      * right before Legacy16Boot. */
+     if (gConfig.acpi_legacy_fadt)
+         usos_acpien_efi_prepare(rsdp_copy);
++    if (gConfig.acpi_legacy_fadt)
++        usos_watcher_prepare(rsdp_copy);
+ 
+     /* Initialize BIOS proxy (find mailbox and helper entry in CSM binary) */
+     if (bios_proxy_init(Csm16_bin, sizeof(Csm16_bin), rsdp_copy) != 0) {
+@@ -762,6 +765,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+     build_coreboot_table(&priv);
+ 
+     build_e820_map(&priv, efi_mmap, efi_mmap_size, efi_desc_size);
++    if (gConfig.acpi_legacy_fadt)
++        usos_watcher_verify_e820(&priv);
+     uintptr_t e820_low = (uintptr_t)&priv.low_stub->e820_map;
+     priv.csm_efi_table->E820Pointer = e820_low;
+     priv.csm_efi_table->E820Length = sizeof(EFI_E820_ENTRY64) * priv.low_stub->e820_entries;
+@@ -875,6 +880,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+      * programs the RTC, as the last step before the boot; RTC A/B before
+      * and after are kept at 0x4F4 for usosvid. No-op unless armed above. */
+     usos_acpien_efi_run();
++    if (gConfig.acpi_legacy_fadt)
++        usos_watcher_publish();
+ 
+     memset(&Regs, 0, sizeof(EFI_IA32_REGISTER_SET));
+     Regs.X.AX = Legacy16Boot;
+diff --git a/src/usos_acpien.h b/src/usos_acpien.h
+index 05ee8f6..1877353 100644
+--- a/src/usos_acpien.h
++++ b/src/usos_acpien.h
+@@ -103,6 +103,9 @@ void usos_acpien_run(const struct usos_acpien_io *io, const struct usos_acpien_f
+  */
+ void usos_acpien_bytes(const struct usos_acpien_result *r, uint8_t out[USOS_ACPIEN_RESULT_LEN]);
+ 
++/* Existing page-zero mechanism, used before boot for watcher BDA publication. */
++bool usos_acpien_bda_store(uint32_t phys, const uint8_t *src, unsigned n);
++
+ /* CSMWrap glue (usos_acpien_efi.c). */
+ void usos_acpien_efi_prepare(const void *rsdp_copy);   /* before ExitBootServices */
+ void usos_acpien_efi_run(void);                        /* right before Legacy16Boot */
+diff --git a/src/usos_acpien_efi.c b/src/usos_acpien_efi.c
+index 178eac1..28c3603 100644
+--- a/src/usos_acpien_efi.c
++++ b/src/usos_acpien_efi.c
+@@ -79,6 +79,12 @@ static bool page0_store(uint32_t phys, const uint8_t *src, unsigned n)
+     return true;
+ }
+ 
++bool usos_acpien_bda_store(uint32_t phys, const uint8_t *src, unsigned n)
++{
++    if (phys != 0x4FCu || n != 4u) return false;
++    return page0_store(phys, src, n);
++}
++
+ void usos_acpien_efi_prepare(const void *rsdp_copy)
+ {
+     uint32_t len = 0;
+diff --git a/src/usos_watcher.c b/src/usos_watcher.c
+new file mode 100644
+index 0000000..8d74b73
+--- /dev/null
++++ b/src/usos_watcher.c
+@@ -0,0 +1,222 @@
++/* Read-only observer logic, shared by EFI, SeaBIOS and host tests.
++ * Own USOS implementation. LGPL-2.1-or-later. No libc or hardware writes. */
++#include "usos_watcher.h"
++
++static usw_u16 usw_rd16(const volatile usw_u8 *p) {
++    return (usw_u16)(p[0] | ((usw_u16)p[1]<<8));
++}
++static usw_u32 usw_rd32(const usw_u8 *p) {
++    return (usw_u32)p[0] | ((usw_u32)p[1]<<8) | ((usw_u32)p[2]<<16) | ((usw_u32)p[3]<<24);
++}
++static usw_u64 usw_rd64(const usw_u8 *p) {
++    return (usw_u64)usw_rd32(p) | ((usw_u64)usw_rd32(p+4)<<32);
++}
++usw_u32 usw_load32(const volatile usw_u8 *p, usw_u32 off) {
++    return *(const volatile usw_u32 *)(p+off);
++}
++usw_u64 usw_load64(const volatile usw_u8 *p, usw_u32 off) {
++    return (usw_u64)usw_load32(p,off) | ((usw_u64)usw_load32(p,off+4)<<32);
++}
++void usw_store32(volatile usw_u8 *p, usw_u32 off, usw_u32 v) {
++    *(volatile usw_u32 *)(p+off)=v;
++}
++void usw_store64(volatile usw_u8 *p, usw_u32 off, usw_u64 v) {
++    usw_store32(p,off,(usw_u32)v); usw_store32(p,off+4,(usw_u32)(v>>32));
++}
++int usw_header_valid(const volatile usw_u8 *p, usw_u32 n) {
++    return p && n>=USW_SIZE && usw_load32(p,0)==USW_MAGIC &&
++        usw_rd16(p+4)==1 && usw_rd16(p+6)==USW_HEADER &&
++        usw_load32(p,8)==USW_SIZE && (usw_load32(p,12)&USW_RESERVED);
++}
++static usw_u16 usw_port(const usw_u8 *f, usw_u32 n, usw_u32 old, usw_u32 gas,
++                        usw_u32 extent) {
++    usw_u64 a=usw_rd32(f+old);
++    if (!a && n>=gas+12 && f[gas]==1 && f[gas+2]==0)
++        a=usw_rd64(f+gas+4);
++    /* Avoid legacy indexed/status ports even for malformed input tables. */
++    return extent && a>=0x100 && a<0x10000 && a+extent<=0x10000 ? (usw_u16)a : 0;
++}
++int usw_parse_fadt(const usw_u8 *f, usw_u32 n, struct usw_ports *p) {
++    usw_u32 len,i; usw_u8 sum=0;
++    *p=(struct usw_ports){0,0,0,0,0,0,0,0};
++    if (!f || n<116 || f[0]!='F' || f[1]!='A' || f[2]!='C' || f[3]!='P') return 0;
++    len=usw_rd32(f+4);
++    if (len<116 || len>n || len>4096) return 0;
++    for(i=0;i<len;i++) sum=(usw_u8)(sum+f[i]);
++    if(sum || (usw_rd32(f+112)&(1u<<20))) return 0;
++    if(f[88]>=4 && !(f[88]&1)) {
++        p->pm_sts=usw_port(f,len,56,148,f[88]);
++        if(p->pm_sts) p->pm_en=(usw_u16)(p->pm_sts+f[88]/2);
++    }
++    if(f[89]>=2) p->pm_cnt=usw_port(f,len,64,172,2);
++    if(f[91]>=4) p->pm_tmr=usw_port(f,len,76,208,4);
++    if(f[92]>=2 && !(f[92]&1) && f[92]<=128) {
++        p->gpe_sts=usw_port(f,len,80,220,f[92]);
++        if(p->gpe_sts) {
++            p->gpe_half=f[92]/2;
++            p->gpe_en=(usw_u16)(p->gpe_sts+p->gpe_half);
++        }
++    }
++    p->timer_bits=(usw_rd32(f+112)&256)?32:24;
++    return 1;
++}
++int usw_e820_reserved(const usw_u8 *map, usw_u32 count, usw_u32 stride,
++                      usw_u64 base, usw_u64 size) {
++    usw_u64 end=base+size,cursor=base; usw_u32 i;
++    if(!map || !size || end<base || stride<20 || count>128) return 0;
++    for(i=0;i<count;i++) {
++        const usw_u8 *e=map+i*stride;
++        usw_u64 a=usw_rd64(e), b=a+usw_rd64(e+8);
++        if(b<a) return 0;
++        if(a<end && b>base && usw_rd32(e+16)!=2) return 0;
++    }
++    for(i=0;i<count && cursor<end;i++) {
++        usw_u32 j; usw_u64 next=cursor;
++        for(j=0;j<count;j++) {
++            const usw_u8 *e=map+j*stride;
++            usw_u64 a=usw_rd64(e), b=a+usw_rd64(e+8);
++            if(usw_rd32(e+16)==2 && a<=cursor && b>next) next=b;
++        }
++        if(next==cursor) return 0;
++        cursor=next;
++    }
++    return cursor>=end;
++}
++void usw_init(volatile usw_u8 *m,const struct usw_ports *p,usw_u64 hz,usw_u32 flags) {
++    usw_u32 i; const usw_u16 ports[8]={p->pm_sts,p->pm_en,p->pm_cnt,p->pm_tmr,
++        p->gpe_sts,p->gpe_en,p->gpe_half,p->timer_bits};
++    for(i=0;i<USW_SIZE;i++) m[i]=0;
++    usw_store32(m,0,USW_MAGIC); usw_store32(m,4,(USW_HEADER<<16)|1);
++    usw_store32(m,8,USW_SIZE); usw_store32(m,12,flags);
++    usw_store64(m,USW_FREQ,hz);
++    for(i=0;i<8;i++) {m[USW_CONFIG+i*2]=(usw_u8)ports[i];m[USW_CONFIG+i*2+1]=(usw_u8)(ports[i]>>8);}
++}
++int usw_time_read(const struct usw_ops *o,usw_u32 pa,usw_u32 *lo,usw_u32 *hi) {
++    usw_u32 i,h1,h2,l;
++    for(i=0;i<2;i++) {
++        h1=o->read32(o->ctx,pa+12); l=o->read32(o->ctx,pa+8);
++        h2=o->read32(o->ctx,pa+16);
++        if(h1==h2) {*lo=l;*hi=h1;return 1;}
++    }
++    return 0;
++}
++/* Bounded division: no libgcc dependency in the 32-bit firmware. */
++static usw_u64 usw_div64(usw_u64 n,usw_u64 d) {
++    usw_u64 q=0,r=0; int i;
++    if(!d) return 0;
++    for(i=63;i>=0;i--) {
++        usw_u64 carry=r>>63;
++        r=(r<<1)|((n>>i)&1);
++        if(carry || r>=d) {r-=d;q|=(usw_u64)1<<i;}
++    }
++    return q;
++}
++void usw_collect(const volatile usw_u8 *m,const struct usw_ops *o,usw_u64 now,struct usw_sample *s) {
++    usw_u32 i,seq,ready,ta=0,sa=0,th=0,sh=0,publish=0;
++    usw_u16 a;
++    *s=(struct usw_sample){0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
++    s->elapsed=now-usw_load64(m,USW_START);
++    s->seconds=usw_div64(s->elapsed,usw_load64(m,USW_FREQ));
++    for(i=0;i<2;i++) {
++        seq=usw_load32(m,USW_SEQ);ready=usw_load32(m,USW_READY);
++        if(seq&1) continue;
++        ta=usw_load32(m,USW_TICK_PA);th=usw_load32(m,USW_TICK_PA+4);
++        sa=usw_load32(m,USW_SHARED_PA);sh=usw_load32(m,USW_SHARED_PA+4);
++        s->hb_entry=usw_load32(m,USW_HB_ENTRY);s->hb_draw=usw_load32(m,USW_HB_DRAW);
++        s->arm=usw_load32(m,USW_ARM);
++        if(seq==usw_load32(m,USW_SEQ) && ready==usw_load32(m,USW_READY)) {publish=1;break;}
++    }
++    if(!publish) s->flags|=USW_F_TORN;
++    else if(!ready) s->flags|=USW_F_READY;
++    else {
++        s->flags|=USW_V_PUBLISH;
++        if(th || sh) s->flags|=USW_F_HIGHPA;
++        if(!th && ta>=0x1000 && !(ta&3) && ta<=0xFFFFFFFCu) {
++            s->tick=o->read32(o->ctx,ta);s->flags|=USW_V_TICK;
++        } else if(!th) s->flags|=USW_F_BADPA;
++        if(!sh && sa>=0x1000 && !(sa&0xFFF) && sa<=0xFFFFF000u) {
++            if(usw_time_read(o,sa,&s->it_low,&s->it_high)) s->flags|=USW_V_TIME;
++            else s->flags|=USW_F_TORN;
++        } else if(!sh) s->flags|=USW_F_BADPA;
++    }
++    a=usw_rd16(m+USW_CONFIG);
++    {usw_u16 en=usw_rd16(m+USW_CONFIG+2);
++     if(a>=0x100 && a<=0xFFFE && en>=a+2u && en<=0xFFFE) {
++        s->pm_sts=o->inw(o->ctx,a);s->pm_en=o->inw(o->ctx,en);s->flags|=USW_V_PMEVT;}}
++    a=usw_rd16(m+USW_CONFIG+4);
++    if(a>=0x100 && a<=0xFFFE) {s->pm_cnt=o->inw(o->ctx,a);s->flags|=USW_V_PMCNT;}
++    a=usw_rd16(m+USW_CONFIG+8);
++    if(a>=0x100) {
++        usw_u16 en=usw_rd16(m+USW_CONFIG+10),half=usw_rd16(m+USW_CONFIG+12);
++        if(half && half<=64 && en==(usw_u32)a+half && (usw_u32)en+half<=0x10000) {
++        for(i=0;i<half;i++) {
++            usw_u8 st=o->inb(o->ctx,(usw_u16)(a+i)),e=o->inb(o->ctx,(usw_u16)(en+i));
++            if(i<4) {s->gpe_sts|=(usw_u32)st<<(i*8);s->gpe_en|=(usw_u32)e<<(i*8);}
++        }
++        s->flags|=USW_V_GPE;
++        if(half>4) s->flags|=USW_F_GPEPART;
++        }
++    }
++    s->imr_master=o->inb(o->ctx,0x21);s->imr_slave=o->inb(o->ctx,0xA1);
++    if(usw_load32(m,USW_LATE)) s->flags|=USW_F_BUSY;
++    if(usw_load32(m,12)&USW_NONINVARIANT) s->flags|=USW_F_UNSTABLE;
++}
++static unsigned usw_text(char *l,unsigned at,const char *s) {
++    while(*s && at<80) l[at++]=*s++;
++    return at;
++}
++static unsigned usw_hex(char *l,unsigned at,usw_u32 n,unsigned digits,int valid) {
++    static const char usw_digits[]="0123456789ABCDEF";
++    while(digits && at<80) {digits--;l[at++]=valid?usw_digits[(n>>(digits*4))&15]:'-';}
++    return at;
++}
++void usw_format(const struct usw_sample *s,char l[80]) {
++    unsigned i=0,j;usw_u32 f=s->flags;
++    for(j=0;j<80;j++) l[j]=' ';
++    i=usw_text(l,i,"W");i=usw_hex(l,i,(usw_u32)s->seconds,4,1);
++    i=usw_text(l,i,"T");i=usw_hex(l,i,s->tick,8,f&USW_V_TICK);
++    i=usw_text(l,i,"I");
++    if(!(f&USW_V_TIME) && (f&USW_F_TORN)) {for(j=0;j<8;j++) l[i++]='?';}
++    else i=usw_hex(l,i,s->it_low,8,f&USW_V_TIME);
++    i=usw_text(l,i," h");i=usw_hex(l,i,s->hb_entry,4,f&USW_V_PUBLISH);
++    i=usw_text(l,i,"a");i=usw_hex(l,i,s->arm,1,f&USW_V_PUBLISH);
++    i=usw_text(l,i," P");i=usw_hex(l,i,s->pm_sts,4,f&USW_V_PMEVT);
++    i=usw_text(l,i,"/");i=usw_hex(l,i,s->pm_en,4,f&USW_V_PMEVT);
++    i=usw_text(l,i,"/");i=usw_hex(l,i,s->pm_cnt,4,f&USW_V_PMCNT);
++    i=usw_text(l,i," G");i=usw_hex(l,i,s->gpe_sts,8,f&USW_V_GPE);
++    i=usw_text(l,i,"/");i=usw_hex(l,i,s->gpe_en,8,f&USW_V_GPE);
++    i=usw_text(l,i," M");i=usw_hex(l,i,((usw_u32)s->imr_master<<8)|s->imr_slave,4,1);
++    i=usw_text(l,i," ");
++    if(f&USW_F_READY) i=usw_text(l,i,"R");
++    if(f&USW_F_HIGHPA) i=usw_text(l,i,"4");
++    if(f&USW_F_BUSY) i=usw_text(l,i,"B");
++    if(f&USW_F_TORN) i=usw_text(l,i,"?");
++    if(f&USW_F_GPEPART) i=usw_text(l,i,"G");
++    if(f&USW_F_UNSTABLE) i=usw_text(l,i,"U");
++    if(f&USW_F_BADPA) i=usw_text(l,i,"X");
++    if(!(f&~0x3Fu)) (void)usw_text(l,i,".");
++}
++void usw_save(volatile usw_u8 *m,const struct usw_sample *s,const char l[80]) {
++    usw_u32 q=usw_load32(m,USW_SSEQ),i;
++    usw_store32(m,USW_SSEQ,q+1);
++    /* A small history permits verification at the end of a VM run without
++     * periodically polling its display or memory. Only helper-owned bytes. */
++    if((s->flags&(USW_V_TICK|USW_V_TIME))==(USW_V_TICK|USW_V_TIME)) {
++        usw_u32 count=usw_load32(m,0x1A8);
++        if(!count) {
++            usw_store32(m,0x1A0,s->tick);usw_store32(m,0x1A4,s->it_low);
++            usw_store64(m,0x1B0,s->seconds);
++        }
++        usw_store32(m,0x1AC,count?usw_load32(m,0x118):s->tick);
++        usw_store32(m,0x1B8,count?usw_load32(m,0x11C):s->it_low);
++        usw_store32(m,0x1A8,count+1);
++    }
++    usw_store32(m,0x104,s->flags);usw_store64(m,0x108,s->elapsed);usw_store64(m,0x110,s->seconds);
++    usw_store32(m,0x118,s->tick);usw_store32(m,0x11C,s->it_low);usw_store32(m,0x120,s->it_high);
++    usw_store32(m,0x124,s->hb_entry);usw_store32(m,0x128,s->hb_draw);usw_store32(m,0x12C,s->arm);
++    usw_store32(m,0x130,(usw_u32)s->pm_sts|((usw_u32)s->pm_en<<16));
++    usw_store32(m,0x134,(usw_u32)s->pm_cnt|((usw_u32)s->imr_master<<16)|((usw_u32)s->imr_slave<<24));
++    usw_store32(m,0x138,s->gpe_sts);usw_store32(m,0x13C,s->gpe_en);
++    for(i=0;i<80;i++) m[0x150+i]=(usw_u8)l[i];
++    usw_store32(m,USW_SSEQ,q+2);
++}
+diff --git a/src/usos_watcher.h b/src/usos_watcher.h
+new file mode 100644
+index 0000000..6a1303f
+--- /dev/null
++++ b/src/usos_watcher.h
+@@ -0,0 +1,79 @@
++/* USOS diagnostic watcher ABI v1. Own implementation, LGPL-2.1-or-later.
++ * No NT source is included. Numeric offsets are shared with usosvid.
++ * Owners after handoff: firmware 00..27 (except helper 20..27) and
++ * 200..23f; usosvid 28..ff; helper 100..1ff. Proxy ABI is separate. */
++#ifndef USOS_WATCHER_H
++#define USOS_WATCHER_H
++typedef unsigned char usw_u8;
++typedef unsigned short usw_u16;
++typedef unsigned int usw_u32;
++typedef unsigned long long usw_u64;
++typedef char usw_width_check[(sizeof(usw_u32)==4 && sizeof(usw_u64)==8)?1:-1];
++#define USW_SIZE 0x1000u
++#define USW_HEADER 0x100u
++#define USW_BDA 0x4FCu
++#define USW_MAGIC 0x44375755u /* UW7D */
++#define USW_RESERVED 1u
++#define USW_NONINVARIANT 2u
++#define USW_FREQ 0x18u
++#define USW_START 0x20u
++#define USW_SEQ 0x28u
++#define USW_READY 0x2Cu
++#define USW_TICK_PA 0x30u
++#define USW_SHARED_PA 0x38u
++#define USW_HB_ENTRY 0x70u
++#define USW_HB_DRAW 0x74u
++#define USW_ARM 0x90u
++#define USW_INIT_CNT 0xB0u
++#define USW_CONFIG 0x200u
++#define USW_SSEQ 0x100u
++#define USW_NEXT 0x1E0u
++#define USW_LAST 0x1E8u
++#define USW_PROXY_START 0x1F0u
++#define USW_LATE 0x1F8u
++#define USW_PROXY_COUNT 0x1FCu
++/* Sample flags. Validity is separate from values, including zero. */
++#define USW_V_TICK 1u
++#define USW_V_TIME 2u
++#define USW_V_PMEVT 4u
++#define USW_V_PMCNT 8u
++#define USW_V_GPE 16u
++#define USW_V_PUBLISH 32u
++#define USW_F_READY 0x100u
++#define USW_F_HIGHPA 0x200u
++#define USW_F_BUSY 0x400u
++#define USW_F_TORN 0x800u
++#define USW_F_GPEPART 0x1000u
++#define USW_F_UNSTABLE 0x2000u
++#define USW_F_BADPA 0x4000u
++#define USW_F_STALE 0x8000u
++struct usw_ports {
++    usw_u16 pm_sts, pm_en, pm_cnt, pm_tmr, gpe_sts, gpe_en;
++    usw_u16 gpe_half, timer_bits;
++};
++struct usw_sample {
++    usw_u32 flags, tick, it_low, it_high, hb_entry, hb_draw, arm;
++    usw_u16 pm_sts, pm_en, pm_cnt;
++    usw_u8 imr_master, imr_slave;
++    usw_u32 gpe_sts, gpe_en;
++    usw_u64 elapsed, seconds;
++};
++struct usw_ops {
++    void *ctx;
++    usw_u32 (*read32)(void *, usw_u32);
++    usw_u8 (*inb)(void *, usw_u16);
++    usw_u16 (*inw)(void *, usw_u16);
++};
++usw_u32 usw_load32(const volatile usw_u8 *, usw_u32);
++usw_u64 usw_load64(const volatile usw_u8 *, usw_u32);
++void usw_store32(volatile usw_u8 *, usw_u32, usw_u32);
++void usw_store64(volatile usw_u8 *, usw_u32, usw_u64);
++int usw_header_valid(const volatile usw_u8 *, usw_u32);
++int usw_parse_fadt(const usw_u8 *, usw_u32, struct usw_ports *);
++int usw_e820_reserved(const usw_u8 *, usw_u32, usw_u32, usw_u64, usw_u64);
++void usw_init(volatile usw_u8 *, const struct usw_ports *, usw_u64, usw_u32);
++int usw_time_read(const struct usw_ops *, usw_u32, usw_u32 *, usw_u32 *);
++void usw_collect(const volatile usw_u8 *, const struct usw_ops *, usw_u64, struct usw_sample *);
++void usw_format(const struct usw_sample *, char [80]);
++void usw_save(volatile usw_u8 *, const struct usw_sample *, const char [80]);
++#endif
+diff --git a/src/usos_watcher_efi.c b/src/usos_watcher_efi.c
+new file mode 100644
+index 0000000..8484e62
+--- /dev/null
++++ b/src/usos_watcher_efi.c
+@@ -0,0 +1,74 @@
++/* Own USOS watcher preparation, LGPL-2.1-or-later.
++ * No RTC, SMI, APIC or chipset writes added by this file. */
++#include <efi.h>
++#include <csmwrap.h>
++#include <io.h>
++#include <printf.h>
++#include "usos_acpien.h"
++#include "usos_watcher.h"
++#include "usos_watcher_efi.h"
++static uint32_t usw_page;
++static bool usw_reserved;
++static void *usw_identity(void *ctx,uint64_t phys,uint32_t len) {
++    (void)ctx;(void)len;return (void *)(uintptr_t)phys;
++}
++static uint64_t usw_tsc(void) {
++    uint32_t a,d;asm volatile("lfence; rdtsc":"=a"(a),"=d"(d)::"memory");
++    return (uint64_t)a|((uint64_t)d<<32);
++}
++static uint64_t usw_calibrate(const struct usw_ports *p) {
++    uint32_t mask=p->timer_bits==32?0xFFFFFFFFu:0xFFFFFFu;
++    uint32_t start=inl(p->pm_tmr)&mask,delta=0,i;
++    uint64_t first=usw_tsc(),dt;
++    for(i=0;i<20000000u;i++) {
++        delta=(inl(p->pm_tmr)-start)&mask;
++        if(delta>=357955u) break; /* >=100 ms, less than a 24-bit wrap */
++        asm volatile("pause");
++    }
++    dt=usw_tsc()-first;
++    if(delta<357955u || delta>3579545u || !dt || dt>100000000000ull) return 0;
++    uint64_t hz=dt*3579545ull/delta;
++    return hz>=1000000ull && hz<=20000000000ull?hz:0;
++}
++void usos_watcher_prepare(const void *rsdp) {
++    struct usw_ports ports;uint32_t len=0,flags=0;
++    uint64_t f=usos_acpien_find_fadt(usw_identity,NULL,rsdp,&len);
++    if(!f || !usw_parse_fadt((const void *)(uintptr_t)f,len,&ports) || !ports.pm_tmr) {
++        printf("USOS WATCH: disabled (no validated FADT PM timer)\n");return;
++    }
++    uint64_t hz=usw_calibrate(&ports);
++    if(!hz) {printf("USOS WATCH: disabled (PM/TSC calibration failed)\n");return;}
++    uint32_t a,b,c,d;
++    asm volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"a"(0x80000000u));
++    if(a>=0x80000007u) {
++        asm volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"a"(0x80000007u));
++        if(!(d&256)) flags|=USW_NONINVARIANT;
++    } else flags|=USW_NONINVARIANT;
++    EFI_PHYSICAL_ADDRESS page=0xFFFFFFFFull;
++    if(gBS->AllocatePages(AllocateMaxAddress,EfiReservedMemoryType,1,&page)!=EFI_SUCCESS ||
++       page<0x100000 || page>0xFFFFF000 || (page&4095)) {
++        printf("USOS WATCH: disabled (reserved page allocation failed)\n");return;
++    }
++    usw_page=(uint32_t)page;
++    usw_init((void *)(uintptr_t)usw_page,&ports,hz,flags);
++    printf("USOS WATCH: page %x TSC %lu Hz PM %x/%x/%x GPE %x/%x half %u%s\n",
++        usw_page,(unsigned long)hz,ports.pm_sts,ports.pm_en,ports.pm_cnt,
++        ports.gpe_sts,ports.gpe_en,ports.gpe_half,flags?" non-invariant TSC":"");
++}
++void usos_watcher_verify_e820(struct csmwrap_priv *p) {
++    if(!usw_page) return;
++    usw_reserved=usw_e820_reserved((const void *)p->low_stub->e820_map,
++        p->low_stub->e820_entries,sizeof(EFI_E820_ENTRY64),usw_page,USW_SIZE);
++    if(usw_reserved) {
++        volatile usw_u8 *m=(void *)(uintptr_t)usw_page;
++        usw_store32(m,12,usw_load32(m,12)|USW_RESERVED);
++    }
++    printf("USOS WATCH: E820 page %x %s\n",usw_page,usw_reserved?"RESERVED PASS":"FAIL (watcher disabled)");
++}
++uint32_t usos_watcher_helper_pa(void) {return usw_reserved?usw_page:0;}
++void usos_watcher_publish(void) {
++    uint32_t pa=usos_watcher_helper_pa();uint8_t bytes[4];
++    for(unsigned i=0;i<4;i++) bytes[i]=(uint8_t)(pa>>(i*8));
++    bool ok=usos_acpien_bda_store(USW_BDA,bytes,4);
++    printf("USOS WATCH: BDA 4fc %x %s\n",pa,ok?"published":"NOT published");
++}
+diff --git a/src/usos_watcher_efi.h b/src/usos_watcher_efi.h
+new file mode 100644
+index 0000000..949b226
+--- /dev/null
++++ b/src/usos_watcher_efi.h
+@@ -0,0 +1,9 @@
++/* CSMWrap glue; calls gated by acpi_legacy_fadt. LGPL-2.1-or-later. */
++#ifndef USOS_WATCHER_EFI_H
++#define USOS_WATCHER_EFI_H
++#include <csmwrap.h>
++void usos_watcher_prepare(const void *rsdp);
++void usos_watcher_verify_e820(struct csmwrap_priv *priv);
++uint32_t usos_watcher_helper_pa(void);
++void usos_watcher_publish(void);
++#endif

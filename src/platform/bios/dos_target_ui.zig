@@ -9,6 +9,7 @@ const seeder16 = @import("dos_fat16_seed.zig");
 const menu = @import("graphics_menu.zig");
 const seabios = @import("seabios.zig");
 const csmwrap_esp = @import("dos_csmwrap_esp.zig");
+const edd_interface = @import("edd_interface.zig");
 const Raw = extern struct { sectors_low: u32 = 0, sectors_high: u32 = 0, bytes_per_sector: u16 = 0, cylinders: u16 = 0, heads: u16 = 0, sectors_per_track: u16 = 0 };
 extern fn bios_drive_info(drive: u32, output: *Raw) callconv(.c) u32;
 extern fn bios_read_sector_drive(drive: u32, lba: u64, out: [*]u8) callconv(.c) u32;
@@ -43,7 +44,7 @@ fn hints(ui: *const graphics.ui.Ui, buffer: *[3]graphics.ui.Hint, enter: graphic
     return buffer;
 }
 
-pub fn action(session: vbe.Session) ?Action {
+pub fn action(session: vbe.Session, title: []const u8) ?Action {
     var selected: usize = 0;
     while (true) {
         const ui = menu.strings(&session);
@@ -52,7 +53,7 @@ pub fn action(session: vbe.Session) ?Action {
             .{ .title = ui.t(.dos_w98_install), .icon = .{ .vector = .windows } },
         };
         var buffer: [3]graphics.ui.Hint = undefined;
-        menu.choice(&session, "Windows 98 SE", ui.t(.dos_w98_subtitle), &rows, selected, &.{}, hints(&ui, &buffer, .key_next));
+        menu.choice(&session, title, ui.t(.dos_w98_subtitle), &rows, selected, &.{}, hints(&ui, &buffer, .key_next));
         const key = console.readKey();
         if (key.ascii == 27) return null;
         if (key.scan == 0x48) selected = 0;
@@ -80,9 +81,10 @@ pub fn dosAction(session: vbe.Session) ?bool {
     }
 }
 
-pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selection {
+/// `win9x_title`: the Windows 95/98/Me system name (FAT32 paths).
+pub fn choose(source: u8, session: vbe.Session, selected_action: Action, win9x_title: []const u8) !?Selection {
     const fat16 = selected_action == .dos_install;
-    const title = if (fat16) "MS-DOS / Windows 3.x" else "Windows 98 SE";
+    const title = if (fat16) "MS-DOS / Windows 3.x" else win9x_title;
     var disks: [16]Disk = undefined;
     var source_gpt: [512]u8 = undefined;
     if (bios_read_sector_drive(source, 1, &source_gpt) != 0) return error.DosSourceIdentityUnavailable;
@@ -91,6 +93,8 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         if (number == source) continue;
         var raw = Raw{};
         if (bios_drive_info(@intCast(number), &raw) != 0 or raw.bytes_per_sector != 512 or raw.sectors_high != 0 or raw.sectors_low < (if (fat16) @as(u32, 264226) else 4_196_386)) continue;
+        // Read before any other INT 13h call; null when the firmware does not say.
+        const bus = edd_interface.lastLabel();
         if (fat16) _ = partition.planFat16(@intCast(number), source, planSectors(raw.sectors_low), 128, raw.cylinders, raw.heads, raw.sectors_per_track, [_]u8{0} ** 512) catch continue;
         var sector: [512]u8 = undefined;
         if (bios_read_sector_drive(@intCast(number), 1, &sector) != 0) continue;
@@ -114,12 +118,16 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         var ordinal: [8]u8 = undefined;
         var mib: [12]u8 = undefined;
         var part_text: [4]u8 = undefined;
+        var body: [160]u8 = undefined;
         const number_text = try std.fmt.bufPrint(&ordinal, "{d}", .{count + 1});
         const mib_text = try std.fmt.bufPrint(&mib, "{d}", .{raw.sectors_low >> 11});
-        const text = if (std.mem.eql(u8, style, "GPT"))
-            strings.format(&disk.label, .dos_disk, &.{ number_text, mib_text })
+        const described = if (std.mem.eql(u8, style, "GPT"))
+            strings.format(&body, .dos_disk, &.{ number_text, mib_text })
         else
-            strings.format(&disk.label, .dos_disk_mbr, &.{ number_text, mib_text, style, try std.fmt.bufPrint(&part_text, "{d}", .{parts}) });
+            strings.format(&body, .dos_disk_mbr, &.{ number_text, mib_text, style, try std.fmt.bufPrint(&part_text, "{d}", .{parts}) });
+        // "SATA - Disk 1 - ...": the same "<type> - " prefix as the
+        // micro-Linux pickers; no prefix when the firmware does not say.
+        const text = edd_interface.prefixed(&disk.label, bus, described);
         disk.len = text.len; count += 1;
     }
     if (count == 0) return error.NoCompatibleDosTargetDisk;
@@ -161,9 +169,9 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
             continue;
         }
         var size_index: usize = 0;
-        const sizes = if (fat16) [_]u32{ 256, 512, 128 } else [_]u32{ 8, 4, 2 };
+        const sizes = if (fat16) [_]u32{ 256, 512, 128 } else [_]u32{ 32, 8, 2 };
         while (size_index < 2 and !sizeAvailable(disk, source, sizes[size_index], fat16)) size_index += 1;
-        const labels = if (fat16) [_][]const u8{ "256 MiB", "512 MiB", "128 MiB" } else [_][]const u8{ "8 GiB", "4 GiB", "2 GiB" };
+        const labels = if (fat16) [_][]const u8{ "256 MiB", "512 MiB", "128 MiB" } else [_][]const u8{ "32 GiB", "8 GiB", "2 GiB" };
         while (true) {
             const size_ui = menu.strings(&session);
             var size_rows: [3]graphics.ui.Row = undefined;
@@ -193,7 +201,7 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
                     .{ .title = confirm_ui.t(.dos_confirm_go), .icon = .{ .vector = .warning } },
                 };
                 const confirm_notes = [_][]const u8{ detail, confirm_ui.t(.dos_confirm_note1), confirm_ui.t(.dos_confirm_note2), confirm_ui.t(.dos_confirm_csmwrap) };
-                const shown_notes: usize = if (fat16 and seabios.csmwrap) 4 else 3;
+                const shown_notes: usize = if (seabios.csmwrap) 4 else 3;
                 var confirm_hints: [3]graphics.ui.Hint = undefined;
                 menu.choice(&session, confirm_ui.t(.dos_confirm_title), disk.label[0..disk.len], &choices, confirm, confirm_notes[0..shown_notes], hints(&confirm_ui, &confirm_hints, .key_confirm));
                 const confirm_key = console.readKey();
@@ -218,7 +226,7 @@ fn sizeAvailable(disk: *const Disk, source: u8, size: u32, fat16: bool) bool {
         _ = partition.planFat16(disk.drive, source, planSectors(disk.sectors), size, disk.cylinders, disk.heads, disk.spt, disk.before) catch return false;
         return true;
     }
-    return disk.sectors >= size * 2 * 1024 * 1024 + 2082;
+    return planSectors(disk.sectors) >= size * 2 * 1024 * 1024 + 2082;
 }
 pub fn commit(plan: partition.Plan) !void {
     var current = Raw{};

@@ -68,6 +68,9 @@ pub const Field = struct {
     /// A product key: letters and digits only, in capitals, the dashes put
     /// in on their own (answer.profile.keyTyped); never traced.
     product_key: bool = false,
+    /// How the product key types (answer.profile.KeyStyle): Windows 95 /
+    /// NT 4.0 fields take only the CD key ddd-ddddddd or the OEM ID.
+    key_style: answer_profile.KeyStyle = .any,
     placeholder: []const u8 = "",
     // choice
     options: []const []const u8 = &.{},
@@ -114,7 +117,13 @@ pub const Outcome = union(enum) {
     y_on: usize,
 };
 
-const max_fields = 40;
+/// Rows one form can hold. The profile editor of Windows 10 / 11 has about
+/// 70 (every typed option of answer.options plus the general rows); its
+/// own bound is checked against this one at compile time
+/// (profile_editor.max_fields). More rows than this used to be written past
+/// `items` / `value_text` in ReleaseFast and corrupt the neighbouring
+/// globals (X470 B261022-203217: garbage help title, freeze on Enter).
+pub const max_fields = 128;
 
 var items: [max_fields]gui.form.Item = undefined;
 var value_text: [max_fields][80]u8 = undefined;
@@ -267,7 +276,7 @@ fn traceText(field: *const Field, out: *[16]u8) []const u8 {
     const value = field.text.?.slice();
     if (value.len == 0) return "";
     if (field.secret) return "(secret)";
-    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.key_symbols }) catch "(key)";
+    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.keySymbolLimitFor(value, field.key_style) }) catch "(key)";
     return value;
 }
 
@@ -313,8 +322,10 @@ fn wheelTarget(fields: []const Field, current: usize, notches: i32) usize {
 
 /// Runs the form until an action button, Back, or X/Y. `selected` is kept
 /// across calls (the owner reopens the form after a confirmation).
-pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hooks, selected: *usize) Outcome {
-    std.debug.assert(fields.len <= max_fields and fields.len > 0);
+pub fn run(title: []const u8, subtitle: []const u8, all_fields: []Field, hooks: ?Hooks, selected: *usize) Outcome {
+    std.debug.assert(all_fields.len <= max_fields and all_fields.len > 0);
+    // Never index past items / value_text (ReleaseFast drops the assert).
+    const fields = all_fields[0..@min(all_fields.len, max_fields)];
     form_fields = fields;
     form_hooks = hooks;
     editing = null;
@@ -552,7 +563,7 @@ fn typeChar(index: usize, raw: u8) bool {
     if (field.product_key) {
         const text = field.text.?;
         const before = text.len;
-        text.len = answer_profile.keyTyped(&text.bytes, text.len, raw);
+        text.len = answer_profile.keyTypedFor(&text.bytes, text.len, raw, field.key_style);
         if (text.len == before) return false;
         notifyChanged(index);
         return true;
@@ -569,7 +580,7 @@ fn backspace(index: usize) void {
     if (field.product_key) {
         const text = field.text.?;
         const before = text.len;
-        text.len = answer_profile.keyBackspace(&text.bytes, text.len);
+        text.len = answer_profile.keyBackspaceFor(&text.bytes, text.len, field.key_style);
         if (text.len != before) notifyChanged(index);
         return;
     }
@@ -728,10 +739,18 @@ test "the trace never shows a product key or a password" {
     try std.testing.expect(std.mem.indexOf(u8, shown, "ABCDE") == null);
     key.set("ABCDE-12");
     try std.testing.expectEqualStrings("(key 7/25)", traceText(&key_field, &out));
+    key.set("12345-OEM-00");
+    try std.testing.expectEqualStrings("(key 10/20)", traceText(&key_field, &out));
     var password = TextValue{};
     password.set(secret);
     const password_field = Field{ .kind = .text, .label = "Password", .text = &password, .secret = true };
     try std.testing.expectEqualStrings("(secret)", traceText(&password_field, &out));
     key.set("");
     try std.testing.expectEqualStrings("", traceText(&key_field, &out));
+    // A Windows 95 field: the CD key counts to 10.
+    const key95_field = Field{ .kind = .text, .label = "Product key", .text = &key, .product_key = true, .key_style = .win95 };
+    key.set("123-45");
+    try std.testing.expectEqualStrings("(key 5/10)", traceText(&key95_field, &out));
+    key.set("12345-OEM-00");
+    try std.testing.expectEqualStrings("(key 10/20)", traceText(&key95_field, &out));
 }

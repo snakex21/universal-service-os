@@ -44,9 +44,15 @@ start=$(value partition_start_lba "$MARKER") || fail 'XPSETUP start missing'
 [ "$slot" = "$(value xpsetup_slot "$TARGET_SNAPSHOT")" ] || fail 'XPSETUP slot changed'
 [ "$start" = "$(value xpsetup_start_lba "$TARGET_SNAPSHOT")" ] || fail 'XPSETUP start changed'
 [ "$slot" = "$(value active_slots "$TARGET_SNAPSHOT")" ] || fail 'XPSETUP must be the only active partition'
-code="$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin"
+# The MBR prepare_xp_target.sh staged: XP geometry fix, or the Windows 2000
+# ACPI build of it (w2k-acpi-mbr-440.bin); the marker hash picks it.
+code=
+for candidate in "$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" "$SCRIPT_DIR/w2k-acpi-mbr-440.bin"; do
+    [ -r "$candidate" ] || continue
+    if [ "$(sha256sum "$candidate" | awk '{print $1}')" = "$(value mbr_code_sha256 "$MARKER")" ]; then code=$candidate; fi
+done
+[ -n "$code" ] || fail 'MBR artifact differs from staged version'
 [ "$(wc -c < "$code" | tr -d ' ')" = 440 ] || fail 'invalid MBR artifact length'
-[ "$(sha256sum "$code" | awk '{print $1}')" = "$(value mbr_code_sha256 "$MARKER")" ] || fail 'MBR artifact differs from staged version'
 mkdir -p /run/xp-resume /mnt/xp-resume-windows
 for file in boot.ini ntldr ntdetect.com; do
     mcopy -o -i "$TARGET_DEVICE@@$((start * 512))" "::/$file" "/run/xp-resume/$file" || fail "Text Mode has not installed $file"

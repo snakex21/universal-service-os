@@ -1,0 +1,500 @@
+"""usosnet (tools/nt/usosnet): the USOS own NDIS 5.0 Ethernet miniport for
+Windows 98 / 98 SE / Me and 2000 / XP x86. The committed binary imports only
+NDIS.SYS functions that the 9x NDIS.VXD provides, carries PE version 4.00,
+and both INFs list exactly the PCI IDs of the driver's chip table.
+
+W9X_NDIS_EXPORTS: export names (names only, no Microsoft file) found in the
+NDIS.VXD of Windows 98 SE (4.10.2222, 1999-05-05) and Windows Me
+(4.90.3000, 2000-06-08); checked 2026-10-18 against the user's own CDs. A new
+import must be added here only after that check."""
+from pathlib import Path
+import re, sys, unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_nt52_driver_imports import pe  # noqa: E402
+
+DRV = ROOT / 'tools/nt/usosnet'
+SYS = DRV / 'bin/i386/usosnet.sys'
+
+W9X_NDIS_EXPORTS = {
+    'NdisAllocateMemory', 'NdisCloseConfiguration', 'NdisFreeMemory', 'NdisInitializeWrapper',
+    'NdisMAllocateMapRegisters', 'NdisMAllocateSharedMemory', 'NdisMCancelTimer',
+    'NdisMDeregisterAdapterShutdownHandler', 'NdisMDeregisterInterrupt', 'NdisMFreeMapRegisters',
+    'NdisMFreeSharedMemory', 'NdisMIndicateStatus', 'NdisMIndicateStatusComplete', 'NdisMInitializeTimer',
+    'NdisMMapIoSpace', 'NdisMQueryAdapterResources', 'NdisMRegisterAdapterShutdownHandler',
+    'NdisMRegisterInterrupt', 'NdisMRegisterMiniport', 'NdisMSetAttributesEx', 'NdisMSetPeriodicTimer',
+    'NdisMSleep', 'NdisMUnmapIoSpace', 'NdisOpenConfiguration', 'NdisQueryBuffer', 'NdisReadConfiguration',
+    'NdisReadNetworkAddress', 'NdisReadPciSlotInformation', 'NdisTerminateWrapper', 'NdisWriteConfiguration',
+    'NdisWritePciSlotInformation', 'NdisWriteErrorLogEntry',
+}
+
+
+def chip_ids():
+    src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+    return {m.upper() for m in re.findall(r'\{ 0x8086, 0x([0-9A-Fa-f]{4}),', src)}
+
+
+def inf_ids(name):
+    text = (DRV / 'inf' / name).read_text(encoding='ascii')
+    return set(re.findall(r'^%[^%]+%=\S+, PCI\\VEN_8086&DEV_([0-9A-F]{4})\r?$', text, re.M))
+
+
+class Binary(unittest.TestCase):
+    def test_imports_only_9x_ndis(self):
+        imports = pe(SYS)[1]
+        self.assertTrue(imports)
+        for mod, name in imports:
+            self.assertEqual(mod, 'ndis.sys', name)
+            self.assertIn(name, W9X_NDIS_EXPORTS, name)
+
+    def test_pe_version_4(self):
+        b = SYS.read_bytes()
+        off = int.from_bytes(b[0x3C:0x40], 'little') + 24
+        self.assertEqual((b[off + 48], b[off + 50]), (4, 0))   # subsystem 4.00
+
+
+class Inf(unittest.TestCase):
+    def test_ids_in_chip_table(self):
+        chips = chip_ids()
+        for name in ('usosnet9x.inf', 'usosnet.inf'):
+            ids = inf_ids(name)
+            self.assertIn('1539', ids, name)       # I211 (X470)
+            self.assertIn('10C9', ids, name)       # 82576 (QEMU igb)
+            self.assertLessEqual(ids, chips, name)
+
+    def test_9x_ndis_loader(self):
+        text = (DRV / 'inf/usosnet9x.inf').read_text(encoding='ascii')
+        for line in ('HKR,,DevLoader,,*ndis', 'HKR,,DeviceVxDs,,usosnet.sys', 'HKR,NDIS,MajorNdisVersion,1,05',
+                     'Signature="$CHICAGO$"', 'Class=Net'):
+            self.assertIn(line, text)
+
+    def test_source_no_kernel_macros(self):
+        """NdisZeroMemory & co. expand to ntoskrnl / HAL calls with WDK 7.1."""
+        for f in ('usosnet.c', 'usosnet_igb.c'):
+            src = (DRV / 'src' / f).read_text(encoding='latin-1')
+            for bad in ('NdisZeroMemory', 'NdisMoveMemory', 'NdisStallExecution', 'NdisEqualMemory',
+                        'NdisRawWritePort', 'NdisWriteRegister', 'NdisReadRegister', 'memset', 'memcpy'):
+                self.assertNotIn(bad + '(', src, f'{f}: {bad}')
+
+
+
+
+class IsrClaim(unittest.TestCase):
+    """Shared INTx: claim only with ICR.INT_ASSERTED, never while masked."""
+
+    def test_claim_rule_host_compiled(self):
+        import shutil, subprocess, tempfile
+        cc = shutil.which('gcc') or shutil.which('cc') or (
+            'C:/msys64/mingw64/bin/gcc.exe' if Path('C:/msys64/mingw64/bin/gcc.exe').exists() else None)
+        if not cc:
+            self.skipTest('no host C compiler')
+        harness = r'''
+#include <stdio.h>
+#define __inline inline
+#include "usosnet_irq.h"
+int main(void) {
+    struct { unsigned long m, icr, want; } t[] = {
+        {0, 0x00000000UL, 0},            /* idle, shared line: not ours */
+        {0, 0x00000084UL, 0},            /* causes latched but not asserted (masked by IMS) */
+        {0, 0x80000080UL, 0x80000080UL}, /* RXT0 asserted */
+        {0, 0x80000004UL, 0x80000004UL}, /* LSC asserted */
+        {0, 0xFFFFFFFFUL, 0},            /* device gone */
+        {1, 0x80000080UL, 0},            /* driver masked: never ours */
+    };
+    struct { unsigned long sec, isr, rxt, up; int want; } w[] = {
+        {3, 0, 5, 1, 0},                 /* too early */
+        {5, 0, 0, 0, 0},                 /* no link, no traffic: nothing to judge */
+        {5, 0, 3, 0, 1},                 /* timer found frames, ISR never claimed */
+        {6, 0, 0, 1, 1},                 /* link up (LSC would have fired), no interrupt */
+        {9, 1, 40, 1, 0},                /* interrupts arrive */
+    };
+    unsigned i; int bad = 0;
+    for (i = 0; i < sizeof t / sizeof t[0]; i++)
+        if (UsosnetIrqClaim(t[i].m, t[i].icr) != t[i].want) { printf("case %u\n", i); bad = 1; }
+    for (i = 0; i < sizeof w / sizeof w[0]; i++)
+        if (UsosnetIrqBroken(w[i].sec, w[i].isr, w[i].rxt, w[i].up) != w[i].want) { printf("wd %u\n", i); bad = 1; }
+    return bad;
+}
+'''
+        with tempfile.TemporaryDirectory() as d:
+            c = Path(d) / 't.c'
+            c.write_text(harness)
+            exe = Path(d) / 't.exe'
+            r = subprocess.run([cc, '-I', str(DRV / 'src'), '-o', str(exe), str(c)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(exe)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_isr_reads_icr_only_when_unmasked(self):
+        src = (DRV / 'src/usosnet_igb.c').read_text(encoding='latin-1')
+        body = re.search(r'static ULONG IgbIrqRead\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertLess(body.index('A->IrqMasked'), body.index('RD32(A, ICR)'))
+        self.assertNotIn('EICR', body)
+        self.assertIn('UsosnetIrqClaim', body)
+        dis = re.search(r'static void IgbIrqDisable\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        en = re.search(r'static void IgbIrqEnable\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertIn('A->IrqMasked = TRUE', dis)
+        self.assertIn('A->IrqMasked = FALSE', en)
+        self.assertNotIn('EIMS', en)                      # legacy INTx: no extended causes
+        self.assertIn('WR32(A, IVAR0, 0)', src)
+        self.assertIn('MdicWrite(A, 4, 0x01E1)', src)     # no pause advertised
+        self.assertIn('CTRL_RFCE | CTRL_TFCE', src)       # iNVM RFCE = 1 cleared too
+
+    def test_timer_polls_and_watchdog_masks(self):
+        '''X470 + Me round 1: no RX at all. The timer polls RX / TX in every
+        mode, the IRQ watchdog masks the chip, the DPC does not unmask it then.'''
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        timer = re.search(r'static VOID TimerFn\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('RxPoll(A)', timer)
+        self.assertIn('TxReclaim(A)', timer)
+        self.assertNotIn('if (A->PollMode) {', timer)
+        sec = re.search(r'static void TimerSecond\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertLess(sec.index('UsosnetIrqBroken'), sec.index('IrqDisable(A)'))
+        dpc = re.search(r'static VOID MpHandleInterrupt\(NDIS_HANDLE Ctx\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertIn('if (!A->PollMode) A->Chip->Ops->IrqEnable(A)', dpc)
+        send = re.search(r'static NDIS_STATUS MpSend\(.*?\n\}', src, re.S).group(0)
+        self.assertNotIn('UsStall', send)                 # no busy wait in the send path
+
+
+def _host_cc():
+    import shutil
+    return shutil.which('gcc') or shutil.which('cc') or (
+        'C:/msys64/mingw64/bin/gcc.exe' if Path('C:/msys64/mingw64/bin/gcc.exe').exists() else None)
+
+
+class ProtoStats(unittest.TestCase):
+    """0.4: per-protocol classification, RX status decode (checksum errors
+    never drop), the statistics page and its wiring into the data path."""
+
+    HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#define __inline inline
+#include "usosnet_proto.h"
+static unsigned char f[200];
+static unsigned long eth(int bcast, unsigned et) {
+    memset(f, 0, sizeof f);
+    memset(f, bcast ? 0xFF : 0x00, 6); if (!bcast) f[5] = 0x7D;
+    f[6] = 0x70; f[12] = et >> 8; f[13] = et & 0xFF; return 14;
+}
+static unsigned long ipv4(int proto, unsigned sp, unsigned dp, unsigned frag) {
+    unsigned char *ip = f + 14;
+    ip[0] = 0x45; ip[6] = frag >> 8; ip[7] = frag & 0xFF; ip[9] = proto;
+    ip[12] = 1; ip[13] = 1; ip[14] = 1; ip[15] = 1;           /* src 1.1.1.1 */
+    ip[16] = 192; ip[17] = 168; ip[18] = 0; ip[19] = 215;    /* dst 192.168.0.215 */
+    ip[20] = sp >> 8; ip[21] = sp & 0xFF; ip[22] = dp >> 8; ip[23] = dp & 0xFF;
+    return 14 + 20 + 8;
+}
+int main(void) {
+    unsigned long c, ports, peer, drop[USNS_DROPS] = {0}, ctr[USNS_CLASSES] = {0};
+    static USNS_BLOCK s;
+    int bad = 0, i;
+#define CHECK(x) do { if (!(x)) { printf("line %d: %s\n", __LINE__, #x); bad = 1; } } while (0)
+    /* DNS reply from 1.1.1.1: UDP + DNS, peer = source */
+    eth(0, 0x0800); ipv4(17, 53, 1025, 0);
+    c = UsnsClassify(f, 90, 1, &ports, &peer);
+    CHECK(c == (USNS_C_IPV4 | USNS_C_UDP | USNS_C_DNS));
+    CHECK(ports == ((53UL << 16) | 1025)); CHECK(peer == 0x01010101UL);
+    c = UsnsClassify(f, 90, 0, &ports, &peer);
+    CHECK(peer == (192UL | (168UL << 8) | (0UL << 16) | (215UL << 24)));
+    /* ICMP, TCP 80, ARP broadcast, IPv6, other, short, DHCP broadcast */
+    eth(0, 0x0800); ipv4(1, 0, 0, 0); CHECK(UsnsClassify(f, 74, 1, &ports, &peer) == (USNS_C_IPV4 | USNS_C_ICMP));
+    eth(0, 0x0800); ipv4(6, 1030, 80, 0); CHECK(UsnsClassify(f, 60, 0, &ports, &peer) == (USNS_C_IPV4 | USNS_C_TCP | USNS_C_HTTP));
+    eth(1, 0x0806); CHECK(UsnsClassify(f, 60, 1, &ports, &peer) == (USNS_C_BCAST | USNS_C_ARP));
+    eth(0, 0x86DD); CHECK(UsnsClassify(f, 80, 1, &ports, &peer) == USNS_C_IPV6);
+    eth(0, 0x8899); CHECK(UsnsClassify(f, 60, 1, &ports, &peer) == USNS_C_OTHER);
+    CHECK(UsnsClassify(f, 10, 1, &ports, &peer) == USNS_C_SHORT);
+    eth(0, 0x0800); CHECK(UsnsClassify(f, 30, 1, &ports, &peer) == (USNS_C_IPV4 | USNS_C_SHORT));
+    eth(1, 0x0800); ipv4(17, 68, 67, 0);
+    CHECK(UsnsClassify(f, 342, 0, &ports, &peer) == (USNS_C_BCAST | USNS_C_IPV4 | USNS_C_UDP | USNS_C_DHCP));
+    /* fragments: a later fragment has no ports */
+    eth(0, 0x0800); ipv4(17, 53, 1025, 0x2000);
+    CHECK(UsnsClassify(f, 90, 1, &ports, &peer) == (USNS_C_IPV4 | USNS_C_FRAG | USNS_C_UDP | USNS_C_DNS));
+    eth(0, 0x0800); ipv4(17, 53, 1025, 0x00B9);
+    c = UsnsClassify(f, 90, 1, &ports, &peer);
+    CHECK(c == (USNS_C_IPV4 | USNS_C_FRAG | USNS_C_UDP) && ports == 0);
+    /* USOSLOG request broadcast */
+    eth(1, 0x0800); ipv4(17, 1050, USNS_LOG_PORT, 0);
+    c = UsnsClassify(f, 60, 0, &ports, &peer);
+    CHECK(UsnsIsLogRequest(c, ports));
+    eth(0, 0x0800); ipv4(17, 1050, USNS_LOG_PORT, 0);
+    c = UsnsClassify(f, 60, 0, &ports, &peer);
+    CHECK(!UsnsIsLogRequest(c, ports));
+    /* RX status: L4E / IPE (checksum offload verdicts) never drop */
+    c = USNS_C_IPV4 | USNS_C_UDP | USNS_C_DNS;
+    CHECK(UsnsRxStatus(drop, 0x00000003UL | USNS_ST_L4E | USNS_ST_IPE | USNS_ST_L4CS | USNS_ST_UDPCS | USNS_ST_IPCS, c) == 0);
+    CHECK(drop[USNS_N_L4E] == 1 && drop[USNS_N_L4E_UDP] == 1 && drop[USNS_N_L4E_DNS] == 1 && drop[USNS_N_IPE] == 1);
+    CHECK(drop[USNS_N_L4CS] == 1 && drop[USNS_N_UDPCS] == 1 && drop[USNS_N_IPCS] == 1);
+    CHECK(UsnsRxStatus(drop, 0x00000003UL, c) == 0);
+    /* frame errors drop, each counted */
+    CHECK(UsnsRxStatus(drop, 0x00000001UL, c) == 1 && drop[USNS_D_NOT_EOP] == 1);
+    CHECK(UsnsRxStatus(drop, 0x00000003UL | USNS_ST_CE, c) == 1 && drop[USNS_D_CE] == 1);
+    CHECK(UsnsRxStatus(drop, 0x00000003UL | USNS_ST_RXE | USNS_ST_SEQ, c) == 1 && drop[USNS_D_RXE] == 1 && drop[USNS_D_SEQ] == 1);
+    CHECK(USNS_ST_FRAME_ERR == 0x97000000UL);
+    CHECK((USNS_ST_FRAME_ERR & (USNS_ST_L4E | USNS_ST_IPE)) == 0);
+    /* counting and history */
+    UsnsCount(ctr, USNS_C_IPV4 | USNS_C_UDP | USNS_C_DNS);
+    CHECK(ctr[3] == 1 && ctr[5] == 1 && ctr[7] == 1 && ctr[4] == 0);
+    for (i = 0; i < 40; i++) UsnsHistory(&s, 1, i, 0, 60, 3, 0);
+    CHECK(s.Seq == 40 && (s.Hist[39 % USNS_HIST][0] >> 8) == 39 && s.Hist[39 % USNS_HIST][1] == 39);
+    CHECK(sizeof(USNS_BLOCK) <= 4096 && sizeof(unsigned long) == 4);
+    printf("size %u\n", (unsigned)sizeof(USNS_BLOCK));
+    return bad;
+}
+'''
+
+    def test_classifier_host_compiled(self):
+        import subprocess, tempfile
+        cc = _host_cc()
+        if not cc:
+            self.skipTest('no host C compiler')
+        with tempfile.TemporaryDirectory() as d:
+            c = Path(d) / 't.c'
+            c.write_text(self.HARNESS)
+            exe = Path(d) / 't.exe'
+            r = subprocess.run([cc, '-m32', '-I', str(DRV / 'src'), '-o', str(exe), str(c)], capture_output=True, text=True)
+            if r.returncode:   # no 32-bit runtime: unsigned long is 32-bit on 64-bit Windows too
+                r = subprocess.run([cc, '-I', str(DRV / 'src'), '-o', str(exe), str(c)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(exe)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_data_path_wiring(self):
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        igb = (DRV / 'src/usosnet_igb.c').read_text(encoding='latin-1')
+        hdr = (DRV / 'src/usosnet.h').read_text(encoding='latin-1')
+        self.assertIn('#define USOSNET_MINOR 5', hdr)
+        poll = re.search(r'static void IgbRxPoll\(PADAPTER A\)\n\{(.*?)\n\}', igb, re.S).group(1)
+        self.assertIn('USNS_ST_FRAME_ERR', poll)          # only frame errors drop
+        self.assertNotIn('L4E', poll)
+        self.assertNotIn('IPE', poll)
+        self.assertIn('UsRxDropped(A', poll)
+        self.assertIn('UsIndicateRx(A, A->RxBuf[i], len, st)', poll)
+        send = re.search(r'static NDIS_STATUS MpSend\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('UsnsCount(S->Tx', send)
+        self.assertIn('UsnsIsLogRequest', send)
+        td = re.search(r'static NDIS_STATUS MpTransferData\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('USNS_T_NO_FRAME', td)
+        self.assertIn('UsosnetStatsVa', src)
+        self.assertIn('UsosnetStatsPa', src)
+        free = re.search(r'static void FreeAll\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertLess(free.index('Magic = 0'), free.index('DmaFree(A, &A->StatsMem)'))
+
+
+class ErrorLogBudget(unittest.TestCase):
+    """98 SE fresh install (X470, 2026-10-20): NDIS.VXD 4.10.2222 counts error
+    log entries per adapter from the first one for 30 s; before Init_Complete
+    the 5th removes the adapter (CONFIGMG Call_At_Appy_Time -> Remove_SubTree)
+    and the first shows a notice. NDISLOG.TXT had USN1..USN4 at 3 s, no USN5.
+    The real LogBudget() is compiled on the host against that model."""
+
+    def test_diaglog_uses_budget_only(self):
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        diag = re.search(r'static void DiagLog\(PADAPTER A, ULONG Event, ULONG Sec\)\r?\n\{(.*?)\r?\n\}', src, re.S).group(1)
+        self.assertNotIn('NdisWriteErrorLogEntry', diag)
+        self.assertEqual(diag.count('LOG10(0x55534E3'), 5)
+        self.assertEqual(src.count('NdisWriteErrorLogEntry('), 1)      # only inside LOG10
+        self.assertNotIn('sec == 3 ||', src)
+
+    HARNESS = r"""#include <stdio.h>
+typedef unsigned long ULONG; typedef unsigned char BOOLEAN;
+#define TRUE 1
+#define FALSE 0
+@CONSTS@
+typedef struct { ULONG TimerCount, LogWindowStart, LogWindowUsed, LogSkipped; } ADAPTER, *PADAPTER;
+@FN@
+int main(void) {
+    ADAPTER a = {0}; ULONG t, ndis_start = 0, ndis_count = 0, written = 0, first = 0; int k, bad = 0;
+    unsigned seed = 1;
+    for (t = 1; t < 400UL * TICKS_PER_SEC; t++) {
+        a.TimerCount = t;
+        /* NDIS.VXD: timer started by the first entry, at 30 s count reset if <= 5 */
+        if (ndis_count && t - ndis_start >= 30UL * TICKS_PER_SEC) ndis_count = 0;
+        seed = seed * 1103515245u + 12345u;
+        for (k = 0; k < (int)((seed >> 16) % 3); k++) {   /* bursts of requests */
+            if (!LogBudget(&a)) continue;
+            if (!ndis_count) ndis_start = t;
+            if (++ndis_count >= 5) { printf("removed at %lu\n", t); bad = 1; }
+            if (!first) first = t;
+            written++;
+        }
+    }
+    if (first < LOG_QUIET_SEC * TICKS_PER_SEC) { printf("early %lu\n", first); bad = 1; }
+    if (written < 40) { printf("only %lu\n", written); bad = 1; }
+    printf("written %lu skipped %lu\n", written, a.LogSkipped);
+    return bad;
+}
+"""
+
+    def test_budget_host_model(self):
+        import subprocess, tempfile
+        cc = _host_cc()
+        if not cc:
+            self.skipTest('no host C compiler')
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        hdr = (DRV / 'src/usosnet.h').read_text(encoding='latin-1')
+        fn = re.search(r'static BOOLEAN LogBudget\(PADAPTER A\)\r?\n\{.*?\r?\n\}', src, re.S).group(0)
+        consts = ''.join(m.group(0) + '\n' for m in re.finditer(
+            r'#define (LOG_QUIET_SEC|LOG_WINDOW_SEC|LOG_WINDOW_MAX|TICK_MS|TICKS_PER_SEC)\b[^\r\n]*', hdr))
+        with tempfile.TemporaryDirectory() as d:
+            c = Path(d) / 'b.c'
+            c.write_text(self.HARNESS.replace('@CONSTS@', consts).replace('@FN@', fn))
+            exe = Path(d) / 'b.exe'
+            r = subprocess.run([cc, '-o', str(exe), str(c)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(exe)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+
+SYS4 = DRV / 'bin/i386/usosnet4.sys'
+
+
+def export_table(name):
+    """tools/tests/data/<name>: [module] sections of export names."""
+    table, cur = {}, None
+    for line in (ROOT / 'tools/tests/data' / name).read_text(encoding='ascii').splitlines():
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('['):
+            cur = table.setdefault(line[1:-1].lower(), set())
+        else:
+            cur.add(line.split(' -> ')[0])
+    return table
+
+
+def iat_va(path, wanted):
+    """Image VA of the IAT slot of one NDIS.SYS import (calls are FF 15 <VA>)."""
+    import struct
+    b = path.read_bytes()
+    u = lambda o: struct.unpack_from('<I', b, o)[0]
+    p = u(60); opt = p + 24; base = u(opt + 28); dd = opt + 96
+    secs = opt + struct.unpack_from('<H', b, p + 20)[0]
+    def off(v):
+        for i in range(struct.unpack_from('<H', b, p + 6)[0]):
+            vs, va, rs, raw = struct.unpack_from('<IIII', b, secs + i * 40 + 8)
+            if va <= v < va + max(vs, rs):
+                return raw + v - va
+        raise ValueError(v)
+    d = off(u(dd + 8))
+    while u(d + 12):
+        names, first = u(d), u(d + 16)
+        k = 0
+        while u(off(names or first) + 4 * k):
+            hint = u(off(names or first) + 4 * k)
+            if not hint & 0x80000000:
+                n = off(hint) + 2
+                if b[n:b.index(b'\0', n)].decode() == wanted:
+                    return base + first + 4 * k
+            k += 1
+        d += 20
+    raise KeyError(wanted)
+
+
+class Ndis4(unittest.TestCase):
+    """usosnet4.sys: the NDIS 4.0 build for Windows 95 OSR2 and NT 4.0 SP6a
+    (docs/usosnet-ndis4-2026-10-20.md). Export names: the user's 95 OSR2.1 PL
+    NDIS.VXD 4.0 tables and NT 4.0 SP6a PL NDIS.SYS 4.00 (names only)."""
+
+    def test_imports_resolve_on_95_osr2_and_nt4_sp6a(self):
+        imports = pe(SYS4)[1]
+        self.assertTrue(imports)
+        w95 = export_table('w95osr2_ndis_exports.txt')['ndis.sys']
+        nt4 = export_table('nt4sp6a_ndis_exports.txt')['ndis.sys']
+        for mod, name in imports:
+            self.assertEqual(mod, 'ndis.sys', name)          # no ntoskrnl / HAL import
+            self.assertIn(name, w95, '95 OSR2 NDIS.VXD: ' + name)
+            self.assertIn(name, nt4, 'NT4 SP6a NDIS.SYS: ' + name)
+        names = {n for _, n in imports}
+        self.assertTrue({'EthFilterDprIndicateReceive', 'EthFilterDprIndicateReceiveComplete',
+                         'NdisMPciAssignResources', 'NdisOverrideBusNumber'} <= names)
+
+    def test_pe_version_4(self):
+        b = SYS4.read_bytes()
+        off = int.from_bytes(b[0x3C:0x40], 'little') + 24
+        self.assertEqual((b[off + 48], b[off + 50]), (4, 0))   # subsystem 4.00
+        self.assertEqual(int.from_bytes(b[off + 68:off + 70], 'little'), 1)   # native
+
+    def test_registers_ndis_4_with_0x48_byte_characteristics(self):
+        b = SYS4.read_bytes()
+        call = b'\xFF\x15' + iat_va(SYS4, 'NdisMRegisterMiniport').to_bytes(4, 'little')
+        at = b.find(call)
+        self.assertGreater(at, 0)
+        self.assertEqual(b.count(call), 1)
+        before = b[at - 128:at]
+        self.assertIn(b'\x6A\x48', before)                  # push 48h: the size argument
+        self.assertRegex(before, rb'\xC6\x45[\x80-\xFF]\x04')   # mov byte [ebp-n], 4: MajorNdisVersion
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        self.assertIn('mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;', src)
+        self.assertIn('C_ASSERT(USOSNET_CHARS_SIZE == 0x48);', src)
+        self.assertIn('#define USOSNET_NDIS_MAJOR 4', (DRV / 'src/usosnet.h').read_text(encoding='latin-1'))
+        self.assertIn('-DUSOSNET_NDIS4=1', (DRV / 'src4/sources').read_text(encoding='latin-1'))
+
+    def test_receive_uses_the_ndis3_filter_not_ndis5_handlers(self):
+        """push dword [reg + 0D8h] (EthDB) before the exported filter calls;
+        no call [reg + 164h] / [reg + 170h] (NDIS 5 EthRxIndicate / Complete
+        handlers of the miniport block, absent from the 4.0 block)."""
+        b = SYS4.read_bytes()
+        pushes = sum(b.count(bytes([0xFF, 0xB0 + r, 0xD8, 0, 0, 0])) for r in range(8) if r != 4)
+        self.assertGreaterEqual(pushes, 2)
+        for disp in (0x164, 0x170):
+            for r in range(8):
+                if r != 4:
+                    self.assertNotIn(bytes([0xFF, 0x90 + r]) + disp.to_bytes(4, 'little'), b)
+        for name in ('EthFilterDprIndicateReceive', 'EthFilterDprIndicateReceiveComplete'):
+            self.assertIn(b'\xFF\x15' + iat_va(SYS4, name).to_bytes(4, 'little'), b)
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        self.assertIn('C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_BLOCK, EthDB) == USOSNET_ETHDB_OFFSET);', src)
+        self.assertIn('#define USOSNET_ETHDB_OFFSET 0xD8', src)
+
+    def test_ndis5_binary_keeps_its_contract(self):
+        imports = {n for _, n in pe(SYS)[1]}
+        self.assertNotIn('EthFilterDprIndicateReceive', imports)
+        self.assertNotIn('NdisOverrideBusNumber', imports)
+
+    def test_nt4_legacy_path(self):
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        init = re.search(r'static NDIS_STATUS MpInitialize\(.*?\nfail:', src, re.S).group(0)
+        nd4 = init.index('#if USOSNET_NDIS4')
+        # PnP resources first; NT4 (NOT_SUPPORTED): bus scan, then the HAL assignment
+        self.assertLess(nd4, init.index('LegacyFind(A, WrapperConfigurationContext)'))
+        self.assertLess(init.index('LegacyFind(A, WrapperConfigurationContext)'),
+                        init.index('NdisMPciAssignResources(MiniportAdapterHandle, A->PciSlot, &rl)'))
+        self.assertLess(init.index('NdisMPciAssignResources'), init.index('A->Chip = FindChip(cfg32)'))
+        find = re.search(r'static BOOLEAN LegacyFind\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('NdisOverrideBusNumber(Wcc, A->Handle, bus)', find)
+        self.assertIn('dev | (fn << 5)', find)                    # PCI_SLOT_NUMBER
+        self.assertIn('0x00800000UL', find)                       # multi-function header bit
+        # every PCI config access goes to the found slot (0 on PnP systems)
+        for f in ('usosnet.c', 'usosnet_igb.c'):
+            text = (DRV / 'src' / f).read_text(encoding='latin-1')
+            self.assertNotRegex(text, r'Ndis(Read|Write)PciSlotInformation\([^,]+, 0,', f)
+        # interrupt failure: polling on the NDIS 4 build, failure on NDIS 5
+        irq = init[init.index('NdisMRegisterInterrupt('):]
+        self.assertLess(irq.index('A->PollMode = 2;'), irq.index('#else'))
+
+    def test_95_inf(self):
+        text = (DRV / 'inf/usosnet95.inf').read_text(encoding='ascii')
+        ids = inf_ids('usosnet95.inf')
+        self.assertTrue({'1539', '10C9'} <= ids)
+        self.assertLessEqual(ids, chip_ids())
+        for line in ('HKR,,DevLoader,,*ndis', 'HKR,,DeviceVxDs,,usosnet.sys', 'HKR,NDIS,MajorNdisVersion,1,04',
+                     'Signature="$CHICAGO$"', 'Class=Net', 'usosnet.sys=1'):
+            self.assertIn(line, text)
+        self.assertNotIn('MajorNdisVersion,1,05', text)
+
+    def test_flow_wiring(self):
+        post = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='latin-1')
+        block = post[post.index('if not exist C:\\USOS\\Drivers\\USOSNET\\USOSNET4.SYS goto nonet4'):post.index(':nonet4')]
+        for token in ('regedit.exe /e C:\\USOS\\NT4\\LOOPCHK.REG', 'drivers\\usosnet4.sys',
+                      'regedit.exe /s C:\\USOS\\NT4\\USOSNET.REG', 'findstr /i /c:"usosnet4.sys"', 'NETSETUP.TXT'):
+            self.assertIn(token, block)
+        self.assertLess(post.index('echo drivers registered'), post.index(':nonet4'))
+        self.assertLess(post.index(':nonet4'), post.index('if not exist C:\\USOS\\NT4\\SP6I386.EXE goto nosp'))
+        dos = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
+        self.assertIn('IF "%U9SYS%"=="95" IF EXIST C:\\%U9SRC%\\USOSNET.SYS SET U9SW=/IS /IW /P I', dos)
+        self.assertLess(dos.index('COPY /Y %U9T%\\NET\\USOSNET.SYS C:\\%U9SRC%'),
+                        dos.index('IF EXIST C:\\%U9SRC%\\USOSNET.SYS SET U9SW='))
+
+if __name__ == '__main__':
+    unittest.main()

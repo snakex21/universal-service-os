@@ -45,8 +45,8 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
-| L6 | Windows 98 na X470 (eksperymentalne) | **Later** | ręczny spike, N4 (msbatch) | spike 2–3 dni, automatyzacja 8–12 dni |
-| L6b | Windows 95 (RTM/A, OSR2/2.1/2.5) na UEFI bez CSM (eksperymentalne) | **Later** (po 1.0) | L6 (ścieżka 98/ME), tryb BIOS przez CSMWrap (1.1), wejście USOSKEY/VBADOS | do oszacowania (głównie reużycie L6) |
+| L6 | Windows 98 SE / 98 / Me na X470 (eksperymentalne) | **W toku** (`feature/win9x-modern`, 2026-09-30): QEMU 98 SE do pulpitu (SeaBIOS), przez CSMWrap do klucza z klawiaturą i myszą USB; Me do klucza; X470: do testu | – | test sprzętowy 1–2 dni |
+| L6b | Windows 95 (RTM/A, OSR2/2.1/2.5) na UEFI bez CSM (eksperymentalne) | **W toku**: OSR2.1 w QEMU do klucza (obraz dyskietki startowej jako tymczasowy most); RTM/A (FAT16): Later | L6 | własne środowisko startowe z CAB-ów: do oszacowania |
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
@@ -54,6 +54,11 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L12 | Instalator z Linuksa (CLI, potem AppImage); macOS: CLI przy DLC | **Later** (po 1.0) | 1.0, L10 (część macOS) | do oszacowania |
 | L13 | Inne systemy / Custom OS: ISO/IMG z RAM-u, Multiboot/Multiboot2, przepisy FreeBSD/OpenBSD/Haiku/ReactOS | **Later** (po 1.0, przed L10) | N5 (wpis dla nieznanych ISO), L12 (niezależne) | poziomy 1+2: 5–8 dni, poziom 3: 3–5 dni per system |
 | L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
+| L12 | Własny stos USB dla DOS (usosusb jako rezydentny sterownik DOS): xHCI, huby, klawiatura/mysz HID, pamięć masowa, hot-swap | **Later** (po 1.0) | usosusb, L11 | do oszacowania |
+| L13 | Własne środowisko przygotowania zamiast mikro-Linuksa Alpine | **Later** (po 1.0); przed 1.0 tylko pakiety Alpine offline | aplikacja UEFI (Zig) | do oszacowania, etapami |
+| L14 | Back-end Realtek RTL8111/8168 w usosnet4 (tylko NT4 / Windows 95) | **Later** (po 1.0) | usosnet4 | do oszacowania |
+| L15 | Winsock dla Windows 3.1 / WfW 3.11: własny GPL WINSOCK.DLL na kodzie mTCP nad USOSPKT | **Later** (po 1.0) | USOSPKT, mTCP | ~20–30 dni |
+| L16 | Multiboot na jednym dysku: instalacja obok istniejących systemów, własny menedżer startu UEFI, ukrywanie partycji dla DOS/9x/NT4 | **Later** (po 1.0) | CSMWrap (L11), przepływ instalacji | do oszacowania |
 
 ## 2. Pozycje
 
@@ -324,7 +329,12 @@ test QEMU). Dodatkowo z porównania E2B: lista PCI ID kontrolerów z
 informacją, czy USOS ma dla nich sterownik XP/7, ostrzeżenie o baterii
 CMOS (zły rok), opcjonalna blokada menu hasłem.
 
-### L6. Windows 98 na X470: **Later**, eksperymentalne
+### L6. Windows 98 na X470: **W toku**, eksperymentalne
+
+Stan 2026-09-30 (`feature/win9x-modern`): [win9x-modern-2026-09-30.md](win9x-modern-2026-09-30.md)
+(95/98/98 SE/Me z menu BIOS i przez CSMWrap, MSBATCH.INF z profilu, Patcher9x
+`all`, U9FIX: MaxPhysPage/MaxFileCache, VESA vmdisp9x, klawiatura i mysz USB
+pod CSMWrap przez USOSKEY/VBADOS). Historia:
 
 Działa dziś w Legacy BIOS (DOS Setup, Patcher9x `mem`) i na retro PC
 MS-7100 ([win98-native](win98-native-2026-09-12.md)). Dla X470 analiza
@@ -353,7 +363,13 @@ automatycznie, bez ręcznej konfiguracji. Kolejność:
    oznaczenie **„do zastąpienia własną implementacją”**:
    - ACPI społeczności dla XP x64 / Server 2003 (L1; od 1.1 dołączone do
      wydania decyzją użytkownika z 2026-09-30, nadal do zastąpienia);
-   - poprawka szybkiego CPU dla Win95 (L6b);
+   - dyskietka startowa Windows 95 (`Windows 95\Boot\BOOTDISK.IMG`, L6b): płyta 95
+     nie startuje; własne środowisko: pliki DOS 7 z CAB-ów płyty wyciąga jej
+     własny EXTRACT.EXE pod FreeDOS (sprawdzone), brakuje sektora startowego:
+     dołączony FreeDOS SYS 3.6 jest zbudowany bez sektorów OEM (`/OEM:W9x`),
+     a SYS.COM z płyty nie działa pod FreeDOS; następny krok: własny build
+     FreeDOS SYS z sektorami OEM (GPL) w zestawie buildu (poprawka szybkiego
+     CPU nie jest już mostem: Patcher9x, MIT, ma własną);
    - USB 3 dla Visty (backport podpisany testowo, sekcja 3).
 
 Nośnik instalacyjny Windows (pliki Microsoft) zawsze dostarcza użytkownik;
@@ -410,6 +426,23 @@ startu 7,8 GB / 1024 cylindry bez nowszego `atapi.sys`), `unattend.txt`
 zamiast `winnt.sif`, brak ACPI, USB i AHCI. Tylko BIOS i retro sprzęt
 (MS-7100 w trybie IDE). Najniższy priorytet.
 
+Stan 2026-10-08: NT 4.0 Workstation/Server instaluje się z UEFI bez CSM
+(cała instalacja w QEMU na docelowym PC, potem CSMWrap;
+docs/nt4-2026-10-07.md, X470 PASS). NT 3.51 Workstation/Server idzie tą
+samą ścieżką (profil `nt3-x86-qemu-csmwrap`, MBR z filtrem E820, bez klucza
+i bez SP; docs/nt351-2026-10-08.md), NT 3.51 Server X470 PASS 2026-10-09.
+NT 3.5 Workstation/Server (2026-10-09, docs/nt35-2026-10-09.md): ta sama
+ścieżka, NT 3.5 Workstation X470 PASS 2026-10-09. NT 3.1 / 3.1 Advanced
+Server (2026-10-09, docs/nt31-2026-10-09.md): instalacja w VM bez
+interakcji (tekstowy Setup odpowiadany po tekście ekranu, GUI Setup z
+poprawionego INITIAL.INF), buildy NT 3.1 sterowników; QEMU OVMF + CSMWrap:
+Workstation do pulpitu z klawiaturą USB; otwarte: logowanie na Advanced
+Server (netlogon bez sieci), X470 czeka.
+NT 4.0 Terminal Server Edition (2026-10-10): wpis `windows-nt-4-tse`, ta sama
+ścieżka; instalacja w QEMU przez micro-Linux PASS, ale jądro RTM TSE resetuje
+się na CPU z więcej niż 3 liśćmi CPUID (Zen 3), więc X470 wymaga SP6 dla TSE
+(zwykły SP6a odmawia na TSE); brak tego pliku u użytkownika.
+
 ### L9. shim-review: **Later**, długoterminowo
 
 Własny shim z wbudowanym certyfikatem USOS, podpisany przez Microsoft,
@@ -458,6 +491,50 @@ innym, w formie osobnego, opcjonalnego dodatku.
 - Ryzyka: EULA Apple (sprzęt inny niż Apple), wrażliwość VirtualSMC/OSK,
   brak kart NVIDIA nowszych niż Kepler, Wi-Fi Intela tylko częściowo.
 - Sprzęt testowy: X470 + RX 560, B550 + 5800X3D.
+
+### L12. Własny stos USB dla DOS: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: przenieść własny usosusb (xHCI, huby,
+klawiatura i mysz HID, pamięć masowa, hot-swap) do rezydentnego sterownika
+DOS. Jeden sterownik daje hot-swap pendrive'ów naraz w MS-DOS, FreeDOS
+i Windows 1.x–3.x. Wolnego sterownika xHCI dla DOS nie ma, a DOSUSB jest
+komercyjny (docs/ds-dos-usb-2026-10-23.md).
+
+### L13. Własne środowisko przygotowania zamiast Alpine: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: zastąpić mikro-Linuksa Alpine własnym
+środowiskiem przygotowania dysku, etapami:
+
+1. ntfs-3g i wimlib wkompilowane w aplikację UEFI (Zig), działające przez
+   UEFI BlockIo.
+2. Własne partycjonowanie, FAT i edycja gałęzi rejestru w Zig.
+3. Opcjonalnie: własny zapis NTFS.
+
+Przed 1.0 tylko: pakiety Alpine dołączone offline (vendoring), z
+przypiętymi wersjami; `blkid 2.42.1-r0` zniknął z CDN Alpine 2026-10-22.
+
+### L14. Realtek RTL8111/8168 w usosnet4: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: back-end RTL8111/8168 w usosnet4 tylko dla
+NT4 i Windows 95 (docs/ds-realtek-research-2026-10-22.md). Pozostałe
+systemy używają sterownika producenta z DATA.
+
+### L15. Winsock dla Windows 3.1 / WfW 3.11: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: własny GPL WINSOCK.DLL na kodzie mTCP nad
+USOSPKT (kolejka pakietów w USOSPKT, tryb standard i 386 enhanced),
+~20–30 dni. Opcjonalny krok pośredni: własny zamiennik WINPKT + Trumpet
+dostarczony przez użytkownika (docs/win3-winsock-options-2026-10-23.md).
+
+### L16. Multiboot na jednym dysku: **Later** (po 1.0)
+
+Decyzja użytkownika 2026-10-23: instalacja na wolne miejsce lub wskazaną
+partycję bez ruszania istniejących systemów. Własny menedżer startu w UEFI
+na dysku (systemy nowoczesne bezpośrednio, stare przez CSMWrap). Ukrywanie
+partycji dla DOS/9x/NT4 (jak OS/2 Boot Manager / System Commander). Reguły
+zgodności: partycje podstawowe, limit 8 GB/LBA dla DOS/9x, MBR vs GPT.
+Na start najczęstsze zestawy (np. DOS+98+XP+7, XP+10); testy kombinacji
+na X470.
 
 ## 2b. Wydanie 1.1 (scalone do `master` 2026-09-29, bez tagu)
 
@@ -554,6 +631,30 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   test świeżej instalacji na SanDisku: [RELEASE-TEST-1.0.md](RELEASE-TEST-1.0.md).
   Tag `v1.0.0` dopiero po zaliczeniu tego testu.
 
+- **Rozdzielczość ekranu: otwarte punkty** (2026-10-21, zasady:
+  [display-policy.md](display-policy.md)):
+  - Vista x64 / 7 / 2008: automatyczna natywna rozdzielczość (USOSRES)
+    zaimplementowana; do potwierdzenia na X470 na świeżej instalacji
+    (Vista x64 ręcznie 1920x1080 OK 2026-10-21).
+  - ~~Win7 x64 przez UefiSeven~~ **ROZSTRZYGNIĘTE (decyzja użytkownika
+    2026-10-22):** domyślnie jeden tryb UefiSeven 1024x768 na cały ekran.
+    Dwa tryby VBE + USOSRES za flagą `Systems\Windows\Windows 7\Unattended\native-res-on.txt`
+    zostają opcjonalne, domyślnie wyłączone (X470 PASS 2026-10-21, ale
+    wyśrodkowane okno 1024x768 odrzucone). CSMWrap odrzucony (zabiera
+    1 procesor logiczny). Pełna rozdzielczość: sterownik GPU użytkownika
+    (AMD/NVIDIA) w `DATA\Drivers`
+    ([w7x64-native-res-2026-10-21.md](w7x64-native-res-2026-10-21.md)).
+  - Vista x64, tekst trybu testowego: zakryty przez nadmalowanie usoswm
+    (X470 PASS 2026-10-21); próba usunięcia u źródła nieudana
+    ([vista-x64-testmode-text-2026-10-21.md](vista-x64-testmode-text-2026-10-21.md)).
+    Po 1.0: debugger jądra, ustalić, skąd win32k bierze ten napis.
+  - 9x: automatyczna rozdzielczość ograniczona do 1920x1080; zdjąć limit
+    po teście z monitorem 1440p/4K.
+  - Windows 3.x: wysoka rozdzielczość przez VBESVGA.DRV tylko z pliku
+    użytkownika (brak licencji); plan integracji w
+    [display-policy.md](display-policy.md).
+  - POSReady 2009: jeszcze bez automatycznej rozdzielczości.
+
 ## 3. Znane ograniczenia (zaakceptowane)
 
 - **AMI pokazuje każdą montowalną partycję** pendrive'a jako osobny
@@ -568,6 +669,11 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   nie jest planowana. Ryzyka: AOAC, przyszły konflikt ze sterownikiem
   firmware, polling zamiast GPIO.
 - Windows XP, Vista i 7 wymagają wyłączonego Secure Boot.
+- **Win7 x64 (natywny UEFI): pendrive pokazuje tylko pierwszą partycję**
+  (decyzja użytkownika 2026-10-22, zostawiamy): usosmpart wymagałby trybu
+  testowego (podpisywanie sterowników jądra x64). Obejście: obudowa/dysk
+  SSD zgłaszany jako dysk stały pokazuje wszystkie partycje
+  ([usb-multipartition-2026-10-14.md](usb-multipartition-2026-10-14.md)).
 - **Vista x64 na X470 działa w trybie testowym** (backport USB 3 podpisany
   testowo). Nie ma legalnie podpisanego sterownika xHCI dla X470 pod Vistę
   x64 (katalog AMD dla Win7 ma tylko OSAttr 6.1 i łańcuch SHA-256). Jedyna

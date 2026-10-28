@@ -1,0 +1,9 @@
+# wlink directives for USOSVMD.VXD (tools/build_win3_usb_keyboard.py adds
+# "file usosvmd.obj name USOSVMD.VXD"). A Windows 9x VMOUSE mouse minidriver
+# (an LE VxD). The DDB is exported as ordinal 1 (VxD loader convention).
+format windows vxd dynamic
+option quiet
+option modname=USOSVMD
+export USOSVMD_DDB.1
+segment _LTEXT preload nondiscardable
+segment _LDATA preload nondiscardable

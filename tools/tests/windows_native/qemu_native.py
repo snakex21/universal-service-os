@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -25,7 +26,10 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-QEMU = ROOT / "tools" / "qemu" / "qemu-system-x86_64.exe"
+# USOS_QEMU_EXE: another executable name in tools/qemu (a copy of
+# qemu-system-x86_64.exe), so parallel runs that stop QEMU by image name
+# leave this run alone.
+QEMU = ROOT / "tools" / "qemu" / os.environ.get("USOS_QEMU_EXE", "qemu-system-x86_64.exe")
 QEMU_IMG = ROOT / "tools" / "qemu" / "qemu-img.exe"
 OVMF_CODE = ROOT / "tools" / "qemu" / "share" / "edk2-x86_64-code.fd"
 OVMF_VARS = ROOT / "tools" / "qemu" / "share" / "edk2-i386-vars.fd"
@@ -34,6 +38,21 @@ RUN = ROOT / "tools" / "tests" / "artifacts" / os.environ.get("USOS_NATIVE_RUN",
 # USOS_NATIVE_TARGET_BUS=ahci: a SATA target (Vista has no inbox NVMe driver).
 TARGET_BUS = os.environ.get("USOS_NATIVE_TARGET_BUS", "nvme")
 STATE = RUN / "qemu-state.json"
+# USOS_NATIVE_TARGET_FIRST=1: the target disk boots before the stick (as if the
+# user picked the disk's UEFI entry in the firmware boot menu). A blank target
+# falls through to the stick; once a CSMWrap path (Vista, 32-bit 8.1/10)
+# prepared it, the disk starts while the stick stays connected for the ISO.
+TARGET_FIRST = os.environ.get("USOS_NATIVE_TARGET_FIRST") == "1"
+# USOS_NATIVE_MACHINE=pc: i440FX. The CSMWrap paths (Vista / Server 2008
+# without CSM) need it: on q35 PE10 in BIOS mode under CSMWrap gets no USB
+# keyboard (Setup's first page never reacts); the CSMWrap Vista harness
+# (tools/tests/legacy_bios/run_csmwrap_vista_prepared.py) uses pc as well.
+MACHINE = os.environ.get("USOS_NATIVE_MACHINE", "q35")
+# USOS_NATIVE_NO_PS2=1: no i8042 at all (machine i8042=off), as on boards whose
+# only keyboard is USB (Vista / 2008 x86 usosusb check, X470 without CSM).
+MACHINE_ARG = MACHINE + (",i8042=off" if os.environ.get("USOS_NATIVE_NO_PS2") == "1" else "")
+# USOS_NATIVE_USB_MOUSE=1: usb-mouse (HID boot mouse) instead of usb-tablet.
+USB_POINTER = "usb-mouse" if os.environ.get("USOS_NATIVE_USB_MOUSE") == "1" else "usb-tablet"
 # USOS_NATIVE_ACCEL=whpx: Windows Hypervisor Platform (much faster than TCG).
 ACCEL = (["-accel", "whpx,kernel-irqchip=off", "-cpu", "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"]
          if os.environ.get("USOS_NATIVE_ACCEL") == "whpx" else ["-accel", "tcg,thread=multi", "-cpu", "max"])
@@ -66,14 +85,22 @@ def monitor(commands: list[str]) -> str:
 
 def launch(args: list[str], label: str, no_reboot: bool) -> None:
     port = free_port()
-    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", "q35", *ACCEL,
-            "-m", "6144", "-smp", "4", "-nic", "none", "-display", "none", "-device", "VGA,xres=1280,yres=800",
+    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", MACHINE_ARG, *ACCEL,
+            *(["-m", "4096", "-smp", "2", "-vga", "std"] if MACHINE == "pc" else ["-m", "6144", "-smp", "4", "-device", "VGA,xres=1280,yres=800"]),
+            "-nic", "none", "-display", "none",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
             "-serial", f"file:{(RUN / f'serial-{label}.log').as_posix()}",
             "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
             "-drive", f"if=pflash,format=raw,file={(RUN / 'vars.fd').as_posix()}",
-            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0",
-            *args]
+            "-device", "qemu-xhci,id=xhci",
+            # USOS_NATIVE_PS2_INPUT=1: no USB keyboard/tablet, sendkey goes to
+            # the PS/2 keyboard (installed systems without an xHCI driver:
+            # Server 2008 R2 / Home Server 2011 first logon).
+            *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", USB_POINTER + ",bus=xhci.0"]),
+            *args,
+            # USOS_NATIVE_EXTRA: more QEMU arguments (shlex syntax), e.g. a
+            # usb-storage stick for the usosusb mass storage checks.
+            *shlex.split(os.environ.get("USOS_NATIVE_EXTRA", ""), posix=True)]
     if no_reboot:
         full.append("-no-reboot")
     stderr = open(RUN / f"qemu-{label}.stderr.log", "wb")
@@ -87,12 +114,37 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
     if stick is not None:
         fmt = "vpc" if stick.suffix.lower() == ".vhd" else "qcow2"
         args += ["-drive", f"if=none,id=stick,file={stick.as_posix()},format={fmt}",
-                 "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK"]
+                 "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK" + (",bootindex=1" if TARGET_FIRST else "")]
     target_fmt = "vpc" if target.suffix.lower() == ".vhd" else "qcow2"
     if TARGET_BUS == "ahci":
-        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt}", "-device", "ahci,id=sata", "-device", "ide-hd,bus=sata.0,drive=target,serial=USOSTARGET"]
+        # USOS_NATIVE_DECOY=<qcow2>: a second internal disk, enumerated before
+        # the target (the guest's disk 0 / sda). The one-disk-question checks
+        # pick the target and prove the decoy is never written (compare its
+        # contents before and after). Default: the decoy has its own AHCI
+        # controller at a lower PCI slot. USOS_NATIVE_DECOY_SAME_CONTROLLER=1
+        # puts it on port 0 of the target's controller instead: before
+        # CSMWrap 3.1.2-usos4 (patch 0005) SeaBIOS ranked controllers, not
+        # ports, and booted the decoy's MBR instead of the prepared target.
+        decoy = os.environ.get("USOS_NATIVE_DECOY")
+        same = decoy and os.environ.get("USOS_NATIVE_DECOY_SAME_CONTROLLER") == "1"
+        port = 1 if same else 0
+        if decoy:
+            bus = "sata.0" if same else "sata_decoy.0"
+            if not same:
+                args += ["-device", "ahci,id=sata_decoy,addr=0x5"]
+            args += ["-drive", f"if=none,id=decoy,file={Path(decoy).resolve().as_posix()},format=qcow2,cache=writeback"]
+            decoy_device = ["-device", f"ide-hd,bus={bus},drive=decoy,serial=USOSDECOY"]
+        args += ["-device", "ahci,id=sata" + (",addr=0x6" if decoy else "")]
+        if decoy:
+            args += decoy_device
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
+                 "-device", f"ide-hd,bus=sata.{port},drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     else:
-        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
+        # NVMe target (default). With USOS_NATIVE_TARGET_FIRST=1 it boots before
+        # the stick, as the AHCI target (CSMWrap paths on an NVMe-only PC,
+        # docs/nvme-nt6-2026-10-12.md).
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
+                 "-device", "nvme,drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     return args
 
 

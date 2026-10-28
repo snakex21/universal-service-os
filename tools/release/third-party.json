@@ -798,6 +798,29 @@
       "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
     },
     {
+      "id": "alpine-syslinux",
+      "name": "syslinux installer (Alpine v3.24 package)",
+      "version": "syslinux 6.04_pre1-r19",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/d5dfca89b19916b8369b7322bfda4bf396742332/main/syslinux",
+          "https://www.zytor.com/pub/syslinux/Testing/6.04/syslinux-6.04-pre1.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine /usr/bin/syslinux (mtools installer with LDLINUX built in) inside initramfs-usos: makes the Windows 9x Setup disk start once (docs/win9x-modern-2026-09-30.md 4c)."
+    },
+    {
       "id": "alpine-dmidecode",
       "name": "dmidecode (Alpine v3.24 package)",
       "version": "dmidecode 3.7-r0",
@@ -1081,7 +1104,7 @@
     {
       "id": "csmwrap",
       "name": "CSMWrap with its SeaBIOS fork",
-      "version": "3.1.2-usos3",
+      "version": "3.1.2-usos18",
       "license": "LGPL-2.1-only AND LGPL-3.0-only",
       "modified": true,
       "ships_in": [
@@ -1104,7 +1127,7 @@
       "source": {
         "bundle_paths": [
           "tools/vendor/csmwrap/3.1.2-src",
-          "tools/vendor/csmwrap/3.1.2-usos3",
+          "tools/vendor/csmwrap/3.1.2-usos18",
           "tools/csmwrap_build",
           "tools/build_csmwrap.ps1",
           "docs/research/csmwrap.md"
@@ -1115,7 +1138,7 @@
         ],
         "offer": false
       },
-      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004); four patches in 3.1.2-usos3/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
+      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004) and 2026-10-11 (the exact disk CSMWrap was loaded from becomes BIOS drive 0x80, by a hash of its sector 0; patch 0005) and 2026-10-13 (an ACPI 1.0 view for legacy systems: an RSDT built from the XSDT when RsdtAddress is 0 or the RSDT is invalid, a FADT copy with the 32-bit fields filled from the X_ fields; patch 0006) and 2026-10-14 (diagnostic, Windows 2000 ACPI flow only: ACPI mode switched on through FADT SMI_CMD/ACPI_ENABLE right before the legacy boot, RTC A/B recorded; patch 0007) and 2026-10-15 (APM power-off from every APM interface: UEFI ResetSystem on the helper core, then a direct ACPI S5 write with SLP_TYP from the DSDT _S5 package; SeaBIOS debug output on the serial port with csmwrap.ini serial = true; patch 0008) and 2026-10-15 (power-off order ACPI mode first, PM1/GPE0 status cleared, S5, helper ResetSystem last, bounded waits, every step recorded in the CMOS RTC alarm bytes; patch 0009) and 2026-10-15 (SeaBIOS NVMe re-arms a controller an OS left stopped or shut down: admin queue and I/O queue pair 1 again in the POST memory, a controller running another admin queue is refused, FUA writes after a re-arm; patch 0010) and 2026-10-15 (diagnostic, only with csmwrap.ini acpi_legacy_fadt = true: a read-only KeTickCount/PM1/GPE0 watcher on the helper core, VGA text row 24, reserved E820 page published at BDA 4FCh; patch 0011, written by Codex and reviewed for USOS; kept in 3.1.2-usos10, not in the usos11 series) and 2026-10-17 (Windows 2000 ACPI flow only, csmwrap.ini acpi_legacy_fadt = true: HPET PNP0103 and AMD GPIO AMDI0030/AMD0030 devices get a _STA of 0 in the legacy DSDT/SSDT copies; patch 0012) and 2026-10-18 (csmwrap.ini int13_boot_disk_only = true: only the boot disk is a BIOS hard disk; patch 0014) and 2026-10-18 (Windows 9x flow only, csmwrap.ini pci_irq_routing = true: PCI INTx routed to 8259 IRQs through the ACPI link devices, Interrupt Line registers, ELCR level bits and a matching $PIR; patch 0015) and 2026-10-18 (USB mouse wheel through the BIOS pointing device: HID report protocol when the report descriptor has a wheel, IntelliMouse device ID 3 after the 200/100/80 sample-rate sequence, INT 15h C205h package sizes 1-7; patch 0016) and 2026-10-18 (SeaBIOS options that only act on romfiles turned off: boot splash, serial console, bios-geometry; patch 0017) and 2026-10-18 (a USB mouse wheel diagnostics record in SeaBIOS low memory, signature USOSMWHL, for USOSDBG.EXE; patch 0018) and 2026-10-18 (more USB mouse report shapes for the wheel: long reports of other report IDs skipped by packet count, up to 16 report IDs, report descriptors up to 4096 bytes; a boot mouse interface after a boot keyboard interface of the same device set up too; patch 0019) and 2026-10-19 (the USB mouse wheel in the INT 15h C207h handler Z word for 3-byte packages also without the IntelliMouse sample-rate sequence; a ring of the last 16 INT 15h C2xxh calls in the USOSMWHL record; patch 0020) and 2026-10-19 (a USB disk service on channel 1 of the BIOS helper core for the Windows 9x miniport USOSUSB.MPD: SCSI commands to USB sticks without a BIOS drive number, BOT reset recovery, fast fail on unplug, a USOSUDSK diagnostics record; patch 0021) and 2026-10-19 (only with csmwrap.ini int13_boot_disk_only = true, the Windows 9x flow: USB stick hot-swap for that service, a port watch on the helper core, runtime bring-up and teardown of bulk-only sticks, a media check, record version 2; SeaBIOS built without MegaRAID SAS and UHCI for ROM room; patch 0022); twenty patches (0001-0010, 0012, 0014-0022) in 3.1.2-usos17/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT).; and on 2026-10-23 USB keyboard / mouse replug on root ports (patch 0023 written by Codex for USOS, patch 0024: the port watch also from the BIOS timer interrupt, any root port, retries, an ownership guard)"
     },
     {
       "id": "touchi2cdxe",
@@ -1194,6 +1217,30 @@
       "notice": "Unmodified PATCH9X.EXE by JHRobotics; source.zip includes libmspack (LGPL-2.1) and its licence."
     },
     {
+      "id": "cregfix",
+      "name": "CREGFIX",
+      "version": "f0693437",
+      "license": "0BSD",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/cregfix/f0693437/LICENSE"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/cregfix/f0693437/cregfix.asm",
+          "tools/vendor/cregfix/f0693437/README"
+        ],
+        "urls": [
+          "https://github.com/mintsuki/cregfix/tree/f0693437080d08bb3596101e1fc17bbffc4efba5"
+        ],
+        "offer": false
+      },
+      "notice": "By mintsuki and contributors; unmodified CREGFIX.SYS (control-register cleanup before Windows 9x Setup under CSMWrap), byte-identical to its source cregfix.asm."
+    },
+    {
       "id": "cwsdpmi",
       "name": "CWSDPMI",
       "version": "r7",
@@ -1261,7 +1308,33 @@
         ],
         "offer": false
       },
-      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
+      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap; VBMOUSE.EXE + VBADOS.TXT also in the FreeDOS and MS-DOS RAM sessions and for MS-DOS mode of Windows 95/98/98 SE (USOS9X folder, DOSMOUSE.BAT)."
+    },
+    {
+      "id": "vmdisp9x",
+      "name": "vmdisp9x VESA display driver and VMHal9x (Windows 95/98/Me)",
+      "version": "1.2025.0.119",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/vmdisp9x/1.2025.0.119/license.txt",
+        "tools/vendor/vmdisp9x/1.2025.0.119/SOURCES.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/vmdisp9x/1.2025.0.119/vmdisp9x-1.2025.0.119.tar.gz",
+          "tools/vendor/vmdisp9x/1.2025.0.119/manifest.json"
+        ],
+        "urls": [
+          "https://github.com/JHRobotics/vmdisp9x/releases/tag/v1.2025.0.119",
+          "https://github.com/JHRobotics/vmhal9x"
+        ],
+        "offer": false
+      },
+      "notice": "By Jaroslav Hensl (JHRobotics), parts The OS/2 Museum; unmodified release binaries (vesamini.drv/.vxd, vmhal9x.dll, vmhal486.dll, vmdisp9x.dll) with USOS's own INF (src/platform/bios/win9x/usosvesa.inf, MODIFIED from vmdisp9x.inf) in EFI/USOS/dos-native/win9x; VMDISP9X.TXT (SOURCES + MIT text) and VMDISP9X.TGZ (source) next to them; Windows 95/98/Me disks get the driver files and VMDISP9X.TXT."
     },
     {
       "id": "freedos",
@@ -1348,6 +1421,84 @@
       "notice": "Unmodified x86/x64 genahci.sys in the XP package. Source: upstream tag GenAHCI = commit b936a0d8 (in the sources zip); consistent with the 6.3.0.1 binaries but not byte-verified (needs WDK 7600), see SOURCES.txt."
     },
     {
+      "id": "ahcint",
+      "name": "AHCINT",
+      "version": "1.3.0.0-usos4",
+      "license": "GPL-3.0-only",
+      "modified": true,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/ahcint/1.3.0.0-usos4/LICENSE",
+        "tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt",
+        "tools/vendor/ahcint/1.3.0.0/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/ahcint/1.3.0.0/src/ahcimain.c",
+          "tools/vendor/ahcint/1.3.0.0/src/ahcisatl.c",
+          "tools/vendor/ahcint/1.3.0.0/src/ahcint.h",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/ahcint.rc",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/makefile",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/sources",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/ahcint9x.lnk",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/build.bat",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/makefile",
+          "tools/vendor/ahcint/1.3.0.0/src/NT/build.bat",
+          "tools/vendor/ahcint/1.3.0.0/SOURCES.txt",
+          "tools/vendor/ahcint/1.3.0.0/manifest.json",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcimain.c",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcisatl.c",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcint.h",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/ahcint.rc",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/makefile",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/sources",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0001-usos1-flush-cache.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/build.cmd",
+          "tools/vendor/ahcint/1.3.0.0-usos4/toolchain.txt",
+          "tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt",
+          "tools/vendor/ahcint/1.3.0.0-usos4/manifest.json",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0002-usos2-target-check-and-trace.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0003-usos3-screen-stages-readback-fail-loudly.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0004-usos4-stall-diagnostics.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0008-usos5-readback-mismatch-not-fatal.patch"
+        ],
+        "urls": [
+          "https://github.com/ages2001/AHCINT/tree/7be9c9b81ef10979cf1e2c37d08a2e2e3e166066",
+          "https://github.com/ages2001/AHCINT/releases/download/v1.3.0.0/AHCINT-v1.3.0.0.zip"
+        ]
+      },
+      "notice": "MODIFIED i386 ahcint.sys 1.3.0.0-usos4 and the unmodified ahcint.inf (AHCINT, ScsiPort AHCI miniport with polling I/O) in the XP package, for Windows 2000 SP4 only: SYNCHRONIZE CACHE, SRB_FUNCTION_FLUSH and SHUTDOWN send FLUSH CACHE (EXT) to the drive, FUA writes are flushed, MODE SENSE reports the caching page; usos2 adds link/engine checks before every command, counters, and a write/read-back test plus an ASCII trace in the USOS gap (LBA 2040-2046) of the disk USOS prepared; usos3 (diagnostic) adds an on-screen status line, stages, sampled read-back and STOP 0x55534F53 instead of carrying on; usos4 (diagnostic) adds a stall watchdog (port registers on screen and in the trace when a command is busy for 2 s), a 250 ms miniport timer and interrupt, bus-reset and idle counters; usos5 counts and traces a read-back mismatch instead of stopping (tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt). Built with WDK 7.1 from the upstream tag v1.3.0.0 (commit 7be9c9b8) plus the USOS patches (all in the sources zip). The repository's LICENSE is the GPLv3 text; the files carry no per-file notices. Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk and, in the default legacy mode, comments out its PnpInterface row."
+    },
+    {
+      "id": "uniata",
+      "name": "UniATA",
+      "version": "0.47b",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/uniata/0.47b/COPYING-GPL-2.0.txt",
+        "tools/vendor/uniata/0.47b/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar",
+          "tools/vendor/uniata/0.47b/SOURCES.txt",
+          "tools/vendor/uniata/0.47b/manifest.json"
+        ],
+        "urls": [
+          "http://alter.org.ua/soft/win/uni_ata/BusMaster_v47b_src.rar"
+        ]
+      },
+      "notice": "Unmodified uniata.sys 0.47b (Alexander A. Telyatnikov) in the XP package, for Windows 2000 SP4 only, used instead of AHCINT when DATA has Systems\\Windows\\Windows 2000\\Unattended\\storage-uniata.txt. Licence GPLv2 per the source headers; the source archive is in the sources zip. USOS writes its own uniata.inf and TXTSETUP.SIF rows."
+    },
+    {
       "id": "xhci98",
       "name": "xhci98",
       "version": "1.1.1.0-usos2",
@@ -1368,6 +1519,10 @@
           "tools/vendor/xhci98/1.1.1.0/SOURCES.txt",
           "tools/vendor/xhci98/1.1.1.0-usos2/patches/0001-usos1-amd-cpu-xhci-start-and-file-log.patch",
           "tools/vendor/xhci98/1.1.1.0-usos2/patches/0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3/patches/0003-usos3-polling-engine.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3/build.cmd",
+          "tools/vendor/xhci98/1.1.1.0-usos3/MODIFIED.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3/manifest.json",
           "tools/vendor/xhci98/1.1.1.0-usos2/build.cmd",
           "tools/vendor/xhci98/1.1.1.0-usos2/toolchain.txt",
           "tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt",
@@ -1377,7 +1532,41 @@
           "https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac"
         ]
       },
-      "notice": "MODIFIED x86/amd64 xhci98.sys and xhci98.inf 1.1.1.0-usos2 (tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED.txt) in the XP package, for Server 2003 x86 and XP x64 only: PCI D0/Memory/Bus Master enable for firmware-disabled controllers (AMD CPU xHCI), CNR wait, forced USBLEGSUP handoff, 16 Supported Protocol groups, scratchpad cap 256, %SystemRoot%\\xhci98.log. Built with WDK 7.1 from the upstream tag v1.1.1.0 (commit 7d0dd9d4) plus the USOS patch (all in the sources zip). Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk."
+      "notice": "MODIFIED x86/amd64 xhci98.sys and xhci98.inf 1.1.1.0-usos2 (tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED.txt) in the XP package, for Server 2003 x86 and XP x64 (Windows 2000 SP4: the x86 1.1.1.0-usos3 build in nt52-usb/x86-w2k, which adds a polling engine): PCI D0/Memory/Bus Master enable for firmware-disabled controllers (AMD CPU xHCI), CNR wait, forced USBLEGSUP handoff, 16 Supported Protocol groups, scratchpad cap 256, %SystemRoot%\\xhci98.log. Built with WDK 7.1 from the upstream tag v1.1.1.0 (commit 7d0dd9d4) plus the USOS patches (all in the sources zip). Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk."
+    },
+    {
+      "id": "xhci98-w9x",
+      "name": "xhci98 (Windows 98 SE build)",
+      "version": "1.1.1.0-usos3-w9x",
+      "license": "GPL-2.0-only",
+      "modified": true,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/xhci98/1.1.1.0-usos3-w9x/LICENSE",
+        "tools/vendor/xhci98/1.1.1.0-usos3-w9x/MODIFIED.txt",
+        "tools/vendor/xhci98/1.1.1.0/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/xhci98/1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz",
+          "tools/vendor/xhci98/1.1.1.0/SOURCES.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0001-usos1-amd-cpu-xhci-start-and-file-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0003-usos3-polling-engine.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0004-usos3-w9x-windows98-build.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/build.cmd",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/toolchain.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/MODIFIED.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/manifest.json"
+        ],
+        "urls": [
+          "https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac"
+        ]
+      },
+      "notice": "MODIFIED x86 xhci98.sys and xhci98.inf 1.1.1.0-usos3-w9x (tools/vendor/xhci98/1.1.1.0-usos3-w9x, MODIFIED.txt) as XHCI98.SYS/.INF/.TXT in EFI/USOS/dos-native/win9x, for Windows 98 SE under CSMWrap only: the usos3 changes (AMD xHCI start, 16 protocol groups, polling) built for 98 (no file sink, KeSetTimer, no /GS); the INF also copies usbport.sys. INSTALL.BAT puts them into the Setup folder only next to the user-supplied USB 2.0 stack (Microsoft files, never shipped). Built with WDK 7.1 from upstream tag v1.1.1.0 plus the USOS patches (all in the sources zip)."
     },
     {
       "id": "go-runtime",
@@ -1420,6 +1609,23 @@
       "notice": "Microsoft files (boot.wim, setup.exe, bcd, boot.sdi), redistributed by the USOS maintainer at their own responsibility; not covered by any USOS licence; no product key."
     },
     {
+      "id": "microsoft-winpe-pe10-x86",
+      "name": "Microsoft Windows PE 10.0.19041 x86 donor (PE10_x86_19041_USOS.iso)",
+      "version": "10.0.19041",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "winpe-x86-asset"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Microsoft files (bootmgr, boot.wim, setup.exe, bcd, boot.sdi; unmodified, copied from a Windows 10 22H2 x86 ISO), redistributed by the USOS maintainer at their own responsibility; not covered by any USOS licence; no product key."
+    },
+    {
       "id": "microsoft-win7-updates",
       "name": "Microsoft Windows 7 SP1 x64 update packages",
       "version": "KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2",
@@ -1452,6 +1658,24 @@
         "urls": []
       },
       "notice": "Microsoft binaries packed in EFI/USOS/windows-native/vista-support.cpio (vista-payload-*.bin) with a USOS test-signing catalog; Microsoft property, not covered by any USOS licence. Kept deliberately by the maintainer (preservation: the original downloads may disappear); redistributed at the maintainer's own risk and removed on request of the rights holder."
+    },
+    {
+      "id": "microsoft-legacy-pack-redist",
+      "name": "Microsoft redistributables of the Windows 95/98/Me/NT 4.0 compatibility pack",
+      "version": "DirectX 8.0 PL, DirectX 9.0c (December 2006), Windows Installer 2.0 (A/W), MDAC 2.8 SP1 PL, VB6 SP6 runtime, VC++ 6.0 SP6 runtime, MSLU 1.1.3790, .NET Framework 2.0 + PL, .NET Framework 1.1 + PL + SP1; IE, DCOM, DUN, WMP and NT4 SP6a/SRP per manifest",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "legacy-pack-ms-asset",
+        "installer"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Original Microsoft installers, unmodified, assigned to the separate release asset USOS-<version>-Legacy-pack-MS.zip (Addons/USOS/MS; embedded in the full installer, downloaded by the online one, SHA-256 pinned). Microsoft property, not covered by any USOS licence. The maintainer's 2026-09-30 decision covers the original runtimes; the 2026-10-20 decision adds IE, DCOM, DUN, WMP and NT4 SP6a/SRP. Those decisions do not establish redistribution permission; per-file terms still apply. Kept at the maintainer's own risk for preservation, removed on request of the rights holder. No asset was built in the 2026-10-20 integration task. Files, classifications and SHA-256: src/addons/legacy-pack.ini (source=release)."
     },
     {
       "id": "microsoft-xp-driver-bundles",

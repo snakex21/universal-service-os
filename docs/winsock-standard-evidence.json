@@ -1,0 +1,120 @@
+{
+  "schema": "winsock-stdmode-regression-v1",
+  "scope": "QEMU only",
+  "baseline_commit": "ff9b496f",
+  "source_commit": "b88b44e87e99ad0e233ac394f53e7cc46def4df9",
+  "runtime_path_parameter": "<runtime>",
+  "guest": "Windows 3.1 PL",
+  "machine": "pc; TCG; Pentium3;64MiB;igb",
+  "mode": "STANDARD confirmed by GetWinFlags=1049; enhanced confirmed independently in reap-enhanced APPCTL.LOG",
+  "tests": {
+    "win16_suite": 145,
+    "default_packet_identity": 1,
+    "fixture_safety": 8
+  },
+  "artifacts": {
+    "APPCTL.EXE": "4d047d4072cc7c73f3107ad8ee620b65def9389fdd23ea159d4830ec2fdfddb9",
+    "GETHTTP.EXE": "5f9767c6786ad041bfc21097db8ab9b4c726e7f7079f37a7b549e9432f4d5e18",
+    "REAPTEST.EXE": "a11ab670dc7edae71332955cb34bd798259b5ebc456f44c51dbad8225e40f420",
+    "WINSOCK.DLL": "74f9d09baf79d0ff07cb93a7ffd1bd53452d14e89b93f18b526e0c54a700b82e"
+  },
+  "results": {
+    "netscape-baseline02": {
+      "exit": 0,
+      "pass": true,
+      "packets": 182,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94661
+        }
+      ]
+    },
+    "opera-baseline": {
+      "exit": 0,
+      "pass": true,
+      "packets": 181,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94685
+        }
+      ]
+    },
+    "netscape-control20": {
+      "exit": 0,
+      "pass": true,
+      "packets": 146,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94690
+        }
+      ]
+    },
+    "opera-control20": {
+      "exit": 0,
+      "pass": true,
+      "packets": 144,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94686
+        }
+      ]
+    },
+    "netscape-final": {
+      "exit": 0,
+      "pass": true,
+      "packets": 183,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94691
+        }
+      ]
+    },
+    "opera-final": {
+      "exit": 0,
+      "pass": true,
+      "packets": 181,
+      "http": [
+        {
+          "status_200": true,
+          "complete_body": true,
+          "response_bytes": 94686
+        }
+      ]
+    },
+    "reap-baseline": {
+      "final_pass": false,
+      "child_pass": 16,
+      "child_fail": 0,
+      "http_200": false,
+      "log_sha256": "9c73ac56fdbb4ad426a3024504a8abb7ca0cf2eef7c724d48dbd478642cda49f"
+    },
+    "reap-final": {
+      "final_pass": true,
+      "child_pass": 16,
+      "child_fail": 0,
+      "http_200": true,
+      "log_sha256": "0fa90fd738bf70318da981c751a20361e40e6c201345cded8baa362cb9f5dbb6"
+    },
+    "reap-enhanced": {
+      "final_pass": true,
+      "child_pass": 16,
+      "child_fail": 0,
+      "http_200": true,
+      "log_sha256": "90e06b22629e2008a93ba1f0b87cfa5507ab3db24791a6c13254c9f1492796cc"
+    }
+  },
+  "x470_crash_reproduced": false,
+  "x470_crash_fixed": false,
+  "images_deleted": [],
+  "cleanup_requires_user_acceptance": true
+}

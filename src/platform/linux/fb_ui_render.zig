@@ -65,6 +65,7 @@ pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state:
         .labels = if (state.label_count > 0) state.labels[0..state.label_count] else &usos.gui.preparation_screen.stage_labels,
         .notice = state.notice,
         .action = state.action,
+        .logon = state.logon,
     }, header);
 }
 

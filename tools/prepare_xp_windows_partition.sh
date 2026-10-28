@@ -13,7 +13,7 @@ usos_nt5_profile
 fail() { printf '[XP_WINDOWS] STOP: %s\n' "$1" >&2; exit 1; }
 value() { awk -F= -v key="$2" '$1==key {sub(/^[^=]*=/, ""); print; found=1; exit} END {if(!found) exit 1}' "$1"; }
 work=$(mktemp -d)
-trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif" "$work/winnt.base"; rmdir "$work"' EXIT HUP INT TERM
+trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif" "$work/winnt.base" "$work/network.ini"; rmdir "$work"' EXIT HUP INT TERM
 awk -f "$SCRIPT_DIR/xp_windows_partition_plan.awk" "$TARGET_SNAPSHOT" > "$work/plan"
 printf '[XP_WINDOWS] shared volume plan checked\n'
 cmp -s "$work/plan" "$XP_WINDOWS_PLAN" || fail 'Windows reservation changed after confirmation'
@@ -76,6 +76,74 @@ case "${USOS_PLAN_PROFILE:-}" in
             printf '[XP_WINDOWS] user drivers: OemPnPDriversPath="%s"\n' "$user_paths"
         fi ;;
 esac
+# Windows 2000 from UEFI: the hardware answers text-mode Setup would stop to
+# confirm on a USB-only board (standard keyboard; with ACPI off the HAL), with
+# the source's own descriptions (w2k_stage.sh, section 4).
+if [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+    . "$SCRIPT_DIR/w2k_stage.sh"
+    mv "$work/winnt.sif" "$work/winnt.base"
+    usos_w2k_answer_sif "${XP_TARGET_ROOT:?}/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the Windows 2000 hardware answers to WINNT.SIF'
+    rm -f "$work/winnt.base"
+    printf '[XP_WINDOWS] Windows 2000 answers: [KeyboardDrivers] standard keyboard, HAL %s\n' "$(usos_w2k_hal)"
+    # Windows 2000 Server CD (ProductType 1): licensing, IIS off, one
+    # automatic logon, "Configure Your Server" off (w2k_stage.sh).
+    if usos_w2k_server_source "${XP_TARGET_ROOT:?}/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF"; then
+        mv "$work/winnt.sif" "$work/winnt.base"
+        usos_w2k_server_sif < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the Windows 2000 Server answers to WINNT.SIF'
+        rm -f "$work/winnt.base"
+        printf '[XP_WINDOWS] Windows 2000 Server answers: licensing Per Server 5, IIS off, Configure Your Server off\n'
+    fi
+fi
+# No key answered: the disc's own I386\WINNT.SIF key, if it has one (OEM /
+# Media Center media; tools/nt5_media_key.sh). The key is not logged.
+. "$SCRIPT_DIR/nt5_media_key.sh"
+key_field=ProductKey
+[ "$NT5_SYSTEM" != windows-2000 ] || key_field=ProductID
+if [ -n "${SOURCE_ROOT:-}" ] && ! usos_nt5_answer_has_key "$key_field" < "$work/winnt.sif" &&
+    media_sif=$(usos_nt5_media_sif_path "$SOURCE_ROOT") && media_key=$(usos_nt5_media_key "$media_sif"); then
+    mv "$work/winnt.sif" "$work/winnt.base"
+    usos_nt5_put_key "$key_field" "$media_key" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the disc key to WINNT.SIF'
+    rm -f "$work/winnt.base"
+    media_key=
+    printf '[XP_WINDOWS] product key: none answered, taken from the disc'"'"'s own I386\\WINNT.SIF (not logged)\n'
+fi
+# LAN (tools/network_setup.sh): own usosnet.sys (NDIS 5.0, x86) for a
+# matching Intel igb card + Microsoft client and TCP/IP, no sharing. Windows
+# 2000, XP x86 and Server 2003 x86; XP x64 has no amd64 usosnet build.
+net_system=
+case "$NT5_SYSTEM:$NT5_SOURCE_DIR" in
+    windows-2000:*) net_system=W2K ;;
+    windows-xp:I386) net_system=XP ;;
+    windows-server-2003:I386) net_system=W2K3 ;;
+esac
+if [ -n "$net_system" ]; then
+    . "$SCRIPT_DIR/network_setup.sh"
+    usos_net_w2k_config "${XP_USER_SETTINGS:-}" "$net_system" > "$work/network.ini" || fail 'invalid LAN profile'
+    usos_net_stage "$work/network.ini" "$XP_TARGET_ROOT" "$SCRIPT_DIR" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+    if [ "$(usos_net_value "$work/network.ini" network)" = on ]; then
+        # The user's own .sif with its own network sections keeps them.
+        USOS_NET_KEEP=no
+        if [ -n "${XP_CUSTOM_SIF:-}" ] && grep -Eiq '^[[:space:]]*\[(networking|netadapters|netclients|netprotocols|netservices)\]' "$XP_CUSTOM_SIF"; then
+            USOS_NET_KEEP=yes
+            printf '[XP_WINDOWS] LAN: the selected .sif has its own network sections; only the driver path is added\n'
+        fi
+        export USOS_NET_KEEP
+        mv "$work/winnt.sif" "$work/winnt.base"
+        usos_net_w2k_sif < "$work/winnt.base" > "$work/winnt.sif" || fail "cannot add the $net_system LAN answer"
+        rm -f "$work/winnt.base"
+    fi
+    rm -f "$work/network.ini"
+fi
+# Driver paths only reach the PnP search path with OemPreinstall=Yes
+# (text-mode Setup appends OemPnPDriversPath to DevicePath only then; X470
+# XP SP3 2026-10-22: usosnet staged, I211 left without a driver).
+. "$SCRIPT_DIR/nt5_user_drivers.sh"
+mv "$work/winnt.sif" "$work/winnt.base"
+usos_nt5_oem_pnp_preinstall < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot set OemPreinstall for OemPnPDriversPath'
+rm -f "$work/winnt.base"
+if grep -qi '^OemPnPDriversPath' "$work/winnt.sif"; then
+    printf '[XP_WINDOWS] OemPnPDriversPath present: OemPreinstall=Yes (DevicePath append in text mode)\n'
+fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

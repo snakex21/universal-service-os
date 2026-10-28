@@ -1,0 +1,9 @@
+{
+  "pass": true,
+  "share_read_write_refused": true,
+  "attribute_handle_allowed": true,
+  "hardlink_alias_first_last_representative": true,
+  "file_id_hash_verified": true,
+  "only_synthetic_C_files_deleted": true,
+  "G_images_opened": false
+}

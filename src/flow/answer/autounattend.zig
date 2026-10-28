@@ -13,6 +13,8 @@ const Profile = @import("profile.zig").Profile;
 const target = @import("target.zig");
 const tables = @import("tables.zig");
 const schema = @import("schema.zig");
+const options = @import("options.zig");
+const display_profile = @import("display_profile.zig");
 
 pub const Arch = target.Arch;
 pub const Family = target.Family;
@@ -27,6 +29,9 @@ pub const Input = struct {
     /// The install image (1-based index) matching the profile's edition on
     /// the chosen media (editions.match); null: Setup shows its edition list.
     image_index: ?u16 = null,
+    /// DATA carries Systems\Windows\<version>\Unattended\fast-startup-on.txt:
+    /// the user keeps Windows' own Fast Startup (docs/ds-fast-startup-2026-10-22.md).
+    fast_startup_on: bool = false,
 };
 
 const W = std.Io.Writer;
@@ -167,17 +172,44 @@ fn setupComponent(w: *W, input: Input) !void {
 const default_hive = "HKU\\USOSDefault";
 const explorer_advanced = "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v {s} /t REG_DWORD /d {d} /f";
 
+/// Vista / 7 / 2008 / 2008 R2 without a firmware CSM (vista_csmwrap_target.sh)
+/// install on the Standard VGA (XDDM) driver at 800x600, 32-bit Windows
+/// 8 / 8.1 / 10 (win-x86-uefi-csmwrap, the same script) on Microsoft Basic
+/// Display at 1024x768. The micro-Linux stages USOSRES.EXE + DISPLAY.TXT
+/// into this folder of the Windows partition before Setup; these answers
+/// register it for every new user (Default hive Run: it removes its own
+/// value, no elevation needed) only when the file is there. The other paths
+/// (UEFI with CSM, native UEFI, Win7 x64 UefiSeven without its opt-in flag)
+/// never have the file, so the commands do nothing there. Server 2012 and
+/// later have no 32-bit release (never on the x86 CSMWrap path).
+/// docs/display-policy.md.
+pub const display_helper = "%SystemDrive%\\USOS\\NT6\\USOSRES.EXE";
+const display_guard = "cmd.exe /c if exist \"" ++ display_helper ++ "\" ";
+
+fn displayHelper(family: Family, arch: Arch) bool {
+    return switch (schema.Level.of(family)) {
+        .vista, .windows_7 => true,
+        .windows_8, .windows_8_1, .windows_10 => !family.server() and arch != .arm64,
+        .windows_11 => false,
+    };
+}
+
 /// The specialize commands of the profile for this version (Deployment
 /// RunSynchronous, run as SYSTEM before OOBE). Each command is at most 259
 /// characters (the schema's limit of Path).
 pub const Commands = struct {
-    items: [16][]const u8 = undefined,
-    storage: [16][200]u8 = undefined,
+    items: [max_commands][]const u8 = undefined,
+    storage: [max_commands][259]u8 = undefined,
     len: usize = 0,
 
     fn add(self: *Commands, comptime format: []const u8, args: anytype) !void {
+        if (self.len == max_commands) return error.TooManyCommands;
         self.items[self.len] = try std.fmt.bufPrint(&self.storage[self.len], format, args);
         self.len += 1;
+    }
+
+    fn addText(self: *Commands, value: []const u8) !void {
+        return self.add("{s}", .{value});
     }
 
     pub fn slice(self: *const Commands) []const []const u8 {
@@ -185,9 +217,122 @@ pub const Commands = struct {
     }
 };
 
-pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !void {
+pub const max_commands = 96;
+
+/// A packed command stays short enough for usos-run-hidden.exe's prefix
+/// (tools/windows_hidden_commands.h: 20 characters within 259).
+pub const packed_limit = 239;
+
+/// Registry operations of the typed options (options.zig) as reg.exe
+/// commands, several per command ("cmd.exe /c reg add ... & reg add ...")
+/// while they fit: fewer RunSynchronousCommand elements keep the answer well
+/// under max_size with every option on. One operation alone is a plain
+/// "reg.exe ..." command.
+const Packer = struct {
+    out: *Commands,
+    text: [packed_limit]u8 = undefined,
+    len: usize = 0,
+    ops: usize = 0,
+
+    fn op(self: *Packer, comptime format: []const u8, args: anytype) !void {
+        var buffer: [packed_limit]u8 = undefined;
+        const one = try std.fmt.bufPrint(&buffer, format, args);
+        const prefix = "cmd.exe /c ";
+        if (self.ops > 0 and prefix.len + self.len + 3 + one.len > packed_limit) try self.flush();
+        if (self.ops > 0) {
+            @memcpy(self.text[self.len .. self.len + 3], " & ");
+            self.len += 3;
+        }
+        @memcpy(self.text[self.len .. self.len + one.len], one);
+        self.len += one.len;
+        self.ops += 1;
+    }
+
+    fn flush(self: *Packer) !void {
+        if (self.ops == 1) {
+            // "reg add ..." -> "reg.exe add ...".
+            try self.out.add("reg.exe{s}", .{self.text[3..self.len]});
+        } else if (self.ops > 1) try self.out.add("cmd.exe /c {s}", .{self.text[0..self.len]});
+        self.len = 0;
+        self.ops = 0;
+    }
+};
+
+fn regOp(packer: *Packer, r: options.Reg, p: *const Profile) !void {
+    const root: []const u8 = switch (r.root) {
+        .hklm => "HKLM",
+        .user => default_hive,
+        .default => "HKU\\.DEFAULT",
+    };
+    switch (r.data) {
+        .del => try packer.op("reg delete \"{s}\\{s}\" /v {s} /f", .{ root, r.key, r.name }),
+        .dword => |v| try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_DWORD /d {d} /f", .{ root, r.key, r.name, v }),
+        .binary => |hex| {
+            // "90,12,03,80" -> /d 90120380.
+            var bytes: [64]u8 = undefined;
+            var n: usize = 0;
+            for (hex) |c| if (c != ',') {
+                bytes[n] = c;
+                n += 1;
+            };
+            try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_BINARY /d {s} /f", .{ root, r.key, r.name, bytes[0..n] });
+        },
+        else => {
+            var number: [16]u8 = undefined;
+            const data = options.dataText(r.data, p, &number);
+            const quote: []const u8 = if (std.mem.indexOfScalar(u8, data, ' ') != null) "\"" else "";
+            try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_SZ /d {s}{s}{s} /f", .{ root, r.key, r.name, quote, data, quote });
+        },
+    }
+}
+
+/// The typed options' machine-wide operations (HKLM, HKU\.DEFAULT and
+/// commands) or, with `user`, the Default User hive ones.
+fn optionCommands(p: *const Profile, family: Family, user: bool, out: *Commands) !void {
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, options.osOfFamily(family));
+    var packer: Packer = .{ .out = out };
+    while (it.next()) |rule| switch (rule.action) {
+        .reg => |r| if ((r.root == .user) == user) try regOp(&packer, r, p),
+        .command => |c| if (!user) {
+            try packer.flush();
+            try out.addText(c);
+        },
+        .native => {},
+    };
+    try packer.flush();
+}
+
+fn hasUserOptions(p: *const Profile, family: Family) bool {
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, options.osOfFamily(family));
+    while (it.next()) |rule| switch (rule.action) {
+        .reg => |r| if (r.root == .user) return true,
+        else => {},
+    };
+    return false;
+}
+
+/// Windows 8 / 8.1 / 10 / 11 (client) boot with Fast Startup; Server SKUs
+/// hide it.
+fn hiberboot(family: Family) bool {
+    return switch (family) {
+        .windows_8, .windows_8_1, .windows_10, .windows_11 => true,
+        else => false,
+    };
+}
+
+pub fn specializeCommands(p: *const Profile, family: Family, arch: Arch, fast_startup_on: bool, out: *Commands) !void {
     out.len = 0;
+    // display=keep: no USOSRES registration (the staging stages nothing).
+    const helper = displayHelper(family, arch) and p.display != .keep;
     if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
+    // Windows 8 / 8.1 / 10 / 11: no Fast Startup (hiberboot). A shutdown then
+    // leaves the NTFS volume clean instead of hibernated, which matters because
+    // USOS installs move between computers; fast-startup-on.txt on DATA keeps
+    // Windows' setting (docs/ds-fast-startup-2026-10-22.md).
+    if (!fast_startup_on and hiberboot(family))
+        try out.add("reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power\" /v HiberbootEnabled /t REG_DWORD /d 0 /f", .{});
     const on = struct {
         fn f(profile: *const Profile, tweak: schema.Tweak, fam: Family) bool {
             return schema.tweakOn(profile, tweak, fam);
@@ -211,12 +356,19 @@ pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !vo
             try out.add("cmd.exe /c start /w pkgmgr.exe /uu:InboxGames /quiet /norestart", .{});
         } else try out.add("dism.exe /Online /NoRestart /Disable-Feature /FeatureName:InboxGames", .{});
     }
-    const hive = on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family);
+    // Typed options (options.zig): HKLM, HKU\.DEFAULT, commands.
+    try optionCommands(p, family, false, out);
+    // The staged folder takes the system drive's permissions (the
+    // micro-Linux made it before Setup).
+    if (helper) try out.add(display_guard ++ "icacls.exe \"%SystemDrive%\\USOS\" /reset /t /c /q", .{});
+    const hive = helper or on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
     if (hive) {
         try out.add("reg.exe load \"" ++ default_hive ++ "\" \"C:\\Users\\Default\\NTUSER.DAT\"", .{});
         if (on(p, .show_extensions, family)) try out.add(explorer_advanced, .{ "HideFileExt", 0 });
         if (on(p, .show_hidden, family)) try out.add(explorer_advanced, .{ "Hidden", 1 });
         if (on(p, .no_welcome_center, family)) try out.add("reg.exe delete \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v WindowsWelcomeCenter /f", .{});
+        try optionCommands(p, family, true, out);
+        if (helper) try out.add(display_guard ++ "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v USOSDisplay /t REG_SZ /d \"" ++ display_helper ++ "\" /f", .{});
         try out.add("reg.exe unload \"" ++ default_hive ++ "\"", .{});
     }
 }
@@ -226,6 +378,17 @@ fn specialize(w: *W, input: Input) !void {
     try w.writeAll("  <settings pass=\"specialize\">\n");
     try component(w, "Microsoft-Windows-Shell-Setup", input.arch);
     try element(w, 3, "ComputerName", if (p.computer.len > 0) p.computer.slice() else "*");
+    // An explicit resolution (tweak display); auto leaves the choice to
+    // Windows (GOP / WDDM driver) or, Vista / 7 / 8.x / 10 on CSMWrap, to USOSRES.
+    if (schema.tweakOn(p, .display, input.family)) {
+        const tag = @tagName(p.display);
+        const x = std.mem.indexOfScalar(u8, tag, 'x').?;
+        try open(w, 3, "Display");
+        try element(w, 4, "ColorDepth", if (p.display_bpp == .@"16") "16" else "32");
+        try element(w, 4, "HorizontalResolution", tag[0..x]);
+        try element(w, 4, "VerticalResolution", tag[x + 1 ..]);
+        try close(w, 3, "Display");
+    }
     try element(w, 3, "RegisteredOwner", p.user.slice());
     if (p.org.len > 0) try element(w, 3, "RegisteredOrganization", p.org.slice());
     if (p.timeZone()) |zone| {
@@ -249,8 +412,31 @@ fn specialize(w: *W, input: Input) !void {
         try element(w, 3, "EnableLUA", "false");
         try endComponent(w);
     }
+    // Server: no Initial Configuration Tasks (2008 / 2008 R2) and no Server
+    // Manager (2008 R2 and later) at the first logon.
+    if (input.family.server()) {
+        const level = @intFromEnum(schema.Level.of(input.family));
+        if (level <= @intFromEnum(schema.Level.windows_7)) {
+            try component(w, "Microsoft-Windows-OutOfBoxExperience", input.arch);
+            try element(w, 3, "DoNotOpenInitialConfigurationTasksAtLogon", "true");
+            try endComponent(w);
+        }
+        if (level >= @intFromEnum(schema.Level.windows_7)) {
+            try component(w, "Microsoft-Windows-ServerManager-SvrMgrNc", input.arch);
+            try element(w, 3, "DoNotOpenServerManagerAtLogon", "true");
+            try endComponent(w);
+        }
+    }
+    // Workgroup (UnattendedJoin; without it Windows uses WORKGROUP).
+    if (p.workgroup.len > 0) {
+        try component(w, "Microsoft-Windows-UnattendedJoin", input.arch);
+        try open(w, 3, "Identification");
+        try element(w, 4, "JoinWorkgroup", p.workgroup.slice());
+        try close(w, 3, "Identification");
+        try endComponent(w);
+    }
     var commands: Commands = .{};
-    try specializeCommands(p, input.family, &commands);
+    try specializeCommands(p, input.family, input.arch, input.fast_startup_on, &commands);
     if (commands.len > 0) {
         try component(w, "Microsoft-Windows-Deployment", input.arch);
         try open(w, 3, "RunSynchronous");
@@ -280,6 +466,35 @@ fn oobe(w: *W, input: Input) !void {
     try w.writeAll("  <settings pass=\"oobeSystem\">\n");
     try international(w, input, false);
     try component(w, "Microsoft-Windows-Shell-Setup", input.arch);
+    // Automatic logon of the first user at every start (LogonCount counts
+    // down per logon: practically permanent).
+    if (p.opt(.autologon) == 1) {
+        try open(w, 3, "AutoLogon");
+        try element(w, 4, "Enabled", "true");
+        try element(w, 4, "LogonCount", "9999999");
+        try element(w, 4, "Username", p.user.slice());
+        try open(w, 4, "Password");
+        try element(w, 5, "Value", p.password.slice());
+        try element(w, 5, "PlainText", "true");
+        try close(w, 4, "Password");
+        try close(w, 3, "AutoLogon");
+    }
+    // The user script hook (options.user_script): at the first sign-in.
+    if (p.opt(.user_script) == 1) {
+        try open(w, 3, "FirstLogonCommands");
+        const scripts = [_][]const u8{ options.user_script_reg, options.user_script_cmd };
+        const descriptions = [_][]const u8{ "USOS user script (.reg)", "USOS user script (.cmd)" };
+        for (scripts, descriptions, 1..) |command, description, order| {
+            try indent(w, 4);
+            try w.writeAll("<SynchronousCommand wcm:action=\"add\">\n");
+            var number: [8]u8 = undefined;
+            try element(w, 5, "Order", try std.fmt.bufPrint(&number, "{d}", .{order}));
+            try element(w, 5, "CommandLine", command);
+            try element(w, 5, "Description", description);
+            try close(w, 4, "SynchronousCommand");
+        }
+        try close(w, 3, "FirstLogonCommands");
+    }
     try open(w, 3, "OOBE");
     // Per version (Microsoft unattend reference, schema.zig): Vista has
     // HideEULAPage, NetworkLocation and ProtectYourPC only; 7 adds
@@ -317,6 +532,10 @@ pub fn render(input: Input, buffer: []u8) ![]const u8 {
     var w: W = .fixed(buffer);
     try w.writeAll("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
     try w.print("<!-- USOS answer profile rendered for {s} ({s}); the target disk is chosen in Setup. docs/answer-profiles.md -->\n", .{ target.systemId(input.family), @tagName(input.arch) });
+    // The profile's display request for the CSMWrap staging (DISPLAY.TXT,
+    // tools/display_profile.sh usos_display_from_xml); none: default auto.
+    if (displayHelper(input.family, input.arch) and display_profile.requested(input.profile))
+        try w.print("<!-- USOS-DISPLAY={s}x{s} -->\n", .{ @tagName(input.profile.display), @tagName(input.profile.display_bpp) });
     try w.writeAll("<unattend xmlns=\"urn:schemas-microsoft-com:unattend\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n");
     try w.writeAll("  <settings pass=\"windowsPE\">\n");
     try international(&w, input, true);
@@ -328,7 +547,10 @@ pub fn render(input: Input, buffer: []u8) ![]const u8 {
     return w.buffered();
 }
 
-pub const max_size = 16 * 1024;
+/// 64 KiB (16 KiB until stage 2 of the options, 2026-10-14): every option
+/// on stays far below it (test below); the consumers take more (DATA answers
+/// up to 1 MiB; usos-run-hidden.exe --wrap allocates the file size + 64 KiB).
+pub const max_size = 64 * 1024;
 
 test "autounattend: manual disk, escaped values, arch on every component" {
     var p = Profile{};
@@ -408,8 +630,63 @@ test "autounattend: tweaks per version, nothing for versions without them" {
     try std.testing.expect(std.mem.indexOf(u8, r2, "<EnableLUA>false</EnableLUA>") != null);
     for ([_][]const u8{ "TurnOffSidebar", "powercfg", "InboxGames", "Themes" }) |k| try std.testing.expect(std.mem.indexOf(u8, r2, k) == null);
     var commands: Commands = .{};
-    try specializeCommands(&p, .windows_7, &commands);
+    try specializeCommands(&p, .windows_7, .x86, false, &commands);
     for (commands.slice()) |command| try std.testing.expect(command.len <= 259);
+}
+
+test "autounattend: display helper on Vista / 7 / 8 / 8.1 / 10, explicit resolution on every 6.x+" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    var buffer: [max_size]u8 = undefined;
+    const registration = "reg.exe add &quot;HKU\\USOSDefault\\Software\\Microsoft\\Windows\\CurrentVersion\\Run&quot; /v USOSDisplay /t REG_SZ /d &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; /f";
+    // amd64 too: an x86 CSMWrap start may get an amd64-rendered answer,
+    // retargeted in the WinPE (windows_installto.h usos_it_arch).
+    for ([_]Family{ .vista, .windows_7, .server_2008, .server_2008_r2, .windows_8, .windows_8_1, .windows_10 }) |family| for ([_]Arch{ .x86, .amd64 }) |arch| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
+        errdefer std.debug.print("family {s}\n", .{@tagName(family)});
+        try std.testing.expect(std.mem.indexOf(u8, xml, "cmd.exe /c if exist &quot;%SystemDrive%\\USOS\\NT6\\USOSRES.EXE&quot; " ++ registration) != null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "icacls.exe &quot;%SystemDrive%\\USOS&quot; /reset /t /c /q") != null);
+        // Default: no request comment (the staging uses auto), no <Display>.
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOS-DISPLAY=") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
+        try schema.check(xml, family, null);
+    };
+    // No 32-bit release (11, Server 2012+) or never CSMWrap (arm64): nothing.
+    for ([_]Family{ .windows_10, .windows_11 }) |family| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = .arm64 }, &buffer);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
+    }
+    for ([_]Family{ .windows_11, .server_2012, .server_2012_r2, .server_2016, .server_2019, .server_2022, .server_2025 }) |family| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = .amd64 }, &buffer);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
+    }
+    p.display = .@"1920x1080";
+    for ([_]Family{ .vista, .windows_7, .windows_10, .windows_11 }) |family| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = .x86 }, &buffer);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>\n        <ColorDepth>32</ColorDepth>\n        <HorizontalResolution>1920</HorizontalResolution>\n        <VerticalResolution>1080</VerticalResolution>\n      </Display>") != null);
+        try std.testing.expectEqual(displayHelper(family, .x86), std.mem.indexOf(u8, xml, "<!-- USOS-DISPLAY=1920x1080xauto -->\n<unattend") != null);
+        try @import("xml_check.zig").wellFormed(xml);
+        try schema.check(xml, family, null);
+    }
+    // An explicit auto: the request comment only (USOSRES picks the mode).
+    p.display = .auto;
+    p.display_explicit = true;
+    const vista = try render(.{ .profile = &p, .family = .vista, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "<!-- USOS-DISPLAY=autoxauto -->") != null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "<Display>") == null);
+    // keep: the keep request only; no <Display>, no registration, no icacls.
+    p.display = .keep;
+    for ([_]Family{ .vista, .windows_7, .server_2008_r2, .windows_8_1, .windows_10, .windows_11 }) |family| for ([_]Arch{ .x86, .amd64 }) |arch| {
+        const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
+        errdefer std.debug.print("keep family {s} {s}\n", .{ @tagName(family), @tagName(arch) });
+        try std.testing.expectEqual(displayHelper(family, arch), std.mem.indexOf(u8, xml, "<!-- USOS-DISPLAY=keepxauto -->\n<unattend") != null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "USOSRES") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "icacls") == null);
+        try std.testing.expect(std.mem.indexOf(u8, xml, "<Display>") == null);
+        try schema.check(xml, family, null);
+    };
 }
 
 test "autounattend: Vista and 7 OOBE answers per version" {
@@ -436,4 +713,119 @@ test "autounattend: Vista and 7 OOBE answers per version" {
     const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, ten, "NetworkLocation") == null);
     try std.testing.expect(std.mem.indexOf(u8, ten, "<HideOEMRegistrationScreen>") != null);
+}
+
+test "autounattend: Server Manager and Initial Configuration Tasks stay closed at logon" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    try p.password.set("Usos-2026!");
+    var buffer: [max_size]u8 = undefined;
+    const r2 = try render(.{ .profile = &p, .family = .server_2008_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<DoNotOpenInitialConfigurationTasksAtLogon>true</DoNotOpenInitialConfigurationTasksAtLogon>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<AdministratorPassword>") != null);
+    try schema.check(r2, .server_2008_r2, null);
+    const r12 = try render(.{ .profile = &p, .family = .server_2012_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r12, "InitialConfigurationTasks") == null);
+    try std.testing.expect(std.mem.indexOf(u8, r12, "<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>") != null);
+    try schema.check(r12, .server_2012_r2, null);
+    const s2008 = try render(.{ .profile = &p, .family = .server_2008, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, s2008, "DoNotOpenServerManagerAtLogon") == null);
+    try std.testing.expect(std.mem.indexOf(u8, s2008, "DoNotOpenInitialConfigurationTasksAtLogon") != null);
+    const eight = try render(.{ .profile = &p, .family = .windows_8_1, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, eight, "ServerManager") == null and std.mem.indexOf(u8, eight, "OutOfBoxExperience") == null);
+}
+
+/// Every typed option at its last value, every tweak, workgroup and a
+/// long password: the largest answer a profile can produce.
+pub fn everythingOn() !Profile {
+    var p = try allTweaks();
+    try p.user2.set("Drugi-Uzytkownik-20c");
+    try p.org.set("USOS Laboratory Organization Name For Size Tests 0123456789ABCD");
+    try p.password.set("P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd!!");
+    try p.workgroup.set("LABORATORY-0123");
+    p.disable_wer = true;
+    p.bypass_tpm = true;
+    p.bypass_secure_boot = true;
+    p.bypass_ram = true;
+    p.no_network_oobe = true;
+    p.timezone = @intCast(tables.timeZoneIndex("Europe/Warsaw").?);
+    p.language = @intCast(tables.languageIndex("pl-PL").?);
+    for (options.table) |o| {
+        if (!o.legacy) p.opts[@intFromEnum(o.opt)] = @intCast(o.values.len - 1);
+    }
+    return p;
+}
+
+test "autounattend: every option on stays within the limits on every version" {
+    const p = try everythingOn();
+    var buffer: [max_size]u8 = undefined;
+    inline for (@typeInfo(Family).@"enum".fields) |f| {
+        const family: Family = @enumFromInt(f.value);
+        if (comptime family.nt5()) continue;
+        for ([_]Arch{ .x86, .amd64 }) |arch| {
+            const xml = try render(.{ .profile = &p, .family = family, .arch = arch, .key = "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", .image_index = 2 }, &buffer);
+            // Headroom (1.5 KiB) for later options; the hidden-runner
+            // prefixes go into a copy without this limit.
+            errdefer std.debug.print("{s}: {d} bytes\n", .{ f.name, xml.len });
+            try std.testing.expect(xml.len <= max_size - 1536);
+            try @import("xml_check.zig").wellFormed(xml);
+            try schema.check(xml, family, null);
+        }
+        var commands: Commands = .{};
+        try specializeCommands(&p, family, .amd64, false, &commands);
+        for (commands.slice()) |command| {
+            try std.testing.expect(command.len <= 259);
+            if (std.mem.startsWith(u8, command, "cmd.exe /c reg")) try std.testing.expect(command.len <= packed_limit);
+        }
+    }
+}
+
+test "autounattend: Fast Startup off on 8 / 8.1 / 10 / 11 clients only, opt-out keeps it" {
+    const p: Profile = .{};
+    const hiber = "/v HiberbootEnabled /t REG_DWORD /d 0 /f";
+    var buffer: [max_size]u8 = undefined;
+    inline for (@typeInfo(Family).@"enum".fields) |f| {
+        const family: Family = @enumFromInt(f.value);
+        if (comptime family.nt5()) continue;
+        // Clients 8 and newer (Windows 11 included: it hibernates just the same
+        // and the disk still moves between computers); Server 2008-2025 hide
+        // Fast Startup, so the command must not appear there.
+        const expected = switch (family) {
+            .windows_8, .windows_8_1, .windows_10, .windows_11 => true,
+            else => false,
+        };
+        if (comptime family.server()) try std.testing.expect(!expected);
+        for ([_]Arch{ .x86, .amd64 }) |arch| {
+            const xml = try render(.{ .profile = &p, .family = family, .arch = arch }, &buffer);
+            errdefer std.debug.print("{s} {s}\n", .{ f.name, @tagName(arch) });
+            try std.testing.expectEqual(expected, std.mem.indexOf(u8, xml, hiber) != null);
+            const kept = try render(.{ .profile = &p, .family = family, .arch = arch, .fast_startup_on = true }, &buffer);
+            try std.testing.expect(std.mem.indexOf(u8, kept, hiber) == null);
+        }
+    }
+}
+
+test "autounattend: typed options render only when set (byte identity)" {
+    var p = try allTweaks();
+    var a: [max_size]u8 = undefined;
+    var b: [max_size]u8 = undefined;
+    const before = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &a);
+    p.opts = @splat(0);
+    const after = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &b);
+    try std.testing.expectEqualStrings(before, after);
+    p.opts[@intFromEnum(options.Opt.autologon)] = 1;
+    p.opts[@intFromEnum(options.Opt.taskbar_left)] = 1;
+    p.opts[@intFromEnum(options.Opt.widgets_off)] = 1;
+    p.opts[@intFromEnum(options.Opt.uac_level)] = 1;
+    const eleven = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "<LogonCount>9999999</LogonCount>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "/v TaskbarAl /t REG_DWORD /d 0 /f") != null);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "cmd.exe /c reg add &quot;HKLM\\SOFTWARE\\Policies\\Microsoft\\Dsh&quot; /v AllowNewsAndInterests /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 5 /f</Path>") != null);
+    // 10 has no left taskbar; Server 2025 no widgets.
+    const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, ten, "TaskbarAl") == null);
+    const server = try render(.{ .profile = &p, .family = .server_2025, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, server, "AllowNewsAndInterests") == null);
 }

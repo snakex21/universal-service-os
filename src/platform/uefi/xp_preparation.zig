@@ -30,21 +30,39 @@ pub const lang_initrd_option = " initrd=\\EFI\\USOS\\lang.cpio";
 pub const Nt5System = enum {
     windows_xp,
     windows_2000,
+    /// Windows 2000 Server: the Windows 2000 action and profile; the
+    /// micro-Linux takes the Server DATA folder (usos.w2k_edition=server).
+    windows_2000_server,
     windows_server_2003,
     windows_xp_x64,
+    /// XP Media Center Edition 2005: the XP action and profile; the
+    /// micro-Linux takes the Media Center DATA folder (usos.xp_edition=mce).
+    windows_xp_mce,
+    /// XP Tablet PC Edition 2005: the XP action and profile; the micro-Linux
+    /// takes the Tablet PC DATA folder (usos.xp_edition=tablet).
+    windows_xp_tablet,
+    windows_whistler,
+    windows_neptune,
+    windows_2000_beta,
 
     pub fn fromId(system_id: []const u8) ?Nt5System {
         if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
         if (std.mem.eql(u8, system_id, "windows-2000")) return .windows_2000;
+        if (std.mem.eql(u8, system_id, "windows-2000-server")) return .windows_2000_server;
         if (std.mem.eql(u8, system_id, "windows-server-2003")) return .windows_server_2003;
         if (std.mem.eql(u8, system_id, "windows-xp-x64")) return .windows_xp_x64;
+        if (std.mem.eql(u8, system_id, "windows-xp-mce")) return .windows_xp_mce;
+        if (std.mem.eql(u8, system_id, "windows-xp-tablet")) return .windows_xp_tablet;
+        if (std.mem.eql(u8, system_id, "windows-whistler")) return .windows_whistler;
+        if (std.mem.eql(u8, system_id, "windows-neptune")) return .windows_neptune;
+        if (std.mem.eql(u8, system_id, "windows-2000-beta")) return .windows_2000_beta;
         return null;
     }
 
     pub fn action(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp => "xp-staging",
-            .windows_2000 => "windows2000-staging",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet, .windows_whistler => "xp-staging",
+            .windows_2000, .windows_2000_server, .windows_neptune, .windows_2000_beta => "windows2000-staging",
             .windows_server_2003 => "windows2003-staging",
             .windows_xp_x64 => "xp64-staging",
         };
@@ -52,10 +70,23 @@ pub const Nt5System = enum {
 
     pub fn planProfile(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp => "xp-x86-sp3-uefi-csm",
-            .windows_2000 => "w2k-x86-sp4-uefi-csm",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet, .windows_whistler => "xp-x86-sp3-uefi-csm",
+            .windows_2000, .windows_2000_server, .windows_neptune, .windows_2000_beta => "w2k-x86-sp4-uefi-csm",
             .windows_server_2003 => "w2k3-x86-sp2-uefi-csm",
             .windows_xp_x64 => "xp-x64-sp2-uefi-csm",
+        };
+    }
+
+    /// Extra micro-Linux argument: the edition whose DATA folder is used.
+    pub fn editionOption(self: Nt5System) []const u8 {
+        return switch (self) {
+            .windows_2000_server => " usos.w2k_edition=server",
+            .windows_xp_mce => " usos.xp_edition=mce",
+            .windows_xp_tablet => " usos.xp_edition=tablet",
+            .windows_whistler => " usos.nt5_variant=whistler",
+            .windows_neptune => " usos.nt5_variant=neptune",
+            .windows_2000_beta => " usos.nt5_variant=w2k-beta",
+            else => "",
         };
     }
 
@@ -83,21 +114,35 @@ pub const CommandParts = struct {
 /// usos.xp_boot=csmwrap: the language (lang.cpio) and everything else are
 /// the default path's.
 pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
-    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), parts.system.editionOption(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
+}
+
+/// The optional XP package (installer Components, install-xp-package.ps1:
+/// EFI\USOS-XP\initramfs-xp + vmlinuz.efi) is on the ESP. Every NT5 system
+/// (2000, XP, 2003, XP x64 and their editions) boots from it.
+pub fn packagePresent(root: *uefi.protocol.File) bool {
+    const files = [_][*:0]const u16{ wide("\\EFI\\USOS-XP\\initramfs-xp"), wide("\\EFI\\USOS-XP\\vmlinuz.efi") };
+    for (files) |path| {
+        const file = root.open(path, .read, .{}) catch return false;
+        file.close() catch {};
+    }
+    return true;
 }
 
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
 pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
+    try usos.catalog.preparation_block.requireSupported(system_id);
     const system = Nt5System.fromId(system_id) orelse return error.UnsupportedNt5System;
     var answer_buffer: [300]u8 = undefined;
     const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);
     const settings_option = answer_screen.xpSettingsOption(answer);
     if (name.len == 0 or name.len > 512 or std.mem.indexOfAny(u8, name, "\\/\r\n") != null) return error.InvalidXpImageName;
-    // Require the isolated payload before creating any diagnostics.
-    const initrd = try root.open(wide("\\EFI\\USOS-XP\\initramfs-xp"), .read, .{});
-    try initrd.close();
+    // Require the isolated payload before creating any diagnostics. Without
+    // the optional XP package (installer Components) this used to surface
+    // as a bare "NotFound"; the menu now names the package.
+    if (!packagePresent(root)) return error.XpPackageMissing;
     try mark(root, "uefi-entry", name);
     const config = try root.open(wide("\\EFI\\USOS\\usos-device.ini"), .read, .{});
     defer config.close() catch {};
@@ -152,6 +197,8 @@ pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8,
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     try bs.setWatchdogTimer(0, 0, null);
     progress(.loading);
+    // The monitor's native size for USOSRES (docs/display-policy.md).
+    @import("display_native.zig").record(root);
     const image = try esp_image.load(root, "\\EFI\\USOS-XP\\vmlinuz.efi");
     defer _ = bs.unloadImage(image) catch .load_error;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;
@@ -209,6 +256,76 @@ test "Windows 2000 from UEFI keeps the XP command line except its action and pro
     try std.testing.expectEqual(@as(?Nt5System, .windows_2000), Nt5System.fromId("windows-2000"));
     try std.testing.expect(Nt5System.fromId("windows-7") == null);
     try std.testing.expect(std.mem.indexOf(u8, xp, " usos.legacy_action=xp-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "usos.w2k_edition") == null);
+}
+
+test "Windows 2000 Server: the 2000 action and profile plus the Server DATA folder" {
+    var w2k_buffer: [2048]u8 = undefined;
+    var server_buffer: [2048]u8 = undefined;
+    const common = CommandParts{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = true };
+    var w2k_parts = common;
+    w2k_parts.system = .windows_2000;
+    var server_parts = common;
+    server_parts.system = Nt5System.fromId("windows-2000-server").?;
+    const w2k = try formatCommand(&w2k_buffer, w2k_parts);
+    const server = try formatCommand(&server_buffer, server_parts);
+    try std.testing.expect(std.mem.indexOf(u8, server, " usos.legacy_action=windows2000-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, server, " usos.plan_profile=w2k-x86-sp4-uefi-csm usos.w2k_edition=server usos.xp_boot=csmwrap ") != null);
+    // Only the edition token differs.
+    const token = " usos.w2k_edition=server";
+    const at = std.mem.indexOf(u8, server, token).?;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], server[0..at]);
+    const rest = server[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(w2k, joined[0 .. at + rest.len]);
+}
+
+test "XP Media Center Edition: the XP action and profile plus its DATA folder" {
+    var xp_buffer: [2048]u8 = undefined;
+    var mce_buffer: [2048]u8 = undefined;
+    const common = CommandParts{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "6d63652e69736f", .csmwrap = true };
+    var xp_parts = common;
+    xp_parts.system = .windows_xp;
+    var mce_parts = common;
+    mce_parts.system = Nt5System.fromId("windows-xp-mce").?;
+    const xp = try formatCommand(&xp_buffer, xp_parts);
+    const mce = try formatCommand(&mce_buffer, mce_parts);
+    try std.testing.expect(std.mem.indexOf(u8, mce, " usos.legacy_action=xp-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, mce, " usos.plan_profile=xp-x86-sp3-uefi-csm usos.xp_edition=mce usos.xp_boot=csmwrap ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "usos.xp_edition") == null);
+    try std.testing.expectEqual(usos.flow.answer.target.Arch.x86, mce_parts.system.arch());
+    // Only the edition token differs.
+    const token = " usos.xp_edition=mce";
+    const at = std.mem.indexOf(u8, mce, token).?;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], mce[0..at]);
+    const rest = mce[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(xp, joined[0 .. at + rest.len]);
+}
+
+test "XP Tablet PC Edition: the XP action and profile plus its DATA folder" {
+    var xp_buffer: [2048]u8 = undefined;
+    var tablet_buffer: [2048]u8 = undefined;
+    const common = CommandParts{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "7470632e69736f", .csmwrap = true };
+    var xp_parts = common;
+    xp_parts.system = .windows_xp;
+    var tablet_parts = common;
+    tablet_parts.system = Nt5System.fromId("windows-xp-tablet").?;
+    const xp = try formatCommand(&xp_buffer, xp_parts);
+    const tablet = try formatCommand(&tablet_buffer, tablet_parts);
+    try std.testing.expect(std.mem.indexOf(u8, tablet, " usos.legacy_action=xp-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, tablet, " usos.plan_profile=xp-x86-sp3-uefi-csm usos.xp_edition=tablet usos.xp_boot=csmwrap ") != null);
+    try std.testing.expectEqual(usos.flow.answer.target.Arch.x86, tablet_parts.system.arch());
+    // Only the edition token differs.
+    const token = " usos.xp_edition=tablet";
+    const at = std.mem.indexOf(u8, tablet, token).?;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], tablet[0..at]);
+    const rest = tablet[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(xp, joined[0 .. at + rest.len]);
 }
 
 test "the menu theme reaches the NT5 micro-Linux command line" {
@@ -217,7 +334,7 @@ test "the menu theme reaches the NT5 micro-Linux command line" {
     try std.testing.expect(outcome.ok());
     const sunset = outcome.theme;
     var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
-    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_server_2003, .windows_xp_x64 }) |system| {
+    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_2000_server, .windows_server_2003, .windows_xp_x64, .windows_xp_mce, .windows_xp_tablet }) |system| {
         for ([_]bool{ false, true }) |csmwrap| {
             var buffer: [2048]u8 = undefined;
             const command = try formatCommand(&buffer, .{ .system = system, .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = csmwrap, .theme_option = theme_cmdline.option(&theme_buffer, sunset), .console_options = "quiet" });

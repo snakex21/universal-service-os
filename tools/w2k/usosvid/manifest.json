@@ -1,0 +1,25 @@
+{
+  "name": "usosvid",
+  "version": "1.3",
+  "licence": "GPL-3.0-or-later (repository LICENSE, NOTICE)",
+  "own_code": true,
+  "build": "build.cmd (WDK 7.1, x86 WXP environment, EXPORT_DRIVER linked as bootvid.sys, shipped as bootvid.dll); not byte-reproducible (PE time stamp, PDB GUID)",
+  "exports": "VidBitBlt@12 VidBufferToScreenBlt@24 VidCleanUp@0 VidDisplayString@4 VidDisplayStringXY@16 VidInitialize@4 VidResetDisplay@4 VidScreenToBufferBlt@24 VidSetScrollRegion@16 VidSetTextColor@4 VidSolidColorFill@20 (names and argument sizes of the Windows 2000 BOOTVID.DLL the 2000 kernel imports)",
+  "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, MmIsAddressValid, KeTickCount, KeInitializeDpc, KeInitializeTimerEx, KeSetTimerEx, KeCancelTimer, MmGetPhysicalAddress, memset (all exported by the Windows 2000 SP4 kernels)",
+  "use": "Windows 2000 text-mode Setup with ACPI on: $WIN_NT$.~BT\\BOOTVID.DLL only (tools/w2k_stage.sh 8.)",
+  "files": {
+    "bin/i386/bootvid.dll": "577ba9de4791d6cb6b292749b6de53127effe6d298841df68f16e7b91645f552",
+    "build.cmd": "ee5bf215f013f4bf3915ec78925ffb4b6734e4944fd4f2eb62ca22298442f6b0",
+    "src/usosvid.c": "d75871d2bb7e0db179c752f78fc2564c734ade1fc0649bcb0345e4c89ac76947",
+    "src/usos_watcher.h": "873a54950e14e99d09a3cab48d76532ab0af9227509d558879148b03400317da",
+    "src/usosvid.def": "dbbf9892496612f965b2846063a3307788404bb41116a6f5b910bbfe32c67357",
+    "src/sources": "5ba2ab894680c5433e56282cb84462932fd762af725435132ad90a7467deb798",
+    "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
+    "bin/i386-diag/bootvid.dll": "e53dd38178aa4199d3712256ca70b6a19f40dfd81dab6d4f0249cd404f89cfa6",
+    "src/sources.diag": "069b593f5b2a659e4abcf6c1ee9fb4432516ce96818460e1a1a0cd7ccb60552a",
+    "src/usos_nmi.c": "3cacdac6020accb78fcbb7718269122473ed9ae7d2389b5a91ad8210532c7de8",
+    "src/usos_nmi.h": "37b23e1b48f9f14db4b9cb35a4cc50d45bcbf599db4d77ab0efc2c4f4ec4bdfd"
+  },
+  "watcher": "1.3: with CSMWrap 3.1.2-usos10 (Windows 2000 ACPI flow) publishes the physical addresses of KeTickCount and KUSER_SHARED_DATA plus heartbeat-DPC entry/draw counters and the timer-arm state into the reserved watcher page whose address CSMWrap leaves at BDA 4FCh; the CSMWrap helper core shows them on text row 24 (src/usos_watcher.h = the ABI header of CSMWrap patch 0011). Console rows 16-23. Since CSMWrap 3.1.2-usos11 (production) there is no watcher page: WatchInit finds no magic at BDA 4FCh and does nothing; the diagnostic CSMWrap 3.1.2-usos11-diag keeps it.",
+  "diag": "1.3-diag (2026-10-17): build.cmd <work> diag compiles src/sources.diag (USOS_VID_DIAG): Codex's one-shot BSP NMI snapshot (src/usos_nmi.c/.h, its \"1.11-nmi\" code unchanged) and the HPET/GPIO _STA signature rows (hs/gs). Only for the Windows 2000 diagnostic setup (DATA ...\\Unattended\\w2k-diag.txt): ~BT and ~LS, with CSMWrap 3.1.2-usos11-diag. The production bin/i386/bootvid.dll is built without USOS_VID_DIAG; usosvid.c without it preprocesses to the 1.3 source (blank lines aside). Built with WDK 7.1, not byte-reproducible."
+}

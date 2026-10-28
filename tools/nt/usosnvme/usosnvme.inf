@@ -1,0 +1,57 @@
+; usosnvme.inf - USOS NVMe SCSI miniport (Windows 2000 / XP / Server 2003 x86)
+; Copyright (C) 2026 Maksymilian and the USOS Authors, GPL-3.0-or-later.
+; Polled ScsiPort miniport for NVM Express controllers (PCI class 01-08-02).
+
+[Version]
+Signature="$Windows NT$"
+Class=SCSIAdapter
+ClassGUID={4D36E97B-E325-11CE-BFC1-08002BE10318}
+Provider=%USOS%
+DriverVer=10/11/2026,1.0.0.0
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+usosnvme.sys = 1
+
+[Manufacturer]
+%USOS% = Nvme_Models
+
+[Nvme_Models]
+%Nvme.DeviceDesc% = Nvme_Inst, PCI\CC_010802
+
+[Nvme_Inst]
+CopyFiles = Nvme_CopyFiles
+
+[Nvme_CopyFiles]
+usosnvme.sys
+
+[Nvme_Inst.Services]
+AddService = usosnvme, 0x00000002, Nvme_Service, Nvme_EventLog
+
+[Nvme_Service]
+ServiceType    = 1
+StartType      = 0
+ErrorControl   = 1
+ServiceBinary  = %12%\usosnvme.sys
+LoadOrderGroup = SCSI miniport
+AddReg         = Nvme_AddReg
+
+[Nvme_AddReg]
+HKR, "Parameters\PnpInterface", "5", 0x00010001, 0x00000001
+
+[Nvme_EventLog]
+AddReg = Nvme_EventLog_AddReg
+
+[Nvme_EventLog_AddReg]
+HKR,,EventMessageFile,0x00020000,"%%SystemRoot%%\System32\IoLogMsg.dll"
+HKR,,TypesSupported,0x00010001,7
+
+[Strings]
+USOS            = "Universal Service OS"
+Nvme.DeviceDesc = "USOS NVM Express Controller"
+DiskName        = "USOS NVMe driver"

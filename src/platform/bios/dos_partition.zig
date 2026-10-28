@@ -20,7 +20,9 @@ pub fn repairLayout(before: *const [512]u8) bool {
 }
 pub fn plan(drive: u8, source: u8, sectors: u32, gib: u32, before: [512]u8) !Plan {
     if (drive < 0x80 or drive > 0x8f or drive == source) return error.UnsafeDosTarget;
-    if (gib != 2 and gib != 4 and gib != 8) return error.InvalidDosPartitionSize;
+    // Windows 9x FAT32: 32 GiB keeps every tool (16-bit ScanDisk, FDISK) and
+    // the LBA28 / 137 GB boot limit comfortably out of reach.
+    if (gib != 2 and gib != 4 and gib != 8 and gib != 32) return error.InvalidDosPartitionSize;
     const wanted = gib * 2 * 1024 * 1024;
     if (sectors < wanted + 2048 + 34) return error.DosTargetTooSmall;
     return .{ .drive = drive, .source_drive = source, .disk_sectors = sectors, .partition_sectors = wanted, .before = before };

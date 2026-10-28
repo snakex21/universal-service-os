@@ -1,0 +1,100 @@
+; usosnet.inf - USOS own Ethernet driver (usosnet.sys, NDIS 5.0 miniport)
+; for Windows 2000 / XP / Server 2003 x86 (the same binary as on 9x).
+; Copyright (C) 2026 Maksymilian and the USOS Authors
+; SPDX-License-Identifier: GPL-3.0-or-later
+
+[Version]
+Signature="$Windows NT$"
+Class=Net
+ClassGUID={4d36e972-e325-11ce-bfc1-08002be10318}
+Provider=%USOS%
+DriverVer=10/20/2026,0.5.0.0
+
+[Manufacturer]
+%Intel%=Intel
+
+[ControlFlags]
+ExcludeFromSelect=*
+
+[Intel]
+%I211.DeviceDesc%=USOSNET.ndi, PCI\VEN_8086&DEV_1539
+%I210.DeviceDesc%=USOSNET.ndi, PCI\VEN_8086&DEV_1533
+%I210FL.DeviceDesc%=USOSNET.ndi, PCI\VEN_8086&DEV_157B
+%82576.DeviceDesc%=USOSNET.ndi, PCI\VEN_8086&DEV_10C9
+
+[USOSNET.ndi.NT]
+Characteristics=0x84
+BusType=5
+AddReg=USOSNET.reg, USOSNET.params.reg
+CopyFiles=USOSNET.CopyFiles
+
+[USOSNET.ndi.NT.Services]
+AddService=usosnet, 2, USOSNET.Service, USOSNET.EventLog
+
+[USOSNET.reg]
+HKR,Ndi,Service,0,"usosnet"
+HKR,Ndi\Interfaces,UpperRange,0,"ndis5"
+HKR,Ndi\Interfaces,LowerRange,0,"ethernet"
+
+[USOSNET.params.reg]
+HKR,Ndi\params\PollMode,ParamDesc,,"Poll mode (no interrupt, diagnostics)"
+HKR,Ndi\params\PollMode,type,,enum
+HKR,Ndi\params\PollMode,default,,"0"
+HKR,Ndi\params\PollMode\enum,"0",,"Off"
+HKR,Ndi\params\PollMode\enum,"1",,"On"
+HKR,,PollMode,0,"0"
+HKR,Ndi\params\SkipPhy,ParamDesc,,"Skip PHY setup (diagnostics)"
+HKR,Ndi\params\SkipPhy,type,,enum
+HKR,Ndi\params\SkipPhy,default,,"0"
+HKR,Ndi\params\SkipPhy\enum,"0",,"Off"
+HKR,Ndi\params\SkipPhy\enum,"1",,"On"
+HKR,,SkipPhy,0,"0"
+HKR,Ndi\params\DebugPort,ParamDesc,,"Debug I/O port (decimal; 233 = E9h in QEMU; 0 = off)"
+HKR,Ndi\params\DebugPort,type,,dword
+HKR,Ndi\params\DebugPort,default,,"0"
+HKR,Ndi\params\DebugPort,min,,"0"
+HKR,Ndi\params\DebugPort,max,,"65535"
+HKR,,DebugPort,0,"0"
+HKR,Ndi\params\NetworkAddress,ParamDesc,,"Network Address"
+HKR,Ndi\params\NetworkAddress,type,,edit
+HKR,Ndi\params\NetworkAddress,LimitText,,"12"
+HKR,Ndi\params\NetworkAddress,UpperCase,,"1"
+HKR,Ndi\params\NetworkAddress,optional,,"1"
+HKR,Ndi\params\NetworkAddress,default,,""
+
+[USOSNET.Service]
+DisplayName=%ServiceName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\usosnet.sys
+LoadOrderGroup=NDIS
+
+[USOSNET.EventLog]
+AddReg=USOSNET.EventLog.reg
+
+[USOSNET.EventLog.reg]
+HKR,,EventMessageFile,0x00020000,"%%SystemRoot%%\System32\netevent.dll"
+HKR,,TypesSupported,0x00010001,7
+
+[USOSNET.CopyFiles]
+usosnet.sys,,,2
+
+[DestinationDirs]
+DefaultDestDir=12
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[SourceDisksFiles]
+usosnet.sys=1
+
+[Strings]
+USOS="Universal Service OS"
+Intel="Intel"
+DiskName="USOS network driver (usosnet)"
+ServiceName="USOS Ethernet miniport (usosnet)"
+I211.DeviceDesc="Intel(R) I211 Gigabit Network Connection (USOS usosnet)"
+I210.DeviceDesc="Intel(R) I210 Gigabit Network Connection (USOS usosnet)"
+I210FL.DeviceDesc="Intel(R) I210 Gigabit Network Connection, flashless (USOS usosnet)"
+82576.DeviceDesc="Intel(R) 82576 Gigabit Network Connection (USOS usosnet)"

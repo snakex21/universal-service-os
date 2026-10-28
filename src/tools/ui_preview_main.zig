@@ -51,23 +51,47 @@ pub fn main(init: std.process.Init) !u8 {
         .{ .key = "Esc", .label = ui.t(.key_power) },
     };
 
+    // The UEFI home: 7 categories + Power (src/catalog/categories.zig). The
+    // macOS tile uses media/UI/Icons/Systems/macos.png when run from the repo
+    // root and is disabled until the add-on registers entries.
+    var macos_icon: gui.RgbaImage = .{};
+    var macos_pixels: ?[]const u8 = null;
+    if (cwd.readFileAlloc(io, "media/UI/Icons/Systems/macos.png", init.gpa, .limited(gui.png_rgba.max_compressed_bytes))) |png| {
+        defer init.gpa.free(png);
+        const scratch = try init.gpa.create(gui.png_rgba.Scratch);
+        defer init.gpa.destroy(scratch);
+        if (gui.png_rgba.decodeIcon(png, &macos_icon, scratch)) macos_pixels = &macos_icon.pixels;
+    } else |_| {}
+    const macos_ready = usos.catalog.categories.macosAddonInstalled();
     const home_items = [_]gui.menu_screens.HomeItem{
         .{ .icon = .windows, .title = "Windows", .description = ui.t(.category_windows_desc) },
         .{ .icon = .terminal, .title = "Linux", .description = ui.t(.category_linux_desc) },
         .{ .icon = .flask, .title = ui.t(.category_beta), .description = ui.t(.category_beta_desc) },
         .{ .icon = .floppy, .title = "DOS", .description = ui.t(.category_dos_desc) },
+        .{ .icon = .disc, .image = macos_pixels, .title = "macOS", .description = ui.t(if (macos_ready) .category_macos_desc else .category_macos_addon), .enabled = macos_ready },
+        .{ .icon = .disc, .title = ui.t(.category_others), .description = ui.t(.category_others_desc) },
         .{ .icon = .gear, .title = ui.t(.category_utilities), .description = ui.t(.category_utilities_desc) },
         .{ .icon = .power, .title = ui.t(.category_power), .description = ui.t(.category_power_desc) },
     };
     gui.menu_screens.home(&ui, header, &home_items, 0, 3, &hints);
     try save(io, cwd, init.gpa, out_dir, "01-home", pixels, width, height);
+    gui.menu_screens.home(&ui, header, &home_items, 4, null, &hints);
+    try save(io, cwd, init.gpa, out_dir, "01b-home-macos-selected", pixels, width, height);
+    const macos_lines = [_][]const u8{ ui.t(.macos_addon_line1), ui.t(.macos_addon_line2), ui.t(.macos_addon_line3) };
+    gui.menu_screens.notice(&ui, header, .{ .title = ui.t(.macos_addon_title), .icon = .info, .heading = ui.t(.macos_addon_heading), .lines = &macos_lines, .hints = &hints });
+    try save(io, cwd, init.gpa, out_dir, "01c-macos-addon-info", pixels, width, height);
 
     var count_buffer: [48]u8 = undefined;
+    // architecture chips (src/gui/arch_badge.zig): system rows show the
+    // architectures of the ISOs probed in this session
+    const arch = gui.arch_badge;
+    const win11_chips = [_]gui.ui.Badge{arch.badge(.x64).?};
+    const win7_chips = [_]gui.ui.Badge{ arch.badge(.x86).?, arch.badge(.x64).? };
     const rows = [_]gui.ui.Row{
-        .{ .title = "Windows 11", .detail = ui.format(&count_buffer, .system_image_count, &.{"2"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success } },
+        .{ .title = "Windows 11", .detail = ui.format(&count_buffer, .system_image_count, &.{"2"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success }, .chips = &win11_chips },
         .{ .title = "Windows 10", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_no_image) }, .enabled = false },
         .{ .title = "Windows 8.1", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .enabled = false },
-        .{ .title = "Windows 7", .detail = ui.format(&count_buffer, .system_image_count, &.{"1"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success } },
+        .{ .title = "Windows 7", .detail = ui.format(&count_buffer, .system_image_count, &.{"1"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success }, .chips = &win7_chips },
         .{ .title = "Windows Vista", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .enabled = false },
         .{ .title = "Windows XP", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_requires_bios), .tone = .warning }, .enabled = false },
         .{ .title = "Windows XP UEFI-CSM PAE", .detail = "Images: 1", .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.badge_experimental), .tone = .warning } },
@@ -75,6 +99,14 @@ pub fn main(init: std.process.Init) !u8 {
     };
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hover = 3, .hints = &hints }, 0);
     try save(io, cwd, init.gpa, out_dir, "02-systems", pixels, width, height);
+
+    const images = [_]gui.ui.Row{
+        .{ .title = "pl_windows_7_ultimate_with_sp1_x86_dvd_u_677455.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.x86) },
+        .{ .title = "Windows 7 Ultimate SP1 PL x64.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.x64) },
+        .{ .title = "Windows 7 AIO x86 x64.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.multi) },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows 7", .subtitle = ui.t(.images_subtitle), .rows = &images, .selected = 0, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "02b-images", pixels, width, height);
 
     // UEFI with Secure Boot on: rows that need Secure Boot off or BIOS stay
     // selectable and explain themselves in the help panel.

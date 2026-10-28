@@ -48,6 +48,9 @@ pub const Setting = struct {
     until: Level = .windows_11,
     /// Only on client editions (not in the Server shell of that level).
     client_only: bool = false,
+    /// Only on Server editions (the Server Manager / Initial Configuration
+    /// Tasks components).
+    server_only: bool = false,
 };
 
 const winpe_intl = "Microsoft-Windows-International-Core-WinPE";
@@ -57,6 +60,8 @@ const shell = "Microsoft-Windows-Shell-Setup";
 const deployment = "Microsoft-Windows-Deployment";
 const wer = "Microsoft-Windows-ErrorReportingCore";
 const lua = "Microsoft-Windows-LUA-Settings";
+const server_manager = "Microsoft-Windows-ServerManager-SvrMgrNc";
+const ict = "Microsoft-Windows-OutOfBoxExperience";
 
 pub const settings = [_]Setting{
     // windowsPE
@@ -79,6 +84,11 @@ pub const settings = [_]Setting{
     .{ .pass = .specialize, .component = shell, .path = "RegisteredOwner" },
     .{ .pass = .specialize, .component = shell, .path = "RegisteredOrganization" },
     .{ .pass = .specialize, .component = shell, .path = "TimeZone" },
+    // Tweak display (explicit resolution): Windows keeps its own mode when
+    // the adapter lacks the requested one.
+    .{ .pass = .specialize, .component = shell, .path = "Display/ColorDepth" },
+    .{ .pass = .specialize, .component = shell, .path = "Display/HorizontalResolution" },
+    .{ .pass = .specialize, .component = shell, .path = "Display/VerticalResolution" },
     .{ .pass = .specialize, .component = shell, .path = "ShowWindowsLive", .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Order" },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Path" },
@@ -86,7 +96,23 @@ pub const settings = [_]Setting{
     // Tweak disable_uac on 7 / 2008 R2 (8+ Store apps need UAC; Vista SP2
     // Setup refused the value, Vista gets the registry value as a command).
     .{ .pass = .specialize, .component = lua, .path = "EnableLUA", .since = .windows_7, .until = .windows_7 },
+    // Server: Server Manager (2008 R2+) and Initial Configuration Tasks
+    // (2008 / 2008 R2) do not open at the first logon.
+    .{ .pass = .specialize, .component = server_manager, .path = "DoNotOpenServerManagerAtLogon", .since = .windows_7, .server_only = true },
+    .{ .pass = .specialize, .component = ict, .path = "DoNotOpenInitialConfigurationTasksAtLogon", .until = .windows_7, .server_only = true },
+    // Typed option workgroup (options.zig).
+    .{ .pass = .specialize, .component = "Microsoft-Windows-UnattendedJoin", .path = "Identification/JoinWorkgroup" },
     // oobeSystem
+    // Typed option autologon (options.zig).
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Enabled" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/LogonCount" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Username" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/Value" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/PlainText" },
+    // Typed option user_script (options.zig).
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/Order" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/CommandLine" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/Description" },
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "UILanguage" },
@@ -119,6 +145,7 @@ pub const Tweak = enum {
     theme_basic,
     no_balloon_tips,
     display,
+    display_bpp,
     disable_uac,
     no_sidebar,
     no_welcome_center,
@@ -143,7 +170,7 @@ const xp_2003 = &[_]Family{ .windows_xp, .windows_2003 };
 /// Which versions render each tweak. Everything else ignores it (the
 /// editor does not offer it there, the renderers write nothing): never a
 /// setting, component, Setup component name or command a version lacks.
-/// Windows 2000 has none (no reg.exe in the base system).
+/// Windows 2000 display requests use the USOS setup-end tools.
 pub const tweak_support = [_]TweakSupport{
     // XP [Components]; Vista pkgmgr / 7 DISM: the InboxGames feature.
     .{ .tweak = .skip_games, .nt5 = &.{.windows_xp}, .since = .vista, .until = .windows_7, .client_only = true },
@@ -155,7 +182,10 @@ pub const tweak_support = [_]TweakSupport{
     .{ .tweak = .theme_classic, .nt5 = &.{.windows_xp}, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .theme_basic, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .no_balloon_tips, .nt5 = xp_2003 },
-    .{ .tweak = .display, .nt5 = xp_2003 },
+    // 6.x+: an explicit resolution as Shell-Setup Display (specialize);
+    // Vista/7 also stage USOSRES on the CSMWrap paths (autounattend.zig).
+    .{ .tweak = .display, .nt5 = &.{ .windows_2000, .windows_xp, .windows_2003 }, .since = .vista },
+    .{ .tweak = .display_bpp, .nt5 = &.{.windows_2000} },
     .{ .tweak = .disable_uac, .since = .vista, .until = .windows_7 },
     .{ .tweak = .no_sidebar, .since = .vista, .until = .windows_7, .client_only = true },
     // Windows 7 no longer opens Getting Started at logon.
@@ -192,7 +222,9 @@ pub fn tweakOn(p: *const @import("profile.zig").Profile, tweak: Tweak, family: F
     const on = switch (tweak) {
         .theme_classic => p.theme == .classic,
         .theme_basic => p.theme == .basic,
-        .display => p.display != .auto,
+        // keep is no resolution: nothing for Setup ([Display] / <Display>).
+        .display => p.display.size() != null,
+        .display_bpp => p.display_bpp != .auto,
         inline else => |t| @field(p, @tagName(t)),
     };
     return on and tweakAvailable(tweak, family);
@@ -214,6 +246,7 @@ fn allowed(pass: Pass, component: []const u8, path: []const u8, family: Family) 
         known = true;
         if (@intFromEnum(level) < @intFromEnum(s.since) or @intFromEnum(level) > @intFromEnum(s.until)) continue;
         if (s.client_only and family.server()) continue;
+        if (s.server_only and !family.server()) continue;
         return;
     }
     return if (known) error.NotForThisVersion else error.UnknownSetting;
@@ -332,14 +365,15 @@ test "schema: every family renders only settings its version has" {
     }
 }
 
-test "schema: every tweak has one support row; 2000 has none" {
+test "schema: every tweak has one support row; 2000 exposes only display" {
     inline for (@typeInfo(Tweak).@"enum".fields) |f| {
         var rows: usize = 0;
         for (tweak_support) |entry| {
             if (entry.tweak == @as(Tweak, @enumFromInt(f.value))) rows += 1;
         }
         try std.testing.expectEqual(@as(usize, 1), rows);
-        try std.testing.expect(!tweakAvailable(@enumFromInt(f.value), .windows_2000));
+        const tweak: Tweak = @enumFromInt(f.value);
+        try std.testing.expectEqual(tweak == .display or tweak == .display_bpp, tweakAvailable(tweak, .windows_2000));
     }
     try std.testing.expect(tweakAvailable(.skip_games, .windows_7));
     try std.testing.expect(!tweakAvailable(.skip_games, .server_2008_r2));
@@ -378,6 +412,22 @@ test "schema: Vista and 7 reject later OOBE settings" {
     try check(lua_setting, .windows_7, null);
     try std.testing.expectError(error.NotForThisVersion, check(lua_setting, .vista, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .server_2008_r2, null));
+    const server_manager_setting =
+        \\<unattend><settings pass="specialize"><component name="Microsoft-Windows-ServerManager-SvrMgrNc">
+        \\<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon></component></settings></unattend>
+    ;
+    try check(server_manager_setting, .server_2008_r2, null);
+    try check(server_manager_setting, .server_2012_r2, null);
+    try std.testing.expectError(error.NotForThisVersion, check(server_manager_setting, .windows_8_1, null));
+    try std.testing.expectError(error.NotForThisVersion, check(server_manager_setting, .server_2008, null));
+    const ict_setting =
+        \\<unattend><settings pass="specialize"><component name="Microsoft-Windows-OutOfBoxExperience">
+        \\<DoNotOpenInitialConfigurationTasksAtLogon>true</DoNotOpenInitialConfigurationTasksAtLogon></component></settings></unattend>
+    ;
+    try check(ict_setting, .server_2008_r2, null);
+    try check(ict_setting, .server_2008, null);
+    try std.testing.expectError(error.NotForThisVersion, check(ict_setting, .server_2012_r2, null));
+    try std.testing.expectError(error.NotForThisVersion, check(ict_setting, .windows_7, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .vista, null));
     const misplaced =
         \\<unattend><settings pass="windowsPE"><component name="Microsoft-Windows-Shell-Setup">

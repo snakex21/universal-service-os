@@ -12,6 +12,7 @@ from build_windows7_nvme import read_assets, build_helpers as build_nvme_helpers
 from build_windows7_sha2 import read_cab as read_sha2_cab, CAB_NAME as SHA2_CAB_NAME
 from build_windows7_kmdf import read_cab as read_kmdf_cab, CAB_NAME as KMDF_CAB_NAME
 from build_windows_vista_support import build as build_vista_support
+from build_usosnvme_nt6_signed import build as build_usosnvme_nt6_signed
 
 
 def build(root: Path):
@@ -52,7 +53,12 @@ def build(root: Path):
     shutil.copyfile(wimboot, out / 'wimboot')
     build_stock_support(root, out)
     build_modern_support(root, out)
-    build_vista_support(root)
+    # Vista / Server 2008 SP2 x64 on NVMe (docs/vista-x64-nvme-2026-10-21.md):
+    # the amd64 usosnvme, test-signed per build like the x86 NT6 package
+    # (private key deleted after signing); the x64 profile runs in test mode.
+    nvme64 = root / 'zig-out/windows-source-mount/usosnvme-nt6-amd64'
+    build_usosnvme_nt6_signed(root, nvme64, arch='amd64')
+    build_vista_support(root, nvme_package=nvme64)
     print('[PASS] Native Windows support:', (out / 'support.cpio').stat().st_size, 'bytes')
 
 
@@ -88,6 +94,13 @@ def build_stock_support(root: Path, out: Path):
         # WIMBoot treats .efi files as boot applications rather than injected
         # WinPE files. Transport target-only EFI assets under neutral names.
         writer.add_file('usos-win7-wrapper.bin', helpers / 'win7-wrapper.efi')
+        # USOSRES for the native-resolution experiment (staged only with
+        # usos-native-res.flag; built by the micro-Linux step).
+        usos_res = root / 'zig-out/windows-usos-res/USOSRES.EXE'
+        if not usos_res.is_file():
+            from build_windows_usos_res import build as build_usos_res
+            usos_res = build_usos_res(root, root / 'zig-out/windows-usos-res')
+        writer.add_file('usos-res.exe', usos_res)
         writer.add_file('usos-win7-video.bin', vendor / 'UefiSeven.efi')
         writer.add_file('uefiseven-LICENSE.txt', vendor / 'LICENSE.txt')
         writer.add_bytes('UefiSeven.ini', b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=0\r\nforce_fakevesa=0\r\n')
@@ -113,11 +126,73 @@ def build_modern_support(root: Path, out: Path):
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86_64-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_modern_uefi_finalize.c'),
                     '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-o', str(helpers / 'usos-modern-finalize.exe')], env=env, check=True)
+    # 32-bit Windows 8.1 / 10 without CSM (win-x86-uefi-csmwrap): the ISO's own
+    # x86 WinPE in BIOS mode; micro-Linux step 610 injects this archive too.
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_x86_csmwrap.c'),
+                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-lversion', '-ladvapi32', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
+    # 32-bit Vista / Server 2008 SP2 on that path: the Vista OOBE gate (WinSAT
+    # guard, interrupted-OOBE recovery, autochk limit) as an x86 build that
+    # hands over to native windeploy (no USB payload); usos-x86-csmwrap.cmd
+    # installs it as C:/USOS/oobe.exe (csmwrap-integration 12.5).
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-DUSOS_GATE_NATIVE_DEPLOY', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_vista_oobe_gate.c'),
+                    '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
+    # 32-bit 7 / 8.x / 10 before 1703 on that path: usos-usbreenum (USB
+    # mass-storage device nodes after Setup, run once from SetupComplete.cmd;
+    # usos-x86-csmwrap.cmd :usbfix). Runs in the installed Windows, so the
+    # Windows 7 / Vista subsystem version.
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_usb_reenum.c'),
+                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lsetupapi', '-lcfgmgr32', '-o', str(helpers / 'usos-usbreenum.exe')], env=env, check=True)
+    # Vista / 7 x86 with the bundled usosusb: tells Explorer about the
+    # stick letters usosusb's legacy volumes get (no PnP broadcast) and logs
+    # them; installed by the usosusb step (:usb_drive_notify, HKLM Run).
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-Wno-missing-declarations', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_drive_notify.c'),
+                    '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-luser32', '-lshell32', '-ladvapi32',
+                    '-o', str(helpers / 'usos-drivenotify.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_nvme_modern.c'), '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lcrypt32', '-lshell32',
+                    '-o', str(helpers / 'usos-nvme-modern.exe')], env=env, check=True)
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:
         writer.add_bytes('usos-modern-uefi.cmd', (root / 'tools/windows_modern_uefi_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
+        writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
+        writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
+        # Vista / Server 2008 SP2 and Windows 7 SP1 x86: own xHCI driver
+        # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
+        # offline by the nt60_usb step (Win7: only without another xHCI
+        # driver). HID and bulk-only disks need no external DATA package.
+        writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
+        writer.add_file('usos-drivenotify.exe', helpers / 'usos-drivenotify.exe')
+        # Windows 7 / 8.x / 10 before 1703 x86: own USB multi-partition disk
+        # filter (committed x86 build of tools/nt/usosmpart), registered
+        # offline by the mpart step of usos-x86-csmwrap.cmd.
+        writer.add_file('usosmpart-x86.sys', root / 'tools/nt/usosmpart/bin/i386/usosmpart.sys')
+        writer.add_file('usos-usbreenum.exe', helpers / 'usos-usbreenum.exe')
+        # NVMe target, Windows 7 / Vista / Server 2008 x86: own SCSIPORT
+        # miniport (2KXP build of tools/nt/usosnvme; imports checked against
+        # NT 6.0 SP2 in tools/tests/test_usosnvme.py), registered offline by
+        # the nvme step of usos-x86-csmwrap.cmd (docs/nvme-nt6-2026-10-12.md).
+        # Signed per build (sys + catalog) with a certificate whose private
+        # key is deleted right after signing; the installed system trusts
+        # only that certificate, so specialize stages / installs the package
+        # silently instead of the NULL driver (section 9).
+        signed = helpers / 'usosnvme-nt6'
+        build_usosnvme_nt6_signed(root, signed)
+        writer.add_file('usosnvme-nt6.sys', signed / 'usosnvme.sys')
+        for name in ('usosnvme.inf', 'usosnvme.cat', 'usosnvme.cer'):
+            writer.add_file(name, signed / name)
+        modern_signed = helpers / 'usosnvme-modern'
+        build_usosnvme_nt6_signed(root, modern_signed, modern=True)
+        for name in ('usosnvme.inf', 'usosnvme.sys', 'usosnvme.cat', 'usosnvme.cer'):
+            writer.add_file('modern-' + name, modern_signed / name)
+        writer.add_file('usos-nvme-modern.exe', helpers / 'usos-nvme-modern.exe')
+        writer.add_bytes('usos-nvme-modern.cmd', (root / 'tools/windows_nvme_modern.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

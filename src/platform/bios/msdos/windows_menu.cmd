@@ -1,5 +1,11 @@
 @echo off
-if not exist C:\WINDOWS\WIN.COM goto missing
+if exist C:\WINDOWS\WIN.COM goto have_win
+rem Windows 3.0 after W1AUTO.BAT renamed WIN.COM (C:\WINDOWS\WIN.BAT).
+if exist C:\WINDOWS\WIN30.COM goto have_win
+if exist C:\WIN386\WIN386.EXE goto have_win
+if exist C:\WINDOWS\WIN386.EXE goto have_win
+goto missing
+:have_win
 if not exist C:\USOSW3\W3CONFIG.SYS goto missing
 if not exist C:\USOSW3\W3AUTO.BAT goto missing
 if exist C:\USOSW3\MENU.TAG goto ready
@@ -50,28 +56,40 @@ echo Windows standard mode will start automatically after 8 seconds.
 echo Previous configuration: C:\USOSW3\*.OLD
 echo.
 if not exist C:\DOS\REBOOT.COM goto manual_restart
-echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
-echo.
 path C:\DOS;C:\WINDOWS;C:\PROGRAMS
 prompt $p$g
 C:
 cd \
+if not exist C:\DOS\CHOICE.COM goto prefill_reboot
+echo R - restart now (automatic after 5 seconds)
+echo A - stay in MS-DOS (type REBOOT later to restart)
+echo.
+C:\DOS\CHOICE.COM /C:RA /T:R,5 Restart now
+if errorlevel 2 goto stay_dos
+C:\DOS\REBOOT.COM
+goto end
+:stay_dos
+echo Type REBOOT and press Enter to restart. Do not run WIN in this session.
+goto end
+:prefill_reboot
+echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
+echo.
 C:\DOS\REBOOT.COM /P
 goto end
 :manual_restart
 echo Restart the computer to open the menu. Do not run WIN in this session.
 goto end
 :missing
-echo USOS: brakuje plikow Windows lub menu. Nie zmieniono konfiguracji.
+echo USOS: Windows files or the menu are missing. The configuration was not changed.
 goto end
 :failed
 if exist C:\USOSW3\MENU.TAG del C:\USOSW3\MENU.TAG
-echo USOS: zapis menu nie powiodl sie. Przywracanie konfiguracji.
+echo USOS: writing the menu failed. Restoring the configuration.
 if exist C:\USOSW3\CONFIG.OLD copy C:\USOSW3\CONFIG.OLD C:\CONFIG.SYS /y
 if exist C:\USOSW3\AUTOEXEC.OLD copy C:\USOSW3\AUTOEXEC.OLD C:\AUTOEXEC.BAT /y
 if exist C:\USOSW3\W3INI.OK goto restore_done
 if exist C:\USOSW3\SYSTEM.OLD copy C:\USOSW3\SYSTEM.OLD C:\WINDOWS\SYSTEM.INI /y
 :restore_done
 if exist C:\WINDOWS\SMARTDRV.EXE C:\WINDOWS\SMARTDRV.EXE /C
-echo Sprawdz bledy zapisu. Zrestartuj komputer, aby ponowic probe.
+echo Check for write errors. Restart the computer to try again.
 :end

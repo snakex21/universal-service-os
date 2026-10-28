@@ -18,6 +18,11 @@ const icons = @import("icons.zig");
 const lang_file = @import("../i18n/lang_file.zig");
 const rgba_image = @import("rgba_image.zig");
 
+/// Solid chips (Badge.fill, Row.chips) are drawn only by 64-bit builds: the
+/// micro-Linux disk pickers use them; the i386 Legacy BIOS Core has a fixed
+/// size budget and never shows them.
+const solid_chips = @import("builtin").cpu.arch != .x86;
+
 pub const Fonts = text.Fonts;
 pub const Style = text.Style;
 pub const Key = lang_file.Key;
@@ -55,6 +60,11 @@ pub const Badge = struct {
     /// as "tested in a VM"; the details pane carries the words). `text`
     /// and `tone` are ignored.
     dot: bool = false,
+    /// A solid chip in this colour instead of the tone's soft fill (disk
+    /// bus chips, src/platform/linux/fb_disk_badge.zig); the label takes
+    /// whichever of the theme's text and background colours (or white and
+    /// black) contrasts more with it.
+    fill: ?Color = null,
 };
 
 pub const HeaderInfo = struct {
@@ -185,6 +195,10 @@ pub const Row = struct {
     detail: []const u8 = "",
     icon: RowIcon = .none,
     badge: ?Badge = null,
+    /// Chips drawn right-aligned in this order left to right (disk bus and
+    /// media in the disk pickers); a chip that would squeeze the title
+    /// below 120 px is left out.
+    chips: []const Badge = &.{},
     enabled: bool = true,
 };
 
@@ -524,13 +538,22 @@ pub const Ui = struct {
         const h = self.px(24);
         const x = right -| w;
         const y = center_y -| (h / 2);
-        const colors = self.toneColors(badge.tone);
+        const colors: ToneColors = if (!solid_chips) self.toneColors(badge.tone) else if (badge.fill) |fill| .{ .fill = fill, .text = self.textOn(fill) } else self.toneColors(badge.tone);
         paint.roundRect(self.surface, x, y, w, h, h / 2, colors.fill, background);
         self.fonts.drawCentered(self.surface, x + w / 2, self.fonts.centeredTop(.small, center_y), .small, badge.text, colors.text, colors.fill);
         return x;
     }
 
-    pub fn toneColors(self: *const Ui, tone: Tone) struct { fill: Color, text: Color } {
+    /// Label colour on a solid chip: the theme's text or background colour,
+    /// whichever contrasts more; plain white or black when neither reaches
+    /// WCAG 4.5:1 (odd custom themes).
+    pub fn textOn(self: *const Ui, fill: Color) Color {
+        return readableOn(self.theme, fill);
+    }
+
+    pub const ToneColors = struct { fill: Color, text: Color };
+
+    pub fn toneColors(self: *const Ui, tone: Tone) ToneColors {
         const theme = self.theme;
         return switch (tone) {
             .neutral => .{ .fill = theme.panel_alt, .text = theme.muted },
@@ -557,6 +580,8 @@ pub const Ui = struct {
         return .{ .x = body.x + column * (card_w + gap), .y = body.y + row_index * (card_h + gap), .w = card_w, .h = card_h };
     }
 
+    /// The plain category card (vector icon, always enabled). The Legacy
+    /// BIOS Core draws only this one; the UEFI menu uses homeCardWith.
     pub fn homeCard(self: *const Ui, rect: Rect, icon: Icon, title: []const u8, description: []const u8, state: RowState) void {
         const theme = self.theme;
         const fill = switch (state) {
@@ -599,6 +624,68 @@ pub const Ui = struct {
             y += self.fonts.lineHeight(.body);
         }
         icons.draw(self.surface, .chevron_right, rect.right() -| pad -| chevron, rect.y + (rect.h -| chevron) / 2, chevron, if (state == .selected) theme.accent else theme.faint, null);
+    }
+
+    pub const HomeCardLook = struct {
+        icon: Icon,
+        /// 32x32 RGBA colour icon drawn on a neutral tile instead of `icon`.
+        image: ?[]const u8 = null,
+        enabled: bool = true,
+    };
+
+    pub fn homeCardWith(self: *const Ui, rect: Rect, look: HomeCardLook, title: []const u8, description: []const u8, state: RowState) void {
+        const theme = self.theme;
+        const enabled = look.enabled;
+        const fill = switch (state) {
+            .selected => theme.accent_soft,
+            .hover => theme.panel_alt,
+            .normal => theme.panel,
+        };
+        const border = switch (state) {
+            .selected => theme.accent,
+            .hover => theme.border_strong,
+            .normal => theme.border,
+        };
+        const thickness = if (state == .selected) self.line(2) else self.line(1);
+        // Clear the previous state's outer ring first (selection is thicker).
+        self.surface.fillRect(rect.x, rect.y, rect.w, rect.h, theme.background);
+        paint.card(self.surface, rect.x, rect.y, rect.w, rect.h, self.px(10), thickness, border, fill, theme.background);
+
+        const pad = self.px(20);
+        const tile = @min(self.px(52), rect.h -| (2 * self.px(16)));
+        const tile_x = rect.x + pad;
+        const tile_y = rect.y + (rect.h -| tile) / 2;
+        if (look.image) |pixels| {
+            // Colour icons keep their own colours: a neutral tile, the
+            // image a little larger than a vector glyph.
+            const image_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent_soft else theme.panel_alt;
+            paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), image_fill, fill);
+            const size = tile * 4 / 5;
+            drawRgba(self.surface, pixels, tile_x + (tile - size) / 2, tile_y + (tile - size) / 2, size, image_fill, enabled);
+        } else {
+            const tile_fill = if (!enabled) theme.disabled else if (state == .selected) theme.accent else theme.accent_soft;
+            paint.roundRect(self.surface, tile_x, tile_y, tile, tile, self.px(10), tile_fill, fill);
+            const glyph = tile * 3 / 5;
+            const glyph_color = if (!enabled) theme.disabled_text else if (state == .selected) theme.on_accent else theme.accent;
+            icons.drawKind(self.surface, look.icon, tile_x + (tile - glyph) / 2, tile_y + (tile - glyph) / 2, glyph, glyph_color, null);
+        }
+
+        const chevron = self.px(18);
+        const text_x = tile_x + tile + self.px(18);
+        const text_right = rect.right() -| pad -| chevron -| self.px(12);
+        const text_w = text_right -| text_x;
+        const title_h = self.fonts.lineHeight(.strong);
+        var lines: [2][]const u8 = undefined;
+        const line_count = self.fonts.wrap(.body, description, text_w, &lines, null);
+        const block_h = title_h + self.px(4) + @as(u32, @intCast(line_count)) * self.fonts.lineHeight(.body);
+        var y = rect.y + (rect.h -| block_h) / 2;
+        _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .strong, title, if (enabled) theme.text else theme.muted, fill);
+        y += title_h + self.px(4);
+        for (lines[0..line_count]) |value| {
+            _ = self.fonts.drawFit(self.surface, text_x, y, text_w, .body, value, if (enabled) theme.muted else theme.disabled_text, fill);
+            y += self.fonts.lineHeight(.body);
+        }
+        if (enabled) icons.draw(self.surface, .chevron_right, rect.right() -| pad -| chevron, rect.y + (rect.h -| chevron) / 2, chevron, if (state == .selected) theme.accent else theme.faint, null);
     }
 
     // ---------------------------------------------------------------- lists
@@ -742,6 +829,16 @@ pub const Ui = struct {
                 right = self.badgeRight(right, center_y, badge, fill) -| self.px(12);
             }
         }
+        var chip_index: usize = if (solid_chips) item.chips.len else 0;
+        while (chip_index > 0) {
+            chip_index -= 1;
+            const chip = item.chips[chip_index];
+            if (self.badgeWidth(chip.text) + self.px(120) >= right -| x) break;
+            var drawn = chip;
+            if (!item.enabled) drawn = .{ .text = chip.text, .tone = .neutral };
+            right = self.badgeRight(right, center_y, drawn, fill) -| self.px(8);
+        }
+        if (solid_chips and item.chips.len > 0) right -|= self.px(4);
         const text_w = right -| x;
         const title_color = if (!item.enabled) theme.disabled_text else theme.text;
         if (item.detail.len > 0) {
@@ -1128,4 +1225,35 @@ test "pad hint keys draw as controller glyphs, other keys as key caps" {
         try std.testing.expectEqual(@as(?usize, 2), ui.footerHit(&hints, "", b_left + ui.keycapWidth("B") + ui.px(8) + ui.fonts.width(.small, "Back") + ui.px(22) + ui.px(4), cy));
         try std.testing.expect(ui.keycapWidth("LB/RB") > 2 * ui.px(24));
     }
+}
+
+/// See Ui.textOn. Contrast with linear light approximated as the squared
+/// channel (no 1 KiB sRGB table: this toolkit is also in the size-capped
+/// Legacy BIOS Core) and a margin (5.0 instead of 4.5); the real WCAG ratio
+/// for the bus colours in every built-in theme is checked by the tests
+/// (src/platform/linux/fb_disk_badge.zig).
+pub fn readableOn(theme: Theme, fill: Color) Color {
+    const white = Color{ .r = 0xff, .g = 0xff, .b = 0xff };
+    const black = Color{ .r = 0, .g = 0, .b = 0 };
+    const a = roughRatio10(theme.text, fill);
+    const b = roughRatio10(theme.background, fill);
+    if (@max(a, b) >= 50) return if (a >= b) theme.text else theme.background;
+    return if (roughRatio10(white, fill) >= roughRatio10(black, fill)) white else black;
+}
+
+fn roughRatio10(x: Color, y: Color) u32 {
+    // u32 only (the Legacy Core is i386 without 64-bit division): at most
+    // 10000 * 65025 = 650_250_000.
+    const lum = struct {
+        fn of(c: Color) u32 {
+            const r: u32 = c.r;
+            const g: u32 = c.g;
+            const b: u32 = c.b;
+            return 2126 * r * r + 7152 * g * g + 722 * b * b;
+        }
+    }.of;
+    const flare: u32 = 10000 * 65025 / 20;
+    const p = lum(x) + flare;
+    const q = lum(y) + flare;
+    return @max(p, q) / (@min(p, q) / 10);
 }

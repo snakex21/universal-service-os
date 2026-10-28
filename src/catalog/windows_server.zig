@@ -21,9 +21,123 @@ pub const entries = [_]SystemEntry{
     server("windows-server-2012-r2", "2012 R2", &methods),
     server("windows-server-2012", "2012", &methods),
     server("windows-server-2008-r2", "2008 R2", &windows7_methods),
+} ++ @import("windows_legacy.zig").uefiOnly(.{
+    // Windows Home Server 2011 (Server 2008 R2 SP1 based, x64): the
+    // Windows 7 native start (os_profiles.zig route_as windows-7). The PE10
+    // donor runs the ISO's sources\setup.exe directly, so the media's own
+    // WinPE shell (wpshell.exe: 160 GB disk minimum, disk wipe) never runs.
+    // UEFI only: the BIOS Core would start that shell.
+    SystemEntry{
+        .id = "windows-home-server-2011",
+        .name = "Windows Home Server 2011",
+        .category = .windows,
+        .family = .windows,
+        .image_directory = "\\Systems\\Windows\\Windows Home Server 2011\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows Home Server 2011\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &windows7_methods,
+        .server = true,
+    },
+}) ++ [_]SystemEntry{
     server("windows-server-2008", "2008", &methods),
     server("windows-server-2003", "2003", &nt5_methods),
-};
+} ++ (if (freestanding) [_]SystemEntry{} else [_]SystemEntry{
+    // Windows 2000 Server: the Windows 2000 flow from UEFI (os_profiles.zig
+    // route_as windows-2000, profile w2k-x86-sp4-uefi-csm) with the Server
+    // CD; the micro-Linux adds the Server answers. The BIOS Core leaves it
+    // out (size budget, no BIOS staging action for it).
+    .{
+        .id = "windows-2000-server",
+        .name = "Windows 2000 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows 2000 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows 2000 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+}) ++ [_]SystemEntry{
+    // Windows NT 4.0 Server: the Workstation flow (os_profiles.zig
+    // nt4-x86-qemu-csmwrap) with the Server CD.
+    .{
+        .id = "windows-nt-4-server",
+        .name = "Windows NT 4.0 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 4.0 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 4.0 Server\\Unattended",
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+} ++ @import("windows_legacy.zig").uefiOnly(.{
+    // Windows NT 4.0 Terminal Server Edition: the NT 4.0 Server flow
+    // (nt4-x86-qemu-csmwrap) with the TSE CD and its own service pack
+    // (docs/nt4-2026-10-07.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-4-tse",
+        .name = "Windows NT 4.0 Terminal Server Edition",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 4.0 Terminal Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 4.0 Terminal Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+    // Windows NT 3.51 Server: the NT 3.51 Workstation flow (os_profiles.zig
+    // nt3-x86-qemu-csmwrap) with the Server CD; UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-51-server",
+        .name = "Windows NT 3.51 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.51 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.51 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+    SystemEntry{
+        .id = "citrix-winframe-1-8",
+        .name = "Citrix WinFrame 1.8",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Citrix WinFrame 1.8\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Citrix WinFrame 1.8\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+    // Windows NT 3.5 Server: the NT 3.5 Workstation flow with the Server CD
+    // (docs/nt35-2026-10-09.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-5-server",
+        .name = "Windows NT 3.5 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.5 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.5 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+    // Windows NT 3.1 Advanced Server: the NT 3.1 Workstation flow with the
+    // Advanced Server CD (docs/nt31-2026-10-09.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-1-server",
+        .name = "Windows NT 3.1 Advanced Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.1 Advanced Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.1 Advanced Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+});
+
+const freestanding = @import("builtin").os.tag == .freestanding;
 
 fn server(comptime id: []const u8, comptime version: []const u8, comptime boot_methods: []const BootMethod) SystemEntry {
     const name = "Windows Server " ++ version;

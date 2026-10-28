@@ -25,6 +25,8 @@ pub const Backend = enum {
     windows_iso,
     xp_staging,
     xp_uefi_staging,
+    /// Windows 95/98/Me from UEFI: micro-Linux step 620 (CSMWrap Setup disk).
+    win9x_uefi,
     windows_bios_iso,
     win9x_dos,
     dos_bios_iso,
@@ -41,7 +43,7 @@ pub const Backend = enum {
         return switch (self) {
             .linux_iso => .any,
             .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => .bios,
-            .xp_uefi_staging, .windows_iso, .wimboot, .vhdboot, .direct_efi, .chainload => .uefi,
+            .xp_uefi_staging, .win9x_uefi, .windows_iso, .wimboot, .vhdboot, .direct_efi, .chainload => .uefi,
         };
     }
 
@@ -49,7 +51,7 @@ pub const Backend = enum {
         return switch (self) {
             .linux_iso => .direct_iso,
             .windows_iso => .direct_iso,
-            .xp_uefi_staging, .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => .direct_iso,
+            .xp_uefi_staging, .win9x_uefi, .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => .direct_iso,
             .wimboot => .wimboot,
             .vhdboot => .vhdboot,
             .direct_efi => .direct_efi,
@@ -184,21 +186,22 @@ test "Windows 10 BIOS ISO uses Windows PE without changing UEFI or other images"
     try std.testing.expectEqual(Backend.windows_iso, resolveForFirmware(win10, .iso, .direct_iso, .uefi).?);
     try std.testing.expectEqual(Backend.chainload, resolveForFirmware(win10, .iso, .chainload, .uefi).?);
     try std.testing.expect(nativeUefiIso("windows-10") and nativeUefiIso("windows-11") and nativeUefiIso("windows-7"));
-    try std.testing.expect(!nativeUefiIso("windows-8-1"));
+    try std.testing.expect(nativeUefiIso("windows-8-1") and !nativeUefiIso("windows-8"));
     try std.testing.expect(resolveForFirmware(win10, .wim, .direct_iso, .bios) == null);
     try std.testing.expect(resolveForFirmware(win10, .iso, .memdisk, .bios) == null);
     try std.testing.expectEqual(Backend.wimboot, resolveForFirmware(win10, .wim, .automatic, .bios).?);
     try std.testing.expectEqual(Backend.chainload, resolveForFirmware(systems.findById("windows-8").?, .iso, .automatic, .bios).?);
 }
 
-test "Windows 98 SE DOS backend is restricted to BIOS ISO selections" {
+test "Windows 98 SE: DOS backend on BIOS, the CSMWrap preparation from UEFI" {
     const win98 = systems.findById("windows-98-se").?;
     try std.testing.expectEqual(Backend.win9x_dos, resolveForFirmware(win98, .iso, .automatic, .bios).?);
     try std.testing.expectEqual(Backend.win9x_dos, resolveForFirmware(win98, .iso, .direct_iso, .bios).?);
     try std.testing.expectEqual(Backend.win9x_dos, resolveForFirmware(win98, .iso, .memdisk, .bios).?);
     try std.testing.expect(resolveForFirmware(win98, .img, .memdisk, .bios) == null);
     try std.testing.expect(resolveForFirmware(win98, .iso, .memdisk, .uefi) == null);
-    try std.testing.expectEqual(Backend.chainload, resolveForFirmware(win98, .iso, .automatic, .uefi).?);
+    try std.testing.expectEqual(Backend.win9x_uefi, resolveForFirmware(win98, .iso, .automatic, .uefi).?);
+    try std.testing.expect(resolveForFirmware(win98, .iso, .chainload, .uefi) == null);
 }
 
 test "MS-DOS and Windows 3.x use the FAT16 BIOS ISO backend only" {
@@ -211,6 +214,15 @@ test "MS-DOS and Windows 3.x use the FAT16 BIOS ISO backend only" {
         try std.testing.expect(resolveForFirmware(entry, .iso, .automatic, .uefi).? != .dos_bios_iso);
     }
     try std.testing.expect(resolveForFirmware(systems.findById("freedos").?, .iso, .automatic, .bios).? != .dos_bios_iso);
+}
+
+test "Windows 1.0x-3.0 and WfW 3.11: the UEFI DOS-family preparation only" {
+    for (os_profiles.windows_early_ids) |id| {
+        const entry = systems.findById(id).?;
+        try std.testing.expectEqual(Backend.win9x_uefi, resolveForFirmware(entry, .iso, .automatic, .uefi).?);
+        try std.testing.expect(resolveForFirmware(entry, .iso, .memdisk, .uefi) == null);
+        try std.testing.expect(!entry.firmware.accepts(.bios));
+    }
 }
 
 test "standalone WIM and VHD images resolve to their native Windows boot backends" {

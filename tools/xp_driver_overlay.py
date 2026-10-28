@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 DRIVERS=ROOT/'media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86'
 SEVEN=os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe')  # USOS_7Z: build kit copy
 META=('TXTSETUP.SIF','DOSNET.INF','HIVESYS.INF','SETUPREG.HIV')
+DRVINDEX='DRVINDEX.INF'  # integrated SP3 media only
 SELECTED=['ACPI/acpi.sys','Dependencies/ntoskrn8.sys','Dependencies/storport.sys',
  'KMDF/wdf01000.sys','KMDF/wdfldr.sys','SATA/genahci.sys','SATA/genahci.inf',
  *['USB3/'+n for n in ('ksecd8.sys','ucx01000.sys','usbd8.sys','usbhub3.sys','usbhub3.inf','usbxhci.sys','usbxhci.inf','wpprecor.sys')]]
@@ -29,10 +30,22 @@ NT52_USB3=False
 NT52_SELECTED_USB3=[n for n in SELECTED if n!='Dependencies/storport.sys']
 NT52_SELECTED=['ACPI/acpi.sys','SATA/genahci.sys','SATA/genahci.inf']
 NT52_MARKERS=('WIN51IS.SP2','WIN51IA.SP2','WIN51IB.SP2','WIN51ID.SP2','WIN51IC.SP2')
+# NVMe target (docs/nvme-nt-2026-10-11.md): USOS's own usosnvme ScsiPort
+# miniport (GPL, tools/nt/usosnvme, 2KXP build) on the system's ScsiPort.
+# The bundle always carries USOSNVME.SY_ / USOSNVME.IN_ in I386; the setup
+# metadata that loads it (TXTSETUP.SIF, DOSNET.INF, HIVESYS.INF,
+# SETUPREG.HIV) is a second set in NVME/, applied by xp_driver_stage.sh only
+# when the target is an NVMe disk, so a SATA install never loads it.
+NVME_DIR=ROOT/'tools/nt/usosnvme'
+NVME_NAMES=('usosnvme.sys','usosnvme.inf')
+NVME_CLASS_GUID='{4D36E97B-E325-11CE-BFC1-08002BE10318}'
+
+def iso_listing(iso):
+    return subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
 
 def source_kind(iso):
     """'xp-sp3' or 'w2k3-sp2' from the media's tag files."""
-    listing=subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
+    listing=iso_listing(iso)
     if 'WIN51IP.SP3' in listing:return 'xp-sp3'
     if any(m in listing for m in NT52_MARKERS):return 'w2k3-sp2'
     raise ValueError('Driver experiment requires XP Professional SP3 or Windows Server 2003 SP2 (x86)')
@@ -62,6 +75,42 @@ def drop_keys(text,section,names):
         if l.strip().startswith('['):inside=l.strip().lower()=='['+section.lower()+']'
         if not inside or key(l) not in names:out.append(l)
     return '\r\n'.join(out)+'\r\n'
+
+def nvme_registry_rows():
+    svc='Services\\usosnvme'
+    rows=[(svc,'Type',4,1),(svc,'Start',4,0),(svc,'ErrorControl',4,1),(svc,'Group',1,'SCSI miniport'),
+          (svc,'ImagePath',2,'system32\\drivers\\usosnvme.sys'),(svc+'\\Parameters\\PnpInterface','5',4,1)]
+    cdb='Control\\CriticalDeviceDatabase\\pci#cc_010802'
+    return rows+[(cdb,'Service',1,'usosnvme'),(cdb,'ClassGUID',1,NVME_CLASS_GUID)]
+
+def nvme_txtsetup(text):
+    for sec in ('SourceDisksFiles','SourceDisksFiles.x86'):text=drop_keys(text,sec,set(NVME_NAMES))
+    text=edit_section(text,'SourceDisksFiles.x86',['usosnvme.sys = 1,,,,,,4_,4,0,0,,1,4','usosnvme.inf = 1,,,,,,,20,0,0'])
+    text=edit_section(text,'FileFlags',['usosnvme.sys = 16'])
+    text=edit_section(text,'HardwareIdsDatabase',['PCI\\CC_010802 = "usosnvme"'])
+    text=edit_section(text,'SCSI.Load',['usosnvme = usosnvme.sys,4'])
+    return edit_section(text,'SCSI',['usosnvme = "USOS NVMe Controller"'])
+
+def nvme_dosnet(text):
+    text=edit_section(text,'Files',['d1,'+n for n in NVME_NAMES],replace=False)
+    return edit_section(text,'FloppyFiles.1',['d1,usosnvme.sys'],replace=False)
+
+def hivesys_rows(rows):
+    out=[]
+    for p,n,t,v in rows:
+        flags={1:'0x00000000',2:'0x00020000',4:'0x00010001'}[t]
+        encoded=hex(v) if t==4 else v
+        out.append(f'HKLM,"SYSTEM\\CurrentControlSet\\{p}","{n}",{flags},"{encoded}"')
+    return out
+
+def nvme_payload(out,i386):
+    """USOSNVME.SY_ and USOSNVME.IN_ (the INF's source path is \\I386, as for GenAHCI)."""
+    raw=out/'raw-nvme';shutil.rmtree(raw,ignore_errors=True);raw.mkdir()
+    shutil.copyfile(NVME_DIR/'bin/2KXP/i386/usosnvme.sys',raw/'USOSNVME.SYS')
+    inf=(NVME_DIR/'usosnvme.inf').read_text(encoding='latin1').replace('\r\n','\n')
+    inf=re.sub(r'(?im)^1\s*=.*$',lambda m:'1="USOS XP drivers",,,"\\I386"',inf)
+    (raw/'USOSNVME.INF').write_bytes(inf.replace('\n','\r\n').encode('latin1'))
+    for n in ('USOSNVME.SYS','USOSNVME.INF'):pack_file(raw/n,i386/(n[:-1]+'_'))
 
 def registry_values(usb3=True):
     rows=registry_rows()
@@ -95,7 +144,7 @@ def registry_rows():
         add('Control\\CriticalDeviceDatabase\\'+hw,'ClassGUID','{'+guid+'}')
     return rows
 
-def patch_hive(path,usb3=True):
+def patch_hive(path,usb3=True,extra=()):
     # Private app hive, not HKLM/HKU. Only the disposable build copy is modified.
     adv=c.WinDLL('advapi32',use_last_error=True)
     adv.RegLoadAppKeyW.argtypes=[c.c_wchar_p,c.POINTER(c.c_void_p),c.c_uint,c.c_uint,c.c_uint]
@@ -105,7 +154,7 @@ def patch_hive(path,usb3=True):
     if rc:raise OSError(rc,'RegLoadAppKeyW build copy')
     hive=handle.value
     try:
-        for p,n,t,v in registry_values(usb3):
+        for p,n,t,v in [*registry_values(usb3),*extra]:
             with winreg.CreateKeyEx(hive,'ControlSet001\\'+p,0,winreg.KEY_ALL_ACCESS) as k:
                 winreg.SetValueEx(k,n,0,t,v)
                 assert winreg.QueryValueEx(k,n)==(v,t)
@@ -144,13 +193,27 @@ def build_driver_overlay(iso,out):
     sp_cab,selected,marker=('SP3.CAB',SELECTED,'WIN51IP.SP3') if kind=='xp-sp3' else ('SP2.CAB',NT52_SELECTED_USB3 if NT52_USB3 else NT52_SELECTED,'WIN51')
     usb3=kind=='xp-sp3' or NT52_USB3
     builtin_usb=BUILTIN_USB if usb3 else ()
-    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],'I386\\'+sp_cab,marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
+    # Integrated SP3 media (nLite-style: the SP3 files merged into DRIVER.CAB
+    # and I386, no I386\SP3.CAB, DriverCabName=driver.cab; e.g. the XP Tablet
+    # PC Edition 2005 SP3 "updated" disc): the bundle adds its own SP3.CAB
+    # holding only the community ACPI and registers it as a driver cabinet,
+    # so the installed system's driver cache serves that ACPI, as on
+    # Microsoft-slipstreamed media.
+    # GUI-mode PnP (setupapi) does not read TXTSETUP.SIF: it finds a driver
+    # file's cabinet through INF\DRVINDEX.INF. With only DRIVER.CAB listed
+    # there, the ACPI device install re-extracted the stock SP3 ACPI.SYS
+    # (5.1.2600.5512) over the community one and the X470 stopped at the
+    # next boot (BIOSTAR evidence 2026-10-10, setupapi.log W025). So the
+    # bundle's DRVINDEX.INF lists its SP3.CAB first, as Microsoft media do.
+    integrated=kind=='xp-sp3' and 'I386\\'+sp_cab not in iso_listing(iso)
+    meta=META+(DRVINDEX,) if integrated else META
+    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in meta],*([] if integrated else ['I386\\'+sp_cab]),marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
     if not (original/marker).exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
-    for n in META:assert (original/n).is_file(),n
+    for n in meta:assert (original/n).is_file(),n
     cabdir=out/'sp3-files';cabdir.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
+    if not integrated:subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
     bundle=out/'bundle';bundle.mkdir(exist_ok=True)
-    hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in META)
+    hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in meta)
     bundle_id=hashlib.sha256(hashes.encode()).hexdigest()
     (bundle/'source.sha256').write_text(hashes,encoding='ascii',newline='\n')
     i386=bundle/'I386';i386.mkdir(exist_ok=True)
@@ -169,7 +232,7 @@ def build_driver_overlay(iso,out):
         pack_file(p,i386/(p.name[:-1]+'_'))
     native=out/'native-usb';native.mkdir(exist_ok=True)
     fallback=out/'source-driver-cache';fallback.mkdir(exist_ok=True)
-    sp3_stamps=xp_cab.stamps((original/sp_cab).read_bytes())
+    sp3_stamps={} if integrated else xp_cab.stamps((original/sp_cab).read_bytes())
     driver_stamps={}
     if any(not (cabdir/n).is_file() for n in builtin_usb):
         # SP3.CAB contains updated files; unchanged XP files remain in DRIVER.CAB.
@@ -194,6 +257,7 @@ def build_driver_overlay(iso,out):
     text=edit_section(text,'HardwareIdsDatabase',[r'PCI\CC_010601 = "genahci"',r'PCI\CC_0C0330 = "usbxhci"',r'USB\ROOT_HUB30 = "usbhub3"',r'USB\USB30_HUB = "usbhub3"',r'USB\USB20_HUB = "usbhub3"'] if usb3 else [r'PCI\CC_010601 = "genahci"'])
     text=edit_section(text,'SCSI.Load',['genahci = genahci.sys,4'])
     text=edit_section(text,'SCSI',['genahci = "USOS Generic SATA AHCI"'])
+    if integrated:text=register_integrated_cab(text,sp_cab)
     for group,svc,label,files in [
       ('BootBusExtenders','wdf01000','Kernel-Mode Driver Framework 1.11',['wdf01000.sys','wdfldr.sys','ntoskrn8.sys']),
       ('BusExtenders','ucx01000','USB Controller Extension',['ucx01000.sys','wdfldr.sys','wpprecor.sys']),
@@ -203,27 +267,36 @@ def build_driver_overlay(iso,out):
         text=edit_section(text,group,[f'{svc} = "{label}",files.{svc},{svc}'])
         text=edit_section(text,'files.'+svc,[n+',4' for n in files])
     (i386/'TXTSETUP.SIF').write_bytes(text.encode(encoding))
+    nvme=bundle/'NVME';nvme.mkdir(exist_ok=True)
+    (nvme/'TXTSETUP.SIF').write_bytes(nvme_txtsetup(text).encode(encoding))
+    nvme_payload(out,i386)
     text,encoding=decode((original/'DOSNET.INF').read_bytes())
     for sec,items in [('Files',names),('FloppyFiles.1',sysnames)]:
         # DOSNET rows share d1, so their identity is the whole row, not its first field.
         text=edit_section(text,sec,['d1,'+n for n in items],replace=False)
+    if integrated:text=edit_section(text,'Files',['d1,'+sp_cab.lower()],replace=False)
     (i386/'DOSNET.INF').write_bytes(text.encode(encoding))
+    (nvme/'DOSNET.INF').write_bytes(nvme_dosnet(text).encode(encoding))
+    if integrated:
+        text,encoding=decode((original/DRVINDEX).read_bytes())
+        (i386/DRVINDEX).write_bytes(register_integrated_drvindex(text,sp_cab,['acpi.sys']).encode(encoding))
     text,encoding=decode((original/'HIVESYS.INF').read_bytes())
-    reglines=[]
-    for p,n,t,v in registry_values(usb3):
-        flags={1:'0x00000000',2:'0x00020000',4:'0x00010001'}[t]
-        encoded=hex(v) if t==4 else v
-        reglines.append(f'HKLM,"SYSTEM\\CurrentControlSet\\{p}","{n}",{flags},"{encoded}"')
-    text=edit_section(text,'AddReg',reglines,replace=False)
+    text=edit_section(text,'AddReg',hivesys_rows(registry_values(usb3)),replace=False)
     text=disable_crash_dump(text)
     (i386/'HIVESYS.INF').write_bytes(text.encode(encoding))
+    (nvme/'HIVESYS.INF').write_bytes(edit_section(text,'AddReg',hivesys_rows(nvme_registry_rows()),replace=False).encode(encoding))
     # Only disposable build files; never reuse transaction logs from an earlier hive.
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     shutil.copyfile(original/'SETUPREG.HIV',i386/'SETUPREG.HIV');patch_hive(i386/'SETUPREG.HIV',usb3)
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     # The registry engine stamps the build time into touched keys and header.
     hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
+    # The NVMe set: the same hive plus usosnvme's service and its CriticalDeviceDatabase row.
+    shutil.copyfile(original/'SETUPREG.HIV',nvme/'SETUPREG.HIV');patch_hive(nvme/'SETUPREG.HIV',usb3,nvme_registry_rows())
+    for suffix in ('.LOG','.LOG1','.LOG2'):(nvme/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
+    hive=nvme/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
+    if integrated:shutil.copyfile(DRIVERS/'ACPI/acpi.sys',cabdir/'acpi.sys')
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
     if len(acpi)!=1:raise ValueError(sp_cab+' lacks unique ACPI; refusing incomplete integration')
     shutil.copyfile(DRIVERS/'ACPI/acpi.sys',acpi[0])
@@ -236,7 +309,35 @@ def build_driver_overlay(iso,out):
     xp_cab.pin(i386/sp_cab,{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
     return finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso)
 
+def register_integrated_cab(text,cab):
+    """TXTSETUP.SIF of integrated SP3 media: the bundle's own driver cabinet
+    next to DRIVER.CAB (copied to the driver cache, directory 39, like
+    Microsoft-slipstreamed media's sp3.cab)."""
+    name=cab.lower()
+    m=re.search(r'(?im)^[ \t]*DriverCabName[ \t]*=[ \t]*(.*?)[ \t]*$',text)
+    cabs=[c.strip() for c in m.group(1).split(',') if c.strip()] if m else ['driver.cab']
+    if name not in [c.lower() for c in cabs]:cabs.append(name)
+    text=edit_section(text,'SetupData',['DriverCabName = '+','.join(cabs)])
+    text=edit_section(text,'SourceDisksFiles',[name+' = 1,,,,,,_x,39,0,0'])
+    return edit_section(text,'FileFlags',[name+' = 16'])
+
+def register_integrated_drvindex(text,cab,files):
+    """DRVINDEX.INF of integrated SP3 media: the bundle's cabinet becomes the
+    first entry of CabFiles with its own file section (as on Microsoft SP3
+    media: CabFiles=SP3,driver, [SP3], [Cabs] SP3=SP3.cab) and the files
+    leave the other cabinets' sections, so setupapi extracts them only from it."""
+    section=cab.rsplit('.',1)[0]
+    names=sorted(f.lower() for f in files)
+    m=re.search(r'(?im)^[ \t]*CabFiles[ \t]*=[ \t]*(.*?)[ \t]*$',text)
+    cabs=[c.strip() for c in m.group(1).split(',') if c.strip()] if m else ['driver']
+    cabs=[section]+[c for c in cabs if c.lower()!=section.lower()]
+    text=edit_section(text,'Version',['CabFiles='+','.join(cabs)])
+    for other in cabs[1:]:text=drop_keys(text,other,set(names))
+    text=edit_section(text,section,names)
+    return edit_section(text,'Cabs',[section+'='+cab])
+
 def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
+    (bundle/'nvme.sha256').write_text(''.join(sha(p)+'  NVME/'+p.name+'\n' for p in sorted((bundle/'NVME').iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'replace-names.txt').write_text('\n'.join(n.upper() for n in names)+'\n',encoding='ascii',newline='\n')
     report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':selected,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB if (native/n).is_file()},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}

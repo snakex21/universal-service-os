@@ -1,0 +1,284 @@
+USOS 3.1.2-usos4 patch 5/5 (2026-10-11): the disk CSMWrap was loaded from is 0x80
+
+CSMWrap's BBS table has one entry per raw disk but only the PCI address
+of its controller, and SeaBIOS (patch 0004) ranks disks by controller, so
+every disk on the controller CSMWrap was loaded from gets priority 0 and
+SeaBIOS breaks the tie by port order: a bootable disk on a lower port of
+the same SATA controller became 0x80 and was booted instead of the disk
+holding CSMWrap's ESP. CSMWrap now finds the raw disk whose device path
+is a prefix of the loaded image's device path and tags its BBS entry
+(IBV1 = "USOS", IBV2 = FNV-1a of its first 512 bytes). Before mapping the
+drives, SeaBIOS reads sector 0 of every hard disk in its boot list and
+moves the one disk with that hash in front of the first hard disk; the
+other disks keep their order after it (0x81, 0x82, ...). No tag, no match
+or more than one match (cloned disks): the order is unchanged.
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b)
+after patches 0001-0004, patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos4, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+--- a/seabios/src/boot.c
++++ b/seabios/src/boot.c
+@@ -822,6 +822,74 @@ add_bev(int type, u32 vector)
+     bev->vector = vector;
+ }
+ 
++// USOS patch 0005: CSMWrap names the disk it was loaded from by a hash of
++// its first sector. Disks on one controller share that controller's BBS
++// priority and SeaBIOS breaks the tie by port, so a bootable disk on a lower
++// port of the same controller would become 0x80. Move the one hard disk whose
++// sector 0 matches in front of the first hard disk; the others keep their
++// order (0x81, 0x82, ...). No match or more than one match: nothing changes.
++int process_op_32(struct disk_op_s *op); // block.c
++
++static u32
++usos_fnv1a(const u8 *p, int len)
++{
++    u32 h = 0x811c9dc5;
++    int i;
++    for (i = 0; i < len; i++) {
++        h ^= p[i];
++        h *= 0x01000193;
++    }
++    return h;
++}
++
++static void
++usos_boot_disk_first(void)
++{
++    u32 want;
++    if (!CONFIG_CSM || !csm_bootdisk_hash(&want))
++        return;
++    u8 *buf = memalign_tmplow(512, 4096);
++    if (!buf) {
++        warn_noalloc();
++        return;
++    }
++    struct bootentry_s *pos, *first = NULL, *match = NULL;
++    int matches = 0;
++    hlist_for_each_entry(pos, &BootList, node) {
++        if (pos->type != IPL_TYPE_HARDDISK)
++            continue;
++        if (!first)
++            first = pos;
++        struct drive_s *drive = pos->drive;
++        if (!drive || drive->blksize < 512 || drive->blksize > 4096)
++            continue;
++        struct disk_op_s dop;
++        memset(&dop, 0, sizeof(dop));
++        dop.drive_fl = drive;
++        dop.command = CMD_READ;
++        dop.lba = 0;
++        dop.count = 1;
++        dop.buf_fl = buf;
++        int ret = process_op_32(&dop);
++        u32 got = ret ? 0 : usos_fnv1a(buf, 512);
++        dprintf(1, "USOS boot disk: %s ret=%d hash=%08x want=%08x\n"
++                , pos->description, ret, got, want);
++        if (!ret && got == want) {
++            matches++;
++            match = pos;
++        }
++    }
++    free(buf);
++    if (matches != 1 || match == first) {
++        dprintf(1, "USOS boot disk: %d match(es), order unchanged\n", matches);
++        return;
++    }
++    dprintf(1, "USOS boot disk: %s moved to 0x80\n", match->description);
++    hlist_del(&match->node);
++    hlist_add_before(&match->node, &first->node);
++    match->priority = first->priority;
++}
++
+ // Prepare for boot - show menu and run bcvs.
+ void
+ bcv_prepboot(void)
+@@ -833,6 +901,8 @@ bcv_prepboot(void)
+     if (haltprio >= 0)
+         bootentry_add(IPL_TYPE_HALT, haltprio, 0, "HALT");
+ 
++    usos_boot_disk_first();
++
+     // Map drives and populate BEV list
+     struct bootentry_s *pos;
+     hlist_for_each_entry(pos, &BootList, node) {
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -443,6 +443,26 @@ int csm_bootprio_usb(struct pci_device *pci)
+     return csm_bootprio_bdf(pci, "USB");
+ }
+ 
++// CSMWrap (USOS patch 0005) tags the BBS entry of the disk it was loaded
++// from with IBV1 = "USOS" and IBV2 = FNV-1a of that disk's first 512 bytes,
++// so boot.c can put exactly that disk first (0x80) when several disks share
++// its controller.
++int csm_bootdisk_hash(u32 *hash)
++{
++    if (!csm_boot_table)
++        return 0;
++    BBS_TABLE *bbs = (void *)csm_boot_table->BbsTable;
++    int i;
++
++    for (i = 0; i < csm_boot_table->NumberBbsEntries; i++) {
++        if (bbs[i].IBV1 == CSM_USOS_BOOTDISK_TAG) {
++            *hash = bbs[i].IBV2;
++            return 1;
++        }
++    }
++    return 0;
++}
++
+ int csm_bootprio_fdc(struct pci_device *pci, int port, int fdid)
+ {
+     if (!csm_boot_table)
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -126,6 +126,8 @@ int csm_bootprio_fdc(struct pci_device *pci, int port, int fdid);
+ int csm_bootprio_ata(struct pci_device *pci, int chanid, int slave);
+ int csm_bootprio_pci(struct pci_device *pci);
+ int csm_bootprio_usb(struct pci_device *pci);
++#define CSM_USOS_BOOTDISK_TAG 0x534f5355 // "USOS"
++int csm_bootdisk_hash(u32 *hash);
+ int csm_quiet(void);
+ 
+ // fw/mptable.c
+--- a/src/bootdev.c
++++ b/src/bootdev.c
+@@ -244,12 +244,68 @@ static void add_bbs_entry(struct low_stub *low_stub,
+     low_stub->bbs_entry_count++;
+ }
+ 
++/*
++ * USOS patch 0005: the raw disk CSMWrap was loaded from. Its device path is
++ * a prefix of the loaded image's device path (PciRoot/.../Sata(port)/HD(..)).
++ */
++static bool device_path_is_prefix(EFI_DEVICE_PATH_PROTOCOL *prefix,
++                                  EFI_DEVICE_PATH_PROTOCOL *path)
++{
++    if (!prefix || !path) {
++        return false;
++    }
++    while (!IsDevicePathEnd(prefix)) {
++        UINTN len = DevicePathNodeLength(prefix);
++        if (IsDevicePathEnd(path) || DevicePathNodeLength(path) != len ||
++            memcmp(prefix, path, len) != 0) {
++            return false;
++        }
++        prefix = NextDevicePathNode(prefix);
++        path = NextDevicePathNode(path);
++    }
++    return true;
++}
++
++static uint32_t fnv1a(const uint8_t *p, size_t len)
++{
++    uint32_t h = 0x811c9dc5;
++    for (size_t i = 0; i < len; i++) {
++        h ^= p[i];
++        h *= 0x01000193;
++    }
++    return h;
++}
++
++/* FNV-1a of the first 512 bytes of the disk (SeaBIOS reads the same sector) */
++static bool boot_disk_hash(EFI_BLOCK_IO_PROTOCOL *block_io, uint32_t *hash)
++{
++    UINT32 bs = block_io->Media->BlockSize;
++    void *buf = NULL;
++
++    if (bs < 512 || bs > 4096 || !block_io->Media->MediaPresent) {
++        return false;
++    }
++    if (gBS->AllocatePool(EfiLoaderData, bs, &buf) != EFI_SUCCESS) {
++        return false;
++    }
++    EFI_STATUS status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
++                                             0, bs, buf);
++    if (!EFI_ERROR(status)) {
++        *hash = fnv1a(buf, 512);
++    }
++    gBS->FreePool(buf);
++    return !EFI_ERROR(status);
++}
++
+ /*
+  * Enumerate block I/O devices and build BBS entries
+  */
+ static int enumerate_block_devices(struct low_stub *low_stub,
+-                                   const struct boot_device_info *boot_info)
++                                   const struct boot_device_info *boot_info,
++                                   EFI_DEVICE_PATH_PROTOCOL *boot_path)
+ {
++    EFI_GUID device_path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
++    bool boot_disk_tagged = false;
+     EFI_STATUS status;
+     EFI_GUID block_io_guid = EFI_BLOCK_IO_PROTOCOL_GUID;
+     EFI_HANDLE *handles = NULL;
+@@ -288,7 +344,23 @@ static int enumerate_block_devices(struct low_stub *low_stub,
+         bool is_boot_device = boot_info->valid && devices_match(&dev_info, boot_info);
+         int priority = is_boot_device ? 0 : next_priority++;
+ 
++        size_t idx = low_stub->bbs_entry_count;
+         add_bbs_entry(low_stub, &dev_info, priority);
++
++        /* USOS patch 0005: tag the exact disk CSMWrap was loaded from */
++        EFI_DEVICE_PATH_PROTOCOL *raw_path = NULL;
++        uint32_t hash;
++        if (!boot_disk_tagged && idx < low_stub->bbs_entry_count && boot_path &&
++            gBS->HandleProtocol(handles[i], &device_path_guid,
++                                (void **)&raw_path) == EFI_SUCCESS &&
++            device_path_is_prefix(raw_path, boot_path) &&
++            boot_disk_hash(block_io, &hash)) {
++            low_stub->bbs_entries[idx].IBV1 = USOS_BOOTDISK_TAG;
++            low_stub->bbs_entries[idx].IBV2 = hash;
++            boot_disk_tagged = true;
++            printf("bootdev: BBS[%zu] is the boot disk (sector 0 hash %08x)\n",
++                   idx, hash);
++        }
+     }
+ 
+     gBS->FreePool(handles);
+@@ -305,6 +377,8 @@ int build_bbs_table(struct csmwrap_priv *priv, EFI_HANDLE image_handle)
+     EFI_GUID loaded_image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+     EFI_LOADED_IMAGE_PROTOCOL *loaded_image = NULL;
+     struct boot_device_info boot_info = {0};
++    EFI_GUID device_path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
++    EFI_DEVICE_PATH_PROTOCOL *boot_path = NULL;
+     struct low_stub *low_stub = priv->low_stub;
+ 
+     if (!low_stub) {
+@@ -323,6 +397,10 @@ int build_bbs_table(struct csmwrap_priv *priv, EFI_HANDLE image_handle)
+     } else if (loaded_image->DeviceHandle) {
+         /* Get boot device information */
+         printf("bootdev: Detecting boot device...\n");
++        if (gBS->HandleProtocol(loaded_image->DeviceHandle, &device_path_guid,
++                                (void **)&boot_path) != EFI_SUCCESS) {
++            boot_path = NULL;
++        }
+         if (get_pci_location(loaded_image->DeviceHandle, &boot_info)) {
+             printf("bootdev: Boot device: PCI %02x:%02x.%x type=%s\n",
+                    boot_info.bus, boot_info.device, boot_info.function,
+@@ -336,7 +414,7 @@ int build_bbs_table(struct csmwrap_priv *priv, EFI_HANDLE image_handle)
+     memset(low_stub->bbs_desc_strings, 0, sizeof(low_stub->bbs_desc_strings));
+ 
+     /* Enumerate all block devices and build BBS entries */
+-    if (enumerate_block_devices(low_stub, &boot_info) < 0) {
++    if (enumerate_block_devices(low_stub, &boot_info, boot_path) < 0) {
+         printf("bootdev: Failed to enumerate block devices\n");
+         /* Not fatal - SeaBIOS can still enumerate drives itself */
+     }
+--- a/src/bootdev.h
++++ b/src/bootdev.h
+@@ -14,6 +14,10 @@ struct csmwrap_priv;
+  * boot device prioritized first.
+  */
+ 
++/* USOS patch 0005: BBS IBV1 of the boot disk's entry; IBV2 = FNV-1a of its
++ * first 512 bytes (SeaBIOS csm_bootdisk_hash / usos_boot_disk_first) */
++#define USOS_BOOTDISK_TAG 0x534f5355u /* "USOS" */
++
+ /* Boot device information extracted from device path */
+ struct boot_device_info {
+     bool valid;

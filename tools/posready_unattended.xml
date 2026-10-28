@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USOS POSReady 2009 answer template (docs/posready-2009-2026-10-10.md). The @...@ fields are filled by tools/posready_qemu_install.sh posready_answer_xml from the menu answer (POSR.SIF); never commit a key. Validated by POSReady Setup in QEMU 2026-10-10 up to the key check. -->
+<Unattend>
+<LoggingData>
+<LogFile Path="%TARGETDRIVE%\Windows\Setup.log" />
+<UnattendedFile Path="%TARGETDRIVE%\Windows\Unattended.xml" Copy="No" />
+</LoggingData>
+<UserData>
+<ProductKey Value="@PRODUCT_KEY@" />
+<FullName Value="@FULL_NAME@" />
+<Organization Value="@ORGANIZATION@" />
+<ComputerName Value="@COMPUTER_NAME@" />
+<AdminPassword Value="@ADMIN_PASSWORD@" StrongPassword="No" EncryptedPassword="No" />
+</UserData>
+<DiskConfig>
+<Disk ID="0" WipeDisk="No">
+<ModifyPartition ID="2" Label="POSReady" Letter="C" FileSystem="NTFS" AllocationUnit="4096" QuickFormat="Yes" FileCompression="No" />
+</Disk>
+</DiskConfig>
+<SystemData>
+<OSConfiguration>
+<PageFile Path="*" InitialSize="*" MaximumSize="*" />
+</OSConfiguration>
+<LanguageSettings>
+<DefaultInputLanguage Value="1033" />
+<NonUnicodeLanguage Value="1033" />
+<UseComplexScriptLanguages Value="No" />
+<UseEastAsianLanguages Value="No" />
+</LanguageSettings>
+<RegionalSettings>
+<StandardsAndFormats Value="1033" />
+<GeographicalLocation Value="244" />
+<TimeZone Value="85" />
+</RegionalSettings>
+<Components>
+<Component Name=".Net Framework 2.0" Install="Yes" />
+<Component Name="Calculator" Install="Yes" />
+<Component Name="Notepad" Install="Yes" />
+<Component Name="Paint" Install="Yes" />
+<Component Name="WordPad" Install="Yes" />
+<Component Name="Command Line Utilities" Install="Yes" />
+<Component Name="Disk Management" Install="Yes" />
+</Components>
+<Networking>
+<IPAddress DynamicIPAddress="Yes" />
+<DNSServer DNSAuto="Yes" />
+<WINSServer WINSAuto="Yes" />
+</Networking>
+<Security>
+<JoinWorkgroup Value="WORKGROUP" />
+</Security>
+</SystemData>
+<!-- USOS: POSReady runs RunOnce inside the First Boot Agent, where the FAT16 Setup partition has no drive letter (QEMU 2026-10-10: D:, E:, F: all missing). posready_after_setup copies \USOS\POSR onto the Windows partition (C:) before the first start, so the command uses that fixed path. Batch files need cmd.exe in FilePath and /c in Attributes; FBA mangles every percent sign (%11% gave "Invalid Path: [%\cmd.exe]"), so the command has none. FIRST.CMD installs the X470 drivers and a RunOnce for LOGON.CMD (first logon: ACPI check, DONE.TXT, shutdown). -->
+<RunOnce>
+<RunOnceCommand FilePath="C:\WINDOWS\system32\cmd.exe" Attributes="/c C:\USOS\POSR\FIRST.CMD" Flags="0" ErrorControl="0" Reboot="False" Timeout="600">
+<DisplayName Value="USOS X470 drivers" />
+<Description Value="USOS: community ACPI, GenAHCI, USB3 for the X470" />
+</RunOnceCommand>
+</RunOnce>
+<SetupData>
+<Preinstall AcceptEula="Yes" />
+</SetupData>
+</Unattend>

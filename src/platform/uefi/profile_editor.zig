@@ -6,9 +6,11 @@
 //! system the editor was opened from (key.<system-id>); it is written only
 //! with "Remember the key".
 //!
-//! "Use for" (`systems=`) says which systems offer the profile; the
-//! "Appearance and extras" section lists only the tweaks the system has
-//! (answer.schema.tweak_support).
+//! "Use for" (`systems=`) says which systems offer the profile. Then the
+//! typed options (answer.options) in their groups (Explorer, Taskbar and
+//! Start, System, Updates and privacy, Apps and scripts, Accounts and network), each group and
+//! each option only where the system renders it, and last the "Appearance
+//! and extras" section with the remaining tweaks (answer.schema.tweak_support).
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -21,6 +23,13 @@ const schema = answer.schema;
 const tables = answer.tables;
 const Profile = answer.Profile;
 const Problem = answer.profile.Problem;
+// Advanced file-only network settings survive ordinary edits; no extra Setup prompts.
+var saved_network: @TypeOf((Profile{}).network) = .on;
+var saved_dialup: @TypeOf((Profile{}).dialup) = .off;
+var saved_ip: answer.profile.Text(18) = .{};
+var saved_gateway: answer.profile.Text(15) = .{};
+var saved_dns: answer.profile.Text(47) = .{};
+var saved_home: answer.profile.Text(200) = .{};
 
 const F = enum(u8) {
     name,
@@ -43,13 +52,17 @@ const F = enum(u8) {
     no_network,
     protect_pc,
     network_location,
-    disable_wer,
     systems,
+    section_explorer,
+    section_taskbar,
+    section_system,
+    section_updates,
+    section_apps,
+    section_accounts,
+    /// A row of the typed option table (field_option says which).
+    option,
+    workgroup,
     section_extras,
-    show_extensions,
-    show_hidden,
-    no_autorun,
-    disable_uac,
     skip_games,
     skip_msn,
     hide_outlook_express,
@@ -57,9 +70,16 @@ const F = enum(u8) {
     no_balloon_tips,
     no_sidebar,
     no_welcome_center,
-    no_hibernation,
     theme,
     display,
+    display_bpp,
+    /// MS-DOS / Windows 1.x-3.x (answer.dos).
+    dos_regional,
+    dos_keyb,
+    /// Windows 3.1 / 3.11 / WfW 3.11: experimental Winsock (answer.dos).
+    dos_winsock,
+    /// Windows 95 / 98 / Me: automatic or manual Setup (answer.msbatch).
+    win9x_setup,
     save,
     cancel,
 };
@@ -67,10 +87,6 @@ const F = enum(u8) {
 /// The tweak toggles in the order of the "Appearance and extras" section.
 const TweakRow = struct { id: F, field: answer.profile.Field, tweak: schema.Tweak, label: view.Key, help: view.Key };
 const tweak_rows = [_]TweakRow{
-    .{ .id = .show_extensions, .field = .show_extensions, .tweak = .show_extensions, .label = .profile_field_show_extensions, .help = .profile_help_show_extensions },
-    .{ .id = .show_hidden, .field = .show_hidden, .tweak = .show_hidden, .label = .profile_field_show_hidden, .help = .profile_help_show_hidden },
-    .{ .id = .no_autorun, .field = .no_autorun, .tweak = .no_autorun, .label = .profile_field_no_autorun, .help = .profile_help_no_autorun },
-    .{ .id = .disable_uac, .field = .disable_uac, .tweak = .disable_uac, .label = .profile_field_disable_uac, .help = .profile_help_disable_uac },
     .{ .id = .skip_games, .field = .skip_games, .tweak = .skip_games, .label = .profile_field_skip_games, .help = .profile_help_skip_games },
     .{ .id = .skip_msn, .field = .skip_msn, .tweak = .skip_msn, .label = .profile_field_skip_msn, .help = .profile_help_skip_msn },
     .{ .id = .hide_outlook_express, .field = .hide_outlook_express, .tweak = .hide_outlook_express, .label = .profile_field_hide_outlook_express, .help = .profile_help_hide_outlook_express },
@@ -78,7 +94,6 @@ const tweak_rows = [_]TweakRow{
     .{ .id = .no_balloon_tips, .field = .no_balloon_tips, .tweak = .no_balloon_tips, .label = .profile_field_no_balloon_tips, .help = .profile_help_no_balloon_tips },
     .{ .id = .no_sidebar, .field = .no_sidebar, .tweak = .no_sidebar, .label = .profile_field_no_sidebar, .help = .profile_help_no_sidebar },
     .{ .id = .no_welcome_center, .field = .no_welcome_center, .tweak = .no_welcome_center, .label = .profile_field_no_welcome_center, .help = .profile_help_no_welcome_center },
-    .{ .id = .no_hibernation, .field = .no_hibernation, .tweak = .no_hibernation, .label = .profile_field_no_hibernation, .help = .profile_help_no_hibernation },
 };
 var tweak_values: [tweak_rows.len]bool = @splat(false);
 
@@ -126,7 +141,17 @@ var no_network = false;
 var protect_index: usize = 2;
 /// Index into NetworkLocation order work, home, public (network_options).
 var network_index: usize = 0;
-var disable_wer = false;
+/// The typed options (answer.options.table order): a toggle's state, or a
+/// choice's offered values (those this system renders, plus a stored value
+/// it does not, kept for other systems) and the selected one.
+const options = answer.options;
+const max_values = 4;
+var opt_flag: [options.count]bool = @splat(false);
+var opt_index: [options.count]usize = @splat(0);
+var opt_labels: [options.count][max_values][]const u8 = undefined;
+var opt_values: [options.count][max_values]u8 = undefined;
+var opt_value_count: [options.count]usize = @splat(0);
+var workgroup_text = form.TextValue{ .max = 15 };
 var protect_options: [3][]const u8 = undefined;
 /// "Use for": this system, its kind (every Windows / every Linux installer),
 /// Windows and Linux, and a stored list that is none of these (kept).
@@ -141,9 +166,25 @@ var theme_options: [3][]const u8 = undefined;
 var theme_values: [3]answer.profile.Theme = undefined;
 var theme_option_count: usize = 0;
 var theme_index: usize = 0;
-var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len][]const u8 = undefined;
+var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len + 1][]const u8 = undefined;
+var display_option_count: usize = 0;
+var bpp_options: [3][]const u8 = undefined;
+var bpp_index: usize = 0;
 var display_index: usize = 0;
+var display_explicit_loaded: bool = false;
+var saved_addons_preset: @TypeOf((Profile{}).addons_preset) = .praca;
+var saved_addons_options: answer.profile.Text(512) = .{};
+var saved_addons_exclude: answer.profile.Text(512) = .{};
 var network_options: [3][]const u8 = undefined;
+/// MS-DOS regional settings: index into DosRegional (auto, manual).
+var dos_regional_options: [2][]const u8 = undefined;
+var dos_regional_index: usize = 0;
+var dos_keyb = false;
+var dos_winsock = false;
+/// Windows 95 / 98 / Me Setup: index into Win9xSetup (auto, manual); the
+/// labels are the DOS regional ones ("Automatic from the profile", "Manual
+/// in the installer").
+var win9x_setup_index: usize = 0;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
 
@@ -163,8 +204,15 @@ const key_chars = form.charset("", true);
 const org_chars = form.cleanAscii(true);
 const password_chars = form.cleanAscii(false);
 
-var fields_storage: [@typeInfo(F).@"enum".fields.len]form.Field = undefined;
-var field_ids: [@typeInfo(F).@"enum".fields.len]F = undefined;
+const max_fields = @typeInfo(F).@"enum".fields.len + options.count;
+comptime {
+    // Every row the editor can add must fit the form (manual_form.items).
+    if (max_fields > form.max_fields) @compileError("profile editor rows exceed manual_form.max_fields");
+}
+var fields_storage: [max_fields]form.Field = undefined;
+var field_ids: [max_fields]F = undefined;
+/// For an F.option row: its index in answer.options.table.
+var field_option: [max_fields]usize = undefined;
 var field_count: usize = 0;
 
 var base: Profile = .{};
@@ -190,9 +238,18 @@ fn setOptions() void {
     locale_options[0] = t(.profile_value_same_language);
     keyboard_options[0] = t(.profile_value_same_locale);
     protect_options = .{ t(.profile_value_protect_recommended), t(.profile_value_protect_updates), t(.profile_value_protect_off) };
-    display_options[0] = t(.profile_value_auto);
-    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i| display_options[i] = f.name;
+    const legacy_display = answer.display_profile.supportsSystem(system_id);
+    const offset: usize = if (legacy_display) 1 else 0;
+    // 9x / NT: the first item (no explicit display) is the automatic native
+    // resolution since 2026-10-20, so it is named that way.
+    display_options[0] = t(if (legacy_display) .profile_value_display_native else .profile_value_auto);
+    if (legacy_display) display_options[1] = t(.profile_value_auto);
+    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i|
+        display_options[i + offset] = if (comptime std.mem.eql(u8, f.name, "keep")) t(.profile_value_display_keep) else f.name;
+    display_option_count = @typeInfo(answer.profile.Display).@"enum".fields.len + offset;
+    bpp_options = .{ t(.profile_value_auto), "32", "16" };
     network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
+    dos_regional_options = .{ t(.profile_value_dos_regional_auto), t(.profile_value_dos_regional_manual) };
     for (tables.languages, 0..) |entry, i| {
         language_options[i + 1] = entry.label;
         locale_options[i + 1] = entry.label;
@@ -213,7 +270,7 @@ fn load(p: *const Profile) void {
     org_text.set(p.org.slice());
     password_text.set(p.password.slice());
     var key: [29]u8 = undefined;
-    key_text.set(answer.profile.normalizeKey(p.keyFor(system_id), &key));
+    key_text.set(answer.profile.normalizeKeyFor(p.keyFor(system_id), &key, keyStyle()));
     loadEdition(p.editionFor(system_id));
     timezone_index = if (p.timezone) |i| @as(usize, i) + 1 else 0;
     language_index = if (p.language) |i| @as(usize, i) + 1 else 0;
@@ -236,9 +293,28 @@ fn load(p: *const Profile) void {
     no_network = p.no_network_oobe;
     protect_index = std.mem.indexOfScalar(answer.profile.ProtectPc, &protect_values, p.protect_pc).?;
     network_index = std.mem.indexOfScalar(answer.profile.NetworkLocation, &network_values, p.network_location).?;
-    disable_wer = p.disable_wer;
+    loadOptions(p);
+    workgroup_text.set(p.workgroup.slice());
+    saved_network = p.network;
+    saved_dialup = p.dialup;
+    saved_ip = p.ip;
+    saved_gateway = p.gateway;
+    saved_dns = p.dns;
+    saved_home = p.home_page;
+    dos_regional_index = @intFromEnum(p.dos_regional);
+    dos_keyb = p.dos_keyb;
+    dos_winsock = p.dos_winsock;
+    win9x_setup_index = @intFromEnum(p.win9x_setup);
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
-    display_index = @intFromEnum(p.display);
+    display_index = if (answer.display_profile.supportsSystem(system_id))
+        (if (answer.display_profile.requested(p)) @intFromEnum(p.display) + @as(usize, 1) else 0)
+    else
+        @intFromEnum(p.display);
+    bpp_index = @intFromEnum(p.display_bpp);
+    display_explicit_loaded = p.display_explicit;
+    saved_addons_preset = p.addons_preset;
+    saved_addons_options = p.addons_options;
+    saved_addons_exclude = p.addons_exclude;
     loadTheme(p.theme);
     loadSystems(answer.applies.effective(p));
 }
@@ -258,7 +334,10 @@ fn editionManual() bool {
 /// stored value (a value in no list: "Type manually" with that text).
 fn loadEdition(stored: []const u8) void {
     edition_option_count = 0;
-    addEdition(t(.profile_value_setup_asks), "");
+    // Server without an edition: Standard (full installation) when the ISO
+    // has it (answer.root matchEdition), else Setup asks.
+    const server = if (familyOfEditor()) |family| family.server() and !family.nt5() else false;
+    addEdition(t(if (server) .profile_value_edition_server_default else .profile_value_setup_asks), "");
     const image_count: usize = if (edition_images) |list| list.len else 0;
     if (edition_images) |list| {
         for (list.slice(), 0..) |*image, i| addEdition(image.label(), image.id(&edition_id_storage[i]));
@@ -354,7 +433,7 @@ fn build(out: *Profile) void {
     } else custom_keyboard;
     // Already XXXXX-XXXXX-... in capitals (answer.profile.keyTyped).
     var key: [29]u8 = undefined;
-    out.setSystemKey(system_id, answer.profile.normalizeKey(key_text.slice(), &key)) catch {};
+    out.setSystemKey(system_id, answer.profile.normalizeKeyFor(key_text.slice(), &key, keyStyle())) catch {};
     const edition: []const u8 = if (editionManual()) std.mem.trim(u8, edition_text.slice(), " ") else edition_values[edition_index];
     out.setSystemEdition(system_id, edition) catch {};
     out.remember_key = remember_key;
@@ -365,10 +444,32 @@ fn build(out: *Profile) void {
     out.no_network_oobe = no_network;
     out.protect_pc = protect_values[protect_index];
     out.network_location = network_values[network_index];
-    out.disable_wer = disable_wer;
+    buildOptions(out);
+    out.workgroup.set(workgroup_text.slice()) catch {};
+    out.network = saved_network;
+    out.dialup = saved_dialup;
+    out.ip = saved_ip;
+    out.gateway = saved_gateway;
+    out.dns = saved_dns;
+    out.home_page = saved_home;
+    out.dos_regional = @enumFromInt(dos_regional_index);
+    out.dos_keyb = dos_keyb;
+    out.dos_winsock = dos_winsock;
+    out.win9x_setup = @enumFromInt(win9x_setup_index);
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
-    out.display = @enumFromInt(display_index);
+    if (answer.display_profile.supportsSystem(system_id)) {
+        out.display = if (display_index == 0) .auto else @enumFromInt(display_index - 1);
+        out.display_explicit = display_index != 0;
+        out.display_bpp = if (display_index == 0 or out.display == .keep) .auto else @enumFromInt(bpp_index);
+    } else {
+        out.display = @enumFromInt(display_index);
+        out.display_bpp = @enumFromInt(bpp_index);
+        out.display_explicit = display_explicit_loaded;
+    }
+    out.addons_preset = saved_addons_preset;
+    out.addons_options = saved_addons_options;
+    out.addons_exclude = saved_addons_exclude;
     _ = answer.profile.normalizeSystems(systems_values[systems_index], &out.systems);
     out.manual_disk = true;
 }
@@ -381,17 +482,28 @@ fn problemOf(id: F) ?Problem {
         .computer => answer.profile.checkComputer(computer_text.slice()),
         .org => answer.profile.checkOrg(org_text.slice()),
         .password => answer.profile.checkPassword(password_text.slice()),
-        .key => answer.profile.checkKey(key_text.slice()),
+        .key => answer.profile.checkKeyFor(key_text.slice(), keyStyle()),
         .edition => if (editionManual()) answer.profile.checkEdition(edition_text.slice()) else null,
+        .workgroup => answer.profile.checkWorkgroup(workgroup_text.slice()),
         else => null,
     };
 }
 
+/// The scope the form would save (`systems=` of the "Use for" row).
+var scope_probe: Profile = .{};
+
 fn duplicateName() bool {
-    // Every profile file counts, also those made for other systems.
-    const other = answer_profiles.stemInUse(name_text.slice()) orelse return false;
-    const current = previous_stem orelse return true;
-    return !std.ascii.eqlIgnoreCase(other, current);
+    // Every profile file counts, but only one offered for a system this
+    // profile is offered for too: "Only Windows XP" and "Only Windows 7"
+    // may both be called "Home" (they get different files).
+    scope_probe = .{};
+    _ = answer.profile.normalizeSystems(systems_values[systems_index], &scope_probe.systems);
+    return answer_profiles.nameTaken(name_text.slice(), &scope_probe, previous_stem);
+}
+
+/// Windows 95 / NT 4.0: the CD key or the OEM ID (answer.profile.KeyStyle).
+fn keyStyle() answer.profile.KeyStyle {
+    return answer.profile.keyStyleFor(system_id);
 }
 
 fn problemText(problem: Problem) []const u8 {
@@ -402,7 +514,7 @@ fn problemText(problem: Problem) []const u8 {
         .reserved_name => t(.profile_problem_reserved_name),
         .same_as_user => t(.profile_problem_same_as_user),
         .only_digits => t(.profile_problem_only_digits),
-        .bad_key_format => t(.profile_problem_bad_key_format),
+        .bad_key_format => view.format(&key_problem_text, .profile_problem_bad_key_format, &.{answer.profile.keyFormats(keyStyle())}),
         .duplicate => t(.profile_problem_duplicate),
         else => t(.profile_problem_bad_characters),
     };
@@ -428,26 +540,35 @@ fn helpKey(id: F) view.Key {
         .no_network => .profile_help_no_network,
         .protect_pc => .profile_help_protect_pc,
         .network_location => .profile_help_network_location,
-        .disable_wer => .profile_help_disable_wer,
         .systems => .profile_help_systems,
         .section_extras => .profile_section_extras,
         .theme => .profile_help_theme,
-        .display => .profile_help_display,
-        .show_extensions, .show_hidden, .no_autorun, .disable_uac, .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center, .no_hibernation => tweak_rows[tweakRow(id).?].help,
+        .display => if (answer.display_profile.supportsSystem(system_id)) .profile_help_display_legacy else .profile_help_display,
+        .display_bpp => .profile_help_display_legacy,
+        .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center => tweak_rows[tweakRow(id).?].help,
+        .section_explorer, .section_taskbar, .section_system, .section_updates, .section_apps, .section_accounts => .profile_section_extras,
+        .option => .profile_help_systems,
+        .workgroup => .profile_help_workgroup,
+        .dos_regional => .profile_help_dos_regional,
+        .dos_keyb => .profile_help_dos_keyb,
+        .dos_winsock => .profile_help_dos_winsock,
+        .win9x_setup => .profile_help_win9x_setup,
         .save, .cancel => subtitleKey(),
     };
 }
 
+var key_problem_text: [160]u8 = undefined;
+
 fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
     const id = field_ids[index];
-    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{system_name}) else t(helpKey(id));
+    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{ system_name, answer.profile.keyFormats(keyStyle()) }) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
     var n: usize = 1;
     if (problemOf(id)) |problem| {
         if (show_all or !isEmptyRequired(id)) {
             help_lines[1] = problemText(problem);
             // A key being typed: how far it is (the count, never the key).
             if (id == .key and problem == .bad_key_format) {
-                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.key_symbols }) catch help_lines[1];
+                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.keySymbolLimitFor(key_text.slice(), keyStyle()) }) catch help_lines[1];
             }
             n = 2;
         }
@@ -477,6 +598,87 @@ fn addField(id: F, field: form.Field) void {
     field_count += 1;
 }
 
+const workgroup_chars = form.charset("-", true);
+
+fn optionLabel(opt: options.Opt) view.Key {
+    return switch (opt) {
+        inline else => |o| @field(view.Key, "profile_field_" ++ @tagName(o)),
+    };
+}
+
+fn optionHelp(i: usize) view.Key {
+    return switch (options.table[i].opt) {
+        inline else => |o| @field(view.Key, "profile_help_" ++ @tagName(o)),
+    };
+}
+
+/// The label of a choice value (value 0: unchanged / the release default).
+fn valueLabel(comptime opt: options.Opt, comptime value: []const u8) view.Key {
+    if (comptime std.mem.eql(u8, value, "default")) return .profile_value_unchanged;
+    return @field(view.Key, "profile_value_" ++ @tagName(opt) ++ "_" ++ value);
+}
+
+fn editorTarget() ?options.Target {
+    return options.targetFor(system_id);
+}
+
+fn loadOptions(p: *const Profile) void {
+    const values = options.values(p);
+    const t_opt = editorTarget();
+    inline for (options.table, 0..) |o, i| {
+        const current = values[i];
+        opt_flag[i] = current != 0;
+        opt_value_count[i] = 0;
+        opt_index[i] = 0;
+        if (comptime !o.isToggle()) {
+            inline for (o.values, 0..) |name, v| {
+                const offered = v == 0 or (if (t_opt) |tt| options.valueAvailable(o.opt, v, tt) else false);
+                // A stored value this system lacks stays (other systems use it).
+                if (offered or v == current) {
+                    if (v == current) opt_index[i] = opt_value_count[i];
+                    opt_labels[i][opt_value_count[i]] = t(valueLabel(o.opt, name));
+                    opt_values[i][opt_value_count[i]] = v;
+                    opt_value_count[i] += 1;
+                }
+            }
+        }
+    }
+}
+
+fn buildOptions(out: *Profile) void {
+    inline for (options.table, 0..) |o, i| {
+        const value: u8 = if (o.isToggle()) @intFromBool(opt_flag[i]) else opt_values[i][opt_index[i]];
+        if (o.legacy) {
+            @field(out, @tagName(o.opt)) = value != 0;
+        } else out.opts[i] = value;
+    }
+}
+
+/// The option rows of one group (with its heading) that this system renders.
+fn addGroup(group: options.Group, heading: F, label: view.Key, tt: options.Target) void {
+    var any = false;
+    for (options.table) |o| any = any or (o.group == group and options.available(o.opt, tt));
+    const workgroup_here = group == .accounts and workgroupAvailable(tt);
+    if (!any and !workgroup_here) return;
+    addField(heading, .{ .kind = .section, .label = t(label) });
+    for (options.table, 0..) |o, i| {
+        if (o.group != group or !options.available(o.opt, tt)) continue;
+        field_option[field_count] = i;
+        if (o.isToggle()) {
+            addField(.option, .{ .kind = .toggle, .label = t(optionLabel(o.opt)), .flag = &opt_flag[i] });
+        } else addField(.option, .{ .kind = .choice, .label = t(optionLabel(o.opt)), .options = opt_labels[i][0..opt_value_count[i]], .index = &opt_index[i] });
+    }
+    if (workgroup_here) addField(.workgroup, .{ .kind = .text, .label = t(.profile_field_workgroup), .text = &workgroup_text, .allowed = &workgroup_chars, .uppercase = true, .placeholder = t(.profile_value_unchanged) });
+}
+
+/// Workgroup: 9x MSBATCH.INF, NT5 WINNT.SIF, 6.x+ UnattendedJoin.
+fn workgroupAvailable(tt: options.Target) bool {
+    return switch (tt.os) {
+        .nt3, .nt4 => false,
+        else => true,
+    };
+}
+
 fn buildFields() void {
     field_count = 0;
     const win11 = std.mem.eql(u8, system_id, "windows-11");
@@ -494,11 +696,26 @@ fn buildFields() void {
     addField(.language, .{ .kind = .choice, .label = t(.profile_field_language), .options = &language_options, .index = &language_index });
     addField(.locale, .{ .kind = .choice, .label = t(.profile_field_locale), .options = &locale_options, .index = &locale_index });
     addField(.keyboard, .{ .kind = .choice, .label = t(.profile_field_keyboard), .options = keyboard_options[0..keyboard_option_count], .index = &keyboard_index });
-    addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
+    // MS-DOS / Windows 1.x-3.x: no product key, no accounts; the regional
+    // settings right after the formats and keyboard they come from.
+    const dos = answer.dos.isDos(system_id);
+    if (dos) {
+        addField(.dos_regional, .{ .kind = .choice, .label = t(.profile_field_dos_regional), .options = &dos_regional_options, .index = &dos_regional_index });
+        if (dos_regional_index == 0) addField(.dos_keyb, .{ .kind = .toggle, .label = t(.profile_field_dos_keyb), .flag = &dos_keyb });
+        // Off by default; Windows 3.1 / 3.11 / WfW 3.11 only.
+        if (answer.dos.winsockCapable(system_id)) addField(.dos_winsock, .{ .kind = .toggle, .label = t(.profile_field_dos_winsock), .flag = &dos_winsock });
+    }
+    // Windows 95 / 98 / Me: automatic (default) or manual Setup, first of
+    // the Setup rows (manual: the key and owner rows only feed USOS itself).
+    if (answer.msbatch.releaseFor(system_id) != null)
+        addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
+    if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
-    addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
-    addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
+    if (!dos) {
+        addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
+        addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
+    }
     if (win11) {
         addField(.bypass_tpm, .{ .kind = .toggle, .label = t(.profile_field_bypass_tpm), .flag = &bypass_tpm });
         addField(.bypass_secure_boot, .{ .kind = .toggle, .label = t(.profile_field_bypass_secure_boot), .flag = &bypass_secure_boot });
@@ -507,22 +724,38 @@ fn buildFields() void {
     }
     if (nt6) addField(.protect_pc, .{ .kind = .choice, .label = t(.profile_field_protect_pc), .options = &protect_options, .index = &protect_index });
     if (legacy_nt6) addField(.network_location, .{ .kind = .choice, .label = t(.profile_field_network_location), .options = &network_options, .index = &network_index });
-    if (nt6) addField(.disable_wer, .{ .kind = .toggle, .label = t(.profile_field_disable_wer), .flag = &disable_wer });
     // Where the profile is offered (after the general settings, so the
     // rows above keep their places).
     addField(.systems, .{ .kind = .choice, .label = t(.profile_field_systems), .options = systems_options[0..systems_option_count], .index = &systems_index });
+    // The typed options, grouped; only what this system renders.
+    if (editorTarget()) |tt| {
+        addGroup(.explorer, .section_explorer, .profile_section_explorer, tt);
+        addGroup(.taskbar, .section_taskbar, .profile_section_taskbar, tt);
+        addGroup(.system, .section_system, .profile_section_system, tt);
+        addGroup(.updates, .section_updates, .profile_section_updates, tt);
+        addGroup(.apps, .section_apps, .profile_section_apps, tt);
+        addGroup(.accounts, .section_accounts, .profile_section_accounts, tt);
+    }
     // Appearance and extras: only what this system has.
     if (family) |f| {
         var any = false;
-        inline for (@typeInfo(schema.Tweak).@"enum".fields) |tf| any = any or schema.tweakAvailable(@enumFromInt(tf.value), f);
+        for (tweak_rows) |row| any = any or schema.tweakAvailable(row.tweak, f);
+        any = any or schema.tweakAvailable(.theme_classic, f) or schema.tweakAvailable(.theme_basic, f) or schema.tweakAvailable(.display, f);
         if (any) {
             addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
             for (tweak_rows, 0..) |row, i| {
                 if (schema.tweakAvailable(row.tweak, f)) addField(row.id, .{ .kind = .toggle, .label = t(row.label), .flag = &tweak_values[i] });
             }
             if (theme_option_count > 1) addField(.theme, .{ .kind = .choice, .label = t(.profile_field_theme), .options = theme_options[0..theme_option_count], .index = &theme_index });
-            if (schema.tweakAvailable(.display, f)) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = &display_options, .index = &display_index });
+            if (schema.tweakAvailable(.display, f)) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
         }
+    }
+    // Legacy renderers have no NT6 Family; expose only their display channel.
+    if (answer.display_profile.supportsSystem(system_id)) {
+        if (family == null) addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
+        if (family == null) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
+        // keep: no USOSRES, so no colour depth to choose.
+        if (display_index != 0 and display_index != @intFromEnum(answer.profile.Display.keep) + 1) addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
     }
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });
@@ -600,5 +833,61 @@ pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u
                 return name_text.slice();
             },
         }
+    }
+}
+
+test "every system's profile editor fits the form; labels and help titles are valid UTF-8" {
+    const systems = usos.catalog.systems.all;
+    var widest: usize = 0;
+    for (systems) |entry| {
+        system_id = entry.id;
+        system_name = entry.name;
+        edition_images = null;
+        previous_stem = null;
+        base = defaults("pl");
+        load(&base);
+        setOptions();
+        // Also with a sized display (adds the colour depth row on 9x / NT).
+        for ([_]usize{ 0, 2 }) |display| {
+            display_index = @min(display, display_option_count - 1);
+            buildFields();
+            widest = @max(widest, field_count);
+            try std.testing.expect(field_count <= form.max_fields);
+            for (fields_storage[0..field_count], 0..) |field, i| {
+                try std.testing.expect(std.unicode.utf8ValidateSlice(field.label));
+                if (field.kind == .section) continue;
+                const help = hookHelp(&dummy_context, i);
+                try std.testing.expect(help.title.ptr == field.label.ptr);
+                for (help.lines) |line| try std.testing.expect(std.unicode.utf8ValidateSlice(line));
+            }
+        }
+    }
+    // Windows 10 / 11 have more rows than the old limit of 40.
+    try std.testing.expect(widest > 40);
+}
+
+test "Windows 9x Setup row: 95/98/Me only, auto by default, manual saved" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-xp", false }, .{ "windows-3-11", false } }) |case| {
+        const id, const offered = case;
+        system_id = id;
+        system_name = id;
+        edition_images = null;
+        previous_stem = null;
+        base = defaults("pl");
+        load(&base);
+        setOptions();
+        buildFields();
+        var row: ?usize = null;
+        for (field_ids[0..field_count], 0..) |fid, i| {
+            if (fid == .win9x_setup) row = i;
+        }
+        try std.testing.expectEqual(offered, row != null);
+        if (row == null) continue;
+        try std.testing.expectEqual(@as(usize, 0), win9x_setup_index);
+        win9x_setup_index = 1;
+        var out: Profile = .{};
+        build(&out);
+        try std.testing.expectEqual(answer.profile.Win9xSetup.manual, out.win9x_setup);
+        win9x_setup_index = 0;
     }
 }

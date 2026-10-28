@@ -113,11 +113,6 @@ func main() {
 		fmt.Sprintf("LEGACY_BOOT AFTER component=core sha256=%s expected=%s changed=%v", legacyAudit.Core.AfterSHA256, legacyAudit.Core.ExpectedSHA256, legacyAudit.Core.Changed),
 		"LEGACY_BOOT_WRITE=PASS",
 	)
-	if err := session.VerifyLegacyBoot(media); err != nil {
-		finish(false, fmt.Errorf("verify Legacy BIOS boot area: %w", err))
-	}
-	lines = append(lines, "LEGACY_BOOT_READBACK=PASS")
-
 	if err := backend.FormatESP(media); err != nil {
 		finish(false, fmt.Errorf("format ESP: %w", err))
 	}
@@ -130,6 +125,16 @@ func main() {
 		finish(false, fmt.Errorf("format WORK: %w", err))
 	}
 	lines = append(lines, "FORMAT_WORK=PASS")
+	// Same order as install.Engine: DATA/WORK keep NoDriveLetter until
+	// formatted; the post-format and Legacy checks expect it cleared.
+	if err := backend.ExposeFormattedVolumes(media); err != nil {
+		finish(false, fmt.Errorf("expose DATA/WORK after format: %w", err))
+	}
+	lines = append(lines, "EXPOSE=PASS")
+	if err := session.VerifyLegacyBoot(media); err != nil {
+		finish(false, fmt.Errorf("verify Legacy BIOS boot area: %w", err))
+	}
+	lines = append(lines, "LEGACY_BOOT_READBACK=PASS")
 
 	postFormat, err := session.VerifyLayoutUnchanged(media)
 	if err != nil {

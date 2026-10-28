@@ -24,7 +24,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     const session = graphics orelse return error.DosPartitionScreenNeedsGraphics;
     const windows = !std.mem.eql(u8, system_id, "ms-dos");
     const install = if (windows) true else target_ui.dosAction(session) orelse return;
-    try @import("windows_iso_config.zig").validateName(image_name);
+    try @import("catalog").windows_iso_config.validateName(image_name);
     @import("graphics_menu.zig").busy(&session, if (windows) "Windows 3.x" else "MS-DOS");
     const data = try storage.gpt.findUsosData(reader);
     const fs = try ntfs.mount(reader, .{ .start_bytes = data.start_lba * 512, .size_bytes = data.sectorCount() * 512 });
@@ -66,7 +66,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM", "VBMOUSE.EXE", "VBADOS.TXT", "USOSKEY.COM" }) |filename|
         try helper(esp, reader, bulk, &builder, filename);
     if (windows) {
-        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "USOSKEY.DRV", "USOS.SHH", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
+        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "WINRUN.BAT", "VBMOUSE.DRV", "USOSKEY.DRV", "USOS.SHH", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS", "W3INF.BAS" }) |filename|
             try helper(esp, reader, bulk, &builder, filename);
     }
     // Installed under CSMWrap (no firmware CSM; docs/design/bios-via-csmwrap.md):
@@ -87,7 +87,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     try seed.validate();
     console.line("[DOS16] ORIGINAL DOS, SOURCE FILES AND PROGRAMS READY IN RAM");
     if (install) {
-        const selected = (try target_ui.choose(drive, session, .dos_install)) orelse return;
+        const selected = (try target_ui.choose(drive, session, .dos_install, "")) orelse return;
         const plan = selected.format_plan orelse return error.MissingDosPartitionPlan;
         try target_ui.commitDos(plan, seed);
         console.line("[DOS16] USER CONFIRMED FAT16 TARGET COMMITTED");
@@ -103,7 +103,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     memdisk.start(0xff);
 }
 
-const EspImage = struct {
+pub const EspImage = struct {
     esp: fat.FileSystem,
     bulk: Reader,
     path: []const []const u16,

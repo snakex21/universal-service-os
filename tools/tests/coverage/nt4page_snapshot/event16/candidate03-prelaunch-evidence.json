@@ -1,0 +1,51 @@
+{
+  "cache_manifest": {
+    "status": "FROZEN_OWN_UEFI_CORE_FROM_COMPLETED_CANONICAL_GRAPH_NOT_VM_TESTED",
+    "source_commit": "a4313b368e83c3c4cee97b51380a3ba54f581aec",
+    "canonical_build_log": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\fullbuild-address03\\build.log",
+    "canonical_fullbuild_pass": false,
+    "canonical_graph_tests_passed": 589,
+    "canonical_fullbuild_blocker": "Unrelated missing pinned Windows7 NVMe assets.zip. Own UEFI Core produced successfully; validated EFI PE and new staging literal. No release PASS.",
+    "source": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt4-hid13-netdns-utc",
+    "output": "G:\\USOS-Kolekcja\\_assets\\B261020-200536-968CCBE8-nt4-hid13-netdns-utc-ipfix",
+    "parent_initrd_sha256": "932bb19a66a9b1807f2658e73d010aa74bbc8fe5521d2881e7cf654dd2efd8be",
+    "initrd_sha256": "932bb19a66a9b1807f2658e73d010aa74bbc8fe5521d2881e7cf654dd2efd8be",
+    "changes": {
+      "zig-out/bin/usos-x86_64.efi": {
+        "before_sha256": "7d882e8f19fa400131e2b4db06b57e959532c4e280abef687ea17ed551c8a9a4",
+        "sha256": "d96cc2a0f815c71fc47eca9584c7ad9605897337b90dd8256a4af2a91b63ad77",
+        "bytes": 2157056
+      }
+    },
+    "preserved_unrelated_files": 290,
+    "invariant": "Only rebuilt own UEFI Core changed; prepare_stick copies this exact file to boot EFI. Entire initrd and all cached HID1.3/NDIS4/strictDNS/logger/storage/timezone/Post/SP6a remain byte-identical. No hub edit, no MSC merge.",
+    "runtime": "Not yet launched; no desktop/LAN/HID/MSC/hardware PASS",
+    "release": false
+  },
+  "cache_manifest_sha256": "7db15b62d4f3ea825da2ac3f97ebd209c516bb991f71f3824f8bcd9dec6a4fed",
+  "launch": {
+    "phase": "LAUNCHED_WAITING_COMPLETION_NOTIFICATION",
+    "source_commit": "a4313b36",
+    "tty_session": 43521,
+    "retention_listener": 56859,
+    "endpoint_cleanup_listener": 86629,
+    "manifest_sha256": "7db15b62d4f3ea825da2ac3f97ebd209c516bb991f71f3824f8bcd9dec6a4fed",
+    "plan_sha256": "cafca3211d2a23bba00e9270a42e605e75f6b92b9e535056b67b031f80caa6fc",
+    "core_sha256": "d96cc2a0f815c71fc47eca9584c7ad9605897337b90dd8256a4af2a91b63ad77",
+    "initrd_sha256": "932bb19a66a9b1807f2658e73d010aa74bbc8fe5521d2881e7cf654dd2efd8be",
+    "fullbuild_pass": false,
+    "graph_tests_pass": 589,
+    "assessment_scope": "PS2 desktop/LAN. HID and MSC separate frozen tests remain outstanding.",
+    "waiting": "ReadDirectoryChangesW, no progress polling",
+    "guard": "one ordinary runner resource guard, no bypass"
+  },
+  "renderer_validation": {
+    "options_nt4_golden_exact": true,
+    "addons_none_renderer_tests": 2,
+    "addons_none_renderer_passed": true,
+    "network_defaults_tests": 27,
+    "network_defaults_passed": true,
+    "actual_native_validator_tests": 4,
+    "actual_native_validator_passed": true
+  }
+}

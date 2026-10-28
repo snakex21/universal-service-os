@@ -14,7 +14,7 @@ against what is really packed, not against what the build is meant to pack:
   `Programs\USOS`, generated README files, empty profile folders);
 - the separately shipped XP package (`zig-out/xp-uefi-csm`: `initramfs-xp`,
   `vmlinuz.efi`, `manifest.json`), diffed against `initramfs-usos`;
-- the WinPE PE10 donor ISO shipped as a release asset;
+- the WinPE PE10 donor ISOs (x64 and x86) shipped as release assets;
 - the installer executable itself (Go).
 
 Licences of Alpine packages come from the `.PKGINFO` of the cached `.apk`
@@ -50,7 +50,8 @@ with exact upstream URLs. **GAP**: still open, with the reason.
 Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 (including the initramfs and cpio archives on it), *DATA* = `USOS_DATA`,
 *XP package* = `USOS-<version>-XP-package-*.zip` (`EFI/USOS-XP`),
-*WinPE asset* = `USOS-<version>-WinPE-PE10-donor.zip`, *installer* =
+*WinPE asset* = `USOS-<version>-WinPE-PE10-donor.zip`, *WinPE x86 asset* =
+`USOS-<version>-WinPE-PE10-x86-donor.zip`, *installer* =
 `USOS-Installer-<version>.exe`.
 
 | Component | Version | Licence (SPDX) | Where it ships | Source location / obligation | Status |
@@ -104,15 +105,20 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 | TouchI2cDxe (MODIFIED) | v1.3.1-usos1 | `BSD-2-Clause-Patent` | stick ESP | sources zip: `tools/vendor/touchi2cdxe/v1.3.1-usos1/usos-rc71l.patch`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/UsosTouchPkg.dsc`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/PROVENANCE.md`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/manifest.json`, `tools/build_touchi2cdxe.ps1`; <https://github.com/jlobue10/TouchI2cDxe/tree/cd673f65049f4bd34dd511ca7a28c345f41efac0> | OK (licence on the ESP; patch in the sources zip) |
 | Syslinux MEMDISK | 6.03 | `GPL-2.0-or-later` | stick ESP | sources zip: `tools/vendor/syslinux/6.03/source.zip`; <https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.zip> | OK (COPYING + source.zip on the ESP) |
 | Patcher9x (with the R. Loew RAM patch) | 0.9.91 | `MIT` | stick ESP | sources zip: `tools/vendor/patcher9x/0.9.91/source.zip`; <https://github.com/JHRobotics/patcher9x/releases/tag/v0.9.91> | OK (LICENSE, NOTICE, source.zip on the ESP) |
+| CREGFIX | f0693437 (2025-11-03) | `0BSD` | vendored, not staged yet (98 SE Setup hardware test) | sources zip: `tools/vendor/cregfix/f0693437/cregfix.asm`; <https://github.com/mintsuki/cregfix/tree/f0693437080d08bb3596101e1fc17bbffc4efba5> | OK (LICENSE; prebuilt CREGFIX.SYS byte-identical to the source, see manifest.json) |
 | CWSDPMI | r7 | `LicenseRef-CWSDPMI` | stick ESP | <https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7s.zip> | OK (CWSDPMI.TXT on the ESP; source URL in NOTICE.TXT) |
 | VBADOS (VBMOUSE.EXE, VBMOUSE.DRV) | 0.67 | `GPL-2.0-or-later` | stick ESP; MS-DOS / Windows 3.x disks installed under CSMWrap | sources zip: `tools/vendor/vbados/0.67/vbados-0.67.tar.gz`; <https://git.javispedro.com/cgit/vbados.git/tag/?h=v0.67> | OK (source VBADOS.TGZ on the ESP; VBADOS.TXT = SOURCES + GPL next to the binaries on the target) |
+| vmdisp9x VESA driver + VMHal9x | 1.2025.0.119 | `MIT` | stick ESP; Windows 95/98/Me disks | sources zip: `tools/vendor/vmdisp9x/1.2025.0.119/vmdisp9x-1.2025.0.119.tar.gz`; <https://github.com/JHRobotics/vmdisp9x/releases/tag/v1.2025.0.119> | OK (VMDISP9X.TXT = SOURCES + MIT text, VMDISP9X.TGZ on the ESP; the INF is USOS's MODIFIED copy `src/platform/bios/win9x/usosvesa.inf`) |
 | HimemX | 3.40 | `GPL-2.0-only OR Artistic-1.0` | stick ESP | sources zip: `tools/vendor/himemx/3.40/source-and-binaries.zip`; <https://github.com/Baron-von-Riedesel/HimemX/releases/tag/v3.40> | OK (licence text + HIMEMSRC.ZIP on the ESP) |
 | FreeDOS kernel, FreeCOM and Doszip | FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68) | `GPL-2.0-only` | stick ESP | sources zip: `tools/vendor/freedos/1.4/kernel.zip`, `tools/vendor/freedos/1.4/freecom.zip`, `tools/vendor/freedos/1.4/doszip.zip`, `tools/vendor/freedos/1.4/manifest.json`; <https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip> | OK on the ESP (COPYING + package zips with sources); FIXED: licence texts extracted for the release |
 | PatchPAE3 (adapted as the USOS XP PAE helper) (MODIFIED) | 3e1d3b65f5c3c1ec0c4759f707d3017e51113103 | `CC-BY-4.0` | XP package | sources zip: `tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103`, `tools/windows_xp_pae.c`, `tools/windows_xp_pae_strings.h`; <https://github.com/evgen-b/PatchPAE3/tree/3e1d3b65f5c3c1ec0c4759f707d3017e51113103> | OK (attribution + licence reference in xp-pae-LICENSE.txt) |
 | GenAHCI | 6.3.0.1 | `GPL-3.0-only` | XP package | sources zip: `tools/vendor/genahci/6.3.0.1-src` (tag `GenAHCI` = commit b936a0d8); <https://github.com/GeorgeK1ng/GenAHCI/tree/b936a0d8bdf410928aefa9e0f373fb1d6c7c8240> | FIXED (source pinned and bundled); consistent with the binaries, not byte-verified (needs WDK 7600), see G7 |
 | xhci98 | 1.1.1.0-usos2 (**MODIFIED**) | `GPL-2.0-only` | XP package (branch `feature/nt52-xhci98`, 1.1 work) | sources zip: `tools/vendor/xhci98/1.1.1.0-src` (tag `v1.1.1.0` = commit 7d0dd9d4, git-ignored tarball pinned in `tools/vendor/xhci98/1.1.1.0/SOURCES.txt`) plus `tools/vendor/xhci98/1.1.1.0-usos2/` (patch, `build.cmd`, `toolchain.txt`, `MODIFIED.txt`); <https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac> | USOS-built (WDK 7.1) x86/amd64 `xhci98.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt` in `usr/lib/usos/nt52-usb/`; Server 2003 x86 and XP x64 only. The unmodified 1.1.1.0 pin stays in `tools/vendor/xhci98/1.1.1.0` as the reference |
+| AHCINT | 1.3.0.0-usos4 (**MODIFIED**) | `GPL-3.0-only` (repository LICENSE = GPLv3 text, no per-file notices) | XP package (branch `feature/win2000-modern`) | tracked source: `tools/vendor/ahcint/1.3.0.0/src` (upstream tag `v1.3.0.0` = commit 7be9c9b8, identical to `src/` of the release archive) and `tools/vendor/ahcint/1.3.0.0-usos4/` (patched `src/`, `patches/0001-usos1-flush-cache.patch`, `patches/0002-usos2-target-check-and-trace.patch`, `patches/0003-usos3-screen-stages-readback-fail-loudly.patch`, `patches/0004-usos4-stall-diagnostics.patch`, `build.cmd`, `toolchain.txt`, `MODIFIED.txt`); <https://github.com/ages2001/AHCINT/tree/7be9c9b81ef10979cf1e2c37d08a2e2e3e166066> | USOS-built (WDK 7.1) i386 `ahcint.sys` (FLUSH CACHE for SYNCHRONIZE CACHE/FLUSH/SHUTDOWN, FUA, caching mode page; usos2: link/engine checks, write/read-back test and trace in the USOS gap of the prepared disk; usos3/usos4: diagnostic status line, stall watchdog) + the unmodified `ahcint.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt` in `usr/lib/usos/w2k-drivers/`; Windows 2000 SP4 only. Staging changes the INF on the target (source path; PnpInterface row commented out in legacy mode) |
+| UniATA | 0.47b | `GPL-2.0` (source headers; the archives carry no licence text, USOS adds `COPYING-GPL-2.0.txt`) | XP package (branch `feature/win2000-modern`) | tracked: `tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar` (the author's source archive); <http://alter.org.ua/soft/win/uni_ata/> | OK: unmodified `uniata.sys`, `COPYING-GPL-2.0.txt`, `SOURCES.txt` in `usr/lib/usos/w2k-drivers/uniata/`; Windows 2000 only, selected with DATA's `storage-uniata.txt`; USOS writes its own `uniata.inf` |
 | Go runtime and standard library, golang.org/x/sys | Go 1.26.2, x/sys v0.47.0 | `BSD-3-Clause` | installer, DATA | <https://go.dev/dl/go1.26.2.src.tar.gz> | FIXED in this audit (release LICENSES); the installer itself shows no notice (F2) |
 | Microsoft Windows PE 10.0.19041 x64 donor (PE10_x64_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
+| Microsoft Windows PE 10.0.19041 x86 donor (PE10_x86_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE x86 asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
 | Microsoft Windows 7 SP1 x64 update packages | KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2 | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
 | Microsoft Windows Vista update and USB 3 driver files | KB2864202 + Windows 8-family USB 3 stack (usbxhci, ucx01000, usbhub3, usbd8) | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
 | Windows XP / Server 2003 driver bundles derived from Microsoft ISOs | per source ISO (see XP package manifest.json) | `LicenseRef-Microsoft-redistributed-by-user` | XP package | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
@@ -180,11 +186,12 @@ Notes on individual entries:
 | `EFI/USOS/dos-native/memdisk`, `COPYING`, `source.zip` | Syslinux MEMDISK 6.03 |
 | `EFI/USOS/dos-native/ram-patch/*` | Patcher9x 0.9.91, CWSDPMI r7 (+ USOS BAT files) |
 | `EFI/USOS/dos-native/msdos/HIMEMX.*`, `HIMEMSRC.ZIP`, `LICENSE.TXT` | HimemX 3.40 (+ USOS BAT files and REBOOT.COM) |
-| `EFI/USOS/dos-native/freedos/*` | FreeDOS kernel, FreeCOM, Doszip (+ USOS BAT files) |
+| `EFI/USOS/dos-native/freedos/*` | FreeDOS kernel, FreeCOM, Doszip (+ USOS BAT files); a copy of VBADOS 0.67 `VBMOUSE.EXE` + `VBADOS.TXT` (source: `msdos/VBADOS.TGZ` on the same ESP) |
 | `EFI/USOS/csmwrap/*` | CSMWrap 3.1.2-usos3 with source and licences |
 | `EFI/USOS/dos-native/msdos/CSMESP.IMG` | the same CSMWrap build, licences, source and patches as a FAT16 image for DOS / Windows 3.x targets (1.1) |
 | `EFI/USOS/dos-native/msdos/VBMOUSE.*`, `VBADOS.TXT`, `VBADOS.TGZ` | VBADOS 0.67 with its GPL text and source (1.1) |
 | `EFI/USOS/dos-native/msdos/USOSKEY.COM`, `USOSKEY.DRV` | USOS code (GPL-3.0-or-later); the driver is built with OpenWatcom 2.0 but links no OpenWatcom library code (1.1) |
+| `EFI/USOS/dos-native/win9x/*` | USOS U9FIX.COM, MSBATCH.INF, USOSVESA.INF (GPL-3.0-or-later); vmdisp9x 1.2025.0.119 + VMHal9x (MIT) with VMDISP9X.TXT and VMDISP9X.TGZ; copies of USOSKEY and VBADOS 0.67 (+ VBADOS.TXT) for Windows 9x under CSMWrap; USOS DOSMOUSE.BAT and INWIN.COM (GPL-3.0-or-later, MS-DOS mode mouse) |
 | `EFI/USOS/shell/*` | EDK2 UEFI Shell (+ USOS `startup.nsh`) |
 | `EFI/USOS/touchi2c_x64.efi`, `EFI/USOS/licenses/touchi2cdxe/LICENSE` | TouchI2cDxe v1.3.1-usos1 |
 | `EFI/USOS/linux/usos-linux.cpio`, `EFI/USOS/themes/*`, `ENROLL*`, `secure-boot.ini`, `build-info.ini`, `USOS-KEY.cer`, `UI/index.html`, `UI/theme.css` | USOS only |
@@ -193,7 +200,8 @@ Notes on individual entries:
 XP package (`initramfs-xp` = `initramfs-usos` + 114 entries):
 `usr/lib/usos/xp-pae.exe` + `xp-pae-LICENSE.txt` (PatchPAE3 adaptation),
 `usr/lib/usos/nt5-storage/` (GenAHCI x86/x64 + `gpl.txt` + `SOURCE.txt`; since 1.1 also `amd64/acpi/`: the community x64 ACPI 2.0 `acpi.sys` 5.2.3790.7777.4 for XP x64 with its `ReadMe.txt` and, per XP x64 SP2 source ISO, `sp2/<sha256>/SP2.CAB` = that ISO's `AMD64\SP2.CAB` with `acpi.sys` replaced),
-`usr/lib/usos/nt52-usb/` (xhci98 1.1.1.0-usos2, MODIFIED, x86/amd64 `.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt`; branch `feature/nt52-xhci98`),
+`usr/lib/usos/nt52-usb/` (xhci98 1.1.1.0-usos2, MODIFIED, x86/amd64 `.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt`; branch `feature/nt52-xhci98`; the x86 build also for Windows 2000),
+`usr/lib/usos/w2k-drivers/` (AHCINT 1.3.0.0-usos3, MODIFIED i386 `ahcint.sys` + the unmodified `ahcint.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt`; `uniata/`: UniATA 0.47b `uniata.sys`, `COPYING-GPL-2.0.txt`, `SOURCES.txt`; `usosrst.sys`, USOS's own GPL-3.0-or-later helper, source `tools/w2k/usosrst/src`; Windows 2000 only),
 `usr/lib/usos/xp-drivers/<bundle>/I386/*` (per-ISO bundles: `SP3.CAB`,
 `TXTSETUP.SIF`, `DOSNET.INF`, `HIVESYS.INF`, `SETUPREG.HIV` and the added
 drivers, largely from the Integral Edition patch set: `USBXHCI`, `UCX01000`, `USBHUB3`, `USBD8`,
@@ -224,11 +232,27 @@ Microsoft files in four places, and the licence terms do not change because
 USOS packs them; they stay Microsoft's property and are not covered by any
 USOS licence:
 
-1. **WinPE PE10 donor** (`PE10_x64_19041_USOS.iso`, Windows PE 10.0.19041
-   x64: `boot/bcd`, `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`),
-   a separate release asset. It is redistributed by the USOS maintainer at
-   the maintainer's own responsibility; users download it separately and
-   place it on DATA. No USOS licence covers it.
+1. **WinPE PE10 donors**, two separate release assets, one per
+   architecture:
+   - `PE10_x64_19041_USOS.iso` (Windows PE 10.0.19041 x64: `boot/bcd`,
+     `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`) in
+     `USOS-<version>-WinPE-PE10-donor.zip`, for Vista and original
+     Windows 7 on UEFI;
+   - `PE10_x86_19041_USOS.iso` (Windows PE 10.0.19041 x86: `bootmgr`,
+     `boot/bcd`, `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`,
+     copied unmodified from the Polish Windows 10 22H2 19045.6396 x86 ISO
+     by `tools/release/build_pe10_donor.py`) in
+     `USOS-<version>-WinPE-PE10-x86-donor.zip`, for 32-bit Windows 7 /
+     Vista / Server 2008 on UEFI without CSM (shipped since 2026-10-20 by
+     maintainer decision; before that the user had to supply a Windows 10
+     x86 ISO, which still works as a fallback).
+
+   Both are images of WinPE and Setup only (no install image, no product
+   key). They are redistributed by the USOS maintainer at the maintainer's
+   own responsibility, on the same basis for both; the full installer embeds
+   them, the online one downloads them, and they are placed on DATA
+   (`Programs\USOS\WinPE`). They are never committed to the git repository.
+   No USOS licence covers them.
 2. **Windows 7 update packages in the stick payload**:
    `win7-support.cpio` holds the original CABs of KB4474419 v3 (SHA-2 code
    signing, 55.8 MB), KB2685811 (KMDF 1.11), KB2990941 v3 and KB3087873 v2
@@ -297,6 +321,7 @@ about 21 MB):
 | Syslinux MEMDISK 6.03 (GPL-2.0-or-later) | `tools/vendor/syslinux/6.03/source.zip` |
 | HimemX 3.40 (GPL-2.0 / Artistic) | `tools/vendor/himemx/3.40/source-and-binaries.zip` |
 | VBADOS 0.67 (GPL-2.0-or-later) | `tools/vendor/vbados/0.67/vbados-0.67.tar.gz` |
+| vmdisp9x 1.2025.0.119 (MIT) | `tools/vendor/vmdisp9x/1.2025.0.119/vmdisp9x-1.2025.0.119.tar.gz` |
 | FreeDOS kernel, FreeCOM, Doszip (GPL-2.0) | `tools/vendor/freedos/1.4/{kernel,freecom,doszip}.zip` (each with `SOURCE/*/SOURCES.ZIP`), `manifest.json` |
 | Patcher9x 0.9.91 (MIT, with libmspack LGPL-2.1) | `tools/vendor/patcher9x/0.9.91/source.zip` |
 | UefiSeven 1.30, TouchI2cDxe usos1, PatchPAE3, fonts (permissive, bundled for completeness) | `tools/vendor/uefiseven/1.30`, the TouchI2cDxe patch/DSC/provenance, `tools/vendor/patchpae3/<commit>`, `tools/windows_xp_pae.c`, `assets/fonts` |
@@ -427,3 +452,44 @@ golden tests):
 Release blockers in the audit's view: G7 (for the XP package), G14 (for
 the stick payload and the XP package), G15 and G16 need a maintainer
 decision before 1.0 is published; the rest are documentation completions.
+
+## 8. Legacy compatibility pack (Windows 95/98/Me/NT 4.0), 2026-09-30
+
+Branch `feature/legacy-compat-pack`, design and full per-package table in
+[design/legacy-compat-pack.md](design/legacy-compat-pack.md) §3; the
+manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
+`license` for every package.
+
+- **In the stick payload / git:** only USOS's own files: the runner
+  `USOSADD.EXE` (GPL-3.0-or-later, built with OpenWatcom 2.0 without its C
+  library, like `USOSKEY.DRV`), the manifest, the host tools. The Microsoft
+  files below live only in a release asset.
+- **Microsoft runtimes with redistribution terms** (DirectX 8.0/9.0c, VB6
+  and VC6 runtimes, Windows Installer 2.0, MDAC 2.8 SP1, MSLU, .NET 1.1/2.0
+  with the Polish language packs and .NET 1.1 SP1; 13 packages,
+  `source=release` in the manifest): their terms allow redistribution
+  *with an application that uses them*, which a stand-alone installer pack
+  does not clearly meet. **Maintainer decision (2026-09-30): ship them**,
+  unmodified, in the separate release asset
+  `USOS-<version>-Legacy-pack-MS.zip` (embedded in the full installer,
+  downloaded by the online one; SHA-256 in `SHA256SUMS` and compiled into
+  the installer; never in git), at the maintainer's own risk, for the same
+  reason as the Windows 7/Vista update files (§5, preservation: the
+  original downloads are gone, archive copies may disappear), not covered
+  by any USOS licence, removed on request of the rights holder.
+  `third-party.json` id `microsoft-legacy-pack-redist`. For these the
+  shipped file is the permanent source, not a bridge.
+- **Additional release class, maintainer decision 2026-10-20:** IE, DCOM,
+  DUN, WMP and NT4 SP6a/SRP join that separate asset, with per-file notices
+  and hashes in the manifest. This records the maintainer's decision,
+  not a new redistribution grant. No asset was built in the integration
+  task. RDP, DSClient, other hotfixes and community repacks of Microsoft
+  files (NUSB, Movie Maker 98) remain **user-supplied only**.
+- **Third-party freeware without a licence text** (Adaptec ASPI, HP printing
+  wizard, WinMeDOS, a WMP skin, the Dell/Inside Out NT4 USB driver):
+  **user-supplied only**. WinMeDOS and MSCONFIG-on-95 are marked as bridges
+  "do zastąpienia własną implementacją".
+- **KernelEx 4.0 Final 2** (GPL-2.0): optional bundled classification under
+  the 2026-10-20 decision, currently `status=missing` because matching
+  source was not found locally. No binary is bundled until source and
+  notices are supplied (then add a `third-party.json` entry).

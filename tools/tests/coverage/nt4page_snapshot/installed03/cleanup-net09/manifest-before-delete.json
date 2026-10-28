@@ -1,0 +1,1442 @@
+{
+  "scope": "Authorized only14 literal qcow2 names from owned completed NET04\u201309/read-only08b. No recursion/directories/logs/source/_assets/NT3/macOS/USB-agent/physical objects deleted.",
+  "sourceproof_commit": "511b44a221e171f82414618b8004d0404b021b2c",
+  "S20_commit": "40e98cd1256384602311db13e07ae934d7830189",
+  "cleanup_script_sha256": "00d36277e3dc8c3cedc7a62a1cd542a3f7395599e8b9f96e39a40e925099633d",
+  "closure": [
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\result.json",
+      "sha256": "f6467d66028ee4c4813f024c00a4deed3b3a7d688df4b163416f26ea72a935ae",
+      "qemu_returncode": 0,
+      "runtime_error_retained": null
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\result.json",
+      "sha256": "36887cf2803eed9f46c7867e2d12525a695194b4d8a4c4271ef4ced58c2e484e",
+      "qemu_returncode": 0,
+      "runtime_error_retained": null
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\result.json",
+      "sha256": "1e753660ec20f84ff4deda75ad4ce519c6edc0ae71238971bffef365243d80de",
+      "qemu_returncode": 0,
+      "runtime_error_retained": null
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\result.json",
+      "sha256": "e3307fbd2f9b67d309a85f1be46c508ed4ddf2b9cc833da2bc87fde85c09fe62",
+      "qemu_returncode": 0,
+      "runtime_error_retained": null
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\result.json",
+      "sha256": "7ce29424872d7d3a529d9bba35955e995043cb1f56df669bb6fbc120977f8f53",
+      "qemu_returncode": 0,
+      "runtime_error_retained": null
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\result.json",
+      "sha256": "a8aea924e3bac914fcb5ad9758a1d888f4aee24085a0788fb43a68f426282025",
+      "qemu_returncode": 0,
+      "runtime_error_retained": "JSONDecodeError: Invalid control character at: line 1 column 511 (char 510)"
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\collection.json",
+      "sha256": "6c0b0212fd277d0fbc255ee8050ff49a2cbcf9ec9d6fb85eea9b96d0ae0366a5",
+      "collector_stopped": true
+    },
+    {
+      "result": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\collection.json",
+      "sha256": "c6f8e11b6e8c0a4686b05382fdc859fe612e6201687f3e714e1c874d33ae7d59",
+      "collector_stopped": true
+    }
+  ],
+  "protected_parent": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+  "protected_sha256": "cf04c232df2dc3bcbc2775c0d31963fd1fc4abd4daf7a2967eba9be1f8af2a21",
+  "rows": [
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+      "sha256": "6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743",
+      "known_historical_pin": "6c4e80a34c20544c314cb3ad88a0e0222320bd0550351d2f4fbc7f3c95e35743",
+      "file_id": "1111881105:0004000000078253",
+      "bytes": 458031104,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-boot.qcow2",
+      "sha256": "ed90e0bfdd066c8fe6d889f8d8ac8765df826330e15a2e249d19edd3e5f6aff0",
+      "known_historical_pin": "ed90e0bfdd066c8fe6d889f8d8ac8765df826330e15a2e249d19edd3e5f6aff0",
+      "file_id": "1111881105:0003000000078256",
+      "bytes": 589824,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-boot.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 67108864
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-hot.qcow2",
+      "sha256": "c7a2f2b0c8aad058ab26e90176abe51660093f6dcc539fbb6e031f5a6def744c",
+      "known_historical_pin": "c7a2f2b0c8aad058ab26e90176abe51660093f6dcc539fbb6e031f5a6def744c",
+      "file_id": "1111881105:0004000000078257",
+      "bytes": 589824,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08-usbmsc-hid-net09\\usb-test-hot.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 67108864
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly\\target.qcow2",
+      "sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "known_historical_pin": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "file_id": "1111881105:000300000007822f",
+      "bytes": 458031104,
+      "links": 2,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+      "sha256": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "known_historical_pin": "f0f976d0af544fc3b2a87dbaac84811785332d9ef487d6e3e0c6a1ed6ad820ee",
+      "file_id": "1111881105:000300000007822f",
+      "bytes": 458031104,
+      "links": 2,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\blank-stick.qcow2",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "known_historical_pin": null,
+      "file_id": "1111881105:000500000007822d",
+      "bytes": 197120,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\blank-stick.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 10737418240
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+      "sha256": "29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10",
+      "known_historical_pin": "29036264e022d760223f2f091805e8c170888b3b8d6b1f933888c0193ce0da10",
+      "file_id": "1111881105:0003000000078204",
+      "bytes": 458031104,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\blank-stick.qcow2",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "known_historical_pin": null,
+      "file_id": "1111881105:0004000000078203",
+      "bytes": 197120,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-network07\\blank-stick.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 10737418240
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\target.qcow2",
+      "sha256": "a57e37c5864718f23b201f3583613cb2776d475009d9938ad11f978343e8c198",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00030000000781f9",
+      "bytes": 5373952,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\blank-stick.qcow2",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00040000000781fb",
+      "bytes": 197120,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-start3-control06\\blank-stick.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 10737418240
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\target.qcow2",
+      "sha256": "6c6dd818688f3147f5d9f08731d93d0fe2ae8d8024c9da7c572b74041eecb029",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00030000000781ec",
+      "bytes": 458031104,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\blank-stick.qcow2",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00050000000781eb",
+      "bytes": 197120,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder05\\blank-stick.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 10737418240
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\target.qcow2",
+      "sha256": "8e9b979b33f4f5332851e4a6b8e182072e12d1ba36ad5e6546a197feacdd610c",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00030000000781e8",
+      "bytes": 458031104,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\target.qcow2",
+          "backing": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        },
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-sp6a-desktop-net-ps2-candidate03\\target-retained.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 4294967296
+        }
+      ]
+    },
+    {
+      "path": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\blank-stick.qcow2",
+      "sha256": "609e86fd72929d31f4fa65bb0224cda437c8d46a5dd522f39863b23c37c70f1b",
+      "known_historical_pin": null,
+      "file_id": "1111881105:00040000000781e7",
+      "bytes": 197120,
+      "links": 1,
+      "attributes": 544,
+      "backing_chain": [
+        {
+          "filename": "G:\\USOS-Kolekcja\\_vm\\nt4-installed03-loadorder04\\blank-stick.qcow2",
+          "backing": null,
+          "format": "qcow2",
+          "virtual_bytes": 10737418240
+        }
+      ]
+    }
+  ],
+  "alias09_paths": [],
+  "known_external_dependents": "None in this reviewed ownership graph. Other-agent children of03 are protected by retaining03. No global process or other-task image scan.",
+  "C_evidence_pins": [
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\command.json",
+      "bytes": 1267,
+      "sha256": "ea4fa5346741e8b5315f4b0e8347b84ca23b723f51de22a63c3594072e56b288"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\completed.json",
+      "bytes": 34,
+      "sha256": "14eb25e4fe80779a092397e4324834e2b79b7597d68331057cbf071746054576"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\network.json",
+      "bytes": 1012,
+      "sha256": "c42a37cb4e0d2b3e4f04cfdc453ab72c31b612fa48cb6528bc22b9d145fada4b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\network.pcap",
+      "bytes": 24,
+      "sha256": "acc530668c8bc60b2d229281130b1899bfc81d70fdada5c34b3236c628f739c8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\operator-02.png",
+      "bytes": 14936,
+      "sha256": "8c47fefff356d6e248a9dbbcdf17bf0c36aa602ed8cdccea611c02ac559120e7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\operator-03.png",
+      "bytes": 14274,
+      "sha256": "43494b0e5a938c81eecd490317d5894ec25244259a40ab255425ebe85a5ceb85"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\result.json",
+      "bytes": 1838,
+      "sha256": "a8aea924e3bac914fcb5ad9758a1d888f4aee24085a0788fb43a68f426282025"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\serial.log",
+      "bytes": 12,
+      "sha256": "11c585087db218efeb332e1775a1bf4237bcb592bb6b0312425f47ca2810cb44"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder04\\stderr.log",
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\command.json",
+      "bytes": 1267,
+      "sha256": "a1df8de573811217fc3416991700b074bba1bce3a35c5037dc05846476ed6831"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\completed.json",
+      "bytes": 34,
+      "sha256": "14eb25e4fe80779a092397e4324834e2b79b7597d68331057cbf071746054576"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\final.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\first-logon.json",
+      "bytes": 35,
+      "sha256": "de416c0878c1d17774dd5a147bdcd177713759c1b6aa7078b0eb2a290eddef89"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\network.json",
+      "bytes": 1375,
+      "sha256": "3a55e8bfa43b5819ab15977906392210695a957333663fda1f4355029c1ba26f"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\network.pcap",
+      "bytes": 1952,
+      "sha256": "63de6b6407c909172370254d055831e7bb73a4a3a947d3a5f9cae4bc9261d26e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-02.png",
+      "bytes": 14941,
+      "sha256": "48c839d374f6de10a01af19624fbd704f2603551d9b6e3ffe8900cb32e2ba439"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-03.png",
+      "bytes": 10815,
+      "sha256": "573b12aa1ce42b165cc4788f96f376d60185b7072e32aa73ce22315816836f37"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-04.png",
+      "bytes": 11809,
+      "sha256": "cdee82fca91724a0067e6ea31755d025cf890a1d5d32e37571c035cad9e835db"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-05.png",
+      "bytes": 12437,
+      "sha256": "c44d83b70761262c64d971222c64543f724c1d5a78f85ae2542cdecee2b546a1"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-06.png",
+      "bytes": 19476,
+      "sha256": "3b8ad92d7fad1611a16af510aea02c75592bff2741b5d3ec8f0a437f055300c8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-07.png",
+      "bytes": 11989,
+      "sha256": "e79e659deba7ace0ed76bc5126d018d0373671677932411edb83f4f97fe24049"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-08.png",
+      "bytes": 8993,
+      "sha256": "ecd52840435729afa193865e7c293a047f9d8bd93d99b59fba4f9a957c963ec2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-09.png",
+      "bytes": 11423,
+      "sha256": "96ee8cc9071b246dce65f76e0ff4cf76e221439b923a0ef582686bd0e10f8795"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-10.png",
+      "bytes": 8997,
+      "sha256": "ed0072de74b98c747900f2c9d4635a5fd41b2efc386fee8dd163759fc3e9aaad"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-11.png",
+      "bytes": 9009,
+      "sha256": "a69d4400ae02dd7b2db7d24839b1628932df60f680f9e75332412fb4fe6927bd"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-12.png",
+      "bytes": 14633,
+      "sha256": "e3f51de9576329e3ca1bb0bc6501969fab2eb33a42ac8e19cb39f54d9b16312b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-13.png",
+      "bytes": 17929,
+      "sha256": "8a9c933055478cf9bbd08d22833fa9876105ac42915304783ff26692f9e3980e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-14.png",
+      "bytes": 8273,
+      "sha256": "9b6bf6358c1b1ea247d8cb3e58df36bfb22ef2c7195ee34c948e9ad6b1833d1c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-15.png",
+      "bytes": 8649,
+      "sha256": "dad8cd479379bcc6f2099a6fbf7afc57d954073dc0873ed002f79825bbaa6d2d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\operator-16.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\result.json",
+      "bytes": 2169,
+      "sha256": "7ce29424872d7d3a529d9bba35955e995043cb1f56df669bb6fbc120977f8f53"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\serial.log",
+      "bytes": 134,
+      "sha256": "094624212169a708c6d83ac1f14b15d842e00145e4e4df4c2161250bbc24bc4c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-loadorder05\\stderr.log",
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\command.json",
+      "bytes": 1282,
+      "sha256": "a879ecd39ee4fba19adb996310b6fa0c52e654ee10e4130b663be1bd0ebb09c7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\completed.json",
+      "bytes": 34,
+      "sha256": "14eb25e4fe80779a092397e4324834e2b79b7597d68331057cbf071746054576"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\final.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\network.json",
+      "bytes": 1010,
+      "sha256": "57e73bb1be18741700f680601ceed5e30931ad2f9e61d8ed4ace99da6138d502"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\network.pcap",
+      "bytes": 24,
+      "sha256": "acc530668c8bc60b2d229281130b1899bfc81d70fdada5c34b3236c628f739c8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-02.png",
+      "bytes": 14943,
+      "sha256": "f9478892dfbd83f1fa75e85c1cb2d9c705147768d56d006eeb3db3e76454d6b3"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-03.png",
+      "bytes": 13850,
+      "sha256": "00225d3cb69d83274fd319b637ab8edd3c565638dd5792f99972bd1e6e8d430e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-04.png",
+      "bytes": 16470,
+      "sha256": "e6d492c40345d3a5ec7eaf580fad4b450d61bf98120d00433227412acc67e580"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-05.png",
+      "bytes": 8294,
+      "sha256": "22f64c12c83b5d71aeb47e90f0e7cb5f339d77137fc6d74ec4bf1e8112825314"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-06.png",
+      "bytes": 8649,
+      "sha256": "dad8cd479379bcc6f2099a6fbf7afc57d954073dc0873ed002f79825bbaa6d2d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\operator-07.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\result.json",
+      "bytes": 1769,
+      "sha256": "e3307fbd2f9b67d309a85f1be46c508ed4ddf2b9cc833da2bc87fde85c09fe62"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\serial.log",
+      "bytes": 12,
+      "sha256": "11c585087db218efeb332e1775a1bf4237bcb592bb6b0312425f47ca2810cb44"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-start3-control06\\stderr.log",
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\command.json",
+      "bytes": 1261,
+      "sha256": "65ac5ebfde6f2fb719d0453638e4fe15facb04834146802c4efd5c73c6921cc0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\completed.json",
+      "bytes": 34,
+      "sha256": "14eb25e4fe80779a092397e4324834e2b79b7597d68331057cbf071746054576"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\final.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\first-logon.json",
+      "bytes": 35,
+      "sha256": "de416c0878c1d17774dd5a147bdcd177713759c1b6aa7078b0eb2a290eddef89"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\network.json",
+      "bytes": 1375,
+      "sha256": "8791e5b5171202e7653c7bf0679a4d154a3c64a517d670ac8bdd53a32a8aaf9e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\network.pcap",
+      "bytes": 1952,
+      "sha256": "00b4ccb72d2bad7d4482868e6e021dc0b3c970d3ccb923d0ae5b4a0813b7b0b9"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-02.png",
+      "bytes": 14938,
+      "sha256": "2f89e10e50213042ee8a52a795b047fc9faadd1bd9344cb9563db250acaf92d4"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-03.png",
+      "bytes": 10823,
+      "sha256": "9e5278e2edeb5437882785b5f3b623259d3145d170a438d224301a6c20c91cb8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-04.png",
+      "bytes": 11808,
+      "sha256": "0f5bb1ce1f9057a804ebffec025c4fbe15e63ee403c3f5bb60cf8731f1f3ae41"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-05.png",
+      "bytes": 12444,
+      "sha256": "0ad37278e0b885337a563052d1de6f77acd7ff0af915b32004a53b3e0526216a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-06.png",
+      "bytes": 13473,
+      "sha256": "966ca95d2458157678839569afa2b785b2c4efe6098866889ca922a620ecc674"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-07.png",
+      "bytes": 14009,
+      "sha256": "74d983926c17b54feb876fa155b1dd0bc763ac98d273d9f433975874f70373c7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-08.png",
+      "bytes": 19932,
+      "sha256": "4b1805041d2fd6578617245bb3eb738b885edcd6577d7cef757b38a7d640cfe0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-09.png",
+      "bytes": 16541,
+      "sha256": "d1600fda77db284bf4043e7ee86aeaa5ad41dc7a47df10b840f933c2e6e8fab0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-10.png",
+      "bytes": 8285,
+      "sha256": "9f6f72d937c3f6e416ac3554088443fb883503a81ce1ade3c55876833d595909"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-11.png",
+      "bytes": 8649,
+      "sha256": "dad8cd479379bcc6f2099a6fbf7afc57d954073dc0873ed002f79825bbaa6d2d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\operator-12.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\result.json",
+      "bytes": 2166,
+      "sha256": "1e753660ec20f84ff4deda75ad4ce519c6edc0ae71238971bffef365243d80de"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\serial.log",
+      "bytes": 74,
+      "sha256": "56265485de31d88a12d913a5876b6570a9dfe25814a7bedecf85d4cdf3123321"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed03-network07\\stderr.log",
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\command.json",
+      "bytes": 1419,
+      "sha256": "7a2f609256bb0fc6504bd9ce410c0ab41219f452d0691a41497dbb7a22003b8d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\completed.json",
+      "bytes": 34,
+      "sha256": "14eb25e4fe80779a092397e4324834e2b79b7597d68331057cbf071746054576"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\final.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\first-logon.json",
+      "bytes": 35,
+      "sha256": "de416c0878c1d17774dd5a147bdcd177713759c1b6aa7078b0eb2a290eddef89"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\guard-attempted.json",
+      "bytes": 20,
+      "sha256": "514cc9f76e4935e9337f9755039f8652098aa7f4a00eb2846bbf3d5c3665ab6d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\instrumentation.json",
+      "bytes": 440,
+      "sha256": "f8025341881ec8d6d7f0c3fd2d0447020322d99fce0f9d90a23c291cd6d9873c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\irq-assessment.json",
+      "bytes": 389,
+      "sha256": "0af6146fdafd6b47a0d0860c2a3d13c5b54f563ad1952158814d615d5bc9bd4e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\network.json",
+      "bytes": 1734,
+      "sha256": "51fb209fa184e2a62c01893d2cc1d4d4001e691c9d2a8bb326b56db96afd0f34"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\network.pcap",
+      "bytes": 3880,
+      "sha256": "c55a7c3bf9f28727568f9956c3730542d6c30e10598130635cdae19b367bc49e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-02.png",
+      "bytes": 14306,
+      "sha256": "bb657c07a9d8b174bf18d495f803ff383752b10430e675248033f711d229843b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-03.png",
+      "bytes": 10829,
+      "sha256": "baeae1610a266136bdb58ee9baea9e137cebcf2b387e9a678a7ab19625218d16"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-04.png",
+      "bytes": 11822,
+      "sha256": "a58efd41e1dbf286ad3003999e151de27fbf976a3757fdf5b5e1a011cbde5896"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-05.png",
+      "bytes": 12452,
+      "sha256": "db03647a482d53770e9a74f8201f8f11d0d6b91cc357ddc900a14d16d813f0a7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-06.png",
+      "bytes": 13502,
+      "sha256": "a6c25719929a70872142c16cdc543c221ebc751b13fc7dd812a27d6be71154d8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-07.png",
+      "bytes": 14033,
+      "sha256": "e7ee22c00bd987043956560848f8979a145d3be1bc19d4bd0bd2e84ec794299e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-08.png",
+      "bytes": 12827,
+      "sha256": "7d0e1bb95c5104cbe4ea736807ca3262e9b758883b6e0b5be217219ab6addf9b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-09.png",
+      "bytes": 27199,
+      "sha256": "09fed1560acea0a3fa823e87a2c439330470db0ad64071d3b8899b8496fba7cf"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-10.png",
+      "bytes": 24484,
+      "sha256": "5b80e9c85e6b80bf2b5752f03465daa86e30f751e54143330ad504ccdd42262c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-11.png",
+      "bytes": 23411,
+      "sha256": "01aa4453ee7131a454695884989457a7f7e8db837491ab0f368916475f00ed17"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-12.png",
+      "bytes": 19921,
+      "sha256": "7ef763d92c993e16d91ce7b466b2be78125a97d8bc7f04eee984d4de0069217c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-13.png",
+      "bytes": 19477,
+      "sha256": "adac66c08ba33e1446b59a54e9b513afaebaa7fa60f1279a29bf469bf659ae5d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-14.png",
+      "bytes": 8261,
+      "sha256": "6d9d21c3bb47042c271f75752d4e965b87bc808ab1b89b461385bcbca01cea95"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-15.png",
+      "bytes": 8649,
+      "sha256": "dad8cd479379bcc6f2099a6fbf7afc57d954073dc0873ed002f79825bbaa6d2d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\operator-16.png",
+      "bytes": 95489,
+      "sha256": "b09f0b14bcb7f1114cb96125fd7c94d4cc5340674e137058e95aa1e4e262028b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\pci-irq-boundary.json",
+      "bytes": 199,
+      "sha256": "5276973efdb5e1c8427650e9e0bcd7f6a9821095e1980c748a3b60a1dd8d4354"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\result.json",
+      "bytes": 3044,
+      "sha256": "36887cf2803eed9f46c7867e2d12525a695194b4d8a4c4271ef4ced58c2e484e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\serial.log",
+      "bytes": 74,
+      "sha256": "56265485de31d88a12d913a5876b6570a9dfe25814a7bedecf85d4cdf3123321"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\stderr.log",
+      "bytes": 4006,
+      "sha256": "a13e307aed33e2667540fdb6c284a3dd24db709cce9ab0601e61cbc32cf1c883"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed07-canonical-irq08\\trace-events.txt",
+      "bytes": 206,
+      "sha256": "54536c28f803cace6bc5ec3c0562bf7eddd303a6990b6f219946840f9a005438"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\command.json",
+      "bytes": 1700,
+      "sha256": "8d205724e6d341e0a376ef13b1462d9efed153d3896827f6aa0e078358bf2219"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\completed.json",
+      "bytes": 46,
+      "sha256": "1d985e4651017e88edd83dab8b6cd464c5c7f9b52e4a3fc1da8f3b28f7439a04"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\endpoint.png",
+      "bytes": 88085,
+      "sha256": "2f673a7f328f8b5383c6d3d386b29861dd268d2c895f12e61d90d2306825a426"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\first-logon.json",
+      "bytes": 42,
+      "sha256": "bab588e08dc369163075b724520bb8d3e89d3115febad78ad715d05d7a783cc1"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\guard-attempted.json",
+      "bytes": 27,
+      "sha256": "00f30d46926844d182f8bbdc9d30c5de5273259a019f663e68e5115c3a61c77f"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\msc-hot-done.json",
+      "bytes": 75,
+      "sha256": "b8a0b7c61813ce1c44c34fce85cd6f2056fc4c3c4a29b5e7f9764e19035d6d0e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\msc-replug-done.json",
+      "bytes": 78,
+      "sha256": "6578bcf5140ee4ca9a7cc92fbff4b89b6f2b86f2a2080a2d43b4ec389a1a3625"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\msc-startup-done.json",
+      "bytes": 79,
+      "sha256": "f1bb33e7c678c94cf4046aff46427da6e09e0a53d3a67d4bfa5335df099cff7a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\network.json",
+      "bytes": 1375,
+      "sha256": "07fb48d7fc429ad7c6c4f8759ab05125264eb36b10eac7d53a7d30fd8b67805b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\network.pcap",
+      "bytes": 1952,
+      "sha256": "82105e319c531e95745c7696cc25edfebc82964d675a90d06a7064d053b3ddb2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-01.png",
+      "bytes": 74033,
+      "sha256": "056a673189902cfd9595c02bc0920a12c289d16f8217837cbe694345f4080c12"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-02.png",
+      "bytes": 14236,
+      "sha256": "7f9d58c551a33264d99b35c454e1c4d8b9f0baab0dbb298e21177ac239f742c8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-03.png",
+      "bytes": 10808,
+      "sha256": "3155eed8a9f63e1c3e15411f1c920b8bff6a3eea7336c20c7a201a20d42d606f"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-04.png",
+      "bytes": 12841,
+      "sha256": "03bf8be01dbc39c924f0f245f38cf5398ed86407fd6d358994d6436c21995a7e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-05.png",
+      "bytes": 13802,
+      "sha256": "9693c01ea1abade5935728d5a165d60334b0fc746389722d88227a07a927a261"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-06.png",
+      "bytes": 14391,
+      "sha256": "5f5c1cdd4936efc5075b4cefd4fc9bfccc2831cc268b3eece539fb4d80192ec7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-07.png",
+      "bytes": 15457,
+      "sha256": "b4919542694f405fddb8e07513a35e5f03fdc59e56ad8f72cba95755ef52b16e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-08.png",
+      "bytes": 16025,
+      "sha256": "feb2833f9e8ab95404850743c59506aeed0f593f9db28a35a8f75e54bab03382"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-09.png",
+      "bytes": 19928,
+      "sha256": "83237fdecd8a490bf6bc89b906b917f5e5d42e93d0bbecce476a9254b148dcb3"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-10.png",
+      "bytes": 19459,
+      "sha256": "d137364507243876e229803f6549b5957050e82ff7362c4c05c1f30410cd783e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-11.png",
+      "bytes": 12119,
+      "sha256": "a9350d07a1ef26a28306bea3c02aec58f2f27df73ad85491d786b2a477fbcec2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-12.png",
+      "bytes": 12119,
+      "sha256": "a9350d07a1ef26a28306bea3c02aec58f2f27df73ad85491d786b2a477fbcec2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-13.png",
+      "bytes": 12110,
+      "sha256": "6ea43ac04f4a90ff40d2d06ee09699cd14265b8b3de23947f6b5eca0ee0876f6"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-14.png",
+      "bytes": 12129,
+      "sha256": "a7e5ec185ad8758a9d19620ee77e266213d264c54cc78dae4bf8fea8558eeaf0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-15.png",
+      "bytes": 12208,
+      "sha256": "836ecd13cfc4515d55d1faf4ec65c29f8a26eab880b545c89ba4568f35c22936"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-16.png",
+      "bytes": 8975,
+      "sha256": "3982498885f1a5d538b27b1753f44d40e9262dab128d1117eef116b5c6c0a1ac"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-17.png",
+      "bytes": 8884,
+      "sha256": "0341684fb2edf5ae457089f1cf6f8cabad8c26387ecf7736c82f2b76315b4e7e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-18.png",
+      "bytes": 15378,
+      "sha256": "397155bc83554df958170e10ebc5ec9d0ae8fb699f0bb5b025a7fc679e7acaf2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-19.png",
+      "bytes": 8919,
+      "sha256": "0c518cf23f50240b8aaa5fff1a0218fa5720dc33c97d065aa7310a73b03dea9a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-20.png",
+      "bytes": 12932,
+      "sha256": "1840cbfa99dfe48cf1e23d9416b3278ecc6e74d868b89bb9bd68bca078b770c4"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-21.png",
+      "bytes": 8917,
+      "sha256": "427d4d141f211142ab03482b38ca682c6b714788ad71d3d974314c6c230dabb2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-22.png",
+      "bytes": 8923,
+      "sha256": "f370af1b3e99d4a1c28f21ba165304f37d41f85b2a0e5b2b4b627bc6e5f50301"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-23.png",
+      "bytes": 18378,
+      "sha256": "6c4850c9ca12710ff620bb10269599fc6e4202b28f1cb865d75afd91d0478edc"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-24.png",
+      "bytes": 15296,
+      "sha256": "f3275bff2a24cb25b0a1aa2b46f12903f253e3745df1e8e024c73064e73284db"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-25.png",
+      "bytes": 16905,
+      "sha256": "e2a8e7f48d0eed1767a05f6b3ece5594ffe76211dd81b541789223c68f3a96c0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-26.png",
+      "bytes": 17981,
+      "sha256": "14bfc1a7aa529701f4124415c47afa3f333f9cb4565f998364f6b6e39bb2c7be"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-27.png",
+      "bytes": 14025,
+      "sha256": "a69e66b2a434dd5eb3991f597e5e6f8eed777c99b3aa222a57dd4009cf4eacc4"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-28.png",
+      "bytes": 14022,
+      "sha256": "3bf68955dab0bca06ac0cd61969364c9450c0bfbd31173fcb8245e096c95c3d0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-29.png",
+      "bytes": 13271,
+      "sha256": "e2e6b4067b55b25e1aee11633dfec9a3d4a70373d9030f954bcc545f527ddaaf"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-30.png",
+      "bytes": 15131,
+      "sha256": "fff4ac64805f9029697200727aecaba70b36058cb6195cdbb50c51189ac5fc98"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-31.png",
+      "bytes": 11635,
+      "sha256": "b0e06333595ccbf65778d07113ff2087172ab9e40ba4048a7d04302417f01978"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-32.png",
+      "bytes": 16164,
+      "sha256": "138a6382ca3c0e87bc3d1a6265ee512bde08ad41ae14ead6c597cbb88405570e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-33.png",
+      "bytes": 15281,
+      "sha256": "2f3de7c953788c9451c6b1090da3c93f9db18b71f21afc47a518c73ee81ab3d2"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-34.png",
+      "bytes": 8163,
+      "sha256": "f7affc87365f19d5029e37c7f6def1ef0fa8b6115856b36d3898432527f4267c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-35.png",
+      "bytes": 8547,
+      "sha256": "754c7b8117e2eafb018a696bb366bcd850eebbdbd5a9dba446f990ed92f20f3d"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\operator-36.png",
+      "bytes": 95471,
+      "sha256": "ccad027ae9c13dd02e5858ad8da28909acbf5db09a15e6076a84ad41c96603d9"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\preflight.json",
+      "bytes": 2648,
+      "sha256": "5821b3866496d81b8e32840b9da47bbf38979b55e2bfa0116b26ac4a149187b0"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\result.json",
+      "bytes": 2761,
+      "sha256": "f6467d66028ee4c4813f024c00a4deed3b3a7d688df4b163416f26ea72a935ae"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\serial.log",
+      "bytes": 153,
+      "sha256": "a903eddd3dce1991251bd5e805dbc56aa328fa88ea4d265e928b7087a8657ad7"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\coverage\\vm\\nt4-installed08-usbmsc-hid-net09\\stderr.log",
+      "bytes": 4029,
+      "sha256": "f2ddae0c9aada5d884f6e81efd5877142b2d52f30fe6c6a86068b9501469f6ec"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\collector-source.py",
+      "bytes": 1923,
+      "sha256": "08a00d41547d66063cd7843ab4a6a5b64332c748e6c0e714139f7b995babeac8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\evaluation.json",
+      "bytes": 6347,
+      "sha256": "3792ae307bd09cf87751b24d5618e4a16e7f90a97e82e1b1dda49ae5c9ef1a64"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\network-collection.json",
+      "bytes": 1348,
+      "sha256": "c6f8e11b6e8c0a4686b05382fdc859fe612e6201687f3e714e1c874d33ae7d59"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\notify-source.py",
+      "bytes": 863,
+      "sha256": "286967faef04c8406d663f668760ea78dddf85570b03390ac84729ceecbf6b2e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\offline-first-layout-rejection.json",
+      "bytes": 259,
+      "sha256": "fb3dd28bf1a743bf61734a51351bb8b18fb557bb0b7c2bdb999cfe47dcd1131e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\own-MSC4LOG.TXT",
+      "bytes": 345,
+      "sha256": "d1c2a5d08005b71b6968693616c9caa282c9ed13bd7d5cfb35efbf6aa8749b02"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\preparation.json",
+      "bytes": 4563,
+      "sha256": "1960450136509e4b5b5840c67a7a9c762376623e8d06f2e9cc96d191d27c02ed"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\prepare-source.py",
+      "bytes": 12159,
+      "sha256": "34fbec09cbd74a26b774293e8d89a4277cb894a50f605ca1c7d62a338c79cd0b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\reused-msc-runtime-source.py",
+      "bytes": 9014,
+      "sha256": "83f5fdb6008e727be772c30e64cd1e18bbf290b9edd96521639733e8e6c22290"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\runtime-preflight.json",
+      "bytes": 2615,
+      "sha256": "377a9a4f16d31aab62d3ce9cf5d87258fc71127a3a1599425b6864ae3b0f138c"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\runtime-result.json",
+      "bytes": 2670,
+      "sha256": "84c8d0cc3ca7d1a9c363016ff2451409f903000115be65f7859f5c3b9527d557"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\runtime-source.py",
+      "bytes": 7849,
+      "sha256": "1f2d31a5a13904160abed563ab14b17e28856c71fe1f1825ca30842d370a57a8"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\stopped-readback.json",
+      "bytes": 3094,
+      "sha256": "c982eacb8de11382c1edbbe59eb446edb370cf957513578f849c93b35cb5074b"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\tools\\tests\\coverage\\nt4page_snapshot\\installed03\\tuple09\\stopped-reader-source.py",
+      "bytes": 2854,
+      "sha256": "76846aa48b46a7e011c6b0d2e79128055b25bfe7843050013bb38eb77f8944fd"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed05-network-excerpt\\collection-state.txt",
+      "bytes": 166,
+      "sha256": "fe5dba8e54f741202639951977c225fc4519ea2c722bf4debb54937f45d19c80"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed05-network-excerpt\\collection.json",
+      "bytes": 1134,
+      "sha256": "3aef0c601baef72fb78b6f4472c1f0b036694f52c24ebca0f9bdcd93f3c71e9e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed05-network-excerpt\\driver-sha256.txt",
+      "bytes": 65,
+      "sha256": "cf17e9fef82b16a1940be3f564444d3635b924268ce4810eea505e87ffcdbd2e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed05-network-excerpt\\network-coverage.txt",
+      "bytes": 625,
+      "sha256": "e8212c635eeedd00deca02ea0af41b14125742cb4fa0debf0dc2f1ed7ddddd4e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed05-network-excerpt\\observer-status.txt",
+      "bytes": 35,
+      "sha256": "ba98d1b82100bf4570b0b873721fe35a76aa3e07c78bf9f78242d83796657afe"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed07-network-excerpt\\collection-state.txt",
+      "bytes": 166,
+      "sha256": "fe5dba8e54f741202639951977c225fc4519ea2c722bf4debb54937f45d19c80"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed07-network-excerpt\\collection.json",
+      "bytes": 1342,
+      "sha256": "eb535a3ce535a4493a359c5b89fc0c65f442d69637b5288b7e4d0237de8f86c6"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed07-network-excerpt\\driver-sha256.txt",
+      "bytes": 65,
+      "sha256": "cf17e9fef82b16a1940be3f564444d3635b924268ce4810eea505e87ffcdbd2e"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed07-network-excerpt\\network-coverage.txt",
+      "bytes": 774,
+      "sha256": "603e70c29d5b718c86aec3a9f06b56b82302b163481be0b43ecafffec91eb067"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed07-network-excerpt\\observer-status.txt",
+      "bytes": 33,
+      "sha256": "aca03be30a64b4fa95e430d9ac48b6eb656c5af311c2584df305a63d13f3d47a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08-network-excerpt\\collection-state.txt",
+      "bytes": 167,
+      "sha256": "0cd4041d1100c87f9cac811c3e8c39a8b4aca9641c85aea07ccd98822493c060"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08-network-excerpt\\collection.json",
+      "bytes": 1113,
+      "sha256": "9545e7b6dd12f2efcd4360d7c943574fdf14f5b6af24f27a0f896a146df2f7a4"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08-network-excerpt\\network-coverage.txt",
+      "bytes": 774,
+      "sha256": "94f84992715a70c2b1f373736aa7bb21f29bb5626413817c3c30465564e77cea"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08-network-excerpt\\observer-status.txt",
+      "bytes": 33,
+      "sha256": "aca03be30a64b4fa95e430d9ac48b6eb656c5af311c2584df305a63d13f3d47a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\collection-state.txt",
+      "bytes": 166,
+      "sha256": "fe5dba8e54f741202639951977c225fc4519ea2c722bf4debb54937f45d19c80"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\collection.json",
+      "bytes": 1564,
+      "sha256": "6c0b0212fd277d0fbc255ee8050ff49a2cbcf9ec9d6fb85eea9b96d0ae0366a5"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\driver-sha256.txt",
+      "bytes": 65,
+      "sha256": "80de68e07a4f74c12cefb1b014ea53ff9e331c34edf22522e72e4d070e84f5de"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\network-coverage.txt",
+      "bytes": 774,
+      "sha256": "94f84992715a70c2b1f373736aa7bb21f29bb5626413817c3c30465564e77cea"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed08b-network-excerpt\\observer-status.txt",
+      "bytes": 33,
+      "sha256": "aca03be30a64b4fa95e430d9ac48b6eb656c5af311c2584df305a63d13f3d47a"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\collection-state.txt",
+      "bytes": 166,
+      "sha256": "fe5dba8e54f741202639951977c225fc4519ea2c722bf4debb54937f45d19c80"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\collection.json",
+      "bytes": 1348,
+      "sha256": "c6f8e11b6e8c0a4686b05382fdc859fe612e6201687f3e714e1c874d33ae7d59"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\driver-sha256.txt",
+      "bytes": 65,
+      "sha256": "80de68e07a4f74c12cefb1b014ea53ff9e331c34edf22522e72e4d070e84f5de"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\network-coverage.txt",
+      "bytes": 774,
+      "sha256": "1c64a4e5388ac75e4844ad089ca789cbf97d8093490dc027549b88beaa09fa37"
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\macierz-windows\\artifacts\\coverage\\nt4-installed09-network-excerpt\\observer-status.txt",
+      "bytes": 33,
+      "sha256": "aca03be30a64b4fa95e430d9ac48b6eb656c5af311c2584df305a63d13f3d47a"
+    }
+  ],
+  "C_transport_copies": [
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-loadorder05\\serial.log",
+      "sha256": "cda0b1634cb475718ac15124ba9a84557873c528332e7e0c80d8442d34de67a9",
+      "bytes": 30467
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-loadorder05\\stderr.log",
+      "sha256": "3193817b3ae35255a2924c35030c132804ebac6089498820c332964acfbd86cb",
+      "bytes": 327
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-loadorder05\\result.json",
+      "sha256": "363d4e1e6e01b9207bf131e610dbbc80782c701046bd5e92ac5fc4d8edbdf700",
+      "bytes": 322
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-loadorder05\\command.json",
+      "sha256": "52a3b9454608a43a5d1720d19f1831b34f70c136e44bdafe9c7d71c835fd29d7",
+      "bytes": 847
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-network07\\serial.log",
+      "sha256": "ff0aac9fda6b554940fde619650e76c685e483dcd435b4c6c4b22d497a150fb1",
+      "bytes": 30495
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-network07\\stderr.log",
+      "sha256": "3193817b3ae35255a2924c35030c132804ebac6089498820c332964acfbd86cb",
+      "bytes": 327
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-network07\\result.json",
+      "sha256": "c2813fbba17f8b5ab36a9194c0c399aedd3352c065dd3e2fc1d1372e6ef16e36",
+      "bytes": 320
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed03-network07\\command.json",
+      "sha256": "8cd26722ef1b2f17a3e2adb8c2029a123f4960f083bdf0f598151a0af5f490e6",
+      "bytes": 845
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed07-canonical-irq08\\serial.log",
+      "sha256": "79f1dfa2f4d96105d21571e63319b12c1f9be5f4f00c8af4f8e1f8455585184f",
+      "bytes": 30392
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed07-canonical-irq08\\stderr.log",
+      "sha256": "3193817b3ae35255a2924c35030c132804ebac6089498820c332964acfbd86cb",
+      "bytes": 327
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed07-canonical-irq08\\result.json",
+      "sha256": "79a08cf5c3ea87be1391cdfda5e078f8b2d2cfacce5dbb247c9d0e7a8eedf59b",
+      "bytes": 326
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed07-canonical-irq08\\command.json",
+      "sha256": "7d33deb8f7c94bb882c870b22cb94586297d9a866cf2f4891525a5467341599f",
+      "bytes": 851
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08b-network-readonly\\serial.log",
+      "sha256": "b1cca2719daeb32e562f940f12f5a0e79b13fef53766853d2c3f1a06d50fbc4c",
+      "bytes": 30499
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08b-network-readonly\\stderr.log",
+      "sha256": "3193817b3ae35255a2924c35030c132804ebac6089498820c332964acfbd86cb",
+      "bytes": 327
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08b-network-readonly\\result.json",
+      "sha256": "172a31cedf8366fd44bfcf03dfde13383cb151568c80a705949044879aea8680",
+      "bytes": 328
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08b-network-readonly\\command.json",
+      "sha256": "9bd5fc6f81ae7238ac022f7da618e694c7a0552c7b7039d50fba24e682a97ad3",
+      "bytes": 853
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08-usbmsc-hid-net09\\serial.log",
+      "sha256": "48ded4d383d04e589887548100084dc6e21d4b3b6ae660a3f511d71a3d9ed0c3",
+      "bytes": 30499
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08-usbmsc-hid-net09\\stderr.log",
+      "sha256": "3193817b3ae35255a2924c35030c132804ebac6089498820c332964acfbd86cb",
+      "bytes": 327
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08-usbmsc-hid-net09\\result.json",
+      "sha256": "9a54314676216ebe28691e47ff6ab0c26f17f156bb143e7c8acb5d4c1016178f",
+      "bytes": 326
+    },
+    {
+      "path": "C:\\Users\\ASRock\\usos-work\\nt4-net\\artifacts\\nt4-success-review\\completed-network-transports\\nt4-installed08-usbmsc-hid-net09\\command.json",
+      "sha256": "c9600188bdba2d18b86379e61c8a126fe79756231dd1181b5e409ccb4baec324",
+      "bytes": 852
+    }
+  ],
+  "literal_count": 14,
+  "unique_file_ids": 13,
+  "unique_qcow2_file_length_bytes": 2297694720,
+  "delete_executed": false
+}

@@ -1,0 +1,74 @@
+; winsock16.def - export list for the USOS Win16 Winsock 1.1 provider.
+; Copyright (C) 2026 Maksymilian and the USOS Authors
+; SPDX-License-Identifier: GPL-3.0-or-later
+;
+; Ordinals follow the public Winsock 1.1 specification appendix ("Name and
+; ordinal"): accept..socket = 1..23, gethostbyaddr..gethostname = 51..57,
+; WSAAsyncSelect..WSACleanup = 101..116, __WSAFDIsSet = 151.  Every entry is
+; exported by name as well, so applications importing by name (the usual case)
+; and applications importing by ordinal both resolve.
+;
+; NB: WSAStartup is ordinal 115, not 1 - ordinal 1 is accept.
+; WEP sits at 1024 because 1..151 are reserved by the Winsock 1.1 ABI.
+
+LIBRARY        WINSOCK
+DESCRIPTION    'USOS Winsock 1.1 (Win16) - GPL-3.0-or-later'
+EXETYPE        WINDOWS
+CODE           PRELOAD MOVEABLE DISCARDABLE
+DATA           PRELOAD MOVEABLE SINGLE
+HEAPSIZE       4096
+STACKSIZE      8192
+
+EXPORTS
+    accept                      @1
+    bind                        @2
+    closesocket                 @3
+    connect                     @4
+    getpeername                 @5
+    getsockname                 @6
+    getsockopt                  @7
+    htonl                       @8
+    htons                       @9
+    inet_addr                   @10
+    inet_ntoa                   @11
+    ioctlsocket                 @12
+    listen                      @13
+    ntohl                       @14
+    ntohs                       @15
+    recv                        @16
+    recvfrom                    @17
+    select                      @18
+    send                        @19
+    sendto                      @20
+    setsockopt                  @21
+    shutdown                    @22
+    socket                      @23
+
+    gethostbyaddr               @51
+    gethostbyname               @52
+    getprotobyname              @53
+    getprotobynumber            @54
+    getservbyname               @55
+    getservbyport               @56
+    gethostname                 @57
+
+    WSAAsyncSelect              @101
+    WSAAsyncGetHostByAddr       @102
+    WSAAsyncGetHostByName       @103
+    WSAAsyncGetProtoByNumber    @104
+    WSAAsyncGetProtoByName      @105
+    WSAAsyncGetServByPort       @106
+    WSAAsyncGetServByName       @107
+    WSACancelAsyncRequest       @108
+    WSASetBlockingHook          @109
+    WSAUnhookBlockingHook       @110
+    WSAGetLastError             @111
+    WSASetLastError             @112
+    WSACancelBlockingCall       @113
+    WSAIsBlocking               @114
+    WSAStartup                  @115
+    WSACleanup                  @116
+
+    __WSAFDIsSet                @151
+
+    WEP                         @1024

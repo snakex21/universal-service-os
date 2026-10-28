@@ -1,4 +1,4 @@
-/* Read VS_FIXEDFILEINFO from PE resources without loading executable code.
+/* Read VS_FIXEDFILEINFO from PE/NE resources without loading executable code.
  * Used by the Linux preparation stage to prevent downgrading Windows files.
  */
 #include <stdint.h>
@@ -14,6 +14,34 @@ static int found;
 static int range(size_t at,size_t bytes){return at<=size&&bytes<=size-at;}
 static uint16_t u16(size_t at){return (uint16_t)data[at]|((uint16_t)data[at+1]<<8);}
 static uint32_t u32(size_t at){return (uint32_t)u16(at)|((uint32_t)u16(at+2)<<16);}
+static int fixed_version(size_t at){
+ if(!range(at,52)||u32(at)!=0xfeef04bd||u32(at+4)!=0x10000)return 0;
+ uint32_t ms=u32(at+8),ls=u32(at+12);
+ if(found&&(ms!=major_minor||ls!=build_revision))return 0;
+ major_minor=ms;build_revision=ls;found=1;return 1;
+}
+static int ne_version(size_t ne){
+ if(!range(ne,64))return 0;
+ size_t table=ne+u16(ne+36),end=ne+u16(ne+38);
+ if(table<ne+64||end<table||!range(table,end-table)||end-table<4)return 0;
+ unsigned shift=u16(table);if(shift>15)return 0;table+=2;
+ while(table+2<=end){
+  unsigned type=u16(table);if(!type)return found;
+  if(end-table<8)return 0;
+  unsigned entries=u16(table+2);table+=8;
+  if(entries>4096||(size_t)entries*12>end-table)return 0;
+  for(unsigned i=0;i<entries;i++,table+=12){
+   if(type!=0x8010)continue;
+   size_t at=(size_t)u16(table)<<shift,length=(size_t)u16(table+2)<<shift;
+   if(u16(table+6)!=0x8001||!range(at,length)||length<72)return 0;
+   unsigned actual=u16(at),value=u16(at+2);
+   static const char key[]="VS_VERSION_INFO";
+   if(actual<72||actual>length||value<52||value>actual-20||memcmp(data+at+4,key,sizeof(key)))return 0;
+   if(!fixed_version(at+20))return 0;
+  }
+ }
+ return 0;
+}
 static size_t offset(uint32_t rva,uint32_t bytes){
  for(unsigned i=0;i<count;i++){
   size_t s=sections+40*i;uint32_t va=u32(s+12),raw=u32(s+20),length=u32(s+16);
@@ -31,10 +59,7 @@ static int version(uint32_t leaf){
  static const char key[]="VS_VERSION_INFO";
  for(unsigned i=0;i<sizeof(key);i++)if(u16(at+6+2*i)!=(unsigned char)key[i])return 0;
  size_t fixed=at+40;
- if(u32(fixed)!=0xfeef04bd||u32(fixed+4)!=0x10000)return 0;
- uint32_t ms=u32(fixed+8),ls=u32(fixed+12);
- if(found&&(ms!=major_minor||ls!=build_revision))return 0;
- major_minor=ms;build_revision=ls;found=1;return 1;
+ return fixed_version(fixed);
 }
 static int walk(uint32_t at,unsigned depth){
  if(depth>2||!relative(at,16))return 0;
@@ -58,7 +83,9 @@ int main(int argc,char **argv){
  size=(size_t)n;data=malloc(size);if(!data){fclose(f);return 1;}
  int ok=fread(data,1,size,f)==size;fclose(f);
  if(!ok||u16(0)!=0x5a4d)goto fail;
- size_t pe=u32(0x3c);if(!range(pe,24)||u32(pe)!=0x4550)goto fail;
+ size_t pe=u32(0x3c);if(!range(pe,2))goto fail;
+ if(u16(pe)==0x454e){if(!ne_version(pe))goto fail;goto success;}
+ if(!range(pe,24)||u32(pe)!=0x4550)goto fail;
  count=u16(pe+6);unsigned optional=u16(pe+20);size_t op=pe+24;
  if(count>96||optional<2||!range(op,optional))goto fail;
  unsigned directory=u16(op)==0x20b?112:u16(op)==0x10b?96:0;
@@ -66,6 +93,6 @@ int main(int argc,char **argv){
  sections=op+optional;if(!range(sections,(size_t)count*40))goto fail;
  uint32_t rva=u32(op+directory+16);resource_size=u32(op+directory+20);
  resource=offset(rva,resource_size);if(resource==SIZE_MAX||!walk(0,0)||!found)goto fail;
- printf("%u %u %u %u\n",major_minor>>16,major_minor&65535,build_revision>>16,build_revision&65535);free(data);return 0;
+ success:printf("%u %u %u %u\n",major_minor>>16,major_minor&65535,build_revision>>16,build_revision&65535);free(data);return 0;
  fail:free(data);return 1;
 }

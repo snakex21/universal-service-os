@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const BootMethod = @import("boot_method.zig").BootMethod;
 const SystemEntry = @import("system_entry.zig").SystemEntry;
 
@@ -14,6 +15,23 @@ pub const entries = [_]SystemEntry{
         .firmware = .any,
         .boot_methods = &methods,
     },
+} ++ uefiOnly(.{
+    // Windows XP Media Center Edition 2005 (XP x86 SP3 Setup with the Media
+    // Center components in CMPNENTS): the XP flow from UEFI (os_profiles.zig
+    // route_as windows-xp, profile xp-x86-sp3-uefi-csm) with its own DATA
+    // folder (usos.xp_edition=mce). The BIOS Core leaves it out (size budget).
+    uefiLegacy("windows-xp-mce", "Windows XP Media Center Edition 2005", "Windows XP Media Center Edition 2005"),
+    // Windows XP Tablet PC Edition 2005 (XP x86 SP3 Setup with the Tablet PC
+    // components in CMPNENTS\TABLETPC): the same XP flow from UEFI with its
+    // own DATA folder (usos.xp_edition=tablet). Not in the BIOS Core.
+    uefiLegacy("windows-xp-tablet", "Windows XP Tablet PC Edition 2005", "Windows XP Tablet PC Edition 2005"),
+    // Windows Embedded POSReady 2009 (XP SP3 Embedded; Windows PE + .NET
+    // Setup + setup.wim, not XP text mode): the whole install in the VM on
+    // the target like NT 4.0 (profile posready-x86-qemu-csmwrap,
+    // docs/posready-2009-2026-10-10.md), then CSMWrap. Not in the BIOS Core.
+    uefiLegacy("windows-embedded-posready-2009", "Windows Embedded POSReady 2009", "Windows Embedded POSReady 2009"),
+    uefiLegacy("windows-flp", "Windows Fundamentals for Legacy PCs", "Windows Fundamentals for Legacy PCs"),
+}) ++ [_]SystemEntry{
     // XP Professional x64 (NT 5.2 amd64): the NT5 staging with an AMD64
     // source (profile xp-x64-sp2-uefi-csm from UEFI, experimental).
     .{
@@ -38,14 +56,70 @@ pub const entries = [_]SystemEntry{
         .firmware = .any,
         .boot_methods = &methods,
     },
-    legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true),
-    legacy("windows-me", "Windows Me", "Windows Me", true),
-    legacy("windows-98-se", "Windows 98 SE", "Windows 98 SE", true),
-    legacy("windows-98", "Windows 98", "Windows 98", true),
-    legacy("windows-95", "Windows 95", "Windows 95", true),
-    legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false),
-    legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false),
-};
+    // Windows NT 4.0 Workstation: from UEFI the whole install runs in QEMU
+    // on the target (profile nt4-x86-qemu-csmwrap, experimental;
+    // docs/nt4-2026-10-07.md), then the SP6a system starts through CSMWrap.
+    anyFirmware(legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true)),
+} ++ uefiOnly(.{
+    // Windows NT 3.51 Workstation: the NT 4.0 VM flow (profile
+    // nt3-x86-qemu-csmwrap, experimental; docs/nt351-2026-10-08.md). UEFI
+    // only: the BIOS Core has no NT 3.51 path (and no room).
+    uefiLegacy("windows-nt-3-51", "Windows NT 3.51", "Windows NT 3.51"),
+    // Windows NT 3.5 Workstation: the NT 3.51 flow (docs/nt35-2026-10-09.md).
+    uefiLegacy("windows-nt-3-5", "Windows NT 3.5", "Windows NT 3.5"),
+    // Windows NT 3.1 Workstation: the NT 3.x VM flow with the 3.1 Setup
+    // (docs/nt31-2026-10-09.md).
+    uefiLegacy("windows-nt-3-1", "Windows NT 3.1", "Windows NT 3.1"),
+}) ++ [_]SystemEntry{
+    // Windows 95/98/Me: the BIOS Core's DOS Setup, and from UEFI the
+    // micro-Linux disk preparation with a CSMWrap ESP (profile
+    // w9x-uefi-csmwrap, experimental; docs/win9x-modern-2026-09-30.md 4c).
+    win9x("windows-me", "Windows Me"),
+    win9x("windows-98-se", "Windows 98 SE"),
+    win9x("windows-98", "Windows 98"),
+    win9x("windows-95", "Windows 95"),
+} ++ uefiOnly(.{
+    // Windows for Workgroups 3.11: the Windows 3.1 flow (SETUP /H:USOS.SHH).
+    early("windows-wfw-3-11", "Windows for Workgroups 3.11", "Windows for Workgroups 3.11"),
+}) ++ [_]SystemEntry{
+    anyFirmware(legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false)),
+    anyFirmware(legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false)),
+} ++ uefiOnly(.{
+    // Windows 1.0x-3.0 (docs/windows-early-2026-10-07.md): MS-DOS 6.22, then
+    // their original Setup from A: (SUBST to C:\WINSETUP), own start menu.
+    early("windows-3-0", "Windows 3.0", "Windows 3.0"),
+    early("windows-2-11-386", "Windows 2.11 (386)", "Windows 2.11 (386)"),
+    early("windows-2-11-286", "Windows 2.11 (286)", "Windows 2.11 (286)"),
+    early("windows-2-03", "Windows 2.03", "Windows 2.03"),
+    early("windows-1-04", "Windows 1.04", "Windows 1.04"),
+    early("windows-1-01", "Windows 1.01", "Windows 1.01"),
+});
+
+/// Only the UEFI menu's DOS-family preparation (w9x-uefi-csmwrap) stages
+/// these; the BIOS Core (freestanding, size budget) leaves them out.
+const freestanding = builtin.os.tag == .freestanding;
+
+pub fn uefiOnly(comptime list: anytype) [if (freestanding) 0 else list.len]SystemEntry {
+    var result: [if (freestanding) 0 else list.len]SystemEntry = undefined;
+    if (!freestanding) {
+        inline for (list, 0..) |entry, i| result[i] = entry;
+    }
+    return result;
+}
+
+/// A UEFI-only entry with an Unattended folder (Windows NT 3.51).
+fn uefiLegacy(comptime id: []const u8, comptime name: []const u8, comptime folder: []const u8) SystemEntry {
+    var result = legacy(id, name, folder, true);
+    result.firmware = .uefi;
+    return result;
+}
+
+/// `folder`: the DATA folder (Systems\Windows\<folder>\Images); no "/".
+fn early(comptime id: []const u8, comptime name: []const u8, comptime folder: []const u8) SystemEntry {
+    var result = legacy(id, name, folder, false);
+    result.firmware = .uefi;
+    return result;
+}
 
 fn legacy(
     comptime id: []const u8,
@@ -63,4 +137,16 @@ fn legacy(
         .firmware = .bios,
         .boot_methods = &methods,
     };
+}
+
+fn win9x(comptime id: []const u8, comptime name: []const u8) SystemEntry {
+    return anyFirmware(legacy(id, name, name, true));
+}
+
+/// BIOS-only installers that UEFI starts through the DOS-family CSMWrap
+/// preparation (profile w9x-uefi-csmwrap).
+fn anyFirmware(entry: SystemEntry) SystemEntry {
+    var result = entry;
+    result.firmware = .any;
+    return result;
 }

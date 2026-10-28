@@ -1,0 +1,23 @@
+# Windows/286 2.11 Setup (USOSKBC, tools/usos_keyscript.py). Detected
+# display, keyboard and mouse; IBM AT; extended memory; no printer; United
+# States; AUTOEXEC.BAT unchanged (the USOS start menu sets the PATH); no Memset.
+wait "SETUP PROGRAM for Microsoft Windows/286"
+key enter
+wait "will now be set up on your hard disk"
+key enter
+wait "list of computers on which you may set up Windows"
+key enter
+wait "which Setup thinks you have"
+key enter
+wait "Extended Memory Setting"
+key enter
+wait "allow you to install a printer"
+key c
+wait "create appropriate country settings"
+key enter
+wait "PATH variable in"
+key n
+wait "Press any key to continue Setup"
+key space
+wait "Memset is a program"
+key c

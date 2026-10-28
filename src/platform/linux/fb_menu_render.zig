@@ -6,6 +6,7 @@ const usos = @import("usos");
 const model = @import("fb_menu_model.zig");
 const table_render = @import("fb_table_render.zig");
 const fb_i18n = @import("fb_i18n.zig");
+const disk_badge = @import("fb_disk_badge.zig");
 const Ui = usos.gui.ui.Ui;
 const Rect = usos.gui.ui.Rect;
 
@@ -108,10 +109,13 @@ pub fn renderWith(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32,
     for (state.items[layout.first..end], layout.first..) |item, index| {
         var item_title: [192]u8 = undefined;
         var item_detail: [256]u8 = undefined;
+        var chips: [model.max_badges]usos.gui.ui.Badge = undefined;
+        for (item.badgeTokens(), 0..) |token, chip| chips[chip] = disk_badge.badge(token);
         const row = usos.gui.ui.Row{
             .title = ui.tr(&item_title, item.title),
             .detail = ui.tr(&item_detail, item.detail),
             .icon = .{ .vector = iconFor(item.title) },
+            .chips = chips[0..item.badge_count],
         };
         ui.row(layout.list.rowRect(index - layout.first), row, usos.gui.menu_screens.stateOf(index, state.selected, hover));
     }
@@ -232,4 +236,29 @@ test "wheel scrolls what is under the pointer" {
     state.info_count = 2; // details fit: over the panel the wheel does nothing
     try std.testing.expectEqual(Layout.WheelTarget.none, layout.wheelTarget(state, true, 400, 400));
     try std.testing.expectEqual(Layout.WheelTarget.list, layout.wheelTarget(state, false, 0, 0));
+}
+
+test "disk chips are drawn in the row, right of the title" {
+    const pixels = try std.testing.allocator.alloc(u32, 1024 * 768);
+    defer std.testing.allocator.free(pixels);
+    const buffer = usos.gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, 1024, 768, .bgrx8).?;
+    const context = try std.testing.allocator.create(fb_i18n.Context);
+    defer std.testing.allocator.destroy(context);
+    context.* = .{};
+    context.load();
+    const ui = context.ui(buffer.surface);
+    const plain = try model.parse("title=Disks\nitem=Micron 3400 (476 GiB)|S/N: 1\nitem=Return to USOS\nselected=1");
+    const chipped = try model.parse("title=Disks\nitem=Micron 3400 (476 GiB)|S/N: 1\nbadge=nvme\nbadge=ssd\nitem=Return to USOS\nselected=1");
+    const layout = Layout.init(&ui, chipped);
+    const rect = layout.list.rowRect(0);
+    render(&ui, plain, 0, 0, false);
+    var before: [64]u32 = undefined;
+    const y = rect.y + rect.h / 2;
+    for (&before, 0..) |*pixel, i| pixel.* = buffer.surface.getRawPixel(rect.right() - ui.px(14) - 1 - @as(u32, @intCast(i)) * 3, y);
+    render(&ui, chipped, 0, 0, false);
+    var changed: usize = 0;
+    for (before, 0..) |pixel, i| {
+        if (buffer.surface.getRawPixel(rect.right() - ui.px(14) - 1 - @as(u32, @intCast(i)) * 3, y) != pixel) changed += 1;
+    }
+    try std.testing.expect(changed > 20);
 }

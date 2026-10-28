@@ -11,7 +11,7 @@ from pathlib import Path
 import json, re, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ['tools/xp_disk_reset_ui.sh', 'tools/xp_confirmation_ui.sh', 'tools/legacy_xp_staging.sh', 'tools/xp_disk_menu.sh', 'tools/vista_csmwrap_prepare.sh']
+SCRIPTS = ['tools/xp_disk_reset_ui.sh', 'tools/xp_confirmation_ui.sh', 'tools/legacy_xp_staging.sh', 'tools/xp_disk_menu.sh', 'tools/vista_csmwrap_prepare.sh', 'tools/w9x_csmwrap_prepare.sh']
 
 
 def catalog():
@@ -46,6 +46,21 @@ def texts(path: Path):
 
 
 class Nt5MenuStrings(unittest.TestCase):
+    def test_confirmation_defaults_to_cancel(self):
+        """Shared XP/Vista/9x confirmation: the preselected item (selected=,
+        counted from 0 by fb_menu_model.zig) is Cancel, and only the menu's
+        first item (usos-fb-ui prints index + 1) confirms."""
+        src = (ROOT / 'tools/xp_confirmation_ui.sh').read_text(encoding='utf-8')
+        selected = int(re.search(r'\\nselected=(\d+)\\n', src).group(1))
+        items = [m.group(1) for m in re.finditer(r"item=([^|]+)\|", src)]
+        self.assertEqual(items, ['Confirm', 'Cancel'])
+        self.assertEqual(items[selected], 'Cancel')
+        self.assertIn('[ "$USOS_MENU_RESULT" = 1 ]', src)
+        model = (ROOT / 'src/platform/linux/fb_menu_model.zig').read_text(encoding='utf-8')
+        self.assertIn('state.selected >= state.count) return error.InvalidSelection', model)
+        menu = (ROOT / 'src/platform/linux/fb_menu.zig').read_text(encoding='utf-8')
+        self.assertIn('"{d}\\n", .{index + 1}', menu)
+
     def test_every_menu_text_has_a_key(self):
         exact, templates = catalog()
         missing = []
@@ -88,6 +103,34 @@ class Nt5MenuStrings(unittest.TestCase):
             missing.append(t)
         self.assertEqual(missing, [])
 
+    def test_w9x_csmwrap_screens_are_translated(self):
+        """95/98/Me/DOS without CSM: the info lines of the erase confirmation,
+        the picker note, the stage details and the two user-facing stops have
+        boot keys (single- or double-quoted, $folder as {0})."""
+        exact, templates = catalog()
+        src = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        # w9x_release_time_zone prints TIMEZONE.INF keys (data, not UI text).
+        tz = src.index('w9x_release_time_zone() {')
+        scan = src[:tz] + src[src.index('\n}\n', tz):]
+        found = []
+        for m in re.finditer(r"printf '([^']*)'", scan):
+            found += m.group(1).split('\\n')
+        found += re.findall(r"USOS_XP_DISK_NOTE=\"([^\"]*)\"", src)
+        for m in re.finditer(r"usos_ui_stage \d \d ('[^']*'|\"[^\"]*\") ('[^']*'|\"[^\"]*\")", src):
+            found += [m.group(1)[1:-1], m.group(2)[1:-1]]
+        found += ['No target disk found (only the USOS stick). No disk was changed.',
+                  'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log']
+        for t in found[-2:]:
+            self.assertIn("stop '" + t + "'", src)
+        missing = []
+        for t in found:
+            t = re.sub(r'%s|\$[a-z_]+', 'X', t).strip()
+            if not t or '=' in t or t.startswith('[') or not re.search('[A-Za-z]{3}', t):
+                continue
+            if t in exact or any(r.match(t) for r in templates) or any(re.fullmatch(re.sub(r'\\{\d\\}', '.+', re.escape(v)), t) for v in exact if '{' in v):
+                continue
+            missing.append(t)
+        self.assertEqual(missing, [])
 
 if __name__ == '__main__':
     unittest.main()

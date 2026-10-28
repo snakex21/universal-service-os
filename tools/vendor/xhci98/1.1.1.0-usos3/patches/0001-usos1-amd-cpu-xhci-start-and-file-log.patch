@@ -1,0 +1,907 @@
+diff --git a/src/sources b/src/sources
+index d604195..3e2cc65 100644
+--- a/src/sources
++++ b/src/sources
+@@ -110,6 +110,7 @@ SOURCES=xhci_mem.c    \
+         xhci_slot.c   \
+         xhci_probe.c  \
+         xhci_dispatch.c \
++        xhci_usos.c   \
+         xhci98.rc
+ 
+ #
+diff --git a/src/xhci.h b/src/xhci.h
+index df65343..9714868 100644
+--- a/src/xhci.h
++++ b/src/xhci.h
+@@ -759,7 +759,11 @@ XHCI_C_ASSERT(portsc_change_mask_is_within_rw1c_range,
+  * docs/contributing/design/04-controller-common-buffer.md.
+  */
+ #define XHCI_MAX_SLOTS              32UL
+-#define XHCI_MAX_SCRATCHPAD         64UL
++/* MODIFIED (USOS 1.1.1.0-usos1): 64 -> 256. The AMD half of the fleet was
++ * never measured (design record 04 section 7 item 4), and the refusal above
++ * the cap is a controller with no USB at all. 256 entries still fit the 2048-byte
++ * array reservation; the common buffer grows by 768 KiB. */
++#define XHCI_MAX_SCRATCHPAD         256UL
+ 
+ /*
+  * The pooled non-EP0 transfer rings (batch 7a-A; design doc 04 section 3.6).
+diff --git a/src/xhci98-amd64.inf b/src/xhci98-amd64.inf
+index baa6ac1..84b121c 100644
+--- a/src/xhci98-amd64.inf
++++ b/src/xhci98-amd64.inf
+@@ -1,5 +1,8 @@
+ ; xhci98-amd64.inf - xHCI USB host controller miniport, the 64-bit package
+ ;
++; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
++; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
++;
+ ; A separate package from src\xhci98.inf, not a third path inside it, so
+ ; that file's [Manufacturer] line, which Windows 98's engine parses, never
+ ; changes for it (design record 11 section 12, decision 2). It installs the
+@@ -23,7 +26,7 @@ ClassGUID={36FC9E60-C465-11CF-8056-444553540000}
+ Provider=%Provider%
+ LayoutFile=layout.inf
+ ; Must equal src\xhci_version.h, as src\xhci98.inf's does.
+-DriverVer=09/24/2026,1.1.1.0
++DriverVer=09/29/2026,1.1.1.0
+ 
+ ; NTamd64 makes this file 64-bit only. NTamd64.6.0 sends Vista x64 and
+ ; Windows 7 x64 to [XhciModels.NTamd64.6.0]; NT 5.2 takes the first.
+@@ -92,9 +95,13 @@ LoadOrderGroup=Base
+ ; the interrupt moderation interval in 250 ns units, 500 here, and 4000 when
+ ; absent or outside 10-4000; EnumPropPages32 and Controller give the
+ ; controller its Advanced tab.
++; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
++; XhciLogFile on (1): every start refusal, successful start and stop is
++; appended to %SystemRoot%\xhci98.log. 0 turns either off.
+ [Xhci.AddReg.NT]
+-HKR,,XhciLogVerbosity,0x00010001,0
++HKR,,XhciLogVerbosity,0x00010001,2
+ HKR,,XhciLogDebugView,0x00010001,0
++HKR,,XhciLogFile,0x00010001,1
+ HKR,,XhciImodInterval250ns,0x00010001,500
+ HKR,,EnumPropPages32,,"usbui.dll,USBControllerPropPageProvider"
+ HKR,,Controller,1,01
+diff --git a/src/xhci98.inf b/src/xhci98.inf
+index 5f88afd..2b826c0 100644
+--- a/src/xhci98.inf
++++ b/src/xhci98.inf
+@@ -1,5 +1,8 @@
+ ; xhci98.inf - xHCI USB host controller miniport, the 32-bit package
+ ;
++; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
++; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
++;
+ ; One file, two setup engines, one xhci98.sys. Windows 98 SE and Windows ME
+ ; read only the undecorated sections and load the driver through
+ ; *NTKERN/NTMPDriver. Windows 2000 and 32-bit XP read the .NTx86 sections and
+@@ -26,7 +29,7 @@ LayoutFile=layout.inf
+ ; Must equal src\xhci_version.h, where the version and date are edited. The
+ ; INF gate and make-package.ps1 both check it. Windows 2000 ranks drivers by
+ ; date then version, so an upgrade must move this forward.
+-DriverVer=09/24/2026,1.1.1.0
++DriverVer=09/29/2026,1.1.1.0
+ 
+ ; NTx86.6.0 selects [XhciModels.NTx86.6.0] on Vista and Windows 7 only. This
+ ; is the line Windows 98's engine parses to find [XhciModels]; add no other
+@@ -105,9 +108,13 @@ HKR,,XhciImodInterval250ns,0x00010001,500
+ ; drawn by usbui.dll, as the NT references write them for EHCI. On Vista and
+ ; Windows 7 the value is only read when the devnode is built: to test it,
+ ; reinstall the package rather than adding it by hand.
++; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
++; XhciLogFile on (1): every start refusal, successful start and stop is
++; appended to %SystemRoot%\xhci98.log. 0 turns either off.
+ [Xhci.AddReg.NT]
+-HKR,,XhciLogVerbosity,0x00010001,0
++HKR,,XhciLogVerbosity,0x00010001,2
+ HKR,,XhciLogDebugView,0x00010001,0
++HKR,,XhciLogFile,0x00010001,1
+ HKR,,XhciImodInterval250ns,0x00010001,500
+ HKR,,EnumPropPages32,,"usbui.dll,USBControllerPropPageProvider"
+ HKR,,Controller,1,01
+diff --git a/src/xhci98.rc b/src/xhci98.rc
+index d4b0609..9f4e7df 100644
+--- a/src/xhci98.rc
++++ b/src/xhci98.rc
+@@ -88,6 +88,7 @@ BEGIN
+     BEGIN
+         BLOCK "040904B0"
+         BEGIN
++            VALUE "Comments",         "Modified by USOS (1.1.1.0-usos1): AMD CPU xHCI start, file log. Not an upstream release.\0"
+             VALUE "CompanyName",      "Yeo Kheng Meng\0"
+             VALUE "FileDescription",  "xHCI USB 2.0 Host Controller Miniport Driver (xhci98)\0"
+             VALUE "FileVersion",      XHCI_VER_STR "\0"
+diff --git a/src/xhci_dispatch.c b/src/xhci_dispatch.c
+index edcab73..33e2ca8 100644
+--- a/src/xhci_dispatch.c
++++ b/src/xhci_dispatch.c
+@@ -32,6 +32,7 @@
+ #include "xhci_usbport.h"
+ #include "xhci_hw.h"
+ #include "xhci_dbg.h"
++#include "xhci_version.h"  /* MODIFIED (USOS): XHCI_VER_STR for the file sink */
+ 
+ /*
+  * The packet must live in static storage: usbport writes its 16 service
+@@ -395,6 +396,14 @@ XHCI_C_ASSERT(packet_is_whole_words,
+ #define XHCI_LOG_VERBOSITY_VALUE_BYTES (17 * 2)
+ #define XHCI_LOG_DBGVIEW_VALUE_NAME    L"XhciLogDebugView"
+ #define XHCI_LOG_DBGVIEW_VALUE_BYTES   (17 * 2)
++/* MODIFIED (USOS 1.1.1.0-usos1): the file sink's switch, 11 characters, and
++ * the defaults USOS applies when a value is ABSENT (text-mode Setup loads the
++ * driver with no software key at all): the log ring on, the file sink on.
++ * An explicit 0 in the key still turns either off. */
++#define XHCI_LOG_FILE_VALUE_NAME       L"XhciLogFile"
++#define XHCI_LOG_FILE_VALUE_BYTES      (12 * 2)
++#define XHCI_USOS_DEFAULT_VERBOSITY    XHCI_LOG_VERBOSITY_RING
++#define XHCI_USOS_DEFAULT_FILE         1UL
+ 
+ /*
+  * Task 23.4's value, in the same key and read by the same service: the
+@@ -599,6 +608,8 @@ static VOID xhciLogReadValues(PXHCI_EXTENSION ext,
+     ext->Log.SwitchStatusVerbosity = (ULONG)status;
+     if (status == MP_STATUS_SUCCESS) {
+         *verbosityValue = value;
++    } else {
++        *verbosityValue = XHCI_USOS_DEFAULT_VERBOSITY;  /* MODIFIED (USOS) */
+     }
+ 
+     value = 0;
+@@ -610,6 +621,16 @@ static VOID xhciLogReadValues(PXHCI_EXTENSION ext,
+     if (status == MP_STATUS_SUCCESS) {
+         *debugViewValue = value;
+     }
++
++    /* MODIFIED (USOS 1.1.1.0-usos1): XhciLogFile, applied by xhciLogStart. */
++    value = 0;
++    status = XhciRegPacket.UsbPortGetMiniportRegistryKeyValue(
++        ext, TRUE, XHCI_LOG_FILE_VALUE_NAME,
++        (ULONG_PTR)XHCI_LOG_FILE_VALUE_BYTES, &value,
++        (ULONG_PTR)sizeof(value));
++    ext->Log.FileEnabled = (status == MP_STATUS_SUCCESS)
++                               ? ((value != 0) ? 1UL : 0UL)
++                               : XHCI_USOS_DEFAULT_FILE;
+ }
+ 
+ /*
+@@ -843,7 +864,7 @@ static VOID xhciLogFlush(PXHCI_EXTENSION ext, ULONG reason)
+      * block. Recording and publication are separate gates with separate owners;
+      * this is the publication one.
+      */
+-    if (!ext->Log.DebugViewEnabled) {
++    if (!ext->Log.DebugViewEnabled && !ext->Log.FileEnabled) { /* MODIFIED (USOS) */
+         XHCI_DBG_VALUE_LIMITED("log: flush skipped - no sink selected", reason);
+         return;
+     }
+@@ -886,6 +907,9 @@ static VOID xhciLogFlush(PXHCI_EXTENSION ext, ULONG reason)
+     }
+ 
+     emitted = 0;
++    if (ext->Log.FileEnabled) {
++        XhciUsosFileHeader(ext, reason);  /* MODIFIED (USOS) */
++    }
+ 
+     for (;;) {
+         XhciControllerLockAcquire(&oldIrql);
+@@ -903,7 +927,12 @@ static VOID xhciLogFlush(PXHCI_EXTENSION ext, ULONG reason)
+          * and turn a bounded ring into a permanently full one that drops every
+          * new record.
+          */
+-        xhciLogEmitDebugView(staging, chunk);
++        if (ext->Log.DebugViewEnabled) {  /* MODIFIED (USOS): either sink */
++            xhciLogEmitDebugView(staging, chunk);
++        }
++        if (ext->Log.FileEnabled) {
++            XhciUsosFileAppend(staging, chunk);
++        }
+         emitted += chunk;
+     }
+ 
+@@ -924,6 +953,10 @@ static VOID xhciLogFlush(PXHCI_EXTENSION ext, ULONG reason)
+     XhciLogFlushEnd(&ext->Log, emitted, 1);
+     XhciControllerLockRelease(oldIrql);
+ 
++    if (ext->Log.FileEnabled) {
++        XhciUsosFileKick();  /* MODIFIED (USOS): PASSIVE, measured above */
++    }
++
+     XHCI_DBG_VALUE_LIMITED("log: flush emitted bytes to DebugView", emitted);
+ }
+ 
+@@ -973,6 +1006,7 @@ static VOID xhciLogStart(PXHCI_EXTENSION ext)
+     XhciLogNote(ext, "log.verbosity.read", ext->Log.VerbosityRead);
+     XhciLogNote(ext, "log.verbosity.refused", ext->Log.VerbosityRefused);
+     XhciLogNote(ext, "log.debugview", ext->Log.DebugViewEnabled);
++    XhciLogNote(ext, "usos.log.file", ext->Log.FileEnabled);  /* MODIFIED */
+ }
+ 
+ /* ------------------------------------------------------------------ */
+@@ -1142,6 +1176,12 @@ static MPSTATUS NTAPI xhciStartController(PVOID miniPortExtension,
+     ext->InterruptVector = resources->InterruptVector;
+     ext->InterruptLevel = (ULONG)resources->InterruptLevel;
+     ext->InterruptMode = resources->InterruptMode;
++    /* MODIFIED (USOS 1.1.1.0-usos1): what PCI.SYS and usbport handed over. */
++    XhciLogNote(ext, "usos.res.types", ext->ResourcesTypes);
++    XhciLogNote(ext, "usos.res.length", ext->IoSpaceLength);
++    XhciLogNote(ext, "usos.res.vector", ext->InterruptVector);
++    XhciLogNote(ext, "usos.res.level", ext->InterruptLevel);
++    XhciLogNote(ext, "usos.res.mode", (ULONG)ext->InterruptMode);
+ 
+     /*
+      * The two facts the Phase 3 task 2 memory model rests on and that only a
+@@ -1195,6 +1235,12 @@ static MPSTATUS NTAPI xhciStartController(PVOID miniPortExtension,
+      * reading a trace, not an address anything dereferences.
+      */
+     XhciLogNoteAddress(ext, "start.ok", (ULONG)ext->ResourceBase);
++    /* MODIFIED (USOS 1.1.1.0-usos1): a working start is worth a record too,
++     * so the log shows both controllers of a machine and not only the one
++     * that failed. File sink only; the DebugView behaviour is upstream's. */
++    if (ext->Log.FileEnabled) {
++        xhciLogFlush(ext, XHCI_LOG_REASON_START);
++    }
+     return MP_STATUS_SUCCESS;
+ }
+ 
+@@ -5301,6 +5347,10 @@ NTSTATUS NTAPI DriverEntry(IN PDRIVER_OBJECT DriverObject,
+     }
+ 
+     XHCI_DBG_TEXT("registered with usbport.sys");
++    /* MODIFIED (USOS 1.1.1.0-usos1): the file sink, and a load marker queued
++     * for the first flush that has the file sink on. */
++    XhciUsosInit(DriverObject);
++    XhciUsosFileAppendText("=== xhci98 " XHCI_VER_STR " loaded ===\r\n");
+     return STATUS_SUCCESS;
+ }
+ 
+diff --git a/src/xhci_hw.h b/src/xhci_hw.h
+index d6a3a43..b07de2d 100644
+--- a/src/xhci_hw.h
++++ b/src/xhci_hw.h
+@@ -1698,4 +1698,18 @@ VOID XhciCommandInit(PXHCI_EXTENSION ext);
+  */
+ ULONG XhciCommandNoOpSelfTest(PXHCI_EXTENSION ext);
+ 
++/*
++ * USOS 1.1.1.0-usos1 additions (src/xhci_usos.c). MODIFIED: not upstream.
++ * XhciUsosPciPrepare: PASSIVE_LEVEL. XhciUsosInit/XhciUsosFileKick:
++ * PASSIVE_LEVEL. XhciUsosFileAppend/Text/Header: <= DISPATCH_LEVEL.
++ */
++ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext);
++#ifndef XHCI_HOST_TEST
++VOID XhciUsosInit(PDRIVER_OBJECT driverObject);
++#endif
++VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count);
++VOID XhciUsosFileAppendText(const char *text);
++VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason);
++VOID XhciUsosFileKick(VOID);
++
+ #endif /* XHCI_HW_H */
+diff --git a/src/xhci_init.c b/src/xhci_init.c
+index 3722927..6cf0e45 100644
+--- a/src/xhci_init.c
++++ b/src/xhci_init.c
+@@ -60,7 +60,12 @@
+  *           take the write at all. The halt bound is reused for symmetry.
+  */
+ #define XHCI_HALT_TIMEOUT_MS        32UL
+-#define XHCI_RESET_TIMEOUT_MS       1000UL
++/* MODIFIED (USOS 1.1.1.0-usos1): 1000 -> 10000 ms, Linux's XHCI_RESET_LONG_USEC.
++ * An AMD CPU xHCI that the firmware powered down can hold CNR for longer than
++ * a warm controller does. Only the PASSIVE start path sleeps this long; the
++ * DISPATCH-level recovery is capped at its 10 ms stall regardless. */
++#define XHCI_RESET_TIMEOUT_MS       10000UL
++#define XHCI_USOS_CNR_TIMEOUT_MS    10000UL
+ #define XHCI_HANDOFF_TIMEOUT_MS     1000UL
+ #define XHCI_RUN_TIMEOUT_MS         XHCI_HALT_TIMEOUT_MS
+ 
+@@ -610,6 +615,19 @@ static ULONG xhciBiosHandoff(PXHCI_EXTENSION ext)
+              * say so.
+              */
+             XhciLogNote(ext, "handoff.bios.held", dw0);
++            /*
++             * MODIFIED (USOS 1.1.1.0-usos1): take ownership anyway, as
++             * Linux's quirk_usb_handoff_xhci does. Under CSMWrap there can be
++             * a BIOS-owned semaphore with no SMM handler left to release it;
++             * leaving both bits set invites the firmware back in later.
++             */
++            if (dw0 != 0xFFFFFFFFUL) {
++                XhciWrite32(ext, offset,
++                            (dw0 & ~XHCI_USBLEGSUP_BIOS_OWNED) |
++                                XHCI_USBLEGSUP_OS_OWNED);
++                XhciLogNote(ext, "usos.handoff.forced",
++                            XhciRead32(ext, offset));
++            }
+         }
+     }
+ 
+@@ -4571,6 +4589,15 @@ MPSTATUS XhciInitController(PXHCI_EXTENSION ext, PUSBPORT_RESOURCES resources)
+      * driver's own quiesce cleared the bit is the point - see xhciCheckBusMaster.
+      */
+     ext->InitStep = XHCI_INIT_STEP_BUS_MASTER;
++    /*
++     * MODIFIED (USOS 1.1.1.0-usos1): D0, Memory Space Enable and Bus Master
++     * Enable before the gate reads them (src/xhci_usos.c). A firmware that
++     * shut the controller down at ExitBootServices leaves all three off and
++     * NT 5.x PCI.SYS restores only decoding.
++     */
++    if (!ext->InitBelowPassive) {
++        (VOID)XhciUsosPciPrepare(ext);
++    }
+     if (!ext->InitBelowPassive && !xhciCheckBusMaster(ext, &value)) {
+         return xhciInitFailed(ext, XHCI_INIT_STEP_BUS_MASTER, value,
+                               MP_STATUS_HW_ERROR);
+@@ -4593,6 +4620,11 @@ MPSTATUS XhciInitController(PXHCI_EXTENSION ext, PUSBPORT_RESOURCES resources)
+     value = XhciRead32(ext, XHCI_CAP_CAPLENGTH);
+     status = XhciCheckCapDword0(value, ext->IoSpaceLength, NULL, NULL);
+     XHCI_DBG_VALUE("CAPLENGTH/HCIVERSION dword", value);
++    /* MODIFIED (USOS 1.1.1.0-usos1): the raw capability words, for the log. */
++    XhciLogNote(ext, "usos.cap.dword0", value);
++    XhciLogNote(ext, "usos.cap.hcsparams1", XhciRead32(ext, 0x04UL));
++    XhciLogNote(ext, "usos.cap.hcsparams2", XhciRead32(ext, 0x08UL));
++    XhciLogNote(ext, "usos.cap.hccparams1", XhciRead32(ext, 0x10UL));
+     if (status != XHCI_HC_OK) {
+         return xhciInitFailed(ext, XHCI_INIT_STEP_CAP_SANITY, status,
+                               MP_STATUS_HW_ERROR);
+@@ -4679,6 +4711,22 @@ MPSTATUS XhciInitController(PXHCI_EXTENSION ext, PUSBPORT_RESOURCES resources)
+ 
+     /* Step 2. */
+     ext->InitStep = XHCI_INIT_STEP_HALT;
++    /*
++     * MODIFIED (USOS 1.1.1.0-usos1): no operational register may be written
++     * while USBSTS.CNR is set (xHCI 1.2 section 4.2), and the halt below
++     * writes USBCMD. A controller fresh out of D3 or a firmware shutdown can
++     * still be not-ready here. Recorded either way; the reset step refuses
++     * on its own if CNR never clears.
++     */
++    value = XhciReadOp(ext, XHCI_OP_USBSTS);
++    XhciLogNote(ext, "usos.usbsts.prehalt", value);
++    if (value != 0xFFFFFFFFUL && (value & XHCI_USBSTS_CNR) != 0) {
++        (VOID)XhciWaitForBits(ext,
++                              ext->HcInfo.OperationalOffset + XHCI_OP_USBSTS,
++                              XHCI_USBSTS_CNR, 0, XHCI_USOS_CNR_TIMEOUT_MS,
++                              &value);
++        XhciLogNote(ext, "usos.usbsts.cnrwait", value);
++    }
+     if (!xhciHalt(ext)) {
+         return xhciInitFailed(ext, XHCI_INIT_STEP_HALT,
+                               XhciReadOp(ext, XHCI_OP_USBSTS),
+@@ -4687,6 +4735,7 @@ MPSTATUS XhciInitController(PXHCI_EXTENSION ext, PUSBPORT_RESOURCES resources)
+ 
+     /* Step 3. */
+     ext->InitStep = XHCI_INIT_STEP_RESET;
++    XhciLogNote(ext, "usos.step.reset", XhciReadOp(ext, XHCI_OP_USBSTS));
+     if (!xhciReset(ext)) {
+         return xhciInitFailed(ext, XHCI_INIT_STEP_RESET,
+                               XhciReadOp(ext, XHCI_OP_USBSTS),
+diff --git a/src/xhci_log.c b/src/xhci_log.c
+index 6e39ada..866925e 100644
+--- a/src/xhci_log.c
++++ b/src/xhci_log.c
+@@ -256,7 +256,8 @@ ULONG XhciLogFlushBegin(PXHCI_LOG log, ULONG reason)
+      * a real report. Testing `Enabled` here would have made that rung publish
+      * nothing at all, which is not what the ladder says it is.
+      */
+-    if (!log->DebugViewEnabled) {
++    /* MODIFIED (USOS 1.1.1.0-usos1): either sink. */
++    if (!log->DebugViewEnabled && !log->FileEnabled) {
+         log->FlushesRefusedState++;
+         return XHCI_LOG_FLUSH_DISABLED;
+     }
+diff --git a/src/xhci_log.h b/src/xhci_log.h
+index 0f70e0e..3fe27cb 100644
+--- a/src/xhci_log.h
++++ b/src/xhci_log.h
+@@ -256,6 +256,8 @@
+  */
+ #define XHCI_LOG_REASON_STOP     0
+ #define XHCI_LOG_REASON_FAILURE  1
++/* MODIFIED (USOS 1.1.1.0-usos1): a flush after a successful start, file sink only. */
++#define XHCI_LOG_REASON_START    2
+ 
+ /* What XhciLogFlushBegin decided. */
+ #define XHCI_LOG_FLUSH_GO         0  /* drain and write                      */
+@@ -455,6 +457,9 @@ typedef struct _XHCI_LOG {
+      * snapshot channel instead.
+      */
+     ULONG DebugViewEnabled;
++    /* MODIFIED (USOS 1.1.1.0-usos1): the SystemRoot xhci98.log file sink
++     * (src/xhci_usos.c), switched by XhciLogFile. */
++    ULONG FileEnabled;
+     /* What the DebugView sink actually emitted, so a target can tell a sink
+      * that was on and silent from one that was never selected. */
+     ULONG DebugViewEmits;
+diff --git a/src/xhci_usos.c b/src/xhci_usos.c
+new file mode 100644
+index 0000000..390cbdf
+--- /dev/null
++++ b/src/xhci_usos.c
+@@ -0,0 +1,467 @@
++/*
++ * xhci_usos.c - USOS additions to xhci98 1.1.1.0 (1.1.1.0-usos1).
++ *
++ * MODIFIED FILE NOTICE (GPL-2.0 section 2a): this file is not part of the
++ * upstream xhci98 source (https://github.com/yeokm1/xhci98, tag v1.1.1.0,
++ * commit 7d0dd9d440e9716a87e0882f905bf8e99fa443ac). It was added by the
++ * Universal Service OS (USOS) project on 2026-09-29 and is distributed under
++ * the same licence as the rest of xhci98, GPL-2.0-only.
++ *
++ * Two things live here, and both exist for the NT 5.x targets USOS stages
++ * xhci98 on (Windows Server 2003 x86 and XP x64 / Server 2003 x64). Neither
++ * is meant for, or tested on, Windows 98/ME.
++ *
++ * 1. XhciUsosPciPrepare - bring a controller that the platform firmware shut
++ *    down at ExitBootServices back to a state the init sequence can use:
++ *    PCI power state D0 (restoring the BARs if the D3hot -> D0 transition
++ *    reset them), Memory Space Enable and Bus Master Enable. Upstream refuses
++ *    a controller whose BME it did not clear itself; an AMD CPU xHCI
++ *    (1022:149C) on an X470 board arrives at NT with no boot configuration at
++ *    all (decoding and mastering off), and NT 5.x PCI.SYS assigns the BAR and
++ *    enables decoding but does not set Bus Master Enable. Linux does the same
++ *    thing here through pci_enable_device() + pci_set_master().
++ *
++ * 2. A file sink for the log ring: every flush (start refusal, successful
++ *    start, stop) is appended to %SystemRoot%\xhci98.log by a system thread
++ *    that retries until the boot volume is reachable, so a start that fails
++ *    while xhci98 is a boot driver (before \SystemRoot resolves) still lands
++ *    in the file a few seconds later. The file is plain ASCII and can be read
++ *    from another machine with the disk attached.
++ *
++ * C89. IRQL requirements are stated per function.
++ */
++
++#include "xhci.h"
++#include "xhci_usbport.h"
++#include "xhci_hw.h"
++#include "xhci_dbg.h"
++#include "xhci_version.h"
++
++#ifndef XHCI_HOST_TEST
++
++/* ------------------------------------------------------------------ */
++/* PCI power state and command enables                                 */
++/* ------------------------------------------------------------------ */
++
++#define USOS_PCI_STATUS          0x06UL
++#define USOS_PCI_STATUS_CAPLIST  0x0010U
++#define USOS_PCI_CAP_PTR         0x34UL
++#define USOS_PCI_CAP_ID_PM       0x01
++#define USOS_PCI_BAR0            0x10UL
++#define USOS_PCI_BAR_COUNT       6UL
++#define USOS_PCI_COMMAND_MSE     0x0002U
++#define USOS_PMCSR_STATE_MASK    0x0003U
++#define USOS_PMCSR_PME_STATUS    0x8000U   /* RW1C - never written as 1 */
++
++static ULONG usosFindPmCap(PXHCI_EXTENSION ext)
++{
++    USHORT status;
++    UCHAR ptr;
++    UCHAR id;
++    ULONG guard;
++
++    status = 0;
++    if (XhciReadPciConfig(ext, USOS_PCI_STATUS, &status, sizeof(status)) !=
++            MP_STATUS_SUCCESS ||
++        status == 0xFFFFU || (status & USOS_PCI_STATUS_CAPLIST) == 0) {
++        return 0;
++    }
++    ptr = 0;
++    if (XhciReadPciConfig(ext, USOS_PCI_CAP_PTR, &ptr, sizeof(ptr)) !=
++        MP_STATUS_SUCCESS) {
++        return 0;
++    }
++    for (guard = 0; guard < 48 && ptr >= 0x40; guard++) {
++        ptr = (UCHAR)(ptr & 0xFC);
++        id = 0;
++        if (XhciReadPciConfig(ext, (ULONG)ptr, &id, sizeof(id)) !=
++            MP_STATUS_SUCCESS) {
++            return 0;
++        }
++        if (id == USOS_PCI_CAP_ID_PM) {
++            return (ULONG)ptr;
++        }
++        if (XhciReadPciConfig(ext, (ULONG)ptr + 1UL, &ptr, sizeof(ptr)) !=
++            MP_STATUS_SUCCESS) {
++            return 0;
++        }
++    }
++    return 0;
++}
++
++/*
++ * IRQL: PASSIVE_LEVEL (config-space service, UsbPortWait). Never fails the
++ * start by itself: everything it could not fix is left for the upstream gates
++ * that follow (bus-master gate, capability sanity) to refuse with their own
++ * step number. Returns the PCI command register as it is on exit.
++ */
++ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext)
++{
++    USHORT command;
++    USHORT wanted;
++    USHORT pmcsr;
++    ULONG pm;
++    ULONG bars[USOS_PCI_BAR_COUNT];
++    ULONG check;
++    ULONG i;
++
++    command = 0;
++    if (XhciReadPciConfig(ext, XHCI_PCI_COMMAND, &command, sizeof(command)) !=
++        MP_STATUS_SUCCESS) {
++        XhciLogNote(ext, "usos.pci.command.unreadable", 1);
++        return 0xFFFFFFFFUL;
++    }
++    XhciLogNote(ext, "usos.pci.command.before", command);
++    if (command == 0xFFFFU) {
++        return 0xFFFFUL;
++    }
++
++    /* Power state first: a function in D3hot answers config space but not
++     * its BAR, and writing D0 can reset the BARs (No_Soft_Reset = 0). */
++    pm = usosFindPmCap(ext);
++    XhciLogNote(ext, "usos.pci.pmcap", pm);
++    if (pm != 0) {
++        pmcsr = 0;
++        if (XhciReadPciConfig(ext, pm + 4UL, &pmcsr, sizeof(pmcsr)) ==
++            MP_STATUS_SUCCESS) {
++            XhciLogNote(ext, "usos.pci.pmcsr.before", pmcsr);
++            if ((pmcsr & USOS_PMCSR_STATE_MASK) != 0 && pmcsr != 0xFFFFU) {
++                for (i = 0; i < USOS_PCI_BAR_COUNT; i++) {
++                    bars[i] = 0;
++                    (VOID)XhciReadPciConfig(ext, USOS_PCI_BAR0 + i * 4UL,
++                                            &bars[i], sizeof(ULONG));
++                }
++                pmcsr = (USHORT)(pmcsr & ~(USOS_PMCSR_STATE_MASK |
++                                           USOS_PMCSR_PME_STATUS));
++                (VOID)XhciWritePciConfig(ext, pm + 4UL, &pmcsr, sizeof(pmcsr));
++                /* D3hot -> D0 recovery time, PCI PM 1.2 section 5.6.1. */
++                XhciDelayMs(ext, 20);
++                check = 0;
++                (VOID)XhciReadPciConfig(ext, USOS_PCI_BAR0, &check,
++                                        sizeof(ULONG));
++                if (check != bars[0]) {
++                    XhciLogNote(ext, "usos.pci.bars.restored", check);
++                    for (i = 0; i < USOS_PCI_BAR_COUNT; i++) {
++                        (VOID)XhciWritePciConfig(ext, USOS_PCI_BAR0 + i * 4UL,
++                                                 &bars[i], sizeof(ULONG));
++                    }
++                }
++                (VOID)XhciWritePciConfig(ext, XHCI_PCI_COMMAND, &command,
++                                         sizeof(command));
++                pmcsr = 0;
++                (VOID)XhciReadPciConfig(ext, pm + 4UL, &pmcsr, sizeof(pmcsr));
++                XhciLogNote(ext, "usos.pci.pmcsr.after", pmcsr);
++            }
++        }
++    }
++
++    wanted = (USHORT)(command | USOS_PCI_COMMAND_MSE | XHCI_PCI_COMMAND_BME);
++    if (wanted != command) {
++        (VOID)XhciWritePciConfig(ext, XHCI_PCI_COMMAND, &wanted,
++                                 sizeof(wanted));
++        command = 0;
++        (VOID)XhciReadPciConfig(ext, XHCI_PCI_COMMAND, &command,
++                                sizeof(command));
++        XhciLogNote(ext, "usos.pci.command.enabled", command);
++        XHCI_DBG_VALUE("usos: PCI command enables set, now", command);
++    }
++    return (ULONG)command;
++}
++
++/* ------------------------------------------------------------------ */
++/* The file sink                                                       */
++/* ------------------------------------------------------------------ */
++
++#define USOS_PEND_BYTES     65536UL
++#define USOS_WRITE_CHUNK    4096UL
++#define USOS_RETRY_MS       2000L
++#define USOS_RETRY_LIMIT    450UL      /* 15 minutes of 2 s retries */
++#define USOS_IDLE_MS        30000L
++
++static UCHAR usosPend[USOS_PEND_BYTES];
++static ULONG usosPendLen;
++static ULONG usosPendDropped;
++static UCHAR usosStage[USOS_WRITE_CHUNK];
++static KSPIN_LOCK usosLock;
++static KEVENT usosWake;
++static ULONG usosInited;
++static ULONG usosRunning;
++static volatile LONG usosStop;
++static PVOID usosThreadObject;
++static PDRIVER_UNLOAD usosChainedUnload;
++
++static NTSTATUS usosOpen(PHANDLE handle)
++{
++    UNICODE_STRING name;
++    OBJECT_ATTRIBUTES attributes;
++    IO_STATUS_BLOCK iosb;
++
++    RtlInitUnicodeString(&name, L"\\SystemRoot\\xhci98.log");
++    InitializeObjectAttributes(&attributes, &name,
++                               OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
++                               NULL, NULL);
++    return ZwCreateFile(handle, FILE_APPEND_DATA | SYNCHRONIZE, &attributes,
++                        &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ,
++                        FILE_OPEN_IF,
++                        FILE_SYNCHRONOUS_IO_NONALERT | FILE_WRITE_THROUGH |
++                            FILE_NON_DIRECTORY_FILE,
++                        NULL, 0);
++}
++
++static VOID usosWait(LONG milliseconds)
++{
++    LARGE_INTEGER timeout;
++
++    timeout.QuadPart = (LONGLONG)milliseconds * (LONGLONG)(-10000);
++    (VOID)KeWaitForSingleObject(&usosWake, Executive, KernelMode, FALSE,
++                                &timeout);
++}
++
++static VOID NTAPI usosWriter(PVOID context)
++{
++    HANDLE file;
++    IO_STATUS_BLOCK iosb;
++    NTSTATUS status;
++    KIRQL irql;
++    ULONG n;
++    ULONG i;
++    ULONG failures;
++
++    UNREFERENCED_PARAMETER(context);
++    failures = 0;
++
++    for (;;) {
++        KeAcquireSpinLock(&usosLock, &irql);
++        n = usosPendLen;
++        if (n == 0 || usosStop || failures > USOS_RETRY_LIMIT) {
++            usosRunning = 0;
++            KeReleaseSpinLock(&usosLock, irql);
++            break;
++        }
++        KeReleaseSpinLock(&usosLock, irql);
++
++        status = usosOpen(&file);
++        if (!NT_SUCCESS(status)) {
++            /* \SystemRoot does not resolve yet (boot-driver start), or the
++             * volume is not writable yet. Try again shortly. */
++            failures++;
++            usosWait(USOS_RETRY_MS);
++            continue;
++        }
++        failures = 0;
++
++        for (;;) {
++            KeAcquireSpinLock(&usosLock, &irql);
++            n = usosPendLen;
++            if (n > USOS_WRITE_CHUNK) {
++                n = USOS_WRITE_CHUNK;
++            }
++            for (i = 0; i < n; i++) {
++                usosStage[i] = usosPend[i];
++            }
++            KeReleaseSpinLock(&usosLock, irql);
++            if (n == 0) {
++                break;
++            }
++            status = ZwWriteFile(file, NULL, NULL, NULL, &iosb, usosStage, n,
++                                 NULL, NULL);
++            if (!NT_SUCCESS(status)) {
++                failures++;
++                break;
++            }
++            KeAcquireSpinLock(&usosLock, &irql);
++            for (i = n; i < usosPendLen; i++) {
++                usosPend[i - n] = usosPend[i];
++            }
++            usosPendLen -= n;
++            KeReleaseSpinLock(&usosLock, irql);
++        }
++        ZwClose(file);
++        if (failures != 0) {
++            usosWait(USOS_RETRY_MS);
++            continue;
++        }
++        /* Linger a little so a burst of flushes (two controllers starting
++         * back to back) shares one thread. */
++        usosWait(USOS_IDLE_MS);
++    }
++    PsTerminateSystemThread(STATUS_SUCCESS);
++}
++
++/*
++ * The unload wrapper. usbport installs its own DriverUnload at registration
++ * (or none); if one exists, the writer thread must be gone before the image
++ * is. IRQL: PASSIVE_LEVEL.
++ */
++static VOID NTAPI usosUnload(PDRIVER_OBJECT driverObject)
++{
++    InterlockedExchange((PLONG)&usosStop, 1);
++    KeSetEvent(&usosWake, IO_NO_INCREMENT, FALSE);
++    if (usosThreadObject != NULL) {
++        (VOID)KeWaitForSingleObject(usosThreadObject, Executive, KernelMode,
++                                    FALSE, NULL);
++        ObDereferenceObject(usosThreadObject);
++        usosThreadObject = NULL;
++    }
++    if (usosChainedUnload != NULL) {
++        usosChainedUnload(driverObject);
++    }
++}
++
++/* DriverEntry, after registration. IRQL: PASSIVE_LEVEL. */
++VOID XhciUsosInit(PDRIVER_OBJECT driverObject)
++{
++    KeInitializeSpinLock(&usosLock);
++    KeInitializeEvent(&usosWake, SynchronizationEvent, FALSE);
++    usosPendLen = 0;
++    usosPendDropped = 0;
++    usosRunning = 0;
++    usosStop = 0;
++    usosThreadObject = NULL;
++    usosInited = 1;
++    if (driverObject != NULL && driverObject->DriverUnload != NULL) {
++        usosChainedUnload = driverObject->DriverUnload;
++        driverObject->DriverUnload = usosUnload;
++    }
++}
++
++/* Queue bytes for the file. IRQL: <= DISPATCH_LEVEL. */
++VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count)
++{
++    KIRQL irql;
++    ULONG i;
++
++    if (!usosInited || bytes == NULL) {
++        return;
++    }
++    KeAcquireSpinLock(&usosLock, &irql);
++    for (i = 0; i < count; i++) {
++        if (usosPendLen >= USOS_PEND_BYTES) {
++            usosPendDropped += count - i;
++            break;
++        }
++        usosPend[usosPendLen++] = bytes[i];
++    }
++    KeReleaseSpinLock(&usosLock, irql);
++}
++
++VOID XhciUsosFileAppendText(const char *text)
++{
++    ULONG n;
++
++    if (text == NULL) {
++        return;
++    }
++    for (n = 0; text[n] != '\0'; n++) {
++    }
++    XhciUsosFileAppend((const UCHAR *)text, n);
++}
++
++static char *usosHex(char *out, ULONG value)
++{
++    static const char digits[] = "0123456789ABCDEF";
++    int shift;
++
++    for (shift = 28; shift >= 0; shift -= 4) {
++        *out++ = digits[(value >> shift) & 0xF];
++    }
++    return out;
++}
++
++static char *usosCopy(char *out, const char *text)
++{
++    while (*text != '\0') {
++        *out++ = *text++;
++    }
++    return out;
++}
++
++/* One header line per flush. IRQL: <= DISPATCH_LEVEL. */
++VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason)
++{
++    char line[160];
++    char *p;
++    LARGE_INTEGER ticks;
++
++    KeQueryTickCount(&ticks);
++    p = line;
++    p = usosCopy(p, "=== xhci98 " XHCI_VER_STR " flush reason=");
++    p = usosHex(p, reason);
++    p = usosCopy(p, " pci=");
++    p = usosHex(p, ext != NULL ? ext->PciVendorDevice : 0);
++    p = usosCopy(p, " step=");
++    p = usosHex(p, ext != NULL ? ext->InitStep : 0);
++    p = usosCopy(p, " status=");
++    p = usosHex(p, ext != NULL ? ext->InitStatus : 0);
++    p = usosCopy(p, " tick=");
++    p = usosHex(p, ticks.LowPart);
++    p = usosCopy(p, " dropped=");
++    p = usosHex(p, usosPendDropped);
++    p = usosCopy(p, " ===\r\n");
++    *p = '\0';
++    XhciUsosFileAppendText(line);
++}
++
++/*
++ * Make sure a writer is running. IRQL: PASSIVE_LEVEL (PsCreateSystemThread);
++ * a call above it only leaves the bytes queued for the next PASSIVE kick.
++ */
++VOID XhciUsosFileKick(VOID)
++{
++    KIRQL irql;
++    ULONG start;
++    HANDLE thread;
++    NTSTATUS status;
++    PVOID object;
++
++    if (!usosInited || KeGetCurrentIrql() != PASSIVE_LEVEL || usosStop) {
++        return;
++    }
++    KeAcquireSpinLock(&usosLock, &irql);
++    start = (usosRunning == 0) ? 1UL : 0UL;
++    if (start) {
++        usosRunning = 1;
++    }
++    KeReleaseSpinLock(&usosLock, irql);
++
++    if (!start) {
++        KeSetEvent(&usosWake, IO_NO_INCREMENT, FALSE);
++        return;
++    }
++
++    /* The previous writer has cleared usosRunning and is on its way out. */
++    if (usosThreadObject != NULL) {
++        (VOID)KeWaitForSingleObject(usosThreadObject, Executive, KernelMode,
++                                    FALSE, NULL);
++        ObDereferenceObject(usosThreadObject);
++        usosThreadObject = NULL;
++    }
++
++    status = PsCreateSystemThread(&thread, THREAD_ALL_ACCESS, NULL, NULL,
++                                  NULL, usosWriter, NULL);
++    if (!NT_SUCCESS(status)) {
++        KeAcquireSpinLock(&usosLock, &irql);
++        usosRunning = 0;
++        KeReleaseSpinLock(&usosLock, irql);
++        return;
++    }
++    object = NULL;
++    if (NT_SUCCESS(ObReferenceObjectByHandle(thread, THREAD_ALL_ACCESS, NULL,
++                                             KernelMode, &object, NULL))) {
++        usosThreadObject = object;
++    }
++    ZwClose(thread);
++}
++
++#else /* XHCI_HOST_TEST */
++
++/* The host suite has no PCI, no file system and no threads. */
++ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext) { (void)ext; return 0; }
++VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count)
++{ (void)bytes; (void)count; }
++VOID XhciUsosFileAppendText(const char *text) { (void)text; }
++VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason)
++{ (void)ext; (void)reason; }
++VOID XhciUsosFileKick(VOID) { }
++
++#endif /* XHCI_HOST_TEST */
+diff --git a/src/xhci_version.h b/src/xhci_version.h
+index a8c86b1..d9d5798 100644
+--- a/src/xhci_version.h
++++ b/src/xhci_version.h
+@@ -50,11 +50,13 @@
+ /* The same number as a string - the resource's two version strings, the DOS
+  * qualifier's banner, and the snapshot reader's report header. Must agree with
+  * XHCI_VER_CSV above; the INF gate refuses a build where it does not. */
+-#define XHCI_VER_STR            "1.1.1.0"
++/* MODIFIED (USOS, 2026-09-29): "-usos1" marks the USOS patch set; the four
++ * integers stay upstream's so nothing that compares them moves. */
++#define XHCI_VER_STR            "1.1.1.0-usos1"
+ 
+ /* The release date, in the MM/DD/YYYY form `DriverVer` takes, zero-padded -
+  * the INF gate refuses an unpadded one, because Windows 98's 16-bit parser is
+  * the reason the padding rule exists. */
+-#define XHCI_DRIVERVER_DATE     "09/24/2026"
++#define XHCI_DRIVERVER_DATE     "09/29/2026"
+ 
+ #endif /* XHCI_VERSION_H */

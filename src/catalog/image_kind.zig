@@ -7,6 +7,9 @@ pub const ImageKind = enum {
     vhd,
     vhdx,
     efi,
+    /// A folder of diskette images in Images (src/catalog/floppy_set.zig);
+    /// never a file extension.
+    floppy_set,
 
     pub fn fromExtension(extension: []const u8) ?ImageKind {
         if (std.ascii.eqlIgnoreCase(extension, ".iso")) return .iso;

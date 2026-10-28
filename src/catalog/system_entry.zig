@@ -14,4 +14,23 @@ pub const SystemEntry = struct {
     boot_methods: []const BootMethod,
     /// Windows Server: listed in the Server section of the Windows category.
     server: bool = false,
+
+    pub fn imageFolder(self: SystemEntry) []const u8 {
+        const path = self.image_directory;
+        const suffix = "\\Images";
+        const std = @import("std");
+        if (!std.mem.endsWith(u8, path, suffix)) return "";
+        const parent = path[0 .. path.len - suffix.len];
+        const at = std.mem.lastIndexOfScalar(u8, parent, '\\') orelse return "";
+        return parent[at + 1 ..];
+    }
+
+    pub fn dataCategory(self: SystemEntry) []const u8 {
+        const prefix = "\\Systems\\";
+        const std = @import("std");
+        if (!std.mem.startsWith(u8, self.image_directory, prefix)) return "";
+        const rest = self.image_directory[prefix.len..];
+        const at = std.mem.indexOfScalar(u8, rest, '\\') orelse return "";
+        return rest[0..at];
+    }
 };

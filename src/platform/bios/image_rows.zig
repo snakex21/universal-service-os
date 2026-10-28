@@ -23,6 +23,7 @@ pub fn kindLabel(kind: catalog.ImageKind) []const u8 {
         .vhd => "VHD",
         .vhdx => "VHDX",
         .efi => "EFI",
+        .floppy_set => unreachable, // the BIOS Core never lists floppy sets
     };
 }
 

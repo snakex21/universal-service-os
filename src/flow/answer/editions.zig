@@ -134,7 +134,15 @@ pub fn parse(xml: []const u8, out: *List) void {
                 if (std.ascii.eqlIgnoreCase(k, "Server Core")) break :blk true;
                 if (std.ascii.eqlIgnoreCase(k, "Server")) break :blk false;
             }
-            break :blk endsWithIgnoreCase(edition_id, "Core") or endsWithIgnoreCase(edition_id, "ACor") or startsWithIgnoreCase(edition_id, "ServerHyper");
+            if (endsWithIgnoreCase(edition_id, "Core") or endsWithIgnoreCase(edition_id, "ACor") or startsWithIgnoreCase(edition_id, "ServerHyper")) break :blk true;
+            // Server 2008 keeps the plain FLAGS id on its Core image
+            // (SERVERWEB); only the name says "Server Core".
+            if (kind == null) {
+                for ([_][]const u8{ image.display.slice(), image.name.slice() }) |text| {
+                    if (std.ascii.indexOfIgnoreCase(text, "Server Core") != null) break :blk true;
+                }
+            }
+            break :blk false;
         };
         out.items[out.len] = image;
         out.len += 1;
@@ -240,6 +248,7 @@ const server_2008_editions = [_]Known{
     .{ .id = "ServerStandardCore", .label = "Standard (Server Core)" },
     .{ .id = "ServerEnterpriseCore", .label = "Enterprise (Server Core)" },
     .{ .id = "ServerDatacenterCore", .label = "Datacenter (Server Core)" },
+    .{ .id = "ServerWebCore", .label = "Web Server (Server Core)" },
 };
 const server_editions = [_]Known{
     .{ .id = "ServerStandard", .label = "Standard (Desktop Experience)" },
@@ -563,6 +572,25 @@ test "editions: ambiguous media never pick an image" {
     });
     try std.testing.expect(match("Standard", &servers) == null);
     try std.testing.expectEqual(@as(u16, 1), match("Standard Core", &servers).?.index);
+}
+
+test "editions: Server 2008 Core image named only by its display name" {
+    // Windows Web Server 2008 SP2 pl: FLAGS SERVERWEB on both images.
+    const xml =
+        \\<WIM><IMAGE INDEX="1"><FLAGS>SERVERWEB</FLAGS><WINDOWS><PRODUCTTYPE>ServerNT</PRODUCTTYPE></WINDOWS>
+        \\<NAME>Windows Web Server 2008 (instalacja pe?na)</NAME><DISPLAYNAME>Windows Web Server 2008 (instalacja pe?na)</DISPLAYNAME></IMAGE>
+        \\<IMAGE INDEX="2"><FLAGS>SERVERWEB</FLAGS><WINDOWS><PRODUCTTYPE>ServerNT</PRODUCTTYPE></WINDOWS>
+        \\<NAME>Windows Web Server 2008 (instalacja Server Core)</NAME><DISPLAYNAME>Windows Web Server 2008 (instalacja Server Core)</DISPLAYNAME></IMAGE></WIM>
+    ;
+    var list = List{};
+    parse(xml, &list);
+    try std.testing.expectEqual(@as(u8, 2), list.len);
+    try std.testing.expect(list.items[0].server and !list.items[0].core);
+    try std.testing.expect(list.items[1].server and list.items[1].core);
+    var id: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("SERVERWEBCore", list.items[1].id(&id));
+    try std.testing.expectEqual(@as(u16, 1), match("Web", &list).?.index);
+    try std.testing.expectEqual(@as(u16, 2), match("Web Core", &list).?.index);
 }
 
 test "editions: known editions per release" {

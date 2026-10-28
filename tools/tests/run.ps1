@@ -24,75 +24,94 @@ function Run-Zig([string[]]$Arguments) {
     }
 }
 
+# Failed steps of this run; every step runs, the summary lists them all.
+$script:Failures = New-Object System.Collections.Generic.List[string]
+
+function Invoke-Step([string]$Label, [scriptblock]$Body) {
+    try {
+        & $Body
+    } catch {
+        Write-Host "[FAIL] ${Label}: $($_.Exception.Message)" -ForegroundColor Red
+        $script:Failures.Add("${Label}: $($_.Exception.Message)")
+    }
+}
+
+function Invoke-PythonStep([string]$Script, [string]$Message) {
+    & python.exe (Join-Path $root $Script)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[FAIL] ${Script}: $Message" -ForegroundColor Red
+        $script:Failures.Add("${Script}: $Message")
+    }
+}
+
+function Complete-Run([string]$PassMessage) {
+    if ($script:Failures.Count -gt 0) {
+        Write-Host "[FAIL] $($script:Failures.Count) step(s) failed:" -ForegroundColor Red
+        foreach ($failure in $script:Failures) { Write-Host "  - $failure" -ForegroundColor Red }
+        exit 1
+    }
+    Write-Host "[PASS] $PassMessage" -ForegroundColor Green
+}
+
 function Run-Unit {
     Write-Host '[TEST] Unit tests' -ForegroundColor Cyan
-    Run-Zig @('build', '--cache-dir', $zigCache, 'test')
-    Run-Zig @('test', 'src/platform/bios/memtest_image.zig', '--cache-dir', $zigCache)
-    Run-Zig @('test', 'src/platform/bios/dos_fat.zig', '--cache-dir', $zigCache)
-    Run-Zig @('test', '--dep', 'graphics', '-Mroot=src/platform/bios/linux_boot_params.zig', '-Mgraphics=src/legacy_graphics_module.zig', '--cache-dir', $zigCache)
+    Invoke-Step 'zig build test' { Run-Zig @('build', '--cache-dir', $zigCache, 'test') }
+    Invoke-Step 'zig test memtest_image.zig' { Run-Zig @('test', 'src/platform/bios/memtest_image.zig', '--cache-dir', $zigCache) }
+    Invoke-Step 'zig test dos_fat.zig' { Run-Zig @('test', 'src/platform/bios/dos_fat.zig', '--cache-dir', $zigCache) }
+    Invoke-Step 'zig test linux_boot_params.zig' { Run-Zig @('test', '--dep', 'graphics', '-Mroot=src/platform/bios/linux_boot_params.zig', '-Mgraphics=src/legacy_graphics_module.zig', '--cache-dir', $zigCache) }
+    Invoke-Step 'zig test edd_interface.zig' { Run-Zig @('test', 'src/platform/bios/edd_interface.zig', '--cache-dir', $zigCache) }
     # M0 golden fingerprints (docs/design/refactor-os-pipeline.md): staged
     # micro-Linux/XP/WinPE payloads and WINNT.SIF of the last build.
-    & python.exe (Join-Path $root 'tools/tests/golden/staged_payloads.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Staged payload goldens differ (see tools/tests/artifacts/golden).' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_hardware_smart.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Hardware SMART tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_legacy_rgba_rle.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Legacy icon compression tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows3_media.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows 3.x media conversion tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_dosnet_aliases.py')
-    if ($LASTEXITCODE -ne 0) { throw 'XP DOSNET alias tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_nt5_source.py')
-    if ($LASTEXITCODE -ne 0) { throw 'NT5 source identity tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_nt5_media_markers.py')
-    if ($LASTEXITCODE -ne 0) { throw 'NT5 local media marker tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_drive_letters.py')
-    if ($LASTEXITCODE -ne 0) { throw 'XP drive letter tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_source_io.py')
-    if ($LASTEXITCODE -ne 0) { throw 'XP source I/O tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_wimboot_kexec.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS kexec entry tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_ordered_wimboot_kexec.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS ordered kexec entry tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows_bios_cpu_check.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS CPU compatibility tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows_disk_order.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS disk-order tests failed' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_dos_disk_filter.py')
-    if ($LASTEXITCODE -ne 0) { throw 'DOS disk isolation and target MBR tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_dos_reboot.py')
-    if ($LASTEXITCODE -ne 0) { throw 'DOS restart helper tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_windows_source_mount.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows PE source mapping tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_windows_driver_support.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows driver transport and answer-file tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_windows7_nvme.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows 7 NVMe helper tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_vista_int10_dispatcher.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Vista Int10 dispatcher step tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_vista_autochk.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Vista autochk exclusion tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_initrd_alignment.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Initramfs alignment (lang.cpio) tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_nt52_staging.py')
-    if ($LASTEXITCODE -ne 0) { throw 'NT 5.2 (Server 2003 / XP x64) staging tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_nt5_menu_strings.py')
-    if ($LASTEXITCODE -ne 0) { throw 'NT5 menu strings without a translation key.' }
-    & python.exe (Join-Path $root 'tools/tests/test_nt5_user_drivers.py')
-    if ($LASTEXITCODE -ne 0) { throw 'NT 5.2 user driver (DATA\Drivers) tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_windows7_uefi_publish.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Windows 7 EFI publication tests failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_refresh.py')
-    if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics mode-change regression failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_connect.py')
-    if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics controller reconnect regression failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_xp_reproducible.py')
-    if ($LASTEXITCODE -ne 0) { throw 'XP cabinet/hive reproducibility tests failed.' }
+    Invoke-PythonStep 'tools/tests/golden/staged_payloads.py' 'Staged payload goldens differ (see tools/tests/artifacts/golden).'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_hardware_smart.py' 'Hardware SMART tests failed.'
+    Invoke-PythonStep 'tools/tests/test_disk_type_labels.py' 'Disk type label tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_legacy_rgba_rle.py' 'Legacy icon compression tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_windows3_media.py' 'Windows 3.x media conversion tests failed.'
+    Invoke-PythonStep 'tools/tests/test_dos_batch_labels.py' 'MS-DOS batch label / Windows 3.x flow tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_win9x_u9fix.py' 'Windows 9x U9FIX tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_dosnet_aliases.py' 'XP DOSNET alias tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_nt5_source.py' 'NT5 source identity tests failed.'
+    Invoke-PythonStep 'tools/tests/addons/test_legacy_pack.py' 'Legacy compatibility pack tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_nt5_media_markers.py' 'NT5 local media marker tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_drive_letters.py' 'XP drive letter tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_xp_source_io.py' 'XP source I/O tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_wimboot_kexec.py' 'Windows BIOS kexec entry tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_ordered_wimboot_kexec.py' 'Windows BIOS ordered kexec entry tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_windows_bios_cpu_check.py' 'Windows BIOS CPU compatibility tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_windows_disk_order.py' 'Windows BIOS disk-order tests failed'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_dos_disk_filter.py' 'DOS disk isolation and target MBR tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_dos_reboot.py' 'DOS restart helper tests failed.'
+    Invoke-PythonStep 'tools/tests/test_windows_source_mount.py' 'Windows PE source mapping tests failed.'
+    Invoke-PythonStep 'tools/tests/test_windows_driver_support.py' 'Windows driver transport and answer-file tests failed.'
+    Invoke-PythonStep 'tools/tests/test_win7_x86_usb_fallback.py' 'Windows 7 x86 bundled USB fallback tests failed.'
+    Invoke-PythonStep 'tools/tests/test_windows7_nvme.py' 'Windows 7 NVMe helper tests failed.'
+    Invoke-PythonStep 'tools/tests/test_vista_int10_dispatcher.py' 'Vista Int10 dispatcher step tests failed.'
+    Invoke-PythonStep 'tools/tests/test_vista_autochk.py' 'Vista autochk exclusion tests failed.'
+    Invoke-PythonStep 'tools/tests/test_x86_vista_oobe_gate.py' 'Vista / 2008 x86 OOBE gate tests failed.'
+    Invoke-PythonStep 'tools/tests/test_image_disk_elcr.py' 'Custom OS ELCR MBR tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_w2k_acpi_mbr.py' 'Windows 2000 ACPI MBR emulation test failed.'
+    Invoke-PythonStep 'tools/tests/test_uefi_boot_entry.py' 'Custom OS firmware boot entry (Boot####/BootNext) tests failed.'
+    Invoke-PythonStep 'tools/tests/test_stick_release.py' 'micro-Linux stick release tests failed.'
+    Invoke-PythonStep 'tools/tests/test_stick_write.py' 'micro-Linux read-only stick ESP tests failed.'
+    Invoke-PythonStep 'tools/tests/test_esp_writes_helper.py' 'micro-Linux stick ESP write helper tests failed.'
+    Invoke-PythonStep 'tools/tests/test_initrd_alignment.py' 'Initramfs alignment (lang.cpio) tests failed.'
+    Invoke-PythonStep 'tools/tests/test_nt52_staging.py' 'NT 5.2 (Server 2003 / XP x64) staging tests failed.'
+    Invoke-PythonStep 'tools/tests/test_nt5_menu_strings.py' 'NT5 menu strings without a translation key.'
+    Invoke-PythonStep 'tools/tests/test_nt5_user_drivers.py' 'NT 5.2 user driver (DATA\Drivers) tests failed.'
+    Invoke-PythonStep 'tools/tests/test_windows7_uefi_publish.py' 'Windows 7 EFI publication tests failed.'
+    Invoke-PythonStep 'tools/tests/test_uefi_graphics_refresh.py' 'UEFI graphics mode-change regression failed.'
+    Invoke-PythonStep 'tools/tests/test_uefi_graphics_connect.py' 'UEFI graphics controller reconnect regression failed.'
+    Invoke-PythonStep 'tools/tests/test_xp_reproducible.py' 'XP cabinet/hive reproducibility tests failed.'
     # Answer profiles (docs/answer-profiles.md): rendered WINNT.SIF / autounattend.xml goldens.
-    & python.exe (Join-Path $root 'tools/tests/test_answer_render.py')
-    if ($LASTEXITCODE -ne 0) { throw 'Answer renderer goldens failed.' }
-    & python.exe (Join-Path $root 'tools/tests/test_xp_user_settings.py')
-    if ($LASTEXITCODE -ne 0) { throw 'usos-xp.ini tests failed.' }
+    Invoke-PythonStep 'tools/tests/test_answer_render.py' 'Answer renderer goldens failed.'
+    Invoke-PythonStep 'tools/tests/addons/test_legacy_flow.py' 'Legacy pack flow tests failed.'
+    Invoke-PythonStep 'tools/tests/test_xp_user_settings.py' 'usos-xp.ini tests failed.'
+    # Every Python test module (unittest and pytest style) in one pytest run:
+    # it lists every failing test instead of stopping at the first module.
+    Invoke-Step 'pytest tools/tests' {
+        & python.exe -m pytest (Join-Path $root 'tools/tests') -q -p no:cacheprovider -W ignore::SyntaxWarning
+        if ($LASTEXITCODE -ne 0) { throw "pytest reported failures (exit code $LASTEXITCODE)" }
+    }
 }
 
 function Run-Selftest {
@@ -180,15 +199,15 @@ function Run-Aarch64 {
 }
 
 switch ($Suite) {
-    'unit' { Run-Unit }
-    'selftest' { Run-Selftest }
-    'x86_64' { Run-X64 }
-    'aarch64' { Run-Aarch64 }
+    'unit' { Run-Unit; Complete-Run 'Unit tests passed.' }
+    'selftest' { Invoke-Step 'selftest' { Run-Selftest }; Complete-Run 'Startup selftest passed.' }
+    'x86_64' { Invoke-Step 'x86_64 QEMU' { Run-X64 }; Complete-Run 'x86_64 QEMU boot self-test passed.' }
+    'aarch64' { Invoke-Step 'aarch64 QEMU' { Run-Aarch64 }; Complete-Run 'ARM64 QEMU boot self-test passed.' }
     'all' {
         Run-Unit
-        Run-Selftest
-        Run-X64
-        Run-Aarch64
-        Write-Host '[PASS] All automated tests passed.' -ForegroundColor Green
+        Invoke-Step 'selftest' { Run-Selftest }
+        Invoke-Step 'x86_64 QEMU' { Run-X64 }
+        Invoke-Step 'aarch64 QEMU' { Run-Aarch64 }
+        Complete-Run 'All automated tests passed.'
     }
 }

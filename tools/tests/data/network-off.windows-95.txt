@@ -1,0 +1,73 @@
+; MSBATCH.INF rendered by USOS from an answer profile (docs/win9x-modern-2026-09-30.md)
+[Version]
+Signature="$CHICAGO$"
+
+[Setup]
+Express=1
+InstallDir="C:\WINDOWS"
+InstallType=1
+EBD=0
+ShowEula=0
+ChangeDir=0
+OptionalComponents=1
+Network=1
+System=0
+CCP=0
+CleanBoot=0
+Display=0
+DevicePath=1
+NoDirWarn=1
+NoPrompt2Boot=1
+Uninstall=0
+VRC=1
+TimeZone="Warsaw"
+
+[NameAndOrg]
+Name="Tester"
+Org="USOS"
+Display=0
+
+[Network]
+ComputerName="USOS-9X"
+Workgroup="USOSLAB"
+Description="Tester"
+Display=0
+Clients=
+Protocols=
+Services=
+
+[Install]
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+UpdateInis=USOS.Memory
+UpdateIniFields=USOS.Csm
+
+[USOS.Profile]
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer",NoDriveTypeAutoRun,1,ff,00,00,00
+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
+HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
+HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
+HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
+
+[USOS.Memory]
+system.ini,386Enh,,"MaxPhysPage=40000"
+system.ini,vcache,,"MaxFileCache=262144"
+
+[USOS.RunOnce]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"
+
+[USOS.NoWelcome]
+DelReg=USOS.Welcome.Del
+AddReg=USOS.Regwiz
+
+[USOS.Welcome.Del]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",Welcome
+
+[USOS.Regwiz]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
+HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
+
+; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines
+; (Me) and the USOS.CsmReg section (every 9x); missing, it is skipped.
+[USOS.Csm]

@@ -34,7 +34,9 @@
 #define REL 260
 typedef struct { WCHAR path[REL]; ULONGLONG size; FILETIME write; DWORD attr; } Entry;
 typedef struct { DWORD magic, count, disk, nesps; FILETIME start; GUID esp_id; GUID esps[32]; Entry e[MAX_ENTRIES]; } Snapshot;
-typedef struct { WCHAR name[MAX_PATH]; DWORD disk, part; int gpt; GUID type, id; } Volume;
+/* raw: no volume object was listed for this partition (an ESP under WinPE
+ * 5.0); `name` is \\?\GLOBALROOT\Device\HarddiskN\PartitionM\. */
+typedef struct { WCHAR name[MAX_PATH]; DWORD disk, part; int gpt, raw; GUID type, id; } Volume;
 static Snapshot before, now;
 static Volume vols[MAX_VOLUMES];
 static unsigned nvols;
@@ -73,6 +75,28 @@ static int later(const FILETIME *t, const FILETIME *start) {
 static int attributes(const WCHAR *path, WIN32_FILE_ATTRIBUTE_DATA *d) { return GetFileAttributesExW(path, GetFileExInfoStandard, d); }
 
 /* ------------------------------------------------------------------ volumes */
+/* GPT identity of a partition of PhysicalDrive`disk` from the drive layout,
+ * by its number (`*part` != 0) or its starting offset (`*part` == 0, then
+ * set). WinPE 5.0 (8.1 / Server 2012 R2) did not report the ESP Setup had
+ * just created on the target disk through its volume (QEMU e2e
+ * 2026-10-08), so the guard found no target ESP; the layout still names it. */
+static BYTE layout_buffer[65536];
+static int layout_gpt(DWORD disk, DWORD *part, LONGLONG offset, GUID *type, GUID *id) {
+    WCHAR path[40]; copy(path, L"\\\\.\\PhysicalDrive"); append_number(path, disk);
+    HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    DWORD got = 0; int ok = DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, layout_buffer, sizeof(layout_buffer), &got, 0); CloseHandle(h);
+    if (!ok || got < offsetof(DRIVE_LAYOUT_INFORMATION_EX, PartitionEntry)) return 0;
+    DRIVE_LAYOUT_INFORMATION_EX *layout = (void *)layout_buffer;
+    if (layout->PartitionStyle != PARTITION_STYLE_GPT) return 0;
+    for (DWORD i = 0; i < layout->PartitionCount; i++) {
+        PARTITION_INFORMATION_EX *p = &layout->PartitionEntry[i];
+        if (p->PartitionStyle != PARTITION_STYLE_GPT || !p->PartitionNumber) continue;
+        if (*part ? p->PartitionNumber != *part : p->StartingOffset.QuadPart != offset) continue;
+        *part = p->PartitionNumber; *type = p->Gpt.PartitionType; *id = p->Gpt.PartitionId; return 1;
+    }
+    return 0;
+}
 static int volumes(void) {
     nvols = 0;
     WCHAR name[64];
@@ -87,13 +111,46 @@ static int volumes(void) {
         STORAGE_DEVICE_NUMBER number; PARTITION_INFORMATION_EX part; DWORD got = 0;
         int ok = DeviceIoControl(h, IOCTL_STORAGE_GET_DEVICE_NUMBER, 0, 0, &number, sizeof(number), &got, 0) && number.DeviceType == FILE_DEVICE_DISK;
         int gpt = ok && DeviceIoControl(h, IOCTL_DISK_GET_PARTITION_INFO_EX, 0, 0, &part, sizeof(part), &got, 0) && part.PartitionStyle == PARTITION_STYLE_GPT;
+        DWORD disk = ok ? number.DeviceNumber : 0, partition = ok ? number.PartitionNumber : 0; LONGLONG offset = 0;
+        if (!gpt) {
+            /* The volume's single extent: its disk and starting offset. */
+            VOLUME_DISK_EXTENTS extents;
+            if (DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &extents, sizeof(extents), &got, 0) && extents.NumberOfDiskExtents == 1) {
+                if (!ok) { disk = extents.Extents[0].DiskNumber; partition = 0; ok = 1; }
+                if (disk == extents.Extents[0].DiskNumber) offset = extents.Extents[0].StartingOffset.QuadPart;
+            }
+        }
         CloseHandle(h);
         if (!ok) continue;
         Volume *v = &vols[nvols++]; zero(v, sizeof(*v));
-        copy(v->name, name); v->disk = number.DeviceNumber; v->part = number.PartitionNumber; v->gpt = gpt;
+        copy(v->name, name); v->disk = disk; v->part = partition; v->gpt = gpt;
         if (gpt) { v->type = part.Gpt.PartitionType; v->id = part.Gpt.PartitionId; }
+        else if ((partition || offset) && layout_gpt(disk, &v->part, offset, &v->type, &v->id)) v->gpt = 1;
     } while (FindNextVolumeW(find, name, 64));
     FindVolumeClose(find);
+    /* WinPE 5.0 (8.1 / Server 2012 R2) listed no volume for the ESP Setup
+     * had created on the target disk (QEMU e2e 2026-10-08), although the
+     * partition is there: add every GPT ESP of the drive layouts that no
+     * listed volume covers, reached through its partition device. */
+    for (DWORD disk = 0; disk < 64; disk++) {
+        WCHAR path[40]; copy(path, L"\\\\.\\PhysicalDrive"); append_number(path, disk);
+        HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        if (h == INVALID_HANDLE_VALUE) continue;
+        DWORD got = 0; int ok = DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, layout_buffer, sizeof(layout_buffer), &got, 0); CloseHandle(h);
+        if (!ok || got < offsetof(DRIVE_LAYOUT_INFORMATION_EX, PartitionEntry)) continue;
+        DRIVE_LAYOUT_INFORMATION_EX *layout = (void *)layout_buffer;
+        if (layout->PartitionStyle != PARTITION_STYLE_GPT) continue;
+        for (DWORD i = 0; i < layout->PartitionCount; i++) {
+            PARTITION_INFORMATION_EX *p = &layout->PartitionEntry[i];
+            if (p->PartitionStyle != PARTITION_STYLE_GPT || !p->PartitionNumber || !eq(&p->Gpt.PartitionType, &esp_type, sizeof(GUID))) continue;
+            int listed = 0;
+            for (unsigned k = 0; k < nvols; k++) if (vols[k].disk == disk && vols[k].part == p->PartitionNumber) listed = 1;
+            if (listed || nvols == MAX_VOLUMES) continue;
+            Volume *v = &vols[nvols++]; zero(v, sizeof(*v));
+            copy(v->name, L"\\\\?\\GLOBALROOT\\Device\\Harddisk"); append_number(v->name, disk); cat(v->name, L"\\Partition"); append_number(v->name, p->PartitionNumber); cat(v->name, L"\\");
+            v->disk = disk; v->part = p->PartitionNumber; v->gpt = 1; v->raw = 1; v->type = p->Gpt.PartitionType; v->id = p->Gpt.PartitionId;
+        }
+    }
     return 1;
 }
 static Volume *esp_on(DWORD disk, unsigned *count) {
@@ -112,12 +169,25 @@ static int letter_of(Volume *v, WCHAR *root) {
     for (int i = 18; i < 26; i++) {
         if (used & (1u << i) || i == 'X' - 'A') continue;
         root[0] = (WCHAR)('A' + i); root[1] = ':'; root[2] = '\\'; root[3] = 0;
+        if (v->raw) {
+            /* A partition without a listed volume: a DOS device name for
+             * its partition device (removed again by unmount_all). */
+            WCHAR drive[3] = {root[0], ':', 0}, device[MAX_PATH];
+            copy(device, v->name + 14); device[len(device) - 1] = 0; /* \Device\HarddiskN\PartitionM */
+            if (DefineDosDeviceW(DDD_RAW_TARGET_PATH, drive, device)) { mounted[i] = 2; return 1; }
+            continue;
+        }
         if (SetVolumeMountPointW(root, v->name)) { mounted[i] = 1; return 1; }
     }
     return 0;
 }
 static void unmount_all(void) {
-    for (int i = 0; i < 26; i++) if (mounted[i]) { WCHAR root[4] = {(WCHAR)('A' + i), ':', '\\', 0}; DeleteVolumeMountPointW(root); mounted[i] = 0; }
+    for (int i = 0; i < 26; i++) {
+        WCHAR root[4] = {(WCHAR)('A' + i), ':', '\\', 0};
+        if (mounted[i] == 1) DeleteVolumeMountPointW(root);
+        if (mounted[i] == 2) { root[2] = 0; DefineDosDeviceW(DDD_REMOVE_DEFINITION, root, 0); }
+        mounted[i] = 0;
+    }
 }
 
 /* ------------------------------------------------------------ ESP inventory */
@@ -525,11 +595,24 @@ static int cmd_after(DWORD disk) {
 
 static DWORD parse_disk(const WCHAR *s) { DWORD n = 0; if (*s < '0' || *s > '9') return (DWORD)-1; while (*s >= '0' && *s <= '9') { n = n * 10 + (*s++ - '0'); if (n > 100000) return (DWORD)-1; } return *s ? (DWORD)-1 : n; }
 #ifndef USOS_FINALIZE_TEST
+/* Diagnostic: the volumes as the guard sees them (disk, partition, GPT type). */
+static int cmd_volumes(void) {
+    if (!volumes()) return fail("cannot enumerate volumes");
+    WCHAR g[40];
+    for (unsigned i = 0; i < nvols; i++) {
+        Volume *v = &vols[i];
+        say("USOS ESP guard: volume disk="); number(v->disk); say(" partition="); number(v->part); say(" gpt="); number(v->gpt);
+        if (v->gpt) { guid_text(g, &v->type); say(" type="); sayw(g); }
+        say(" "); sayw(v->name); say("\r\n");
+    }
+    return 0;
+}
 void entry(void) {
     HKEY k; if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\MiniNT", 0, KEY_READ, &k) != ERROR_SUCCESS) ExitProcess(1); RegCloseKey(k);
     unsigned n = GetModuleFileNameW(0, base, MAX_PATH); if (!n || n >= MAX_PATH - 64) ExitProcess(1); while (n && base[n - 1] != '\\') n--; base[n] = 0; if (!n) ExitProcess(1);
     const WCHAR *c = GetCommandLineW(); int quote = 0; while (*c) { if (*c == '"') quote = !quote; else if (*c == ' ' && !quote) break; c++; } while (*c == ' ') c++;
     if (iprefix(c, L"before ")) { DWORD d = parse_disk(c + 7); ExitProcess(d == (DWORD)-1 ? 2 : cmd_before(d)); }
+    if (iprefix(c, L"volumes")) ExitProcess(cmd_volumes());
     if (iprefix(c, L"after ")) { DWORD d = parse_disk(c + 6); ExitProcess(d == (DWORD)-1 ? 2 : cmd_after(d)); }
     if (iprefix(c, L"run-from \"")) {
         static WCHAR executable[MAX_PATH]; const WCHAR *start = c + 10; unsigned i = 0;

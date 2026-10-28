@@ -143,9 +143,10 @@ Release assets:
 
 | File | Purpose |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | **Full installer**: all of USOS plus the WinPE donor and both XP packages; works offline |
-| `USOS-Installer-1.0.0-online.exe` | **Online installer**: small download; fetches the WinPE donor and XP packages from this release when needed and verifies them |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor, needed for Vista and original Windows 7 ISOs on UEFI (included in the full installer; separate for manual or offline use) |
+| `USOS-Installer-1.0.0.exe` | **Full installer**: all of USOS plus both WinPE donors (x64, x86) and both XP packages; works offline |
+| `USOS-Installer-1.0.0-online.exe` | **Online installer**: small download; fetches the WinPE donors and XP packages from this release when needed and verifies them |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 x64 donor, needed for Vista and original Windows 7 ISOs on UEFI (included in the full installer; separate for manual or offline use) |
+| `USOS-1.0.0-WinPE-PE10-x86-donor.zip` | PE10 x86 donor, used by 32-bit Windows 7, Vista and Server 2008 on UEFI without CSM, so no own Windows 10 x86 ISO is needed (included in the full installer; separate for manual or offline use) |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI package for exactly one original ISO each (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`); included in the full installer, or installed by hand with the included `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | sources of the third-party components and the written source offer |
 | `USOS-1.0.0-buildkit.zip` | pinned toolchains and build inputs for an offline rebuild |
@@ -160,8 +161,8 @@ Check a download with `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
 1. Get a USB stick of **at least 32 GiB** (in practice 64 GB; a stick sold
    as "32 GB" is usually too small). **Everything on it will be erased.**
 2. On a Windows PC run `USOS-Installer-1.0.0.exe` (it asks for
-   administrator rights), choose **Installation**, pick the stick, type the
-   confirmation text and click **ERASE AND INSTALL**.
+   administrator rights), choose **Installation**, pick the stick, tick the
+   confirmation box and click **ERASE AND INSTALL**.
 3. Copy your ISO images to the DATA partition, into the `Images` folder of
    each system, e.g. `Systems\Windows\Windows 11\Images\`.
 4. After the install, the installer's **Components** step puts the WinPE
@@ -306,9 +307,9 @@ The build runs on Windows. Full instructions: [docs/BUILDING.md](docs/BUILDING.m
 - **Offline build:** extract `USOS-1.0.0-buildkit.zip`, set `USOS_BUILDKIT`
   to the extracted `USOS-1.0.0-buildkit` folder and run `build.bat`; the kit
   is checked against its manifest and downloads are disabled.
-- **Signing key:** the Secure Boot (MOK) key lives **outside the
-  repository**, in `%APPDATA%\USOS\signing\` (`USOS_SIGNING_DIR` overrides
-  it). Without it the build is **unsigned** and boots only with Secure Boot
+- **Signing key:** the Secure Boot (MOK) key lives in the git-ignored
+  portable folder `installer\data\signing\` (`USOS_SIGNING_DIR` overrides
+  it; a key in the older `%APPDATA%\USOS\signing\` is copied there once). Without it the build is **unsigned** and boots only with Secure Boot
   off. Never commit or share the key.
 
 Windows ISOs, drivers and other third-party media are never part of the

@@ -73,7 +73,9 @@ pub fn collect(system: *const SystemEntry, image: ImageKind, firmware: Firmware)
     result.len = raw_len;
     for (raw[0..raw_len], 0..) |option, index| {
         var label = FixedText{};
-        const win2k = @import("std").mem.eql(u8, system.id, "windows-2000");
+        // Windows 2000 Server is UEFI only (the BIOS Core has no such entry).
+        const win2k = @import("std").mem.eql(u8, system.id, "windows-2000") or
+            (@import("builtin").os.tag != .freestanding and @import("std").mem.eql(u8, system.id, "windows-2000-server"));
         setLabel(&label, if (win2k and option.method == .automatic and option.backend == .xp_staging)
             "Automatic (Windows 2000 Setup)"
         else baseLabel(option.method, option.backend));
@@ -110,6 +112,7 @@ fn baseLabel(method: BootMethod, backend: ?capability.Backend) []const u8 {
         .linux_iso => "Automatic (Linux ISO)",
         .xp_staging => "Automatic (XP staging)",
         .xp_uefi_staging => "Automatic (UEFI preparation / XP via CSM)",
+        .win9x_uefi => "Automatic (UEFI preparation / DOS Setup via CSMWrap)",
         .wimboot => "Automatic (WIMBoot)",
         .vhdboot => "Automatic (VHDBoot)",
         .direct_efi => "Automatic (EFI)",

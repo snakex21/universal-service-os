@@ -143,6 +143,14 @@ Status: profile katalogu istnieją; instalacje wymagają osobnej pracy.
 - Rozszerzanie Linux Live poza pierwszy sprawdzony SliTaz oraz walidacja
   narzędzi w UEFI pozostają osobnymi etapami wcześniejszej kolejki.
 
+- Custom OS (2026-10-11, docs/custom-os-2026-10-11.md): kategoria „Inne
+  systemy” w UEFI; oficjalny obraz hybrydowy zapisywany na dysk docelowy
+  (Haiku, FreeBSD, KolibriOS, FreeDOS, własny obraz; QEMU PASS). Odłożone:
+  ReactOS za CSMWrap (0x7B w QEMU), TempleOS (tylko IDE), instalacja FreeBSD
+  bez drugiego dysku (bsdinstall w VM), wejście USB w KolibriOS/ReactOS (brak xHCI).
+  Partia 2 (2026-10-12): OpenBSD, NetBSD, 9front, Redox (QEMU, USB-only
+  wejście); ZealOS/MINIX/AROS/OpenIndiana nie (szczegóły w sekcji 6).
+
 ## Proponowana kolejność
 
 Windows 7 UEFI / USB 3 → Vista UEFI → macierz XP i starszych → języki →

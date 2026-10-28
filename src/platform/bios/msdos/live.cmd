@@ -5,6 +5,8 @@ if not exist C:\DOS\READY.TAG goto failed
 if not exist C:\TEMP\nul md C:\TEMP
 if not exist C:\PROGRAMS\nul md C:\PROGRAMS
 set TEMP=C:\TEMP
+rem USB/PS/2 mouse for DOS programs through the BIOS (INT 33h, VBADOS).
+if exist C:\VBMOUSE.EXE C:\VBMOUSE.EXE
 path C:\DOS;C:\PROGRAMS;C:\
 prompt $p$g
 cls

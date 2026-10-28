@@ -1,0 +1,787 @@
+USOS 3.1.2-usos5 patch 6/6 (2026-10-13): ACPI 1.0 view for legacy systems
+
+ACPI 1.0 operating systems (Windows 2000's ACPI HAL, XP) find the tables
+only through RSDP.RsdtAddress -> RSDT and read only the 32-bit FADT fields
+(FIRMWARE_CTRL, DSDT, PM1/PM2/PM_TMR/GPE blocks). CSMWrap copied the
+firmware RSDP as is, and create_patched_rsdt() returned NULL when
+RsdtAddress was 0, so such a firmware gave a legacy OS no ACPI tables at
+all. New src/usos_acpi10.c (own code from the public ACPI specification,
+no EFI dependency) runs on CSMWrap's RSDP copy before the helper-core MADT
+patch: RsdtAddress 0, an invalid RSDT or one that lacks the FACP/APIC the
+XSDT lists -> a new RSDT from the XSDT entries below 4 GiB; FADT 32-bit
+fields 0 with the X_ field set below 4 GiB (blocks only in System I/O
+space) -> a FADT copy with them filled, referenced from the RSDT only (the
+XSDT keeps the firmware FADT); RsdtAddress, checksum and extended checksum
+of the RSDP copy fixed. New tables live in EfiACPIReclaimMemory below
+4 GiB. A valid ACPI 1.0 view is not touched. Everything is logged through
+CSMWrap's printf ("USOS ACPI10: ..."; screen with verbose = true, serial
+with serial = true). create_patched_rsdt() now starts from the RSDP copy.
+
+Windows 2000 only (csmwrap.ini acpi_legacy_fadt = true, written by
+tools/xp_csmwrap_esp.sh for the 2000 ACPI flow): the RSDT's FACP is always
+a copy cut to the ACPI 1.0 layout (revision 1, length 116, 32-bit fields
+filled). The 2000 ACPI HALs copy FADT.Length bytes into a fixed 0x84-byte
+buffer; a revision 3+ FADT (0xF4+ bytes) overwrites the HAL's MADT/IOAPIC
+data in HAL phase 0. The XSDT keeps the firmware FADT; XP and every other
+flow see no change from this option. With the same option the DSDT and
+SSDTs reached through the RSDT are copies in which every static resource
+template's QWord Address Space descriptor reaching above 4 GiB is cleared
+(Min/Max/Translation/Length 0, the firmware's own "unused window" form):
+the 2000 acpi.sys keeps only the low 32 bits of a QWord Length and stops
+with STOP 0xA5 (0x2, ...) in its PCI root window check (QEMU q35's 64-bit
+window). The firmware tables and the XSDT view stay unchanged.
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b)
+after patches 0001-0005, patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos5, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/src/bios_proxy.c b/src/bios_proxy.c
+--- a/src/bios_proxy.c
++++ b/src/bios_proxy.c
+@@ -639,8 +639,9 @@
+     }
+     patched_madt = new_madt;
+ 
+-    /* Create patched RSDT */
+-    struct acpi_rsdt *new_rsdt = create_patched_rsdt(orig_rsdp, (uintptr_t)new_madt);
++    /* Create patched RSDT (USOS patch 0006: from the RSDP copy, whose RSDT
++     * may be the one usos_acpi10_efi_fixup() built or copied) */
++    struct acpi_rsdt *new_rsdt = create_patched_rsdt(copy_rsdp, (uintptr_t)new_madt);
+     if (new_rsdt) {
+         patched_rsdt = new_rsdt;
+         copy_rsdp->rsdt_addr = (uint32_t)(uintptr_t)new_rsdt;
+diff -ruN a/src/config.c b/src/config.c
+--- a/src/config.c
++++ b/src/config.c
+@@ -357,6 +357,15 @@
+         } else {
+             printf("  warning: invalid value for 'verbose': %s\n", val);
+         }
++    } else if (streq_nocase(key, "acpi_legacy_fadt")) {
++        /* USOS patch 0006 */
++        bool v;
++        if (parse_bool(val, &v)) {
++            gConfig.acpi_legacy_fadt = v;
++            printf("  acpi_legacy_fadt = %s\n", v ? "true" : "false");
++        } else {
++            printf("  warning: invalid value for 'acpi_legacy_fadt': %s\n", val);
++        }
+     } else if (streq_nocase(key, "vga")) {
+         uint8_t b, d, f;
+         if (parse_pci_address(val, &b, &d, &f)) {
+diff -ruN a/src/config.h b/src/config.h
+--- a/src/config.h
++++ b/src/config.h
+@@ -21,6 +21,8 @@
+     CHAR16 vgabios_path[CONFIG_VGABIOS_PATH_MAX];
+     bool iommu_disable;
+     bool verbose;
++    /* USOS patch 0006: RSDT FACP -> ACPI 1.0 FADT copy (Windows 2000 flow) */
++    bool acpi_legacy_fadt;
+     bool vga_specified;
+     uint8_t vga_bus;
+     uint8_t vga_device;
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -16,6 +16,7 @@
+ #include <pir.h>
+ #include <config.h>
+ #include <oprom.h>
++#include <usos_acpi10.h>
+ #include <flanterm.h>
+ #include <flanterm_backends/fb.h>
+ 
+@@ -634,6 +635,13 @@
+     /* Calculate RSDP copy location for MADT patching */
+     void *rsdp_copy = priv.csm_bin + (priv.csm_efi_table->AcpiRsdPtrPointer - priv.csm_bin_base);
+ 
++    /* USOS patch 0006: ACPI 1.0 operating systems (2000, XP) read only
++     * RsdtAddress/RSDT and the 32-bit FADT fields; build them from the
++     * XSDT/X_ fields when the firmware left them out; csmwrap.ini
++     * acpi_legacy_fadt = true (Windows 2000) also gives the RSDT an ACPI
++     * 1.0 FADT (revision 1, 116 bytes). */
++    usos_acpi10_efi_fixup(rsdp_copy, gConfig.acpi_legacy_fadt);
++
+     /* Initialize BIOS proxy (find mailbox and helper entry in CSM binary) */
+     if (bios_proxy_init(Csm16_bin, sizeof(Csm16_bin), rsdp_copy) != 0) {
+         panic("BIOS proxy initialization failed\n");
+diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
+--- a/src/usos_acpi10.c
++++ b/src/usos_acpi10.c
+@@ -0,0 +1,543 @@
++/*
++ * USOS patch 0006: ACPI 1.0 view for legacy operating systems.
++ * See usos_acpi10.h. Own code from the public ACPI specification;
++ * part of CSMWrap 3.1.2-usos5 (MODIFIED by USOS, LGPL-2.1).
++ */
++#include "usos_acpi10.h"
++
++#define HDR_LEN 36u
++#define MAX_TABLE_LEN (1u << 20)
++#define MAX_RSDT_ENTRIES 256u
++
++/* FADT offsets (ACPI 6.5 table 5.9). */
++#define FADT_FIRMWARE_CTRL 36u
++#define FADT_DSDT 40u
++#define FADT_X_FIRMWARE_CTRL 132u
++#define FADT_X_DSDT 140u
++#define GAS_SYSTEM_IO 1u
++#define FADT_V1_LEN 116u
++
++#define LOG(...) do { if (ops->log) ops->log(__VA_ARGS__); } while (0)
++
++static uint32_t rd32(const uint8_t *p)
++{
++    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
++}
++
++static uint64_t rd64(const uint8_t *p)
++{
++    return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
++}
++
++static void wr32(uint8_t *p, uint32_t v)
++{
++    p[0] = (uint8_t)v;
++    p[1] = (uint8_t)(v >> 8);
++    p[2] = (uint8_t)(v >> 16);
++    p[3] = (uint8_t)(v >> 24);
++}
++
++static bool sig_is(const uint8_t *p, const char *sig)
++{
++    return p[0] == (uint8_t)sig[0] && p[1] == (uint8_t)sig[1] &&
++           p[2] == (uint8_t)sig[2] && p[3] == (uint8_t)sig[3];
++}
++
++static uint8_t sum8(const uint8_t *p, uint32_t len)
++{
++    uint8_t s = 0;
++    for (uint32_t i = 0; i < len; i++)
++        s = (uint8_t)(s + p[i]);
++    return s;
++}
++
++static void copy_bytes(uint8_t *dst, const uint8_t *src, uint32_t len)
++{
++    for (uint32_t i = 0; i < len; i++)
++        dst[i] = src[i];
++}
++
++static void fix_table_checksum(uint8_t *t)
++{
++    uint32_t len = rd32(t + 4);
++    t[9] = 0;
++    t[9] = (uint8_t)(0u - sum8(t, len));
++}
++
++/* Header of the table at phys if it fits below 4 GiB and is sane, else NULL. */
++static uint8_t *map_table(const struct usos_acpi10_ops *ops, uint64_t phys, uint32_t *len_out)
++{
++    if (phys == 0 || phys > 0xFFFFFFFFull - HDR_LEN)
++        return NULL;
++    uint8_t *h = ops->map(ops->ctx, phys, HDR_LEN);
++    if (!h)
++        return NULL;
++    uint32_t len = rd32(h + 4);
++    if (len < HDR_LEN || len > MAX_TABLE_LEN || phys + len > 0x100000000ull)
++        return NULL;
++    uint8_t *t = ops->map(ops->ctx, phys, len);
++    if (t && len_out)
++        *len_out = len;
++    return t;
++}
++
++static bool table_valid(uint8_t *t, uint32_t len, const char *sig)
++{
++    return t && sig_is(t, sig) && sum8(t, len) == 0;
++}
++
++/* Does the (valid) RSDT list a table with this signature? */
++static bool rsdt_has(const struct usos_acpi10_ops *ops, const uint8_t *rsdt, uint32_t len, const char *sig)
++{
++    uint32_t n = (len - HDR_LEN) / 4;
++    for (uint32_t i = 0; i < n; i++) {
++        uint8_t *t = map_table(ops, rd32(rsdt + HDR_LEN + 4 * i), NULL);
++        if (t && sig_is(t, sig))
++            return true;
++    }
++    return false;
++}
++
++/* Does the XSDT list a table with this signature below 4 GiB? */
++static bool xsdt_has_low(const struct usos_acpi10_ops *ops, const uint8_t *xsdt, uint32_t len, const char *sig)
++{
++    uint32_t n = (len - HDR_LEN) / 8;
++    for (uint32_t i = 0; i < n; i++) {
++        uint8_t *t = map_table(ops, rd64(xsdt + HDR_LEN + 8 * i), NULL);
++        if (t && sig_is(t, sig))
++            return true;
++    }
++    return false;
++}
++
++/* New RSDT from the XSDT entries below 4 GiB. Returns phys or 0. */
++static uint32_t synth_rsdt(const struct usos_acpi10_ops *ops, const uint8_t *xsdt, uint32_t xlen, uint32_t *flags)
++{
++    uint32_t n = (xlen - HDR_LEN) / 8;
++    if (n > MAX_RSDT_ENTRIES)
++        n = MAX_RSDT_ENTRIES;
++    uint32_t keep = 0;
++    for (uint32_t i = 0; i < n; i++) {
++        uint64_t a = rd64(xsdt + HDR_LEN + 8 * i);
++        if (map_table(ops, a, NULL))
++            keep++;
++    }
++    uint32_t len = HDR_LEN + 4 * keep;
++    uint64_t phys = ops->alloc(ops->ctx, len);
++    uint8_t *r = phys ? ops->map(ops->ctx, phys, len) : NULL;
++    if (!r || phys > 0xFFFFFFFFull - len) {
++        *flags |= USOS_ACPI10_ALLOC_FAILED;
++        LOG("USOS ACPI10: cannot allocate RSDT\n");
++        return 0;
++    }
++    copy_bytes(r, xsdt, HDR_LEN);  /* OEM id, table id, revisions, creator */
++    r[0] = 'R'; r[1] = 'S'; r[2] = 'D'; r[3] = 'T';
++    wr32(r + 4, len);
++    r[8] = 1;
++    uint32_t j = 0;
++    for (uint32_t i = 0; i < n; i++) {
++        uint64_t a = rd64(xsdt + HDR_LEN + 8 * i);
++        uint8_t *t = map_table(ops, a, NULL);
++        if (t) {
++            wr32(r + HDR_LEN + 4 * j++, (uint32_t)a);
++        } else if (a) {
++            *flags |= USOS_ACPI10_SKIPPED_HIGH;
++            LOG("USOS ACPI10: XSDT entry %u at %llx left out (above 4 GiB or unreadable)\n",
++                (unsigned)i, (unsigned long long)a);
++        }
++    }
++    fix_table_checksum(r);
++    *flags |= USOS_ACPI10_RSDT_SYNTH;
++    LOG("USOS ACPI10: built RSDT at %x from XSDT (%u of %u entries)\n",
++        (unsigned)phys, (unsigned)keep, (unsigned)n);
++    return (uint32_t)phys;
++}
++
++struct pm_block {
++    uint32_t off;      /* 32-bit block address */
++    uint32_t x_off;    /* X_ GAS */
++    uint32_t len_off;  /* length byte, 0 = none */
++    const char *name;
++};
++
++static const struct pm_block pm_blocks[] = {
++    { 56, 148, 88, "PM1a_EVT_BLK" },
++    { 60, 160, 88, "PM1b_EVT_BLK" },
++    { 64, 172, 89, "PM1a_CNT_BLK" },
++    { 68, 184, 89, "PM1b_CNT_BLK" },
++    { 72, 196, 90, "PM2_CNT_BLK" },
++    { 76, 208, 91, "PM_TMR_BLK" },
++    { 80, 220, 92, "GPE0_BLK" },
++    { 84, 232, 93, "GPE1_BLK" },
++};
++
++/*
++ * Fill the zero 32-bit fields of the FADT copy f (length len) from its X_
++ * fields. Returns the number of fields filled.
++ */
++static unsigned fill_fadt(const struct usos_acpi10_ops *ops, uint8_t *f, uint32_t len, bool log)
++{
++    unsigned n = 0;
++    static const struct { uint32_t off, x_off; const char *name; } ptrs[] = {
++        { FADT_FIRMWARE_CTRL, FADT_X_FIRMWARE_CTRL, "FIRMWARE_CTRL" },
++        { FADT_DSDT, FADT_X_DSDT, "DSDT" },
++    };
++    for (unsigned i = 0; i < sizeof(ptrs) / sizeof(ptrs[0]); i++) {
++        if (len < ptrs[i].x_off + 8 || rd32(f + ptrs[i].off) != 0)
++            continue;
++        uint64_t x = rd64(f + ptrs[i].x_off);
++        if (x == 0)
++            continue;
++        if (x > 0xFFFFFFFFull) {
++            if (log)
++                LOG("USOS ACPI10: FADT X_%s %llx above 4 GiB, %s stays 0\n",
++                    ptrs[i].name, (unsigned long long)x, ptrs[i].name);
++            continue;
++        }
++        wr32(f + ptrs[i].off, (uint32_t)x);
++        n++;
++        if (log)
++            LOG("USOS ACPI10: FADT %s = %x (from X_%s)\n", ptrs[i].name, (unsigned)x, ptrs[i].name);
++    }
++    for (unsigned i = 0; i < sizeof(pm_blocks) / sizeof(pm_blocks[0]); i++) {
++        const struct pm_block *b = &pm_blocks[i];
++        if (len < b->x_off + 12 || rd32(f + b->off) != 0)
++            continue;
++        const uint8_t *gas = f + b->x_off;
++        uint64_t x = rd64(gas + 4);
++        if (x == 0)
++            continue;
++        if (gas[0] != GAS_SYSTEM_IO || x > 0xFFFFull) {
++            if (log)
++                LOG("USOS ACPI10: FADT X_%s space %u addr %llx not System I/O, %s stays 0\n",
++                    b->name, (unsigned)gas[0], (unsigned long long)x, b->name);
++            continue;
++        }
++        wr32(f + b->off, (uint32_t)x);
++        n++;
++        if (f[b->len_off] == 0 && gas[1] >= 8) {
++            f[b->len_off] = (uint8_t)(gas[1] / 8);
++        }
++        if (log)
++            LOG("USOS ACPI10: FADT %s = %x len %u (from X_%s)\n",
++                b->name, (unsigned)x, (unsigned)f[b->len_off], b->name);
++    }
++    return n;
++}
++
++/*
++ * Legacy AML filter (Windows 2000 only, ops->legacy_fadt).
++ *
++ * The 2000 acpi.sys keeps only the low 32 bits of a QWord Address Space
++ * descriptor's Length (ACPI 6.5 6.4.3.5.1) when it turns a _CRS into an
++ * IO_RESOURCE_REQUIREMENTS_LIST, then checks every PCI root window for
++ * Max - Min + 1 == Length and stops with STOP 0xA5 (0x2, device extension,
++ * requirements list, error count) on a mismatch. A 64-bit MMIO window
++ * (QEMU q35: 0x100000000-0x8FFFFFFFF, Length 0x800000000) always trips it.
++ * The same acpi.sys skips descriptors whose Length is 0, which is how
++ * firmware itself marks an unused window (AMI CRS templates). So in every
++ * static resource template of the DSDT/SSDTs a QWord descriptor that
++ * reaches above 4 GiB gets Min/Max/Translation/Length 0: 2000 (no PAE use
++ * of PCI windows) could not use that space anyway.
++ *
++ * A resource template is a Buffer (AML 0x11 PkgLength BufferSize ByteList)
++ * whose initializer parses as small/large resource items ending with the
++ * End Tag exactly at the end of the initializer; anything else is left
++ * alone. Windows written at run time by the AML (CreateQWordField) are not
++ * covered.
++ */
++#define AML_BUFFER_OP 0x11u
++#define RES_QWORD_ADDR 0x8Au
++#define RES_QWORD_BODY 43u
++#define RES_END_TAG 0x0Fu
++
++/* PkgLength at p (ACPI 6.5 20.2.4): encoded size in bytes, 0 if invalid. */
++static uint32_t aml_pkglen(const uint8_t *p, const uint8_t *end, uint32_t *val)
++{
++    if (p >= end)
++        return 0;
++    uint32_t extra = p[0] >> 6;
++    if ((uint32_t)(end - p) < 1 + extra)
++        return 0;
++    if (extra == 0) {
++        *val = p[0] & 0x3Fu;
++        return 1;
++    }
++    if (p[0] & 0x30u)
++        return 0;
++    uint32_t v = p[0] & 0x0Fu;
++    for (uint32_t i = 0; i < extra; i++)
++        v |= (uint32_t)p[1 + i] << (4 + 8 * i);
++    *val = v;
++    return 1 + extra;
++}
++
++static bool qword_high(const uint8_t *d)
++{
++    /* Min 14, Max 22, Translation 30, Length 38 (from the tag byte). */
++    static const uint8_t offs[] = { 14, 22, 30, 38 };
++    for (unsigned i = 0; i < sizeof(offs); i++)
++        if (rd32(d + offs[i] + 4) != 0)
++            return true;
++    return false;
++}
++
++/*
++ * Resource template at [p, e): number of QWord descriptors above 4 GiB, or
++ * -1 if it is not a well-formed template. With apply, clears them.
++ */
++static int res_template_filter(uint8_t *p, uint8_t *e, bool apply)
++{
++    uint8_t *start = p;
++    int hits = 0;
++    while (p < e) {
++        uint8_t tag = p[0];
++        if (tag & 0x80u) {
++            if (e - p < 3)
++                return -1;
++            uint32_t l = (uint32_t)p[1] | ((uint32_t)p[2] << 8);
++            if ((uint32_t)(e - p) - 3 < l)
++                return -1;
++            if (tag == RES_QWORD_ADDR && l >= RES_QWORD_BODY && qword_high(p)) {
++                hits++;
++                if (apply) {
++                    for (unsigned i = 14; i < 46; i++)
++                        p[i] = 0;
++                }
++            }
++            p += 3 + l;
++        } else {
++            uint32_t l = tag & 7u;
++            if ((uint32_t)(e - p) - 1 < l)
++                return -1;
++            if (((tag >> 3) & 0x0Fu) == RES_END_TAG) {
++                if (l != 1 || p + 2 != e)
++                    return -1;
++                if (apply && hits && p[1] != 0) {
++                    /* Checksum in use: whole template sums to 0. */
++                    p[1] = 0;
++                    p[1] = (uint8_t)(0u - sum8(start, (uint32_t)(e - start)));
++                }
++                return hits;
++            }
++            p += 1 + l;
++        }
++    }
++    return -1;
++}
++
++/* AML table t (length len): QWord windows above 4 GiB in static templates. */
++static unsigned aml_legacy_filter(uint8_t *t, uint32_t len, bool apply)
++{
++    unsigned hits = 0;
++    uint8_t *end = t + len;
++    for (uint8_t *p = t + HDR_LEN; p + 4 < end; p++) {
++        if (*p != AML_BUFFER_OP)
++            continue;
++        uint32_t plen = 0;
++        uint32_t pl = aml_pkglen(p + 1, end, &plen);
++        if (!pl || plen <= pl || plen > (uint32_t)(end - (p + 1)))
++            continue;
++        uint8_t *q = p + 1 + pl;               /* BufferSize */
++        uint8_t *bend = p + 1 + plen;          /* end of the ByteList */
++        uint32_t size;
++        uint32_t sl;
++        switch (*q) {
++        case 0x0A: sl = 2; size = q + 1 < bend ? q[1] : 0; break;
++        case 0x0B: sl = 3; size = q + 2 < bend ? (uint32_t)q[1] | ((uint32_t)q[2] << 8) : 0; break;
++        case 0x0C: sl = 5; size = q + 4 < bend ? rd32(q + 1) : 0; break;
++        default: continue;
++        }
++        uint8_t *init = q + sl;
++        if (init + 2 > bend || (uint32_t)(bend - init) > size)
++            continue;
++        int n = res_template_filter(init, bend, false);
++        if (n > 0) {
++            hits += (unsigned)n;
++            if (apply)
++                res_template_filter(init, bend, true);
++        }
++        if (n >= 0)
++            p = bend - 1;                      /* a template holds no AML */
++    }
++    return hits;
++}
++
++/*
++ * Copy of the AML table at phys with the legacy filter applied; physical
++ * address of the copy, or 0 if nothing needed changing (or no memory).
++ */
++static uint32_t aml_legacy_copy(const struct usos_acpi10_ops *ops, uint32_t phys, const char *sig, uint32_t *flags)
++{
++    uint32_t len = 0;
++    uint8_t *t = map_table(ops, phys, &len);
++    if (!t || !sig_is(t, sig))
++        return 0;
++    unsigned hits = aml_legacy_filter(t, len, false);
++    if (hits == 0)
++        return 0;
++    uint64_t cphys = ops->alloc(ops->ctx, len);
++    uint8_t *copy = cphys ? ops->map(ops->ctx, cphys, len) : NULL;
++    if (!copy || cphys > 0xFFFFFFFFull - len) {
++        *flags |= USOS_ACPI10_ALLOC_FAILED;
++        LOG("USOS ACPI10: cannot allocate %s copy\n", sig);
++        return 0;
++    }
++    copy_bytes(copy, t, len);
++    aml_legacy_filter(copy, len, true);
++    fix_table_checksum(copy);
++    *flags |= USOS_ACPI10_AML_FILTERED;
++    LOG("USOS ACPI10: legacy %s copy at %x: %u QWord window(s) above 4 GiB cleared\n",
++        sig, (unsigned)cphys, hits);
++    return (uint32_t)cphys;
++}
++
++/* Make the RSDT ours (a copy) before an entry changes. */
++static bool own_rsdt(const struct usos_acpi10_ops *ops, uint8_t **rsdt, uint32_t *rsdt_phys, uint32_t rlen, uint32_t *flags)
++{
++    uint64_t rphys = ops->alloc(ops->ctx, rlen);
++    uint8_t *rcopy = rphys ? ops->map(ops->ctx, rphys, rlen) : NULL;
++    if (!rcopy || rphys > 0xFFFFFFFFull - rlen) {
++        *flags |= USOS_ACPI10_ALLOC_FAILED;
++        LOG("USOS ACPI10: cannot allocate RSDT copy\n");
++        return false;
++    }
++    copy_bytes(rcopy, *rsdt, rlen);
++    *rsdt = rcopy;
++    *rsdt_phys = (uint32_t)rphys;
++    *flags |= USOS_ACPI10_RSDT_COPIED;
++    return true;
++}
++
++uint32_t usos_acpi10_fixup(const struct usos_acpi10_ops *ops, void *rsdp_v)
++{
++    uint8_t *rsdp = rsdp_v;
++    uint32_t flags = 0;
++    uint8_t rev = rsdp[15];
++    uint32_t rsdt_phys = rd32(rsdp + 16);
++    uint32_t rlen = 0;
++    uint8_t *rsdt = map_table(ops, rsdt_phys, &rlen);
++    bool rsdt_ok = table_valid(rsdt, rlen, "RSDT");
++
++    uint64_t xsdt_phys = rev >= 2 ? rd64(rsdp + 24) : 0;
++    uint32_t xlen = 0;
++    uint8_t *xsdt = map_table(ops, xsdt_phys, &xlen);
++    bool xsdt_ok = table_valid(xsdt, xlen, "XSDT");
++
++    if (rsdt_ok && xsdt_ok) {
++        static const char *const must[] = { "FACP", "APIC" };
++        for (unsigned i = 0; i < 2; i++) {
++            if (!rsdt_has(ops, rsdt, rlen, must[i]) && xsdt_has_low(ops, xsdt, xlen, must[i])) {
++                LOG("USOS ACPI10: RSDT at %x lacks %s that the XSDT lists\n", (unsigned)rsdt_phys, must[i]);
++                rsdt_ok = false;
++            }
++        }
++    } else if (!rsdt_ok) {
++        if (rsdt_phys == 0)
++            LOG("USOS ACPI10: RsdtAddress is 0\n");
++        else
++            LOG("USOS ACPI10: RSDT at %x invalid (signature, length or checksum)\n", (unsigned)rsdt_phys);
++    }
++
++    bool rsdt_ours = false;
++    if (!rsdt_ok) {
++        if (!xsdt_ok) {
++            LOG("USOS ACPI10: no usable XSDT, ACPI 1.0 view left as is\n");
++            return flags | USOS_ACPI10_NO_XSDT;
++        }
++        rsdt_phys = synth_rsdt(ops, xsdt, xlen, &flags);
++        if (!rsdt_phys)
++            return flags;
++        rsdt = map_table(ops, rsdt_phys, &rlen);
++        if (!rsdt)
++            return flags | USOS_ACPI10_ALLOC_FAILED;
++        rsdt_ours = true;
++    }
++
++    /* FADT through the RSDT. */
++    uint32_t n = (rlen - HDR_LEN) / 4;
++    for (uint32_t i = 0; i < n; i++) {
++        uint32_t fphys = rd32(rsdt + HDR_LEN + 4 * i);
++        uint32_t flen = 0;
++        uint8_t *fadt = map_table(ops, fphys, &flen);
++        if (!fadt || !sig_is(fadt, "FACP"))
++            continue;
++        /* Dry run on the firmware table: anything to fill? */
++        uint8_t probe[512];
++        uint32_t plen = flen < sizeof(probe) ? flen : (uint32_t)sizeof(probe);
++        copy_bytes(probe, fadt, plen);
++        bool cut = ops->legacy_fadt && (flen > FADT_V1_LEN || fadt[8] != 1);
++        unsigned need = fill_fadt(ops, probe, plen, false);
++        /* Windows 2000: DSDT copy without QWord windows above 4 GiB. */
++        uint32_t dsdt_new = ops->legacy_fadt && plen >= FADT_DSDT + 4
++            ? aml_legacy_copy(ops, rd32(probe + FADT_DSDT), "DSDT", &flags) : 0;
++        if (need == 0 && !cut && !dsdt_new)
++            break;
++        uint64_t cphys = ops->alloc(ops->ctx, flen);
++        uint8_t *copy = cphys ? ops->map(ops->ctx, cphys, flen) : NULL;
++        if (!copy || cphys > 0xFFFFFFFFull - flen) {
++            flags |= USOS_ACPI10_ALLOC_FAILED;
++            LOG("USOS ACPI10: cannot allocate FADT copy\n");
++            break;
++        }
++        copy_bytes(copy, fadt, flen);
++        unsigned filled = fill_fadt(ops, copy, flen, true);
++        if (cut) {
++            /* ACPI 1.0 layout: the 2000 HALs copy FADT.Length bytes into a
++             * 0x84-byte buffer. Bytes past 116 stay in the page, unused. */
++            uint32_t newlen = flen < FADT_V1_LEN ? flen : FADT_V1_LEN;
++            LOG("USOS ACPI10: legacy FADT: revision %u length %u -> revision 1 length %u\n",
++                (unsigned)copy[8], (unsigned)flen, (unsigned)newlen);
++            wr32(copy + 4, newlen);
++            copy[8] = 1;
++            flags |= USOS_ACPI10_FADT_LEGACY;
++        }
++        if (dsdt_new) {
++            wr32(copy + FADT_DSDT, dsdt_new);
++            if (flen >= FADT_X_DSDT + 8 && rd64(copy + FADT_X_DSDT) != 0) {
++                wr32(copy + FADT_X_DSDT, dsdt_new);
++                wr32(copy + FADT_X_DSDT + 4, 0);
++            }
++        }
++        fix_table_checksum(copy);
++        if (!rsdt_ours && !own_rsdt(ops, &rsdt, &rsdt_phys, rlen, &flags))
++            break;
++        rsdt_ours = true;
++        wr32(rsdt + HDR_LEN + 4 * i, (uint32_t)cphys);
++        fix_table_checksum(rsdt);
++        flags |= USOS_ACPI10_FADT_FIXED;
++        LOG("USOS ACPI10: FADT copy at %x (%u fields filled), RSDT at %x\n",
++            (unsigned)cphys, filled, (unsigned)rsdt_phys);
++        break;
++    }
++
++    /* Windows 2000: SSDT copies without QWord windows above 4 GiB. */
++    if (ops->legacy_fadt) {
++        for (uint32_t i = 0; i < n; i++) {
++            uint32_t snew = aml_legacy_copy(ops, rd32(rsdt + HDR_LEN + 4 * i), "SSDT", &flags);
++            if (!snew)
++                continue;
++            if (!rsdt_ours && !own_rsdt(ops, &rsdt, &rsdt_phys, rlen, &flags))
++                break;
++            rsdt_ours = true;
++            wr32(rsdt + HDR_LEN + 4 * i, snew);
++            fix_table_checksum(rsdt);
++        }
++    }
++
++    if (rsdt_ours) {
++        wr32(rsdp + 16, rsdt_phys);
++        rsdp[8] = 0;
++        rsdp[8] = (uint8_t)(0u - sum8(rsdp, 20));
++        if (rev >= 2) {
++            uint32_t len = rd32(rsdp + 20);
++            if (len < 36 || len > 64)
++                len = 36;
++            rsdp[32] = 0;
++            rsdp[32] = (uint8_t)(0u - sum8(rsdp, len));
++        }
++        flags |= USOS_ACPI10_RSDP_UPDATED;
++        LOG("USOS ACPI10: RSDP copy RsdtAddress = %x\n", (unsigned)rsdt_phys);
++    }
++    return flags;
++}
+diff -ruN a/src/usos_acpi10.h b/src/usos_acpi10.h
+--- a/src/usos_acpi10.h
++++ b/src/usos_acpi10.h
+@@ -0,0 +1,79 @@
++/*
++ * USOS patch 0006: ACPI 1.0 view for legacy operating systems.
++ *
++ * ACPI 1.0 operating systems (Windows 2000, XP, NT-era HALs) reach the
++ * tables only through RSDP.RsdtAddress -> RSDT (32-bit entries) and read
++ * only the 32-bit FADT fields (FIRMWARE_CTRL, DSDT, PM/GPE blocks). UEFI
++ * firmware may publish an XSDT only (RsdtAddress 0) or fill only the X_
++ * fields. usos_acpi10_fixup() repairs that view on CSMWrap's RSDP copy:
++ *
++ *  1. RsdtAddress 0, or an RSDT that fails its signature/length/checksum
++ *     check or lacks the FACP/APIC that the XSDT lists below 4 GiB: build a
++ *     new RSDT from the XSDT entries that lie below 4 GiB.
++ *  2. FADT FIRMWARE_CTRL / DSDT / PM and GPE block fields 0 while the X_
++ *     field is set and below 4 GiB (blocks: System I/O only): a FADT copy
++ *     with the 32-bit fields filled, referenced from the RSDT (never the
++ *     firmware's table, never the XSDT).
++ *  3. RSDP copy: RsdtAddress, checksum and extended checksum.
++ *  4. Only with ops->legacy_fadt (Windows 2000): the RSDT FADT copy is cut
++ *     to the ACPI 1.0 layout (revision 1, length 116) even when no field
++ *     needed filling, and the DSDT/SSDTs it reaches are copies in which
++ *     every static resource template's QWord Address Space descriptor that
++ *     reaches above 4 GiB is cleared (Min/Max/Translation/Length 0): the
++ *     2000 acpi.sys keeps only 32 bits of the Length and then stops with
++ *     STOP 0xA5 (0x2, ...) in its PCI root window check.
++ *
++ * A valid ACPI 1.0 view is left untouched. Written by the USOS project from
++ * the public ACPI specification (6.5, sections 5.2.5-5.2.9). Part of
++ * CSMWrap 3.1.2-usos5, a MODIFIED version of CSMWrap (LGPL-2.1).
++ *
++ * No EFI dependency: memory access and allocation go through the ops, so
++ * the same file builds on a host for unit tests.
++ */
++#ifndef USOS_ACPI10_H
++#define USOS_ACPI10_H
++
++#include <stdint.h>
++#include <stddef.h>
++#include <stdbool.h>
++
++struct usos_acpi10_ops {
++    void *ctx;
++    /* Pointer to len bytes at physical address phys, or NULL. */
++    void *(*map)(void *ctx, uint64_t phys, uint32_t len);
++    /* len zeroed bytes in ACPI memory below 4 GiB; physical address or 0. */
++    uint64_t (*alloc)(void *ctx, uint32_t len);
++    /* printf-like log, may be NULL. */
++    int (*log)(const char *fmt, ...);
++    /*
++     * Windows 2000 (csmwrap.ini acpi_legacy_fadt = true): the RSDT's FACP is
++     * always a copy cut to the ACPI 1.0 layout (revision 1, 116 bytes) with
++     * the 32-bit fields filled. The 2000 ACPI HALs copy the whole FADT
++     * (FADT.Length bytes) into a fixed 0x84-byte buffer; a longer FADT
++     * overwrites the HAL's MADT/IOAPIC data in HAL phase 0.
++     */
++    bool legacy_fadt;
++};
++
++/* Result flags of usos_acpi10_fixup(). */
++#define USOS_ACPI10_RSDT_SYNTH      0x01u  /* new RSDT built from the XSDT */
++#define USOS_ACPI10_RSDT_COPIED     0x02u  /* firmware RSDT copied (FACP entry replaced) */
++#define USOS_ACPI10_FADT_FIXED      0x04u  /* FADT copy with 32-bit fields filled */
++#define USOS_ACPI10_RSDP_UPDATED    0x08u  /* RSDP copy now points at a new RSDT */
++#define USOS_ACPI10_NO_XSDT         0x10u  /* RSDT unusable and no usable XSDT */
++#define USOS_ACPI10_ALLOC_FAILED    0x20u
++#define USOS_ACPI10_SKIPPED_HIGH    0x40u  /* XSDT entries above 4 GiB left out */
++#define USOS_ACPI10_FADT_LEGACY     0x80u  /* RSDT FADT cut to revision 1, 116 bytes */
++#define USOS_ACPI10_AML_FILTERED    0x100u /* DSDT/SSDT copy: QWord windows above 4 GiB cleared */
++
++/*
++ * rsdp: CSMWrap's writable RSDP copy (20 bytes for revision 0, else
++ * rsdp->length bytes). Returns a mask of USOS_ACPI10_* flags; 0 = the ACPI
++ * 1.0 view was already valid (nothing changed).
++ */
++uint32_t usos_acpi10_fixup(const struct usos_acpi10_ops *ops, void *rsdp);
++
++/* CSMWrap glue (usos_acpi10_efi.c): fixup with UEFI memory, logs via printf. */
++uint32_t usos_acpi10_efi_fixup(void *rsdp_copy, bool legacy_fadt);
++
++#endif
+diff -ruN a/src/usos_acpi10_efi.c b/src/usos_acpi10_efi.c
+--- a/src/usos_acpi10_efi.c
++++ b/src/usos_acpi10_efi.c
+@@ -0,0 +1,44 @@
++/*
++ * USOS patch 0006: EFI glue for usos_acpi10.c (identity-mapped memory,
++ * EfiACPIReclaimMemory pages below 4 GiB, CSMWrap's printf log).
++ * Part of CSMWrap 3.1.2-usos5 (MODIFIED by USOS, LGPL-2.1).
++ */
++#include <efi.h>
++#include <csmwrap.h>
++#include <printf.h>
++#include "usos_acpi10.h"
++
++static void *usos_acpi10_map(void *ctx, uint64_t phys, uint32_t len)
++{
++    (void)ctx;
++    (void)len;
++    return (void *)(uintptr_t)phys;
++}
++
++static uint64_t usos_acpi10_alloc(void *ctx, uint32_t len)
++{
++    (void)ctx;
++    EFI_PHYSICAL_ADDRESS addr = 0xFFFFFFFF;
++    if (gBS->AllocatePages(AllocateMaxAddress, EfiACPIReclaimMemory,
++                           (len + 4095) / 4096, &addr) != EFI_SUCCESS)
++        return 0;
++    memset((void *)(uintptr_t)addr, 0, ((len + 4095) / 4096) * 4096);
++    return addr;
++}
++
++uint32_t usos_acpi10_efi_fixup(void *rsdp_copy, bool legacy_fadt)
++{
++    struct usos_acpi10_ops ops = {
++        .ctx = NULL,
++        .map = usos_acpi10_map,
++        .alloc = usos_acpi10_alloc,
++        .log = printf,
++        .legacy_fadt = legacy_fadt,
++    };
++    uint32_t flags = usos_acpi10_fixup(&ops, rsdp_copy);
++    if (flags == 0)
++        printf("USOS ACPI10: ACPI 1.0 view valid (RSDT, 32-bit FADT fields), unchanged\n");
++    else
++        printf("USOS ACPI10: result flags %x\n", (unsigned)flags);
++    return flags;
++}

@@ -16,10 +16,20 @@ pub const Badge = ui_mod.Badge;
 pub const HeaderInfo = ui_mod.HeaderInfo;
 pub const Icon = icons.Kind;
 
+/// Disabled and colour-icon home cards (the macOS tile) exist only in the
+/// UEFI menu; the size-limited Legacy BIOS Core (freestanding) leaves them out.
+const card_extras = @import("builtin").os.tag != .freestanding;
+
 pub const HomeItem = struct {
     icon: Icon,
     title: []const u8,
     description: []const u8,
+    /// Colour system icon (32x32 RGBA, e.g. the macOS tile from bios-ui.bin)
+    /// drawn instead of the vector `icon` when present.
+    image: if (card_extras) ?[]const u8 else void = if (card_extras) null else {},
+    /// A disabled card stays visible and selectable (it explains itself) but
+    /// is drawn greyed out.
+    enabled: if (card_extras) bool else void = if (card_extras) true else {},
 };
 
 pub fn home(ui: *const Ui, header: HeaderInfo, items: []const HomeItem, selected: usize, hover: ?usize, hints: []const Hint) void {
@@ -33,7 +43,11 @@ pub fn home(ui: *const Ui, header: HeaderInfo, items: []const HomeItem, selected
 pub fn homeItem(ui: *const Ui, items: []const HomeItem, index: usize, state: RowState) void {
     if (index >= items.len) return;
     const item = items[index];
-    ui.homeCard(ui.homeCardRect(index, items.len), item.icon, item.title, item.description, state);
+    if (card_extras) {
+        ui.homeCardWith(ui.homeCardRect(index, items.len), .{ .icon = item.icon, .image = item.image, .enabled = item.enabled }, item.title, item.description, state);
+    } else {
+        ui.homeCard(ui.homeCardRect(index, items.len), item.icon, item.title, item.description, state);
+    }
 }
 
 /// The optional offer banner under the home cards (e.g. "save the Secure
@@ -267,5 +281,35 @@ test "menu screens render in Polish at common resolutions" {
         try std.testing.expectEqual(@as(?usize, geometry.first), listHit(geometry, rows.len, hit_rect.x + 2, hit_rect.y + 2));
         _ = summary(&ui, header, .{ .title = "Gotowe", .labels = &.{ "System", "Obraz" }, .values = &.{ "Windows 11", "win11.iso" }, .action = "Wczytaj ISO Windows" });
         notice(&ui, header, .{ .title = "Brak obrazów", .icon = .warning, .tone = .warning, .heading = "Nie znaleziono", .lines = &.{"Skopiuj plik do:"} });
+    }
+}
+
+test "home grid: disabled macOS tile with a colour icon, 8 cards in 4 even rows" {
+    const font = @import("font.zig");
+    const lang_file = @import("../i18n/lang_file.zig");
+    const ScreenBuffer = @import("screen_buffer.zig").ScreenBuffer;
+    const Theme = @import("theme.zig").Theme;
+    const pack = try font.Pack.parse(@embedFile("fonts/usos-font.bin"));
+    const coverage = lang_file.Coverage{ .context = @ptrCast(&pack), .has = font.coverageHas };
+    const table = try lang_file.Table.parse(@embedFile("../i18n/testdata/lang-pl.bin"), coverage);
+    const icon_pixels = [_]u8{0x80} ** (32 * 32 * 4);
+    for ([_][2]u32{ .{ 800, 600 }, .{ 1024, 768 }, .{ 1280, 720 }, .{ 1920, 1080 } }) |size| {
+        const pixels = try std.testing.allocator.alloc(u32, size[0] * size[1]);
+        defer std.testing.allocator.free(pixels);
+        const buffer = ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, size[0], size[1], .bgrx8).?;
+        const ui = Ui.init(buffer.surface, Theme{}, &pack, &table);
+        try std.testing.expectEqualStrings("Wymaga dodatku macOS", ui.t(.category_macos_addon));
+        var items: [8]HomeItem = undefined;
+        for (&items) |*item| item.* = .{ .icon = .windows, .title = "Windows", .description = ui.t(.category_windows_desc) };
+        items[4] = .{ .icon = .disc, .image = &icon_pixels, .title = "macOS", .description = ui.t(.category_macos_addon), .enabled = false };
+        home(&ui, .{ .firmware = "UEFI", .language = "Polski", .build = "B" }, &items, 4, null, &.{});
+        // Two columns, four full rows: the last row has both cards.
+        const last = ui.homeCardRect(7, items.len);
+        const left = ui.homeCardRect(6, items.len);
+        try std.testing.expectEqual(left.y, last.y);
+        try std.testing.expect(last.x > left.x);
+        try std.testing.expect(last.bottom() < size[1] - ui.footerHeight());
+        const mac = ui.homeCardRect(4, items.len);
+        try std.testing.expectEqual(@as(?usize, 4), homeHit(&ui, items.len, mac.x + 5, mac.y + 5));
     }
 }

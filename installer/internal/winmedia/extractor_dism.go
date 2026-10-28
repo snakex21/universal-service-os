@@ -8,6 +8,10 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
+
+	"github.com/snakex21/universal-service-os/installer/internal/portable"
 )
 
 // DismExtractor wypakowuje plik z WIM przez DISM. Wybrano DISM, bo jest
@@ -23,7 +27,7 @@ import (
 type DismExtractor struct {
 	// Exe to sciezka do dism.exe; puste = wyszukanie w PATH.
 	Exe string
-	// MountRoot to katalog na punkty montowania; puste = os.TempDir().
+	// MountRoot to katalog na punkty montowania; puste = data\tmp obok EXE (portable.TempDir).
 	MountRoot string
 	// Run pozwala podmienic wykonanie komendy w testach; nil = exec.
 	Run func(name string, args ...string) ([]byte, error)
@@ -63,23 +67,28 @@ func (d DismExtractor) ExtractFile(wimPath string, imageIndex int, pathInWIM, ds
 	}
 	mountRoot := d.MountRoot
 	if strings.TrimSpace(mountRoot) == "" {
-		mountRoot = os.TempDir()
+		dir, err := portable.TempDir()
+		if err != nil {
+			return err
+		}
+		mountRoot = dir
 	}
 	mountDir, err := os.MkdirTemp(mountRoot, "usos-wim-mount-")
 	if err != nil {
 		return fmt.Errorf("utworzenie punktu montowania: %w", err)
 	}
 	defer os.Remove(mountDir)
+	logPath := mountDir + ".log"
 
 	if out, err := d.run(exe, "/Mount-Wim",
 		"/WimFile:"+wimPath,
 		"/index:"+strconv.Itoa(imageIndex),
 		"/MountDir:"+mountDir,
-		"/ReadOnly"); err != nil {
+		"/ReadOnly", "/LogPath:"+logPath, "/ScratchDir:"+mountRoot); err != nil {
 		return fmt.Errorf("dism /Mount-Wim %s:%d: %w: %s", wimPath, imageIndex, err, strings.TrimSpace(string(out)))
 	}
 	copyErr := copyFile(filepath.Join(mountDir, strings.TrimPrefix(filepath.FromSlash(pathInWIM), string(filepath.Separator))), dst)
-	if out, err := d.run(exe, "/Unmount-Wim", "/MountDir:"+mountDir, "/Discard"); err != nil {
+	if out, err := d.run(exe, "/Unmount-Wim", "/MountDir:"+mountDir, "/Discard", "/LogPath:"+logPath, "/ScratchDir:"+mountRoot); err != nil {
 		if copyErr != nil {
 			return fmt.Errorf("%w (dodatkowo dism /Unmount-Wim: %v: %s)", copyErr, err, strings.TrimSpace(string(out)))
 		}
@@ -92,7 +101,7 @@ func (d DismExtractor) run(name string, args ...string) ([]byte, error) {
 	if d.Run != nil {
 		return d.Run(name, args...)
 	}
-	return exec.Command(name, args...).CombinedOutput()
+	return hiddenexec.CombinedOutput(fmt.Sprint(filepath.Base(name), " ", args), hiddenexec.Command(name, args...))
 }
 
 // copyFile kopiuje plik zachowujac zwykle uprawnienia; katalog docelowy

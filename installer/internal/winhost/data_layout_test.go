@@ -21,6 +21,16 @@ func TestRequiredDataDirectoriesCoverEveryVisibleProfile(t *testing.T) {
 		filepath.Join("Systems", "Betas", "Windows Longhorn", "Unattended"),
 		filepath.Join("Systems", "DOS", "MS-DOS", "Images"),
 		filepath.Join("Systems", "DOS", "MS-DOS", "Programs"),
+		filepath.Join("Systems", "DOS", "FreeDOS", "Images"),
+		filepath.Join("Systems", "Other", "Haiku", "Images"),
+		filepath.Join("Systems", "Other", "FreeBSD", "Images"),
+		filepath.Join("Systems", "Other", "ReactOS", "Images"),
+		filepath.Join("Systems", "Other", "KolibriOS", "Images"),
+		filepath.Join("Systems", "Other", "OpenBSD", "Images"),
+		filepath.Join("Systems", "Other", "NetBSD", "Images"),
+		filepath.Join("Systems", "Other", "9front", "Images"),
+		filepath.Join("Systems", "Other", "Redox", "Images"),
+		filepath.Join("Systems", "Other", "Other", "Images"),
 		"Utilities",
 		filepath.Join("Programs", "USOS"),
 	}
@@ -55,9 +65,14 @@ func TestWindows311DoesNotCreateUnattendedDirectory(t *testing.T) {
 }
 
 func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
-	// 16 client versions (with XP x64) plus Windows Server 2003 to 2025.
-	if len(windowsProfiles) != 25 {
-		t.Fatalf("windows profile count=%d, want 25", len(windowsProfiles))
+	// 16 client versions (with XP x64), Windows Server 2003 to 2025, Windows
+	// 2000 Server, the early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04,
+	// 1.01), Windows NT 3.51, 3.5 and 3.1 Workstation / Server, XP Media
+	// Center Edition 2005, XP Tablet PC Edition 2005, Windows Embedded 8.1
+	// Industry, Windows NT 4.0 Terminal Server Edition and Windows Home Server
+	// 2011.
+	if len(windowsProfiles) != 45 {
+		t.Fatalf("windows profile count=%d, want 45", len(windowsProfiles))
 	}
 	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
 	if len(linuxProfiles) != 12 {
@@ -68,6 +83,11 @@ func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	}
 	if len(dosProfiles) != 6 {
 		t.Fatalf("DOS profile count=%d, want 6", len(dosProfiles))
+	}
+	// Haiku, FreeBSD, ReactOS, KolibriOS, OpenBSD, NetBSD, 9front, Redox and
+	// the own-image entry.
+	if len(otherProfiles) != 9 {
+		t.Fatalf("other profile count=%d, want 9", len(otherProfiles))
 	}
 }
 
@@ -111,7 +131,7 @@ func TestRequiredDataDirectoriesContainDriversTree(t *testing.T) {
 	for _, name := range []string{"Windows 11", "Windows 10", "Windows 8.1", "Windows 8", "Windows 7", "Windows Vista", "Windows XP", "Windows 2000",
 		"Windows Server 2025", "Windows Server 2022", "Windows Server 2019", "Windows Server 2016",
 		"Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2", "Windows Server 2008",
-		"Windows XP x64", "Windows Server 2003"} {
+		"Windows XP x64", "Windows Server 2003", "Windows 2000 Server", "Windows XP Media Center Edition 2005", "Windows XP Tablet PC Edition 2005", "Windows Embedded 8.1 Industry", "Windows Home Server 2011"} {
 		nt[name] = true
 	}
 	for _, profile := range windowsProfiles {

@@ -30,7 +30,14 @@ ComputerName=USOS-XP
 [Identification]
 JoinWorkgroup=WORKGROUP
 [Networking]
-InstallDefaultComponents=Yes
+InstallDefaultComponents=No
+[NetClients]
+MS_MSClient=USOS.MSClient
+[USOS.MSClient]
+[NetProtocols]
+MS_TCPIP=USOS.TCPIP
+[USOS.TCPIP]
+[NetServices]
 [RegionalSettings]
 LanguageGroup="2"
 SystemLocale=00000415
@@ -43,4 +50,35 @@ rem USOS: local administrator accounts from usos-xp.ini, run hidden by pae.exe a
 set USOS_LOG=%SystemRoot%\usos-users.log
 net user "Tester" "Test123!" /add >> "%USOS_LOG%" 2>&1
 for %%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%G "Tester" /add >> "%USOS_LOG%" 2>&1
+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 exit /b 0
+
+----- usos-reg.txt -----
+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|HideFileExt|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer|NoDriveTypeAutoRun|dword|255
+HKLM\SYSTEM\CurrentControlSet\Services\Cdrom|Autorun|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|ProxyEnable|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffline|dword|0
+USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
+USER\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
+USER\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+USER\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
+DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|ProxyEnable|dword|0
+DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffline|dword|0
+DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
+DEFAULT\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
+DEFAULT\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+DEFAULT\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
+HKLM\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
+
+----- DISPLAY.TXT -----
+1024x768xauto

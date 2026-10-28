@@ -27,8 +27,8 @@ const Source = struct {
 
 pub fn run(reader: Reader, bulk: Reader, folder: []const u8, image: catalog.ImageItem, graphics: ?vbe.Session) !void {
     if (image.kind != .iso) return error.MemtestI586IsoRequired;
-    try @import("windows_iso_config.zig").validateName(folder);
-    try @import("windows_iso_config.zig").validateName(image.name.slice());
+    try @import("catalog").windows_iso_config.validateName(folder);
+    try @import("catalog").windows_iso_config.validateName(image.name.slice());
     var folder16: [255]u16 = undefined;
     var image16: [255]u16 = undefined;
     for (folder, 0..) |ch, i| folder16[i] = ch;

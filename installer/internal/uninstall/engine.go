@@ -20,6 +20,9 @@ type DestructiveSession interface {
 type Backend interface {
 	BeginUSOSDestructive(expected Target) (DestructiveSession, domain.Disk, error)
 	FormatExFAT(media MediaLayout) error
+	// ExposeFormattedVolume clears the NoDriveLetter bit the partition is
+	// created with and gives the formatted volume a drive letter.
+	ExposeFormattedVolume(media MediaLayout) error
 	VerifyUninstall(media MediaLayout) (VerificationReport, error)
 }
 
@@ -89,6 +92,9 @@ func (e *Engine) run(expected Target, events chan<- Event) {
 	if err := e.runStage(events, StageFormatExFAT, func() error {
 		if err := e.backend.FormatExFAT(media); err != nil {
 			return err
+		}
+		if err := e.backend.ExposeFormattedVolume(media); err != nil {
+			return fmt.Errorf("expose exFAT volume after format: %w", err)
 		}
 		readBack, err := session.VerifyUninstallLayoutUnchanged(media)
 		if err != nil {

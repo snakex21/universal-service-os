@@ -1,0 +1,18 @@
+#include <windows.h>
+#include <ntverp.h>
+#define VER_FILETYPE                VFT_DRV
+#define VER_FILESUBTYPE             VFT2_DRV_SYSTEM
+#define VER_FILEDESCRIPTION_STR     "USOS USB disk service SCSI miniport for Windows 9x (GPL-3.0-or-later)"
+#define VER_INTERNALNAME_STR        "usosusb.mpd"
+#define VER_ORIGINALFILENAME_STR    "usosusb.mpd"
+#undef VER_COMPANYNAME_STR
+#define VER_COMPANYNAME_STR         "Universal Service OS"
+#undef VER_PRODUCTNAME_STR
+#define VER_PRODUCTNAME_STR         "Universal Service OS"
+#undef VER_LEGALCOPYRIGHT_STR
+#define VER_LEGALCOPYRIGHT_STR      "Copyright (C) 2026 Maksymilian and the USOS Authors"
+#undef VER_PRODUCTVERSION
+#define VER_PRODUCTVERSION          1,0,0,0
+#undef VER_PRODUCTVERSION_STR
+#define VER_PRODUCTVERSION_STR      "1.0"
+#include "common.ver"

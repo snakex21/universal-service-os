@@ -32,12 +32,31 @@ class MediaTests(unittest.TestCase):
         self.assertEqual(expected, recovered)
 
     def test_rejects_unsafe_iso_names_and_non_floppy_input(self):
-        for name in ('../IO.SYS', 'LONGFILENAME.EXE', 'FILE NAME.COM', 'A/B.COM'):
+        for name in ('../IO.SYS', 'LONGFILENAME.EXE', 'FILE NAME.COM', 'A/B/C.COM', 'LONGDIRNAME/A.COM'):
             with self.assertRaises(ValueError):
                 build({name: b'file'})
         for data in (b'', bytes(1474560)):
             with self.assertRaises(ValueError):
                 list(files(data))
+
+    def test_one_directory_level_for_windows_1_pif_files(self):
+        data = build({'SETUP.EXE': b'MZ', 'PIF/WRITE.PIF': b'pif' * 100})
+        table_size = struct.unpack_from('<I', data, 16 * 2048 + 132)[0]
+        table_lba = struct.unpack_from('<I', data, 16 * 2048 + 140)[0]
+        table = data[table_lba * 2048:table_lba * 2048 + table_size]
+        self.assertEqual(table[8:9], b'\x00')
+        self.assertEqual(table[10], 3)
+        self.assertEqual(table[18:21], b'PIF')
+        pif_lba = struct.unpack_from('<I', table, 12)[0]
+        pos = pif_lba * 2048
+        names = []
+        while data[pos]:
+            names.append(data[pos + 33:pos + 33 + data[pos + 32]])
+            if names[-1] == b'WRITE.PIF;1':
+                lba, size = struct.unpack_from('<I', data, pos + 2)[0], struct.unpack_from('<I', data, pos + 10)[0]
+                self.assertEqual(data[lba * 2048:lba * 2048 + size], b'pif' * 100)
+            pos += data[pos]
+        self.assertIn(b'WRITE.PIF;1', names)
 
 if __name__ == '__main__':
     unittest.main()

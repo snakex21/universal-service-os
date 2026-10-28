@@ -41,6 +41,7 @@ pub const hashes = [_]u32{
     0x0366a7d5, // lx.detecting_usos_partitions
     0x6d3ee2fe, // lx.device_guard_runs_before_the_first_destructive_o
     0x42f61b3c, // lx.disk_prepared
+    0xd49c641f, // lx.disk_wait_nvme_countdown
     0x94ae85fb, // lx.disk_x
     0xf0f119eb, // lx.disks_smart
     0xb68b6f2a, // lx.disks_smart_2
@@ -64,6 +65,16 @@ pub const hashes = [_]u32{
     0x75d932c4, // lx.hardware_information
     0x0d14da67, // lx.hardware_smart
     0x3fc155ac, // lx.identity_attributes_and_error_history_no_additio
+    0x58230247, // lx.image_disk_after_restart
+    0x27467e49, // lx.image_disk_layout
+    0x627a6d87, // lx.image_disk_restart_notice
+    0xfc2931f2, // lx.image_disk_restart_notice_9front
+    0xe13475fb, // lx.image_disk_restart_notice_freebsd
+    0x710fff7e, // lx.image_disk_restart_notice_haiku
+    0xa24fc59c, // lx.image_disk_restart_notice_netbsd
+    0xa24adf21, // lx.image_disk_restart_notice_openbsd
+    0x3c39c188, // lx.image_disk_restart_notice_redox
+    0x6e68bf21, // lx.image_disk_writing
     0x6cc43056, // lx.initializing_keyboard_and_mouse
     0x34d9903d, // lx.initializing_only_the_storage_stack_needed_for_p
     0xa600211f, // lx.inspecting_disk
@@ -72,6 +83,14 @@ pub const hashes = [_]u32{
     0xa8c66f00, // lx.keep_the_usos_stick_connected
     0x8173ebb9, // lx.keep_the_usos_usb_drive_connected_setup_will_sta
     0x752c33ab, // lx.loading_the_selected_boot_image_from_ntfs
+    0x238df5fa, // lx.logon_answer_file
+    0x30117541, // lx.logon_autologon
+    0x9200e4eb, // lx.logon_domain_no_password
+    0x4c3fbfd5, // lx.logon_domain_profile_password
+    0x8276d4e9, // lx.logon_file_password
+    0x533622f2, // lx.logon_no_password
+    0x6bfbeb26, // lx.logon_profile_password
+    0x3753f2a9, // lx.logon_setup_asks
     0x65fc5619, // lx.measured_byte_progress_transfer_speed_and_eta
     0xe0764ec1, // lx.measured_byte_progress_transfer_speed_and_eta_ar
     0xd738a5be, // lx.models_serial_numbers_capacity_and_health_report
@@ -81,7 +100,19 @@ pub const hashes = [_]u32{
     0xc9d96a0d, // lx.new_xpsetup_installer_partition_2_gib
     0x399e2996, // lx.no_disks_detected
     0x2be3334f, // lx.no_separate_xpsetup_partition_will_remain
+    0x5acb69c8, // lx.no_target_disk_no_nvme_controller
+    0x1d25b9a3, // lx.no_target_disk_nvme_no_disk
     0x76d8d357, // lx.no_unattended_file_selected_skipped
+    0xf76a47e0, // lx.nt3_failed
+    0xdc0d7b06, // lx.nt3_needs_vm
+    0x0f924b74, // lx.nt4_after_restart
+    0x26b7fa06, // lx.nt4_checking
+    0x30c7d55b, // lx.nt4_failed
+    0x9dcb2084, // lx.nt4_install_title
+    0x69cefafb, // lx.nt4_needs_key
+    0xcfdf9246, // lx.nt4_needs_sp6a
+    0xff201299, // lx.nt4_needs_vm
+    0xe770f2ef, // lx.nvme_x86_csmwrap_not_supported
     0xe5d5307c, // lx.one_partition_for_windows_and_automatic_setup
     0x02b9eb81, // lx.opening_data_partition
     0x03527491, // lx.opening_the_hardware_panel
@@ -148,6 +179,7 @@ pub const hashes = [_]u32{
     0xc4b74054, // lx.the_native_vhd_boot_manager_and_bcd_will_be_asse
     0x7383eba2, // lx.the_vhd_vhdx_remains_on_data_work_contains_the_v
     0xb35dc805, // lx.the_wim_boot_environment_will_be_assembled_next
+    0x1217c9ca, // lx.type_x
     0x74abccc9, // lx.unknown_interface
     0x41cf0383, // lx.used_free_space_in_file_systems_unknown
     0xc59b65ff, // lx.usos_creates_an_efi_partition_vista
@@ -169,6 +201,18 @@ pub const hashes = [_]u32{
     0x53e526f6, // lx.vista_csmwrap_setup_hint
     0xda567045, // lx.vista_csmwrap_why
     0x59b2e029, // lx.vista_start_the_prepared_disk
+    0x4468e914, // lx.w9x_csmwrap_after_restart
+    0x6cf6ff01, // lx.w9x_csmwrap_copying
+    0xc337af94, // lx.w9x_csmwrap_layout
+    0xf1a71816, // lx.w9x_csmwrap_restart_notice
+    0xdfa2e92c, // lx.w9x_csmwrap_why
+    0xea679f67, // lx.w9x_no_target_disk
+    0x52a87627, // lx.w9x_phase1_checking
+    0x004a1c42, // lx.w9x_phase1_failed
+    0xf12314c8, // lx.w9x_phase1_progress
+    0xd68d8fdf, // lx.w9x_phase1_title
+    0xa4b7e3fb, // lx.w9x_preparation_failed
+    0x45c444d4, // lx.w9x_start_the_prepared_disk
     0xd2c4e12a, // lx.windows_c_x_gib_ntfs
     0xf4336aff, // lx.windows_xp
     0x1a650cd0, // lx.writing_autounattend_xml_to_the_prepared_work_pa
@@ -227,6 +271,7 @@ pub const english = [_][]const u8{
     "Detecting USOS partitions",
     "device_guard runs before the first destructive operation.",
     "Disk prepared",
+    "Waiting for the NVMe disk to appear: {0} s left.",
     "Disk: {0}",
     "DISKS & SMART",
     "Disks & SMART",
@@ -250,6 +295,16 @@ pub const english = [_][]const u8{
     "HARDWARE INFORMATION",
     "HARDWARE & SMART",
     "Identity, attributes and error history; no additional disk query",
+    "After the restart the disk starts by itself into {0}.",
+    "New layout: the {0} image unchanged at the start of the disk ({1} MB); a 64 MiB CSMWrap partition at the end only when the image has no UEFI loader; the rest stays unallocated.",
+    "After the restart the firmware starts this disk's UEFI entry and {0} starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and 9front starts from it. At the bootargs prompt press Enter, then Enter again for the user glenda (if asked for vgasize, type text). To install 9front, run inst/start in a terminal. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and FreeBSD starts from it. The first start enlarges the system to the whole disk. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and NetBSD starts from it. The first start enlarges the system to the whole disk and restarts once by itself. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and OpenBSD starts from it. It is the OpenBSD installer: it needs a network connection for the file sets (http) or a second disk to install onto. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and Redox starts from it. At the resolution picker press Enter; the livedisk image runs from memory (changes are not kept). Redox on real hardware is experimental: if it stops at \"redoxfs: failed to open\" or the keyboard does not react, this PC's disk or USB controller is not supported yet. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "Writing the {0} image to the selected disk.",
     "Initializing keyboard and mouse.",
     "Initializing only the storage stack needed for preparation.",
     "Inspecting disk",
@@ -258,6 +313,14 @@ pub const english = [_][]const u8{
     "Keep the USOS stick connected.",
     "Keep the USOS USB drive connected. Setup will start automatically.",
     "Loading the selected boot image from NTFS.",
+    "After the installation log on with the account from your answer file {0}.",
+    "After the installation Windows logs on automatically as {0}.",
+    "After the installation log on to the domain {1} as {0} (no password).",
+    "After the installation log on to the domain {1} as {0} with the password set in the answer profile.",
+    "After the installation log on as {0}; the password is the one in {1}.",
+    "After the installation log on as {0} (no password).",
+    "After the installation log on as {0} with the password set in the answer profile.",
+    "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
     "Measured byte progress, transfer speed and ETA.",
     "Measured byte progress, transfer speed and ETA are now available.",
     "Models, serial numbers, capacity and health reports",
@@ -267,7 +330,19 @@ pub const english = [_][]const u8{
     "New XPSETUP installer partition: 2 GiB.",
     "No disks detected.",
     "No separate XPSETUP partition will remain.",
+    "No target disk found (only the USOS stick), and no NVMe controller is visible on PCI. If an NVMe disk is installed, shut the computer down completely (power off, not restart), wait a few seconds and try again. No disk was changed.",
+    "No target disk found: the NVMe controller is on PCI, but its disk did not appear within 60 s. Shut the computer down completely (power off, not restart) and try again. No disk was changed.",
     "No unattended file selected - skipped.",
+    "The Windows NT 3.51 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
+    "Windows NT 3.51 installs only in the VM on this PC, which is not available: {0}",
+    "After the restart the disk starts by itself into the installed {0}.",
+    "Checking the installed system",
+    "The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
+    "{0} installation in the background (start {1})",
+    "Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks",
+    "Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\\Windows\\Windows NT 4.0\\ServicePack on USOS_DATA",
+    "Windows NT 4.0 installs only in the VM on this PC, which is not available: {0}",
+    "32-bit {0} on NVMe is not supported yet on this path. No disk was changed.",
     "One partition for Windows and automatic setup.",
     "Opening DATA partition",
     "Opening the hardware panel.",
@@ -334,6 +409,7 @@ pub const english = [_][]const u8{
     "The native VHD boot manager and BCD will be assembled next.",
     "The VHD/VHDX remains on DATA; WORK contains the verified boot manager and BCD.",
     "The WIM boot environment will be assembled next.",
+    "Type: {0}",
     "Unknown interface",
     "Used/free space in file systems: unknown.",
     "USOS creates an EFI partition and leaves the rest free. In Vista Setup select the unallocated space.",
@@ -355,6 +431,18 @@ pub const english = [_][]const u8{
     "In {0} Setup select the unallocated space; do not delete the two small partitions.",
     "Without CSM, Vista starts through CSMWrap, so USOS must first prepare the target disk.",
     "Windows Vista: start the prepared disk",
+    "After the restart the disk starts by itself and {0} Setup continues on it.",
+    "Copying {0} Setup, the USOS helpers and CSMWrap to the selected disk.",
+    "New layout (MBR): {0} (drive C:) for {1}, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.",
+    "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the {0} installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "Without CSM, {0} starts through CSMWrap, so USOS prepares the target disk first.",
+    "No target disk found (only the USOS stick). No disk was changed.",
+    "Checking the result of stage 1",
+    "Windows Setup stage 1 did not finish. The computer was not restarted; logs: EFI/USOS/win9x/phase1",
+    "Do not turn off the computer. Elapsed: {0}, written to disk: {1} MB.",
+    "{0} installation - stage 1 in the background",
+    "The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log",
+    "{0}: start the prepared disk",
     "Windows C: {0} GiB NTFS.",
     "WINDOWS XP",
     "Writing Autounattend.xml to the prepared WORK partition.",

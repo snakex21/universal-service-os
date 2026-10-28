@@ -4,6 +4,8 @@ import struct,sys,unittest
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools'))
 sys.path.insert(0,str(ROOT/'zig-out/int13-python'))
+sys.path.insert(0,str(ROOT/'tools/tests'))
+import depguard
 from wimboot_kexec import make_ordered_kexec_wimboot,build_disk_order,build_kexec_bridge,build_kexec_cpu_reset
 from test_windows_disk_order import DiskOrder
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_16,UC_HOOK_INTR,UC_HOOK_CODE
@@ -13,6 +15,7 @@ class OrderedEntry(unittest.TestCase):
     call=DiskOrder.call
     @classmethod
     def setUpClass(cls):
+        depguard.require_zig()
         cls.original=(ROOT/'tools/vendor/wimboot/2.9.0/wimboot').read_bytes()
         cls.image=make_ordered_kexec_wimboot(
             cls.original,

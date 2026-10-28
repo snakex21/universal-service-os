@@ -53,10 +53,27 @@ tools/vendor/csmwrap/3.1.2/COPYING.LESSER -text
 tools/vendor/uefi-shell/** -text
 assets/uefi-shell/startup.nsh -text
 
-# CSMWrap 3.1.2-usos1/usos3 source builds: patches, the guest script and the
-# source archive are hashed byte for byte (LF), see tools/vendor/csmwrap/3.1.2-usos3/manifest.json.
+# CSMWrap 3.1.2-usos1/usos3/usos4/usos5/usos6/usos7/usos8/usos9/usos10/usos11/usos12/usos13/usos14/usos15/usos16/usos17/usos18 source builds: patches, the guest script and the
+# source archive are hashed byte for byte (LF), see tools/vendor/csmwrap/3.1.2-usos18/manifest.json.
 tools/vendor/csmwrap/3.1.2-usos1/** -text
 tools/vendor/csmwrap/3.1.2-usos3/** -text
+tools/vendor/csmwrap/3.1.2-usos4/** -text
+tools/vendor/csmwrap/3.1.2-usos5/** -text
+tools/vendor/csmwrap/3.1.2-usos6/** -text
+tools/vendor/csmwrap/3.1.2-usos7/** -text
+tools/vendor/csmwrap/3.1.2-usos8/** -text
+tools/vendor/csmwrap/3.1.2-usos9/** -text
+tools/vendor/csmwrap/3.1.2-usos10/** -text
+tools/vendor/csmwrap/3.1.2-usos11/** -text
+tools/vendor/csmwrap/3.1.2-usos11-diag/** -text
+tools/vendor/csmwrap/3.1.2-usos11-int13x/** -text
+tools/vendor/csmwrap/3.1.2-usos12/** -text
+tools/vendor/csmwrap/3.1.2-usos13/** -text
+tools/vendor/csmwrap/3.1.2-usos14/** -text
+tools/vendor/csmwrap/3.1.2-usos15/** -text
+tools/vendor/csmwrap/3.1.2-usos16/** -text
+tools/vendor/csmwrap/3.1.2-usos17/** -text
+tools/vendor/csmwrap/3.1.2-usos18/** -text
 tools/vendor/csmwrap/3.1.2-src/** -text
 tools/csmwrap_build/guest_build.sh text eol=lf
 

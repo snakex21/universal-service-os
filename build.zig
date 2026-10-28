@@ -9,6 +9,7 @@ pub fn build(b: *std.Build) void {
     addHostImageProbe(b, target, optimize);
     addHostUiPreview(b, target, optimize);
     addHostAnswerTool(b, target, optimize);
+    addHostWin3xDisplayTool(b, target, optimize);
     addHostLegacyFat32Probe(b, target, optimize);
     addHostLegacyNtfsProbe(b, target, optimize);
     const ntfs_driver = addFetchNtfsDriver(b);
@@ -140,13 +141,18 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         "src/platform/uefi/windows_user_drivers.zig",
         "src/platform/uefi/theme_editor.zig",
         "src/platform/uefi/manual_form.zig",
+        "src/platform/uefi/profile_editor.zig",
+        "src/platform/uefi/win9x_key_prompt.zig",
         "src/platform/uefi/xp_preparation.zig",
         "src/platform/uefi/vista_preparation.zig",
         "src/platform/uefi/uefi_shell.zig",
         "src/platform/uefi/bios_mode.zig",
+        "src/platform/uefi/apm_breadcrumbs.zig",
+        "src/platform/uefi/partition_handles.zig",
         "tools/windows7_uefi_trace.zig",
         "tools/windows7_vga_routing.zig",
         "tools/windows7_gop_retry.zig",
+        "tools/windows7_vbe_table.zig",
     };
     for (uefi_test_files) |file| {
         const module = b.createModule(.{ .root_source_file = b.path(file), .target = target, .optimize = optimize });
@@ -182,6 +188,19 @@ fn addHostAnswerTool(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
     const exe = b.addExecutable(.{ .name = "usos-answer", .root_module = tool_module });
     const install = b.addInstallArtifact(exe, .{});
     const step = b.step("answer-tool", "Build the host answer renderer (usos-answer: profile -> WINNT.SIF settings / autounattend.xml)");
+    step.dependOn(&install.step);
+}
+
+fn addHostWin3xDisplayTool(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/win3x_display_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tool_module.addImport("usos", createUsosModule(b, target, optimize));
+    const exe = b.addExecutable(.{ .name = "usos-win3x-display", .root_module = tool_module });
+    const install = b.addInstallArtifact(exe, .{});
+    const step = b.step("win3x-display-tool", "Build the host Windows 3.x display patch tool (usos-win3x-display; the micro-Linux runs usos-fb-ui --win3x-display)");
     step.dependOn(&install.step);
 }
 

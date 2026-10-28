@@ -1,0 +1,48 @@
+; USOSUSB.INF - USOS USB disk service SCSI miniport for Windows 95 OSR2 / 98 /
+; 98 SE / Me. Copyright (C) 2026 Maksymilian and the USOS Authors,
+; GPL-3.0-or-later. usosusb.mpd (tools/nt/usosusb9x) runs under SCSIPORT.PDR /
+; IOS and reaches USB flash drives through UDS channel 1 of SeaBIOS in CSMWrap
+; (3.1.2-usos16 or later); it touches no PCI device and no xHCI. Each slot is
+; a removable disk (target n, "USOS USB disk slot n").
+; The device is a root devnode with hardware ID USOSUSB and no resources: the
+; USOS 9x flow registers it with USOSUSB.REG; by hand: Control Panel, Add New
+; Hardware, No (select from a list), SCSI controllers, Have Disk.
+; Experimental until a hardware pass. Not together with xhci98.
+
+[Version]
+Signature="$CHICAGO$"
+Class=SCSIAdapter
+Provider=%USOS%
+DriverVer=10/19/2026,1.0.0.0
+
+[DestinationDirs]
+DefaultDestDir=12
+
+[SourceDisksNames]
+1=%DiskName%,,0
+
+[SourceDisksFiles]
+usosusb.mpd=1
+
+[Manufacturer]
+%USOS%=USOS.Mfg
+
+[USOS.Mfg]
+%USOSUSB.DeviceDesc%=USOSUSB, USOSUSB
+
+[USOSUSB]
+CopyFiles=USOSUSB.Copy
+AddReg=USOSUSB.AddReg
+
+[USOSUSB.Copy]
+usosusb.mpd
+
+[USOSUSB.AddReg]
+HKR,,DevLoader,,*IOS
+HKR,,DontLoadIfConflict,,"Y"
+HKR,,PortDriver,,usosusb.mpd
+
+[Strings]
+USOS="USOS"
+USOSUSB.DeviceDesc="USOS USB disk service (usosusb)"
+DiskName="USOS USB disk driver"

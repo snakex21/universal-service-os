@@ -1,0 +1,30 @@
+# wlink directives for USOSMOUS.DRV (tools/build_win3_usb_keyboard.py adds
+# "file usosmous.obj name USOSMOUS.DRV"). A Windows mouse driver: module
+# name MOUSE (USER imports the mouse driver by that name), the DDK ordinals.
+# No OpenWatcom runtime: own entry point, only import records.
+format windows dll initglobal
+option modname=MOUSE
+option description 'USOS USB mouse for Windows 3.x/9x under CSMWrap (GPL-3.0-or-later)'
+option start=__DLLstart_
+option nodefaultlibs
+option stack=0
+option quiet
+libpath '%WATCOM%/lib286/win'
+library windows
+export INQUIRE.1 resident
+export ENABLE.2 resident
+export DISABLE.3 resident
+export MOUSEGETINTVECT.4 resident
+export WEP.5 resident
+# Windows Me: USOSKEY.DRV calls it by name once its bridge copy is in place.
+export USOSATTACH.6 resident
+# Windows Me: USOSKEY.DRV's DOS-box guard (WH_CBT) pauses / resumes the mouse.
+export USOSPAUSE.7 resident
+# USOSDBG.EXE: wheel diagnostics (read only).
+export USOSWHEELINFO.8 resident
+segment type code fixed
+segment type data fixed
+# USOSKEY.DRV (task time): is the USOSVMD.VXD / VMOUSE mode active? (then
+# its DOS-box guard stays off). USOSDBG.EXE: the VMOUSE-mode diagnostics.
+export USOSVMDMODE.9 resident
+export USOSVMDINFO.10 resident

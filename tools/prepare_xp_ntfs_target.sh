@@ -29,7 +29,7 @@ dd if="$TARGET_DEVICE" of="$work/before" bs=512 count=1 2>/dev/null
 cmp -s "$work/before" "$XP_EXPECTED_MBR" || fail 'MBR changed before NTFS preparation'
 cp "$work/before" "$work/expected"
 printf '\007' | dd of="$work/expected" bs=1 seek=$((450+(slot-1)*16)) conv=notrunc 2>/dev/null
-dd if="$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" of="$work/expected" bs=440 count=1 conv=notrunc 2>/dev/null
+dd if="${XP_MBR_CODE:-$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin}" of="$work/expected" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if="$work/expected" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc 2>/dev/null
 sync
 dd if="$TARGET_DEVICE" of="$work/after" bs=512 count=1 2>/dev/null
@@ -57,18 +57,98 @@ cmp -s "$work/sector" "$work/readback" || fail 'NTFS backup boot sector mismatch
 modprobe ntfs3
 mkdir "$work/volume"
 mount -t ntfs3 "$node" "$work/volume"; mounted=yes
+# Typed answer-profile options (src/flow/answer/options.zig): the registry
+# set of the rendered profile and usos-reg.exe (tools/windows_usos_reg.c)
+# next to usos-users.cmd, which applies and deletes the set at setup end.
+usos_nt5_stage_regset() {
+    usos_xp_settings_regset "$XP_USER_SETTINGS" "$work/usos-reg.txt" || return 0
+    [ -f "$SCRIPT_DIR/usos-reg.exe" ] || fail 'usos-reg.exe is missing from this build'
+    cp "$SCRIPT_DIR/usos-reg.exe" "$1/usos-reg.exe" && cp "$work/usos-reg.txt" "$1/usos-reg.txt" || fail 'cannot stage the registry set'
+    cmp -s "$SCRIPT_DIR/usos-reg.exe" "$1/usos-reg.exe" && cmp -s "$work/usos-reg.txt" "$1/usos-reg.txt" || fail 'registry set readback mismatch'
+    printf '[NT5] registry set staged: %s entries for usos-reg.exe\n' "$(grep -vc '^;' "$work/usos-reg.txt")"
+    rm -f "$work/usos-reg.txt"
+}
+# Display (docs/display-policy.md, user decisions 2026-10-21 / 2026-10-22):
+# XP and Server 2003, x86 and x64, get USOSRES at the first logon on every
+# install: with a USOS settings file (its display= request), and also
+# without one or with the user's own WINNT.SIF (auto). Auto = the monitor's
+# native mode (prep-time EDID, else the registry EDID), else the highest;
+# nothing when the driver already runs it. A user's .sif that sets
+# [Display] XResolution keeps its own mode (nothing staged). DIR = the
+# setup folder; DIR's line for the setup-end script goes to stdout.
+usos_nt52_display_stage() {
+    case "$NT5_SYSTEM" in windows-2000) return 0 ;; esac
+    if [ ! -f "$SCRIPT_DIR/USOSRES.EXE" ] || [ ! -f "$SCRIPT_DIR/display_profile.sh" ]; then
+        printf '[NT5] DISPLAY USOSRES.EXE missing in this build; display unchanged\n' >&2; return 0
+    fi
+    . "$SCRIPT_DIR/display_profile.sh"
+    if [ -n "${XP_CUSTOM_SIF:-}" ]; then
+        if usos_display_sif_fixed "$XP_CUSTOM_SIF"; then
+            printf '[NT5] DISPLAY the selected .sif sets [Display]; its mode is kept, USOSRES not staged\n' >&2; return 0
+        fi
+        _nd_request=autoxauto
+    else
+        _nd_request=$(usos_display_request_nt52 "${XP_USER_SETTINGS:-}") || fail 'duplicate display request'
+    fi
+    # Keep (profile display=keep or DATA's display-keep.txt): Windows' own
+    # mode, nothing staged or registered.
+    if usos_display_keep "$_nd_request"; then
+        printf '[NT5] DISPLAY keep (profile display=keep or display-keep.txt): USOSRES not staged\n' >&2; return 0
+    fi
+    usos_display_stage "$1" "$SCRIPT_DIR/USOSRES.EXE" "$_nd_request" || fail 'cannot stage the display helper'
+    cmp -s "$SCRIPT_DIR/USOSRES.EXE" "$1/USOSRES.EXE" || fail 'USOSRES.EXE readback mismatch'
+    printf '[NT5] DISPLAY request=%s native=%s apply=first-logon\n' "$_nd_request" "$(usos_display_native || echo unknown)" >&2
+    usos_display_nt52_run_line "${1##*/USOS/}"
+}
+# Without usos-xp.ini accounts (no settings file, or the user's own .sif):
+# the setup-end script only registers the display helper (stdout, CRLF).
+usos_nt52_display_only_cmd() {
+    printf '@echo off\r\nrem USOS: display helper registration at setup end (docs/display-policy.md).\r\n'
+    printf 'set USOS_LOG=%%SystemRoot%%\\usos-users.log\r\n'
+    printf '%s\r\n' "$(printf '%s' "$1" | tr -d '\r\n')"
+    printf 'exit /b 0\r\n'
+}
+# CMD (setup-end script, ends with exit /b 0) with LINE before its last line.
+usos_nt52_insert_before_exit() {
+    # ENVIRON, not -v: awk -v would eat the backslashes of the path.
+    USOS_ADD_LINE=$2 awk '{sub(/\r$/, ""); l[NR]=$0} END {a=ENVIRON["USOS_ADD_LINE"]; sub(/\r$/, "", a); for(i=1;i<=NR;i++){if(i==NR) printf "%s\r\n", a; printf "%s\r\n", l[i]}}' "$1" > "$1.new" && mv "$1.new" "$1"
+}
 export XP_TARGET_ROOT="$work/volume" MTOOLS_IMAGE="$node"
 sh "$SCRIPT_DIR/prepare_xp_local_source.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k3-x86-sp2-uefi-csm ]; then
 sh "$SCRIPT_DIR/xp_driver_stage.sh" apply || fail 'XP driver integration failed'
 elif usos_nt5_uefi_generic_profile && [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
 sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integration failed'
+elif [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+# Windows 2000: AHCINT (ScsiPort, polling) and ACPI off (w2k_stage.sh).
+sh "$SCRIPT_DIR/w2k_stage.sh" apply || fail 'Windows 2000 AHCI/ACPI integration failed'
+# The USOS gap marker at LBA 2046 (AHCINT usos2+'s target check and trace ring,
+# LBA 2040-2045 cleared); the partition starts at 2048, the gap is USOS's.
+. "$SCRIPT_DIR/w2k_stage.sh"
+disk_sig=$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | od -An -tx4 | tr -d ' \n')
+dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=2040 count=6 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the USOS gap trace sectors'
+usos_w2k_gap_marker "$disk_sig" > "$work/gap-marker"
+dd if="$work/gap-marker" of="$TARGET_DEVICE" bs=512 seek=2046 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the USOS gap marker'
+dd if="$TARGET_DEVICE" of="$work/gap-readback" bs=512 skip=2046 count=1 2>/dev/null
+cmp -s "$work/gap-marker" "$work/gap-readback" || fail 'USOS gap marker readback mismatch'
+printf '[W2K_STAGE] USOS gap marker PASS lba=2046 disk_signature=%s (AHCINT trace ring 2040-2043, test 2045)\n' "$disk_sig"
 fi
-# NT 5.2 (Server 2003 x86, XP x64): USB 2.0 input/storage on xHCI through
-# xhci98 (nt52_usb_stage.sh), after the storage step. XP x86 keeps its bundle.
-case "${USOS_PLAN_PROFILE:-}" in w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm)
-sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed' ;;
+# NT 5.2 (Server 2003 x86, XP x64) and Windows 2000: USB 2.0 input/storage on
+# xHCI through xhci98 (nt52_usb_stage.sh), after the storage step. XP x86
+# keeps its bundle.
+# Windows 2000 before SP3/SP4 (the Server RTM media) has no usbport.sys,
+# which xhci98 imports: skipped, the installed system keeps its own USB.
+case "${USOS_PLAN_PROFILE:-}" in w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm|w2k-x86-sp4-uefi-csm)
+if [ "$NT5_SYSTEM" = windows-2000 ] && [ -z "$(find "$work/volume/\$WIN_NT\$.~LS/I386" -maxdepth 1 -type f \( -iname usbport.sys -o -iname usbport.sy_ \) | head -n 1)" ]; then
+printf '[NT52_USB] SKIP: this Windows 2000 source has no usbport.sys (before SP3); no xhci98\n'
+else
+sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed'
+fi ;;
 esac
+# Every NT 5 system: every partition of a USB stick gets a letter (own disk
+# class lower filter usosmpart.sys, nt5_usosmpart_stage.sh); after the
+# storage and USB steps, which edit the same TXTSETUP.SIF / HIVESYS.INF.
+sh "$SCRIPT_DIR/nt5_usosmpart_stage.sh" apply || fail 'USB multi-partition filter integration failed'
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
 mkdir -p "$work/volume/USOS/XP"
@@ -79,10 +159,30 @@ cmp -s "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe" || fail 'PAE help
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
 . "$SCRIPT_DIR/xp_user_settings.sh"
 usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
+display_line=$(usos_nt52_display_stage "$work/volume/USOS/XP")
+[ -z "$display_line" ] || usos_nt52_insert_before_exit "$work/accounts.cmd" "$display_line" || fail 'cannot register the display helper'
 cp "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"
 printf '[XP_PAE] usos-users.cmd staged (accounts from usos-xp.ini, run hidden by pae.exe)\n'
+usos_nt5_stage_regset "$work/volume/USOS/XP"
+else
+# No settings file or the user's own .sif: display helper only (pae.exe runs it).
+display_line=$(usos_nt52_display_stage "$work/volume/USOS/XP")
+if [ -n "$display_line" ]; then
+usos_nt52_display_only_cmd "$display_line" > "$work/volume/USOS/XP/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+printf '[XP_PAE] usos-users.cmd staged (display helper only, run hidden by pae.exe)\n'
+fi
+fi
+# LAN helper (network_setup.sh staged USOSLAN.EXE + LAN.REG in USOS\XP): its
+# Run value is imported by usos-users.cmd at setup end (pae.exe), as
+# usos-setup.cmd does on 2000 / 2003. Without a script yet: a minimal one.
+if [ -f "$work/volume/USOS/XP/USOSLAN.EXE" ] && [ -f "$work/volume/USOS/XP/LAN.REG" ]; then
+if [ ! -f "$work/volume/USOS/XP/usos-users.cmd" ]; then
+printf '@echo off\r\nrem USOS: XP setup end (run hidden by pae.exe).\r\nset USOS_LOG=%%SystemRoot%%\\usos-users.log\r\nexit /b 0\r\n' > "$work/volume/USOS/XP/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+fi
+usos_nt52_insert_before_exit "$work/volume/USOS/XP/usos-users.cmd" 'if exist "%SystemDrive%\USOS\XP\LAN.REG" %SystemRoot%\regedit.exe /s "%SystemDrive%\USOS\XP\LAN.REG"' || fail 'cannot register the LAN helper'
+printf '[XP_PAE] LAN helper registered in usos-users.cmd (LAN.REG at setup end)\n'
 fi
 # Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
 if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
@@ -114,6 +214,14 @@ mkdir -p "$setup_dir"
     printf 'set USOS_LOG=%%SystemRoot%%\\usos-setup.log\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" call "%%USOS_DIR%%\\usos-users.cmd"\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" del /f /q "%%USOS_DIR%%\\usos-users.cmd"\r\n'
+    # LAN helper Run value (network_setup.sh: 2000 and Server 2003 x86).
+    if [ "$NT5_SYSTEM" = windows-2000 ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then
+        printf 'if exist "%%USOS_DIR%%\\USOSLAN.EXE" if exist "%%USOS_DIR%%\\LAN.REG" %%SystemRoot%%\\regedit.exe /s "%%USOS_DIR%%\\LAN.REG"\r\n'
+    fi
+    if [ "$NT5_SYSTEM" = windows-2000 ]; then
+        printf 'rem VESA display (usosvbe + framebuf.dll, w2k_stage.sh 11.; DATA vesa-off.txt: none).\r\n'
+        printf 'if exist "%%USOS_DIR%%\\vesa.cmd" call "%%USOS_DIR%%\\vesa.cmd"\r\n'
+    fi
     if [ "$NT5_SYSTEM" = windows-server-2003 ]; then
         printf 'rem Enterprise/Datacenter: /PAE on the installed entry (without it SP2 uses PAE only with DEP).\r\n'
         printf 'bootcfg /raw "/PAE" /A /ID 1 >> "%%USOS_LOG%%" 2>&1\r\n'
@@ -121,13 +229,39 @@ mkdir -p "$setup_dir"
     fi
     printf 'exit /b 0\r\n'
 } > "$setup_dir/usos-setup.cmd"
+# Windows 2000 Server: the first logon's [GuiRunOnce] imports srvwiz.reg
+# ("Configure Your Server" off; w2k_stage.sh usos_w2k_server_sif).
+if [ "$NT5_SYSTEM" = windows-2000 ]; then
+. "$SCRIPT_DIR/w2k_stage.sh"
+if usos_w2k_server_source "$work/volume/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF"; then
+usos_w2k_server_reg > "$setup_dir/srvwiz.reg"
+printf '[NT5] srvwiz.reg staged in USOS/%s (Windows 2000 Server: Configure Your Server off at the first logon)\n' "$NT5_SETUP_DIR"
+fi
+# VESA display (w2k_stage.sh 11.): on unless DATA's vesa-off.txt.
+if [ "${USOS_W2K_VESA:-on}" = on ]; then
+usos_w2k_vesa_stage "$setup_dir" "$work/volume/\$WIN_NT\$.~LS/I386" || fail 'cannot stage the Windows 2000 VESA display'
+else
+printf '[NT5] VESA display off (vesa-off.txt): VGA 640x480 stays\n'
+fi
+fi
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
 . "$SCRIPT_DIR/xp_user_settings.sh"
 usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
+display_line=$(usos_nt52_display_stage "$setup_dir")
+[ -z "$display_line" ] || usos_nt52_insert_before_exit "$work/accounts.cmd" "$display_line" || fail 'cannot register the display helper'
 cp "$work/accounts.cmd" "$setup_dir/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$setup_dir/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"
 printf '[NT5] usos-users.cmd staged in USOS/%s (accounts from usos-xp.ini, run by usos-setup.cmd at setup end)\n' "$NT5_SETUP_DIR"
+usos_nt5_stage_regset "$setup_dir"
+else
+# No settings file or the user's own .sif: display helper only (Server 2003
+# and XP x64; Windows 2000 registers it through vesa.cmd).
+display_line=$(usos_nt52_display_stage "$setup_dir")
+if [ -n "$display_line" ]; then
+usos_nt52_display_only_cmd "$display_line" > "$setup_dir/usos-users.cmd" || fail 'cannot write usos-users.cmd'
+printf '[NT5] usos-users.cmd staged in USOS/%s (display helper only, run by usos-setup.cmd at setup end)\n' "$NT5_SETUP_DIR"
+fi
 fi
 sync
 umount "$work/volume"; mounted=no

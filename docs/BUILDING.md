@@ -67,7 +67,7 @@ first and rebuilds the installer with the tag and their SHA-256 compiled in;
 a download must match both that list and the release's `SHA256SUMS`. Publish
 the release under exactly that tag. That rebuilt installer ships as
 `USOS-Installer-<version>-online.exe`; `USOS-Installer-<version>.exe` is the
-full build, the same executable with the three zips appended as an overlay
+full build, the same executable with the component zips appended as an overlay
 (`installer\cmd\usos-component-bundle`), which `assemble_release.py` checks
 byte for byte.
 
@@ -134,11 +134,11 @@ inside an existing clone, then `git checkout -f`).
 | `tools\cache\freedos`, `buildkit-downloads`, `go-mod` | FreeDOS provenance, build kit assembly, Go modules | the kit, or fetched by `tools\release\fetch_buildkit_inputs.py` and `go mod download` |
 | `tools\cache\secure-boot` (OVMF Secure Boot firmware) | QEMU Secure Boot tests only | fetched by `tools\tests\secure_boot\fetch_ovmf_secboot.py` |
 | `tools\cache\registry-reader` (python-registry) | offline hive inspection scripts only | `pip install --target tools\cache\registry-reader python-registry` |
-egistry-reader` (python-registry) | offline hive inspection scripts only | `pip install --target tools\cache
-egistry-reader python-registry` |
 | git-ignored `tools\vendor\**` archives, incl. the XP integrator tree | payload, release sources, build kit | the kit (`inputs\tools\vendor\...`) |
 | `media\Systems\Windows\Windows 7\Updates\*.msu` | Windows 7 payload | the kit (`inputs\media\...`) |
 | `artifacts\vista\hardware-success-v11-20260920-235629\` | frozen Vista payload (`tools\build_windows_vista_support.py` stops without it) | the kit (`inputs\artifacts\...`). It was captured from a hardware-verified install (`tools\snapshot_vista_working_usb.py`) and cannot be regenerated without such a stick: without the kit, get it from the maintainer; there is no substitute |
+| `tools\vendor\xhci98\1.1.1.0-src\xhci98-7d0dd9d4...tar.gz` | GPL-2.0 source of the shipped `xhci98.sys` (`make_release.ps1` sources zip, the xhci98 rebuild); not `build.bat` | the kit, or `tools\release\fetch_buildkit_inputs.py`, which downloads the tag tarball into place against its pinned SHA-256 (`REPO_INPUTS`) |
+| `artifacts\vista\oobe-resume-20260921-190133\Windows\Panther\UnattendGC\setupact.log`, `artifacts\vista\winsat-stall-20260921-184000\USOS\Vista\SYSTEM.before-usb` | fixtures of `tools\tests\check_vista_oobe_policy.py` | the kit (`inputs\artifacts\...`). Captured on hardware on 2026-09-21, maintainer-only like the frozen payload. `make_buildkit.py` stops when one of these or the xhci98 tarball is missing (`REQUIRED_INPUTS`) |
 | `installer\build\` | installer outputs | written by `build.bat`; nothing to fetch |
 | `installer\internal\payload\assets\payload.zip` | installer `go:embed` | written by `build.bat` (see above) |
 | XP package for `tools\build_xp_uefi_csm_trial.py --bundles-from` | rebuilding the XP UEFI-CSM package without every source XP ISO | an earlier package (`zig-out\xp-uefi-csm\` of a previous build, or the XP package from a release); a full rebuild from the XP ISOs needs none. Only `make_release.ps1` and XP package work need it, not `build.bat` |
@@ -180,6 +180,8 @@ files in place: the change would reach both trees.
 | `inputs\tools\vendor\...` | git-ignored vendor archives: FreeDOS, HimemX, ImDisk, Patcher9x, Syslinux and wimlib source zips, Windows 7 NVMe assets, GenAHCI, the XP integrator tree | their own licences |
 | `inputs\media\Systems\Windows\Windows 7\Updates\*.msu`, `inputs\tools\vendor\windows7-kmdf\*.msu` | Windows 7 SHA-2, NVMe and KMDF updates | Microsoft; kept for preservation at the maintainer's own risk, removed on request |
 | `inputs\artifacts\vista\hardware-success-v11-20260920-235629\` | frozen Vista v11 payload (hardware-verified) | USOS code + Microsoft files, as above |
+| `inputs\artifacts\vista\oobe-resume-...\setupact.log`, `inputs\artifacts\vista\winsat-stall-...\SYSTEM.before-usb` | the two `check_vista_oobe_policy.py` fixtures | Microsoft files (a Setup log and a hive), as above |
+| `inputs\tools\vendor\xhci98\1.1.1.0-src\*.tar.gz` | xhci98 1.1.1.0 tag tarball, the corresponding source of the shipped driver | GPL-2.0-only |
 | `csmwrap-vm\apk\v3.24\` | partial Alpine v3.24 mirror (signed `APKINDEX.tar.gz` of main and community + 52 packages) for the CSMWrap build VM | per package |
 
 Toolchain licences and sources: the Zig and Go archives carry their own
@@ -220,6 +222,38 @@ from the pinned URL, and extracts only `binnt64`, `h` and `lib286\win`. The
 driver links no OpenWatcom library code. The TSR `USOSKEY.COM` is built with
 the repository's Zig (ld.lld, `src/platform/bios/msdos/com.ld`).
 
+## Rebuilding AHCINT 1.3.0.0-usos3 (optional)
+
+The XP package uses the pinned `tools\vendor\ahcint\1.3.0.0-usos3\bin\2KXP\i386\ahcint.sys`
+(manifest.json); `build.bat` does not rebuild it. To rebuild from the
+patched source in that folder (`src\`, upstream v1.3.0.0 plus
+`patches\0001-usos1-flush-cache.patch`, `patches\0002-usos2-target-check-and-trace.patch`
+and `patches\0003-usos3-screen-stages-readback-fail-loudly.patch`):
+
+```
+tools\vendor\ahcint\1.3.0.0-usos3\build.cmd [workdir]
+```
+
+It needs the same WDK 7.1 as xhci98 below (`tools\WinDDK71` or `WDKROOT`,
+x86 WXP target). The output is functionally identical but not
+byte-identical; before pinning a new build, check that its imports
+(ntoskrnl, scsiport) resolve on the Windows 2000 SP4 kernel.
+
+## Rebuilding usosrst (optional)
+
+`usosrst.sys` is USOS's own Windows 2000 helper driver (GPL-3.0-or-later,
+`tools\w2k\usosrst\src\usosrst.c`): the STOP code in the VGA text buffer and,
+during Setup, a restart through the FADT reset register, port CF9h and the
+8042. The XP package uses the pinned `tools\w2k\usosrst\bin\i386\usosrst.sys`
+(manifest.json); to rebuild it with the same WDK 7.1:
+
+```
+tools\w2k\usosrst\build.cmd [workdir]
+```
+
+Before pinning a new build, check that its imports (ntoskrnl, hal) resolve on
+the Windows 2000 SP4 kernel and every 2000 HAL.
+
 ## Rebuilding xhci98 1.1.1.0-usos2 (optional)
 
 The XP package uses the vendored, hash-pinned binaries in
@@ -250,8 +284,14 @@ PDB GUID); compare with the pinned binaries by behaviour, not hash.
 
 ## Not in the kit
 
-- **Windows ISOs** (never shipped), the WinPE PE10 donor (a separate release
-  asset) and the XP ISOs the XP packages are derived from.
+- **Windows ISOs** (never shipped), the WinPE PE10 donors (separate release
+  assets, never in git) and the XP ISOs the XP packages are derived from.
+  A donor is made from a Windows 10 2004..22H2 Setup ISO with
+  `python -I tools\release\build_pe10_donor.py --arch x86|x64 --source <iso>
+  --out artifacts\pe10-<arch>` (7-Zip and Windows IMAPI2FS; the members are
+  copied unmodified). `make_release.ps1 -WinPEDonorX86` takes the x86 one
+  (default: DATA, then `artifacts\pe10-x86`); `assemble_release.py` refuses a
+  donor whose name, size or SHA-256 differs from its pin.
 - **TouchI2cDxe** is built outside the repository from an EDK2 checkout
   (`tools\build_touchi2cdxe.ps1`, network); the release uses the vendored,
   MOK-signed binary.

@@ -4,8 +4,11 @@ const SystemEntry = @import("system_entry.zig").SystemEntry;
 const methods = [_]BootMethod{ .automatic, .direct_iso, .chainload, .memdisk, .disk_image, .floppy_image };
 
 pub const entries = [_]SystemEntry{
-    dos("freedos", "FreeDOS", "FreeDOS"),
-    dos("ms-dos", "MS-DOS", "MS-DOS"),
+    // From UEFI: the official FreeDOS USB image written to the target disk
+    // (custom-image-uefi, docs/custom-os-2026-10-11.md); BIOS: the Core.
+    anyFirmware(dos("freedos", "FreeDOS", "FreeDOS")),
+    // From UEFI: the DOS-family CSMWrap preparation (w9x-uefi-csmwrap).
+    anyFirmware(dos("ms-dos", "MS-DOS", "MS-DOS")),
     dos("pc-dos", "PC DOS", "PC DOS"),
     dos("dr-dos", "DR-DOS", "DR-DOS"),
     dos("opendos", "OpenDOS", "OpenDOS"),
@@ -22,4 +25,10 @@ fn dos(comptime id: []const u8, comptime name: []const u8, comptime folder: []co
         .firmware = .bios,
         .boot_methods = &methods,
     };
+}
+
+fn anyFirmware(entry: SystemEntry) SystemEntry {
+    var result = entry;
+    result.firmware = .any;
+    return result;
 }

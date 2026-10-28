@@ -11,6 +11,7 @@ const manual_drivers = @import("manual_drivers.zig");
 const manual_themes = @import("manual_themes.zig");
 const uefi_shell = @import("uefi_shell.zig");
 const bios_mode = @import("bios_mode.zig");
+const answer_profiles = @import("answer_profiles.zig");
 const secure_boot = @import("secure_boot.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
@@ -159,24 +160,38 @@ fn biosMode(root: *std.os.uefi.protocol.File, bios: bios_mode.Availability) void
         view.waitForDismiss();
         return;
     }
-    var confirm_rows = [_]usos.gui.ui.Row{
-        .{ .title = view.t(.key_cancel), .icon = .{ .vector = .close } },
-        .{ .title = view.t(.bios_mode_start), .icon = .{ .vector = .chip } },
-    };
+    // Answer profiles offered for Windows 95/98/Me: a row each starts the BIOS
+    // mode with that profile staged as MSBATCH.INF (docs/win9x-modern-2026-09-30.md).
+    answer_profiles.reload(root);
+    answer_profiles.filter("windows-98-se");
+    var rows_storage: [2 + answer_profiles.max]usos.gui.ui.Row = undefined;
+    rows_storage[0] = .{ .title = view.t(.key_cancel), .icon = .{ .vector = .close } };
+    rows_storage[1] = .{ .title = view.t(.bios_mode_start), .icon = .{ .vector = .chip } };
+    const profiles = answer_profiles.len();
+    for (0..profiles) |i| rows_storage[2 + i] = .{ .title = answer_profiles.get(i).name.slice(), .detail = view.t(.bios_mode_profile_detail), .icon = .{ .vector = .windows } };
+    const confirm_rows = rows_storage[0 .. 2 + profiles];
     const notes = [_][]const u8{ view.t(.bios_mode_note_restart), view.t(.bios_mode_note_cpu), view.t(.bios_mode_note_video) };
     const help = usos.gui.menu_screens.Help{ .title = view.t(.utilities_bios_mode_title), .lines = &notes, .badge = .{ .text = view.t(.badge_experimental), .tone = .warning } };
     var selected: usize = 0;
     var list: view.ListScreen = undefined;
-    list.open(view.t(.utilities_bios_mode_title), view.t(.bios_mode_question), &confirm_rows, selected, false, help);
+    list.open(view.t(.utilities_bios_mode_title), view.t(.bios_mode_question), confirm_rows, selected, false, help);
     while (true) {
         switch (navigation.handle(input.readBlocking(), &selected, confirm_rows.len, &list)) {
-            .activate => if (selected == 1) break else return,
+            .activate => if (selected >= 1) break else return,
             .back => return,
             .changed => list.updateSelection(selected, help),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
+    answer_profiles.clearRendered(root);
+    if (selected >= 2) answer_profiles.stageWin9x(root, answer_profiles.get(selected - 2)) catch |err| {
+        var buffer: [96]u8 = undefined;
+        const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), view.t(.error_stopped) };
+        view.notice(view.t(.utilities_bios_mode_title), .error_circle, .danger, view.t(.error_efi), &lines);
+        view.waitForDismiss();
+        return;
+    };
     input.stopGamepads();
     view.handover(view.t(.bios_mode_starting));
     bios_mode.start(root) catch |err| {

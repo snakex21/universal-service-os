@@ -19,19 +19,38 @@ var windowsProfiles = []dataProfile{
 	{"windows-11", "Windows 11", true, true},
 	{"windows-10", "Windows 10", true, true},
 	{"windows-8-1", "Windows 8.1", true, true},
+	// Windows Embedded 8.1 Industry: the Windows 8.1 flow (UEFI only).
+	{"windows-embedded-8-1-industry", "Windows Embedded 8.1 Industry", true, true},
 	{"windows-8", "Windows 8", true, true},
 	{"windows-7", "Windows 7", true, true},
 	{"windows-vista", "Windows Vista", true, true},
 	{"windows-xp", "Windows XP", true, true},
 	{"windows-xp-x64", "Windows XP x64", true, true},
+	// Windows XP Media Center Edition 2005: the XP flow from UEFI.
+	{"windows-xp-mce", "Windows XP Media Center Edition 2005", true, true},
+	// Windows XP Tablet PC Edition 2005: the XP flow from UEFI.
+	{"windows-xp-tablet", "Windows XP Tablet PC Edition 2005", true, true},
+	// Windows Embedded POSReady 2009: its own VM flow from UEFI (Windows PE +
+	// POSReady Setup in QEMU on the target, then CSMWrap).
+	{"windows-embedded-posready-2009", "Windows Embedded POSReady 2009", true, false},
 	{"windows-2000", "Windows 2000", true, true},
 	{"windows-nt-4", "Windows NT 4.0", true, false},
+	{"windows-nt-3-51", "Windows NT 3.51", true, false},
+	{"windows-nt-3-5", "Windows NT 3.5", true, false},
+	{"windows-nt-3-1", "Windows NT 3.1", true, false},
 	{"windows-me", "Windows Me", true, false},
 	{"windows-98-se", "Windows 98 SE", true, false},
 	{"windows-98", "Windows 98", true, false},
 	{"windows-95", "Windows 95", true, false},
+	{"windows-wfw-3-11", "Windows for Workgroups 3.11", false, false},
 	{"windows-3-11", "Windows 3.11", false, false},
 	{"windows-3-1", "Windows 3.1", false, false},
+	{"windows-3-0", "Windows 3.0", false, false},
+	{"windows-2-11-386", "Windows 2.11 (386)", false, false},
+	{"windows-2-11-286", "Windows 2.11 (286)", false, false},
+	{"windows-2-03", "Windows 2.03", false, false},
+	{"windows-1-04", "Windows 1.04", false, false},
+	{"windows-1-01", "Windows 1.01", false, false},
 	// Windows Server (src/catalog/windows_server.zig); 2003 x86 uses the NT5
 	// staging.
 	{"windows-server-2025", "Windows Server 2025", true, true},
@@ -41,8 +60,21 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2012-r2", "Windows Server 2012 R2", true, true},
 	{"windows-server-2012", "Windows Server 2012", true, true},
 	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
+	// Windows Home Server 2011: the Windows 7 / 2008 R2 flow (UEFI only).
+	{"windows-home-server-2011", "Windows Home Server 2011", true, true},
 	{"windows-server-2008", "Windows Server 2008", true, true},
 	{"windows-server-2003", "Windows Server 2003", true, true},
+	// Windows 2000 Server: the Windows 2000 flow from UEFI.
+	{"windows-2000-server", "Windows 2000 Server", true, true},
+	// Windows NT 4.0 Terminal Server Edition: the NT 4.0 VM flow with the
+	// TSE CD (its own service pack: ServicePack next to Images).
+	{"windows-nt-4-tse", "Windows NT 4.0 Terminal Server", true, false},
+	// Windows NT 3.51 Server: the NT 3.51 VM flow with the Server CD.
+	{"windows-nt-3-51-server", "Windows NT 3.51 Server", true, false},
+	// Windows NT 3.5 Server: the NT 3.5 VM flow with the Server CD.
+	{"windows-nt-3-5-server", "Windows NT 3.5 Server", true, false},
+	// Windows NT 3.1 Advanced Server: the NT 3.1 VM flow with the AS CD.
+	{"windows-nt-3-1-server", "Windows NT 3.1 Advanced Server", true, false},
 }
 
 var linuxProfiles = []dataProfile{
@@ -78,6 +110,20 @@ var dosProfiles = []dataProfile{
 	{"other-dos", "Other DOS", false, false},
 }
 
+// otherProfiles are the "Other systems" (Custom OS, src/catalog/other_systems.zig):
+// the official hybrid image goes to Images, no answer files.
+var otherProfiles = []dataProfile{
+	{"haiku", "Haiku", false, false},
+	{"freebsd", "FreeBSD", false, false},
+	{"reactos", "ReactOS", false, false},
+	{"kolibrios", "KolibriOS", false, false},
+	{"openbsd", "OpenBSD", false, false},
+	{"netbsd", "NetBSD", false, false},
+	{"9front", "9front", false, false},
+	{"redox", "Redox", false, false},
+	{"other-os", "Other", false, false},
+}
+
 var requiredDataDirectories = buildRequiredDataDirectories()
 
 func buildRequiredDataDirectories() []string {
@@ -95,6 +141,7 @@ func buildRequiredDataDirectories() []string {
 	appendProfiles(filepath.Join("Systems", "Linux"), linuxProfiles)
 	appendProfiles(filepath.Join("Systems", "Betas"), betaProfiles)
 	appendProfiles(filepath.Join("Systems", "DOS"), dosProfiles)
+	appendProfiles(filepath.Join("Systems", "Other"), otherProfiles)
 	directories = append(directories, "Utilities", "Programs", filepath.Join("Programs", "USOS"))
 	directories = append(directories, filepath.Join("Systems", "DOS", "MS-DOS", "Programs"))
 	directories = append(directories, filepath.Join("Utilities", "FreeDOS", "Programs"))

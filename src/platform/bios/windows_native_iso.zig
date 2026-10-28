@@ -2,7 +2,7 @@ const std = @import("std");
 const storage = @import("storage");
 const udf = @import("catalog").udf;
 const cpio = @import("windows_cpio.zig");
-const iso_config = @import("windows_iso_config.zig");
+const iso_config = @import("catalog").windows_iso_config;
 const wimboot = @import("windows_wimboot.zig");
 const console = @import("console.zig");
 const graphics_menu = @import("graphics_menu.zig");
@@ -73,7 +73,8 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     const support = try fat.fileInfo(esp, reader, &support_path);
     if (support.size < 512 or support.size > 8 * 1024 * 1024 or support.size % 4 != 0) return error.InvalidWindowsSupport;
     var config: [544]u8 = undefined;
-    const config_data = try iso_config.sourceConfigForFolder(&config, data.part_guid, file.size(), folder, image_name);
+    // The category of the path opened above (Systems\Windows\<folder>).
+    const config_data = try iso_config.sourceConfigForCategory(&config, data.part_guid, file.size(), "Windows", folder, image_name);
     var total: u64 = support.size;
     for (files, boot_names) |node, name| total += try cpio.entrySize(name, @intCast(node.size));
     total += try cpio.entrySize("usos-source.ini", @intCast(config_data.len));

@@ -815,14 +815,17 @@ real_entry:
     test cx, 0x0001
     jz .drive_info_legacy_probe
 
-    /* EDD exists. Ask for the standard 0x1E-byte drive parameter block. */
+    /* EDD exists. Ask for the full 0x4A-byte EDD-3 block (as Linux does);
+     * firmware returns only the part it supports (0x1A/0x1E/0x42/0x4A).
+     * The EDD 3.0 interface type at 0x28 gives the disk pickers their type
+     * (src/platform/bios/edd_interface.zig reads it from DRIVE_PARAMS). */
     mov byte ptr [THUNK_EDD_RESULT], 3
     xor ax, ax
     mov es, ax
     mov di, DRIVE_PARAMS
-    mov cx, 15
+    mov cx, 37
     rep stosw
-    mov word ptr [DRIVE_PARAMS], 0x001E
+    mov word ptr [DRIVE_PARAMS], 0x004A
     mov si, DRIVE_PARAMS
     mov dl, byte ptr [THUNK_BIOS_DRIVE]
     mov ah, 0x48

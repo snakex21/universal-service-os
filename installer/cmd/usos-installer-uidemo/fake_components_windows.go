@@ -40,6 +40,8 @@ func (f *fakeComponents) InstallComponent(_ install.MediaLayout, id components.I
 	switch {
 	case id == components.WinPE:
 		f.status.WinPE, f.status.WinPEName = true, "PE10_x64_19041_USOS.iso"
+	case id == components.WinPEX86:
+		f.status.WinPEX86, f.status.WinPEX86Name = true, "PE10_x86_19041_USOS.iso"
 	case !storeOnly:
 		f.status.XPLang, f.status.XPCurrent = id.XPLang(), true
 	}

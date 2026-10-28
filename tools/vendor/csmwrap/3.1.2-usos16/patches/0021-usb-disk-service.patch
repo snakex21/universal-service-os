@@ -1,0 +1,1207 @@
+USOS CSMWrap patch 0021 (2026-10-19): USB disk service (UDS) on channel 1 of the helper core
+
+Windows 95/98/98 SE/Me on the X470 have no xHCI driver; SeaBIOS inside
+CSMWrap is the only xHCI owner (USB keyboard, mouse and INT 13h). With
+csmwrap.ini int13_boot_disk_only = true (patch 0014) a USB stick gets no
+BIOS drive number, so the 9x real-mode mapper never touches it. This patch
+lets an OS driver (USOSUSB.MPD, a SCSIPORT miniport in the USOS repository)
+send SCSI commands to such a stick through SeaBIOS, with no second xHCI
+owner (docs/usb9x-hotswap-design-2026-10-19.md, stage 1):
+
+- stacks.c: the "CSMPPrxy" mailbox is 64-byte aligned and gets channel 1
+  at +48 (magic "UDS1", req_phys, doorbell, done) in the same cache line,
+  so the helper's MONITOR on request_pending also wakes on the doorbell.
+  CSMWrap's own copy of the struct (48 bytes) and offsets 0-47 unchanged.
+- romlayout.S: the helper loop checks channel 0 first (unchanged), then
+  doorbell != done -> usos_uds_service(mailbox + 48).
+- hw/usb-uds.c (new): the request block is read once from the OS's
+  physical address (refused when 0, unaligned, wrapping or in
+  A0000h-FFFFFh), validated (magic, version, size, op, dev, LUN, CDB
+  length 6-16, direction, length <= 64 KiB, data range not wrapping and
+  not in A0000h-FFFFFh), then ENUM (device table), SCSI (CBW / data / CSW
+  with any CDB and direction, automatic REQUEST SENSE on CSW status 1),
+  RESET (BOT reset recovery), EJECT (SYNCHRONIZE CACHE, START STOP UNIT
+  LoEj; the entry stays ejected until reboot) or STATUS (a copy of the
+  record below). Only results are written back, then done = doorbell.
+  A device with a BIOS drive number (hard disk or CD-ROM, opt-out of
+  0014) is refused (OWNED): never two owners of one file system.
+- usb-msc.c: an xHCI BOT device gets a device-table entry at setup
+  (up to 8; generation 1, LUNs, root port and slot id; no extra USB
+  traffic at POST); its control pipe is kept instead of being put on the
+  free list (on xHCI that never released the slot), for the BOT reset
+  recovery. VID:PID, INQUIRY vendor/product and READ CAPACITY(10) of LUN 0
+  are read on the helper core at the first request for a device without
+  a BIOS number. usbdrive_s moves to usb-msc.h with a table index. INT 13h
+  use of USB disks is unchanged.
+- usb-xhci.c: own bulk TD to a physical buffer (two chained TRBs with
+  ISP when it crosses a 64 KiB boundary), checking on every wait pass
+  that the controller still answers (capability dword as at POST, not
+  all ones, not halted, no host system error) and that the device's root
+  port still has CCS: an unplug ends the request at once (GONE), the slot
+  gets Disable Slot and stays gone until reboot; endpoint recovery after
+  a stall / error / timeout (Reset Endpoint, Stop Endpoint, Set TR
+  Dequeue Pointer); BOT reset recovery = Bulk-Only Mass Storage Reset +
+  CLEAR_FEATURE(ENDPOINT_HALT) on both bulk endpoints (missing upstream:
+  "XXX - reset connection"). No PCI configuration access from the helper
+  core (CF8h/CFCh would race the OS on the other CPU), the MMIO checks
+  stand in for the BAR check of patch 0010.
+- A diagnostics record in low memory (VARLOW, 16-byte aligned, "USOS"
+  "UDSK", version 1, 768 bytes, header written at xHCI setup): per device
+  state, BIOS number, LUNs, port, VID:PID, slot, speed, generation,
+  capacity, last CDB / CSW / sense / status, counters (requests, CHECK,
+  timeouts, BOT resets, GONE, refused, KiB in/out); the BIOS hard disks
+  and CD-ROMs as mapped (number, DTYPE, UDS index, sectors); a ring of the
+  last 16 events (present, gone, reset, eject, bad request, controller
+  failure, timeout, phase error, registration failure, stall). Written
+  only, for USOSDBG.EXE / USOSLOG.EXE.
+
+Without an OS client nothing calls channel 1 and every other path behaves
+as in 3.1.2-usos15.
+
+Own code. Applies after 0001-0010, 0012, 0014-0020, patch -p1 from the
+top of the tree. Part of a MODIFIED CSMWrap made by the USOS project
+(SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/Makefile b/seabios/Makefile
+--- a/seabios/Makefile
++++ b/seabios/Makefile
+@@ -37,7 +37,7 @@ SRC16=$(SRCBOTH)
+ SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c x86.c		\
+     optionroms.c pmm.c font.c boot.c bootsplash.c jpeg.c bmp.c		\
+     tcgbios.c sha1.c hw/pcidevice.c hw/ahci.c hw/pvscsi.c		\
+-    hw/usb-xhci.c hw/usb-hub.c hw/sdcard.c fw/coreboot.c		\
++    hw/usb-xhci.c hw/usb-hub.c hw/usb-uds.c hw/sdcard.c fw/coreboot.c	\
+     fw/lzmadecode.c fw/multiboot.c fw/csm.c fw/biostables.c		\
+     fw/paravirt.c fw/shadow.c fw/pciinit.c fw/smm.c fw/smp.c		\
+     fw/mtrr.c fw/xen.c fw/acpi.c fw/mptable.c fw/pirtable.c		\
+diff -ruN a/seabios/src/hw/usb-msc.c b/seabios/src/hw/usb-msc.c
+--- a/seabios/src/hw/usb-msc.c
++++ b/seabios/src/hw/usb-msc.c
+@@ -14,13 +14,9 @@
+ #include "string.h" // memset
+ #include "usb.h" // struct usb_s
+ #include "usb-msc.h" // usb_msc_setup
++#include "usb-uds.h" // usos_uds_reserve
+ #include "util.h" // bootprio_find_usb
+ 
+-struct usbdrive_s {
+-    struct drive_s drive;
+-    struct usb_pipe *bulkin, *bulkout;
+-    int lun;
+-};
+ 
+ u32 UsbMscNextTag VARLOW;
+ 
+@@ -149,7 +145,7 @@ usb_msc_maxlun(struct usbdevice_s *usbdev)
+ 
+ static int
+ usb_msc_lun_setup(struct usb_pipe *inpipe, struct usb_pipe *outpipe,
+-                  struct usbdevice_s *usbdev, int lun)
++                  struct usbdevice_s *usbdev, int lun, int uds)
+ {
+     // Allocate drive structure.
+     struct usbdrive_s *drive = malloc_fseg(sizeof(*drive));
+@@ -165,6 +161,7 @@ usb_msc_lun_setup(struct usb_pipe *inpipe, struct usb_pipe *outpipe,
+     drive->bulkin = inpipe;
+     drive->bulkout = outpipe;
+     drive->lun = lun;
++    drive->uds = uds + 1;   // USOS patch 0021: 0 = not in the UDS table
+ 
+     int prio = bootprio_find_usb(usbdev, lun);
+     int ret = scsi_drive_setup(&drive->drive, "USB MSC", prio);
+@@ -213,8 +210,10 @@ usb_msc_setup(struct usbdevice_s *usbdev)
+ 
+     int maxlun = usb_msc_maxlun(usbdev);
+     int lun, pipesused = 0;
++    // USOS patch 0021: an entry in the USB disk service table (xHCI only)
++    int uds = MODESEGMENT ? -1 : usos_uds_reserve(inpipe);
+     for (lun = 0; lun < maxlun + 1; lun++) {
+-        int ret = usb_msc_lun_setup(inpipe, outpipe, usbdev, lun);
++        int ret = usb_msc_lun_setup(inpipe, outpipe, usbdev, lun, uds);
+         if (!ret)
+             pipesused = 1;
+     }
+@@ -222,6 +221,8 @@ usb_msc_setup(struct usbdevice_s *usbdev)
+     if (!pipesused)
+         goto fail;
+ 
++    if (!MODESEGMENT && uds >= 0)
++        usos_uds_commit(uds, usbdev, inpipe, outpipe, maxlun);
+     return 0;
+ fail:
+     dprintf(1, "Unable to configure USB MSC device.\n");
+diff -ruN a/seabios/src/hw/usb-msc.h b/seabios/src/hw/usb-msc.h
+--- a/seabios/src/hw/usb-msc.h
++++ b/seabios/src/hw/usb-msc.h
+@@ -1,6 +1,15 @@
+ #ifndef __USB_MSC_H
+ #define __USB_MSC_H
+ 
++#include "block.h" // struct drive_s
++
++struct usbdrive_s {
++    struct drive_s drive;
++    struct usb_pipe *bulkin, *bulkout;
++    int lun;
++    u8 uds;     // USOS patch 0021: USB disk service table index + 1, 0 none
++};
++
+ // usb-msc.c
+ struct disk_op_s;
+ int usb_process_op(struct disk_op_s *op);
+diff -ruN a/seabios/src/hw/usb-uds.c b/seabios/src/hw/usb-uds.c
+--- a/seabios/src/hw/usb-uds.c
++++ b/seabios/src/hw/usb-uds.c
+@@ -0,0 +1,596 @@
++// USOS USB disk service (UDS): USB mass storage for an OS driver through
++// channel 1 of the CSMWrap helper core.
++//
++// Copyright (C) 2026 Maksymilian and the USOS Authors
++//
++// This file may be distributed under the terms of the GNU LGPLv3 license.
++//
++// USOS patch 0021 (CSMWrap 3.1.2-usos16). Own code from the USB Mass
++// Storage Class Bulk-Only Transport 1.0, xHCI 1.2 and SCSI SPC/SBC
++// specifications. SeaBIOS stays the only owner of the xHCI controller; the
++// Windows 9x miniport USOSUSB.MPD sends SCSI commands for USB sticks that
++// have no BIOS drive number (csmwrap.ini int13_boot_disk_only, patch 0014)
++// through a request block in its own memory:
++//
++//   F-segment: "CSMPPrxy" mailbox (64-byte aligned) + struct uds_channel at
++//   +48, in the same cache line, so the helper's MONITOR/MWAIT wakes on the
++//   channel 1 doorbell too. romlayout.S: the helper loop serves channel 0
++//   (call32 from V86) first, then calls usos_uds_service() when doorbell !=
++//   done. One request at a time; the OS polls done.
++//
++// Stage 1 of docs/usb9x-hotswap-design-2026-10-19.md (USOS repository): the
++// sticks found at POST; an unplugged stick ends its request at once
++// (GONE), its slot is disabled and it stays gone until the next boot.
++
++#include "biosvar.h" // GET_GLOBAL
++#include "block.h" // getDrive
++#include "byteorder.h" // be32_to_cpu
++#include "config.h" // CONFIG_USB_XHCI
++#include "output.h" // dprintf
++#include "stacks.h" // yield
++#include "string.h" // memcpy
++#include "usb.h" // usb_send_default_control
++#include "usb-msc.h" // struct usbdrive_s
++#include "usb-uds.h" // struct uds_req
++#include "usb-xhci.h" // xhci_usos_bulk
++#include "util.h" // timer_calc
++
++struct uds_int {
++    struct usb_pipe *in, *out, *ctl;
++    u32 capword;
++    u8 iface, probed;
++    char vendor[8], product[16];
++};
++
++struct uds_int UdsInt[UDS_MAX_DEVS] VARFSEG;
++u8 UdsCount VARFSEG;
++struct uds_diag UdsDiag VARLOW __aligned(16);
++extern u32 TimerKHz;
++extern u32 UsbMscNextTag;
++
++#define UDS_XFER_MS (USB_TIME_COMMAND + 100)
++
++// The request check of src/platform/bios/win9x/usosuds_slot.c (USOS
++// repository, the same authors), here under the LGPLv3 like this file.
++static u32
++uds_req_check(const struct uds_req *r, u32 *why)
++{
++    u32 w = UDS_WHY_OK;
++    if (r->magic != UDS_REQ_MAGIC) w = UDS_WHY_MAGIC;
++    else if (r->version != UDS_VERSION) w = UDS_WHY_VERSION;
++    else if (r->size != sizeof(struct uds_req)) w = UDS_WHY_SIZE;
++    else if (r->op < UDS_OP_ENUM || r->op > UDS_OP_STATUS) w = UDS_WHY_OP;
++    else if (r->op != UDS_OP_ENUM && r->op != UDS_OP_STATUS && r->dev >= UDS_MAX_DEVS) w = UDS_WHY_DEV;
++    else if (r->op == UDS_OP_SCSI && r->lun > UDS_MAX_LUN) w = UDS_WHY_LUN;
++    else if (r->op == UDS_OP_SCSI && (r->cdb_len < 6 || r->cdb_len > UDS_MAX_CDB)) w = UDS_WHY_CDB;
++    else if (r->dir > UDS_DIR_OUT) w = UDS_WHY_DIR;
++    else if ((r->op == UDS_OP_ENUM || r->op == UDS_OP_STATUS) && r->dir != UDS_DIR_IN) w = UDS_WHY_DIR;
++    else if ((r->op == UDS_OP_RESET || r->op == UDS_OP_EJECT) && r->dir != UDS_DIR_NONE) w = UDS_WHY_DIR;
++    else if ((r->dir == UDS_DIR_NONE) != (r->data_len == 0)) w = UDS_WHY_LEN;
++    else if (r->data_len > UDS_MAX_DATA) w = UDS_WHY_LEN;
++    else if (r->op == UDS_OP_ENUM && r->data_len < UDS_MAX_DEVS * sizeof(struct uds_dev_info)) w = UDS_WHY_LEN;
++    else if (r->data_len && (r->data_phys == 0 || r->data_phys > 0xFFFFFFFFUL - (r->data_len - 1)))
++        w = UDS_WHY_ADDR;
++    else if (r->data_len && r->data_phys < 0x100000UL && r->data_phys + r->data_len > 0xA0000UL)
++        w = UDS_WHY_ADDR;   /* never DMA into VGA / option ROM / BIOS (A0000h-FFFFFh) */
++    if (why) *why = w;
++    return w == UDS_WHY_OK ? UDS_S_OK : UDS_S_BADREQ;
++}
++
++
++/****************************************************************
++ * Diagnostics record
++ ****************************************************************/
++
++void
++usos_uds_init(void)
++{
++    if (UdsDiag.version)
++        return;
++    // two immediates: the signature is not in the ROM image as data
++    UdsDiag.sig[0] = 0x534f5355;   // "USOS"
++    UdsDiag.sig[1] = 0x4b534455;   // "UDSK"
++    UdsDiag.version = UDS_DIAG_VERSION;
++}
++
++static void
++uds_event(int idx, u8 event, u8 result)
++{
++    u8 slot = UdsDiag.next_event % UDS_DIAG_EVENTS;
++    struct uds_diag_event *e = &UdsDiag.ev[slot];
++    u32 khz = GET_GLOBAL(TimerKHz);
++    e->ms = khz ? timer_calc(0) / khz : 0;
++    e->dev = idx;
++    e->port = (idx >= 0 && idx < UDS_MAX_DEVS) ? UdsDiag.dev[idx].port : 0;
++    e->event = event;
++    e->result = result;
++    UdsDiag.next_event = (slot + 1) % UDS_DIAG_EVENTS;
++    UdsDiag.events++;
++}
++
++// BIOS drive number of a UDS entry: 80h+ hard disk, E0h+ CD-ROM, 0 none
++static u8
++uds_bios_drive(int idx)
++{
++    int t, i;
++    for (t = EXTTYPE_HD; t <= EXTTYPE_CD; t++)
++        for (i = 0; i < BUILD_MAX_EXTDRIVE; i++) {
++            struct drive_s *drive = getDrive(t, i);
++            if (!drive || (drive->type != DTYPE_USB_32 && drive->type != DTYPE_USB))
++                continue;
++            struct usbdrive_s *ud = container_of(drive, struct usbdrive_s, drive);
++            if (ud->uds == idx + 1)
++                return (t == EXTTYPE_HD ? 0x80 : 0xe0) + i;
++        }
++    return 0;
++}
++
++// The BIOS hard disks and CD-ROMs as they were mapped (first service call)
++static void
++uds_fill_disks(void)
++{
++    int t, i, n = 0;
++    for (t = EXTTYPE_HD; t <= EXTTYPE_CD; t++)
++        for (i = 0; i < BUILD_MAX_EXTDRIVE && n < UDS_DIAG_DISKS; i++) {
++            struct drive_s *drive = getDrive(t, i);
++            if (!drive)
++                continue;
++            struct uds_diag_disk *d = &UdsDiag.disk[n++];
++            d->bios = (t == EXTTYPE_HD ? 0x80 : 0xe0) + i;
++            d->dtype = drive->type;
++            if (drive->type == DTYPE_USB_32 || drive->type == DTYPE_USB)
++                d->uds = container_of(drive, struct usbdrive_s, drive)->uds;
++            d->sectors_lo = drive->sectors;
++            d->sectors_hi = drive->sectors >> 32;
++        }
++    UdsDiag.disks = n;
++}
++
++
++/****************************************************************
++ * Bulk-Only Transport
++ ****************************************************************/
++
++struct uds_cbw {
++    u32 sig, tag, len;
++    u8 flags, lun, cblen;
++    u8 cb[16];
++} PACKED;
++
++struct uds_csw {
++    u32 sig, tag, residue;
++    u8 status;
++} PACKED;
++
++static int
++uds_ctl(struct uds_int *u, u8 type, u8 request, u16 value, u16 index)
++{
++    struct usb_ctrlrequest req = {
++        .bRequestType = type, .bRequest = request,
++        .wValue = value, .wIndex = index, .wLength = 0,
++    };
++    return usb_send_default_control(u->ctl, &req, NULL);
++}
++
++static void
++uds_clear_halt(struct uds_int *u, struct usb_pipe *pipe, int in)
++{
++    xhci_usos_reset_ep(pipe);
++    uds_ctl(u, USB_RECIP_ENDPOINT, USB_REQ_CLEAR_FEATURE, 0
++            , pipe->ep | (in ? USB_DIR_IN : 0));
++}
++
++static void
++uds_gone(int idx)
++{
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    if (d->state == UDS_DEV_GONE)
++        return;
++    d->state = UDS_DEV_GONE;
++    xhci_usos_disable(UdsInt[idx].in);
++    uds_event(idx, UDS_EV_GONE, d->last_op);
++}
++
++// BOT reset recovery (MSC BOT 1.0 5.3.4): Bulk-Only Mass Storage Reset,
++// then CLEAR_FEATURE(ENDPOINT_HALT) on bulk-in and bulk-out, each with the
++// xHCI endpoint reset and dequeue pointer set.
++static int
++uds_reset(int idx)
++{
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    int rc = xhci_usos_check(u->in, u->capword);
++    if (rc == USOS_X_GONE) {
++        uds_gone(idx);
++        return -1;
++    }
++    if (rc)
++        return -1;
++    d->resets++;
++    rc = uds_ctl(u, USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0xff, 0, u->iface);
++    uds_clear_halt(u, u->in, 1);
++    uds_clear_halt(u, u->out, 0);
++    uds_event(idx, UDS_EV_RESET, rc ? 1 : 0);
++    return rc;
++}
++
++static u32
++uds_fail(int idx, int rc, u8 phase)
++{
++    switch (rc) {
++    case USOS_X_GONE:
++        uds_gone(idx);
++        return UDS_S_GONE;
++    case USOS_X_HW:
++        uds_event(idx, UDS_EV_HWFAIL, 1);
++        return UDS_S_HWFAIL;
++    case USOS_X_TIMEOUT:
++        uds_event(idx, UDS_EV_TIMEOUT, phase);
++        UdsDiag.dev[idx].timeouts++;
++        uds_reset(idx);
++        return UdsDiag.dev[idx].state == UDS_DEV_GONE ? UDS_S_GONE : UDS_S_TIMEOUT;
++    default:
++        uds_event(idx, UDS_EV_PHASE, phase);
++        uds_reset(idx);
++        return UdsDiag.dev[idx].state == UDS_DEV_GONE ? UDS_S_GONE : UDS_S_PHASE;
++    }
++}
++
++// One SCSI command (CBW, data, CSW). UDS_S_OK / _CHECK (CSW status 1, no
++// sense fetched here) / _GONE / _TIMEOUT / _PHASE / _HWFAIL.
++static u32
++uds_bot(int idx, u8 lun, const u8 *cdb, u8 cdblen, u8 dir, u32 phys, u32 len
++        , u32 *residue, u8 *cswstatus)
++{
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_cbw cbw;
++    struct uds_csw csw;
++    memset(&cbw, 0, sizeof(cbw));
++    memset(&csw, 0, sizeof(csw));
++    u32 tag = UsbMscNextTag + 1;
++    UsbMscNextTag = tag;
++    cbw.sig = 0x43425355;   // "USBC"
++    cbw.tag = tag;
++    cbw.len = len;
++    cbw.flags = dir == UDS_DIR_IN ? USB_DIR_IN : 0;
++    cbw.lun = lun;
++    cbw.cblen = cdblen;
++    memcpy(cbw.cb, cdb, cdblen);
++    int rc = xhci_usos_bulk(u->out, (u32)&cbw, sizeof(cbw), UDS_XFER_MS, u->capword);
++    if (rc)
++        return uds_fail(idx, rc, 1);
++    if (len) {
++        int in = dir == UDS_DIR_IN;
++        struct usb_pipe *pipe = in ? u->in : u->out;
++        rc = xhci_usos_bulk(pipe, phys, len, UDS_XFER_MS, u->capword);
++        if (rc == USOS_X_STALL) {
++            // the device ended the data phase: clear it, the CSW follows
++            uds_event(idx, UDS_EV_STALL, 2);
++            uds_clear_halt(u, pipe, in);
++        } else if (rc) {
++            return uds_fail(idx, rc, 2);
++        }
++    }
++    rc = xhci_usos_bulk(u->in, (u32)&csw, sizeof(csw), UDS_XFER_MS, u->capword);
++    if (rc == USOS_X_STALL) {
++        uds_event(idx, UDS_EV_STALL, 3);
++        uds_clear_halt(u, u->in, 1);
++        rc = xhci_usos_bulk(u->in, (u32)&csw, sizeof(csw), UDS_XFER_MS, u->capword);
++    }
++    if (rc)
++        return uds_fail(idx, rc, 3);
++    if (csw.sig != 0x53425355 || csw.tag != tag) {   // "USBS"
++        uds_event(idx, UDS_EV_PHASE, 4);
++        uds_reset(idx);
++        return UDS_S_PHASE;
++    }
++    if (csw.status >= 2) {
++        uds_event(idx, UDS_EV_PHASE, 5);
++        uds_reset(idx);
++        return UDS_S_PHASE;
++    }
++    *residue = csw.residue > len ? len : csw.residue;
++    *cswstatus = csw.status;
++    return csw.status ? UDS_S_CHECK : UDS_S_OK;
++}
++
++// a short command with a small IN buffer on this stack (POST and helper)
++static u32
++uds_cmd_in(int idx, const u8 *cdb, u8 cdblen, void *buf, u32 len)
++{
++    u32 residue = 0;
++    u8 cs = 0;
++    memset(buf, 0, len);
++    return uds_bot(idx, 0, cdb, cdblen, len ? UDS_DIR_IN : UDS_DIR_NONE
++                   , (u32)buf, len, &residue, &cs);
++}
++
++
++/****************************************************************
++ * Device table (POST)
++ ****************************************************************/
++
++int
++usos_uds_reserve(struct usb_pipe *inpipe)
++{
++    if (!CONFIG_USB_XHCI || !CONFIG_USB_MSC || inpipe->type != USB_TYPE_XHCI)
++        return -1;
++    usos_uds_init();
++    if (UdsCount >= UDS_MAX_DEVS) {
++        uds_event(-1, UDS_EV_REGFAIL, 1);
++        return -1;
++    }
++    return UdsCount++;
++}
++
++void
++usos_uds_commit(int idx, struct usbdevice_s *usbdev, struct usb_pipe *inpipe
++                , struct usb_pipe *outpipe, int maxlun)
++{
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    u->in = inpipe;
++    u->out = outpipe;
++    // The control pipe stays with the stick (BOT reset recovery); the
++    // caller would otherwise free it after setup. On xHCI that only put it
++    // on a free list: the device slot and its EP0 stay as they were.
++    u->ctl = usbdev->defpipe;
++    usbdev->defpipe = NULL;
++    u->iface = usbdev->iface->bInterfaceNumber;
++    u->capword = xhci_usos_capword(inpipe);
++    u32 where = xhci_usos_where(inpipe);
++    d->slotid = where >> 8;
++    d->port = where;
++    d->speed = usbdev->speed;
++    d->luns = maxlun + 1;
++
++    d->generation = 1;
++    d->state = UDS_DEV_PRESENT;
++    UdsDiag.devs = UdsCount;
++    uds_event(idx, UDS_EV_PRESENT, d->luns);
++    dprintf(1, "USOS UDS: dev %d port %d slot %d luns %d\n"
++            , idx, d->port, d->slotid, d->luns);
++}
++
++
++/****************************************************************
++ * Channel 1 requests (helper core)
++ ****************************************************************/
++
++// VID:PID, INQUIRY strings and READ CAPACITY(10) of LUN 0, on the helper
++// core at the first request for a device without a BIOS number (POST
++// sends nothing beyond what SeaBIOS always sent).
++static void
++uds_probe(int idx)
++{
++    struct uds_int *u = &UdsInt[idx];
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    if (u->probed || d->state != UDS_DEV_PRESENT)
++        return;
++    u->probed = 1;
++    struct usb_device_descriptor dd;
++    struct usb_ctrlrequest req = {
++        .bRequestType = USB_DIR_IN, .bRequest = USB_REQ_GET_DESCRIPTOR,
++        .wValue = USB_DT_DEVICE << 8, .wIndex = 0, .wLength = sizeof(dd),
++    };
++    memset(&dd, 0, sizeof(dd));
++    if (!usb_send_default_control(u->ctl, &req, &dd)) {
++        d->vid = dd.idVendor;
++        d->pid = dd.idProduct;
++    }
++
++    static const u8 inquiry[6] = { 0x12, 0, 0, 0, 36, 0 };
++    static const u8 capacity[10] = { 0x25 };
++    u8 buf[36];
++    int i, ok = 0;
++    for (i = 0; i < 2 && !ok; i++)   // a pending UNIT ATTENTION fails the first
++        ok = uds_cmd_in(idx, inquiry, sizeof(inquiry), buf, 36) == UDS_S_OK;
++    if (ok) {
++        memcpy(u->vendor, buf + 8, 8);
++        memcpy(u->product, buf + 16, 16);
++    } else {
++        uds_event(idx, UDS_EV_REGFAIL, 2);
++    }
++    for (i = 0, ok = 0; i < 2 && !ok; i++)
++        ok = uds_cmd_in(idx, capacity, sizeof(capacity), buf, 8) == UDS_S_OK;
++    if (ok) {
++        d->last_lba_lo = be32_to_cpu(*(u32*)buf);
++        d->block_size = be32_to_cpu(*(u32*)(buf + 4));
++    }
++    dprintf(1, "USOS UDS: dev %d %04x:%04x cap %u x %u\n"
++            , idx, d->vid, d->pid, d->last_lba_lo, d->block_size);
++}
++
++// common checks of a request for one device; UDS_S_OK = go on
++static u32
++uds_dev_check(struct uds_req *r, int scsi)
++{
++    int idx = r->dev;
++    if (idx >= UdsCount || UdsDiag.dev[idx].state == UDS_DEV_EMPTY)
++        return UDS_S_NODEV;
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    d->bios_drive = uds_bios_drive(idx);
++    if (d->bios_drive) {
++        d->refused++;
++        return UDS_S_OWNED;
++    }
++    uds_probe(idx);
++    if (d->state != UDS_DEV_PRESENT || (scsi && r->generation != d->generation)) {
++        d->gone++;
++        return UDS_S_GONE;
++    }
++    if (r->lun >= d->luns) {
++        UdsDiag.badreq++;
++        UdsDiag.last_why = UDS_WHY_LUN;
++        d->refused++;
++        return UDS_S_BADREQ;
++    }
++    int rc = xhci_usos_check(UdsInt[idx].in, UdsInt[idx].capword);
++    if (rc == USOS_X_GONE) {
++        uds_gone(idx);
++        d->gone++;
++        return UDS_S_GONE;
++    }
++    if (rc) {
++        uds_event(idx, UDS_EV_HWFAIL, 2);
++        d->refused++;
++        return UDS_S_HWFAIL;
++    }
++    return UDS_S_OK;
++}
++
++static void
++uds_op_scsi(struct uds_req *r)
++{
++    int idx = r->dev;
++    struct uds_diag_dev *d = &UdsDiag.dev[idx];
++    d->requests++;
++    d->last_op = r->cdb[0];
++    u32 residue = 0;
++    u8 cs = 0;
++    u32 st = uds_bot(idx, r->lun, r->cdb, r->cdb_len, r->dir, r->data_phys
++                     , r->data_len, &residue, &cs);
++    r->residue = residue;
++    r->csw_status = cs;
++    r->sense_len = 0;
++    if (st == UDS_S_CHECK) {
++        // automatic REQUEST SENSE (fixed format, 18 bytes)
++        static const u8 rs[6] = { 0x03, 0, 0, 0, 18, 0 };
++        u8 sense[18];
++        u32 res2 = 0;
++        u8 cs2 = 0;
++        d->checks++;
++        memset(sense, 0, sizeof(sense));
++        u32 st2 = uds_bot(idx, r->lun, rs, sizeof(rs), UDS_DIR_IN, (u32)sense
++                          , sizeof(sense), &res2, &cs2);
++        if (st2 == UDS_S_OK) {
++            r->sense_len = sizeof(sense) - res2;
++            memcpy(r->sense, sense, sizeof(sense));
++            d->last_key = sense[2] & 0x0f;
++            d->last_asc = sense[12];
++            d->last_ascq = sense[13];
++        } else if (st2 == UDS_S_GONE) {
++            st = UDS_S_GONE;
++        }
++    } else if (st == UDS_S_OK) {
++        u32 kib = (r->data_len - residue) >> 10;
++        if (r->dir == UDS_DIR_IN)
++            d->kib_in += kib;
++        else
++            d->kib_out += kib;
++    }
++    if (st == UDS_S_GONE)
++        d->gone++;
++    d->last_csw = cs;
++    r->status = st;
++}
++
++static void
++uds_op_enum(struct uds_req *r)
++{
++    struct uds_dev_info *out = (void*)r->data_phys;
++    int i;
++    for (i = 0; i < UDS_MAX_DEVS; i++) {
++        struct uds_dev_info info;
++        memset(&info, 0, sizeof(info));
++        struct uds_diag_dev *d = &UdsDiag.dev[i];
++        if (i < UdsCount && d->state != UDS_DEV_EMPTY) {
++            d->bios_drive = uds_bios_drive(i);
++            if (!d->bios_drive)
++                uds_probe(i);
++            info.state = d->state;
++            info.bios_drive = d->bios_drive;
++            info.luns = d->luns;
++            info.port = d->port;
++            info.vid = d->vid;
++            info.pid = d->pid;
++            info.generation = d->generation;
++            info.block_size = d->block_size;
++            info.last_lba_lo = d->last_lba_lo;
++            info.last_lba_hi = d->last_lba_hi;
++            memcpy(info.vendor, UdsInt[i].vendor, sizeof(info.vendor));
++            memcpy(info.product, UdsInt[i].product, sizeof(info.product));
++        }
++        memcpy(&out[i], &info, sizeof(info));
++    }
++    r->residue = r->data_len - UDS_MAX_DEVS * sizeof(struct uds_dev_info);
++    r->status = UDS_S_OK;
++}
++
++static void
++uds_op_eject(struct uds_req *r)
++{
++    static const u8 sync[10] = { 0x35 };
++    static const u8 stop[6] = { 0x1b, 0, 0, 0, 0x02, 0 };   // LoEj, stop
++    int idx = r->dev;
++    u8 buf[1];
++    uds_cmd_in(idx, sync, sizeof(sync), buf, 0);   // no cache: ILLEGAL REQUEST
++    u32 st = uds_cmd_in(idx, stop, sizeof(stop), buf, 0);
++    if (UdsDiag.dev[idx].state == UDS_DEV_GONE) {
++        r->status = UDS_S_GONE;
++        return;
++    }
++    UdsDiag.dev[idx].state = UDS_DEV_EJECTED;
++    uds_event(idx, UDS_EV_EJECT, st);
++    r->status = UDS_S_OK;
++}
++
++// Called by the helper loop (romlayout.S) when the channel 1 doorbell
++// differs from done; ch = mailbox + 48.
++void VISIBLE32FLAT
++usos_uds_service(struct uds_channel *ch)
++{
++    u32 seq = ch->doorbell;
++    u32 rp = ch->req_phys;
++    usos_uds_init();
++    UdsDiag.services++;
++    UdsDiag.channel = (u32)ch;
++    if (!UdsDiag.disks)
++        uds_fill_disks();
++    if (!rp || (rp & 3) || rp > 0xffffffff - sizeof(struct uds_req)
++        || (rp + sizeof(struct uds_req) > 0xa0000 && rp < 0x100000)) {
++        UdsDiag.badreq++;
++        UdsDiag.last_why = UDS_WHY_ADDR;
++        goto done;
++    }
++    struct uds_req r;
++    memcpy(&r, (void*)rp, sizeof(r));   // nothing is read twice from the OS
++    u32 why;
++    u32 st = uds_req_check(&r, &why);
++    r.sense_len = 0;
++    r.residue = 0;
++    r.csw_status = 0;
++    if (st != UDS_S_OK) {
++        UdsDiag.badreq++;
++        UdsDiag.last_why = why;
++        uds_event(r.dev < UDS_MAX_DEVS ? r.dev : -1, UDS_EV_BADREQ, why);
++        r.status = UDS_S_BADREQ;
++    } else if (r.op == UDS_OP_ENUM) {
++        uds_op_enum(&r);
++    } else if (r.op == UDS_OP_STATUS) {
++        u32 n = r.data_len < sizeof(UdsDiag) ? r.data_len : sizeof(UdsDiag);
++        memcpy((void*)r.data_phys, &UdsDiag, n);
++        r.residue = r.data_len - n;
++        r.status = UDS_S_OK;
++    } else {
++        r.status = uds_dev_check(&r, r.op == UDS_OP_SCSI);
++        if (r.status == UDS_S_OK) {
++            if (r.op == UDS_OP_SCSI)
++                uds_op_scsi(&r);
++            else if (r.op == UDS_OP_RESET)
++                r.status = uds_reset(r.dev) ? UDS_S_PHASE : UDS_S_OK;
++            else
++                uds_op_eject(&r);
++            if (UdsDiag.dev[r.dev].state == UDS_DEV_GONE)
++                r.status = UDS_S_GONE;
++        }
++        UdsDiag.dev[r.dev].last_status = r.status;
++    }
++    if (r.dev < UdsCount)
++        r.generation = UdsDiag.dev[r.dev].generation;
++    memcpy((void*)rp + offsetof(struct uds_req, status), &r.status
++           , sizeof(r) - offsetof(struct uds_req, status));
++done:
++    barrier();
++    ch->done = seq;
++}
+diff -ruN a/seabios/src/hw/usb-uds.h b/seabios/src/hw/usb-uds.h
+--- a/seabios/src/hw/usb-uds.h
++++ b/seabios/src/hw/usb-uds.h
+@@ -0,0 +1,150 @@
++// USOS USB disk service (UDS) on channel 1 of the CSMWrap helper core.
++//
++// Copyright (C) 2026 Maksymilian and the USOS Authors
++//
++// This file may be distributed under the terms of the GNU LGPLv3 license.
++//
++// USOS patch 0021 (CSMWrap 3.1.2-usos16). Own code. The structures are the
++// same layout as src/platform/bios/win9x/usosuds.h of the USOS repository
++// (UDS ABI version 1), which the Windows 9x miniport USOSUSB.MPD uses.
++#ifndef __USB_UDS_H
++#define __USB_UDS_H
++
++#include "types.h" // u32
++
++#define UDS_VERSION       1
++#define UDS_CH1_MAGIC     0x31534455   // "UDS1"
++#define UDS_REQ_MAGIC     0x52534455   // "UDSR"
++#define UDS_MAX_DEVS      8
++#define UDS_MAX_LUN       15
++#define UDS_MAX_DATA      65536
++#define UDS_MAX_CDB       16
++
++struct uds_channel {
++    u32 magic;
++    u32 req_phys;
++    volatile u32 doorbell;
++    volatile u32 done;
++};
++
++#define UDS_OP_ENUM    1
++#define UDS_OP_SCSI    2
++#define UDS_OP_RESET   3
++#define UDS_OP_EJECT   4
++#define UDS_OP_STATUS  5
++
++#define UDS_DIR_NONE   0
++#define UDS_DIR_IN     1
++#define UDS_DIR_OUT    2
++
++#define UDS_S_OK       0
++#define UDS_S_CHECK    1
++#define UDS_S_NODEV    2
++#define UDS_S_GONE     3
++#define UDS_S_TIMEOUT  4
++#define UDS_S_PHASE    5
++#define UDS_S_BADREQ   6
++#define UDS_S_OWNED    7
++#define UDS_S_HWFAIL   8
++
++struct uds_req {
++    u32 magic;
++    u16 version;
++    u16 size;
++    u32 seq;
++    u8  op, dev, lun, dir;
++    u32 data_phys;
++    u32 data_len;
++    u8  cdb_len, rsvd0[3];
++    u8  cdb[UDS_MAX_CDB];
++    u32 status;
++    u32 generation;
++    u32 residue;
++    u8  csw_status, sense_len, rsvd1[2];
++    u8  sense[20];
++};
++
++#define UDS_DEV_EMPTY    0
++#define UDS_DEV_PRESENT  1
++#define UDS_DEV_GONE     2
++#define UDS_DEV_EJECTED  3
++#define UDS_DEV_FAILED   4
++
++struct uds_dev_info {
++    u8  state, bios_drive, luns, port;
++    u16 vid, pid;
++    u32 generation;
++    u32 block_size;
++    u32 last_lba_lo, last_lba_hi;
++    char vendor[8];
++    char product[16];
++};
++
++#define UDS_WHY_OK        0
++#define UDS_WHY_MAGIC     1
++#define UDS_WHY_VERSION   2
++#define UDS_WHY_SIZE      3
++#define UDS_WHY_OP        4
++#define UDS_WHY_DEV       5
++#define UDS_WHY_LUN       6
++#define UDS_WHY_CDB       7
++#define UDS_WHY_DIR       8
++#define UDS_WHY_LEN       9
++#define UDS_WHY_ADDR      10
++
++// diagnostics record "USOS" "UDSK" (VARLOW, written only)
++#define UDS_DIAG_VERSION  1
++#define UDS_DIAG_DISKS    8
++#define UDS_DIAG_EVENTS   16
++
++struct uds_diag_dev {
++    u8  state, bios_drive, luns, port;
++    u16 vid, pid;
++    u8  slotid, speed, last_csw, last_key;
++    u8  last_asc, last_ascq, last_op, last_status;
++    u32 generation;
++    u32 block_size;
++    u32 last_lba_lo, last_lba_hi;
++    u32 requests, checks, timeouts, resets, gone, refused;
++    u32 kib_in, kib_out;
++};
++
++struct uds_diag_disk {
++    u8  bios, dtype, uds, rsvd;
++    u32 sectors_lo, sectors_hi;
++};
++
++#define UDS_EV_PRESENT   1
++#define UDS_EV_GONE      2
++#define UDS_EV_RESET     3
++#define UDS_EV_EJECT     4
++#define UDS_EV_BADREQ    5
++#define UDS_EV_HWFAIL    6
++#define UDS_EV_TIMEOUT   7
++#define UDS_EV_PHASE     8
++#define UDS_EV_REGFAIL   9
++#define UDS_EV_STALL    10
++
++struct uds_diag_event {
++    u32 ms;
++    u8  dev, port, event, result;
++};
++
++struct uds_diag {
++    u32 sig[2];
++    u8  version, devs, next_event, disks;
++    u32 services, badreq, last_why, channel, events;
++    struct uds_diag_dev dev[UDS_MAX_DEVS];
++    struct uds_diag_disk disk[UDS_DIAG_DISKS];
++    struct uds_diag_event ev[UDS_DIAG_EVENTS];
++};
++
++struct usb_pipe;
++struct usbdevice_s;
++void usos_uds_init(void);
++int usos_uds_reserve(struct usb_pipe *inpipe);
++void usos_uds_commit(int idx, struct usbdevice_s *usbdev
++                     , struct usb_pipe *inpipe, struct usb_pipe *outpipe
++                     , int maxlun);
++
++#endif // usb-uds.h
+diff -ruN a/seabios/src/hw/usb-xhci.c b/seabios/src/hw/usb-xhci.c
+--- a/seabios/src/hw/usb-xhci.c
++++ b/seabios/src/hw/usb-xhci.c
+@@ -15,6 +15,7 @@
+ #include "string.h" // memcpy
+ #include "usb.h" // struct usb_s
+ #include "usb-xhci.h" // struct ehci_qh
++#include "usb-uds.h" // usos_uds_init
+ #include "util.h" // timer_calc
+ #include "x86.h" // readl
+ 
+@@ -701,6 +702,7 @@ xhci_setup(void)
+ {
+     if (! CONFIG_USB_XHCI)
+         return;
++    usos_uds_init();   // USOS patch 0021: the USOSUDSK record header
+ 
+     struct pci_device *pci;
+     foreachpci(pci) {
+@@ -1243,3 +1245,184 @@ xhci_poll_intr(struct usb_pipe *p, void *data)
+     xhci_xfer_normal(pipe, buf, len);
+     return 0;
+ }
++
++
++/****************************************************************
++ * USOS patch 0021: transport helpers for the USB disk service
++ * (src/hw/usb-uds.c, channel 1 of the helper core). Own code.
++ ****************************************************************/
++
++static struct usb_xhci_s *
++xhci_usos_cntl(struct xhci_pipe *pipe)
++{
++    return container_of(pipe->pipe.cntl, struct usb_xhci_s, usb);
++}
++
++// (slot id << 8) | root hub port (1-based) of a pipe's device, from the
++// output slot context the controller keeps; 0 when unknown.
++u32
++xhci_usos_where(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    if (!pipe->slotid || pipe->slotid > xhci->slots)
++        return 0;
++    struct xhci_slotctx *slot = (void*)xhci->devs[pipe->slotid].ptr_low;
++    if (!slot)
++        return 0;
++    u32 port = (slot->ctx[1] >> 16) & 0xff;
++    if (!port || port > xhci->ports)
++        return pipe->slotid << 8;
++    return (pipe->slotid << 8) | port;
++}
++
++// Controller and port state before / during a UDS transfer:
++// 0 usable, USOS_X_GONE the device's root port lost CCS, USOS_X_HW the
++// registers read all ones (BAR moved / decode off) or the controller
++// halted / reported a host system error. capword: dword 0 of the
++// capability registers as read at POST (0 = do not compare).
++int
++xhci_usos_check(struct usb_pipe *p, u32 capword)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    u32 v = readl(xhci->caps);
++    if (v == 0xffffffff || (capword && v != capword))
++        return USOS_X_HW;
++    u32 sts = readl(&xhci->op->usbsts);
++    if (sts == 0xffffffff || (sts & ((1<<0) | (1<<2))))   // HCH, HSE
++        return USOS_X_HW;
++    u32 port = xhci_usos_where(p) & 0xff;
++    if (port && !(readl(&xhci->pr[port - 1].portsc) & XHCI_PORTSC_CCS))
++        return USOS_X_GONE;
++    return 0;
++}
++
++u32
++xhci_usos_capword(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    return readl(xhci_usos_cntl(pipe)->caps);
++}
++
++// A command TRB with a raw parameter (Set TR Dequeue needs a pointer that
++// xhci_cmd_submit would read as an input context).
++static int
++xhci_usos_cmd(struct usb_xhci_s *xhci, u32 param, u32 flags)
++{
++    mutex_lock(&xhci->cmds->lock);
++    xhci_trb_queue(xhci->cmds, (void*)param, 0, flags);
++    xhci_doorbell(xhci, 0, 0);
++    int rc = xhci_event_wait(xhci, xhci->cmds, 1000);
++    mutex_unlock(&xhci->cmds->lock);
++    return rc;
++}
++
++// Bring a bulk endpoint back to an empty, stopped-and-restartable ring
++// after a stall, an error or a timeout (xHCI 1.2 4.6.8 Reset Endpoint,
++// 4.6.9 Stop Endpoint, 4.6.10 Set TR Dequeue Pointer): Reset Endpoint
++// (halted -> stopped; a context state error when it was not halted),
++// Stop Endpoint (running -> stopped), then the dequeue pointer to the
++// ring's enqueue position; TRBs still queued are dropped.
++int
++xhci_usos_reset_ep(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    struct xhci_ring *ring = &pipe->reqs;
++    u32 ep = (pipe->slotid << 24) | (pipe->epid << 16);
++    xhci_usos_cmd(xhci, 0, (CR_RESET_ENDPOINT << 10) | ep);
++    xhci_usos_cmd(xhci, 0, (CR_STOP_ENDPOINT << 10) | ep);
++    if (ring->nidx >= ARRAY_SIZE(ring->ring) - 1) {
++        // the next TRB would go behind a link TRB: wrap first
++        xhci_trb_fill(ring, ring->ring, 0, (TR_LINK << 10) | TRB_LK_TC);
++        ring->nidx = 0;
++        ring->cs ^= 1;
++    }
++    u32 deq = (u32)&ring->ring[ring->nidx] | (ring->cs ? 1 : 0);
++    int cc = xhci_usos_cmd(xhci, deq, (CR_SET_TR_DEQUEUE << 10) | ep);
++    ring->eidx = ring->nidx;
++    return cc == CC_SUCCESS ? 0 : -1;
++}
++
++// Disable Slot for a device that was unplugged: the controller drops its
++// endpoints and every queued TD, so no DMA goes to an OS buffer later.
++void
++xhci_usos_disable(struct usb_pipe *p)
++{
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    if (pipe->slotid)
++        xhci_cmd_disable_slot(xhci_usos_cntl(pipe), pipe->slotid);
++}
++
++// One bulk TD to or from a physical buffer (no paging on the helper core:
++// linear = physical). A buffer that crosses a 64 KiB boundary becomes two
++// chained TRBs (a TRB buffer must not cross one), both with ISP, so a
++// short packet in the first one ends the TD with an event. While waiting,
++// the root port and the controller are checked on every pass, so an
++// unplug ends the request at once (USOS_X_GONE) instead of after the
++// transfer timeout. Returns USOS_X_OK / _STALL / _ERR / _TIMEOUT / _GONE /
++// _HW; on _TIMEOUT / _GONE / _HW the TD may still be queued (the caller
++// resets the endpoint or disables the slot).
++int
++xhci_usos_bulk(struct usb_pipe *p, u32 addr, u32 len, u32 timeout, u32 capword)
++{
++    if (!CONFIG_USB_XHCI)
++        return USOS_X_ERR;
++    struct xhci_pipe *pipe = container_of(p, struct xhci_pipe, pipe);
++    struct usb_xhci_s *xhci = xhci_usos_cntl(pipe);
++    struct xhci_ring *ring = &pipe->reqs;
++    if (!len || xhci_ring_busy(ring))
++        return USOS_X_ERR;
++    int rc = xhci_usos_check(p, capword);
++    if (rc)
++        return rc;
++    u32 first = len, rest = 0;
++    if ((addr ^ (addr + len - 1)) & ~0xffff) {
++        first = 0x10000 - (addr & 0xffff);
++        rest = len - first;
++    }
++    u32 n = rest ? 2 : 1;
++    if (ring->nidx + n > ARRAY_SIZE(ring->ring) - 1) {
++        // keep the TD in one lap: no link TRB inside a chain
++        xhci_trb_fill(ring, ring->ring, 0, (TR_LINK << 10) | TRB_LK_TC);
++        ring->nidx = 0;
++        ring->cs ^= 1;
++    }
++    u32 flags = (TR_NORMAL << 10) | TRB_TR_ISP;
++    if (rest) {
++        xhci_trb_fill(ring, (void*)addr, first, flags | TRB_TR_CH);
++        ring->nidx++;
++        barrier();
++        xhci_trb_fill(ring, (void*)(addr + first), rest, flags | TRB_TR_IOC);
++    } else {
++        xhci_trb_fill(ring, (void*)addr, len, flags | TRB_TR_IOC);
++    }
++    ring->nidx++;
++    xhci_doorbell(xhci, pipe->slotid, pipe->epid);
++
++    u32 end = timer_calc(timeout);
++    for (;;) {
++        xhci_process_events(xhci);
++        if (!xhci_ring_busy(ring))
++            break;
++        if (n == 2 && ring->eidx == ring->nidx - 1) {
++            // event on the first TRB (short packet or error): TD ended
++            ring->eidx = ring->nidx;
++            break;
++        }
++        rc = xhci_usos_check(p, capword);
++        if (rc)
++            return rc;
++        if (timer_check(end))
++            return USOS_X_TIMEOUT;
++        yield();
++    }
++    u32 cc = (ring->evt.status >> 24) & 0xff;
++    if (cc == CC_SUCCESS || cc == CC_SHORT_PACKET)
++        return USOS_X_OK;
++    if (cc == CC_STALL_ERROR)
++        return USOS_X_STALL;
++    dprintf(1, "%s: cc %d\n", __func__, cc);
++    return USOS_X_ERR;
++}
+diff -ruN a/seabios/src/hw/usb-xhci.h b/seabios/src/hw/usb-xhci.h
+--- a/seabios/src/hw/usb-xhci.h
++++ b/seabios/src/hw/usb-xhci.h
+@@ -15,6 +15,20 @@ struct usb_pipe *xhci_realloc_pipe(struct usbdevice_s *usbdev
+ int xhci_send_pipe(struct usb_pipe *p, int dir, const void *cmd
+                    , void *data, int datasize);
+ int xhci_poll_intr(struct usb_pipe *p, void *data);
++// USOS patch 0021 (USB disk service transport)
++#define USOS_X_OK      0
++#define USOS_X_STALL   1
++#define USOS_X_ERR     2
++#define USOS_X_TIMEOUT 3
++#define USOS_X_GONE    4
++#define USOS_X_HW      5
++u32 xhci_usos_where(struct usb_pipe *p);
++int xhci_usos_check(struct usb_pipe *p, u32 capword);
++u32 xhci_usos_capword(struct usb_pipe *p);
++int xhci_usos_reset_ep(struct usb_pipe *p);
++void xhci_usos_disable(struct usb_pipe *p);
++int xhci_usos_bulk(struct usb_pipe *p, u32 addr, u32 len, u32 timeout
++                   , u32 capword);
+ 
+ // --------------------------------------------------------------
+ // register interface
+diff -ruN a/seabios/src/romlayout.S b/seabios/src/romlayout.S
+--- a/seabios/src/romlayout.S
++++ b/seabios/src/romlayout.S
+@@ -521,12 +521,17 @@ bios_proxy_helper_16_entry:
+ .Lhelper_poll_loop:
+         cmpl $0, 8(%ebp)
+         jne .Lhelper_handle_request
++        // USOS patch 0021: channel 1 (USB disk service), doorbell != done
++        movl 56(%ebp), %eax
++        cmpl 60(%ebp), %eax
++        jne .Lhelper_uds_request
+ 
+         // Check if we should use mwait or pause
+         testl %esi, %esi
+         jz .Lhelper_do_pause
+ 
+         // MONITOR/MWAIT path - monitor the request_pending field
++        // (the channel 1 doorbell is in the same 64-byte line)
+         leal 8(%ebp), %eax              // EAX = address to monitor (request_pending)
+         xorl %ecx, %ecx                 // ECX = extensions (0)
+         xorl %edx, %edx                 // EDX = hints (0)
+@@ -535,6 +540,9 @@ bios_proxy_helper_16_entry:
+         // Check again after arming monitor (avoid race condition)
+         cmpl $0, 8(%ebp)
+         jne .Lhelper_handle_request
++        movl 56(%ebp), %eax
++        cmpl 60(%ebp), %eax
++        jne .Lhelper_uds_request
+ 
+         // Wait for write to monitored address
+         xorl %eax, %eax                 // EAX = hints (0 = C1 state)
+@@ -572,6 +580,14 @@ bios_proxy_helper_16_entry:
+ 
+         jmp .Lhelper_poll_loop
+ 
++.Lhelper_uds_request:
++        // USOS patch 0021: usos_uds_service(EAX = channel 1 at mailbox + 48);
++        // it writes done itself. EBP / ESI are callee-saved.
++        leal 48(%ebp), %eax
++        movl $_cfunc32flat_usos_uds_service, %edi
++        calll *%edi
++        jmp .Lhelper_poll_loop
++
+         /*
+          * uefi_reset_call - Transition to 64-bit and call ResetSystem()
+          *
+diff -ruN a/seabios/src/stacks.c b/seabios/src/stacks.c
+--- a/seabios/src/stacks.c
++++ b/seabios/src/stacks.c
+@@ -47,6 +47,13 @@ struct bios_proxy_mailbox {
+     u32 reset_cr3;              /* offset 36: CR3 for 64-bit identity mapping */
+     u32 reset_fn_lo;            /* offset 40: ResetSystem() address (low) */
+     u32 reset_fn_hi;            /* offset 44: ResetSystem() address (high) */
++    /* USOS patch 0021: channel 1 (USB disk service, src/hw/usb-uds.c) in the
++     * same 64-byte line, so the helper's MONITOR on request_pending also
++     * wakes on uds_doorbell. CSMWrap's own copy of this struct ends at 48. */
++    u32 uds_magic;              /* offset 48: "UDS1" */
++    u32 uds_req_phys;           /* offset 52: OS: its request block */
++    volatile u32 uds_doorbell;  /* offset 56: OS: seq of the posted request */
++    volatile u32 uds_done;      /* offset 60: helper: seq of the last done */
+ };
+ 
+ /*
+@@ -54,8 +61,9 @@ struct bios_proxy_mailbox {
+  * CSMWrap finds this by scanning for the signature and calculates the runtime
+  * address. The F-segment is safe from OS writes (treated as ROM shadow).
+  */
+-struct bios_proxy_mailbox bios_proxy VARFSEG __aligned(8) = {
++struct bios_proxy_mailbox bios_proxy VARFSEG __aligned(64) = {
+     .signature = BIOS_PROXY_SIGNATURE,
++    .uds_magic = 0x31534455,    /* "UDS1" (USOS patch 0021) */
+ };
+ 
+ 

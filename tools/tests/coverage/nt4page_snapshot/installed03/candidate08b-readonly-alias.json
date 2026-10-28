@@ -1,0 +1,7 @@
+{
+  "source": "G:\\USOS-Kolekcja\\_vm\\nt4-installed07-canonical-irq08\\target.qcow2",
+  "readonly_alias": "G:\\USOS-Kolekcja\\_vm\\nt4-installed08b-network-readonly\\target.qcow2",
+  "same_inode": true,
+  "no_disk_payload_write": true,
+  "collector_only": true
+}

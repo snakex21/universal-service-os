@@ -40,9 +40,10 @@ pub fn show(
     firmware: usos.firmware.Firmware,
 ) void {
     const unattended = answer.path;
+    if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
-    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
+    const backend = manual_images.backendFor(system, image, method, firmware) orelse return showUnsupported();
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
@@ -51,7 +52,7 @@ pub fn show(
     var fields = Fields{};
     var notes: [8][]const u8 = undefined;
     var note_count: usize = 0;
-    fields.add(view.t(.summary_system), system.name);
+    fields.add(view.t(.summary_system), view.tr(system.name));
     fields.add(view.t(.summary_image), image.name.slice());
     // Windows Server media: its editions as Setup will list them.
     var editions_text: [256]u8 = undefined;
@@ -135,7 +136,9 @@ pub fn show(
         if (unattended) |path| {
             fields.add(view.t(.summary_answer_file), path);
             // An answer file for another architecture does nothing in Setup.
-            if (image.media) |info| if (info.arch == .x86 or info.arch == .x64 or info.arch == .arm64) {
+            // Not on the 32-bit CSMWrap paths: usos-x86-csmwrap retargets an
+            // amd64-only answer to x86 (tools/windows_installto.h).
+            if (image.media) |info| if ((info.arch == .x86 or info.arch == .x64 or info.arch == .arm64) and !manual_images.x86Csmwrap(system, image)) {
                 const media_arch = answer_profiles.archOf(info);
                 if (system.unattended_directory) |directory| if (xp_settings.answerArchMismatch(directory, path, media_arch)) {
                     notes[note_count] = view.format(&arch_note, .profile_arch_warning, &.{@tagName(media_arch)});
@@ -150,16 +153,57 @@ pub fn show(
         }
     }
     var can_start = true;
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental);
+        // Windows NT 4.0 (nt4-x86-qemu-csmwrap) and NT 3.51
+        // (nt3-x86-qemu-csmwrap): the whole install in the VM.
+        const nt4 = usos.flow.answer.nt4.isNt4(system.id);
+        const nt3 = usos.flow.answer.nt3.isNt3(system.id);
+        // POSReady 2009: also the whole install in the VM (no NT limits note).
+        const posready = usos.flow.answer.posready.isPosReady(system.id);
+        // Custom OS (custom-image-uefi): the image is written to the disk.
+        const custom = customImage(system.id);
+        fields.add(view.t(.summary_preparation), if (custom) view.t(.summary_image_disk) else if (nt4 or nt3 or posready) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
+        fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
+        if (nt4 or nt3) {
+            notes[note_count] = view.t(if (nt3) .summary_nt3_limits else .summary_nt4_limits);
+            note_count += 1;
+        }
+        // Windows 1.0x-3.0 (not WfW 3.11, which has the 3.1 batch Setup).
+        for (usos.catalog.os_profiles.windows_early_ids[1..]) |id| {
+            if (std.mem.eql(u8, system.id, id)) {
+                notes[note_count] = view.t(.summary_win_early_limits);
+                note_count += 1;
+                break;
+            }
+        }
+    }
     if (backend == .xp_uefi_staging) {
         // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on
         // a small ESP of the target disk; docs/design/csmwrap-integration.md).
         fields.add(view.t(.summary_preparation), if (secure_boot.csm().likelyOn()) view.t(.summary_xp_preparation) else view.t(.summary_xp_csmwrap));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
+        // No XP package on this stick (an optional installer component): say
+        // so here instead of failing with "NotFound" after Start.
+        if (!@import("xp_preparation.zig").packagePresent(root)) {
+            can_start = false;
+            notes[note_count] = view.t(.xp_prep_package_missing);
+            note_count += 1;
+        }
         // Windows 2000 shares the preparation, not the XP driver bundle or PAE;
         // Server 2003 and XP x64 (NT 5.2) get GenAHCI instead of the bundle.
         if (std.mem.eql(u8, system.id, "windows-2000")) {
             notes[note_count] = view.t(.summary_w2k_limits);
+            note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-2000-server")) {
+            notes[note_count] = view.t(.summary_w2k_server_limits);
+            note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-xp-mce")) {
+            notes[note_count] = view.t(.summary_xp_mce_limits);
+            note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-xp-tablet")) {
+            notes[note_count] = view.t(.summary_xp_tablet_limits);
             note_count += 1;
         } else if (std.mem.eql(u8, system.id, "windows-server-2003") or std.mem.eql(u8, system.id, "windows-xp-x64")) {
             notes[note_count] = view.t(.summary_nt52_limits);
@@ -172,10 +216,23 @@ pub fn show(
     var user_text: [120]u8 = undefined;
     const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
     const vista = native == .vista;
-    const modern_native = image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id);
+    const modern_native = image.kind == .iso and backend == .windows_iso and (usos.flow.preparation_capability.nativeModernNt(system.id) or usos.catalog.os_profiles.traits(system.id).x86_csmwrap);
     var modern_pe_text: [96]u8 = undefined;
     var modern_driver_text: [120]u8 = undefined;
-    if (modern_native) {
+    if (modern_native and manual_images.x86Csmwrap(system, image)) {
+        // 32-bit media without CSM: win-x86-uefi-csmwrap (CSMWrap, MBR disk).
+        if (windows_native_iso.inspectModernX86(system.image_directory, image.name.slice())) |inspection| {
+            fields.add(view.t(.summary_iso_case), view.t(.summary_w9x_csmwrap));
+            fields.add(view.t(.summary_disk), view.t(.summary_vista_csmwrap_disk));
+            const setup = inspection.setup;
+            fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&modern_pe_text, "{d}.{d}.{d} x86 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));
+        } else |err| {
+            can_start = false;
+            fields.add(view.t(.summary_iso_inspection), @errorName(err));
+            notes[note_count] = view.tr(usos.windows7_iso.errorDetail(err));
+            note_count += 1;
+        }
+    } else if (modern_native) {
         if (windows_native_iso.inspectModern(system.image_directory, image.name.slice())) |inspection| {
             fields.add(view.t(.summary_iso_case), view.t(.summary_native_case));
             const setup = inspection.setup;
@@ -196,7 +253,27 @@ pub fn show(
             note_count += 1;
         }
     }
-    if (image.kind == .iso and native.legacyPe()) {
+    const nt6_x86 = image.kind == .iso and backend == .windows_iso and native.legacyPe() and manual_images.x86Csmwrap(system, image);
+    if (nt6_x86) {
+        // 32-bit Windows 7 / Vista / Server 2008 without CSM
+        // (win-nt6-x86-uefi-csmwrap): the x86 PE10 donor runs the ISO's Setup
+        // in BIOS mode through CSMWrap (MBR disk prepared in micro-Linux).
+        if (windows_native_iso.inspectNt6X86(windows_native_iso.legacyFolder(system), image.name.slice(), windows_native_iso.nt6Minor(system))) |inspection| {
+            fields.add(view.t(.summary_iso_case), view.t(.summary_w9x_csmwrap));
+            fields.add(view.t(.summary_disk), view.t(.summary_vista_csmwrap_disk));
+            fields.add(view.t(.summary_boot_source), inspection.donor_name.slice());
+            const setup = inspection.boot_setup;
+            fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&version_text, "{d}.{d}.{d} x86 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));
+        } else |err| {
+            can_start = false;
+            fields.add(view.t(.summary_iso_inspection), @errorName(err));
+            // A damaged recorded x86 donor: "run Repair", as for the x64 one;
+            // no x86 donor at all: localized "add it in the installer".
+            notes[note_count] = (if (err == error.Windows10PeDonorCorrupt or err == error.X86PeDonorMissing) donorNote(err) else null) orelse view.tr(usos.windows7_iso.errorDetail(err));
+            note_count += 1;
+        }
+    }
+    if (image.kind == .iso and native.legacyPe() and !nt6_x86) {
         if (windows_native_iso.inspect(windows_native_iso.legacyFolder(system), image.name.slice(), vista)) |inspection| {
             // Vista without CSM (the UEFI path gave a black screen on the X470,
             // 2026-09-27): vista-x64-sp2-uefi-csmwrap (legacy MBR install
@@ -264,6 +341,10 @@ pub fn show(
     };
 }
 
+/// Windows 95: the chosen profile (or the USOS default) with the key typed
+/// at start (win9x_key_prompt.zig); this start only.
+var keyed_95: ?answer_profiles.Profile = null;
+
 fn start(
     root: *std.os.uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
@@ -273,17 +354,32 @@ fn start(
     firmware: usos.firmware.Firmware,
 ) void {
     const unattended = answer.path;
+    if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
+    // Windows 95 without a 95 key (profile or none): ask for it now, while
+    // the gamepads still work (the on-screen keyboard). Windows 95 may go on
+    // without one (Setup's own page asks); NT 4.0 / POSReady need theirs.
+    keyed_95 = null;
+    if (usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) == .win9x_uefi) {
+        const key_prompt = @import("win9x_key_prompt.zig");
+        const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+        if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
+            const key = key_prompt.ask(system.name, system.id) orelse return;
+            // Windows 95 without a key: Setup's own Product ID page asks.
+            if (key.len > 0) keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
+        }
+    }
     // No USB gamepad transfer may outlive the menu into another loader;
     // the pads are picked up again if the launch fails and the menu returns.
     input.stopGamepads();
-    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
+    const backend = manual_images.backendFor(system, image, method, firmware) orelse return showUnsupported();
     // Progress rows come from the selection's profile (plan).
     const os_plan = usos.flow.plan.make(system, image.kind, method, firmware);
     view.setPlanLabels(if (os_plan) |plan| plan.labels() else null);
     // Rendered answers of an earlier start may hold a key or a password.
     answer_profiles.clearRendered(root);
     const profile: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+    recordLogon(root, system, answer, profile);
     const os_profile_id = if (os_plan) |plan| plan.profile.id else "unknown";
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
@@ -304,8 +400,36 @@ fn start(
         };
         return;
     }
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on
+        // the ESP, then micro-Linux step 620 writes the Setup disk.
+        vista_csmwrap_heading = system.name;
+        view.vistaCsmwrapStatus(.validating, "Reading the selected ISO", vista_csmwrap_heading);
+        const win9x = @import("win9x_preparation.zig");
+        var request_answer: win9x.Answer = .none;
+        if (keyed_95) |*keyed| {
+            answer_profiles.stageWin9x(root, keyed) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (profile) |p| {
+            answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (unattended) |name| request_answer = .{ .file = name };
+        // No answer chosen: the USOS default MSBATCH.INF gets the menu
+        // language's time zone (else the Date/Time page waits for a click).
+        const time_zone = usos.flow.answer.msbatch.timeZoneForUi(view.languageCode());
+        // The menu language's locale and keyboard (NT 3.x English CDs take them).
+        const tables = usos.flow.answer.tables;
+        const ui_input: ?win9x.UiInput = if (tables.language(tables.languageForUi(view.languageCode()))) |l| .{ .lcid = l.lcid, .klid = l.keyboard } else null;
+        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone, ui_input) catch |err| return showError(view.t(.error_preparation), err);
+        view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
+        @import("vista_preparation.zig").startWin9x(root, vista_csmwrap_heading) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_preparation), err);
+        };
+        return;
+    }
     if (image.kind == .efi and (resolved == .direct_efi or resolved == .chainload)) {
-        const lines = [_][]const u8{ system.name, image.name.slice(), view.t(.efi_line1) };
+        const lines = [_][]const u8{ view.tr(system.name), image.name.slice(), view.t(.efi_line1) };
         view.status(view.t(.efi_title), view.tr(resolved.label()), &lines);
         esp_image_start.start(root, system.image_directory, image.name.slice()) catch |err| {
             showError(view.t(.error_efi), err);
@@ -314,6 +438,37 @@ fn start(
     }
 
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (image.kind == .iso and backend == .windows_iso and manual_images.x86Csmwrap(system, image)) {
+        // 32-bit Windows 8.1 / 10 without CSM (win-x86-uefi-csmwrap): the ISO
+        // is checked here, then micro-Linux step 610 writes the Windows
+        // partition, the ISO's own WinPE (staging) and the CSMWrap ESP to the
+        // chosen MBR disk; Setup then runs in BIOS mode from that disk.
+        // Windows 7 / Vista / Server 2008 (win-nt6-x86-uefi-csmwrap): the same
+        // step 610, but an x86 PE10 donor boots instead of the ISO's own PE.
+        if (secure_boot.enforced()) return showSecureBootRequired(system);
+        const nt6 = manual_images.nt6Legacy(system);
+        vista_csmwrap_heading = if (nt6) windows_native_iso.legacyFolder(system) else windows_native_iso.systemFolder(system.image_directory) catch system.name;
+        view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
+        var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
+        if (profile) |p| {
+            _ = answer_profiles.stage(root, p, system.id, .x86, if (nt6) windows_native_iso.nt6_x86_csmwrap_profile else windows_native_iso.x86_csmwrap_profile) catch |err| return showError(view.t(.error_iso), err);
+            x86_answer = .profile;
+        } else if (unattended) |name| x86_answer = .{ .file = name };
+        (if (nt6)
+            windows_native_iso.prepareNt6X86Csmwrap(root, windows_native_iso.legacyFolder(system), image.name.slice(), windows_native_iso.nt6Minor(system), x86_answer, showVistaCsmwrapIso)
+        else
+            windows_native_iso.prepareX86Csmwrap(root, system.image_directory, image.name.slice(), x86_answer, showVistaCsmwrapIso)) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_iso), err);
+            return;
+        };
+        view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
+        @import("vista_preparation.zig").startCsmwrapHeading(root, vista_csmwrap_heading) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_preparation), err);
+        };
+        return;
+    }
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
@@ -398,6 +553,39 @@ fn start(
 
 var wimboot_plan: [512]u8 = undefined;
 
+/// How to log on after this installation (src/flow/answer/logon.zig,
+/// docs/logon-after-install.md), from the answer this start hands over:
+/// \EFI\USOS\answer\logon.ini for the micro-Linux pages and the DATA note,
+/// and the line of the native ISO progress page. Every start rewrites (or
+/// removes) it, so no hint of an earlier start remains.
+fn recordLogon(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, answer: manual_unattended.Choice, profile: ?*const answer_profiles.Profile) void {
+    const logon = usos.flow.answer.logon;
+    const source: logon.Source = if (profile) |p|
+        .{ .profile = p }
+    else if (answer.path) |name|
+        .{ .file = name }
+    else xp: {
+        // NT5 without a profile or a .sif: DATA's usos-xp.ini, unless the
+        // manual installation was chosen.
+        if (logon.flowFor(system.id) != .nt5 or answer.ignore_settings) break :xp .none;
+        const name = usos.catalog.os_profiles.traits(system.id).settings_file orelse break :xp .none;
+        const directory = system.unattended_directory orelse break :xp .none;
+        const read = struct {
+            var summary: usos.flow.xp_settings_summary.Summary = .{};
+        };
+        read.summary = xp_settings.read(directory, name);
+        if (!read.summary.active) break :xp .none;
+        break :xp .{ .xp_settings = .{ .user = read.summary.user(), .password_set = read.summary.password_set } };
+    };
+    const result = logon.derive(system.id, source);
+    var english_buffer: [256]u8 = undefined;
+    const english = result.sentence(&english_buffer);
+    var local_buffer: [512]u8 = undefined;
+    const local = if (english.len > 0) view.trFormat(&local_buffer, english) else "";
+    view.setLogonLine(english);
+    answer_profiles.writeLogon(root, system.id, result, english, local);
+}
+
 /// The native wimboot starts are x64 (amd64 components).
 fn renderForWimboot(profile: ?*const answer_profiles.Profile, system: *const usos.catalog.SystemEntry, os_profile_id: []const u8) !?windows_native_iso.Rendered {
     const p = profile orelse return null;
@@ -416,7 +604,7 @@ pub fn showWinPe(
     if (!system.firmware.accepts(firmware) or firmware != .uefi) return showFirmwareUnavailable();
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     var fields = Fields{};
-    fields.add(view.t(.summary_system), system.name);
+    fields.add(view.t(.summary_system), view.tr(system.name));
     fields.add(view.t(.summary_image), image.name.slice());
     fields.add(view.t(.summary_iso_case), view.t(.media_winpe));
     if (image.media) |info| {
@@ -447,6 +635,7 @@ pub fn showWinPe(
 
 fn startWinPe(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) void {
     input.stopGamepads();
+    view.setLogonLine("");
     view.setPlanLabels(null);
     view.windowsIsoStatus(.validating, "Reading the selected WinPE ISO");
     windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, null, true, view.windowsIsoStatus) catch |err| {
@@ -462,11 +651,13 @@ fn showMediaBlocked(name: []const u8, reason: usos.image_probe.windows_media.Blo
 }
 
 /// Missing or damaged PE10 donor (Programs/USOS/WinPE): a localized
-/// "run Repair in the USOS installer" message.
+/// "run Repair in the USOS installer" message; no x86 donor: a localized
+/// "add it in the installer (Components)" message.
 fn donorNote(err: anyerror) ?[]const u8 {
     return switch (err) {
         error.Windows10PeDonorMissing, error.Windows10PeDonorInvalid, error.Windows10PeDonorNotRecorded => view.t(.donor_missing),
         error.Windows10PeDonorCorrupt => view.t(.donor_corrupt),
+        error.X86PeDonorMissing => view.t(.donor_x86_missing),
         else => null,
     };
 }
@@ -495,6 +686,12 @@ fn showUnsupported() void {
     view.waitForDismiss();
 }
 
+fn showPreparationBlocked(system: *const usos.catalog.SystemEntry, reason: []const u8) void {
+    const lines = [_][]const u8{ view.tr(reason), view.t(.notice_backend_line2) };
+    view.notice(view.tr(system.name), .warning, .warning, view.t(.system_unavailable), &lines);
+    view.waitForDismiss();
+}
+
 fn showSecureBootRequired(system: *const usos.catalog.SystemEntry) void {
     const line1 = if (system.family == .linux) view.t(.summary_secure_boot_linux_line1) else view.t(.summary_secure_boot_line1);
     const lines = [_][]const u8{ line1, view.t(.summary_secure_boot_line2) };
@@ -510,6 +707,7 @@ fn showError(title: []const u8, err: anyerror) void {
         error.IsoNotContiguousEnough, error.IsoResidentOrSparse => view.t(.error_linux_fragmented),
         error.NoLinuxEntry => view.t(.error_linux_no_entry),
         error.HelperMissing => view.t(.error_linux_helper),
+        error.XpPackageMissing => view.t(.xp_prep_package_missing),
         else => view.t(.error_stopped),
     };
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };
@@ -544,4 +742,12 @@ fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) voi
 fn nt5Arch(system_id: []const u8) usos.flow.answer.target.Arch {
     const nt5 = @import("xp_preparation.zig").Nt5System.fromId(system_id) orelse return .x86;
     return nt5.arch();
+}
+
+/// Custom OS and FreeDOS from UEFI (profile custom-image-uefi).
+fn customImage(system_id: []const u8) bool {
+    for (usos.catalog.os_profiles.custom_image_ids) |id| {
+        if (std.mem.eql(u8, id, system_id)) return true;
+    }
+    return false;
 }

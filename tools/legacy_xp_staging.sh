@@ -7,9 +7,23 @@
 # (USOS_XP_ESP_DIR), uses the canonical 255/63 geometry and runs the driver
 # preflight; every other profile behaves as before.
 
+# The stick ESP may be read-only here (a menu wait, tools/stick_write.sh;
+# X470 2026-10-12, B261012-104904: "cannot write Legacy XP staging status to
+# ESP" at the disk picker): every write onto it goes through usos_stick_write.
+command -v usos_stick_write >/dev/null 2>&1 || usos_stick_write() { "$@"; }
+
 xp_stage_set() {
     XP_STAGE_STATE=$1
     export XP_STAGE_STATE
+    usos_stick_write xp_stage_write
+    case $? in
+        0) ;;
+        2) stop 'cannot publish Legacy XP staging status on ESP' ;;
+        *) stop 'cannot write Legacy XP staging status to ESP' ;;
+    esac
+}
+
+xp_stage_write() {
     status_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-status.txt
     tmp_file="$status_file.tmp"
     {
@@ -18,9 +32,8 @@ xp_stage_set() {
         printf 'image=%s\n' "${XP_IMAGE_NAME:-unknown}"
         printf 'target=%s\n' "${TARGET_DEVICE:-unselected}"
         printf 'uptime=%s\n' "$(cut -d' ' -f1 /proc/uptime 2>/dev/null || true)"
-    } > "$tmp_file" || stop 'cannot write Legacy XP staging status to ESP'
-    mv "$tmp_file" "$status_file" || stop 'cannot publish Legacy XP staging status on ESP'
-    sync
+    } > "$tmp_file" || return 1
+    mv "$tmp_file" "$status_file" || return 2
 }
 
 xp_run_logged() {
@@ -35,8 +48,7 @@ xp_run_logged() {
     ) 2>&1 | tee "$tmp_log"
     [ -r "$rc_file" ] || return 125
     command_rc=$(cat "$rc_file")
-    cp "$tmp_log" "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/$log_name" 2>/dev/null || true
-    sync
+    usos_stick_write cp "$tmp_log" "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/$log_name" 2>/dev/null || true
     return "$command_rc"
 }
 
@@ -59,9 +71,10 @@ usos_hex_to_ascii() {
 }
 
 usos_legacy_xp_staging() {
-    [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
-    . /usr/lib/usos/nt5_profile.sh
+    . "${USOS_LIB_DIR:-/usr/lib/usos}/nt5_profile.sh"
     usos_nt5_profile || stop 'Unsupported NT5 source profile'
+    usos_nt5_require_supported || { stop 'NT5 beta compatibility is not validated; no disk was selected'; return 1; }
+    [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
     # XP without firmware CSM (xp-x86-sp3-uefi-csmwrap, experimental): the UEFI
     # menu adds usos.xp_boot=csmwrap only when it found no CSM. The Windows
     # plan then leaves the disk's last 65 MiB for the CSMWrap ESP
@@ -100,9 +113,9 @@ usos_legacy_xp_staging() {
     insmod "$NTFS3_MODULE" 2>/dev/null || true
     mkdir -p /mnt/data /mnt/source /mnt/xpsetup
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only for Legacy XP staging'
-    XP_IMAGE_PATH="/mnt/data/Systems/Windows/$NT5_NAME/Images/$XP_IMAGE_NAME"
+    XP_IMAGE_PATH="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Images/$XP_IMAGE_NAME"
     [ -f "$XP_IMAGE_PATH" ] || stop "selected XP ISO not found on DATA: $XP_IMAGE_NAME"
-    printf '[LEGACY_XP] SOURCE PASS path=Systems/Windows/%s/Images/%s\n' "$NT5_NAME" "$XP_IMAGE_NAME"
+    printf '[LEGACY_XP] SOURCE PASS path=Systems/%s/%s/Images/%s\n' "$NT5_CATEGORY" "$NT5_NAME" "$XP_IMAGE_NAME"
 
     XP_WINNT_SIF=''
     if [ -n "$unattended_hex" ]; then
@@ -115,7 +128,7 @@ usos_legacy_xp_staging() {
             *.sif) ;;
             *) stop "Legacy XP unattended file is not .sif: $XP_UNATTENDED_NAME" ;;
         esac
-        XP_WINNT_SIF="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/$XP_UNATTENDED_NAME"
+        XP_WINNT_SIF="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/$XP_UNATTENDED_NAME"
         [ -f "$XP_WINNT_SIF" ] || stop "selected XP WINNT.SIF not found on DATA: $XP_UNATTENDED_NAME"
         [ -r /usr/lib/usos/xp_unattended_policy.sh ] || stop 'xp_unattended_policy.sh is missing'
         . /usr/lib/usos/xp_unattended_policy.sh
@@ -403,6 +416,21 @@ usos_legacy_xp_staging() {
         [ -z "$XP_WINNT_SIF" ] || stop 'Experimental XP does not accept custom SIF files'
         [ ! -f "$TEST_INI" ] || stop 'Test auto-confirm is forbidden in this experiment'
         TARGET_SIZE_FOR_BIOS=$(usos_disk_size "$TARGET_DEVICE")
+        # NVMe target (usosnvme, docs/nvme-nt-2026-10-11.md): 512-byte LBAs
+        # only, and only the systems whose bundle carries the driver.
+        case "$TARGET_DEVICE" in /dev/nvme*)
+            nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
+            [ "$nvme_lbs" = 512 ] || stop "The NVMe target uses $nvme_lbs-byte sectors; Windows NT 3.x to 2003 need 512-byte sectors (switch the namespace to a 512-byte LBA format first). No target write occurred"
+            # Windows 2000 (w2k_stage.sh 9.) is wired but has no QEMU desktop
+            # pass yet: only with DATA's Unattended\nvme-experimental.txt (X470 test).
+            case "${NT5_SYSTEM:-windows-xp}" in
+                windows-xp|windows-server-2003) ;;
+                windows-2000) [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop "Windows 2000 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\$NT5_CATEGORY\\$NT5_NAME\\Unattended to try it. No target write occurred"
+                    printf '[XP_NVME] Windows 2000 NVMe experimental (nvme-experimental.txt)\n' ;;
+                *) stop "No NVMe driver for $NT5_SYSTEM in this flow yet (usosnvme: XP SP3 and Server 2003 SP2 x86). No target write occurred" ;;
+            esac
+            printf '[XP_NVME] target=%s logical_block=512 driver=usosnvme\n' "$TARGET_DEVICE" ;;
+        esac
         # Canonical on-disk geometry, NOT a claim about firmware AH08 geometry.
         # The verified NT52 NTFS reader uses EDD; firmware CSM is used after poweroff.
         XP_BIOS_DRIVE=80
@@ -449,6 +477,11 @@ usos_legacy_xp_staging() {
     fi
     SOURCE_ROOT=/mnt/source
     export SOURCE_ROOT TARGET_DEVICE USOS_DISK_DEVICE
+    # display-keep.txt (2000, XP, 2003, every answer, also none): no USOSRES,
+    # Windows keeps its own display mode (docs/display-policy.md;
+    # prepare_xp_ntfs_target.sh and w2k_stage.sh read USOS_DISPLAY_KEEP).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/display-keep.txt" ]; then USOS_DISPLAY_KEEP=1; else USOS_DISPLAY_KEEP=0; fi
+    export USOS_DISPLAY_KEEP
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
     if usos_nt5_uefi_profile; then
     if [ "$NT5_SYSTEM" = windows-xp ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then
@@ -459,8 +492,60 @@ usos_legacy_xp_staging() {
     elif [ "$NT5_SYSTEM" = windows-2000 ]; then
     # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
     # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
-    # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
-    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers\n'
+    # its own set instead (w2k_stage.sh, after the source copy): AHCINT and
+    # ACPI kept (or off with DATA's acpi-off.txt, the STOP 0xA5 fallback),
+    # plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
+    [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
+    # hal-standard.txt (with acpi-off.txt): the Standard PC HAL (hal.dll, PIC)
+    # instead of the MPS HAL, pinned through WINNT.SIF ComputerType.
+    if [ "$USOS_W2K_ACPI" = off ] && [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/hal-standard.txt" ]; then USOS_W2K_HAL=standard; else USOS_W2K_HAL=auto; fi
+    # storage-uniata.txt: UniATA 0.47b instead of AHCINT (the X470 A/B option).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/storage-uniata.txt" ]; then USOS_W2K_STORAGE=uniata; else USOS_W2K_STORAGE=ahcint; fi
+    [ "$USOS_W2K_STORAGE" = ahcint ] || [ -f /usr/lib/usos/w2k-drivers/uniata/uniata.sys ] || stop 'Windows 2000 UniATA driver is missing from the package; no target write occurred'
+    # usosrst.sys (own helper: STOP screen, Setup restart without an 8042).
+    [ -f /usr/lib/usos/w2k-drivers/usosrst.sys ] || stop 'Windows 2000 helper driver (usosrst) is missing from the package; no target write occurred'
+    # The clock fixes are the default (w2k_stage.sh 6., X470 2026-10-05):
+    # hpet-keep.txt keeps HPET LegacyReplacement, rtc-keep.txt keeps the HAL's
+    # RTC reads (docs/windows-2000-modern-2026-09-30.md 7c-7e).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/hpet-keep.txt" ]; then USOS_W2K_HPET=keep; else USOS_W2K_HPET=legacy-off; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/rtc-keep.txt" ]; then USOS_W2K_RTC=keep; else USOS_W2K_RTC=fix; fi
+    # bootvid-ms.txt: the Microsoft boot video in text mode even with ACPI on
+    # (w2k_stage.sh 8.; default there: USOS's text BOOTVID.DLL + /SOS).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/bootvid-ms.txt" ]; then USOS_W2K_BOOTVID=ms; else USOS_W2K_BOOTVID=text; fi
+    # w2k-diag.txt (alias: Codex's old nmi-snapshot.txt): the Windows 2000
+    # ACPI diagnostic setup instead of the clean default (w2k_stage.sh 10.,
+    # xp_csmwrap_esp.sh): CSMWrap 3.1.2-usos11-diag (tick watcher + NMI
+    # snapshot), usosvid 1.3-diag in ~BT and the installed system, /SOS
+    # /BOOTLOG in the installed boot.ini. Needs ACPI on.
+    USOS_W2K_DIAG=off
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/w2k-diag.txt" ] || [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nmi-snapshot.txt" ]; then
+        [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: the diagnostic flag (w2k-diag.txt / nmi-snapshot.txt) needs ACPI on; remove acpi-off.txt or the flag. No target write occurred'
+        [ -f /usr/lib/usos/w2k-drivers/usosvid-diag/bootvid.dll ] && [ -f /usr/lib/usos/w2k-drivers/csmwrap-diag/csmwrapx64.efi ] || stop 'Windows 2000 diagnostic files are missing from the package; no target write occurred'
+        USOS_W2K_DIAG=on; USOS_W2K_BOOTVID=text
+        printf '[W2K_DRIVERS] DIAGNOSTIC setup (w2k-diag.txt): CSMWrap usos11-diag, usosvid 1.3-diag, /SOS /BOOTLOG\n'
+    fi
+    # vesa-off.txt: no VESA display (w2k_stage.sh 11.; default: own usosvbe
+    # miniport + the CD's framebuf.dll, registered at setup end, 1024x768x16).
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/vesa-off.txt" ]; then USOS_W2K_VESA=off; else USOS_W2K_VESA=on; fi
+    [ "$USOS_W2K_VESA" = off ] || [ -f /usr/lib/usos/w2k-drivers/usosvbe/usosvbe.sys ] || stop 'Windows 2000 VESA miniport (usosvbe) is missing from the package; no target write occurred'
+    # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
+    # stays on, so it never combines with acpi-off.txt.
+    USOS_W2K_ACPI_PKG=
+    if [ -d "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi" ]; then
+        [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: acpi-off.txt and the user ACPI package (Unattended\acpi) exclude each other; remove one. No target write occurred'
+        USOS_W2K_ACPI_PKG="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi"
+    fi
+    # ACPI on: the target gets the Windows 2000 ACPI build of the USOS MBR
+    # (HPET LegacyReplacement off before the HAL calibrates on IRQ 0, ACPI 2.0
+    # QWord names rewritten for 2000's acpi.sys; xp_geometry_fix_mbr.S).
+    if [ "$USOS_W2K_ACPI" = on ]; then
+        [ -f /usr/lib/usos/w2k-acpi-mbr-440.bin ] || stop 'Windows 2000 ACPI MBR is missing from the package; no target write occurred'
+        USOS_XP_MBR_CODE=/usr/lib/usos/w2k-acpi-mbr-440.bin; export USOS_XP_MBR_CODE
+        printf '[W2K_DRIVERS] MBR w2k-acpi-mbr-440.bin (HPET LegacyReplacement off, QWord names for acpi.sys)\n'
+    fi
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG USOS_W2K_BOOTVID USOS_W2K_DIAG USOS_W2K_VESA
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86, VESA %s%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$USOS_W2K_VESA" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).
@@ -468,8 +553,8 @@ usos_legacy_xp_staging() {
     [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'
     printf '[NT5_STORAGE] PREFLIGHT PASS genahci %s on the system StorPort\n' "$nt5_storage_arch"
     fi
-    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
-    # NT 5.2: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
+    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ] || [ "$NT5_SYSTEM" = windows-2000 ]; then
+    # NT 5.2 and 2000: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
     case "$NT5_SOURCE_DIR" in AMD64) nt52_usb_arch=amd64 ;; *) nt52_usb_arch=x86 ;; esac
     [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.sys" ] && [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.inf" ] || stop 'NT 5.2 USB driver (xhci98) is missing from the package; no target write occurred'
     printf '[NT52_USB] PREFLIGHT PASS xhci98 %s\n' "$nt52_usb_arch"
@@ -478,7 +563,7 @@ usos_legacy_xp_staging() {
     . /usr/lib/usos/xp_user_settings.sh
     # XP_SETTINGS_MODE=off (usos.xp_settings=off): manual installation chosen in the menu;
     # plan (usos.xp_settings=plan): a USOS answer profile rendered on the ESP.
-    usos_xp_settings_select "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" "$XP_WINNT_SIF$XP_CUSTOM_SIF" "${XP_SETTINGS_MODE:-}" || stop 'XP answer settings are invalid (usos-xp.ini on DATA or the chosen profile). No target write occurred'
+    usos_xp_settings_select "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" "$XP_WINNT_SIF$XP_CUSTOM_SIF" "${XP_SETTINGS_MODE:-}" || stop 'XP answer settings are invalid (usos-xp.ini on DATA or the chosen profile). No target write occurred'
     fi
     XP_SOURCE_OPEN=yes
     fi
@@ -532,7 +617,9 @@ usos_legacy_xp_staging() {
     else
         confirmation_screen=/run/xp-disk-confirm.txt
         {
-            printf '%s - CONFIRM INSTALLATION\n\nDisk: %s\nS/N: %s\nSize: %s GiB\n\n' "$NT5_TITLE" "$XP_TARGET_MODEL" "$XP_TARGET_SERIAL" "$((TARGET_SIZE_FOR_BIOS / 1073741824))"
+            printf '%s - CONFIRM INSTALLATION\n\nDisk: %s\n' "$NT5_TITLE" "$XP_TARGET_MODEL"
+            usos_disk_type_line "$TARGET_DEVICE"
+            printf 'S/N: %s\nSize: %s GiB\n\n' "$XP_TARGET_SERIAL" "$((TARGET_SIZE_FOR_BIOS / 1073741824))"
             if [ -n "$XP_WINDOWS_PLAN" ]; then
                 windows_sectors=$(awk -F= '$1=="windows_sectors" {print $2}' "$XP_WINDOWS_PLAN")
                 printf 'Windows C: %s GiB NTFS.\nOne partition for Windows and automatic setup.\nNo separate XPSETUP partition will remain.\n' "$((windows_sectors / 2097152))"
@@ -568,6 +655,23 @@ usos_legacy_xp_staging() {
         [ -r /usr/lib/usos/xp_csmwrap_esp.sh ] || stop 'xp_csmwrap_esp.sh is missing'
         xp_run_logged legacy-xp-csmwrap.log sh /usr/lib/usos/xp_csmwrap_esp.sh || stop 'The CSMWrap ESP could not be created on the target'
         printf '[LEGACY_XP] CSMWRAP ESP PASS\n'
+        # Firmware entry for the target's CSMWrap ESP, first in BootOrder,
+        # plus BootNext (tools/uefi_boot_entry.sh, as Custom OS). Without it
+        # the X470 started the still-plugged USOS stick again after the
+        # preparation (2026-10-22, B261022-211645) and every Setup restart
+        # (text mode -> GUI -> desktop) would too. First in BootOrder, not
+        # only BootNext: BootNext covers one restart. Not fatal: removing the
+        # stick still boots the disk through the removable-media path.
+        if [ -r /usr/lib/usos/uefi_boot_entry.sh ]; then
+            if xp_run_logged legacy-xp-boot-entry.log env TARGET_DEVICE="$TARGET_DEVICE" \
+                ENTRY_NAME="${NT5_NAME:-Windows XP}" sh /usr/lib/usos/uefi_boot_entry.sh add; then
+                printf '[LEGACY_XP] BOOT ENTRY PASS (BootOrder first + BootNext: the restart starts the target)\n'
+            else
+                printf '[LEGACY_XP] BOOT ENTRY not written; remove the USOS stick before the restart\n'
+            fi
+        else
+            printf '[LEGACY_XP] BOOT ENTRY helper missing; remove the USOS stick before the restart\n'
+        fi
     fi
     xp_stage_set prepare-xpsetup-pass
     usos_ui_stage 5 5 'Verification and finalization' 'Verifying the staged source, unmounting media and flushing writes.' || true
@@ -585,6 +689,10 @@ usos_legacy_xp_staging() {
 
     umount /mnt/source || stop 'cannot unmount selected XP ISO after preparation'
     losetup -d "$LOOP_DEVICE" || stop 'cannot detach selected XP ISO loop device'
+    # How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md):
+    # every later page shows it; DATA gets last-install-login.txt (no password).
+    usos_logon_take /mnt/esp "${NT5_SYSTEM:-}" || true
+    usos_logon_save /mnt/data "Systems/$NT5_CATEGORY/$NT5_NAME" || true
     umount /mnt/data || stop 'cannot unmount USOS_DATA after XP preparation'
     printf '[LEGACY_XP] PREPARED PASS backend=xp-staging\n'
     xp_stage_set handoff-finalize
@@ -640,8 +748,6 @@ usos_legacy_xp_staging() {
         IFS= read -r _poweroff_request || true
     fi
     printf '[LEGACY_XP] POWER OFF REQUESTED input=%s\n' "$USOS_UI_TTY"
-    poweroff -f 2>/dev/null || true
-    sleep 2
-    halt -f 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh poweroff
     while true; do sleep 3600; done
 }

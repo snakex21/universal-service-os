@@ -12,7 +12,7 @@ pub fn run(esp: storage.fat32.FileSystem, reader: Reader, bulk: Reader, graphics
     var boot: [512]u8 = undefined;
     try readHelper(esp, bulk, "BOOT16.BIN", &boot);
     var builder = try dos.Builder.initDisk(ram, &boot, &dos_mbr_start, 0x80);
-    for ([_][]const u8{ "KERNEL.SYS", "COMMAND.COM", "DZ.EXE", "DZ.DOS", "FDAUTO.BAT", "FDCONFIG.SYS", "TOOLS.BAT", "README.TXT", "REBOOT.COM", "DOSZIP.TXT" }) |filename| {
+    for ([_][]const u8{ "KERNEL.SYS", "COMMAND.COM", "DZ.EXE", "DZ.DOS", "FDAUTO.BAT", "FDCONFIG.SYS", "TOOLS.BAT", "README.TXT", "REBOOT.COM", "DOSZIP.TXT", "VBMOUSE.EXE", "VBADOS.TXT" }) |filename| {
         const size = try helperSize(esp, reader, filename);
         try readHelper(esp, bulk, filename, try builder.reserve(filename, size, false));
     }
