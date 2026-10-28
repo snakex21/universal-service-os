@@ -27,6 +27,9 @@ var payloadFiles = []payloadFile{
 	{`src/gui/themes/usos-sunset.ini`, `EFI/USOS/themes/usos-sunset.ini`},
 	{`src/gui/themes/usos-forest.ini`, `EFI/USOS/themes/usos-forest.ini`},
 	{`zig-out/test-assets/ntfs_x64.efi`, `EFI/USOS/ntfs_x64.efi`},
+	// MiniOS (src/prep): Windows 10/11 x64 without Windows Setup, profile
+	// option prep_env=minios (src/platform/uefi/minios_start.zig).
+	{`zig-out/test-assets/usosprep-x86_64.efi`, `EFI/USOS/minios/usosprep-x64.efi`},
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},
 	{`zig-out/micro-linux/initramfs-usos`, `EFI/USOS/micro-linux/initramfs-usos`},

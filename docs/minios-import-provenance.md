@@ -4,9 +4,14 @@
 Path-scoped import of the MiniOS prep environment from Codex branch
 `codex/minios-etap1` at `33aa5c6d` (reviewed and accepted up to that commit).
 No branch history was merged. Paths taken from `33aa5c6d`:
-`src/prep/**`, `tools/minios/**`, `src/storage/ntfs.zig`, the MiniOS
+`src/prep/**`, `tools/minios/**`, the MiniOS
 `tools/tests/*` files, `docs/minios*`, the `addUsosPrep` hunk of `build.zig`
 and the `/runtime/` lines of `.gitignore`.
+
+`src/storage/ntfs.zig` was imported first and then reset to master: MiniOS
+uses its own fork (`src/prep/ntfs_reader.zig`, module `ntfs_ro`), and the
+changed shared reader pushed the Legacy BIOS Core below its 4096-byte
+headroom gate (3908 bytes) in build.bat.
 
 Included by state: 1381f4fa (removal of the historical bootfiles capacity
 override) and b13074eb..33aa5c6d (retirement of the scoped DISM exception,

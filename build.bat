@@ -35,7 +35,7 @@ rem the same dependency graph as the full release.
 
 rem Build release USB and manual-QEMU USB in one Zig graph so both copies of
 rem BOOTX64.EFI come from the exact same emitted binary and build identifier.
-"%ZIG%" build -j2 --summary all --cache-dir "%ROOT%tools\cache\zig" test selftest install qemu-x86_64-manual-image fetch-ntfs-driver micro-linux -Doptimize=ReleaseFast
+"%ZIG%" build -j2 --summary all --cache-dir "%ROOT%tools\cache\zig" test selftest install qemu-x86_64-manual-image fetch-ntfs-driver micro-linux usosprep-install-app -Doptimize=ReleaseFast
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 rem Release-owned helpers for the direct Core -> Windows PE path.

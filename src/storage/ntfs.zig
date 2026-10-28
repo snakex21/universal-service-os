@@ -1,6 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 const random_reader = @import("random_reader.zig");
-const libstd = @import("std");
 
 pub const Error = random_reader.Error || error{
     InvalidBPB,
@@ -28,9 +26,6 @@ pub const Error = random_reader.Error || error{
     UnsupportedName,
     NotFile,
     UnsupportedFileData,
-    AttributeListBounds,
-    AttributeListMismatch,
-    UnsupportedMftAttributeList,
 };
 
 pub const Partition = struct {
@@ -203,10 +198,6 @@ fn mountInto(reader: random_reader.Reader, partition: Partition, out: *FileSyste
     try readPartition(reader, partition, mft_byte, record);
     try validateAndFixRecord(record, bytes_per_sector, "FILE", error.InvalidMftSignature);
 
-    // Bootstrapping a fragmented MFT through its own extension records needs
-    // a separate resolver. Never silently use only its first DATA extent.
-    if (try findAttribute(record,0x20,null)) |_| return error.UnsupportedMftAttributeList;
-
     const mft_stream = try collectStream(record, 0x80, null, cluster_bytes, total_clusters);
     if (mft_stream.len == 0 or mft_stream.data_size < file_record_bytes) return error.MissingMftData;
     if (mft_stream.runs[0].sparse or mft_stream.runs[0].vcn != 0 or mft_stream.runs[0].lcn != @as(i64, @intCast(mft_lcn))) return error.InvalidAttribute;
@@ -281,14 +272,6 @@ pub const File = struct {
 };
 
 pub fn openFile(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16, output: *File) Error!void {
-    const reference = try resolveFileReference(fs,reader,components);
-    var record_storage: [max_file_record_bytes]u8 = undefined;
-    const record = try readMftRecord(fs, reader, reference, &record_storage);
-    if ((le16(record[22..24]) & 3) != 1) return error.NotFile;
-    try fileFromRecord(record, fs.cluster_bytes, fs.total_clusters, output);
-}
-
-fn resolveFileReference(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16) Error!u64 {
     if (components.len == 0) return error.NotFile;
     const parent = try resolveDirectory(fs, reader, components[0 .. components.len - 1]);
     const name = components[components.len - 1];
@@ -303,208 +286,10 @@ fn resolveFileReference(fs: FileSystem, reader: random_reader.Reader, components
             }
         }
     }
-    return reference orelse return error.NotFound;
-}
-
-fn findAttribute(record: []const u8, wanted_type: u32, wanted_instance: ?u16) Error!?[]const u8 {
-    var offset: usize = le16(record[20..22]);
-    const used: usize = le32(record[24..28]);
-    if (offset < 24 or used > record.len) return error.InvalidAttribute;
-    while (offset + 16 <= used) {
-        const kind = le32(record[offset..][0..4]);
-        if (kind == 0xffffffff) return null;
-        const length: usize = le32(record[offset+4..][0..4]);
-        if (length < 24 or length % 8 != 0 or length > used-offset) return error.InvalidAttribute;
-        const attr = record[offset..][0..length];
-        if (kind == wanted_type and (wanted_instance == null or le16(attr[14..16]) == wanted_instance.?)) return attr;
-        offset += length;
-    }
-    return null;
-}
-
-/// Heap-backed read-only DATA resolver for large, Windows-copied ISO files.
-/// Bounds are explicit; the legacy File/MFT structs retain their small fixed
-/// runlists. No write/flush callback is accepted anywhere in this API.
-pub const LargeFile = struct {
-    pub const run_limit = 8192;
-    pub const attribute_list_limit = 256 * 1024;
-    allocator: libstd.mem.Allocator,
-    runs: libstd.ArrayList(Run) = .empty,
-    resident: []u8 = &.{},
-    data_size: u64 = 0,
-    attribute_extents: usize = 0,
-
-    pub fn deinit(self: *LargeFile) void {
-        self.runs.deinit(self.allocator);
-        if (self.resident.len != 0) self.allocator.free(self.resident);
-    }
-    pub fn size(self: *const LargeFile) u64 { return self.data_size; }
-    pub fn runCount(self: *const LargeFile) usize { return self.runs.items.len; }
-    pub fn readAt(self: *const LargeFile, fs: *const FileSystem, reader: random_reader.Reader, offset: u64, output: []u8) Error!void {
-        if (offset > self.data_size or output.len > self.data_size-offset) return error.OutOfBounds;
-        if (self.resident.len != 0) {
-            @memcpy(output,self.resident[@intCast(offset)..][0..output.len]);
-            return;
-        }
-        var logical = offset;
-        var remaining = output;
-        while (remaining.len != 0) {
-            const vcn = shiftRightU64(logical,fs.cluster_shift);
-            // Runs are contiguous in VCN order; binary search is independent
-            // of the number of fragments elsewhere in the source ISO.
-            var low: usize = 0;
-            var high = self.runs.items.len;
-            while (low < high) {
-                const middle = low + (high-low)/2;
-                if (self.runs.items[middle].vcn <= vcn) low = middle+1 else high = middle;
-            }
-            if (low == 0) return error.RunlistBounds;
-            const run = self.runs.items[low-1];
-            const within = logical-try checkedMul(run.vcn,fs.cluster_bytes);
-            const available = try checkedMul(run.clusters,fs.cluster_bytes);
-            if (within >= available or run.sparse) return error.RunlistBounds;
-            const physical = try checkedAdd(try checkedMul(@intCast(run.lcn),fs.cluster_bytes),within);
-            const n: usize = @intCast(@min(remaining.len,available-within));
-            try readPartition(reader,fs.partition,physical,remaining[0..n]);
-            logical += n; remaining = remaining[n..];
-        }
-    }
-    fn append(self: *LargeFile, run: Run) !void {
-        if (self.runs.items.len == run_limit) return error.RunlistTooFragmented;
-        const start: u64 = @intCast(run.lcn);
-        const end = try checkedAdd(start,run.clusters);
-        for (self.runs.items) |old| {
-            const old_start: u64 = @intCast(old.lcn);
-            if (start < try checkedAdd(old_start,old.clusters) and old_start < end) return error.RunlistLoop;
-        }
-        if (self.runs.items.len == self.runs.capacity) {
-            const wanted = @min(run_limit,@max(16,self.runs.items.len+self.runs.items.len/2));
-            try self.runs.ensureTotalCapacityPrecise(self.allocator,wanted);
-        }
-        self.runs.appendAssumeCapacity(run);
-    }
-    fn dataAttribute(self: *LargeFile, fs: *const FileSystem, attr: []const u8, expected_vcn: u64) !u64 {
-        if (attr[9] != 0 or le16(attr[12..14]) != 0) return error.UnsupportedFileData;
-        if (attr[8] == 0) {
-            if (self.attribute_extents != 0 or expected_vcn != 0) return error.AttributeListMismatch;
-            const n: usize = le32(attr[16..20]);
-            const at: usize = le16(attr[20..22]);
-            if (at < 24 or at > attr.len or n > attr.len-at) return error.InvalidAttribute;
-            self.resident = try self.allocator.dupe(u8,attr[at..][0..n]);
-            self.data_size = n; self.attribute_extents += 1;
-            return 0;
-        }
-        if (attr.len < 64 or self.resident.len != 0 or le16(attr[34..36]) != 0) return error.UnsupportedFileData;
-        const first = le64(attr[16..24]);
-        const last = le64(attr[24..32]);
-        const at: usize = le16(attr[32..34]);
-        if (first != expected_vcn or last < first or at < 64 or at >= attr.len) return error.AttributeListMismatch;
-        if (first == 0) {
-            if (self.attribute_extents != 0 or le64(attr[56..64]) < le64(attr[48..56])) return error.UnsupportedFileData;
-            self.data_size = le64(attr[48..56]);
-        }
-        var pos = at;
-        var vcn = first;
-        var lcn: i64 = 0;
-        const before = self.runs.items.len;
-        while (true) {
-            if (pos == attr.len) return error.InvalidAttribute;
-            const code = attr[pos]; pos += 1;
-            if (code == 0) break;
-            const n: usize = code & 15;
-            const d: usize = code >> 4;
-            if (n == 0 or n > 8 or d == 0 or d > 8 or n+d > attr.len-pos) return error.UnsupportedFileData;
-            const clusters = readUnsigned(attr[pos..][0..n]); pos += n;
-            if (clusters == 0) return error.RunlistLoop;
-            lcn = addI64(lcn,readSigned(attr[pos..][0..d])) orelse return error.RunlistBounds; pos += d;
-            if (lcn < 0 or try checkedAdd(@intCast(lcn),clusters) > fs.total_clusters) return error.RunlistBounds;
-            try self.append(.{.vcn=vcn,.lcn=lcn,.clusters=clusters,.sparse=false});
-            vcn = try checkedAdd(vcn,clusters);
-        }
-        if (before == self.runs.items.len or vcn != try checkedAdd(last,1)) return error.AttributeListMismatch;
-        self.attribute_extents += 1;
-        return vcn;
-    }
-};
-
-fn checkedAdd(a: u64,b: u64) Error!u64 { return addU64(a,b) orelse error.RunlistBounds; }
-fn checkedMul(a: u64,b: u64) Error!u64 { return mulU64(a,b) orelse error.RunlistBounds; }
-
-pub fn openLargeFile(fs: *const FileSystem, reader: random_reader.Reader, components: []const []const u16, allocator: libstd.mem.Allocator, output: *LargeFile) !void {
-    const reference = try resolveFileReference(fs.*,reader,components);
-    try largeFileFromReference(fs,reader,reference,allocator,output);
-}
-fn largeFileFromReference(fs: *const FileSystem, reader: random_reader.Reader, reference: u64, allocator: libstd.mem.Allocator, output: *LargeFile) !void {
-    var storage: [max_file_record_bytes]u8 = undefined;
-    const record = try readMftRecord(fs.*,reader,reference,&storage);
-    if ((le16(record[22..24]) & 3) != 1 or le64(record[32..40]) != 0) return error.NotFile;
-    output.* = .{.allocator=allocator};
-    errdefer output.deinit();
-    var next_vcn: u64 = 0;
-    if (try findAttribute(record,0x20,null)) |list_attr| {
-        const list = try readAttributeList(fs,reader,record,list_attr,allocator);
-        defer allocator.free(list);
-        const base_sequence = le16(record[16..18]);
-        var at: usize = 0;
-        var count: usize = 0;
-        while (at < list.len) {
-            if (list.len-at < 26) return error.AttributeListBounds;
-            const item = list[at..];
-            const n: usize = le16(item[4..6]);
-            const name_len: usize = item[6];
-            const name_at: usize = item[7];
-            if (n < 26 or n % 8 != 0 or n > item.len or (name_len != 0 and (name_at < 26 or name_at > n or name_len*2 > n-name_at))) return error.AttributeListBounds;
-            if (le32(item[0..4]) == 0x80 and name_len == 0) {
-                if (count == LargeFile.run_limit) return error.AttributeListBounds;
-                count += 1;
-                const lowest = le64(item[8..16]);
-                const ref = le64(item[16..24]);
-                const number = ref & 0x0000ffffffffffff;
-                const sequence: u16 = @intCast(ref>>48);
-                const instance = le16(item[24..26]);
-                if (lowest != next_vcn) return error.AttributeListMismatch;
-                const current = try readMftRecord(fs.*,reader,number,&storage);
-                if ((le16(current[22..24]) & 3) != 1 or sequence != le16(current[16..18])) return error.AttributeListMismatch;
-                const expected_base = reference | (@as(u64,base_sequence)<<48);
-                if (number == reference) {
-                    if (le64(current[32..40]) != 0 or sequence != base_sequence) return error.AttributeListMismatch;
-                } else if (le64(current[32..40]) != expected_base) return error.AttributeListMismatch;
-                const data = (try findAttribute(current,0x80,instance)) orelse return error.AttributeListMismatch;
-                if (data[8] != 0 and (data.len < 64 or le64(data[16..24]) != lowest)) return error.AttributeListMismatch;
-                next_vcn = try output.dataAttribute(fs,data,next_vcn);
-            }
-            at += n;
-        }
-        if (count == 0) return error.AttributeListMismatch;
-    } else {
-        var at: usize = le16(record[20..22]);
-        const used: usize = le32(record[24..28]);
-        while (at+16 <= used) {
-            const kind = le32(record[at..][0..4]); if (kind == 0xffffffff) break;
-            const n: usize = le32(record[at+4..][0..4]);
-            if (n < 24 or n > used-at) return error.InvalidAttribute;
-            const attr = record[at..][0..n];
-            if (kind == 0x80 and attr[9] == 0) next_vcn = try output.dataAttribute(fs,attr,next_vcn);
-            at += n;
-        }
-    }
-    if (output.attribute_extents == 0) return error.NotFile;
-    if (output.resident.len == 0 and output.data_size > try checkedMul(next_vcn,fs.cluster_bytes)) return error.RunlistBounds;
-}
-
-fn readAttributeList(fs: *const FileSystem, reader: random_reader.Reader, record: []const u8, attr: []const u8, allocator: libstd.mem.Allocator) ![]u8 {
-    if (attr[9] != 0 or le16(attr[12..14]) != 0) return error.AttributeListMismatch;
-    if (attr[8] == 0) {
-        const n: usize = le32(attr[16..20]); const at: usize = le16(attr[20..22]);
-        if (at < 24 or at > attr.len or n > attr.len-at or n > LargeFile.attribute_list_limit) return error.AttributeListBounds;
-        return allocator.dupe(u8,attr[at..][0..n]);
-    }
-    const stream = try collectStream(record,0x20,null,fs.cluster_bytes,fs.total_clusters);
-    if (stream.data_size == 0 or stream.data_size > LargeFile.attribute_list_limit) return error.AttributeListBounds;
-    const bytes = try allocator.alloc(u8,@intCast(stream.data_size));
-    errdefer allocator.free(bytes);
-    try readStream(fs.*,reader,stream,0,bytes);
-    return bytes;
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs, reader, reference orelse return error.NotFound, &record_storage);
+    if ((le16(record[22..24]) & 3) != 1) return error.NotFile;
+    try fileFromRecord(record, fs.cluster_bytes, fs.total_clusters, output);
 }
 
 fn fileFromRecord(record: []const u8, cluster_bytes: u32, total_clusters: u64, result: *File) Error!void {
@@ -630,122 +415,6 @@ test "resident answer files are copied and validated without disk I/O" {
     try std.testing.expectEqualStrings("<xml/>", file.resident[0..6]);
     std.mem.writeInt(u16, attr[20..22], 31, .little);
     try std.testing.expectError(error.InvalidAttribute, fileFromRecord(&record, 512, 16, &file));
-}
-
-test "heap-backed DATA reader supports 300 fragments without enlarging legacy runlists" {
-    var attr = [_]u8{0} ** (64+300*3+1);
-    libstd.mem.writeInt(u32,attr[0..4],0x80,.little);
-    libstd.mem.writeInt(u32,attr[4..8],attr.len,.little);
-    attr[8]=1;
-    libstd.mem.writeInt(u64,attr[24..32],299,.little);
-    libstd.mem.writeInt(u16,attr[32..34],64,.little);
-    libstd.mem.writeInt(u64,attr[48..56],300*512,.little);
-    libstd.mem.writeInt(u64,attr[56..64],300*512,.little);
-    for (0..300) |i| @memcpy(attr[64+i*3..][0..3],&[_]u8{0x11,1,2});
-    var fs: FileSystem=undefined;
-    fs.cluster_bytes=512; fs.cluster_shift=9; fs.total_clusters=1024;
-    fs.partition=.{.start_bytes=0,.size_bytes=1024*512};
-    var file: LargeFile=.{.allocator=libstd.testing.allocator}; defer file.deinit();
-    try libstd.testing.expectEqual(@as(u64,300),try file.dataAttribute(&fs,&attr,0));
-    try libstd.testing.expectEqual(@as(usize,300),file.runCount());
-    try libstd.testing.expectEqual(@as(usize,128),max_runs);
-    const Memory=struct {
-        fn read(_: *anyopaque,offset: u64,out: []u8) random_reader.Error!void {
-            for (out,0..) |*byte,i| byte.*=@truncate((offset+i)/512);
-        }
-    };
-    var context: u8=0;
-    const reader: random_reader.Reader=.{.context=&context,.read_fn=Memory.read};
-    var bytes: [4]u8=undefined;
-    try file.readAt(&fs,reader,129*512-2,&bytes);
-    try libstd.testing.expectEqualSlices(u8,&.{2,2,4,4},&bytes);
-    try libstd.testing.expectError(error.OutOfBounds,file.readAt(&fs,reader,300*512-2,&bytes));
-    try libstd.testing.expectError(error.AttributeListMismatch,file.dataAttribute(&fs,&attr,300));
-}
-
-fn testLargeRecord(out: []u8,sequence: u16,base: u64,used: u32) void {
-    @memcpy(out[0..4],"FILE");
-    libstd.mem.writeInt(u16,out[4..6],48,.little);
-    libstd.mem.writeInt(u16,out[6..8],3,.little);
-    libstd.mem.writeInt(u16,out[16..18],sequence,.little);
-    libstd.mem.writeInt(u16,out[20..22],56,.little);
-    libstd.mem.writeInt(u16,out[22..24],1,.little);
-    libstd.mem.writeInt(u32,out[24..28],used,.little);
-    libstd.mem.writeInt(u64,out[32..40],base,.little);
-    libstd.mem.writeInt(u16,out[48..50],0xaaaa,.little);
-    libstd.mem.writeInt(u16,out[510..512],0xaaaa,.little);
-    libstd.mem.writeInt(u16,out[1022..1024],0xaaaa,.little);
-}
-fn testLargeData(out: []u8,instance: u16,vcn: u64,lcn: u8) void {
-    libstd.mem.writeInt(u32,out[0..4],0x80,.little);
-    libstd.mem.writeInt(u32,out[4..8],72,.little); out[8]=1;
-    libstd.mem.writeInt(u16,out[14..16],instance,.little);
-    libstd.mem.writeInt(u64,out[16..24],vcn,.little);
-    libstd.mem.writeInt(u64,out[24..32],vcn,.little);
-    libstd.mem.writeInt(u16,out[32..34],64,.little);
-    libstd.mem.writeInt(u64,out[48..56],1024,.little);
-    libstd.mem.writeInt(u64,out[56..64],1024,.little);
-    @memcpy(out[64..68],&[_]u8{0x11,1,lcn,0});
-}
-fn testLargeListItem(out: []u8,vcn: u64,reference: u64,instance: u16) void {
-    libstd.mem.writeInt(u32,out[0..4],0x80,.little);
-    libstd.mem.writeInt(u16,out[4..6],32,.little);
-    libstd.mem.writeInt(u64,out[8..16],vcn,.little);
-    libstd.mem.writeInt(u64,out[16..24],reference,.little);
-    libstd.mem.writeInt(u16,out[24..26],instance,.little);
-}
-test "ATTRIBUTE_LIST validates sequence base reference VCN and instance before reading extensions" {
-    const Memory=struct {
-        bytes: [8192]u8=[_]u8{0} ** 8192,
-        fn read(ctx: *anyopaque,at: u64,out: []u8) random_reader.Error!void {
-            const self: *@This()=@ptrCast(@alignCast(ctx));
-            if (at>self.bytes.len or out.len>self.bytes.len-at) return error.OutOfBounds;
-            @memcpy(out,self.bytes[@intCast(at)..][0..out.len]);
-        }
-    };
-    var m: Memory=.{};
-    var fs: FileSystem=undefined;
-    fs.partition=.{.start_bytes=0,.size_bytes=m.bytes.len};
-    fs.cluster_bytes=512; fs.cluster_shift=9; fs.total_clusters=16;
-    fs.file_record_bytes=1024; fs.bytes_per_sector=512;
-    fs.mft_stream=.{.data_size=4*1024};
-    try fs.mft_stream.append(.{.vcn=0,.lcn=1,.clusters=8,.sparse=false});
-    const base=m.bytes[512+2*1024..][0..1024];
-    const extension=m.bytes[512+3*1024..][0..1024];
-    testLargeRecord(base,7,0,224);
-    testLargeData(base[56..128],4,0,10);
-    const list=base[128..216];
-    libstd.mem.writeInt(u32,list[0..4],0x20,.little);
-    libstd.mem.writeInt(u32,list[4..8],88,.little);
-    libstd.mem.writeInt(u32,list[16..20],64,.little);
-    libstd.mem.writeInt(u16,list[20..22],24,.little);
-    testLargeListItem(list[24..56],0,(@as(u64,7)<<48)|2,4);
-    testLargeListItem(list[56..88],1,(@as(u64,9)<<48)|3,6);
-    libstd.mem.writeInt(u32,base[216..220],0xffffffff,.little);
-    testLargeRecord(extension,9,(@as(u64,7)<<48)|2,136);
-    testLargeData(extension[56..128],6,1,12);
-    libstd.mem.writeInt(u32,extension[128..132],0xffffffff,.little);
-    @memset(m.bytes[10*512..11*512],0x31);
-    @memset(m.bytes[12*512..13*512],0x42);
-    const reader: random_reader.Reader=.{.context=&m,.read_fn=Memory.read};
-    var file: LargeFile=undefined;
-    try largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&file);
-    defer file.deinit();
-    try libstd.testing.expectEqual(@as(usize,2),file.attribute_extents);
-    var bytes: [4]u8=undefined; try file.readAt(&fs,reader,510,&bytes);
-    try libstd.testing.expectEqualSlices(u8,&.{0x31,0x31,0x42,0x42},&bytes);
-    var bad: LargeFile=undefined;
-    libstd.mem.writeInt(u16,extension[16..18],10,.little);
-    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
-    libstd.mem.writeInt(u16,extension[16..18],9,.little);
-    libstd.mem.writeInt(u64,extension[32..40],(@as(u64,7)<<48)|4,.little);
-    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
-    libstd.mem.writeInt(u64,extension[32..40],(@as(u64,7)<<48)|2,.little);
-    libstd.mem.writeInt(u64,list[64..72],0,.little);
-    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
-    libstd.mem.writeInt(u64,list[64..72],1,.little);
-    libstd.mem.writeInt(u16,list[80..82],7,.little);
-    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
 }
 
 fn resolveDirectory(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16) Error!u64 {

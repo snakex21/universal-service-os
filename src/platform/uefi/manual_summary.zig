@@ -472,6 +472,19 @@ fn start(
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
+        // Profile option prep_env=minios (experimental): MiniOS applies the
+        // image itself and restarts on success; any failure or a cancelled
+        // disk question is logged and falls through to Windows Setup.
+        const minios = @import("minios_start.zig");
+        if (minios.wanted(profile, system.id)) {
+            view.windowsIsoStatus(.starting, "Starting MiniOS (disk question follows)");
+            minios.run(root, system.id, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+                var line: [96]u8 = undefined;
+                @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to Windows Setup: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
+            };
+            view.refreshFramebuffer();
+            view.windowsIsoStatus(.validating, "MiniOS did not finish; starting Windows Setup (EFI\\USOS\\Logs\\minios-start.txt)");
+        }
         windows_native_iso.startModern(root, system.image_directory, image.name.slice(), unattended, rendered, false, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
