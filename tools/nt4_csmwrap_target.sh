@@ -748,21 +748,27 @@ if [ -n "$nt3" ]; then
         fail 'cannot prepare WINNT.SIF'
     profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work") || fail 'cannot read the answer profile values'
     log "answer profile: $profile_values"
-    if [ "$NATIVE" = 1 ]; then
-        # Native: the LAN INF fix-up runs between the install VM's starts
-        # (usos_nt351_vm_patch); there are none, so no network yet.
-        log 'NT351 LAN skipped: native install (the LAN step needs the install VM so far)'
+    if [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then
+        # Native NT 3.5: its LAN INF fix-up still runs only between the
+        # install VM's starts (usos_nt35_vm_patch); no network yet.
+        log 'NT35 LAN skipped: native install (the NT 3.5 LAN step needs the install VM so far)'
         _u351_enabled=off
     elif [ "$major:$minor" = 3:51 ]; then
         . "$LIB/nt351_network_setup.sh"
         # LAN is optional, as on NT4 (network_setup.sh): a refused preflight
         # (no / two supported cards, static IP or DNS, driver check) installs
         # without network instead of stopping the whole install.
-        if ! usos_nt351_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+        # Native (docs/nt351-native-net-2026-10-28.md): the USOSNET351N build
+        # (no HAL PCI bus on the X470) and the OEMNADLB patch in the local
+        # source (usos_nt351_source_patch below) instead of between VM starts.
+        _u351_variant=''
+        [ "$NATIVE" != 1 ] || _u351_variant=native
+        if ! usos_nt351_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" $_u351_variant; then
             log 'NT351 LAN skipped: preflight refused (DHCP, one supported card and verified own driver required); installing without network'
             _u351_enabled=off
         fi
         if [ "$_u351_enabled" = on ]; then
+            cp "$work/WINNT.SIF" "$work/WINNT.NONET" || fail 'cannot keep the answer without network'
             usos_nt351_answer "$work/WINNT.SIF" > "$work/WINNT.NET351" &&
               mv "$work/WINNT.NET351" "$work/WINNT.SIF" || fail 'cannot render original NT351 LAN answer'
         fi
@@ -914,6 +920,20 @@ if [ -n "$nt3" ]; then
 fi
 [ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
 log "local source: $(find "$ls_src" -type f | wc -l | tr -d ' ') files"
+if [ "$NATIVE" = 1 ] && [ -n "$nt3" ] && [ "$minor" = 51 ] && [ "${_u351_enabled:-off}" = on ]; then
+    # Native NT 3.51 LAN: OEMNADLB.IN_ of the local source patched before
+    # text mode copies it (the VM path patched system32 between its starts).
+    # A failed patch puts the answer without network back (GUI Setup would
+    # otherwise stop on the loopback's options page) instead of stopping.
+    if net351_log=$(usos_nt351_source_patch "$ls_src" "$work"); then
+        log "$net351_log"
+    else
+        log 'NT351 LAN off: the local source OEMNADLB.IN_ is not the pinned original (or the cabinet rebuild failed); installing without network'
+        mv "$work/WINNT.NONET" "$work/WINNT.SIF" || fail 'cannot restore the answer without network'
+        _u351_enabled=off
+    fi
+fi
+rm -f "$work/WINNT.NONET"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
@@ -996,12 +1016,13 @@ done
 cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 nt3_nvme_stage
 nt3_stage_profile
-# The NT 3.5x LAN libraries are sourced only on the install VM path (the
-# native path skips LAN above), so their stage functions exist only there
-# (X470 2026-10-28, B261028-165856: "usos_nt351_stage: not found").
-if [ "$NATIVE" != 1 ]; then
+# The NT 3.5 LAN library is sourced only on the install VM path (the native
+# path skips NT 3.5 LAN above), so its stage functions exist only there
+# (X470 2026-10-28, B261028-165856: "usos_nt351_stage: not found"). NT 3.51
+# sources its library on both paths.
 [ "$minor" != 51 ] || usos_nt351_stage "$work/c" || fail 'cannot stage verified NT351 LAN driver'
 [ "$minor" != 51 ] || usos_nt351_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT351 Workstation client policy request'
+if [ "$NATIVE" != 1 ]; then
 [ "$minor" != 50 ] || usos_nt35_stage "$work/c" || fail 'cannot stage verified NT35 LAN driver'
 [ "$minor" != 50 ] || usos_nt35_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT35 Workstation client policy request'
 fi

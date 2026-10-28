@@ -983,12 +983,40 @@ static int net351_equal_files(const char *source, const char *target)
     return equal;
 }
 
+/* Does the HAL have a PCI bus? NTDETECT records the PCI BIOS as a
+   MultifunctionAdapter entry with Identifier "PCI"; the NT 3.x MBR hides
+   the PCI BIOS on machines with more than 8 buses (the X470), and then the
+   HAL has no PCI bus handler (docs/nt351-native-net-2026-10-28.md). */
+static int net351_hal_pci(void)
+{
+    HKEY root, sub;
+    char name[4], id[16];
+    DWORD i, type, size;
+    int found = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\MultifunctionAdapter", 0, KEY_READ, &root))
+        return 0;
+    /* subkeys 0, 1, ... (RegOpenKeyExA only: the NT 3.1 import set) */
+    for (i = 0; !found && i < 10; i++) {
+        name[0] = (char)('0' + i);
+        name[1] = 0;
+        if (RegOpenKeyExA(root, name, 0, KEY_READ, &sub)) continue;
+        size = sizeof id - 1;
+        if (!RegQueryValueExA(sub, "Identifier", NULL, &type, (BYTE *)id, &size) && type == REG_SZ) {
+            id[size < sizeof id ? size : sizeof id - 1] = 0;
+            if (!lstrcmpiA(id, "PCI")) found = 1;
+        }
+        RegCloseKey(sub);
+    }
+    RegCloseKey(root);
+    return found;
+}
+
 static int nt351_network(void)
 {
     static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet351.sys";
     HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
     char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
-    DWORD version, type, size, medium, enabled;
+    DWORD version, type, size, medium, enabled, bus_type;
     DWORD (WINAPI *get_version)(void);
     int ok = 0, meta_len;
     meta_len = read_text("NET351.ON", meta, sizeof meta);
@@ -1027,7 +1055,15 @@ static int nt351_network(void)
     if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
     lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet351.sys");
     if (!CopyFileA(DIR "USOSNET351.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET351.SYS",dst)) goto done;
-    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"PollMode",0) ||
+    /* BusType 5 (PCI) with a HAL PCI bus (VM, small machines); without one
+       NDIS can neither translate nor connect a PCI resource: BusType 1 (Isa,
+       bus 0) maps BAR0 and takes the 8259 line, usosnet351 reads the
+       configuration space through CF8h/CFCh and polls when the line is unset. */
+    bus_type = net351_hal_pci() ? 5 : 1;
+    say(bus_type == 5 ? "NET351: HAL PCI bus present, BusType 5\r\n" :
+        "NET351: no HAL PCI bus (PCI BIOS hidden), BusType 1 + CF8h/CFCh in usosnet351\r\n");
+    if (!net351_dword(params,"BusType",bus_type) || (bus_type == 1 && !net351_dword(params,"BusNumber",0)) ||
+        !net351_dword(params,"PollMode",0) ||
         !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
         !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
     /* Commit the new image only after byte-for-byte copy and configuration

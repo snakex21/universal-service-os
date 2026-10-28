@@ -814,6 +814,13 @@ def main() -> int:
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(net351).hexdigest()+'  USOSNET351.SYS\n').encode('ascii')))
+        # Native NT 3.51 build (no HAL PCI bus: CF8h/CFCh, 20 ms timer;
+        # docs/nt351-native-net-2026-10-28.md). The VM path keeps the
+        # qualified USOSNET351.SYS above.
+        net351n = (root / 'tools/nt/usosnet/bin/i386/usosnet351n.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351N.SYS', stat.S_IFREG | 0o644, net351n))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351N.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net351n).hexdigest()+'  USOSNET351N.SYS\n').encode('ascii')))
         logger351 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.EXE', stat.S_IFREG | 0o644, logger351))
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.SHA256', stat.S_IFREG | 0o644,

@@ -40,6 +40,17 @@ pub fn main(init: std.process.Init) !u8 {
             const in_path = args.next() orelse return 2;
             return usos.win3x.nt35_initial.run(init.io, init.gpa, in_path, args.next() orelse return 2);
         }
+        // tools/nt4_csmwrap_target.sh, native NT 3.51 LAN: one-file cabinet
+        // (OEMNADLB.IN_) out / back in (src/compat/win3x/nt3_cab_file.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt3-cab-get")) {
+            const cab_path = args.next() orelse return 2;
+            return usos.win3x.nt3_cab_file.runGet(init.io, init.gpa, cab_path, args.next() orelse return 2);
+        }
+        if (std.mem.eql(u8, arg, "--nt3-cab-put")) {
+            const cab_path = args.next() orelse return 2;
+            const file_path = args.next() orelse return 2;
+            return usos.win3x.nt3_cab_file.runPut(init.io, init.gpa, cab_path, file_path, args.next() orelse return 2);
+        }
         // tools/nt4_csmwrap_target.sh, native NT 4.0: the RTM kernel's CPUID
         // leaf limit (src/compat/win3x/nt4_kernel.zig; no UI).
         if (std.mem.eql(u8, arg, "--nt4-kernel")) {

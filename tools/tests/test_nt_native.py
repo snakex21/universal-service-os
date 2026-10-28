@@ -86,25 +86,35 @@ class NativeWiring(unittest.TestCase):
         # The miniports go next to SETUPLDR (~BT) and into the local source.
         block = text[text.index('nt3_native_txtsetup "$ports"'):]
         self.assertIn('for dir in "$bt_dir" "$ls_src"; do', block[:1200])
-        self.assertIn("log 'NT351 LAN skipped: native install", text)
+        # Native NT 3.51 has LAN since docs/nt351-native-net-2026-10-28.md;
+        # native NT 3.5 still skips it.
+        self.assertIn("log 'NT35 LAN skipped: native install", text)
+        self.assertIn('if [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then', text)
         self.assertIn('if [ "$major:$minor" = 3:50 ] && [ "$NATIVE" != 1 ]; then', text)
 
     def test_native_nt3_lan_stage_needs_no_lan_library(self):
-        # X470 2026-10-28 (B261028-165856): the native path never sources
-        # nt351_network_setup.sh, so "usos_nt351_stage: not found" stopped
-        # the prep. Run the staging block as it is, without the libraries.
+        # X470 2026-10-28 (B261028-165856): the native path never sourced
+        # the LAN libraries, so "usos_nt351_stage: not found" stopped the
+        # prep. Since docs/nt351-native-net-2026-10-28.md native NT 3.51
+        # sources nt351_network_setup.sh (its stage functions exist), native
+        # NT 3.5 still sources nothing. Run the staging block as it is.
         nl = chr(10)
         text = TARGET.read_text(encoding='utf-8')
-        start = text.index('if [ "$NATIVE" != 1 ]; then' + nl + '[ "$minor" != 51 ] || usos_nt351_stage')
-        block = text[start:text.index(nl + 'fi' + nl, start) + 4]
+        start = text.index('[ "$minor" != 51 ] || usos_nt351_stage')
+        end = text.index('if [ "$NATIVE" != 1 ]; then' + nl + '[ "$minor" != 50 ] || usos_nt35_stage', start)
+        block = text[start:text.index(nl + 'fi' + nl, end) + 4]
         self.assertIn('usos_nt35_client_request', block)
         stub = nl.join(['fail() { echo "FAIL $1"; exit 9; }', 'work=/x; product=0; ANSWER_KIND=PROFILE', ''])
-        for minor in ('51', '50'):
-            rc, out, err = sh(stub + 'NATIVE=1; minor=' + minor + nl + block + 'echo ok' + nl)
-            self.assertEqual((rc, out.strip()), (0, 'ok'), err)
-        # The install VM path still calls the sourced stage functions.
         names = ('usos_nt351_stage', 'usos_nt351_client_request', 'usos_nt35_stage', 'usos_nt35_client_request')
         calls = ''.join(n + '() { echo ' + n + '; }' + nl for n in names)
+        nt351 = ''.join(n + '() { echo ' + n + '; }' + nl for n in names[:2])
+        # Native 3.5: no library, nothing called.
+        rc, out, err = sh(stub + 'NATIVE=1; minor=50' + nl + block + 'echo ok' + nl)
+        self.assertEqual((rc, out.strip()), (0, 'ok'), err)
+        # Native 3.51: the sourced 3.51 functions only.
+        rc, out, err = sh(stub + nt351 + 'NATIVE=1; minor=51' + nl + block)
+        self.assertEqual((rc, out.split()), (0, list(names[:2])), err)
+        # The install VM path still calls the sourced stage functions.
         for minor, want in (('51', list(names[:2])), ('50', list(names[2:]))):
             rc, out, err = sh(stub + calls + 'NATIVE=0; minor=' + minor + nl + block)
             self.assertEqual((rc, out.split()), (0, want), err)
