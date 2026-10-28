@@ -7,6 +7,9 @@
 //!   usos-win3x-display nt35-initial IN OUT
 //!                                         NT 3.5 INITIAL.IN_ processor line
 //!                                         (micro-Linux: usos-fb-ui --nt35-initial)
+//!   usos-win3x-display nt4-kernel IN OUT
+//!                                         NT 4.0 RTM kernel CPUID leaf limit
+//!                                         (micro-Linux: usos-fb-ui --nt4-kernel)
 //!   usos-win3x-display w9x-mini SETUPDIR HELPERDIR|-
 //!                                         Windows 9x Setup MINI.CAB (the
 //!                                         micro-Linux runs it as
@@ -36,6 +39,10 @@ pub fn main(init: std.process.Init) !u8 {
     if (std.mem.eql(u8, command, "nt35-initial")) {
         const in_path = args.next() orelse return usage();
         return win3x.nt35_initial.run(io, init.gpa, in_path, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "nt4-kernel")) {
+        const in_path = args.next() orelse return usage();
+        return win3x.nt4_kernel.run(io, init.gpa, in_path, args.next() orelse return usage());
     }
     if (std.mem.eql(u8, command, "expand")) {
         const in_path = args.next() orelse return usage();

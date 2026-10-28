@@ -210,20 +210,61 @@ move to the next round; LAN for native 3.5x.
   class/title/control IDs, press only known buttons, log every action).
 - Memory: `/NODEBUG /MAXMEM=64` through TXTSETUP.INF or the MBR hook cap.
 
-### 4.5 Slice 4 - NT 4.0 (hard)
+### 4.5 Slice 4 - NT 4.0 native, opt-in (implemented, needs a build)
 
-The RTM text-mode kernel resets on Zen 3, the SP6a kernel hangs in text mode.
-Options, in order of cost:
-1. Find why the SP6a kernel hangs in text mode (local NT5 sources for the
-   text-mode/setupdd path; compare with the working SP6a boot of the
-   installed system). If it is a known init path (e.g. a driver from the RTM
-   CD that does not match the SP6a kernel), slipstream the SP6a kernel, HAL
-   and the matching drivers into `~BT` / `~LS` and TXTSETUP.SIF.
-2. An own CPUID-limiting shim before NTOSKRNL starts is not possible on
-   AMD without virtualization (no MaxVal limit MSR); not planned.
-3. Keep the VM path for NT 4.0 (it works on the X470 with the 9x flag fix).
-Then the same pieces as NT 3.51 (miniports in text mode, POST.CMD finish
-work in-OS, key gate stays).
+Root causes (offline analysis 2026-10-28: our own binary comparison of the
+user's RTM and SP6a kernels; the NT5 `cpu.asm` / `usetup.c` read to confirm
+the mechanisms):
+- RTM reset: `KiSetProcessorType` runs `mov eax,0; cpuid; cmp eax,3; jg`, so
+  a CPU with more than 3 standard CPUID leaves (Zen 3: 10h) is taken for a
+  type 5 CPU without CPUID. SP6a has no such check.
+- SP6a text-mode hang: text mode's RTM `NTDLL.DLL` / `USETUP.EXE` call
+  SP6a's renumbered system services (six USETUP imports land on other
+  services). Not needed any more: text mode stays a consistent RTM set and
+  POST.CMD installs SP6a afterwards, as in the VM flow.
+
+`EFI/USOS/win9x/nt4-native.flag` on the stick ESP + NT 4.0 / Server / TSE:
+1. prepare skips the VM gate and the VM. SP6a (TSE: its SP6) is used when
+   present but is no longer required: the patched RTM kernel runs without it.
+2. target, before any disk write: `usos-fb-ui --nt4-kernel`
+   (`src/compat/win3x/nt4_kernel.zig`, own code) reads the CD's
+   `NTOSKRNL.EX_`/`.EXE` and `NTKRNLMP.EXE`, finds
+   `B8 00000000 0F A2 64 8B 0D 38000000 8F 41 34 8F 41 30 83 F8 03 7F`
+   exactly once, changes `03` to `7F` (1 byte), recomputes the PE checksum and
+   writes a plain PE. No match, two matches or a cabinet holding another file
+   stop the prepare with no disk change. The family mask (`and ebx,700h`;
+   SP6a: `F00h`) stays: the proven QEMU `level=3` runs used 700h.
+3. The patched kernels replace both twins (`.EX_` / `.EXE`) in `~BT` and
+   `~LS\I386`. `nt3_native_txtsetup` now also takes `[SourceDisksFiles]` and
+   an `OsLoadOptionsVar`: `[SCSI.Load]` = `ahcint` (+ `usosnvme`, NT 4.0
+   builds), `OsLoadOptions = "/nodebug /NUMPROC=2 /MAXMEM=1024"` (text-mode
+   kernel), `OsLoadOptionsVar = "/NUMPROC=2 /MAXMEM=1024"` (the value text
+   mode writes to BOOT.INI, NT5 `spboot.c`; the Enterprise CD carries both).
+4. MBR: the NT 3.x MBR + hook sector (E820 filter, HPET LegacyReplacement off
+   before the HAL starts) with the hook sector's options byte 509 = 1, which
+   keeps the PCI BIOS visible (NT 4.0 HAL, AHCINT-NT4).
+5. WINNT.SIF: `[Unattended] ComputerType` = the CD's `[Computer] mps_mp`
+   description when the answer has none (the USOS answer already pins it).
+6. GUI page recorder: NT 4.0 has no `[GuiUnattended] DetachedProgram` (its
+   `syssetup.dll` has no such key), so `$OEM$\CMDLINES.TXT` starts
+   `USOSANS3.EXE /detach` first. It records from that point on (the end of GUI
+   Setup, e.g. the Server "minor errors" box) to `C:\USOS\NT4\USOSANS.TXT`.
+   Earlier GUI pages are not recorded (the answer file covers them in the VM).
+
+Offline checks (2026-10-28): the sequence occurs exactly once in all six
+kernels of the user's CDs (WS PL 1381.1, Enterprise Server EN, TSE EN; WS/ES
+UP 0xC5F8B, MP 0xC9F2B; TSE UP 0xD1E7B, MP 0xD6383) and not at all in the
+SP6a kernel. After the patch only that byte and the checksum differ, and the
+checksum verifies. QEMU (one text-mode boot, no install): the WS PL CD with
+the two patched kernels reaches the text-mode Welcome page with
+`-cpu EPYC-Milan,level=0x10` (TCG). The unpatched RTM CD resets there.
+
+Open for the X470 run: real Zen 3 with the RTM `halapic` (text mode) /
+`halmps`; the RTM SETUPLDR's E820 path with 32 GB (E820 filter in the hook);
+GUI pages before CMDLINES.TXT (no input expected, not recorded); the Server
+"minor errors" box (the VM answered Alt+N; natively it would wait); BOOT.INI
+gets no `[USOS /SOS]` / `[VGA mode]` entries, and the `~LS`/`~BT`/syslinux
+files stay on C: (finish-step jobs, next round).
 
 ## 5. What is reused from the 9x native work
 
@@ -246,4 +287,9 @@ work in-OS, key gate stays).
   the 3.51 and 3.5 runs (every GUI page);
 - slice 3: the 3.1 page answerer;
 - NT 4.0 key gate with a Select CD (no key page) and with the key;
-- NT 4.0 VM path with `phase1-native.flag` present (the 2026-10-27 blocker).
+- NT 4.0 VM path with `phase1-native.flag` present (the 2026-10-27 blocker);
+- slice 4: native NT 4.0 WS PL (`nt4-native.flag`): text mode on the patched
+  RTM kernel, GUI mode, POST.CMD with SP6a. Gates, read offline from the
+  target C:: `\WINNT\SYSTEM32` (text mode copied files), `setup.log` (text
+  mode finished), `\USOS\NT4\USOSANS.TXT`, `POST.LOG` and CSDVersion 0x600
+  (SP6a applied).

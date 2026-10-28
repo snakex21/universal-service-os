@@ -58,6 +58,11 @@
  * usosrst, usosusb) reach PCI configuration space through ports CF8h/CFCh
  * themselves.  With a last bus <= 7 every bridge lies below the count
  * NTDETECT reports and nothing is hooked (Setup VM, small QEMU machines).
+ * Native NT 4.0 (docs/nt-native-plan.md) takes the same MBR and hook sector
+ * with bit 0 of the sector's options byte (offset 509) set: the PCI BIOS
+ * stays visible.  The NT 4.0 HAL has no such bridge loop (the installed NT
+ * 4.0 runs on the X470 with every bus) and its PCI bus handler is what the
+ * NT 4.0 AHCINT build and the display path rely on.
  */
 .intel_syntax noprefix
 .code16
@@ -72,6 +77,10 @@
 .equ H1A,             (hook_1a - hook_start)
 .equ OLD15,           (hook_end - hook_start)
 .equ OLD1A,           (hook_end - hook_start) + 4
+/* Options byte of the hook sector (after the code, before "U3"); the target
+   script sets it per system (nt4_csmwrap_target.sh). */
+.equ HOOK_OPTIONS,    509
+.equ OPT_KEEP_PCI_BIOS, 1
 
 nt3_e820_mbr_start:
     cli
@@ -138,7 +147,10 @@ relocated:
     mov word ptr [0x15 * 4 + 2], es
     sti
 
-    /* PCI BIOS last bus >= 8: hide B101h from NTDETECT (see above). */
+    /* PCI BIOS last bus >= 8: hide B101h from NTDETECT (see above),
+       unless the hook sector's options byte keeps the PCI BIOS. */
+    test byte ptr es:[HOOK_OPTIONS], OPT_KEEP_PCI_BIOS
+    jnz boot_partition
     mov ax, 0xB101
     int 0x1A
     jc boot_partition

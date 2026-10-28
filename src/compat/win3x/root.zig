@@ -6,6 +6,7 @@ pub const display_run = @import("display_run.zig");
 pub const cab = @import("cab.zig");
 pub const w9x_mini = @import("w9x_mini.zig");
 pub const nt35_initial = @import("nt35_initial.zig");
+pub const nt4_kernel = @import("nt4_kernel.zig");
 
 test {
     _ = lz;
@@ -15,4 +16,5 @@ test {
     _ = cab;
     _ = w9x_mini;
     _ = nt35_initial;
+    _ = nt4_kernel;
 }

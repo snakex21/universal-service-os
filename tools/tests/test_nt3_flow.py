@@ -71,7 +71,7 @@ class Nt3Target(unittest.TestCase):
     def test_target_handles_nt3(self):
         text = TARGET.read_text(encoding='utf-8')
         self.assertIn('[ -z "${NT_MAJOR:-}" ] || [ "$NT_MAJOR" = "$major" ]', text)
-        self.assertIn('[ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin', text)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin', text)
         # winnt.exe's ~BT\SYSTEM32 (0x6B C000003A without it).
         self.assertIn('cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE"', text)
         self.assertIn('cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL"', text)
@@ -311,7 +311,7 @@ class Nt3Mbr(unittest.TestCase):
                      '$padded[510] = 0x55', '$padded[511] = 0x33'):
             self.assertIn(want, ps1)
         target = TARGET.read_text(encoding='utf-8')
-        self.assertIn('[ -z "$nt3" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', target)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', target)
         self.assertIn('dd if="$mbr_hook" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync', target)
         self.assertLess(target.index('cannot write the MBR\''), target.index('cannot write the MBR hook sector'))
         build = BUILD.read_text(encoding='utf-8')

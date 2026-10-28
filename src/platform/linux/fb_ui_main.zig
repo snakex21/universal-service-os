@@ -40,6 +40,12 @@ pub fn main(init: std.process.Init) !u8 {
             const in_path = args.next() orelse return 2;
             return usos.win3x.nt35_initial.run(init.io, init.gpa, in_path, args.next() orelse return 2);
         }
+        // tools/nt4_csmwrap_target.sh, native NT 4.0: the RTM kernel's CPUID
+        // leaf limit (src/compat/win3x/nt4_kernel.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt4-kernel")) {
+            const in_path = args.next() orelse return 2;
+            return usos.win3x.nt4_kernel.run(init.io, init.gpa, in_path, args.next() orelse return 2);
+        }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
             const bcd = @import("bcd_lowmem.zig");

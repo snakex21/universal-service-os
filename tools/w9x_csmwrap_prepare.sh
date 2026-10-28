@@ -231,13 +231,18 @@ usos_w9x_csmwrap_prepare() {
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
         NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1' ;;
     esac
-    # Native NT 3.51 / 3.5 (no install VM, docs/nt-native-plan.md): opt-in with
-    # EFI/USOS/win9x/nt3-native.flag while it is tested on hardware; the
-    # 9x phase1-native.flag never switches NT.
+    # Native NT 3.51 / 3.5 / 4.0 (no install VM, docs/nt-native-plan.md):
+    # opt-in while it is tested on hardware, EFI/USOS/win9x/nt3-native.flag
+    # for NT 3.51 / 3.5 and nt4-native.flag for NT 4.0 / Server / TSE (the
+    # RTM kernels with the raised CPUID leaf limit); the 9x
+    # phase1-native.flag never switches NT.
     nt_native=no
+    nt_native_flag=''
     case "$tag" in
-        NT351|NT351S|NT35|NT35S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;
+        NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;
+        NT4|NT4S|NT4T) nt_native_flag=nt4-native.flag ;;
     esac
+    [ -z "$nt_native_flag" ] || [ ! -e "/mnt/esp/EFI/USOS/win9x/$nt_native_flag" ] || nt_native=yes
     posr=''
     if [ "$tag" = POSR ]; then
         posr=yes nt_name='Windows Embedded POSReady 2009'
@@ -261,8 +266,10 @@ usos_w9x_csmwrap_prepare() {
         # Edition SP6 from the TSE folder, under the same file name.
         sp_dir="/mnt/data/Systems/Windows/$folder/ServicePack"
         [ ! -d "$sp_dir" ] || sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
-        [ -n "$sp_exe" ] || stop "Windows NT 4.0 Terminal Server needs the Terminal Server Edition Service Pack 6 (not the regular NT 4.0 SP6a, which refuses Terminal Server): put its SP6I386.EXE into Systems\\Windows\\$folder\\ServicePack on USOS_DATA"
-        w9x_csmwrap_log "NT4 TSE service pack: ${sp_exe#/mnt/data/}"
+        # Native (nt4-native.flag): the RTM TSE kernel with the raised CPUID
+        # leaf limit starts on this PC, so the TSE SP6 is used when present.
+        [ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop "Windows NT 4.0 Terminal Server needs the Terminal Server Edition Service Pack 6 (not the regular NT 4.0 SP6a, which refuses Terminal Server): put its SP6I386.EXE into Systems\\Windows\\$folder\\ServicePack on USOS_DATA"
+        w9x_csmwrap_log "NT4 TSE service pack: ${sp_exe:+${sp_exe#/mnt/data/}}${sp_exe:-none (native)}"
     elif [ "$nt_major" = 4 ]; then
         # SP6a (the user's SP6I386.EXE, a Microsoft file: never on the stick):
         # the X470 cannot start the RTM kernel, only an SP6a system.
@@ -271,8 +278,10 @@ usos_w9x_csmwrap_prepare() {
             sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
             [ -z "$sp_exe" ] || break
         done
-        [ -n "$sp_exe" ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
-        w9x_csmwrap_log "NT4 service pack: ${sp_exe#/mnt/data/}"
+        # Native: SP6a stays the default (POST.CMD), but the patched RTM
+        # kernel also runs without it.
+        [ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
+        w9x_csmwrap_log "NT4 service pack: ${sp_exe:+${sp_exe#/mnt/data/}}${sp_exe:-none (native)}"
     fi
     img=''
     [ "$tag" != IMG ] || img=yes
@@ -509,7 +518,7 @@ usos_w9x_csmwrap_prepare() {
         vm_reason=$(w9x_vm_available "$tag") || stop "$nt_name installs only in the VM on this PC, which is not available: $vm_reason"
         w9x_csmwrap_log "POSR vm ($vm_reason)"
     elif [ -n "$nt4" ] && [ "$nt_native" = yes ]; then
-        w9x_csmwrap_log "NT native: $nt_name text mode, GUI mode and first start on this PC (nt3-native.flag)"
+        w9x_csmwrap_log "NT native: $nt_name text mode, GUI mode and first start on this PC ($nt_native_flag)"
     elif [ -n "$nt4" ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         . /usr/lib/usos/nt4_qemu_install.sh

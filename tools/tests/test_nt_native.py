@@ -122,8 +122,12 @@ class Recorder(unittest.TestCase):
         from build_windows_usos_res import build_nt3_answer
         from check_nt52_driver_imports import pe
         allowed = {
+            # GetModuleFileNameA / GetCommandLineA / CreateProcessA /
+            # CreateMutexA / GetLastError: also in the NT 3.51 and NT 4.0
+            # kernel32 (checked 2026-10-28).
             'kernel32.dll': {'CloseHandle', 'CreateFileA', 'ExitProcess', 'FlushFileBuffers', 'GetTickCount',
-                             'SetFilePointer', 'Sleep', 'WriteFile', 'lstrcmpA', 'lstrcmpiA', 'lstrlenA'},
+                             'SetFilePointer', 'Sleep', 'WriteFile', 'lstrcmpA', 'lstrcmpiA', 'lstrlenA',
+                             'GetModuleFileNameA', 'GetCommandLineA', 'CreateProcessA', 'CreateMutexA', 'GetLastError'},
             'user32.dll': {'EnumChildWindows', 'EnumWindows', 'GetClassNameA', 'GetDlgCtrlID', 'GetWindowTextA',
                            'GetWindowTextLengthA', 'IsWindowEnabled', 'IsWindowVisible', 'wsprintfA'},
         }
@@ -138,10 +142,14 @@ class Recorder(unittest.TestCase):
         self.assertIn('textlen=%d', src)
         self.assertIn('mode=record', src)
 
-    def test_prepare_flag_is_nt351_only_and_skips_the_vm(self):
+    def test_prepare_flags_per_family_and_skip_the_vm(self):
         text = PREPARE.read_text(encoding='utf-8')
-        self.assertIn('NT351|NT351S|NT35|NT35S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;', text)
+        self.assertIn('NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;', text)
+        self.assertIn('NT4|NT4S|NT4T) nt_native_flag=nt4-native.flag ;;', text)
+        self.assertIn('[ -z "$nt_native_flag" ] || [ ! -e "/mnt/esp/EFI/USOS/win9x/$nt_native_flag" ] || nt_native=yes', text)
         self.assertEqual(text.count('nt_native=yes'), 1)
+        # NT 3.1 and POSReady have no native flag.
+        self.assertNotIn('NT31|NT31S) nt_native_flag', text)
         self.assertIn('NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)"', text)
         native = text.index('if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then\n        # Native')
         vm = text.index('nt4_vm_install "$TARGET_DEVICE"')
@@ -150,6 +158,192 @@ class Recorder(unittest.TestCase):
         # The VM gate is not consulted for a native start.
         gate = text.index('elif [ -n "$nt4" ] && [ "$nt_native" = yes ]; then')
         self.assertLess(gate, text.index('elif [ -n "$nt4" ]; then\n        . /usr/lib/usos/w9x_phase1_qemu.sh'))
+
+
+# The section shapes of the NT 4.0 CDs (WS PL, Enterprise Server EN, TSE EN):
+# [SourceDisksFiles] twice, [SetupData] twice, the Enterprise CD's
+# OsLoadOptionsVar. Synthetic, no Microsoft text beyond section/key names.
+SIF4 = (
+    '[SourceDisksFiles]\r\namsint.sys   = 1,,,,,,_3,4,1\r\natapi.sys    = 1,,,,,,_3,4,0,0\r\n'
+    'ntkrnlmp.exe = 1,,,,,,_1,2,3\r\nntoskrnl.exe = 1,,,,,,,2,3\r\n\r\n'
+    '[SourceDisksFiles]\r\nperfc015.dat = 1,,,,,,,2,0,0\r\n\r\n'
+    '[SetupData]\r\nMajorVersion = 4\r\nMinorVersion = 0\r\nOsLoadOptions = "/nodebug /maxmem=256"\r\n'
+    'OsLoadOptionsVAR = "/maxmem=256"\r\nProductType = 1\r\n\r\n'
+    '[SCSI.Load]\r\ncpqarray = cpqarray.sys,4\r\natapi = atapi.sys,4\r\namsint = amsint.sys,4\r\n\r\n;\r\n; Extenders\r\n;\r\n'
+    '[Extenders.Load]\r\npcmcia = pcmcia.sys,4\r\n'
+    '[SetupData]\r\nFreeDiskSpace = 125872\r\n'
+    '[Computer]\r\nmps_up      = "MPS Uniprocessor PC",files.none\r\nmps_mp      = "MPS Multiprocessor PC",files.none\r\n'
+    '[SCSI]\r\namsint   = "AMD PCI SCSI Controller/Ethernet Adapter"\r\n'
+)
+
+
+def run_fn_file(fn_name, args, text):
+    tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-native-'))
+    try:
+        (tmp / 'in.sif').write_bytes(text.encode('ascii'))
+        fn = function_text(TARGET, fn_name)
+        rc, out, err = sh(f'{fn}\n{fn_name} {args} < "{(tmp / "in.sif").as_posix()}" > "{(tmp / "out.sif").as_posix()}"')
+        return rc, (tmp / 'out.sif').read_bytes().decode('ascii'), err
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def all_sections(text, name):
+    out, inside = [], False
+    for line in text.split('\r\n'):
+        if line.startswith('['):
+            inside = line.lower() == name.lower()
+            if inside:
+                out.append([])
+            continue
+        if inside and line:
+            out[-1].append(line)
+    return out
+
+
+class Nt4NativeTxtsetup(unittest.TestCase):
+    OPTS = '"ahcint" "/nodebug /NUMPROC=2 /MAXMEM=1024" "/NUMPROC=2 /MAXMEM=1024"'
+
+    def test_sourcedisksfiles_row_once_and_scsi_load(self):
+        rc, out, err = run_fn_file('nt3_native_txtsetup', self.OPTS, SIF4)
+        self.assertEqual(rc, 0, err)
+        files = all_sections(out, '[SourceDisksFiles]')
+        self.assertEqual(len(files), 2)
+        self.assertIn('ahcint.sys = 1,,,,,,_3,4,1', files[0])
+        self.assertNotIn('ahcint.sys = 1,,,,,,_3,4,1', files[1])
+        self.assertEqual(all_sections(out, '[SCSI.Load]'), [['ahcint = ahcint.sys,4', ';', '; Extenders', ';']])
+        self.assertEqual(all_sections(out, '[Extenders.Load]'), [['pcmcia = pcmcia.sys,4']])
+        self.assertIn('ahcint = "USOS AHCI (SATA)"', all_sections(out, '[SCSI]')[0])
+
+    def test_both_setupdata_get_the_options_and_the_var(self):
+        _, out, _ = run_fn_file('nt3_native_txtsetup', self.OPTS, SIF4)
+        setups = all_sections(out, '[SetupData]')
+        self.assertEqual(len(setups), 2)
+        for setup in setups:
+            opts = [l for l in setup if l.lower().startswith('osloadoptions')]
+            self.assertEqual(opts, ['OsLoadOptions = "/nodebug /NUMPROC=2 /MAXMEM=1024"', 'OsLoadOptionsVar = "/NUMPROC=2 /MAXMEM=1024"'])
+        self.assertNotIn('maxmem=256', out)
+        self.assertIn('FreeDiskSpace = 125872', out)
+
+    def test_nt3_call_without_var_keeps_a_var_row(self):
+        # The NT 3.5x call passes no third argument: OsLoadOptionsVar rows stay.
+        rc, out, err = run_fn_file('nt3_native_txtsetup', '"ahcint" "/nodebug"', SIF4)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('OsLoadOptionsVAR = "/maxmem=256"', out)
+        self.assertNotIn('OsLoadOptionsVar = ', out)
+
+    def test_computer_desc(self):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-ct-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'in.sif').write_bytes(SIF4.encode('ascii'))
+        fn = function_text(TARGET, 'nt4_computer_desc')
+        rc, out, err = sh(f'{fn}\nnt4_computer_desc mps_mp < "{(tmp / "in.sif").as_posix()}"')
+        self.assertEqual((rc, out), (0, 'MPS Multiprocessor PC\n'), err)
+
+    def test_native_answer_computer_type(self):
+        desc = '"MPS Multiprocessor PC"'
+        _, out, _ = run_fn_file('nt4_native_answer', desc, '[Unattended]\r\nOemPreinstall = Yes\r\n[UserData]\r\nFullName = "x"\r\n')
+        self.assertEqual(out, '[Unattended]\r\nComputerType = "MPS Multiprocessor PC", Retail\r\nOemPreinstall = Yes\r\n[UserData]\r\nFullName = "x"\r\n')
+        # An answer with its own ComputerType keeps it.
+        _, out, _ = run_fn_file('nt4_native_answer', desc, '[Unattended]\r\nComputerType = "Standard PC", Retail\r\n')
+        self.assertEqual(out.count('ComputerType'), 1)
+        self.assertIn('"Standard PC"', out)
+        # No [Unattended] section: one is added.
+        _, out, _ = run_fn_file('nt4_native_answer', desc, '[UserData]\r\nFullName = "x"\r\n')
+        self.assertTrue(out.endswith('\r\n[Unattended]\r\nComputerType = "MPS Multiprocessor PC", Retail\r\n'))
+
+
+FAKE_FB_UI = '''#!/bin/sh
+[ "$1" = --nt4-kernel ] || exit 2
+echo "[NT4_KERNEL] $2: CPUID leaf limit 3 -> 7Fh" >&2
+[ "$FAKE_RC" = 0 ] || exit "$FAKE_RC"
+{ cat "$2"; echo patched; } > "$3"
+'''
+
+
+class Nt4NativeKernels(unittest.TestCase):
+    """nt4_native_kernels with a stand-in usos-fb-ui (no Microsoft file)."""
+
+    def run_kernels(self, files, tool_rc=0):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-kern-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'i386').mkdir()
+        for name in files:
+            (tmp / 'i386' / name).write_bytes(b'kernel ' + name.encode())
+        tool = tmp / 'fbui.sh'
+        tool.write_text(FAKE_FB_UI, encoding='ascii', newline='\n')
+        fn = function_text(TARGET, 'nt4_native_kernels')
+        script = ('log() { printf "[NT4_CSMWRAP] %s\\n" "$*"; }\nfail() { printf "STOP: %s\\n" "$1"; exit 1; }\n' + fn + '\n'
+                  f'work="{(tmp / "work").as_posix()}"; i386="{(tmp / "i386").as_posix()}"; mkdir -p "$work"\n'
+                  f'FAKE_RC={tool_rc} USOS_FB_UI="{tool.as_posix()}" nt4_native_kernels\n')
+        rc, out, err = sh(script)
+        return rc, out + err, tmp
+
+    def test_plain_and_compressed_kernels(self):
+        rc, out, tmp = self.run_kernels(['NTOSKRNL.EX_', 'NTKRNLMP.EXE'])
+        self.assertEqual(rc, 0, out)
+        self.assertEqual((tmp / 'work/kernel/NTOSKRNL.EXE').read_bytes(), b'kernel NTOSKRNL.EX_patched\n')
+        self.assertEqual((tmp / 'work/kernel/NTKRNLMP.EXE').read_bytes(), b'kernel NTKRNLMP.EXEpatched\n')
+        self.assertIn('[NT4_CSMWRAP] [NT4_KERNEL]', out)
+
+    def test_no_match_or_missing_kernel_stops(self):
+        rc, out, _ = self.run_kernels(['NTOSKRNL.EXE', 'NTKRNLMP.EXE'], tool_rc=1)
+        self.assertNotEqual(rc, 0)
+        self.assertIn('cannot raise the CPUID leaf limit of NTOSKRNL', out)
+        self.assertIn('No disk was changed', out)
+        rc, out, _ = self.run_kernels(['NTOSKRNL.EXE'])
+        self.assertNotEqual(rc, 0)
+        self.assertIn('the ISO has no I386\\NTKRNLMP.EXE', out)
+
+
+class Nt4NativeWiring(unittest.TestCase):
+    def test_target_order_and_pieces(self):
+        text = TARGET.read_text(encoding='utf-8')
+        first_write = text.index('dd if=/dev/zero of="$TARGET_DEVICE"')
+        self.assertLess(text.index('[ "$nt3:$major" = :4 ]'), first_write)
+        # The kernels are patched and the hook options byte set before the disk is touched.
+        self.assertLess(text.index('        nt4_native_kernels\n'), first_write)
+        self.assertLess(text.index('printf \'\\001\' | dd of="$work/hook.bin" bs=1 seek=509'), first_write)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin', text)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', text)
+        self.assertIn('[ -n "$nt3" ] || [ "$NATIVE" != 1 ] || nt4_native_mbr=yes', text)
+        # Kernels and miniports in ~BT and the local source, the CD twin removed.
+        block = text[text.index('elif [ "$NATIVE" = 1 ]; then\n    # Native NT 4.0'):]
+        block = block[:block.index('\nfi\n')]
+        self.assertIn('nt3_native_txtsetup "$ports" "/nodebug $NT_NATIVE_LOAD_OPTIONS" "$NT_NATIVE_LOAD_OPTIONS"', block)
+        self.assertIn('for dir in "$bt_dir" "$ls_src"; do', block)
+        self.assertIn('rm -f "$dir/$base.EX_" "$dir/$base.EXE"', block)
+        self.assertIn('cp "$work/kernel/$base.EXE" "$dir/$base.EXE"', block)
+        # Recorder from CMDLINES.TXT (NT 4.0 has no DetachedProgram).
+        self.assertIn('USOSANS3.EXE /detach', text)
+        self.assertIn('cp "$ans3" "$usos/USOSANS3.EXE"', text)
+        self.assertIn('nt4_native_answer "$nt4_mps_desc"', text)
+
+    def test_prepare_service_pack_optional_only_native(self):
+        text = PREPARE.read_text(encoding='utf-8')
+        self.assertIn('[ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop "Windows NT 4.0 Terminal Server needs', text)
+        self.assertIn('[ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop \'Windows NT 4.0 needs Service Pack 6a', text)
+        self.assertLess(text.index('nt_native=no'), text.index('if [ "$tag" = NT4T ]; then'))
+
+    def test_mbr_options_byte(self):
+        src = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        self.assertIn('.equ HOOK_OPTIONS,    509', src)
+        check = src.index('    test byte ptr es:[HOOK_OPTIONS], OPT_KEEP_PCI_BIOS\n    jnz boot_partition\n    mov ax, 0xB101\n')
+        self.assertLess(src.index('    mov word ptr [0x15 * 4 + 2], es\n'), check)
+        ps1 = (ROOT / 'tools/build_xp_geometry_fix_mbr.ps1').read_text(encoding='utf-8')
+        # The hook code stays below the options byte.
+        self.assertIn('max is 502', ps1)
+
+    def test_kernel_tool_entry_points(self):
+        fb = (ROOT / 'src/platform/linux/fb_ui_main.zig').read_text(encoding='utf-8')
+        self.assertIn('"--nt4-kernel"', fb)
+        self.assertIn('usos.win3x.nt4_kernel.run', fb)
+        root = (ROOT / 'src/compat/win3x/root.zig').read_text(encoding='utf-8')
+        self.assertIn('pub const nt4_kernel = @import("nt4_kernel.zig");', root)
+        src = (ROOT / 'src/compat/win3x/nt4_kernel.zig').read_text(encoding='utf-8')
+        # mov eax,0 ; cpuid ; mov ecx,fs:[38h] ; pop [ecx+34h] ; pop [ecx+30h] ; cmp eax,
+        self.assertIn('0xB8, 0, 0, 0, 0, 0x0F, 0xA2, 0x64, 0x8B, 0x0D, 0x38, 0, 0, 0, 0x8F, 0x41, 0x34, 0x8F, 0x41, 0x30, 0x83, 0xF8', src)
+        self.assertIn('pub const new_limit: u8 = 0x7F;', src)
 
 
 if __name__ == '__main__':

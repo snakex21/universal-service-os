@@ -52,10 +52,12 @@ EDITION=${NT4_EDITION:-}
 # usb-storage-off.txt -> 0, read by w9x_csmwrap_prepare.sh).
 USB_STORAGE=${NT4_USB_STORAGE:-1}
 # 1: text mode, GUI mode and the first start run natively on this PC after
-# the restart (no install VM; docs/nt-native-plan.md). NT 3.51 only so far.
+# the restart (no install VM; docs/nt-native-plan.md). NT 3.51 / 3.5
+# (nt3-native.flag) and NT 4.0 / Server / TSE (nt4-native.flag).
 NATIVE=${NT_NATIVE:-0}
 # BOOT.INI options of the VM flow's finish step (nt4_qemu_install.sh
-# NT4_BOOT_OPTIONS), here through TXTSETUP.SIF OsLoadOptions.
+# NT4_BOOT_OPTIONS), here through TXTSETUP.SIF OsLoadOptions (NT 4.0 also
+# OsLoadOptionsVar, the BOOT.INI value of its text mode).
 NT_NATIVE_LOAD_OPTIONS=${NT_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 SYSLINUX_DIR=${NT4_SYSLINUX_DIR:-/usr/share/syslinux}
@@ -327,8 +329,8 @@ nt3_standard_hal() {
           printf "%s\r\n", line }'
 }
 
-# Native NT 3.51 text mode on this PC (NT_NATIVE=1, docs/nt-native-plan.md,
-# no install VM): TXTSETUP.SIF (stdin -> stdout, CR LF) with
+# Native NT 3.51 / 3.5 / 4.0 text mode on this PC (NT_NATIVE=1,
+# docs/nt-native-plan.md, no install VM): TXTSETUP.SIF (stdin -> stdout, CR LF) with
 #   [SCSI.Load]  only the USOS miniports ($1: "ahcint" or "ahcint usosnvme"):
 #                SETUPLDR loads every row, and the ISA/EISA probes of the
 #                CD's 30+ miniports have no business on a modern board;
@@ -336,23 +338,29 @@ nt3_standard_hal() {
 #                boot disk as a boot driver of the new system);
 #   [Files]      a row per miniport, the CD's amsint.sys row fields (same
 #                media, directory 4 = system32\drivers, boot driver flag);
+#                NT 4.0 names the section [SourceDisksFiles] (twice on its
+#                CDs: the row goes into the first one);
 #   [SetupData]  OsLoadOptions = $2: SETUPLDR passes it to the text-mode
 #                kernel and text mode writes it into BOOT.INI (the NT 4.0
 #                Enterprise CD's "/maxmem=256" reached BOOT.INI that way,
 #                2026-10-07), so text mode, GUI mode and the installed system
 #                run with the /MAXMEM the VM flow's finish step adds.
+#                $3 (NT 4.0): OsLoadOptionsVar = $3 as well, the value text
+#                mode takes for BOOT.INI when the SIF has it (the Enterprise
+#                CD carries both; NT 4.0 has two [SetupData] sections, each
+#                gets the rows).
 # The NT 3.5 CD has no amsint.sys: its ncrc810.sys row (the same kind of PCI
 # boot miniport, boot driver flag 1) is taken then.
 # rc 1 (nothing written) when the SIF has neither [Files] row.
 nt3_native_txtsetup() {
-    awk -v BINMODE=3 -v ports="$1" -v opts="$2" '
+    awk -v BINMODE=3 -v ports="$1" -v opts="$2" -v var="${3:-}" '
         { line = $0; sub(/\r$/, "", line); lines[++n] = line }
         END {
             np = split(ports, port, " ")
             for (i = 1; i <= n; i++) {
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
                 if (low ~ /^\[/) sec = low
-                else if (sec == "[files]" && low ~ /^(amsint|ncrc810)\.sys=/) {
+                else if ((sec == "[files]" || sec == "[sourcedisksfiles]") && low ~ /^(amsint|ncrc810)\.sys=/) {
                     f = lines[i]; sub(/^[^=]*=[ \t]*/, "", f)
                     if (low ~ /^amsint/) ams = f; else ncr = f
                 }
@@ -366,15 +374,71 @@ nt3_native_txtsetup() {
                     printf "%s\r\n", line
                     if (sec == "[scsi.load]") for (p = 1; p <= np; p++) printf "%s = %s.sys,4\r\n", port[p], port[p]
                     if (sec == "[scsi]") for (p = 1; p <= np; p++) printf "%s = \"%s\"\r\n", port[p], (port[p] == "usosnvme" ? "USOS NVMe" : "USOS AHCI (SATA)")
-                    if (sec == "[files]") for (p = 1; p <= np; p++) printf "%s.sys = %s\r\n", port[p], fields
-                    if (sec == "[setupdata]") printf "OsLoadOptions = \"%s\"\r\n", opts
+                    if ((sec == "[files]" || sec == "[sourcedisksfiles]") && !files_done) {
+                        for (p = 1; p <= np; p++) printf "%s.sys = %s\r\n", port[p], fields
+                        files_done = 1
+                    }
+                    if (sec == "[setupdata]") {
+                        printf "OsLoadOptions = \"%s\"\r\n", opts
+                        if (var != "") printf "OsLoadOptionsVar = \"%s\"\r\n", var
+                    }
                     continue
                 }
                 if (sec == "[scsi.load]" && low != "" && low !~ /^;/) continue
                 if (sec == "[setupdata]" && low ~ /^osloadoptions=/) continue
+                if (sec == "[setupdata]" && var != "" && low ~ /^osloadoptionsvar=/) continue
                 printf "%s\r\n", line
             }
         }'
+}
+
+# Native NT 4.0: the CD's [Computer] description of a machine type ($1, e.g.
+# mps_mp -> "MPS Multiprocessor PC"; stdin = TXTSETUP.SIF), for WINNT.SIF
+# [Unattended] ComputerType, which must name it exactly.
+nt4_computer_desc() {
+    awk -v key="$1" '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) ~ /^\[computer\][ \t]*$/); next }
+        s { k = $0; sub(/[ \t]*=.*/, "", k); gsub(/[ \t]/, "", k)
+            if (tolower(k) == key && match($0, /"[^"]*"/)) { print substr($0, RSTART + 1, RLENGTH - 2); exit } }'
+}
+
+# Native NT 4.0 (stdin -> stdout, CR LF): [Unattended] ComputerType = "$1",
+# Retail unless the answer names one (the USOS answer pins MPS Multiprocessor
+# PC; text mode would otherwise take what NTDETECT reports, and the VM flow's
+# pentium3 VM is no longer there to make that MPS).
+nt4_native_answer() {
+    awk -v BINMODE=3 -v desc="$1" '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
+          if (low ~ /^\[/) sec = low
+          else if (sec == "[unattended]" && low ~ /^computertype=/) has = 1 }
+        END {
+            for (i = 1; i <= n; i++) {
+                printf "%s\r\n", lines[i]
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                if (!has && low == "[unattended]") { printf "ComputerType = \"%s\", Retail\r\n", desc; has = 1 }
+            }
+            if (!has) printf "\r\n[Unattended]\r\nComputerType = \"%s\", Retail\r\n", desc
+        }'
+}
+
+# Native NT 4.0: the CD's RTM kernels with the CPUID leaf limit raised
+# (src/compat/win3x/nt4_kernel.zig, usos-fb-ui --nt4-kernel; the RTM
+# KiSetProcessorType takes a CPU with more than 3 CPUID leaves for one
+# without CPUID, and the boot ends in a triple fault on Zen 3). Run on the
+# user's own CD files before the disk is written: $work/kernel/NTOSKRNL.EXE
+# and NTKRNLMP.EXE (plain PE, checksum recomputed); a kernel without exactly
+# one match (an SP CD, an unknown build) stops here.
+nt4_native_kernels() {
+    mkdir -p "$work/kernel" || fail 'cannot create the kernel work folder'
+    for base in NTOSKRNL NTKRNLMP; do
+        src=''
+        low=$(printf %s "$base" | tr '[:upper:]' '[:lower:]')
+        for name in "$base.EXE" "$base.EX_" "$low.exe" "$low.ex_"; do [ -f "$i386/$name" ] && src="$i386/$name" && break; done
+        [ -n "$src" ] || fail "the ISO has no I386\\$base.EXE. No disk was changed"
+        if "${USOS_FB_UI:-usos-fb-ui}" --nt4-kernel "$src" "$work/kernel/$base.EXE" > "$work/kernel.log" 2>&1; then rc=0; else rc=$?; fi
+        while IFS= read -r line; do log "$line"; done < "$work/kernel.log"
+        [ "$rc" = 0 ] && [ -s "$work/kernel/$base.EXE" ] ||
+            fail "cannot raise the CPUID leaf limit of $base (not an NT 4.0 RTM kernel?). No disk was changed"
+    done
 }
 
 crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
@@ -600,14 +664,20 @@ case "$TARGET_DEVICE" in /dev/nvme*)
     [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; Windows NT needs 512-byte sectors. No disk was changed" ;;
 esac
 [ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $major.$NT_MINOR system"
+# Native NT 4.0 (no VM): the NT 3.x MBR too. Text mode then runs on the PC,
+# and its pre-ACPI HAL needs the HPET LegacyReplacement off before it starts
+# (usosrst comes only with POST.CMD) and the E820 filter for the RTM
+# SETUPLDR; the PCI BIOS stays visible (options byte, below).
+nt4_native_mbr=''
+[ -n "$nt3" ] || [ "$NATIVE" != 1 ] || nt4_native_mbr=yes
 mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
-[ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
+[ -z "$nt3$nt4_native_mbr" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
 [ -r "$mbr_code" ] || fail "missing: $mbr_code"
 [ "$(wc -c < "$mbr_code" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
 # NT 3.x: the MBR's resident INT 15h / INT 1Ah hooks are sector 1
 # (nt3_e820_mbr.S; it boots without hooks when the sector is missing).
 mbr_hook=''
-[ -z "$nt3" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin
+[ -z "$nt3$nt4_native_mbr" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin
 [ -z "$mbr_hook" ] || [ "$(wc -c < "$mbr_hook" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_hook"
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
@@ -653,12 +723,24 @@ if [ -z "$nt3" ]; then
     log "product key: $key_state"
 fi
 if [ "$NATIVE" = 1 ]; then
-    { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ]; } && [ -z "$nt31" ] ||
-        fail "the native install (no VM) covers Windows NT 3.51 and 3.5 only so far, not NT $major.$minor. No disk was changed"
+    { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ] || [ "$nt3:$major" = :4 ]; } && [ -z "$nt31" ] ||
+        fail "the native install (no VM) covers Windows NT 4.0, 3.51 and 3.5 only so far, not NT $major.$minor. No disk was changed"
     # NT 3.5: more than 128 MiB loses the boot disk (NT35_BOOT_OPTIONS in
     # nt4_qemu_install.sh).
     [ "$minor" != 50 ] || NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=128}
-    [ -r "$drv/USOSANS3.EXE" ] || fail "missing: $drv/USOSANS3.EXE (GUI Setup page recorder). No disk was changed"
+    # The GUI Setup page recorder (one build for NT 3.5x and 4.0, $LIB/nt3).
+    ans3=$LIB/nt3/USOSANS3.EXE
+    [ -r "$ans3" ] || fail "missing: $ans3 (GUI Setup page recorder). No disk was changed"
+    if [ -z "$nt3" ]; then
+        # Native NT 4.0 (nt4-native.flag): the RTM kernels with the CPUID
+        # leaf limit raised, before any disk write; the MPS machine type for
+        # ComputerType.
+        command -v cmp >/dev/null 2>&1 || fail 'cmp is required. No disk was changed'
+        nt4_native_kernels
+        nt4_mps_desc=$(nt4_computer_desc mps_mp < "$txtsetup")
+        [ -n "$nt4_mps_desc" ] || fail 'TXTSETUP.SIF has no [Computer] mps_mp row (not an NT 4.0 CD?). No disk was changed'
+        [ -z "$nvme" ] || [ -r "$LIB/nt4/USOSNVME.SYS" ] || fail "missing: $LIB/nt4/USOSNVME.SYS (NVMe driver). No disk was changed"
+    fi
     log 'native: text mode on this PC after the restart (no install VM)'
 fi
 if [ -n "$nt3" ]; then
@@ -702,6 +784,10 @@ else
         nt4_tse_answer < "$work/WINNT.SIF" > "$work/WINNT.TSE" && mv "$work/WINNT.TSE" "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
         log 'Terminal Server: 5 client licenses (TerminalServerDesktops), no IE 4.0 during Setup'
     fi
+    if [ "$NATIVE" = 1 ]; then
+        nt4_native_answer "$nt4_mps_desc" < "$work/WINNT.SIF" > "$work/WINNT.NAT" && mv "$work/WINNT.NAT" "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+        log "native: ComputerType $(awk '{ sub(/\r$/, "") } tolower($0) ~ /^[ \t]*computertype[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); print; exit }' "$work/WINNT.SIF")"
+    fi
 fi
 [ "${product:-0}" = 0 ] || log 'server CD: stand-alone server (AdvServerType = SERVERNT), licensing Per Server 5 (LicenseFilePrintData)'
 if grep -qi '^!\{0,1\}TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
@@ -737,6 +823,15 @@ if [ -n "$nt31" ]; then
     MKFS_NOALIGN=-a
 fi
 log "disk_sectors=$total part_start=$PART_START part_sectors=$PART_SECTORS"
+if [ -n "$nt4_native_mbr" ]; then
+    # Hook sector options byte (offset 509, nt3_e820_mbr.S HOOK_OPTIONS):
+    # bit 0 keeps the PCI BIOS visible for the NT 4.0 HAL.
+    cp "$mbr_hook" "$work/hook.bin" && printf '\001' | dd of="$work/hook.bin" bs=1 seek=509 count=1 conv=notrunc 2>/dev/null ||
+        fail 'cannot prepare the MBR hook sector. No disk was changed'
+    [ "$(od -An -tu1 -j509 -N1 "$work/hook.bin" | tr -d ' \n')" = 1 ] || fail 'the MBR hook options byte did not take. No disk was changed'
+    mbr_hook=$work/hook.bin
+    log 'MBR: NT 3.x MBR + hook (E820 filter, HPET LegacyReplacement off), PCI BIOS kept (options byte 509 = 1)'
+fi
 
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'
@@ -839,6 +934,32 @@ if [ -n "$nt3" ]; then
         done
         log "native: TXTSETUP.SIF [SCSI.Load] = $ports, OsLoadOptions = /nodebug $NT_NATIVE_LOAD_OPTIONS"
     fi
+elif [ "$NATIVE" = 1 ]; then
+    # Native NT 4.0: text mode reaches C: through the NT 4.0 AHCINT /
+    # usosnvme builds (PCI through the HAL bus handler; the MBR keeps the
+    # PCI BIOS), the same TXTSETUP.SIF routing as NT 3.5x; OsLoadOptions for
+    # the text-mode kernel, OsLoadOptionsVar for BOOT.INI.
+    ports=ahcint
+    [ -z "$nvme" ] || ports='ahcint usosnvme'
+    for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do
+        [ -f "$sif" ] || continue
+        nt3_native_txtsetup "$ports" "/nodebug $NT_NATIVE_LOAD_OPTIONS" "$NT_NATIVE_LOAD_OPTIONS" < "$sif" > "$work/txtsetup.nat" && cat "$work/txtsetup.nat" > "$sif" ||
+            fail 'cannot add the USOS miniports to TXTSETUP.SIF (no amsint.sys [SourceDisksFiles] row?)'
+    done
+    # The patched kernels (nt4_native_kernels) where SETUPLDR (~BT) and text
+    # mode (local source) take them, as plain files: the CD's compressed
+    # twin goes, so nothing can pick the unpatched copy.
+    for dir in "$bt_dir" "$ls_src"; do
+        cp "$drv/$ahci" "$dir/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS to the Setup source'
+        [ -z "$nvme" ] || cp "$drv/$nvme_sys" "$dir/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS to the Setup source'
+        for base in NTOSKRNL NTKRNLMP; do
+            rm -f "$dir/$base.EX_" "$dir/$base.EXE"
+            cp "$work/kernel/$base.EXE" "$dir/$base.EXE" || fail "cannot copy the patched $base.EXE to the Setup source"
+            cmp -s "$work/kernel/$base.EXE" "$dir/$base.EXE" || fail "read-back: $base.EXE differs in the Setup source"
+        done
+    done
+    log "native: TXTSETUP.SIF [SCSI.Load] = $ports, OsLoadOptions = /nodebug $NT_NATIVE_LOAD_OPTIONS, OsLoadOptionsVar = $NT_NATIVE_LOAD_OPTIONS"
+    log 'native: NTOSKRNL.EXE + NTKRNLMP.EXE with the raised CPUID leaf limit in ~BT and the local source'
 fi
 # setupldr started from the hard disk runs \NTDETECT.COM of the boot
 # partition (QEMU 2026-10-07: "NTDETECT failed" without it).
@@ -926,13 +1047,23 @@ printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$uso
 else
 # $OEM$ (OemPreinstall = Yes): CMDLINES.TXT runs at the end of GUI-mode Setup
 # and turns on one automatic Administrator logon with POST.CMD in RunOnce.
+# Native: first the GUI Setup page recorder (NT 4.0 has no DetachedProgram;
+# /detach returns at once, the recorder keeps running, one instance only).
 for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
     mkdir -p "$oem"
-    printf '[Commands]\r\n"C:\\WINNT\\REGEDIT.EXE /s C:\\USOS\\NT4\\SETUP.REG"\r\n' > "$oem/CMDLINES.TXT"
+    {
+        printf '[Commands]\r\n'
+        [ "$NATIVE" != 1 ] || printf '"C:\\USOS\\NT4\\USOSANS3.EXE /detach"\r\n'
+        printf '"C:\\WINNT\\REGEDIT.EXE /s C:\\USOS\\NT4\\SETUP.REG"\r\n'
+    } > "$oem/CMDLINES.TXT"
 done
 
 usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
+if [ "$NATIVE" = 1 ]; then
+    cp "$ans3" "$usos/USOSANS3.EXE" || fail 'cannot copy USOSANS3.EXE'
+    log 'native: GUI Setup page recorder USOSANS3.EXE (CMDLINES.TXT, log C:\USOS\NT4\USOSANS.TXT)'
+fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_SIF" NT4 > "$work/network.ini" || fail 'invalid LAN metadata'
 usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
@@ -1013,6 +1144,8 @@ if [ -n "$SP_EXE" ]; then
         printf 'package\r\n' > "$usos/SPPKG.TXT"
         log 'service pack: older self-extractor without -x (package run with -u -z)'
     fi
+elif [ "$NATIVE" = 1 ]; then
+    log 'service pack: none (native: the RTM kernel with the raised CPUID leaf limit stays)'
 elif [ -n "$tse" ]; then
     log 'service pack: none (the X470 needs the Terminal Server Edition SP6: the RTM TSE kernel stops on CPUs with more than 3 CPUID leaves)'
 else
@@ -1328,4 +1461,8 @@ blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
 [ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 6 ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'
-log "PASS target=$TARGET_DEVICE answer=$ANSWER_KIND; next: the NT 4.0 install in the VM"
+if [ "$NATIVE" = 1 ]; then
+    log "PASS target=$TARGET_DEVICE answer=$ANSWER_KIND; next: Setup on this PC after the restart (native)"
+else
+    log "PASS target=$TARGET_DEVICE answer=$ANSWER_KIND; next: the NT 4.0 install in the VM"
+fi
