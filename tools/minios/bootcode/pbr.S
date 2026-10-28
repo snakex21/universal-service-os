@@ -4,6 +4,8 @@
  * Public handoff contract consulted: GNU GRUB ntldr.c, GPLv3+, real-mode
  * CS2000:0, segments0/SP7c00, DL BIOS disk, NTFS BPB at7c00, A20 enabled.
  * No Microsoft bootstrap bytes are incorporated.
+ * At most 960 sectors (480 KiB, end 0x98000): Windows 10 22H2's BOOTMGR is
+ * 413738 bytes (809 sectors); the int 12h / EBDA checks bound it at runtime.
  */
 .intel_syntax noprefix
 .code16
@@ -26,7 +28,7 @@ entry:
     sti
     cmp word ptr [count], 0
     je fail
-    cmp word ptr [count], 768
+    cmp word ptr [count], 960
     ja fail
     int 0x12
     movzx eax, ax

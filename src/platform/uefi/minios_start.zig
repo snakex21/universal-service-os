@@ -1,5 +1,7 @@
-//! Windows 10/11 x64 through MiniOS instead of Windows Setup (profile option
-//! `prep_env=minios`, experimental; docs/minios-hardware-flow.md).
+//! Windows 10/11 x64 through MiniOS instead of Windows Setup, and 32-bit
+//! Windows 10 without CSM through MiniOS instead of the Alpine preparation
+//! (profile option `prep_env=minios`, experimental;
+//! docs/minios-hardware-flow.md).
 //!
 //! The menu writes \USOSPREP.CFG (USOSPREP_HW_V1) and, for a USOS profile,
 //! \USOSPREP.XML (the rendered answer, staged by MiniOS as
@@ -7,7 +9,8 @@
 //! \EFI\USOS\minios\usosprep-x64.efi and, when it reports success, restarts
 //! into the new Windows. MiniOS asks the one disk question itself. Any
 //! failure or a cancelled disk question returns an error: the caller logs it
-//! and continues with the default path (the ISO's own Windows Setup).
+//! and continues with the default path (the ISO's own Windows Setup, or the
+//! Alpine micro-Linux preparation on the 32-bit CSMWrap route).
 //! Every start records its outcome in EFI\USOS\Logs\minios-start.txt;
 //! MiniOS writes its own log to EFI\USOS\Logs\MINIOS-<build>.LOG.
 const std = @import("std");
@@ -26,6 +29,12 @@ pub const record_path = "\\EFI\\USOS\\Logs\\minios-start.txt";
 
 const plan = usos.flow.minios_plan;
 pub const wanted = plan.wanted;
+pub const wantedX86Csmwrap = plan.wantedX86Csmwrap;
+pub const Route = plan.Route;
+
+fn fallbackName(route: Route) []const u8 {
+    return if (route == .mbr_csmwrap) "the Alpine preparation (CSMWrap)" else "Windows Setup";
+}
 
 fn record(root: *uefi.protocol.File, comptime fmt: []const u8, args: anytype) void {
     var text: [512]u8 = undefined;
@@ -48,10 +57,10 @@ fn deleteFile(root: *uefi.protocol.File, comptime path: []const u8) void {
 }
 
 /// Returns only when MiniOS did not finish (the caller falls back to Setup).
-pub fn run(root: *uefi.protocol.File, system_id: []const u8, image_directory: []const u8, name: []const u8, profile: *const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
+pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, image_directory: []const u8, name: []const u8, profile: *const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
     const index = plan.imageIndex(profile, system_id, images) orelse {
-        record(root, "not started: the profile names no edition found on this ISO (MiniOS has no edition list); Windows Setup instead", .{});
+        record(root, "not started ({s}): the profile names no edition found on this ISO (MiniOS has no edition list); {s} instead", .{ @tagName(route), fallbackName(route) });
         return error.MiniosNeedsEdition;
     };
     var catalog = data_volume.openCatalog() catch |err| {
@@ -74,12 +83,12 @@ pub fn run(root: *uefi.protocol.File, system_id: []const u8, image_directory: []
         return err;
     };
     var text: [1536]u8 = undefined;
-    const cfg = try plan.formatConfig(&text, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
+    const cfg = try plan.formatConfig(&text, route, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
     try settings_store.replaceFile(root, config_path, cfg);
     if (xml) |bytes| try settings_store.replaceFile(root, answer_path, bytes) else deleteFile(root, answer_path);
     // A rendered answer may hold a key or password: never left behind.
     defer deleteFile(root, answer_path);
-    serial.writeAscii("[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1)\r\n");
+    serial.writeAscii(if (route == .mbr_csmwrap) "[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1 mode=mbr csmwrap=on)\r\n" else "[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1)\r\n");
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const image = esp_image.load(root, app_path) catch |err| {
         record(root, "not started: {s} not loadable ({s})", .{ app_path, @errorName(err) });
@@ -92,16 +101,16 @@ pub fn run(root: *uefi.protocol.File, system_id: []const u8, image_directory: []
     };
     switch (status) {
         .success => {
-            record(root, "PASS image={d}; restarting into the new Windows", .{index});
+            record(root, "PASS route={s} image={d}; restarting into the new Windows", .{ @tagName(route), index });
             deleteFile(root, answer_path);
             uefi.system_table.runtime_services.resetSystem(.cold, .success, null);
         },
         .aborted => {
-            record(root, "disk question cancelled, nothing written; Windows Setup instead", .{});
+            record(root, "disk question cancelled, nothing written; {s} instead", .{fallbackName(route)});
             return error.MiniosCancelled;
         },
         else => {
-            record(root, "FAILED status={s}; see EFI\\USOS\\Logs\\MINIOS-{s}.LOG; Windows Setup instead", .{ @tagName(status), usos.build_info.id });
+            record(root, "FAILED route={s} status={s}; see EFI\\USOS\\Logs\\MINIOS-{s}.LOG; {s} instead", .{ @tagName(route), @tagName(status), usos.build_info.id, fallbackName(route) });
             return error.MiniosFailed;
         },
     }

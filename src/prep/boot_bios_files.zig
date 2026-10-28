@@ -27,7 +27,10 @@ pub const Stats = struct {
     bootmgr_lba: u64 = 0,
     bootmgr_sectors: u16 = 0,
 };
-pub const max_bootmgr_bytes: u64 = 768 * 512;
+/// tools/minios/bootcode/pbr.S accepts at most 960 sectors (Windows 10 22H2
+/// x86 BOOTMGR: 413738 bytes = 809 sectors; Win7: 750).
+pub const max_bootmgr_sectors: u64 = 960;
+pub const max_bootmgr_bytes: u64 = max_bootmgr_sectors * 512;
 fn get(comptime T: type, data: []const u8, at: usize) T {
     return std.mem.readInt(T, data[at..][0..@sizeOf(T)], .little);
 }
@@ -190,7 +193,7 @@ pub fn bootmgrRun(disk: p.Disk, system: parts.Partition, size: u64, expected: [3
     if (run.sparse or run.vcn != 0 or run.lcn < 0 or run.clusters < (size + fs.cluster_bytes - 1) / fs.cluster_bytes) return error.BootManagerNotContiguous;
     const start = std.math.mul(u64, @intCast(run.lcn), fs.cluster_bytes) catch return error.BootManagerRunBounds;
     const bytes = count * 512;
-    if (start < 8192 or start >= system.size_bytes or bytes > system.size_bytes - start or count > 768) return error.BootManagerRunBounds;
+    if (start < 8192 or start >= system.size_bytes or bytes > system.size_bytes - start or count > max_bootmgr_sectors) return error.BootManagerRunBounds;
     var hash = std.crypto.hash.sha2.Sha256.init(.{});
     var at: u64 = 0;
     while (at < size) {
@@ -206,7 +209,9 @@ pub fn bootmgrRun(disk: p.Disk, system: parts.Partition, size: u64, expected: [3
 /// Experimental first-boot proof only: a later update relocating BOOTMGR
 /// invalidates the fixed run binding and requires reprovisioning.
 pub fn provisionBios(disk: p.Disk, prepared: wl.Layout, ids: wl.Ids, tracker: *p.TrackedAllocator, options: Options, code: OwnBootCode, log: app.Logger) !Stats {
-    if (!options.gates.layout_apply or !options.gates.bcd_reference) return error.PrerequisiteGateMissing;
+    // Hardware flow (USOSPREP_HW_V1): this run applied the disk itself; the
+    // host bcdboot comparison is not rerun there (as provisionUefi).
+    if (!options.gates.layout_apply or !(options.gates.bcd_reference or options.gates.hardware_flow)) return error.PrerequisiteGateMissing;
     try validateBootCode(code);
     const guid = try boot.formatGuid(options.loader_guid);
     const a = tracker.allocator();

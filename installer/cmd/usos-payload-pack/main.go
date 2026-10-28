@@ -30,6 +30,9 @@ var payloadFiles = []payloadFile{
 	// MiniOS (src/prep): Windows 10/11 x64 without Windows Setup, profile
 	// option prep_env=minios (src/platform/uefi/minios_start.zig).
 	{`zig-out/test-assets/usosprep-x86_64.efi`, `EFI/USOS/minios/usosprep-x64.efi`},
+	// 32-bit Windows 10 through MiniOS (CSMWrap route): MiniOS stages the
+	// display helper into \USOS\NT6 like vista_csmwrap_target.sh step 2b.
+	{`zig-out/windows-usos-res/USOSRES.EXE`, `EFI/USOS/minios/USOSRES.EXE`},
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},
 	{`zig-out/micro-linux/initramfs-usos`, `EFI/USOS/micro-linux/initramfs-usos`},

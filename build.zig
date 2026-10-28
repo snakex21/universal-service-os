@@ -47,11 +47,17 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         .{ .arch = std.Target.Cpu.Arch.x86_64, .name = "x86_64" },
         .{ .arch = std.Target.Cpu.Arch.x86, .name = "ia32" },
     };
+    // Own MBR / NTFS PBR templates (tools/minios/bootcode/*.S, no Microsoft
+    // bytes) for the hardware MBR route (Windows 10 x86 through CSMWrap).
+    const bootcode_dir = b.getInstallPath(.prefix, "minios-bootcode");
+    const bootcode = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/build_bios_bootcode.py", "--zig", b.graph.zig_exe, "--out", bootcode_dir });
     inline for (variants) |variant| {
         const target = b.resolveTargetQuery(.{ .cpu_arch = variant.arch, .os_tag = .uefi, .cpu_model = if (variant.arch == .x86) .{ .explicit = &std.Target.x86.cpu.i486 } else .baseline });
         const module = b.createModule(.{ .root_source_file = b.path("src/prep/uefi_main.zig"), .target = target, .optimize = .ReleaseSmall });
         module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = target, .optimize = .ReleaseSmall }));
+        module.addImport("bios_boot_code", b.createModule(.{ .root_source_file = .{ .cwd_relative = b.pathJoin(&.{ bootcode_dir, "boot_code.zig" }) }, .target = target, .optimize = .ReleaseSmall }));
         const exe = b.addExecutable(.{ .name = "usosprep-" ++ variant.name, .root_module = module });
+        exe.step.dependOn(&bootcode.step);
         const install = b.addInstallFile(exe.getEmittedBin(), "test-assets/usosprep-" ++ variant.name ++ ".efi");
         step.dependOn(&install.step);
         install_step.dependOn(&install.step);

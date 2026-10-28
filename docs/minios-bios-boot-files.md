@@ -26,9 +26,11 @@ Fresh qualified MBR BCD devices use the original disk signature and exact
 system and Windows offsets. Copying is streamed and rehashes each source;
 filesystem completion precedes a read-only BOOTMGR run resolution and a
 read-back SHA-256 check. This final run must be non-sparse, begin at VCN 0,
-and cover the exact rounded file size. The loader size is limited to 768
-sectors (393216 bytes); the PBR separately checks available low memory at
-runtime. Win7's observed 383786-byte BOOTMGR needs 750 sectors.
+and cover the exact rounded file size. The loader size is limited to 960
+sectors (491520 bytes, loaded up to 0x98000); the PBR separately checks
+available low memory at runtime. Win7's observed 383786-byte BOOTMGR needs
+750 sectors, Windows 10 22H2 x86's 413738-byte BOOTMGR 809 (the earlier
+768-sector limit refused it).
 
 Executable MBR/PBR sectors are published only after all these steps. Their
 own assembly templates are passed in `OwnBootCode`; no Microsoft boot-sector

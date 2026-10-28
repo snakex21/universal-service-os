@@ -5,6 +5,7 @@ const builtin = @import("builtin");
 const uefi = std.os.uefi;
 const platform = @import("platform.zig");
 const partitions = @import("partitions.zig");
+const fat32 = @import("fat32.zig");
 const ntfs = @import("ntfs.zig");
 const app = @import("app.zig");
 const scale = @import("scale.zig");
@@ -48,6 +49,7 @@ fn config(text: []const u8) !Config {
     var seen_locale = false;
     var seen_unattend = false;
     var seen_entry = false;
+    var seen_csmwrap = false;
     var kind: ?partitions.Kind = null;
     var sectors: ?u64 = null;
     var token: ?[64]u8 = null;
@@ -122,6 +124,10 @@ fn config(text: []const u8) !Config {
             if (seen_unattend) return error.InvalidArgument;
             seen_unattend = true;
             hw_cfg.unattend = try switchValue(line[9..]);
+        } else if (hardware and std.mem.startsWith(u8, line, "csmwrap=")) {
+            if (seen_csmwrap) return error.InvalidArgument;
+            seen_csmwrap = true;
+            hw_cfg.csmwrap = try switchValue(line[8..]);
         } else if (hardware and std.mem.startsWith(u8, line, "boot_entry=")) {
             if (seen_entry) return error.InvalidArgument;
             seen_entry = true;
@@ -132,7 +138,9 @@ fn config(text: []const u8) !Config {
         // The disk question supplies the size; diagnostics that stop QEMU
         // through its exit port have no meaning on a real machine.
         if (sectors != null or probe_items != null or !seen_build or (workload orelse .stage1a) != .install) return error.InvalidArgument;
-        if (kind != null and kind.? != .gpt) return error.InvalidArgument;
+        // mode=mbr only as the CSMWrap route (32-bit Windows 10 in BIOS mode
+        // through a CSMWrap ESP on the same disk); csmwrap=on never with GPT.
+        if (kind != null and (kind.? == .mbr) != hw_cfg.csmwrap) return error.InvalidArgument;
         sectors = 0;
     }
     const selected = workload orelse .stage1a;
@@ -664,7 +672,7 @@ const Candidate = struct { io: *uefi.protocol.BlockIo, sectors: u64, bus: []cons
 /// asks for one, waits 3 s, then asks for an explicit Space confirmation.
 /// Writes this run's marker to sector 0 of that disk only and returns its
 /// sector count. Esc anywhere: nothing is written (error.UserCancelled).
-fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, log: app.Logger) !u64 {
+fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, mbr: bool, log: app.Logger) !u64 {
     const bs = uefi.system_table.boot_services orelse return error.Io;
     const boot_path = (try bs.handleProtocol(uefi.protocol.DevicePath, boot_handle)) orelse return error.Unsupported;
     const boot_body = try pathBody(boot_path);
@@ -683,6 +691,19 @@ fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, log: app.Logger) !u64 {
         const body = pathBody(path) catch continue;
         if (body.len == 0 or std.mem.startsWith(u8, boot_body, body)) continue;
         if (media.last_block + 1 < 64 * 1024 * 1024 / 512 * 256) continue; // < 16 GiB: not a Windows 10/11 target
+        if (mbr) {
+            // The CSMWrap MBR route: at most 2 TiB (MBR), and no NVMe disk
+            // (the Alpine route gates 32-bit Windows 10 on NVMe behind its own
+            // usosnvme-modern package, which MiniOS does not stage).
+            if (media.last_block + 1 > hw.mbr_max_sectors) {
+                log.say("HW_DISK skipped bus={s} sectors={d}: larger than 2 TiB (MBR)\n", .{ busName(body), media.last_block + 1 });
+                continue;
+            }
+            if (std.mem.eql(u8, busName(body), "NVMe")) {
+                log.say("HW_DISK skipped NVMe sectors={d}: 32-bit Windows on NVMe stays on the Alpine route\n", .{media.last_block + 1});
+                continue;
+            }
+        }
         var table: []const u8 = "no partition table";
         if (blockRead(io, 1, sector[0..512], .source_io)) |_| {
             if (std.mem.eql(u8, sector[0..8], "EFI PART")) table = "GPT" else if (blockRead(io, 0, sector[0..512], .source_io)) |_| {
@@ -748,6 +769,11 @@ const MemorySource = struct {
 const HwApply = struct {
     xml: ?[]const u8 = null,
     high_water: u64 = 0,
+    /// CSMWrap route: USOSRES.EXE + DISPLAY.TXT into \USOS\NT6 of the new
+    /// Windows (vista_csmwrap_target.sh step 2b); null = nothing staged.
+    display: ?[]const u8 = null,
+    root: ?*uefi.protocol.File = null,
+    allocator: ?std.mem.Allocator = null,
     /// Windows\Panther\unattend.xml: Windows reads it in specialize and
     /// oobeSystem after an image apply (the windowsPE pass is ignored).
     fn post(ctx: *anyopaque, fs: *ntfs.Ntfs, log: app.Logger) anyerror!void {
@@ -760,9 +786,48 @@ const HwApply = struct {
             _ = try fs.writeFile(panther, W("unattend.xml"), .{ .context = &source, .size = xml.len, .read_fn = MemorySource.read }, .{});
             log.say("HW_UNATTEND Windows\\Panther\\unattend.xml bytes={d}\n", .{xml.len});
         } else log.say("HW_UNATTEND none: Windows starts its own OOBE (manual mode)\n", .{});
+        if (self.display) |request| self.stageDisplay(fs, request, log) catch |err| log.say("HW_DISPLAY not staged ({s}); Windows keeps its own mode\n", .{@errorName(err)});
         self.high_water = fs.next_lcn * 4096;
     }
+    /// Optional, like the Alpine route: any refusal keeps Windows' own mode.
+    /// Both files are read completely before the first NTFS change.
+    fn stageDisplay(self: *HwApply, fs: *ntfs.Ntfs, request: []const u8, log: app.Logger) !void {
+        const root = self.root orelse return error.InvalidArgument;
+        const allocator = self.allocator orelse return error.InvalidArgument;
+        const exe = try readSmallFile(root, W("\\EFI\\USOS\\minios\\USOSRES.EXE"), allocator, 1024 * 1024);
+        defer allocator.free(exe);
+        const native: ?[]u8 = readSmallFile(root, W("\\EFI\\USOS\\display-native.txt"), allocator, 64) catch null;
+        defer if (native) |bytes| allocator.free(bytes);
+        var text_buf: [128]u8 = undefined;
+        const text = try hw.displayText(&text_buf, request, native);
+        const usos_dir = (try fs.lookup(5, W("USOS"))) orelse try fs.mkdir(5, W("USOS"), .{ .attributes = 0x10 });
+        const nt6 = (try fs.lookup(usos_dir, W("NT6"))) orelse try fs.mkdir(usos_dir, W("NT6"), .{ .attributes = 0x10 });
+        const Item = struct { name: []const u16, bytes: []const u8 };
+        for ([_]Item{ .{ .name = W("USOSRES.EXE"), .bytes = exe }, .{ .name = W("DISPLAY.TXT"), .bytes = text } }) |item| {
+            if (try fs.lookup(nt6, item.name) != null) try fs.removeFile(nt6, item.name);
+            var source: MemorySource = .{ .bytes = item.bytes };
+            _ = try fs.writeFile(nt6, item.name, .{ .context = &source, .size = item.bytes.len, .read_fn = MemorySource.read }, .{});
+        }
+        log.say("HW_DISPLAY request={s} USOSRES.EXE bytes={d} DISPLAY.TXT bytes={d} apply=first-sign-in\n", .{ request, exe.len, text.len });
+    }
 };
+
+fn readSmallFile(root: *uefi.protocol.File, path: [:0]const u16, allocator: std.mem.Allocator, limit: u64) ![]u8 {
+    const file = try root.open(path, .read, .{});
+    defer file.close() catch {};
+    var info_buf: [1024]u8 align(8) = undefined;
+    const info = try file.getInfo(.file, &info_buf);
+    if (info.attribute.directory or info.file_size == 0 or info.file_size > limit) return error.InvalidArgument;
+    const bytes = try allocator.alloc(u8, @intCast(info.file_size));
+    errdefer allocator.free(bytes);
+    var done: usize = 0;
+    while (done < bytes.len) {
+        const n = try file.read(bytes[done..]);
+        if (n == 0) return error.Io;
+        done += n;
+    }
+    return bytes;
+}
 
 fn readUnattend(root: *uefi.protocol.File, allocator: std.mem.Allocator) ![]u8 {
     const file = try root.open(W("\\USOSPREP.XML"), .read_write, .{});
@@ -807,12 +872,34 @@ fn targetPathBody(io: *uefi.protocol.BlockIo, out: []u8) ![]const u8 {
 /// What bcdboot does on a Setup install: a "Windows Boot Manager" Boot####
 /// for the target ESP, first in BootOrder. The removable fallback path on
 /// the target ESP remains when the firmware refuses the variables.
+const BootTarget = struct {
+    number: u32,
+    start_lba: u64,
+    size_lba: u64,
+    signature: [16]u8,
+    /// UEFI HD node: partition format 1 = MBR, 2 = GPT; signature 1 = MBR id, 2 = GUID.
+    format: u8,
+    signature_type: u8,
+    description: [:0]const u16,
+    file: [:0]const u16,
+};
 fn addBootEntry(io: *uefi.protocol.BlockIo, esp: partitions.Partition, esp_guid: [16]u8, log: app.Logger) !u16 {
+    return addBootTarget(io, .{ .number = 1, .start_lba = esp.start_bytes / 512, .size_lba = esp.size_bytes / 512, .signature = esp_guid, .format = 2, .signature_type = 2, .description = W("Windows Boot Manager"), .file = W("\\EFI\\Microsoft\\Boot\\bootmgfw.efi") }, log);
+}
+/// The CSMWrap ESP (MBR slot 3) of the CSMWrap route: what the Alpine route
+/// leaves to the firmware's removable-path scan, as an explicit entry.
+fn addCsmwrapBootEntry(io: *uefi.protocol.BlockIo, esp_start: u64, mbr_signature: u32, log: app.Logger) !u16 {
+    var signature: [16]u8 = @splat(0);
+    std.mem.writeInt(u32, signature[0..4], mbr_signature, .little);
+    return addBootTarget(io, .{ .number = 3, .start_lba = esp_start, .size_lba = hw.csmwrap_esp_sectors, .signature = signature, .format = 1, .signature_type = 1, .description = W("Windows (USOS CSMWrap)"), .file = W("\\EFI\\BOOT\\BOOTX64.EFI") }, log);
+}
+fn addBootTarget(io: *uefi.protocol.BlockIo, t: BootTarget, log: app.Logger) !u16 {
     var option: [1024]u8 = undefined;
-    const description = W("Windows Boot Manager");
-    const file = W("\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
+    const description = t.description;
+    const file = t.file;
     var at: usize = 6;
-    @memcpy(option[at..][0 .. (description.len + 1) * 2], std.mem.sliceAsBytes(description[0 .. description.len + 1]));
+    @memcpy(option[at..][0 .. description.len * 2], std.mem.sliceAsBytes(description));
+    option[at + description.len * 2 ..][0..2].* = .{ 0, 0 };
     at += (description.len + 1) * 2;
     const path_start = at;
     var body_buf: [512]u8 = undefined;
@@ -823,19 +910,20 @@ fn addBootEntry(io: *uefi.protocol.BlockIo, esp: partitions.Partition, esp_guid:
     hd[0] = 4;
     hd[1] = 1;
     std.mem.writeInt(u16, hd[2..4], 42, .little);
-    std.mem.writeInt(u32, hd[4..8], 1, .little);
-    std.mem.writeInt(u64, hd[8..16], esp.start_bytes / 512, .little);
-    std.mem.writeInt(u64, hd[16..24], esp.size_bytes / 512, .little);
-    @memcpy(hd[24..40], &esp_guid);
-    hd[40] = 2;
-    hd[41] = 2;
+    std.mem.writeInt(u32, hd[4..8], t.number, .little);
+    std.mem.writeInt(u64, hd[8..16], t.start_lba, .little);
+    std.mem.writeInt(u64, hd[16..24], t.size_lba, .little);
+    @memcpy(hd[24..40], &t.signature);
+    hd[40] = t.format;
+    hd[41] = t.signature_type;
     @memcpy(option[at..][0..42], &hd);
     at += 42;
     const file_bytes = (file.len + 1) * 2;
     option[at] = 4;
     option[at + 1] = 4;
     std.mem.writeInt(u16, option[at + 2 ..][0..2], @intCast(4 + file_bytes), .little);
-    @memcpy(option[at + 4 ..][0..file_bytes], std.mem.sliceAsBytes(file[0 .. file.len + 1]));
+    @memcpy(option[at + 4 ..][0 .. file.len * 2], std.mem.sliceAsBytes(file));
+    option[at + 4 + file.len * 2 ..][0..2].* = .{ 0, 0 };
     at += 4 + file_bytes;
     option[at..][0..4].* = .{ 0x7f, 0xff, 4, 0 };
     at += 4;
@@ -867,8 +955,145 @@ fn addBootEntry(io: *uefi.protocol.BlockIo, esp: partitions.Partition, esp_guid:
         }
     }
     try rt.setVariable(order_name, &uefi.tables.global_variable, attrs, order[0..used]);
-    log.say("HW_BOOT_ENTRY Boot{X:0>4} Windows Boot Manager first in BootOrder entries={d}\n", .{ free, used / 2 });
+    var label: [64]u8 = undefined;
+    const label_len = std.unicode.utf16LeToUtf8(&label, description) catch 0;
+    log.say("HW_BOOT_ENTRY Boot{X:0>4} {s} first in BootOrder entries={d}\n", .{ free, label[0..label_len], used / 2 });
     return free;
+}
+
+// ---------------------------------------------- CSMWrap ESP (MBR route)
+
+const csmwrap_dir = "\\EFI\\USOS\\csmwrap";
+/// The LGPL obligations travel with the binary (tools/xp_csmwrap_esp.sh).
+const csmwrap_files = [_][]const u8{ "LICENSE-CSMWrap-LGPL-2.1.txt", "COPYING-SeaBIOS-LGPLv3.txt", "COPYING-SeaBIOS-GPLv3.txt", "SOURCES.txt", "csmwrap-3.1.2-src.tar.xz" };
+
+fn stickPath(buffer: *[300:0]u16, path: []const u8) ![:0]const u16 {
+    const n = try std.unicode.utf8ToUtf16Le(buffer[0..299], path);
+    buffer[n] = 0;
+    return buffer[0..n :0];
+}
+fn openStick(root: *uefi.protocol.File, path: []const u8) !*uefi.protocol.File {
+    var buffer: [300:0]u16 = undefined;
+    return root.open(try stickPath(&buffer, path), .read, .{});
+}
+fn stickFileSize(file: *uefi.protocol.File) !u64 {
+    var info_buf: [1024]u8 align(8) = undefined;
+    const info = try file.getInfo(.file, &info_buf);
+    if (info.attribute.directory) return error.InvalidArgument;
+    return info.file_size;
+}
+/// Before the disk question (nothing written yet): CSMWrap present with the
+/// pinned hash and its licence files next to it, as the Alpine route checks.
+fn checkCsmwrap(root: *uefi.protocol.File, log: app.Logger) !void {
+    const file = openStick(root, csmwrap_dir ++ "\\csmwrapx64.efi") catch |err| {
+        log.say("CSMWRAP missing {s}\\csmwrapx64.efi ({s})\n", .{ csmwrap_dir, @errorName(err) });
+        return error.CsmwrapMissing;
+    };
+    defer file.close() catch {};
+    var hash = std.crypto.hash.sha2.Sha256.init(.{});
+    var buffer: [4096]u8 = undefined;
+    var total: u64 = 0;
+    while (true) {
+        const n = try file.read(&buffer);
+        if (n == 0) break;
+        hash.update(buffer[0..n]);
+        total += n;
+    }
+    const digest = std.fmt.bytesToHex(hash.finalResult(), .lower);
+    if (!std.mem.eql(u8, &digest, hw.csmwrap_sha256)) {
+        log.say("CSMWRAP hash {s} is not the pinned {s}\n", .{ &digest, hw.csmwrap_sha256 });
+        return error.CsmwrapHashMismatch;
+    }
+    for (csmwrap_files) |name| {
+        var path: [160]u8 = undefined;
+        const f = openStick(root, try std.fmt.bufPrint(&path, csmwrap_dir ++ "\\{s}", .{name})) catch {
+            log.say("CSMWRAP licence file missing: {s}\n", .{name});
+            return error.CsmwrapIncomplete;
+        };
+        f.close() catch {};
+    }
+    log.say("CSMWRAP PASS csmwrapx64.efi bytes={d} sha256={s} (pinned 3.1.2-usos18)\n", .{ total, &digest });
+}
+/// Streams one stick file into the new FAT; `pinned`: required SHA-256.
+fn copyToFat(volume: *fat32.Volume, root: *uefi.protocol.File, from: []const u8, to: []const u8, buffer: []u8, pinned: ?[]const u8) !u64 {
+    const file = try openStick(root, from);
+    defer file.close() catch {};
+    const size = try stickFileSize(file);
+    var out = try volume.createFile(to, size);
+    var hash = std.crypto.hash.sha2.Sha256.init(.{});
+    var done: u64 = 0;
+    while (done < size) {
+        const want: usize = @intCast(@min(buffer.len, size - done));
+        const n = try file.read(buffer[0..want]);
+        if (n == 0) return error.Io;
+        hash.update(buffer[0..n]);
+        try out.write(buffer[0..n]);
+        done += n;
+    }
+    try out.finish();
+    if (pinned) |expected| {
+        const digest = std.fmt.bytesToHex(hash.finalResult(), .lower);
+        if (!std.mem.eql(u8, &digest, expected)) return error.CsmwrapHashMismatch;
+    }
+    return size;
+}
+/// Every regular file of a stick folder whose name ends in `suffix`.
+fn copyFolderToFat(volume: *fat32.Volume, root: *uefi.protocol.File, from: []const u8, to: []const u8, suffix: []const u8, buffer: []u8) !u32 {
+    const dir = try openStick(root, from);
+    defer dir.close() catch {};
+    var copied: u32 = 0;
+    var info: [1024]u8 align(8) = undefined;
+    while (true) {
+        const n = try dir.read(&info);
+        if (n == 0) break;
+        if (n < 82) return error.InvalidArgument;
+        if (std.mem.readInt(u64, info[72..80], .little) & 0x10 != 0) continue;
+        const units = std.mem.bytesAsSlice(u16, info[80 .. 80 + (n - 80) / 2 * 2]);
+        var len: usize = 0;
+        while (len < units.len and units[len] != 0) len += 1;
+        var name: [256]u8 = undefined;
+        const name_len = try std.unicode.utf16LeToUtf8(&name, @alignCast(units[0..len]));
+        const text = name[0..name_len];
+        if (text.len <= suffix.len or !std.ascii.endsWithIgnoreCase(text, suffix)) continue;
+        var src: [300]u8 = undefined;
+        var dst: [300]u8 = undefined;
+        _ = try copyToFat(volume, root, try std.fmt.bufPrint(&src, "{s}\\{s}", .{ from, text }), try std.fmt.bufPrint(&dst, "{s}/{s}", .{ to, text }), buffer, null);
+        copied += 1;
+        if (copied > 256) return error.TooManyEntries;
+    }
+    return copied;
+}
+/// tools/xp_csmwrap_esp.sh on the MiniOS side: a 64 MiB FAT ESP (FAT32 with
+/// 512-byte clusters here, FAT16 on the Alpine route) holding CSMWrap as
+/// \EFI\BOOT\BOOTX64.EFI, csmwrap.ini, licences, source and patches.
+/// Written before its MBR entry is published.
+fn writeCsmwrapEsp(root: *uefi.protocol.File, disk: platform.Disk, esp_start: u64, serial: u32, allocator: std.mem.Allocator, log: app.Logger) !void {
+    const part: partitions.Partition = .{ .start_bytes = esp_start * 512, .size_bytes = hw.csmwrap_esp_sectors * 512 };
+    var volume = try fat32.format(disk, part, .{ .serial = serial, .label = "CSMWRAP    ".* });
+    for ([_][]const u8{ "EFI", "EFI/BOOT", "CSMWRAP", "CSMWRAP/patches", "CSMWRAP/licenses" }) |dir| _ = try volume.mkdir(dir);
+    const buffer = try allocator.alloc(u8, 65536);
+    defer allocator.free(buffer);
+    const efi_bytes = try copyToFat(&volume, root, csmwrap_dir ++ "\\csmwrapx64.efi", "EFI/BOOT/BOOTX64.EFI", buffer, hw.csmwrap_sha256);
+    // Quiet unless the stick has EFI\USOS\csmwrap-verbose.flag (as Alpine).
+    const verbose = if (openStick(root, "\\EFI\\USOS\\csmwrap-verbose.flag")) |flag| blk: {
+        flag.close() catch {};
+        break :blk true;
+    } else |_| false;
+    const ini = if (verbose) "serial = false\r\nverbose = true\r\n" else "serial = false\r\nverbose = false\r\n";
+    var out = try volume.createFile("EFI/BOOT/csmwrap.ini", ini.len);
+    try out.write(ini);
+    try out.finish();
+    var extra: u64 = 0;
+    for (csmwrap_files) |name| {
+        var src: [160]u8 = undefined;
+        var dst: [160]u8 = undefined;
+        extra += try copyToFat(&volume, root, try std.fmt.bufPrint(&src, csmwrap_dir ++ "\\{s}", .{name}), try std.fmt.bufPrint(&dst, "CSMWRAP/{s}", .{name}), buffer, null);
+    }
+    const patches = try copyFolderToFat(&volume, root, csmwrap_dir ++ "\\patches", "CSMWRAP/patches", ".patch", buffer);
+    const licences = try copyFolderToFat(&volume, root, csmwrap_dir ++ "\\licenses", "CSMWRAP/licenses", ".txt", buffer);
+    if (patches == 0 or licences == 0) return error.CsmwrapIncomplete;
+    try volume.flush();
+    log.say("CSMWRAP_ESP PASS start={d} sectors={d} BOOTX64.EFI bytes={d} verbose={any} licence_bytes={d} patches={d} licences={d}\n", .{ esp_start, hw.csmwrap_esp_sectors, efi_bytes, verbose, extra, patches, licences });
 }
 
 /// Hardware install: the QEMU install pipeline over the user's disk, made
@@ -878,10 +1103,17 @@ fn addBootEntry(io: *uefi.protocol.BlockIo, esp: partitions.Partition, esp_guid:
 fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle, target: *Device, tracker: *platform.TrackedAllocator, seed: [64]u8, output: *Output, log: app.Logger) !void {
     const allocator = tracker.allocator();
     const src_cfg = cfg.source orelse return error.InvalidArgument;
+    const mbr = cfg.kind == .mbr;
     var apply: HwApply = .{};
     const xml: ?[]u8 = if (cfg.hw.unattend) try readUnattend(root, allocator) else null;
     defer if (xml) |bytes| allocator.free(bytes);
     apply.xml = xml;
+    if (mbr) {
+        apply.display = hw.displayRequest(xml);
+        apply.root = root;
+        apply.allocator = allocator;
+        if (apply.display == null) log.say("HW_DISPLAY keep (profile display=keep or the answer's own mode): USOSRES not staged\n", .{});
+    }
     const source = try allocator.create(Device);
     defer allocator.destroy(source);
     source.* = .{ .io = try chooseSource(src_cfg, target.io, log), .category = .source_io };
@@ -890,9 +1122,18 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     var blank = try hw.VirtualBlank.init(allocator, target.disk());
     defer blank.deinit();
     log.say("HW_TARGET virtual_blank chunk={d} sectors={d}; stale bytes hidden, first-touch zeroed\n", .{ hw.chunk_bytes, cfg.sectors });
-    var combined: ?writecombine.Cache = if (cfg.combine) try writecombine.Cache.init(allocator, blank.disk(), .block_device) else null;
+    // MBR route: the install pipeline sees the disk up to the CSMWrap ESP
+    // (system 100 MiB + Windows end there; Disk bounds every access).
+    var install_disk = blank.disk();
+    var esp_start: u64 = 0;
+    if (mbr) {
+        esp_start = try hw.csmwrapEspStart(cfg.sectors);
+        install_disk.sectors = esp_start;
+        log.say("HW_LAYOUT mbr system=100MiB(active) windows_end_sector={d} csmwrap_esp_start={d} csmwrap_esp_sectors={d}\n", .{ esp_start, esp_start, hw.csmwrap_esp_sectors });
+    }
+    var combined: ?writecombine.Cache = if (cfg.combine) try writecombine.Cache.init(allocator, install_disk, .block_device) else null;
     defer if (combined) |*cache| cache.deinit();
-    const target_disk = if (combined) |*cache| cache.disk() else blank.disk();
+    const target_disk = if (combined) |*cache| cache.disk() else install_disk;
     var wide: [1024]u16 = undefined;
     const n = try std.unicode.utf8ToUtf16Le(&wide, src_cfg.path);
     var components: [32][]const u16 = undefined;
@@ -912,7 +1153,7 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     const ids = try layout.Ids.fromSeed64(seed);
     var marker: [84]u8 = undefined;
     const marker_text = try std.fmt.bufPrint(&marker, "USOSPREP TARGET v1\n{s}\n", .{cfg.token});
-    const result = try install_app.run(target_disk, .uefi, ids, .{ .explicit = true, .source_identity = @intFromPtr(source.io), .target_identity = @intFromPtr(target.io), .boot_identity = @intFromPtr(boot), .marker = marker_text, .virtual_blank = true }, tracker, .{ .context = iso, .size = iso.file.size(), .read_fn = iso.reader().read_fn }, cfg.wim_index.?, .{ .verify_scope = cfg.verify_scope, .post_apply_context = &apply, .post_apply = HwApply.post }, log);
+    const result = try install_app.run(target_disk, if (mbr) .bios else .uefi, ids, .{ .explicit = true, .source_identity = @intFromPtr(source.io), .target_identity = @intFromPtr(target.io), .boot_identity = @intFromPtr(boot), .marker = marker_text, .virtual_blank = true }, tracker, .{ .context = iso, .size = iso.file.size(), .read_fn = iso.reader().read_fn }, cfg.wim_index.?, .{ .verify_scope = cfg.verify_scope, .post_apply_context = &apply, .post_apply = HwApply.post }, log);
     if (combined) |cache| log.say("TARGET_COMBINE capacity={d} logical_writes={d} upstream_writes={d} drains={d} failures={d}\n", .{ writecombine.capacity, cache.stats.logical_writes, cache.stats.upstream_writes, cache.stats.drains, cache.stats.failures });
     // Byte-identical to a fresh image wherever Windows reads metadata.
     try blank.fillRange(0, result.windows.start_bytes);
@@ -926,12 +1167,46 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     var wide_locale: [32]u16 = undefined;
     const locale_len = try std.unicode.utf8ToUtf16Le(&wide_locale, cfg.hw.localeText());
     const loader_guid = try hw.loaderGuid(seed, &.{ ids.base.disk_guid, ids.base.partition_guid, ids.esp, ids.msr });
+    const timestamp = std.math.mul(u64, std.math.add(u64, Output.clock(output), 11644473600) catch return error.InvalidBootTime, 10000000) catch return error.InvalidBootTime;
+    if (mbr) {
+        // BIOS boot: own MBR + NTFS PBR (tools/minios/bootcode), BOOTMGR and
+        // Boot\ from Windows\Boot\PCAT, an offline BIOS BCD (REGF writer).
+        const code = @import("bios_boot_code");
+        const bios_stats = try @import("boot_bios_files.zig").provisionBios(install_disk, result, ids, tracker, .{
+            .loader_guid = loader_guid,
+            .timestamp = timestamp,
+            .locale = wide_locale[0..locale_len],
+            .gates = .{ .layout_apply = true, .hardware_flow = true },
+        }, .{ .mbr = &code.mbr, .pbr = &code.pbr }, log);
+        try blank.disk().flush();
+        log.say("HW_BOOT_BIOS files={d} bytes={d} bootmgr_lba={d} bootmgr_sectors={d} bcd_sha256={s} mbr_signature={x:0>8}\n", .{ bios_stats.files, bios_stats.bytes, bios_stats.bootmgr_lba, bios_stats.bootmgr_sectors, std.fmt.bytesToHex(bios_stats.bcd_sha256, .lower), ids.base.mbr_signature });
+        // The CSMWrap ESP, then its MBR slot 3 (published last, read back).
+        try blank.fillRange(esp_start * 512, (esp_start + hw.csmwrap_esp_sectors) * 512);
+        var fat_serial = std.mem.readInt(u32, ids.msr[0..4], .little) ^ 0x43534d57;
+        if (fat_serial == 0 or fat_serial == 0xffffffff) fat_serial = 0x55534f53;
+        try writeCsmwrapEsp(root, blank.disk(), esp_start, fat_serial, allocator, log);
+        try blank.disk().flush();
+        var sector0: [512]u8 = undefined;
+        try blank.disk().read(0, &sector0);
+        try hw.addCsmwrapEntry(&sector0, esp_start);
+        try blank.disk().write(0, &sector0);
+        try blank.disk().flush();
+        var readback: [512]u8 = undefined;
+        try target.disk().read(0, &readback);
+        if (!std.mem.eql(u8, &readback, &sector0)) return error.MbrReadbackMismatch;
+        log.say("HW_MBR PASS slot1=system(active,NTFS) slot2=Windows(NTFS) slot3=CSMWrap ESP(0xEF) start={d} signature={x:0>8}\n", .{ esp_start, ids.base.mbr_signature });
+        if (cfg.hw.boot_entry) {
+            _ = addCsmwrapBootEntry(target.io, esp_start, ids.base.mbr_signature, log) catch |err| log.say("HW_BOOT_ENTRY WARN {s}; the firmware's removable-path scan of the disk remains (as the Alpine route)\n", .{@errorName(err)});
+        }
+        log.say("USOSPREP HW PASS image={d} route=mbr-csmwrap; the menu restarts into the new Windows (CSMWrap, BIOS mode)\n", .{cfg.wim_index.?});
+        return;
+    }
     const boot_files = @import("boot_files.zig");
     var guarded = try @import("boot_target.zig").EspOnly.init(blank.disk(), result);
     const stats = try boot_files.provisionUefi(guarded.disk(), result, ids, tracker, .{
         .arch = if (builtin.cpu.arch == .x86_64) .x64 else .ia32,
         .loader_guid = loader_guid,
-        .timestamp = std.math.mul(u64, std.math.add(u64, Output.clock(output), 11644473600) catch return error.InvalidBootTime, 10000000) catch return error.InvalidBootTime,
+        .timestamp = timestamp,
         .locale = wide_locale[0..locale_len],
         .gates = .{ .layout_apply = true, .hardware_flow = true },
     }, log);
@@ -1025,11 +1300,14 @@ fn run(output: *Output) anyerror!void {
         hw_run.build_len = cfg.hw.build_len;
         log.say("HW build={s} locale={s} unattend={any} boot_entry={any} qemu_detected={any}\n", .{ cfg.hw.buildId(), cfg.hw.localeText(), cfg.hw.unattend, cfg.hw.boot_entry, output.qemu });
     }
+    // CSMWrap route: CSMWrap and its licences are checked before the disk
+    // question, so a stick without them writes nothing.
+    if (cfg.hardware and cfg.kind == .mbr) try checkCsmwrap(root, log);
     try connectStorage(log);
     // Hardware: the flow's one disk question. Only the chosen disk receives
     // this run's token; choose() below then requires exactly one disk with
     // that size and token, as in the QEMU gate.
-    if (cfg.hardware) cfg.sectors = try pickTarget(cfg.token, boot_handle, log);
+    if (cfg.hardware) cfg.sectors = try pickTarget(cfg.token, boot_handle, cfg.kind == .mbr, log);
     var device: Device = .{ .io = try choose(cfg, boot_handle, log) };
     const tracker = output.tracker orelse return error.InvalidArgument;
     errdefer log.say("MEM failure alloc_current={d} alloc_peak={d}\n", .{ tracker.current, tracker.peak });
@@ -1364,6 +1642,13 @@ test "hardware config: menu-written, disk from the disk question, install only" 
     try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\nlocale=a\n"));
     try std.testing.expectError(error.InvalidArgument, config("USOSPREP_HW_V1\nmode=mbr\ntoken=" ++ token ++ "\nprofile=install\nwim_index=6\n" ++ source ++ "build=B1\n"));
     try std.testing.expectError(error.InvalidArgument, config("USOSPREP_HW_V1\nmode=gpt\ntoken=" ++ token ++ "\nprofile=wim\nwim_index=6\nbuild=B1\n"));
+    // MBR only as the CSMWrap route; csmwrap=on never with GPT.
+    const mbr = try config("USOSPREP_HW_V1\nmode=mbr\ntoken=" ++ token ++ "\nprofile=install\nwim_index=1\n" ++ source ++ "build=B1\ncsmwrap=on\n");
+    try std.testing.expect(mbr.kind == .mbr and mbr.hw.csmwrap);
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\ncsmwrap=on\n"));
+    try std.testing.expectError(error.InvalidArgument, config("USOSPREP_HW_V1\nmode=mbr\ntoken=" ++ token ++ "\nprofile=install\nwim_index=1\n" ++ source ++ "build=B1\ncsmwrap=off\n"));
+    try std.testing.expectError(error.InvalidArgument, config(base ++ "build=B1\ncsmwrap=off\ncsmwrap=off\n"));
+    try std.testing.expectError(error.InvalidArgument, config("USOSPREP_QEMU_ONLY\nmode=mbr\ntarget_sectors=4194304\ntoken=" ++ token ++ "\ncsmwrap=on\n"));
     // QEMU configs cannot use the hardware keys.
     try std.testing.expectError(error.InvalidArgument, config("USOSPREP_QEMU_ONLY\nmode=gpt\ntarget_sectors=4194304\ntoken=" ++ token ++ "\nbuild=B1\n"));
 }
