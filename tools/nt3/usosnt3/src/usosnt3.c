@@ -1361,6 +1361,9 @@ static void vesa(void)
     say("vesa on\r\n");
 }
 
+static int native_install(void);
+static void boot_ini_finish(void);
+
 static void WINAPI handler(DWORD control)
 {
     (void)control;
@@ -1381,6 +1384,8 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     open_log("POST.LOG");
     if (!post()) goto failed;
     polish();
+    if (native_install())
+        boot_ini_finish();
     /* Once only: the service turns itself off before DONE.TXT. */
     if (g_client_requested) {
         if (!client_commit_installer()) goto failed;
@@ -1404,11 +1409,278 @@ stopped:
         SetServiceStatus(g_status_handle, &g_status);
 }
 
+/* ------------------------------------------------------------------------
+ * Native install (docs/nt-native-plan.md, NATIVE.TXT written by
+ * nt4_csmwrap_target.sh only on the native path): no install VM, so the
+ * VM flow's finish step (nt4_qemu_install.sh nt4_vm_finish) never runs on
+ * this disk. usosnt3 does its two parts that matter on the PC:
+ *   - usb_early(): /setup (GUI Setup) already copies usosusb.sys and writes
+ *     its service, so the FIRST start of the installed system has the USB
+ *     keyboard and mouse (X470 2026-10-28: the first start only had PS/2,
+ *     usosusb came with post() and needed one more restart);
+ *   - boot_ini_finish(): BOOT.INI as nt4_boot_ini writes it (timeout=5, no
+ *     "C:\" entry for the saved syslinux boot sector, the boot options on
+ *     every entry, [USOS /SOS] / [VGA mode] after the default) and the
+ *     Setup leftovers on C:\ removed.
+ */
+static int native_install(void)
+{
+    return GetFileAttributesA(DIR "NATIVE.TXT") != 0xFFFFFFFF;
+}
+
+/* Reads at most size - 1 bytes of a file into buf (NUL-terminated); returns the length or -1. */
+static int read_small(const char *path, char *buf, int size)
+{
+    HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    DWORD n = 0;
+    if (h == INVALID_HANDLE_VALUE)
+        return -1;
+    if (!ReadFile(h, buf, (DWORD)size - 1, &n, NULL))
+        n = 0;
+    CloseHandle(h);
+    buf[n] = 0;
+    return (int)n;
+}
+
+/* No C runtime: an own byte copy (the compiler must not turn it into memcpy). */
+static void copy_bytes(char *d, const char *s, int n)
+{
+    volatile char *vd = d;
+    int i;
+    for (i = 0; i < n; i++)
+        vd[i] = s[i];
+}
+
+static char lower(char c)
+{
+    return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+}
+
+/* 1 when line (length n) contains the lower-case word w, case-insensitively. */
+static int has_ci(const char *line, int n, const char *w)
+{
+    int i, k, wl = len(w);
+    for (i = 0; i + wl <= n; i++) {
+        for (k = 0; k < wl && lower(line[i + k]) == w[k]; k++)
+            ;
+        if (k == wl)
+            return 1;
+    }
+    return 0;
+}
+
+static void usb_early(void)
+{
+    char sys[MAX_PATH], dst[MAX_PATH];
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usosusb.sys");
+    if (!CopyFileA(DIR "USOSUSB.SYS", dst, FALSE)) {
+        say_hex("usb early: COPY FAILED, error ", GetLastError());
+        return;
+    }
+    say("usb early: copied ");
+    say(dst);
+    say("\r\n");
+    set_dword("usosusb", NULL, "Type", 1);
+    set_dword("usosusb", NULL, "Start", 1);
+    set_dword("usosusb", NULL, "ErrorControl", 0);
+    set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");
+    set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
+    set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
+}
+
+/* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
+static void native_options(char *opts, int size)
+{
+    static char buf[512];
+    int i, n = read_small(DIR "NATIVE.TXT", buf, sizeof buf), o = 0;
+    opts[0] = 0;
+    for (i = 0; i < n; i++) {
+        if ((i == 0 || buf[i - 1] == '\n') && i + 13 <= n && has_ci(buf + i, 13, "boot_options=")) {
+            i += 13;
+            while (i < n && buf[i] != '\r' && buf[i] != '\n' && o < size - 1)
+                opts[o++] = buf[i++];
+            opts[o] = 0;
+            return;
+        }
+    }
+}
+
+static void out_add(char *out, int *o, int size, const char *s, int n)
+{
+    int i;
+    for (i = 0; i < n && *o < size - 1; i++)
+        out[(*o)++] = s[i];
+    out[*o] = 0;
+}
+
+/* Removes " /MAXMEM=<digits>" (any case) from line[0..*n). */
+static void drop_maxmem(char *line, int *n)
+{
+    int i, j;
+    for (i = 0; i + 8 <= *n; i++) {
+        if (line[i] == '/' && has_ci(line + i, 8, "/maxmem=")) {
+            int s = i, e = i + 8;
+            while (s > 0 && (line[s - 1] == ' ' || line[s - 1] == '\t'))
+                s--;
+            while (e < *n && line[e] >= '0' && line[e] <= '9')
+                e++;
+            for (j = 0; e + j < *n; j++)
+                line[s + j] = line[e + j];
+            *n -= e - s;
+            i = s - 1;
+        }
+    }
+}
+
+static void boot_ini_finish(void)
+{
+    static char in[8192], out[12288], line[600];
+    char opts[200];
+    int n, i = 0, o = 0, sos = 0, vga = 0, first_end = -1;
+    int arc_len = 0, desc_s = 0, desc_l = 0;
+    char arc_line[600];
+    const char *ini = "C:\\BOOT.INI";
+    static const char *const leftovers[] = {
+        "C:\\BOOTSECT.DOS", "C:\\LDLINUX.SYS", "C:\\LDLINUX.C32", "C:\\SYSLINUX.CFG", "C:\\CHAIN.C32",
+        "C:\\LIBCOM32.C32", "C:\\LIBUTIL.C32", "C:\\$LDR$", "C:\\TXTSETUP.SIF", "C:\\WINNT.SIF"
+    };
+    DWORD attr, w;
+    HANDLE h;
+
+    native_options(opts, sizeof opts);
+    n = read_small(ini, in, sizeof in);
+    if (n <= 0) {
+        say("boot.ini: cannot read C:\\BOOT.INI\r\n");
+        return;
+    }
+    if (has_ci(in, n, "[usos /sos]")) {
+        say("boot.ini: already finished\r\n");
+    } else {
+        while (i < n) {
+            int l = 0, t = 0;
+            while (i < n && in[i] != '\n') {
+                if (in[i] != '\r' && l < (int)sizeof line - 200)
+                    line[l++] = in[i];
+                i++;
+            }
+            if (i < n)
+                i++;
+            while (t < l && (line[t] == ' ' || line[t] == '\t'))
+                t++;
+            if (l - t >= 7 && has_ci(line + t, 7, "timeout") && has_ci(line + t, l - t, "=")) {
+                lstrcpyA(line, "timeout=5");
+                l = 9;
+            } else if (l - t >= 3 && lower(line[t]) == 'c' && line[t + 1] == ':' && line[t + 2] == '\\') {
+                int k = t + 3;
+                while (k < l && (line[k] == ' ' || line[k] == '\t'))
+                    k++;
+                if (k < l && line[k] == '=')
+                    continue;           /* the "C:\" entry: Setup's copy of the syslinux boot sector */
+            } else if (l - t >= 6 && has_ci(line + t, 6, "multi(")) {
+                if (has_ci(line, l, "/basevideo"))
+                    vga = 1;
+                else if (has_ci(line, l, "/sos"))
+                    sos = 1;
+                else if (first_end < 0) {
+                    int p, q;
+                    for (p = 0; p + 1 < l && !(line[p] == '=' && line[p + 1] == '"'); p++)
+                        ;
+                    for (q = p + 2; q < l && line[q] != '"'; q++)
+                        ;
+                    if (p + 1 < l && q < l) {
+                        arc_len = p;
+                        desc_s = p + 2;
+                        desc_l = q - desc_s;
+                        copy_bytes(arc_line, line, l);
+                        first_end = 1;
+                    }
+                }
+                if (!has_ci(line, l, "/numproc")) {
+                    drop_maxmem(line, &l);
+                    while (l > 0 && (line[l - 1] == ' ' || line[l - 1] == '\t'))
+                        l--;
+                    if (opts[0]) {
+                        line[l++] = ' ';
+                        copy_bytes(line + l, opts, len(opts));
+                        l += len(opts);
+                    }
+                }
+                out_add(out, &o, sizeof out, line, l);
+                out_add(out, &o, sizeof out, "\r\n", 2);
+                if (first_end == 1) {
+                    first_end = o;      /* the extra entries go right after this line */
+                }
+                continue;
+            }
+            out_add(out, &o, sizeof out, line, l);
+            out_add(out, &o, sizeof out, "\r\n", 2);
+        }
+        if (first_end > 0 && (!sos || !vga)) {
+            static char extra[1400], tail[12288];
+            int e = 0, tl = o - first_end;
+            copy_bytes(tail, out + first_end, tl);
+            if (!sos) {
+                out_add(extra, &e, sizeof extra, arc_line, arc_len);
+                out_add(extra, &e, sizeof extra, "=\"", 2);
+                out_add(extra, &e, sizeof extra, arc_line + desc_s, desc_l);
+                out_add(extra, &e, sizeof extra, " [USOS /SOS]\" /SOS", 18);
+                if (opts[0]) {
+                    out_add(extra, &e, sizeof extra, " ", 1);
+                    out_add(extra, &e, sizeof extra, opts, len(opts));
+                }
+                out_add(extra, &e, sizeof extra, "\r\n", 2);
+            }
+            if (!vga) {
+                out_add(extra, &e, sizeof extra, arc_line, arc_len);
+                out_add(extra, &e, sizeof extra, "=\"", 2);
+                out_add(extra, &e, sizeof extra, arc_line + desc_s, desc_l);
+                out_add(extra, &e, sizeof extra, " [VGA mode]\" /basevideo /sos", 28);
+                if (opts[0]) {
+                    out_add(extra, &e, sizeof extra, " ", 1);
+                    out_add(extra, &e, sizeof extra, opts, len(opts));
+                }
+                out_add(extra, &e, sizeof extra, "\r\n", 2);
+            }
+            o = first_end;
+            out_add(out, &o, sizeof out, extra, e);
+            out_add(out, &o, sizeof out, tail, tl);
+        }
+        attr = GetFileAttributesA(ini);
+        SetFileAttributesA(ini, FILE_ATTRIBUTE_NORMAL);
+        h = CreateFileA(ini, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h != INVALID_HANDLE_VALUE && WriteFile(h, out, (DWORD)o, &w, NULL) && w == (DWORD)o &&
+            FlushFileBuffers(h)) {
+            say("boot.ini: timeout=5, no C:\\ entry, options ");
+            say(opts[0] ? opts : "(none)");
+            say("\r\n");
+        } else {
+            say_hex("boot.ini: WRITE FAILED, error ", GetLastError());
+        }
+        if (h != INVALID_HANDLE_VALUE)
+            CloseHandle(h);
+        if (attr != 0xFFFFFFFF)
+            SetFileAttributesA(ini, attr);
+    }
+    for (i = 0; i < (int)(sizeof leftovers / sizeof leftovers[0]); i++) {
+        if (GetFileAttributesA(leftovers[i]) == 0xFFFFFFFF)
+            continue;
+        SetFileAttributesA(leftovers[i], FILE_ATTRIBUTE_NORMAL);
+        say(DeleteFileA(leftovers[i]) ? "removed " : "CANNOT REMOVE ");
+        say(leftovers[i]);
+        say("\r\n");
+    }
+}
+
 static void setup(void)
 {
     char image[MAX_PATH];
     open_log("SETUP.LOG");
     say("USOS NT 3.51 setup: registering the usosnt3 service\r\n");
+    if (native_install())
+        usb_early();
     lstrcpyA(image, DIR);
     lstrcatA(image, "USOSNT3.EXE /service");
     set_dword(SVC_NAME, NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
@@ -1483,6 +1755,20 @@ void __stdcall entry(void)
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
         ExitProcess(post() ? 0 : 3);
+    }
+    /* By hand on a native install that predates the early USB / BOOT.INI
+       steps: what /setup and the service add on the native path. */
+    if (lstrcmpA(opt, "finish") == 0) {
+        open_log("POST.LOG");
+        say("USOS native finish (by hand)\r\n");
+        if (!native_install()) {
+            say("no NATIVE.TXT: not a native install, nothing done\r\n");
+            ExitProcess(3);
+        }
+        usb_early();
+        boot_ini_finish();
+        say("finish done\r\n");
+        ExitProcess(0);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
     if (lstrcmpA(opt, "polish") == 0) {

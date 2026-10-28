@@ -1020,6 +1020,12 @@ if [ "$NATIVE" = 1 ]; then
     # GUI-mode Setup page recorder (tools/nt3/usosans3): USOSNT3.EXE /setup
     # starts it; it logs every page to \USOS\NT3\USOSANS.TXT.
     cp "$drv/USOSANS3.EXE" "$usos/USOSANS3.EXE" || fail 'cannot copy USOSANS3.EXE'
+    # NATIVE.TXT: the native-path marker for usosnt3. /setup (GUI Setup)
+    # installs usosusb at once, so the first start has the USB keyboard and
+    # mouse; the service does the VM finish step's BOOT.INI part (timeout=5,
+    # no C:\ entry, these options, [USOS /SOS]) and removes the leftovers.
+    printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write NATIVE.TXT'
+    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS (usosnt3: USB from the first start, BOOT.INI finish)"
 fi
 if [ "$NATIVE" = 1 ] && [ "$minor" = 50 ]; then
     # NT 3.5 text mode runs AUTOCHK.EXE from ~BT (TXTSETUP.SIF autochk.exe on

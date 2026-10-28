@@ -593,14 +593,16 @@ class Nt3AnswerProfile(unittest.TestCase):
     def test_usosnt3_imports_exist_on_nt31(self):
         # Every static import of usosnt3.exe is exported by the kernel32 /
         # advapi32 of NT 3.1 (checked against the 3.1, 3.5 and 3.51 CDs'
-        # DLLs on 2026-10-14); newer calls go through GetProcAddress.
+        # DLLs on 2026-10-14; SetFileAttributesA, for BOOT.INI on the native
+        # path, checked in the installed NT 3.51 kernel32 2026-10-28); newer
+        # calls go through GetProcAddress.
         from check_nt52_driver_imports import pe
         nt31 = {
             'kernel32.dll': {'CloseHandle', 'CopyFileA', 'CreateFileA', 'DeleteFileA', 'ExitProcess', 'FlushFileBuffers',
                              'FindClose', 'FindFirstFileA', 'FindNextFileA', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess',
                              'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError',
                              'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
-                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFilePointer', 'Sleep', 'WriteFile',
+                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFileAttributesA', 'SetFilePointer', 'Sleep', 'WriteFile',
                              'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
                              'lstrcpyA'},
             'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',

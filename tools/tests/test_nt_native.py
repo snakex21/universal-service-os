@@ -132,6 +132,35 @@ class NativeWiring(unittest.TestCase):
         self.assertIn('usr/lib/usos/nt3/USOSANS3.EXE', micro)
 
 
+    def test_native_marker_early_usb_and_boot_ini_finish(self):
+        # X470 2026-10-28 (native NT 3.51, B261028-191138): the first start had
+        # only PS/2 (usosusb came with the service's post(), active only after
+        # one more restart) and BOOT.INI kept Setup's timeout=30 + the "C:\"
+        # entry of the saved syslinux boot sector.
+        text = TARGET.read_text(encoding='utf-8')
+        nt3 = text[text.index('usos="$work/c/USOS/NT3"' + chr(10) + 'mkdir -p "$usos"'):text.index('usos="$work/c/USOS/NT4"')]
+        self.assertIn('''printf 'boot_options=%s\\r\\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT"''', nt3)
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
+        setup = src[src.index('static void setup(void)'):]
+        setup = setup[:setup.index(chr(10) + '}' + chr(10))]
+        self.assertIn('if (native_install())\n        usb_early();', setup)
+        early = src[src.index('static void usb_early(void)'):]
+        early = early[:early.index(chr(10) + '}' + chr(10))]
+        for piece in ('"\\\\drivers\\\\usosusb.sys"', 'set_dword("usosusb", NULL, "Start", 1);',
+                      'set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");',
+                      'set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);',
+                      'set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);'):
+            self.assertIn(piece, early)
+        service = src[src.index('static void WINAPI service_main('):]
+        service = service[:service.index(chr(10) + '}' + chr(10))]
+        self.assertIn('if (native_install())\n        boot_ini_finish();', service)
+        finish = src[src.index('static void boot_ini_finish(void)' + chr(10) + '{'):]
+        finish = finish[:finish.index(chr(10) + '}' + chr(10))]
+        for piece in ('"timeout=5"', '" [USOS /SOS]\\" /SOS"', '" [VGA mode]\\" /basevideo /sos"',
+                      '"C:\\\\BOOTSECT.DOS"', '"C:\\\\LDLINUX.SYS"', '"C:\\\\WINNT.SIF"'):
+            self.assertIn(piece, finish)
+
+
 class Recorder(unittest.TestCase):
     def test_imports_exist_on_nt3_and_pe_version(self):
         # kernel32 / user32 calls checked against the NT 3.51 CD's DLLs
