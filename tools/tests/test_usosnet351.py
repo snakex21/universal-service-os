@@ -149,7 +149,7 @@ class ResourceQueryExecution(unittest.TestCase):
 #define FALSE 0
 typedef uint32_t ULONG,NDIS_STATUS,UINT;
 typedef struct { ULONG Count; } NDIS_RESOURCE_LIST,*PNDIS_RESOURCE_LIST;
-typedef struct { void *Handle; ULONG PciSlot,AssignStatus,Legacy; } ADAPTER;
+typedef struct { void *Handle; ULONG PciSlot,PciBus,BusType,AssignStatus,Legacy; } ADAPTER;
 static unsigned query_calls,find_calls,assign_calls,write_status,found;
 static NDIS_RESOURCE_LIST assigned={2};
 static void NdisMQueryAdapterResources(NDIS_STATUS *st,void *ctx,PNDIS_RESOURCE_LIST res,UINT *len) {
@@ -159,6 +159,8 @@ static void NdisMQueryAdapterResources(NDIS_STATUS *st,void *ctx,PNDIS_RESOURCE_
  if(write_status){*st=0;res->Count=1;}
 }
 static int LegacyFind(ADAPTER *a,void *ctx){(void)ctx;find_calls++;a->PciSlot=3;return found;}
+/* native CF8h/CFCh scan: no card in this harness */
+static int Cf8Find(ADAPTER *a){(void)a;return 0;}
 static NDIS_STATUS NdisMPciAssignResources(void *h,ULONG slot,PNDIS_RESOURCE_LIST *r) {
  (void)h;if(slot!=3)return 99;assign_calls++;*r=&assigned;return 0;
 }

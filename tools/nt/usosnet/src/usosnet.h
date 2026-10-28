@@ -64,6 +64,13 @@
  * NT4/95 driver timer, re-armed with the one-shot NdisSetTimer because its
  * NDIS.VXD has no NdisMSetPeriodicTimer. */
 #define USOSNET_NDIS30 (USOSNET_NDIS3 || USOSNET_W95RTM)
+/* Driver-owned 20 ms timer (TimerFn): every build except NT 3.5, which
+ * keeps the NDIS-owned 2 s CheckForHang. NT 3.51 got the timer back for
+ * the native path (no install VM, docs/nt351-native-net-2026-10-28.md): on
+ * the X470 its HAL has no PCI bus handler, so the card's INTx is not
+ * reachable and the timer carries RX / TX. The NDIS 3.0 builds re-arm the
+ * one-shot NdisSetTimer (95 RTM pattern). */
+#define USOSNET_DRVTIMER (!USOSNET_NDIS3 || USOSNET_NT351)
 #if USOSNET_NT351 + USOSNET_NT35 + USOSNET_W95RTM > 1
 #error Select one NDIS 3.0 target
 #endif
@@ -93,8 +100,8 @@
 /* NT4/95/NDIS5: one timer for every mode, RX / TX housekeeping every tick (also with
  * interrupts: a lost or misrouted INTx then costs latency, not the link),
  * link, statistics, watchdogs and the diagnostic log once a second.
- * NT351 creates no driver timer; its NDIS-owned CheckForHang is a slow
- * nominal2000ms fallback. IRQ is the normal RX/TX path in that variant. */
+ * NT 3.51 has the timer too (USOSNET_DRVTIMER); NT 3.5 creates none: its
+ * NDIS-owned CheckForHang is a slow nominal 2000 ms fallback there. */
 #define TICK_MS         20
 #define TICKS_PER_SEC   (1000 / TICK_MS)
 #define LOG_MAX         40      /* NdisWriteErrorLogEntry rounds per start */
@@ -270,6 +277,11 @@ typedef struct _ADAPTER {
     ULONG ProbeMap, ProbeRestore, ProbeReset; /* IgbMmioProbe: 1 = chip answers */
     BOOLEAN InitLogged;
 #endif
+#if USOSNET_NT351
+    BOOLEAN Cf8;                /* found by the CF8h/CFCh scan (no HAL PCI bus) */
+    BOOLEAN Halted;             /* MpHalt done; a late timer callback returns */
+    ULONG BusType;              /* registry Parameters BusType (1 Isa for Cf8) */
+#endif
 } ADAPTER, *PADAPTER;
 
 /* register access (MMIO through volatile pointers, no HAL import) */
@@ -291,6 +303,19 @@ void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
 void UsIndicateRxComplete(PADAPTER A);
 void UsRxDropped(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
 
+#if USOSNET_NT351
+/* Native NT 3.51 (docs/nt351-native-net-2026-10-28.md): the NT 3.x MBR hides
+ * the PCI BIOS on machines with more than 8 PCI buses (X470), so the HAL
+ * has no PCI bus handler and NdisRead/WritePciSlotInformation return 0.
+ * When the NDIS bus scan finds no card, the driver scans ports CF8h/CFCh
+ * itself (as AHCINT / usosnvme NT351) and every later config access of
+ * this binary goes there: g_UsCf8Bus = the card's bus, ~0 = through NDIS. */
+extern ULONG g_UsCf8Bus;
+ULONG UsPciRead(NDIS_HANDLE H, ULONG Slot, ULONG Off, PVOID Buf, ULONG Len);
+ULONG UsPciWrite(NDIS_HANDLE H, ULONG Slot, ULONG Off, PVOID Buf, ULONG Len);
+#define NdisReadPciSlotInformation(h, s, o, b, l) UsPciRead((h), (s), (o), (b), (l))
+#define NdisWritePciSlotInformation(h, s, o, b, l) UsPciWrite((h), (s), (o), (b), (l))
+#endif
 extern const USOSNET_CHIP_OPS IgbOps;
 #if USOSNET_W95RTM
 ULONG IgbMmioProbe(PADAPTER A);

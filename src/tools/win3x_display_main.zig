@@ -10,6 +10,9 @@
 //!   usos-win3x-display nt4-kernel IN OUT
 //!                                         NT 4.0 RTM kernel CPUID leaf limit
 //!                                         (micro-Linux: usos-fb-ui --nt4-kernel)
+//!   usos-win3x-display nt3-cab-get CAB OUT | nt3-cab-put CAB FILE OUT
+//!                                         one-file NT 3.5x cabinet (micro-Linux:
+//!                                         usos-fb-ui --nt3-cab-get / --nt3-cab-put)
 //!   usos-win3x-display w9x-mini SETUPDIR HELPERDIR|-
 //!                                         Windows 9x Setup MINI.CAB (the
 //!                                         micro-Linux runs it as
@@ -43,6 +46,15 @@ pub fn main(init: std.process.Init) !u8 {
     if (std.mem.eql(u8, command, "nt4-kernel")) {
         const in_path = args.next() orelse return usage();
         return win3x.nt4_kernel.run(io, init.gpa, in_path, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "nt3-cab-get")) {
+        const cab_path = args.next() orelse return usage();
+        return win3x.nt3_cab_file.runGet(io, init.gpa, cab_path, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "nt3-cab-put")) {
+        const cab_path = args.next() orelse return usage();
+        const file_path = args.next() orelse return usage();
+        return win3x.nt3_cab_file.runPut(io, init.gpa, cab_path, file_path, args.next() orelse return usage());
     }
     if (std.mem.eql(u8, command, "expand")) {
         const in_path = args.next() orelse return usage();
