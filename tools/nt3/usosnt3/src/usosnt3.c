@@ -1417,6 +1417,27 @@ static void setup(void)
     set_sz(SVC_NAME, "ImagePath", REG_EXPAND_SZ, image);
     set_sz(SVC_NAME, "ObjectName", REG_SZ, "LocalSystem");
     set_sz(SVC_NAME, "DisplayName", REG_SZ, "USOS post-install");
+    /* Native install (docs/nt-native-plan.md): the GUI Setup page recorder
+       (tools/nt3/usosans3) runs next to GUI Setup on its desktop and logs
+       every page to C:\USOS\NT3\USOSANS.TXT. Only when the target script
+       staged it (native NT 3.5x); the install VM never gets the file. */
+    if (GetFileAttributesA(DIR "USOSANS3.EXE") != 0xFFFFFFFF) {
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        char cmd[MAX_PATH];
+        int i;
+        lstrcpyA(cmd, DIR "USOSANS3.EXE");
+        for (i = 0; i < (int)sizeof si; i++)   /* volatile: no memset (no C runtime) */
+            ((volatile char *)&si)[i] = 0;
+        si.cb = sizeof si;
+        if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            say("page recorder USOSANS3.EXE started\r\n");
+        } else {
+            say_hex("page recorder: CreateProcess failed, error ", GetLastError());
+        }
+    }
 }
 
 /* The first argument without its leading / or -, lower case, at most 15

@@ -140,27 +140,62 @@ What tells us where it stopped (silent logging, no photos needed):
 - C: of the target afterwards (offline, read-only): `\WINNT\SYSTEM32` present
   -> text mode copied; `\WINNT\SYSTEM32\CONFIG\SYSTEM` + `setup.log` -> text
   mode finished; `\USOS\NT3\POST.LOG` / `DONE.TXT` -> first start done;
-  `BOOT.INI` content -> OsLoadOptions reached it.
+  `BOOT.INI` content -> OsLoadOptions reached it; `\USOS\NT3\USOSANS.TXT`
+  -> every GUI Setup page with its controls (slice 2 recorder).
+- The same run works for NT 3.5 Workstation (slice 2, same flag).
 - If the screen stays black/blue right after "Setup is inspecting your
   computer's hardware configuration": text-mode HAL/NTDETECT (compare with
   the installed-system path, which passes).
 
-### 4.3 Slice 2 - finish in usosnt3, NT 3.5
+### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 
-- usosnt3 `/polish` (first start): BOOT.INI `[USOS /SOS]` + `[VGA mode]`,
-  `/MAXMEM` check, autochk restore from `\USOS\NT3\AUTOCHK.EXE`, remove
-  `~LS`, `~BT`, LDLINUX.SYS, `$LDR$`, TXTSETUP.SIF, WINNT.SIF, BOOTSECT.DOS
-  and the BOOT.INI `C:\` entry; write DONE.TXT last.
-- NT 3.5: usosachk also into `~BT` (3.5 reads AUTOCHK.EXE there; avoids the
-  ENTER page); `OsLoadOptions` `/MAXMEM=128`; GUI `GetProcessor` refuses
-  Zen 3 -> patch INITIAL.INF in the local source (expand INITIAL.IN_, set
-  `STF_PROCESSOR = I586` before the processor branch, store it uncompressed;
-  verify that 3.5 text mode copies an uncompressed file under the `.IN_`
-  name). Offline check: the patched INF text; hardware check: X470 run.
-- LAN: move `usos_nt351_vm_patch` / `usos_nt35_vm_patch` work into
-  usosnt3 or into pre-patched INFs in the local source.
+Rule (user, 2026-10-28): the native path needs **zero input**. NT 3.x/4 text
+mode has no USB keyboard at all, so every text-mode prompt is a dead end; GUI
+pages are answered by an NT-side USOSANS equivalent, never by the user.
 
-### 4.4 Slice 3 - NT 3.1 / 3.1 AS
+- NT 3.5 with `nt3-native.flag` (tags NT35 / NT35S), same routing as 3.51:
+  - `[Files]` row for ahcint from the CD's `ncrc810.sys` row (the 3.5 CD has
+    no amsint.sys; offline check on the user's 3.5 CD: `dx,d6,_3,4,1`);
+  - `OsLoadOptions = "/nodebug /NUMPROC=2 /MAXMEM=128"` (3.5 loses the boot
+    disk above 128 MiB);
+  - "Setup was unable to verify your C: drive ... Press ENTER": 3.5 runs
+    AUTOCHK.EXE from `~BT`; the usosachk stand-in now goes there too, so the
+    page should not come (unverified on hardware);
+  - GUI `GetProcessor` refuses Zen 3: `usos-fb-ui --nt35-initial`
+    (`src/compat/win3x/nt35_initial.zig`, own code) unpacks the CD's
+    one-file MSZIP `INITIAL.IN_`, adds `set STF_PROCESSOR =
+    $(ProcessorID_I586) ;USOS-NT35-CPU` right after `detect ProcessorVar`,
+    and writes it back as a cabinet (stored deflate blocks, parsed back
+    before use). Offline check on the user's 3.5 CD: exactly that one line
+    differs and 7-Zip tests the new cabinet OK. A failure stops prepare.
+  - 3.5 LAN off natively (its INF patch ran between VM starts).
+- GUI page recorder `USOSANS3.EXE` (`tools/nt3/usosans3`, own Win32 code,
+  kernel32 + user32 only, PE 3.10, imports checked against the NT 3.51 CD's
+  DLLs): staged in `\USOS\NT3` for every native start; `USOSNT3.EXE /setup`
+  (GUI Setup's `[GuiUnattended] !DetachedProgram`) starts it, so it runs on
+  GUI Setup's desktop. Once a second it lists the visible top-level windows
+  and their child controls; on every change it appends class, title, control
+  ID, class, text (Edit controls: length only), visible / enabled to
+  `C:\USOS\NT3\USOSANS.TXT` (flushed; 1 MiB / 6 h cap). This version only
+  records (`mode=record`); answer rules come from the first X470 log.
+
+Pages that can need input on the native path, and how each is covered:
+
+| Phase | Page | NT | Covered by |
+|---|---|---|---|
+| text | "unable to verify C:" (ENTER) | 3.51 / 3.5 | usosachk in `~LS` (3.51) / `~BT` (3.5) |
+| text | end of text mode (ENTER to restart) | 3.5x | unattended: restarts by itself (as in the VM) |
+| text | Welcome / Express / partition / FAT / `\winnt` / restart | 3.1 | open: slice 3 (no unattended text mode) |
+| GUI | processor not supported (fatal) | 3.5 | INITIAL.IN_ I586 line |
+| GUI | network pages | 3.5x | `!SetupNetWork = NO` + LAN off |
+| GUI | Date/Time applet, AS Domain Settings | 3.1 | open: answerer (slice 3) |
+| GUI | anything else | all | unknown: USOSANS3 records it; answer rules next round |
+
+Still open after slice 2: the finish jobs in usosnt3 (`[USOS /SOS]` entry,
+autochk restore, leftover cleanup) are not needed to reach the desktop and
+move to the next round; LAN for native 3.5x.
+
+### 4.4 Slice 3 - NT 3.1 / 3.1 AS, answer rules
 
 - Text mode (SETUPAPP, no answer file): either INF switches that skip the
   express pages (check TXTSETUP.INF offline first) or an own text-mode
@@ -207,7 +242,8 @@ work in-OS, key gate stays).
   miniport, the text-mode HAL with hidden PCI, `OsLoadOptions` reaching the
   text-mode kernel and BOOT.INI, GUI Setup on Zen 3 (GetProcessor), usosnt3
   first start without the VM finish step;
-- slice 2: 3.5 text + GUI with the patched INITIAL.INF;
+- slice 2: 3.5 text + GUI with the patched INITIAL.INF; USOSANS.TXT of
+  the 3.51 and 3.5 runs (every GUI page);
 - slice 3: the 3.1 page answerer;
 - NT 4.0 key gate with a Select CD (no key page) and with the key;
 - NT 4.0 VM path with `phase1-native.flag` present (the 2026-10-27 blocker).

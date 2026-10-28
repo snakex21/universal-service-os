@@ -34,6 +34,12 @@ pub fn main(init: std.process.Init) !u8 {
             const setup_dir = args.next() orelse return 2;
             return usos.win3x.w9x_mini.run(init.io, init.gpa, setup_dir, args.next() orelse return 2);
         }
+        // tools/nt4_csmwrap_target.sh, native NT 3.5: INITIAL.IN_ with the
+        // I586 processor line (src/compat/win3x/nt35_initial.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt35-initial")) {
+            const in_path = args.next() orelse return 2;
+            return usos.win3x.nt35_initial.run(init.io, init.gpa, in_path, args.next() orelse return 2);
+        }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
             const bcd = @import("bcd_lowmem.zig");

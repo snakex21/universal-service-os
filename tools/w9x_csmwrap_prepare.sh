@@ -231,12 +231,12 @@ usos_w9x_csmwrap_prepare() {
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
         NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1' ;;
     esac
-    # Native NT 3.51 (no install VM, docs/nt-native-plan.md): opt-in with
+    # Native NT 3.51 / 3.5 (no install VM, docs/nt-native-plan.md): opt-in with
     # EFI/USOS/win9x/nt3-native.flag while it is tested on hardware; the
     # 9x phase1-native.flag never switches NT.
     nt_native=no
     case "$tag" in
-        NT351|NT351S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;
+        NT351|NT351S|NT35|NT35S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;
     esac
     posr=''
     if [ "$tag" = POSR ]; then

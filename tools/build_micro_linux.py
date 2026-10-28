@@ -799,6 +799,9 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
         nt3_post = build_nt3(root)
         put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        # Native NT 3.5x GUI-mode Setup page recorder (docs/nt-native-plan.md).
+        from build_windows_usos_res import build_nt3_answer
+        put(entries, Entry("usr/lib/usos/nt3/USOSANS3.EXE", stat.S_IFREG | 0o644, build_nt3_answer(root).read_bytes()))
         net35 = (root / 'tools/nt/usosnet/bin/i386/usosnet35.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SYS', stat.S_IFREG | 0o644, net35))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SHA256', stat.S_IFREG | 0o644,

@@ -80,17 +80,67 @@ class NativeTxtsetup(unittest.TestCase):
 class NativeWiring(unittest.TestCase):
     def test_target_refuses_other_versions_before_the_disk(self):
         text = TARGET.read_text(encoding='utf-8')
-        gate = text.index('if [ "$NATIVE" = 1 ]; then\n    [ "$nt3:$minor" = yes:51 ]')
+        gate = text.index('if [ "$NATIVE" = 1 ]; then\n    { [ "$nt3:$minor" = yes:51 ]')
         self.assertLess(gate, text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
         self.assertIn('No disk was changed', text[gate:gate + 300])
         # The miniports go next to SETUPLDR (~BT) and into the local source.
         block = text[text.index('nt3_native_txtsetup "$ports"'):]
         self.assertIn('for dir in "$bt_dir" "$ls_src"; do', block[:1200])
         self.assertIn("log 'NT351 LAN skipped: native install", text)
+        self.assertIn('if [ "$major:$minor" = 3:50 ] && [ "$NATIVE" != 1 ]; then', text)
+
+    def test_target_nt35_needs_no_key_page(self):
+        text = TARGET.read_text(encoding='utf-8')
+        block = text[text.index('if [ "$NATIVE" = 1 ] && [ "$minor" = 50 ]; then'):]
+        block = block[:block.index(chr(10) + 'fi' + chr(10))]
+        # "unable to verify C:" never comes: the stand-in where 3.5 looks (~BT).
+        self.assertIn('cp "$drv/USOSACHK.EXE" "$bt_dir/AUTOCHK.EXE"', block)
+        # GUI Setup's processor check: the patched INITIAL.IN_ or a stop.
+        self.assertIn('--nt35-initial "$initial" "$work/INITIAL.NEW"', block)
+        self.assertIn("fail 'cannot patch the NT 3.5 INITIAL.INF processor check'", block)
+        self.assertIn('NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=128}', text)
+        # The page recorder is staged for every native start.
+        self.assertIn('cp "$drv/USOSANS3.EXE" "$usos/USOSANS3.EXE"', text)
+
+    def test_usosnt3_setup_starts_the_recorder(self):
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
+        setup = src[src.index('static void setup(void)'):]
+        setup = setup[:setup.index(chr(10) + '}' + chr(10))]
+        self.assertIn('DIR "USOSANS3.EXE"', setup)
+        self.assertIn('DETACHED_PROCESS', setup)
+        micro = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
+        self.assertIn('usr/lib/usos/nt3/USOSANS3.EXE', micro)
+
+
+class Recorder(unittest.TestCase):
+    def test_imports_exist_on_nt3_and_pe_version(self):
+        # kernel32 / user32 calls checked against the NT 3.51 CD's DLLs
+        # (2026-10-28); all of them are NT 3.1 APIs.
+        import struct
+        import sys
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from build_windows_usos_res import build_nt3_answer
+        from check_nt52_driver_imports import pe
+        allowed = {
+            'kernel32.dll': {'CloseHandle', 'CreateFileA', 'ExitProcess', 'FlushFileBuffers', 'GetTickCount',
+                             'SetFilePointer', 'Sleep', 'WriteFile', 'lstrcmpA', 'lstrcmpiA', 'lstrlenA'},
+            'user32.dll': {'EnumChildWindows', 'EnumWindows', 'GetClassNameA', 'GetDlgCtrlID', 'GetWindowTextA',
+                           'GetWindowTextLengthA', 'IsWindowEnabled', 'IsWindowVisible', 'wsprintfA'},
+        }
+        exe = build_nt3_answer(ROOT, ROOT / 'zig-out/windows-usos-res/ans3-test')
+        data = exe.read_bytes()
+        opt = struct.unpack_from('<I', data, 0x3c)[0] + 24
+        self.assertEqual(struct.unpack_from('<HH', data, opt + 48), (3, 10))
+        _, imports = pe(exe)
+        self.assertEqual([f'{m}!{n}' for m, n in imports if n not in allowed.get(m.lower(), set())], [])
+        src = (ROOT / 'tools/nt3/usosans3/usosans3.c').read_text(encoding='utf-8')
+        # Edit controls: only the length, never the text (passwords).
+        self.assertIn('textlen=%d', src)
+        self.assertIn('mode=record', src)
 
     def test_prepare_flag_is_nt351_only_and_skips_the_vm(self):
         text = PREPARE.read_text(encoding='utf-8')
-        self.assertIn('NT351|NT351S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;', text)
+        self.assertIn('NT351|NT351S|NT35|NT35S) [ ! -e /mnt/esp/EFI/USOS/win9x/nt3-native.flag ] || nt_native=yes ;;', text)
         self.assertEqual(text.count('nt_native=yes'), 1)
         self.assertIn('NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)"', text)
         native = text.index('if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then\n        # Native')

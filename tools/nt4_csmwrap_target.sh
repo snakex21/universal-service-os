@@ -341,7 +341,9 @@ nt3_standard_hal() {
 #                Enterprise CD's "/maxmem=256" reached BOOT.INI that way,
 #                2026-10-07), so text mode, GUI mode and the installed system
 #                run with the /MAXMEM the VM flow's finish step adds.
-# rc 1 (nothing written) when the SIF has no amsint.sys [Files] row.
+# The NT 3.5 CD has no amsint.sys: its ncrc810.sys row (the same kind of PCI
+# boot miniport, boot driver flag 1) is taken then.
+# rc 1 (nothing written) when the SIF has neither [Files] row.
 nt3_native_txtsetup() {
     awk -v BINMODE=3 -v ports="$1" -v opts="$2" '
         { line = $0; sub(/\r$/, "", line); lines[++n] = line }
@@ -350,8 +352,12 @@ nt3_native_txtsetup() {
             for (i = 1; i <= n; i++) {
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
                 if (low ~ /^\[/) sec = low
-                else if (sec == "[files]" && low ~ /^amsint\.sys=/) { fields = lines[i]; sub(/^[^=]*=[ \t]*/, "", fields) }
+                else if (sec == "[files]" && low ~ /^(amsint|ncrc810)\.sys=/) {
+                    f = lines[i]; sub(/^[^=]*=[ \t]*/, "", f)
+                    if (low ~ /^amsint/) ams = f; else ncr = f
+                }
             }
+            fields = (ams != "") ? ams : ncr
             if (fields == "") exit 1
             for (i = 1; i <= n; i++) {
                 line = lines[i]; low = tolower(line); gsub(/[ \t]/, "", low)
@@ -647,8 +653,12 @@ if [ -z "$nt3" ]; then
     log "product key: $key_state"
 fi
 if [ "$NATIVE" = 1 ]; then
-    [ "$nt3:$minor" = yes:51 ] && [ -z "$nt31" ] ||
-        fail "the native install (no VM) covers Windows NT 3.51 only so far, not NT $major.$minor. No disk was changed"
+    { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ]; } && [ -z "$nt31" ] ||
+        fail "the native install (no VM) covers Windows NT 3.51 and 3.5 only so far, not NT $major.$minor. No disk was changed"
+    # NT 3.5: more than 128 MiB loses the boot disk (NT35_BOOT_OPTIONS in
+    # nt4_qemu_install.sh).
+    [ "$minor" != 50 ] || NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=128}
+    [ -r "$drv/USOSANS3.EXE" ] || fail "missing: $drv/USOSANS3.EXE (GUI Setup page recorder). No disk was changed"
     log 'native: text mode on this PC after the restart (no install VM)'
 fi
 if [ -n "$nt3" ]; then
@@ -675,7 +685,7 @@ if [ -n "$nt3" ]; then
               mv "$work/WINNT.NET351" "$work/WINNT.SIF" || fail 'cannot render original NT351 LAN answer'
         fi
     fi
-    if [ "$major:$minor" = 3:50 ]; then
+    if [ "$major:$minor" = 3:50 ] && [ "$NATIVE" != 1 ]; then
         . "$LIB/nt35_network_setup.sh"
         if ! usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
             log 'NT35 LAN skipped: preflight refused (DHCP, exact PCI bus/slot and verified own driver required); installing without network'
@@ -869,6 +879,30 @@ nt3_stage_profile
 mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
 cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE" || fail 'cannot copy USOSACHK.EXE'
 rm -f "$bt_dir/AUTOCHK.EXE"
+if [ "$NATIVE" = 1 ]; then
+    # GUI-mode Setup page recorder (tools/nt3/usosans3): USOSNT3.EXE /setup
+    # starts it; it logs every page to \USOS\NT3\USOSANS.TXT.
+    cp "$drv/USOSANS3.EXE" "$usos/USOSANS3.EXE" || fail 'cannot copy USOSANS3.EXE'
+fi
+if [ "$NATIVE" = 1 ] && [ "$minor" = 50 ]; then
+    # NT 3.5 text mode runs AUTOCHK.EXE from ~BT (TXTSETUP.SIF autochk.exe on
+    # boot floppy _3); without it: "Setup was unable to verify your C:
+    # drive ... Press ENTER" (the VM typed ENTER; text mode has no USB
+    # keyboard). The stand-in goes there too, so the page never comes.
+    cp "$drv/USOSACHK.EXE" "$bt_dir/AUTOCHK.EXE" || fail 'cannot copy USOSACHK.EXE to ~BT'
+    # GUI Setup refuses a CPU newer than a Pentium (INITIAL.INF GetProcessor):
+    # the local source's INITIAL.IN_ gets the I586 line
+    # (src/compat/win3x/nt35_initial.zig, usos-fb-ui --nt35-initial).
+    initial=''
+    for name in INITIAL.IN_ INITIAL.INF; do [ -f "$ls_src/$name" ] && initial="$ls_src/$name" && break; done
+    [ -n "$initial" ] || fail 'the NT 3.5 local source has no INITIAL.IN_'
+    rm -f "$work/INITIAL.NEW"
+    if "${USOS_FB_UI:-usos-fb-ui}" --nt35-initial "$initial" "$work/INITIAL.NEW" > "$work/initial.log" 2>&1; then rc=0; else rc=$?; fi
+    while IFS= read -r line; do log "$line"; done < "$work/initial.log"
+    [ "$rc" = 0 ] && [ -s "$work/INITIAL.NEW" ] || fail 'cannot patch the NT 3.5 INITIAL.INF processor check'
+    cat "$work/INITIAL.NEW" > "$initial" && rm -f "$work/INITIAL.NEW" || fail 'cannot write INITIAL.IN_'
+    log 'native NT 3.5: usosachk in ~BT, INITIAL.INF processor = I586'
+fi
 [ -z "$SP_EXE" ] || log "service pack: $(basename "$SP_EXE") ignored (NT 3.51 service packs are not installed yet)"
 # VESA display (docs/nt3-vesa-2026-10-14.md): our miniport (USOSVBE.SYS, NT 3.x
 # build of tools/nt4/usosvbe) + the CD's own framebuf.dll, which text-mode

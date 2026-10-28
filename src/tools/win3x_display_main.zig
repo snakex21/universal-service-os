@@ -4,6 +4,9 @@
 //!
 //!   usos-win3x-display patch-dir DIR      patch a staged WINSETUP folder
 //!   usos-win3x-display expand IN OUT      SZDD / KWAJ / plain -> OUT
+//!   usos-win3x-display nt35-initial IN OUT
+//!                                         NT 3.5 INITIAL.IN_ processor line
+//!                                         (micro-Linux: usos-fb-ui --nt35-initial)
 //!   usos-win3x-display w9x-mini SETUPDIR HELPERDIR|-
 //!                                         Windows 9x Setup MINI.CAB (the
 //!                                         micro-Linux runs it as
@@ -29,6 +32,10 @@ pub fn main(init: std.process.Init) !u8 {
     if (std.mem.eql(u8, command, "w9x-mini")) {
         const setup_dir = args.next() orelse return usage();
         return win3x.w9x_mini.run(io, init.gpa, setup_dir, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "nt35-initial")) {
+        const in_path = args.next() orelse return usage();
+        return win3x.nt35_initial.run(io, init.gpa, in_path, args.next() orelse return usage());
     }
     if (std.mem.eql(u8, command, "expand")) {
         const in_path = args.next() orelse return usage();
