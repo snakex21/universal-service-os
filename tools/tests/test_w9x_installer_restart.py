@@ -223,17 +223,20 @@ class SkippedMissing(unittest.TestCase):
     def test_setup_exit_code_ignores_skipped_missing(self):
         fin = section(self.src, 'static void finish(void) {', '/* ---- entry')
         self.assertIn('else { skipped++; if (st == UA_ST_MISSING) missing++; }', fin)
-        self.assertIn('ExitProcess(failed || skipped > missing ? 2 : g_state.pending_reboot ? 3010 : 0);', fin)
-        self.assertNotIn('ExitProcess(failed || skipped ? 2', fin)
+        # 2026-10-28: failed / skipped packages never block either; the exit
+        # code only says whether a restart is pending
+        setup = fin[fin.index('    if (g_setup_mode) {'):]
+        self.assertIn('write_notdone();\n        ExitProcess(g_state.pending_reboot ? 3010 : 0);', setup)
+        self.assertNotIn('ExitProcess(failed', fin)
         # still listed in the log with its reason
         self.assertIn('st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;', fin)
 
     def test_final_check_ignores_skipped_missing(self):
         start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
         chk = start[start.index('if(g_setup_mode && exact_switch(cmdline,"check")){'):]
-        chk = chk[:chk.index('ExitProcess(failed?2:0);')]
-        self.assertLess(chk.index('if(g_state.st[x]==UA_ST_MISSING)'), chk.index('check=run_check(p);'))
-        self.assertIn('continue;}', chk[chk.index('if(g_state.st[x]==UA_ST_MISSING)'):chk.index('check=run_check(p);')])
+        chk = chk[:chk.index('ExitProcess(0);')]
+        self.assertLess(chk.index('if(st==UA_ST_MISSING)'), chk.index('check=run_check(p);'))
+        self.assertIn('continue;}', chk[chk.index('if(st==UA_ST_MISSING)'):chk.index('check=run_check(p);')])
 
     def test_coordinator_takes_exit_0_or_3010_to_the_final_restart(self):
         body = self.fb[self.fb.index('code=child("C:\\\\USOS\\\\ADDONS\\\\USOSADD.EXE /setup");'):]
@@ -246,7 +249,101 @@ class SkippedMissing(unittest.TestCase):
         self.assertIn('k <= UA_ST_MISSING; k++', state)
 
 
+class FailedPackagesDoNotBlock(unittest.TestCase):
+    """Product decision 2026-10-28 (X470 98 FE PL B261027-231909: WMP 7.1
+    and NUSB "failed", USOSFB's Retry box held the first desktop): a failed
+    optional add-on never blocks; it is listed in NOTDONE.TXT and shown in
+    one box after the desktop. Retry stays for coordinator-level failures."""
+    src = ADD.read_text(encoding='latin-1')
+    fb = FB.read_text(encoding='latin-1')
+
+    def test_final_check_lists_and_exits_0(self):
+        start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
+        chk = start[start.index('if(g_setup_mode && exact_switch(cmdline,"check")){'):]
+        chk = chk[:chk.index('ExitProcess(0);') + 15]
+        self.assertNotIn('ExitProcess(2)', chk)
+        self.assertNotIn('failed?2', chk)
+        self.assertLess(chk.index('write_notdone();'), chk.index('ExitProcess(0);'))
+        # a done package whose check fails after the restart is listed
+        self.assertIn('if(check==0&&(st==UA_ST_DONE||st==UA_ST_PRESENT)){', chk)
+        # a failed one that the restart finished counts as installed
+        self.assertIn('if(check>0&&st!=UA_ST_DONE&&st!=UA_ST_PRESENT){', chk)
+        self.assertIn('g_state.pending_reboot=0;save_state();unregister();', chk)
+
+    def test_notdone_lists_failed_and_skipped_not_missing(self):
+        body = section(self.src, 'static int write_notdone(void) {', 'static void show_note(void) {')
+        self.assertIn('if (st == UA_ST_DONE || st == UA_ST_PRESENT || st == UA_ST_MISSING) continue;', body)
+        self.assertIn('"USOS: nie zainstalowano:\\r\\n"', body)
+        self.assertIn('"NOTDONE.TXT"', body)
+        self.assertIn('if (!listed) { DeleteFileA(path); return 0; }', body)
+
+    def test_note_waits_for_the_desktop(self):
+        note = section(self.src, 'static void show_note(void) {', '/* After the last restart')
+        self.assertLess(note.index('FindWindowA("Shell_TrayWnd", 0)'), note.index('MessageBoxA('))
+        self.assertIn('MB_OK | MB_ICONWARNING', note)
+        start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
+        self.assertLess(start.index('if (exact_switch(cmdline, "note")) show_note();'), start.index('LEGACY.INI'))
+
+    def test_coordinator_shows_the_note_after_completion_without_waiting(self):
+        final = self.fb[self.fb.index('if(!save("FIRSTBT.OK"'):]
+        final = final[:final.index('ExitProcess(0);')]
+        self.assertIn('C:\\\\USOS\\\\ADDONS\\\\NOTDONE.TXT', final)
+        self.assertIn('USOSADD.EXE /note', final)
+        self.assertIn('CloseHandle(pi.hProcess);', final)
+        self.assertNotIn('child("C:\\\\USOS\\\\ADDONS\\\\USOSADD.EXE /note', final)  # not waited for
+        self.assertIn('fail("add-on runner failed before the final restart (not a package failure)")', self.fb)
+        self.assertNotIn('packages did not finish before final restart', self.fb)
+
+
+class DisplayFallback(unittest.TestCase):
+    """X470 98 FE PL 2026-10-28: boots in Windows' VGA fallback queued
+    RunOnce *DisplayFallback; run by USOSFB, desk.cpl ,-1 left the settings
+    at 640,480/4 (1920,1080/32 in the snapshot before it ran)."""
+    fb = FB.read_text(encoding='latin-1')
+
+    def test_fallback_value_is_deleted_not_run(self):
+        body = section(self.fb, 'static void run_once_values(void){', 'static DWORD ex_sections(void){')
+        i = body.index('if(!lstrcmpiA(name,"*DisplayFallback")){')
+        self.assertLess(body.index('code=RegDeleteValueA(key,name);'), i)
+        self.assertIn('continue;}', body[i:i + 300])
+        self.assertLess(i, body.index('code=child(cmd);'))
+
+    def test_usosres_mode_is_kept_and_written_back(self):
+        start = self.fb[self.fb.index('void __cdecl fb_start(void){'):]
+        self.assertLess(start.index('log_line("coordinator entered before desktop");'), start.index('display_check("at start");'))
+        self.assertLess(start.index('USOSRES.EXE /setup'), start.index('if(!exists("DISPMODE.TXT"))dispmode_save();'))
+        chk = section(self.fb, 'static int display_check(const char*when){', 'static void drop_fallback(')
+        self.assertIn('HKEY_CURRENT_CONFIG,dset,0,KEY_SET_VALUE', chk)
+        self.assertIn('read_local("DISPMODE.TXT"', chk)
+        self.assertIn('"Display\\\\Settings"', self.fb)
+
+    def test_final_boot_retries_the_mode_twice_then_releases(self):
+        final = self.fb[self.fb.index('if(!lstrcmpA(phase,"reboot\\r\\n")){'):]
+        final = final[:final.index('if(!save("FIRSTBT.OK"')]
+        d = final.index('if(display_check("before the desktop")){')
+        self.assertIn('if(!exists("DISPFIX.2")){', final[d:])
+        self.assertLess(final[d:].index('drop_fallback("one more final restart");'), final[d:].index('reboot("reboot\\r\\n"'))
+        self.assertIn('drop_fallback("final boot");', final)
+        self.assertLess(d, final.index('USOSADD.EXE /setup /check'))
+
+
 class Manifest(unittest.TestCase):
+    def test_wmp71_installed_check_is_the_active_setup_version(self):
+        text = PACK.read_text(encoding='utf-8')
+        body = section(text, '[pkg:wmp71-pl]', '\n[pkg:')
+        # X470 98 FE PL 2026-10-28: Version "7,1,0,3055" there after the
+        # install; PlayerUpgrade\PlayerVersion stays WMP 6.4's 6,4,7,1121
+        self.assertIn('\ncheck=regver:HKLM\\Software\\Microsoft\\Active Setup\\Installed Components\\'
+                      '{6BF52A52-394A-11d3-B153-00C04F79FAA6},Version>=7.1.0.3055\n', body)
+        self.assertNotIn('check=regver:HKLM\\Software\\Microsoft\\MediaPlayer\\PlayerUpgrade', body)
+
+    def test_nusb_only_on_98se(self):
+        text = PACK.read_text(encoding='utf-8')
+        body = section(text, '[pkg:nusb33-pl]', '\n[pkg:')
+        # its IExpress VERCHECK allows 4.10.2222 only; it replaces USER.EXE /
+        # EXPLORER.EXE with 98 SE builds
+        self.assertIn('\nos=98SE\n', body)
+
     def test_wmp71_inner_setup_gets_no_reboot(self):
         text = PACK.read_text(encoding='utf-8')
         body = section(text, '[pkg:wmp71-pl]', '\n[pkg:')

@@ -1158,6 +1158,58 @@ static void run_chain(void) {
     }
 }
 
+/* /setup: NOTDONE.TXT beside this program lists the packages of the plan
+ * that are not installed (failed, or skipped for an unmet dependency), with
+ * their reasons; files not on the media (skipped-missing) are not listed. No
+ * such package: the file is removed. USOSFB starts "USOSADD /note" after the
+ * final restart when it exists: one box over the desktop, never before it
+ * (a failed optional add-on does not hold the first desktop, 2026-10-28).
+ * Returns the number of packages listed. */
+static int write_notdone(void) {
+    static char text[4096];
+    char path[UA_PATH], line[200];
+    const char *name_key = g_pl ? "name_pl" : "name_en";
+    int i, listed = 0;
+    text[0] = 0;
+    ua_append(text, sizeof text, g_pl ? "USOS: nie zainstalowano:\r\n" : "USOS: not installed:\r\n");
+    for (i = 0; i < g_plan.count; i++) {
+        int x = g_plan.idx[i], st = g_state.st[x];
+        const char *name = ua_ini_get(&g_m, g_p.pkg[x].section, name_key);
+        if (g_p.pkg[x].tier == UA_TIER_GROUP) continue;
+        if (st == UA_ST_DONE || st == UA_ST_PRESENT || st == UA_ST_MISSING) continue;
+        line[0] = 0;
+        ua_append(line, sizeof line, "- ");
+        ua_append(line, sizeof line, name ? name : g_p.pkg[x].id);
+        ua_append(line, sizeof line, " (");
+        ua_append(line, sizeof line, g_state.why[x][0] ? g_state.why[x] : ua_state_name(st));
+        ua_append(line, sizeof line, ")\r\n");
+        if (listed++ < 20) ua_append(text, sizeof text, line);
+    }
+    path_join(path, g_root, "NOTDONE.TXT");
+    if (!listed) { DeleteFileA(path); return 0; }
+    ua_append(text, sizeof text, g_pl ? "\r\nDziennik: " : "\r\nLog: ");
+    ua_append(text, sizeof text, g_log);
+    ua_append(text, sizeof text, "\r\n");
+    write_file(path, text, ua_len(text));
+    log2("USOSADD setup: not installed, listed in ", path);
+    return listed;
+}
+
+/* /note (USOSFB, after the final restart): NOTDONE.TXT in one box once the
+ * taskbar is there (at most 2 minutes' wait); nothing else is read. */
+static void show_note(void) {
+    static char text[4096];
+    char path[UA_PATH];
+    int n, waited;
+    path_join(path, g_root, "NOTDONE.TXT");
+    n = read_file(path, text, sizeof text);
+    if (n <= 0) ExitProcess(0);
+    for (waited = 0; waited < 120 && !FindWindowA("Shell_TrayWnd", 0); waited++) Sleep(1000);
+    Sleep(3000);
+    MessageBoxA(0, text, "USOS", MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+    ExitProcess(0);
+}
+
 /* After the last restart: log and show "zainstalowano X/Y, pominieto Z
  * (pow\363d)". A failed package never stops the chain (run_chain goes on). */
 static void finish(void) {
@@ -1217,7 +1269,12 @@ static void finish(void) {
             ua_itoa(num, sizeof num, missing);
             log2("USOSADD setup: skipped-missing (files not on the media, not a failure): ", num);
         }
-        ExitProcess(failed || skipped > missing ? 2 : g_state.pending_reboot ? 3010 : 0);
+        /* Failed or skipped packages never block the first desktop: they are
+         * listed (NOTDONE.TXT, shown after it); the exit code only says
+         * whether a restart is pending. Exit 2 stays for the runner's own
+         * failures (manifest, TMP, NDIS repair). */
+        write_notdone();
+        ExitProcess(g_state.pending_reboot ? 3010 : 0);
     }
     lan_defaults(1);
     unregister();
@@ -1252,6 +1309,7 @@ void __cdecl ua_start(void) {
     GetModuleFileNameA(0, g_root, sizeof g_root);
     for (i = ua_len(g_root) - 1; i > 0 && g_root[i] != '\\'; i--) ;
     g_root[i] = 0;
+    if (exact_switch(cmdline, "note")) show_note();
     GetWindowsDirectoryA(g_win, sizeof g_win);
     GetSystemDirectoryA(g_sysdir, sizeof g_sysdir);
     if (!reg_string(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Setup", "SourcePath",
@@ -1344,21 +1402,32 @@ void __cdecl ua_start(void) {
     if (g_state.starts == 0 || dry) log_plan();
     if (dry) ExitProcess(0);
 
+    /* After the final restart. A package whose check still fails (or that
+     * failed / was skipped in the chain) is listed in NOTDONE.TXT and never
+     * stops the desktop (2026-10-28): exit 0, USOSFB shows the list after
+     * the desktop. Retry stays for the coordinator's own failures. */
     if(g_setup_mode && exact_switch(cmdline,"check")){
         int failed=0;
         for(i=0;i<g_plan.count;i++){
-            int x=g_plan.idx[i],check;
+            int x=g_plan.idx[i],check,st=g_state.st[x];
             const ua_pkg *p=&g_p.pkg[x];
             if(p->tier==UA_TIER_GROUP)continue;
             /* files not on the media: not installed on purpose, not a failure */
-            if(g_state.st[x]==UA_ST_MISSING){log2("USOSADD setup final check: skipped-missing, ignored: ",p->id);continue;}
+            if(st==UA_ST_MISSING){log2("USOSADD setup final check: skipped-missing, ignored: ",p->id);continue;}
             check=run_check(p);
-            if(check==0||(check<0&&g_state.st[x]!=UA_ST_DONE&&g_state.st[x]!=UA_ST_PRESENT)){
-                failed++;log2("USOSADD setup final check failed: ",p->id);}
+            if(check>0&&st!=UA_ST_DONE&&st!=UA_ST_PRESENT){
+                /* installed after all (a restart finished it) */
+                g_state.why[x][0]=0;g_state.st[x]=UA_ST_DONE;log2("USOSADD setup final check: installed after the restart: ",p->id);continue;}
+            if(check==0&&(st==UA_ST_DONE||st==UA_ST_PRESENT)){
+                ua_copy(g_state.why[x],sizeof g_state.why[x],g_pl?"brak po restarcie":"not present after the restart");
+                g_state.st[x]=UA_ST_FAILED;}
+            if(g_state.st[x]!=UA_ST_DONE&&g_state.st[x]!=UA_ST_PRESENT){
+                failed++;log2("USOSADD setup final check: not installed, listed: ",p->id);}
         }
-        if(!failed){g_state.pending_reboot=0;save_state();unregister();}
-        log_line(failed?"USOSADD setup final check incomplete":"USOSADD setup final checks complete");
-        ExitProcess(failed?2:0);
+        g_state.pending_reboot=0;save_state();unregister();
+        write_notdone();
+        log_line(failed?"USOSADD setup final checks complete; packages not installed are listed (not blocking)":"USOSADD setup final checks complete");
+        ExitProcess(0);
     }
 
     /* Started from Run after the shell; still wait while Setup finishes

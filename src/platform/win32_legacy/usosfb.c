@@ -264,6 +264,13 @@ static void run_once_values(void){HKEY key;DWORD index=0,n,size,type,code;int do
         if(code!=ERROR_SUCCESS){wsprintfA(line,"RunOnce %s not deleted (code %lu); not run, the rest waits for the final Explorer boot",name,code);log_line(line);break;}
         done++;
         if(!lstrcmpiA(name,"USOSFirstBoot")){log_line("RunOnce USOSFirstBoot: own value deleted, armed again at the next restart");continue;}
+        /* USER queues it when the display driver failed in this boot and the
+         * VGA fallback runs. desk.cpl ,-1 is the user's "display problem"
+         * page; run here it stored the fallback's 640x480x4 as the display
+         * settings (X470 98 FE PL 2026-10-28: 1920,1080/32 before it ran,
+         * 640,480/4 after, a mode vesamini.drv does not offer). Deleted and
+         * logged; display_check() puts the USOSRES mode back. */
+        if(!lstrcmpiA(name,"*DisplayFallback")){wsprintfA(line,"RunOnce *DisplayFallback (display driver failed, VGA fallback): deleted, not run (%.200s)",cmd);log_line(line);continue;}
         if(type!=REG_SZ||!cmd[0]){wsprintfA(line,"RunOnce %s: no command, deleted",name);log_line(line);continue;}
         wsprintfA(line,"RunOnce %s, as Explorer runs it before the desktop:",name);log_line(line);
         code=child(cmd);wsprintfA(line,"RunOnce %s exit %lu",name,code);log_line(line);}
@@ -302,6 +309,57 @@ static void windows_logon(void){HKEY key;LONG code;char line[96];
     else if(code==ERROR_FILE_NOT_FOUND)lstrcpyA(line,"Network\\Logon PrimaryProvider absent");
     else wsprintfA(line,"Network\\Logon PrimaryProvider not removed (code %ld)",code);
     log_line(line);}
+/* Display state of every coordinator boot (X470 98 FE PL 2026-10-28: the
+ * boots after IE 6 SP1's WININIT and after Retry came up in Windows' VGA
+ * fallback, *DisplayFallback in RunOnce, the settings ended at 640x480x4).
+ * DISPMODE.TXT holds "Resolution|BitsPerPixel" of HKEY_CURRENT_CONFIG
+ * Display\Settings right after USOSRES applied its mode. Each start logs the
+ * screen mode in use, the stored settings and a queued *DisplayFallback, and
+ * writes the DISPMODE values back if anything changed them (they apply at
+ * the next boot). Returns 1 when the screen is not in the DISPMODE size. */
+static const char dset[]="Display\\Settings";
+static int reg_sz(HKEY hive,const char*key,const char*value,char*out,DWORD cap){HKEY k;DWORD type,size=cap-1;LONG code;
+    out[0]=0;if(RegOpenKeyExA(hive,key,0,KEY_READ,&k)!=ERROR_SUCCESS)return 0;
+    code=RegQueryValueExA(k,value,0,&type,(BYTE*)out,&size);RegCloseKey(k);
+    if(code!=ERROR_SUCCESS||type!=REG_SZ){out[0]=0;return 0;}out[size<cap?size:cap-1]=0;return 1;}
+static int screen_mode(DWORD*w,DWORD*h,DWORD*bpp){HMODULE gdi=LoadLibraryA("GDI32.DLL");HDC dc;int ok=0;
+    int(WINAPI*caps)(HDC,int)=gdi?(int(WINAPI*)(HDC,int))GetProcAddress(gdi,"GetDeviceCaps"):0;
+    if(caps&&(dc=GetDC(0))!=0){*w=(DWORD)caps(dc,HORZRES);*h=(DWORD)caps(dc,VERTRES);*bpp=(DWORD)(caps(dc,BITSPIXEL)*caps(dc,PLANES));
+        ok=*w&&*h;ReleaseDC(0,dc);}
+    if(gdi)FreeLibrary(gdi);return ok;}
+static void dispmode_save(void){char res[32],bpp[16],v[64],line[120];
+    if(!reg_sz(HKEY_CURRENT_CONFIG,dset,"Resolution",res,sizeof res)||!reg_sz(HKEY_CURRENT_CONFIG,dset,"BitsPerPixel",bpp,sizeof bpp)){
+        log_line("display: no HKEY_CURRENT_CONFIG Display\\Settings after USOSRES; DISPMODE.TXT not written");return;}
+    wsprintfA(v,"%s|%s",res,bpp);
+    if(save("DISPMODE.TXT",v)){wsprintfA(line,"display: DISPMODE.TXT %s (USOSRES mode, written back after a display fallback)",v);log_line(line);}}
+/* "1920,1080" -> 1920, 1080 */
+static void res_parse(const char*r,DWORD*w,DWORD*h){*w=*h=0;
+    while(*r>='0'&&*r<='9')*w=*w*10+(DWORD)(*r++-'0');if(*r==',')r++;while(*r>='0'&&*r<='9')*h=*h*10+(DWORD)(*r++-'0');}
+static int display_check(const char*when){char res[32],bpp[16],want[64],line[400],*bar;DWORD w=0,h=0,b=0,cw,ch;int fb,ok;HKEY k;
+    fb=reg_sz(HKEY_LOCAL_MACHINE,once,"*DisplayFallback",line,sizeof line);
+    reg_sz(HKEY_CURRENT_CONFIG,dset,"Resolution",res,sizeof res);reg_sz(HKEY_CURRENT_CONFIG,dset,"BitsPerPixel",bpp,sizeof bpp);
+    if(!screen_mode(&w,&h,&b))w=h=b=0;
+    wsprintfA(line,"display %s: screen %lux%lux%lu, settings %s/%s, RunOnce *DisplayFallback %s",when,w,h,b,
+        res[0]?res:"-",bpp[0]?bpp:"-",fb?"queued (display driver failed in this boot)":"absent");
+    log_line(line);
+    if(!read_local("DISPMODE.TXT",want,sizeof want))return 0;
+    for(bar=want;*bar&&*bar!='|';bar++);if(!*bar)return 0;*bar++=0;
+    res_parse(want,&cw,&ch);
+    if(lstrcmpA(res,want)||lstrcmpA(bpp,bar)){
+        if(RegOpenKeyExA(HKEY_CURRENT_CONFIG,dset,0,KEY_SET_VALUE,&k)==ERROR_SUCCESS){
+            ok=RegSetValueExA(k,"Resolution",0,REG_SZ,(const BYTE*)want,length(want)+1)==ERROR_SUCCESS&&
+               RegSetValueExA(k,"BitsPerPixel",0,REG_SZ,(const BYTE*)bar,length(bar)+1)==ERROR_SUCCESS;RegCloseKey(k);
+            wsprintfA(line,"display: settings %s/%s changed after USOSRES; %s/%s %s for the next boot",
+                res[0]?res:"-",bpp[0]?bpp:"-",want,bar,ok?"written back":"NOT written back");}
+        else wsprintfA(line,"display: settings %s/%s differ from DISPMODE %s/%s; key not writable",res,bpp,want,bar);
+        log_line(line);}
+    return w&&cw&&(w!=cw||h!=ch);}
+/* Final boot: a *DisplayFallback value queued in an earlier boot (or in this
+ * one, before one more final restart) is not left for Explorer's RunOnce. */
+static void drop_fallback(const char*why){HKEY k;char line[160];
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_SET_VALUE,&k)!=ERROR_SUCCESS)return;
+    if(RegDeleteValueA(k,"*DisplayFallback")==ERROR_SUCCESS){wsprintfA(line,"RunOnce *DisplayFallback deleted (%s)",why);log_line(line);}
+    RegCloseKey(k);}
 /* USOSADD's STATE.INI with a package still "running" (an installer
  * restarted Windows inside it, X470 98 FE PL 2026-10-27 wmp71-pl=running:1,
  * or a retry deferred to a restart), or a clean exit without the CHAIN.END
@@ -352,6 +410,7 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(exists("FIRSTBT.OK")){log_line("already complete");leave(0);}
     if(exists("FIRSTBT.ERR")){log_line("previous firstboot failure; automatic retry refused (FIRSTBT.ERR present)");leave(2);}
     log_line("coordinator entered before desktop");
+    display_check("at start");
     /* 98, first start under Explorer's RunOnce (no FIRSTBT.STA yet; not yet
      * seen on hardware). A taskbar only means Explorer did not wait for
      * RunOnce: this start installs nothing and restarts into a shell boot at
@@ -376,12 +435,32 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
     if(!late_ready())fail("late prerequisites or single display check failed");
     if(!lstrcmpA(phase,"reboot\r\n")){
         if(exists("VMDLATE.BAT")&&!exists("VMDLATE.OK"))fail("DOS mouse final restart check failed");
+        /* The first desktop in the USOSRES mode: a final boot that came up
+         * in another mode (the VGA fallback; settings already written back
+         * by display_check) gets up to two more final restarts, then the
+         * desktop as it is. */
+        if(display_check("before the desktop")){
+            if(!exists("DISPFIX.2")){save(exists("DISPFIX.1")?"DISPFIX.2":"DISPFIX.1","final boot not in the USOSRES mode\r\n");
+                drop_fallback("one more final restart");
+                reboot("reboot\r\n","restart: final boot came up in another display mode; one more final restart");}
+            log_line("display: not in the USOSRES mode after two more final restarts; desktop released as it is");}
+        /* never left for Explorer: desk.cpl ,-1 would store the fallback
+         * mode as the settings for every later boot */
+        drop_fallback("final boot");
         finish_runonceex();
         if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES&&
            child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup /check")!=0)fail("final package checks incomplete");
         if(exists("NETCFG.INI")&&child("C:\\USOS9X\\USOSLAN.EXE /setup /refresh")!=0)fail("final IE/network defaults incomplete");
         windows_logon();
         if(!save("FIRSTBT.OK","complete; final_post_addons_restarts=1\r\n"))fail("cannot save completion");
+        /* Packages that failed or were skipped: USOSADD lists them in
+         * NOTDONE.TXT; one box after the desktop, from a process this
+         * coordinator does not wait for (never before the desktop). */
+        if(GetFileAttributesA("C:\\USOS\\ADDONS\\NOTDONE.TXT")!=INVALID_FILE_ATTRIBUTES){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[]="C:\\USOS\\ADDONS\\USOSADD.EXE /note";
+            memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
+            if(CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi)){CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+                log_line("packages not installed: C:\\USOS\\ADDONS\\NOTDONE.TXT, shown after the desktop (USOSADD /note, not waited for)");}
+            else log_line("packages not installed: C:\\USOS\\ADDONS\\NOTDONE.TXT (note not started)");}
         if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS){RegDeleteValueA(key,"USOSFirstBoot");RegCloseKey(key);}
         log_line("complete: releasing first desktop; final_post_addons_restarts=1");CloseHandle(journal);ExitProcess(0);
     }
@@ -401,7 +480,8 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         if(!save("FIRSTBT.STA","install\r\n"))fail("cannot journal package boundary");
         if(exists("USOSRES.EXE")){
             if(child("C:\\USOS9X\\USOSRES.EXE /setup")!=0||!read_local("DISPLAY.DONE",text,sizeof text)||
-               (!contains(text,"DISPLAY applied")&&!contains(text,"DISPLAY saved; restart required")&&!contains(text,"DISPLAY already at the selected mode")))fail("display request not applied before packages");}
+               (!contains(text,"DISPLAY applied")&&!contains(text,"DISPLAY saved; restart required")&&!contains(text,"DISPLAY already at the selected mode")))fail("display request not applied before packages");
+            if(!exists("DISPMODE.TXT"))dispmode_save();}
     }
     if(GetFileAttributesA("C:\\USOS\\ADDONS\\SELECT.INI")!=INVALID_FILE_ATTRIBUTES){
         code=child("C:\\USOS\\ADDONS\\USOSADD.EXE /setup");
@@ -417,6 +497,9 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
             if(mid>=mid_limit())fail(win98?"more than nine package restarts before the desktop":"more than four package restarts before the desktop");
             wsprintfA(next,"mid%d\r\n",mid+1);wsprintfA(note,"restart: package restart %d before the desktop",mid+1);
             reboot(next,note);}
-        if(code!=0&&code!=3010)fail("packages did not finish before final restart");}
+        /* 0 / 3010: the chain ended; failed or skipped packages are listed in
+         * NOTDONE.TXT and never hold the desktop (2026-10-28). Anything else
+         * is the runner's own failure (manifest, TMP, NDIS repair). */
+        if(code!=0&&code!=3010)fail("add-on runner failed before the final restart (not a package failure)");}
     reboot("reboot\r\n","restart: sole final post-addons restart");
 }

@@ -195,16 +195,30 @@ def test_presets(m: lm.Manifest) -> None:
     plan = lm.resolve(m, '98SE', 'PL', '', False, ['usb-nt4-ionetworks', 'speechsdk51-langpack'])
     if plan.order:
         fail(f'status/other-system options must stay out: {plan.order}')
-    # 98: one restart after the dependencies (DCOM98, IE 6 SP1), the rest
-    # batched into the final one (X470 98 FE PL 2026-10-27); the 950
-    # coordinator's DCOM95 / IE 5.5 SP2 restarts stay
-    for pid, want in (('dcom98', 'now'), ('ie6sp1-pl-9x', 'now'), ('dx9c', 'end'), ('mdac28sp1-pl', 'end'),
+    # 98: one restart after the dependencies (DCOM98 batched into IE 6 SP1's
+    # restart, 2026-10-28), the rest batched into the final one (X470 98 FE
+    # PL 2026-10-27); the 950 coordinator's DCOM95 / IE 5.5 SP2 restarts stay
+    for pid, want in (('dcom98', 'end'), ('ie6sp1-pl-9x', 'now'), ('dx9c', 'end'), ('mdac28sp1-pl', 'end'),
                       ('wmp71-pl', 'end'), ('nusb33-pl', 'end')):
         if m.find(pid).get('reboot') != want:
             fail(f'{pid}: reboot={m.find(pid).get("reboot")}, want {want}')
     for pid in ('dcom95', 'ie55sp2-pl'):
         if m.find(pid).get('reboot_setup') != 'now':
             fail(f'{pid}: reboot_setup={m.find(pid).get("reboot_setup")}, want now')
+    # 98 FE PL full pack: two restarts in all (2026-10-28): A = IE 6 SP1's
+    # (reboot=now, after DCOM98 + IE 6), B = the final one. No other package
+    # of the plan restarts on its own; NUSB 3.3a (98 SE only) is not in it.
+    # The exclusions are the USOS default SELECT.INI's (no Dial-Up Adapter;
+    # X470 98 FE PL B261027-231909).
+    plan = lm.resolve(m, '98FE', 'PL', '', True, [], ['dun14-95-en', 'dun14-95-en-on-pl', 'dun14-98-pl',
+                                                     'dun14-98-en', 'dun14-98se-pl', 'dun14-98se-en'])
+    now = [pid for pid in plan.order if m.find(pid).get('reboot') == 'now' or m.find(pid).get('reboot_setup') == 'now']
+    if now != ['ie6sp1-pl-9x']:
+        fail(f'98 FE PL: restarting packages {now}, want only ie6sp1-pl-9x')
+    if 'nusb33-pl' in plan.order or 'wmp71-pl' not in plan.order:
+        fail(f'98 FE PL plan: nusb33-pl must be out, wmp71-pl in: {plan.order}')
+    if plan.order.index('dcom98') > plan.order.index('ie6sp1-pl-9x'):
+        fail('98 FE PL: DCOM98 must run before IE 6 SP1 (both before restart A)')
 
 
 def make_user_folder(tmp: Path, m: lm.Manifest, ids: list[str]) -> dict[str, bytes]:
