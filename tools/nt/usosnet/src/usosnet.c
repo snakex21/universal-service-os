@@ -1186,9 +1186,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_RINGS;
 
 #if USOSNET_NT351
-    /* Cf8: the line register is the only interrupt source; BusType 1 makes it
-     * an 8259 IRQ. None set (0 / FFh / >= 16): the timer polls. */
-    if (A->Cf8 && !A->PollMode && (A->IrqVector == 0 || A->IrqVector > 15)) {
+    /* Cf8: nobody routed the card's INTx (no PCI BIOS, no ACPI under the
+     * Standard PC HAL); the line register may name an 8259 IRQ another
+     * device asserts, and connecting there could unmask a level storm. The
+     * chip stays masked and the 20 ms timer polls (PollMode 2). */
+    if (A->Cf8 && !A->PollMode) {
         UsLog(A, "cf8 line %x: poll", A->IrqVector, 0);
         A->PollMode = 2;
     }

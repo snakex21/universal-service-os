@@ -89,7 +89,7 @@ class SourceContract(unittest.TestCase):
         # the real NDIS function stays reachable through the parenthesized name
         self.assertIn('(NdisReadPciSlotInformation)(H, Slot, Off, Buf, Len)', source)
         self.assertIn('if (!Cf8Find(A)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }', source)
-        self.assertIn('A->Cf8 && !A->PollMode && (A->IrqVector == 0 || A->IrqVector > 15)', source)
+        self.assertIn('if (A->Cf8 && !A->PollMode) {', source)
         self.assertIn('if (A->TimerInit) return FALSE;      /* NT 3.51: TimerFn does it every 20 ms */', source)
 
     def test_usosnt3_bus_type(self):
