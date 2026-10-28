@@ -163,13 +163,6 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\RunOnce]
 "USOSFirstBoot"="C:\\USOS9X\\USOSFB.EXE"
 EOF
-    # 98 FE / 98 SE: FastReboot "0" (Setup writes "1"; INSTALL.BAT's
-    # [USOS.CsmReg] sets "0" too), re-imported in real mode every boot until
-    # FIRSTBT.OK in case a package writes it back. X470 98 FE PL B261028-114842
-    # and the run before: some coordinator restarts powered the PC off.
-    case "$2" in
-        '4 10 0 '*) printf '\r\n[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Shutdown]\r\n"FastReboot"="0"\r\n' >> "$1/FIRSTBT.REG" || return 1 ;;
-    esac
     printf '[boot]\r\nshell=Explorer.exe\r\n' > "$1/SHELLHDR.INI" || return 1
     case "$2" in
         '4 10 0 '*) printf 'MSDOS.SYS BootLog=1 kept until FIRSTBT.OK (98 only)\r\n' > "$1/BOOTLOG.ON" || return 1 ;;

@@ -253,6 +253,19 @@ static int selftest(void) {
     CHECK(ua_parse_check("reg:HKLM\\Software\\Microsoft\\OLE,EnableDCOM", &k) && strcmp(k.value, "EnableDCOM") == 0);
     CHECK(ua_parse_check("regdw:HKLM\\A\\v1.1.4322,SP>=1", &k) && k.kind == UA_CHK_REGDW && strcmp(k.min, "1") == 0);
     CHECK(ua_parse_check("ntsp:6a", &k) && k.kind == UA_CHK_NTSP);
+    /* WMP 7.1 / 9 rules as in legacy-pack.ini against the comma-separated
+     * Active Setup Version values read on X470 (98 FE "7,1,0,3055", 98 SE
+     * "9,0,0,2980"): the GUID key keeps its path, the minimum compares equal. */
+    CHECK(ua_parse_check("regver:HKLM\\Software\\Microsoft\\Active Setup\\Installed Components\\"
+                         "{6BF52A52-394A-11d3-B153-00C04F79FAA6},Version>=7.1.0.3055", &k) &&
+          k.kind == UA_CHK_REGVER && k.hive == 0 && strcmp(k.value, "Version") == 0 &&
+          strcmp(k.path, "Software\\Microsoft\\Active Setup\\Installed Components\\{6BF52A52-394A-11d3-B153-00C04F79FAA6}") == 0 &&
+          ua_vercmp("7,1,0,3055", k.min) >= 0 && ua_vercmp("6,4,7,1121", k.min) < 0);
+    CHECK(ua_parse_check("regver:HKLM\\Software\\Microsoft\\Active Setup\\Installed Components\\"
+                         "{6BF52A52-394A-11d3-B153-00C04F79FAA6},Version>=9.0.0.2980", &k) &&
+          k.kind == UA_CHK_REGVER && strcmp(k.min, "9.0.0.2980") == 0 && strcmp(k.value, "Version") == 0 &&
+          strcmp(k.path, "Software\\Microsoft\\Active Setup\\Installed Components\\{6BF52A52-394A-11d3-B153-00C04F79FAA6}") == 0 &&
+          ua_vercmp("9,0,0,2980", k.min) >= 0 && ua_vercmp("7,1,0,3055", k.min) < 0);
     CHECK(!ua_parse_check("regver:HKLM\\A,B", &k));
     CHECK(!ua_parse_check("reg:HKXX\\A", &k));
     CHECK(!ua_parse_check("bogus:1", &k));

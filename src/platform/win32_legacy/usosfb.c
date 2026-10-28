@@ -170,22 +170,6 @@ static void vcache_tune(void){MEMORYSTATUS m;char value[32],line[96];int i;
         wsprintfA(line,WritePrivateProfileStringA("vcache",keys[i],values[i],sysini)?"VCACHE: [vcache] %s=%s written":"VCACHE: [vcache] %s=%s not written",keys[i],values[i]);
         log_line(line);}
     WritePrivateProfileStringA(0,0,0,sysini);}
-/* 98 FE / 98 SE: FastReboot "0" holds only during the install (MSBATCH
- * [USOS.CsmReg] at Setup, FIRSTBT.REG every real-mode boot until
- * FIRSTBT.OK). After FIRSTBT.OK, on the final desktop and after the last
- * restart decision (display re-final restarts included), Setup's own value
- * "1" (the hive after a clean 98 FE Setup, X470 B261028-114842) comes back.
- * Only our "0" is replaced; FIRSTBT.BAT ends at FIRSTBT.OK before REGEDIT. */
-static void fastreboot_restore(void){HKEY key;char value[8];DWORD n=sizeof value,type=0;
-    if(!win98)return;
-    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,"System\\CurrentControlSet\\Control\\Shutdown",0,KEY_QUERY_VALUE|KEY_SET_VALUE,&key)!=ERROR_SUCCESS){
-        log_line("FastReboot: Control\\Shutdown not opened; left as it is");return;}
-    if(RegQueryValueExA(key,"FastReboot",0,&type,(BYTE*)value,&n)!=ERROR_SUCCESS||type!=REG_SZ||lstrcmpA(value,"0"))
-        log_line("FastReboot: not USOS's install-time \"0\"; left as it is");
-    else if(RegSetValueExA(key,"FastReboot",0,REG_SZ,(const BYTE*)"1",2)==ERROR_SUCCESS)
-        log_line("FastReboot: install-time \"0\" replaced by Setup's default \"1\" (final desktop)");
-    else log_line("FastReboot: restoring \"1\" failed; \"0\" stays");
-    RegCloseKey(key);}
 static void reboot(const char*phase,const char*reason){int last=!lstrcmpA(phase,"reboot\r\n");
     if(last){
         vcache_tune();
@@ -489,7 +473,6 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         if(exists("NETCFG.INI")&&child("C:\\USOS9X\\USOSLAN.EXE /setup /refresh")!=0)fail("final IE/network defaults incomplete");
         windows_logon();
         if(!save("FIRSTBT.OK","complete; final_post_addons_restarts=1\r\n"))fail("cannot save completion");
-        fastreboot_restore();
         /* USOSADD's own end-of-chain summary dialog (installed X/Y, failed,
          * skipped incl. files missing on the media), which /setup does not
          * show before the desktop: SUMMARY.TXT from the final /check, else
