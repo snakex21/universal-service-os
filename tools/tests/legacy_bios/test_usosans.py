@@ -63,7 +63,8 @@ HARNESS = r'''
  * u TICK...: su_step (the first-start Setup wizard), TICK = frame,page,kind,
  * filled,accepted,declined,next_ready, prints "action/why/event"; e BITS:
  * an_edge per bit; a N: an_rec_allow N + 2 times; z MS WATCHING:
- * an_time_up. */
+ * an_time_up; V HEXVERSION: an_is_me_version; O C M P: an_starts_owned;
+ * M HEX: an_is_usosmous. */
 static int unhex(const char *h, char *out, int cap)
 {
     int n = 0;
@@ -88,6 +89,9 @@ int main(int argc, char **argv)
     else if (argv[1][0] == 'i') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_names_monitor_inf(buf)); }
     else if (argv[1][0] == 'f') { int n = unhex(argv[2], buf, sizeof buf); printf("%u %u\n", an_field(buf, n, "boots"), an_field(buf, n, "desk")); }
     else if (argv[1][0] == 'r') printf("%d\n", an_remove_now((unsigned)atoi(argv[2]), (unsigned)atoi(argv[3]), atoi(argv[4]), atoi(argv[5])));
+    else if (argv[1][0] == 'V') printf("%d\n", an_is_me_version(strtoul(argv[2], 0, 16)));
+    else if (argv[1][0] == 'O') printf("%d\n", an_starts_owned(atoi(argv[2]), atoi(argv[3]), atoi(argv[4])));
+    else if (argv[1][0] == 'M') { unhex(argv[2], buf, sizeof buf); printf("%d\n", an_is_usosmous(buf)); }
     else if (argv[1][0] == 'k') { int vk = atoi(argv[2]); printf("%d %d %d\n", an_key_polled(vk), an_key_character(vk), an_key_code_shown(vk, atoi(argv[3]), atoi(argv[4]))); }
     else if (argv[1][0] == 'w') {
         ANWUSTATE s;
@@ -472,6 +476,23 @@ class Logic(unittest.TestCase):
         loop = src[src.index('start = ref = GetTickCount();'):src.index('pending = addons_pending();', src.index('start = ref = GetTickCount();'))]
         self.assertLess(loop.index('if (chain_open()) ref = now;'), loop.index('an_chain_time_up(now - start, now - ref,'))
 
+    def test_windows_me_helpers(self):
+        # GetVersion() on 9x: 95 0xC3B60004, 98 0xC0000A04, 98 SE 0xC0000A04 (build in the high word), Me 0xC0005A04
+        for v, want in (('C3B60004', 0), ('C0000A04', 0), ('C0005A04', 1), ('00005A04', 0), ('C0005A05', 0)):
+            with self.subTest(version=v):
+                self.assertEqual(self.run_exe('V', v), str(want))
+        for chain, me, pending, want in ((1, 0, 0, 1), (0, 1, 1, 1), (0, 1, 0, 0), (0, 0, 1, 0), (1, 1, 0, 1)):
+            with self.subTest(chain=chain, me=me, pending=pending):
+                self.assertEqual(self.run_exe('O', str(chain), str(me), str(pending)), str(want))
+        for text, want in (('usosmous.drv', 1), ('USOSMOUS.DRV', 1), (' usosmous.drv ', 1), ('mouse.drv', 0),
+                           ('usosmous.drv2', 0), ('', 0), ('usosmous', 0)):
+            with self.subTest(text=text):
+                self.assertEqual(self.run_exe('M', text.encode().hex() or '00'), str(want))
+        # X470 Me PL 2026-10-28: removed at the 5th start ("start limit") while USOSAddons still ran; owned: kept
+        self.assertEqual(self.run_exe('r', '5', '2', '1', self.run_exe('O', '0', '1', '1')), '0')
+        self.assertEqual(self.run_exe('r', '6', '5', '0', self.run_exe('O', '0', '1', '0')), '1')
+        self.assertEqual(self.run_exe('r', '13', '5', '1', self.run_exe('O', '0', '1', '1')), '1')
+
     def test_new_frame_starts_over(self):
         got = self.hw(*[page(**dict(INTRO, monitor=0))] * 4, *[page(frame=8, **INTRO)] * 4)
         self.assertEqual(got[3][:2], (LEAVE, E_OTHER))
@@ -498,7 +519,7 @@ class Sources(unittest.TestCase):
     def test_never_types_or_writes_passwords(self):
         c = EXE_SRC.read_text(encoding='utf-8')
         for banned in ('WM_SETTEXT', 'SetWindowText', 'SetDlgItemText', 'keybd_event', 'SendInput', 'WM_CHAR',
-                       'WM_KEYDOWN', 'RegSetValue', '.PWL', 'WritePrivateProfile', 'BM_CLICK', 'CreateProcess', 'WinExec'):
+                       'WM_KEYDOWN', 'RegSetValue', '.PWL', 'BM_CLICK', 'CreateProcess', 'WinExec'):
             self.assertNotIn(banned, c)
         # the only presses: OK of a logon dialog, Next / Finish of the wizard frame
         self.assertEqual(c.count('PostMessageA('), 1)
@@ -539,6 +560,38 @@ class Sources(unittest.TestCase):
         self.assertIn('lstrcatA(g_log, "USOSANS.TXT");', c)
         self.assertIn('Sleep(15000);', c)                # after the shell's RunServices enumeration
 
+    def test_me_only_writes(self):
+        # Windows Me (X470 2026-10-28): the only profile writes are the two lines of USOSMOUS.INF, in me_mouse,
+        # only on Me with USOSMOUS.INF and the driver staged; the only other change is deleting *DisplayFallback
+        c = EXE_SRC.read_text(encoding='utf-8')
+        self.assertEqual(c.count('WritePrivateProfileStringA('), 2)
+        mm = c[c.index('static void me_mouse(void)'):c.index('void __cdecl usos_entry(void)')]
+        self.assertIn('WritePrivateProfileStringA("boot", "mouse.drv", "usosmous.drv", "SYSTEM.INI");', mm)
+        self.assertIn('WritePrivateProfileStringA("386Enh", "mouse", 0, "SYSTEM.INI");', mm)
+        self.assertIn('if (!g_me || g_me_mouse_sets >= AN_ME_MOUSE_MAX) return;', mm)
+        self.assertIn('if (!beside("USOSMOUS.INF") || GetFileAttributesA(ME_MOUSE_DRV) == (DWORD)-1) return;', mm)
+        self.assertIn('if (an_is_usosmous(cur)) return;', mm)
+        md = c[c.index('static void me_display(void)'):c.index('static void me_mouse(void)')]
+        self.assertIn('if (!g_me) return;', md)
+        self.assertIn('r = RegDeleteValueA(k, "*DisplayFallback");', md)
+        self.assertEqual(c.count('RegDeleteValueA('), 2)  # USOSAns and *DisplayFallback
+        self.assertIn(r'#define ME_MOUSE_DRV "C:\\WINDOWS\\SYSTEM\\USOSMOUS.DRV"', c)
+        entry = c[c.index('void __cdecl usos_entry(void)'):]
+        self.assertIn('g_me = an_is_me_version((unsigned long)GetVersion());', entry)
+        self.assertIn('owned = an_starts_owned(chain_open(), g_me, pending);', entry)
+        self.assertIn('if (an_remove_now(g_boots, g_desk, pending, owned)) {', entry)
+        self.assertIn('an_remove_now(g_boots + 1, g_desk, pending, an_starts_owned(chain_open(), g_me, pending))', entry)
+        self.assertIn('if (g_me && ++ticks % AN_ME_CHECK_TICKS == 0) { me_display(); me_mouse(); }', entry)
+        # the fallback is deleted before the start can end at the removal decision
+        self.assertLess(entry.index('me_display();'), entry.index('if (an_remove_now(g_boots, g_desk, pending, owned))'))
+        # the Setup page finder takes both title IDs
+        cb = c[c.index('static BOOL CALLBACK su_page_cb('):c.index('static BOOL CALLBACK clickable_cb(')]
+        self.assertIn('if (!GetDlgItem(w, PG_TITLE_ID) && !GetDlgItem(w, AN_SETUP_TITLE_ME_ID)) return TRUE;', cb)
+        # dos_startup.cmd stages USOSMOUS.INF (the marker me_mouse needs) with exactly these two lines
+        ins = INSTALL.read_text(encoding='utf-8', errors='replace')
+        self.assertIn(r'ECHO system.ini,boot,"mouse.drv=*","mouse.drv=usosmous.drv">>C:\USOS9X\USOSMOUS.INF', ins)
+        self.assertIn(r'ECHO system.ini,386Enh,"mouse=*",>>C:\USOS9X\USOSMOUS.INF', ins)
+
     def test_payload_lists(self):
         import build_win9x_support as b
         self.assertIn('USOSANS.EXE', b.STAGED)
@@ -548,7 +601,8 @@ class Sources(unittest.TestCase):
             self.assertLessEqual(names, b.USOSLOG_IMPORTS[dll] | {'RegDeleteValueA', 'EnumChildWindows', 'FindWindowA',
                                                                  'GetDlgItem', 'GetParent', 'IsWindowEnabled',
                                                                  'PostMessageA', 'SendMessageTimeoutA', 'GetAsyncKeyState',
-                                                                 'GetDlgCtrlID', 'GetFileAttributesA'}, dll)
+                                                                 'GetDlgCtrlID', 'GetFileAttributesA',
+                                                                 'WritePrivateProfileStringA'}, dll)
         self.assertIn('    build_usoslog(out, work)\n    build_usosans(out, work)\n', (ROOT / 'tools/build_win9x_support.py').read_text())
         self.assertIn("'EFI/USOS/dos-native/win9x/USOSANS.EXE'",
                       (ROOT / 'tools/verify_release_consistency.ps1').read_text(encoding='utf-8-sig'))
@@ -941,6 +995,48 @@ class Media(unittest.TestCase):
 
     def test_95_osr21_pl(self):
         self.check('95-osr21-pl', 'pl', '95')
+
+    def test_me_pl_setup_wizard_pages(self):
+        """Me's first-start Setup wizard (SETUPX.DLL of PRECOPY1.CAB, the file the installed Me runs): user
+        information, licence and key pages titled with Static AN_SETUP_TITLE_ME_ID (1072), not 1070; the last
+        page keeps 1070; the page rules of usospg_logic.h classify exactly these three as their kinds."""
+        iso = MEDIA / ISOS['me-pl'][0]
+        if not SEVEN.exists() or not iso.exists():
+            self.skipTest('no me-pl medium')
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import test_usospg as pg
+        d = Path(tempfile.mkdtemp(prefix='usos-usosans-me-'))
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        subprocess.run([str(SEVEN), 'e', '-y', f'-o{d}', str(iso), 'WIN9X/PRECOPY1.CAB'], capture_output=True, timeout=60)
+        cab = next(d.glob('[Pp][Rr][Ee][Cc][Oo][Pp][Yy]1.[Cc][Aa][Bb]'), None)
+        self.assertIsNotNone(cab)
+        subprocess.run([str(SEVEN), 'e', '-y', f'-o{d / "dll"}', str(cab), 'setupx.dll'], capture_output=True, timeout=60)
+        setupx = next((d / 'dll').glob('[Ss][Ee][Tt][Uu][Pp][Xx].[Dd][Ll][Ll]'), None)
+        self.assertIsNotNone(setupx)
+        dialogs = pg.ne_dialogs(setupx.read_bytes())
+        ids = pg.defines('PG_TITLE_ID', 'PG_NAME_ID', 'PG_ORG_ID', 'PG_EULA_TEXT_ID', 'PG_EULA_YES_ID', 'PG_EULA_NO_ID',
+                         'PG_KEY1_ID', 'PG_KEY_FIELDS')
+        me_title = int(LOGIC.read_text(encoding='ascii').split('#define AN_SETUP_TITLE_ME_ID')[1].split()[0])
+        self.assertEqual(me_title, 1072)
+
+        def kind(rid, next_shown=1, finish_shown=0):
+            # usosans.c sets the title flag for every page su_page_cb found (1070 or 1072)
+            return pg.kind_of((1,) + pg.static_shape(dialogs[rid], ids)[1:], next_shown, finish_shown)
+        for rid, want in ((112, pg.USER), (600, pg.EULA), (608, pg.KEY)):
+            with self.subTest(dialog=rid):
+                c = {cid: cls for cid, cls, _ in dialogs[rid]}
+                self.assertEqual(c.get(me_title), 'Static')
+                self.assertNotIn(ids['PG_TITLE_ID'], c)
+                self.assertEqual(kind(rid), want)
+        self.assertEqual({cid: cls for cid, cls, _ in dialogs[4205]}.get(ids['PG_TITLE_ID']), 'Static')
+        self.assertEqual(kind(4205, 0, 1), pg.FINISH)
+        # no other titled page of the file is one of the three kinds
+        for rid, ctrls in dialogs.items():
+            have = {cid for cid, _, _ in ctrls}
+            if rid in (112, 600, 608) or not have & {ids['PG_TITLE_ID'], me_title}:
+                continue
+            with self.subTest(other=rid):
+                self.assertEqual(kind(rid), pg.OTHER)
 
     def test_95_osr1_en(self):
         self.check('95-osr1-en', 'en', '95')

@@ -568,4 +568,60 @@ static int an_remove_now(unsigned boots, unsigned desk_boots, int addons_pending
     return 0;
 }
 
+/* ---- Windows Me ----
+ *
+ * X470 Me PL OEM 4.90.3000, B261028-141536 (2026-10-28): no first-desktop
+ * coordinator on Me; the add-ons run on the desktop (USOSAddons Run value).
+ *
+ * First-start Setup wizard: Me's SETUPX.DLL (PRECOPY1.CAB, the same file
+ * the installed system runs) titles its user information (dialog 112),
+ * licence (600) and product key (608) pages with Static 1072, not 1070 as
+ * 98 / 98 SE; the last page (4205) keeps 1070. Every other control ID of
+ * the page rules is the same (1025 / 1011, 617 / 618 / 619, 1058..1062).
+ * The run logged "no page with the title Static 1070" and the user typed
+ * the three pages through. */
+#define AN_SETUP_TITLE_ME_ID 1072
+
+/* GetVersion() on 9x: major in the low byte, minor in the next one;
+ * Me = 4.90, platform bit 31 set. */
+static int an_is_me_version(unsigned long v)
+{
+    return (v & 0x80000000UL) && (v & 0xFFUL) == 4 && ((v >> 8) & 0xFFUL) == 90;
+}
+
+/* The starts stay owned (the RunServices value is kept, up to
+ * AN_HARD_MAX_BOOTS) while the 95 / 98 coordinator's chain is open, and on
+ * Me while the add-on chain still has its USOSAddons Run value: the same
+ * run had its *DisplayFallback dialog in a package boot after the value
+ * was gone (start limit at the 5th start). */
+static int an_starts_owned(int chain_open, int is_me, int addons_pending)
+{
+    return chain_open || (is_me && addons_pending);
+}
+
+/* Me mouse: SYSTEM.INI [boot] mouse.drv as USOSMOUS.INF sets it. The
+ * first-start boots ran with Setup's mouse.drv=mouse.drv (BOOTLOG "No mouse
+ * driver installed": no mouse at the wizard and the first sign-in), because
+ * USOSMOUS.INF runs from machine RunOnce only at the first sign-in and
+ * applies from the next start. Setup's hardware detection in the first
+ * start after phase 1 writes mouse.drv=mouse.drv again (MSMOUSE.INF for the
+ * *PNP0F0E it adds), so the value is checked every AN_ME_CHECK_TICKS and
+ * set again, at most AN_ME_MOUSE_MAX times per start. */
+#define AN_ME_CHECK_TICKS 20
+#define AN_ME_MOUSE_MAX   4
+static int an_is_usosmous(const char *v)
+{
+    static const char want[] = "usosmous.drv";
+    int i;
+    while (*v == ' ' || *v == '\t') v++;
+    for (i = 0; want[i]; i++) {
+        char c = v[i];
+        if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+        if (c != want[i]) return 0;
+    }
+    for (; v[i]; i++)
+        if (v[i] != ' ' && v[i] != '\t') return 0;
+    return 1;
+}
+
 #endif

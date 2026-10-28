@@ -40,7 +40,14 @@
  *     a name -> Next; licence -> 618 checked + its BN_CLICKED, then Next;
  *     all five key fields at 5 characters -> Next; the last page -> Finish,
  *     only in a frame that showed one of the other pages. Name and key
- *     fields are only measured (WM_GETTEXTLENGTH), never read.
+ *     fields are only measured (WM_GETTEXTLENGTH), never read. Me's
+ *     user / licence / key pages carry the title Static 1072 instead.
+ *  4. Windows Me only (no first-desktop coordinator there): a queued
+ *     RunOnce *DisplayFallback is deleted before Explorer runs it, and
+ *     SYSTEM.INI [boot] mouse.drv=usosmous.drv / no [386Enh] mouse= (the
+ *     lines of C:\USOS9X\USOSMOUS.INF) is set from the first start after
+ *     phase 1 on, every 5 s while it differs (4 times per start at most);
+ *     the value stays while the add-on chain (USOSAddons) is pending.
  * Diagnostics (C:\USOS9X\USOSANS.TXT, at most 3000 recorder lines): every
  * visible top-level dialog once with what it was taken for; every wizard
  * page at first sight with all its controls (class, ID, Static / Button
@@ -536,7 +543,7 @@ static HWND g_su_page_logged;
 static int g_su_kind_logged = -1;
 static unsigned char g_su_why = 0xFF;
 static const char *const su_kind_name[] = { "other", "user information", "licence", "product key", "finish" };
-static const char *const su_why_name[] = { "", "no page with the title Static 1070", "page not one of the four kinds",
+static const char *const su_why_name[] = { "", "no page with the title Static 1070 / 1072", "page not one of the four kinds",
     "finish page, but no user / licence / key page seen in this frame", "page settling", "Next not enabled yet",
     "pressed, waiting for the page to go", "page left to the user" };
 
@@ -550,7 +557,8 @@ static BOOL CALLBACK su_page_cb(HWND w, LPARAM l)
 {
     PAGEFIND *f = (PAGEFIND *)l;
     if (GetParent(w) != f->frame || !IsWindowVisible(w) || !class_of(w, "#32770")) return TRUE;
-    if (!GetDlgItem(w, PG_TITLE_ID)) return TRUE;
+    /* 98 / 98 SE: 1070 on every page; Me: 1072 on user / licence / key */
+    if (!GetDlgItem(w, PG_TITLE_ID) && !GetDlgItem(w, AN_SETUP_TITLE_ME_ID)) return TRUE;
     f->page = w;
     return FALSE;
 }
@@ -615,7 +623,8 @@ static void su_tick(HWND frame)
         if (page != g_su_page_logged || kind != g_su_kind_logged) {
             g_su_page_logged = page;
             g_su_kind_logged = kind;
-            safe_text(GetDlgItem(page, PG_TITLE_ID), title, sizeof title);
+            safe_text(GetDlgItem(page, PG_TITLE_ID) ? GetDlgItem(page, PG_TITLE_ID) : GetDlgItem(page, AN_SETUP_TITLE_ME_ID),
+                      title, sizeof title);
             wsprintfA(line, "setup wizard page: %s \"%s\", next %s, finish %s%s", su_kind_name[kind], title,
                       v.next_ready ? "ready" : "not ready", button_ready(fin) ? "ready" : "not ready",
                       kind == PG_USER ? (v.filled ? ", name filled" : ", name empty")
@@ -815,19 +824,76 @@ static void scan(void)
     }
 }
 
+/* ---- Windows Me (no first-desktop coordinator; usosans_logic.h) ---- */
+
+#define RUNONCE_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+#define ME_MOUSE_DRV "C:\\WINDOWS\\SYSTEM\\USOSMOUS.DRV"
+static int g_me;
+static unsigned g_me_mouse_sets;
+
+/* USER.EXE queues RunOnce *DisplayFallback (rundll32 shell32.dll,
+ * Control_RunDLL desk.cpl ,-1) when the display driver failed in this
+ * start; Explorer runs it after the sign-in: the "Ekran" box with OK /
+ * Pomoc the user had to answer on the X470 (its deleted value is still in
+ * that run's SYSTEM.DAT). On 98 FE the same page stored the fallback's
+ * 640x480x4 as the display settings; USOSFB deletes the value there, this
+ * does it on Me before Explorer gets to it. Only deleted and logged; the
+ * settings USOSRES applied are not touched (no registry writes here). */
+static void me_display(void)
+{
+    HKEY k;
+    char cmd[200], line[400];
+    DWORD type, size = sizeof cmd - 1;
+    LONG r;
+    if (!g_me) return;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY, 0, KEY_READ | KEY_SET_VALUE, &k) != ERROR_SUCCESS) return;
+    if (RegQueryValueExA(k, "*DisplayFallback", 0, &type, (BYTE *)cmd, &size) == ERROR_SUCCESS) {
+        cmd[size < sizeof cmd ? size : sizeof cmd - 1] = 0;
+        if (type != REG_SZ) cmd[0] = 0;
+        r = RegDeleteValueA(k, "*DisplayFallback");
+        wsprintfA(line, "display: RunOnce *DisplayFallback (display driver failed in this start, VGA fallback) %s, not run (%s)",
+                  r == ERROR_SUCCESS ? "deleted" : "NOT deleted", cmd);
+        say(line);
+    }
+    RegCloseKey(k);
+}
+
+/* SYSTEM.INI [boot] mouse.drv=usosmous.drv and no [386Enh] mouse=, the two
+ * lines of C:\USOS9X\USOSMOUS.INF (dos_startup.cmd stages it, and the
+ * driver in SYSTEM, only for Me), from this start on instead of after the
+ * first sign-in; applies from the next start. Nothing else is written. */
+static void me_mouse(void)
+{
+    char cur[64], line[200];
+    BOOL ok;
+    if (!g_me || g_me_mouse_sets >= AN_ME_MOUSE_MAX) return;
+    if (!beside("USOSMOUS.INF") || GetFileAttributesA(ME_MOUSE_DRV) == (DWORD)-1) return;
+    GetPrivateProfileStringA("boot", "mouse.drv", "", cur, sizeof cur, "SYSTEM.INI");
+    if (an_is_usosmous(cur)) return;
+    g_me_mouse_sets++;
+    ok = WritePrivateProfileStringA("boot", "mouse.drv", "usosmous.drv", "SYSTEM.INI");
+    WritePrivateProfileStringA("386Enh", "mouse", 0, "SYSTEM.INI");
+    wsprintfA(line, "me mouse: SYSTEM.INI [boot] mouse.drv=%s -> usosmous.drv%s, [386Enh] mouse= removed (from the next start; %u of %u)",
+              cur, ok ? "" : " NOT written", g_me_mouse_sets, (unsigned)AN_ME_MOUSE_MAX);
+    say(line);
+}
+
 void __cdecl usos_entry(void)
 {
     char line[200];
     DWORD start, now, ref;
     HANDLE mutex;
-    int pending, desk_now = 0, k;
+    int pending, desk_now = 0, k, owned;
+    unsigned ticks = 0;
     if (!paths()) ExitProcess(2);
     mutex = CreateMutexA(0, FALSE, "USOSANS-instance");
     if (mutex && GetLastError() == ERROR_ALREADY_EXISTS) ExitProcess(0);
     if (!(GetVersion() & 0x80000000UL)) { say("USOSANS: not Windows 9x, nothing to do"); ExitProcess(0); }
+    g_me = an_is_me_version((unsigned long)GetVersion());
     state_read();
     g_boots++;
     pending = addons_pending();
+    owned = an_starts_owned(chain_open(), g_me, pending);
     /* With the first-desktop coordinator (FIRSTBT.ON) USOSFB runs the
      * add-on chain, not the USOSAddons Run value: its markers say whether
      * the chain is over (X470 98 FE PL 2026-10-28 logged "chain over" at
@@ -840,15 +906,19 @@ void __cdecl usos_entry(void)
               : "pending (USOSFB: no FIRSTBT.OK / ERR yet)");
     say(line);
     say(chain_open() ? "first-desktop coordinator still owns the starts (FIRSTBT.ON, no FIRSTBT.OK / ERR): value kept up to 12 starts"
-                     : "first-desktop coordinator not staged or finished");
-    if (an_remove_now(g_boots, g_desk, pending, chain_open())) {
+        : owned ? "first-desktop coordinator not staged; Windows Me add-on chain pending (USOSAddons): value kept up to 12 starts"
+                : "first-desktop coordinator not staged or finished");
+    me_display();
+    if (an_remove_now(g_boots, g_desk, pending, owned)) {
         state_write();
         remove_value(g_boots > AN_HARD_MAX_BOOTS ? "hard start limit" : g_boots > AN_MAX_BOOTS ? "start limit" : "first starts done");
         ExitProcess(0);
     }
     state_write();
+    me_mouse();
     start = ref = GetTickCount();
     for (;;) {
+        if (g_me && ++ticks % AN_ME_CHECK_TICKS == 0) { me_display(); me_mouse(); }
         scan();
         if (!desk_now && FindWindowA("Shell_TrayWnd", 0)) {
             desk_now = 1;
@@ -864,7 +934,7 @@ void __cdecl usos_entry(void)
     pending = addons_pending();
     say("USOSANS: time over (10 minutes after the start or after the coordinator's chain ended, longer while a wizard was shown; 2 hours at most), ending");
     /* The next start would only remove the value: do it now. */
-    if (an_remove_now(g_boots + 1, g_desk, pending, chain_open()))
+    if (an_remove_now(g_boots + 1, g_desk, pending, an_starts_owned(chain_open(), g_me, pending)))
         remove_value(g_boots + 1 > AN_HARD_MAX_BOOTS ? "hard start limit" : g_boots + 1 > AN_MAX_BOOTS ? "start limit" : "first starts done");
     ExitProcess(0);
 }

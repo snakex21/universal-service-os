@@ -527,8 +527,9 @@ def build_usoslog(out: Path, work: Path, *, nt3: bool = False) -> Path:
 USOSANS_IMPORTS = {
     'kernel32.dll': {
         'CloseHandle', 'CreateFileA', 'CreateMutexA', 'ExitProcess', 'FlushFileBuffers', 'GetFileAttributesA', 'GetLastError',
-        'GetLocalTime', 'GetModuleFileNameA', 'GetTickCount', 'GetVersion', 'ReadFile', 'SetFilePointer',
-        'Sleep', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA'},
+        'GetLocalTime', 'GetModuleFileNameA', 'GetPrivateProfileStringA', 'GetTickCount', 'GetVersion', 'ReadFile',
+        'SetFilePointer', 'Sleep', 'WriteFile', 'WritePrivateProfileStringA', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA',
+        'lstrcpynA'},
     'user32.dll': {
         'EnumChildWindows', 'EnumWindows', 'FindWindowA', 'GetAsyncKeyState', 'GetClassNameA', 'GetCursorPos',
         'GetDlgCtrlID', 'GetDlgItem', 'GetParent', 'GetWindowLongA', 'GetWindowTextA', 'IsWindowEnabled',

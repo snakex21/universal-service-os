@@ -152,7 +152,9 @@ class Sources(unittest.TestCase):
         for need in ('!beside("FIRSTBT.ON") ? (pending ? "pending" : "over")','beside("FIRSTBT.OK") ? "over (USOSFB: FIRSTBT.OK)"',
                      'beside("FIRSTBT.ERR") ? "stopped (USOSFB: FIRSTBT.ERR)"','"pending (USOSFB: no FIRSTBT.OK / ERR yet)"'):
             self.assertIn(need,msg)
-        self.assertIn('an_remove_now(g_boots, g_desk, pending, chain_open())',src)   # decision unchanged
+        # decision: the coordinator's chain, and on Me the pending add-on chain (X470 Me PL 2026-10-28)
+        self.assertIn('owned = an_starts_owned(chain_open(), g_me, pending);',src)
+        self.assertIn('an_remove_now(g_boots, g_desk, pending, owned)',src)
 
     def test_usosadd_elapsed_timer_and_slow_note(self):
         src=(ROOT/'src/platform/win32_legacy/usosadd/main.c').read_text(encoding='ascii')
