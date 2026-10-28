@@ -151,8 +151,44 @@ static void rejected(void){char line[160];DWORD start=GetTickCount(),gone;MSG me
         while(PeekMessageA(&message,0,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageA(&message);}}
     log_line("session still running a minute after the rejected restart: one more restart request");
     if(!ExitWindowsEx(EWX_REBOOT|EWX_FORCE,0))fail("restart request rejected twice");}
+/* 98 FE / 98 SE only (not 95: its VCACHE is not tuned here; Me has no
+ * USOSFB coordinator), before the final restart, with at least 512 MiB
+ * visible to Windows (MaxPhysPage=40000 caps it at 1 GiB): SYSTEM.INI
+ * [vcache] MinFileCache=65536 (64 MiB the cache never shrinks below) and
+ * ChunkSize=512 (VCACHE's own default, written out). MaxFileCache stays
+ * USOS's 262144 (MSBATCH [USOS.Memory], U9FIX every boot; VCACHE above
+ * 512 MiB overruns the system arena). Values already there are kept. */
+#define USOS_VCACHE_MIN_RAM (512UL*1024*1024)
+static void vcache_tune(void){MEMORYSTATUS m;char value[32],line[96];int i;
+    static const char*const keys[3]={"MinFileCache","ChunkSize","MaxFileCache"},*const values[3]={"65536","512","262144"};
+    if(!win98)return;
+    memset(&m,0,sizeof m);m.dwLength=sizeof m;GlobalMemoryStatus(&m);
+    if(m.dwTotalPhys<USOS_VCACHE_MIN_RAM){wsprintfA(line,"VCACHE: %lu MiB visible, under 512 MiB: [vcache] left as it is",m.dwTotalPhys>>20);log_line(line);return;}
+    for(i=0;i<3;i++){
+        if(GetPrivateProfileStringA("vcache",keys[i],"",value,sizeof value,sysini)){
+            wsprintfA(line,"VCACHE: [vcache] %s=%s kept",keys[i],value);log_line(line);continue;}
+        wsprintfA(line,WritePrivateProfileStringA("vcache",keys[i],values[i],sysini)?"VCACHE: [vcache] %s=%s written":"VCACHE: [vcache] %s=%s not written",keys[i],values[i]);
+        log_line(line);}
+    WritePrivateProfileStringA(0,0,0,sysini);}
+/* 98 FE / 98 SE: FastReboot "0" holds only during the install (MSBATCH
+ * [USOS.CsmReg] at Setup, FIRSTBT.REG every real-mode boot until
+ * FIRSTBT.OK). After FIRSTBT.OK, on the final desktop and after the last
+ * restart decision (display re-final restarts included), Setup's own value
+ * "1" (the hive after a clean 98 FE Setup, X470 B261028-114842) comes back.
+ * Only our "0" is replaced; FIRSTBT.BAT ends at FIRSTBT.OK before REGEDIT. */
+static void fastreboot_restore(void){HKEY key;char value[8];DWORD n=sizeof value,type=0;
+    if(!win98)return;
+    if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,"System\\CurrentControlSet\\Control\\Shutdown",0,KEY_QUERY_VALUE|KEY_SET_VALUE,&key)!=ERROR_SUCCESS){
+        log_line("FastReboot: Control\\Shutdown not opened; left as it is");return;}
+    if(RegQueryValueExA(key,"FastReboot",0,&type,(BYTE*)value,&n)!=ERROR_SUCCESS||type!=REG_SZ||lstrcmpA(value,"0"))
+        log_line("FastReboot: not USOS's install-time \"0\"; left as it is");
+    else if(RegSetValueExA(key,"FastReboot",0,REG_SZ,(const BYTE*)"1",2)==ERROR_SUCCESS)
+        log_line("FastReboot: install-time \"0\" replaced by Setup's default \"1\" (final desktop)");
+    else log_line("FastReboot: restoring \"1\" failed; \"0\" stays");
+    RegCloseKey(key);}
 static void reboot(const char*phase,const char*reason){int last=!lstrcmpA(phase,"reboot\r\n");
     if(last){
+        vcache_tune();
         if(!shell_set(0))fail("cannot restore SYSTEM.INI shell=Explorer.exe before the final restart");
         log_line("final boot: Explorer is the shell again and processes RunOnce before this coordinator");}
     else if(!exists("SHELL.BAD")){
@@ -453,14 +489,18 @@ void __cdecl fb_start(void){OSVERSIONINFOA version;char phase[32],next[16],note[
         if(exists("NETCFG.INI")&&child("C:\\USOS9X\\USOSLAN.EXE /setup /refresh")!=0)fail("final IE/network defaults incomplete");
         windows_logon();
         if(!save("FIRSTBT.OK","complete; final_post_addons_restarts=1\r\n"))fail("cannot save completion");
-        /* Packages that failed or were skipped: USOSADD lists them in
-         * NOTDONE.TXT; one box after the desktop, from a process this
-         * coordinator does not wait for (never before the desktop). */
-        if(GetFileAttributesA("C:\\USOS\\ADDONS\\NOTDONE.TXT")!=INVALID_FILE_ATTRIBUTES){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[]="C:\\USOS\\ADDONS\\USOSADD.EXE /note";
+        fastreboot_restore();
+        /* USOSADD's own end-of-chain summary dialog (installed X/Y, failed,
+         * skipped incl. files missing on the media), which /setup does not
+         * show before the desktop: SUMMARY.TXT from the final /check, else
+         * NOTDONE.TXT; one box after the desktop, once (SUMMARY.SHN), from
+         * a process this coordinator does not wait for. */
+        if(GetFileAttributesA("C:\\USOS\\ADDONS\\SUMMARY.TXT")!=INVALID_FILE_ATTRIBUTES||
+           GetFileAttributesA("C:\\USOS\\ADDONS\\NOTDONE.TXT")!=INVALID_FILE_ATTRIBUTES){STARTUPINFOA si;PROCESS_INFORMATION pi;char cmd[]="C:\\USOS\\ADDONS\\USOSADD.EXE /note";
             memset(&si,0,sizeof si);memset(&pi,0,sizeof pi);si.cb=sizeof si;
             if(CreateProcessA(0,cmd,0,0,FALSE,0,0,0,&si,&pi)){CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
-                log_line("packages not installed: C:\\USOS\\ADDONS\\NOTDONE.TXT, shown after the desktop (USOSADD /note, not waited for)");}
-            else log_line("packages not installed: C:\\USOS\\ADDONS\\NOTDONE.TXT (note not started)");}
+                log_line("add-on summary (C:\\USOS\\ADDONS\\SUMMARY.TXT or NOTDONE.TXT) shown after the desktop (USOSADD /note, not waited for)");}
+            else log_line("add-on summary: USOSADD /note not started");}
         if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,once,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS){RegDeleteValueA(key,"USOSFirstBoot");RegCloseKey(key);}
         log_line("complete: releasing first desktop; final_post_addons_restarts=1");CloseHandle(journal);ExitProcess(0);
     }

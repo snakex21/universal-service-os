@@ -1113,6 +1113,12 @@ static void run_chain(void) {
         g_answer_pkg = 0;
         g_guard_pkg = 0;
         timing_off();
+        {   /* ADDONS.LOG: how long the package's commands ran (m:ss) */
+            DWORD sec = (GetTickCount() - g_pkg_start) / 1000;
+            char took[48];
+            wsprintfA(took, "  elapsed %lu:%02lu (%lu s)", sec / 60, sec % 60, sec);
+            log_line(took);
+        }
         if (g_restart_refused) {
             log_line("  the installer's own restart was refused: counted as a restart it asked for");
             g_restart_asked = 1;
@@ -1195,30 +1201,43 @@ static int write_notdone(void) {
     return listed;
 }
 
-/* /note (USOSFB, after the final restart): NOTDONE.TXT in one box once the
- * taskbar is there (at most 2 minutes' wait); nothing else is read. */
+/* /note (USOSFB, after the final restart): once the taskbar is there (at
+ * most 2 minutes' wait) the original end-of-chain summary dialog from
+ * SUMMARY.TXT (every run, not only with failures), else NOTDONE.TXT as
+ * before. Shown once: SUMMARY.SHN is written before the box. */
 static void show_note(void) {
     static char text[4096];
-    char path[UA_PATH];
+    char path[UA_PATH], shown[UA_PATH];
+    const char *body = text;
+    UINT icon = MB_ICONWARNING;
     int n, waited;
-    path_join(path, g_root, "NOTDONE.TXT");
+    path_join(shown, g_root, "SUMMARY.SHN");
+    if (exists(shown)) ExitProcess(0);
+    path_join(path, g_root, "SUMMARY.TXT");
     n = read_file(path, text, sizeof text);
-    if (n <= 0) ExitProcess(0);
+    if (n > 3 && (text[0] == '0' || text[0] == '1') && text[1] == '\r' && text[2] == '\n') {
+        icon = text[0] == '1' ? MB_ICONWARNING : MB_ICONINFORMATION;
+        body = text + 3;
+    } else {
+        path_join(path, g_root, "NOTDONE.TXT");
+        n = read_file(path, text, sizeof text);
+        if (n <= 0) ExitProcess(0);
+    }
+    if (!write_file(shown, "shown\r\n", 7)) ExitProcess(0);
     for (waited = 0; waited < 120 && !FindWindowA("Shell_TrayWnd", 0); waited++) Sleep(1000);
     Sleep(3000);
-    MessageBoxA(0, text, "USOS", MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+    MessageBoxA(0, body, "USOS", MB_OK | icon | MB_SETFOREGROUND);
     ExitProcess(0);
 }
 
-/* After the last restart: log and show "zainstalowano X/Y, pominieto Z
- * (pow\363d)". A failed package never stops the chain (run_chain goes on). */
-static void finish(void) {
-    static char text[4096];
+/* The summary text of the original end-of-chain dialog: "zainstalowano
+ * X/Y, bledy: F, pominieto: S" and the failed / skipped / skipped-missing
+ * packages with their reasons (at most 15), then the log path. Logged here.
+ * Returns the number failed; *missing gets the skipped-missing count. */
+static int summary_text(char *text, int cap, int *missing_out) {
     int i, done = 0, failed = 0, skipped = 0, missing = 0, listed = 0;
     char num[8];
     const char *name_key = g_pl ? "name_pl" : "name_en";
-    repair_ndis_before_restart();
-    if (!g_setup_mode && g_state.pending_reboot) restart();
     for (i = 0; i < g_plan.count; i++) {
         int st = g_state.st[g_plan.idx[i]];
         if (g_p.pkg[g_plan.idx[i]].tier == UA_TIER_GROUP) continue;
@@ -1227,16 +1246,16 @@ static void finish(void) {
         else { skipped++; if (st == UA_ST_MISSING) missing++; }
     }
     text[0] = 0;
-    ua_append(text, sizeof text, g_pl ? "Pakiet zgodno\234ci USOS: zainstalowano " : "USOS compatibility pack: installed ");
-    ua_itoa(num, sizeof num, done); ua_append(text, sizeof text, num);
-    ua_append(text, sizeof text, "/");
-    ua_itoa(num, sizeof num, done + failed + skipped); ua_append(text, sizeof text, num);
-    ua_append(text, sizeof text, g_pl ? ", b\263\352dy: " : ", failed: ");
-    ua_itoa(num, sizeof num, failed); ua_append(text, sizeof text, num);
-    ua_append(text, sizeof text, g_pl ? ", pomini\352to: " : ", skipped: ");
-    ua_itoa(num, sizeof num, skipped); ua_append(text, sizeof text, num);
+    ua_append(text, cap, g_pl ? "Pakiet zgodno\234ci USOS: zainstalowano " : "USOS compatibility pack: installed ");
+    ua_itoa(num, sizeof num, done); ua_append(text, cap, num);
+    ua_append(text, cap, "/");
+    ua_itoa(num, sizeof num, done + failed + skipped); ua_append(text, cap, num);
+    ua_append(text, cap, g_pl ? ", b\263\352dy: " : ", failed: ");
+    ua_itoa(num, sizeof num, failed); ua_append(text, cap, num);
+    ua_append(text, cap, g_pl ? ", pomini\352to: " : ", skipped: ");
+    ua_itoa(num, sizeof num, skipped); ua_append(text, cap, num);
     log_line(text);
-    ua_append(text, sizeof text, "\r\n");
+    ua_append(text, cap, "\r\n");
     for (i = 0; i < g_plan.count; i++) {
         int x = g_plan.idx[i], st = g_state.st[x];
         const char *name = ua_ini_get(&g_m, g_p.pkg[x].section, name_key);
@@ -1250,10 +1269,42 @@ static void finish(void) {
         ua_append(line, sizeof line, g_state.why[x][0] ? g_state.why[x] : ua_state_name(st));
         ua_append(line, sizeof line, ")");
         log_line(line);
-        if (listed++ < 15) { ua_append(text, sizeof text, "\r\n"); ua_append(text, sizeof text, line); }
+        if (listed++ < 15) { ua_append(text, cap, "\r\n"); ua_append(text, cap, line); }
     }
-    ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
-    ua_append(text, sizeof text, g_log);
+    ua_append(text, cap, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
+    ua_append(text, cap, g_log);
+    if (missing_out) *missing_out = missing;
+    return failed;
+}
+
+/* /setup /check: the same dialog after FIRSTBT.OK. Under the coordinator
+ * the chain ends in /setup, which shows no dialog (the desktop is not there
+ * yet, 756ca823); USOSFB starts "USOSADD /note" on the first desktop and it
+ * shows SUMMARY.TXT once. First line "1" / "0": failed packages (the
+ * dialog's warning / information icon), then the text. */
+static void write_summary(void) {
+    static char text[4096];
+    char path[UA_PATH];
+    int failed;
+    ua_copy(text, sizeof text, "0\r\n");
+    failed = summary_text(text + 3, sizeof text - 3, 0);
+    if (failed) text[0] = '1';
+    path_join(path, g_root, "SUMMARY.SHN");
+    DeleteFileA(path);
+    path_join(path, g_root, "SUMMARY.TXT");
+    write_file(path, text, ua_len(text));
+    log2("USOSADD setup: summary for the first desktop in ", path);
+}
+
+/* After the last restart: log and show "zainstalowano X/Y, pominieto Z
+ * (pow\363d)". A failed package never stops the chain (run_chain goes on). */
+static void finish(void) {
+    static char text[4096];
+    int failed, missing;
+    char num[8];
+    repair_ndis_before_restart();
+    if (!g_setup_mode && g_state.pending_reboot) restart();
+    failed = summary_text(text, sizeof text, &missing);
     if (g_setup_mode) {
         char end[UA_PATH];
         guard_off();
@@ -1426,6 +1477,7 @@ void __cdecl ua_start(void) {
         }
         g_state.pending_reboot=0;save_state();unregister();
         write_notdone();
+        write_summary();
         log_line(failed?"USOSADD setup final checks complete; packages not installed are listed (not blocking)":"USOSADD setup final checks complete");
         ExitProcess(0);
     }

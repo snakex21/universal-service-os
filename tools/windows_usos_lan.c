@@ -110,7 +110,30 @@ static int user_favorite(HKEY root){char folder[MAX_PATH],expanded[MAX_PATH];
 
 /* Resolve the actual link target through the OS Shell Link interface. A
  * localized label or a mention of ICW in a description is never a match. */
-static int icw_target(const char *target){const char *p=target,*base=target;while(*p){if(*p=='\\'||*p=='/')base=p+1;p++;}return eq(base,"ICWCONN1.EXE");}
+/* ICWCONN1.EXE, or INETWIZ.EXE (the ICW 5/6 front end in the same
+ * Connection Wizard folder, App Paths on X470 98 FE + IE 6 SP1). */
+static int icw_target(const char *target){const char *p=target,*base=target;while(*p){if(*p=='\\'||*p=='/')base=p+1;p++;}return eq(base,"ICWCONN1.EXE")||eq(base,"INETWIZ.EXE");}
+static int has_text(const char *s,const char *what){unsigned i,k;
+  for(i=0;s[i];i++){for(k=0;what[k];k++){char a=s[i+k],b=what[k];if(a>='A'&&a<='Z')a+='a'-'A';if(b>='A'&&b<='Z')b+='a'-'A';if(a!=b)break;}
+    if(!what[k])return 1;}
+  return 0;}
+/* X470 98 FE + IE 6 SP1 2026-10-28: HKCU RunOnce "^SetupICWDesktop" =
+ * "...\Connection Wizard\icwconn1.exe /desktop" was still pending at the
+ * final /refresh; it runs after the desktop and puts "Polacz z Internetem"
+ * there although ICW is marked completed. Removed only while Completed is
+ * set and only with that exact command. */
+static void icw_runonce(void){static const char *names[2]={"^SetupICWDesktop","SetupICWDesktop"};
+  char value[MAX_PATH];HKEY k;DWORD n,t,done=0;unsigned i;
+  if(RegOpenKeyExA(HKEY_CURRENT_USER,wizard,0,KEY_QUERY_VALUE,&k))return;
+  n=4;t=0;if(RegQueryValueExA(k,"Completed",0,&t,(BYTE*)&done,&n)||n!=4)done=0;RegCloseKey(k);
+  if(done!=1){log_line("ICW RunOnce desktop step kept: ICW not marked completed");return;}
+  if(RegOpenKeyExA(HKEY_CURRENT_USER,"Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",0,KEY_QUERY_VALUE|KEY_SET_VALUE,&k))return;
+  for(i=0;i<2;i++){n=sizeof(value)-1;
+    if(RegQueryValueExA(k,names[i],0,&t,(BYTE*)value,&n)||(t!=REG_SZ&&t!=REG_EXPAND_SZ))continue;value[n]=0;
+    if(!has_text(value,"icwconn1.exe")||!has_text(value,"/desktop"))continue;
+    if(RegDeleteValueA(k,names[i])==ERROR_SUCCESS){log_line("ICW completed: HKCU RunOnce desktop step removed (no Connect to the Internet shortcut)");log_line(names[i]);}
+    else{failures++;log_line("ICW RunOnce desktop step removal failed");}}
+  RegCloseKey(k);}
 static void desktop_links(HKEY root,const char *value,HRESULT(WINAPI *create)(REFCLSID,LPUNKNOWN,DWORD,REFIID,LPVOID *)) {
   static const GUID clsid={0x00021401,0,0,{0xc0,0,0,0,0,0,0,0x46}};
   static const GUID link_id={0x000214ee,0,0,{0xc0,0,0,0,0,0,0,0x46}};
@@ -150,6 +173,7 @@ static void shortcuts(void) {
    * Polish Me, X470 2026-10-20); 95/98 without that value: nothing to do. */
   desktop_links(HKEY_LOCAL_MACHINE,"Common Desktop",create);
   uninitialize();FreeLibrary(ole);
+  icw_runonce();
 }
 
 #ifdef USOS_LAN_NT
@@ -224,17 +248,36 @@ static void remove_me_dialup(void){HMODULE dll;HDEVINFO devices;SP_DEVINFO_DATA 
  * VxD\DHCP\DhcpInfoNN "DhcpInfo" (X470 95 RTM run with a lease, 2026-10-26:
  * DhcpInfo00, address at +4, mask at +8, server at +12, network order);
  * the run without one (2026-10-27) had no DhcpInfoNN key. NetTrans
- * IPAddress 0.0.0.0 is only the "obtain automatically" setting. */
+ * IPAddress 0.0.0.0 is only the "obtain automatically" setting. 98's VDHCP
+ * keeps no DhcpInfo blob but separate 4-byte binary values in the same key
+ * (X470 98 FE SYSTEM.DAT, 2026-10-28: DhcpIPAddress/DhcpSubnetMask/
+ * DhcpServer in network order, Lease seconds as a little-endian DWORD). */
 static void ip_text(char *out,const BYTE *p){unsigned i,k=0,n,v;char d[3];
   for(i=0;i<4;i++){v=p[i];n=0;do{d[n++]=(char)('0'+v%10);v/=10;}while(v);while(n)out[k++]=d[--n];if(i<3)out[k++]='.';}
   out[k]=0;}
+static int dhcp_value(HKEY k,const char *name,BYTE *out){DWORD n=4,type;
+  return !RegQueryValueExA(k,name,0,&type,out,&n)&&n==4;}
+static void digits_text(char *out,DWORD v){char d[10];unsigned n=0,k=0;
+  do{d[n++]=(char)('0'+v%10);v/=10;}while(v);while(n)out[k++]=d[--n];out[k]=0;}
 static void dhcp_lease(const char *when){HKEY k;char key[80],line[MAX_PATH],ip[16];BYTE data[64];DWORD n,type;unsigned i,found=0;LONG r;
   for(i=0;i<8;i++){
     lstrcpyA(key,"System\\CurrentControlSet\\Services\\VxD\\DHCP\\DhcpInfo00");key[len(key)-1]=(char)('0'+i);
     if(RegOpenKeyExA(HKEY_LOCAL_MACHINE,key,0,KEY_QUERY_VALUE,&k))continue;
-    n=sizeof data;r=RegQueryValueExA(k,"DhcpInfo",0,&type,data,&n);RegCloseKey(k);
+    n=sizeof data;r=RegQueryValueExA(k,"DhcpInfo",0,&type,data,&n);
     found++;copy(line,"DHCP ");cat(line,when);cat(line,": ");cat(line,key+len(key)-10);
-    if(r||n<16){cat(line," without a readable DhcpInfo value");log_line(line);continue;}
+    if(r||n<16){
+      /* 98 FE / SE / ME layout: separate values. */
+      if(dhcp_value(k,"DhcpIPAddress",data+4)){
+        ip_text(ip,data+4);cat(line," ip=");cat(line,ip);
+        if(dhcp_value(k,"DhcpSubnetMask",data+8)){ip_text(ip,data+8);cat(line," mask=");cat(line,ip);}
+        if(dhcp_value(k,"DhcpServer",data+12)){ip_text(ip,data+12);cat(line," server=");cat(line,ip);}
+        if(dhcp_value(k,"Lease",data+16)){cat(line," lease=");
+          digits_text(ip,(DWORD)data[16]|(DWORD)data[17]<<8|(DWORD)data[18]<<16|(DWORD)data[19]<<24);cat(line,ip);cat(line,"s");}
+        if(!(data[4]|data[5]|data[6]|data[7]))cat(line," (no address)");
+      }
+      else cat(line," without a readable DhcpInfo or DhcpIPAddress value");
+      RegCloseKey(k);log_line(line);continue;}
+    RegCloseKey(k);
     ip_text(ip,data+4);cat(line," ip=");cat(line,ip);
     ip_text(ip,data+8);cat(line," mask=");cat(line,ip);
     ip_text(ip,data+12);cat(line," server=");cat(line,ip);

@@ -222,14 +222,15 @@ class SkippedMissing(unittest.TestCase):
 
     def test_setup_exit_code_ignores_skipped_missing(self):
         fin = section(self.src, 'static void finish(void) {', '/* ---- entry')
-        self.assertIn('else { skipped++; if (st == UA_ST_MISSING) missing++; }', fin)
+        text = section(self.src, 'static int summary_text(', 'static void write_summary(void) {')
+        self.assertIn('else { skipped++; if (st == UA_ST_MISSING) missing++; }', text)
         # 2026-10-28: failed / skipped packages never block either; the exit
         # code only says whether a restart is pending
         setup = fin[fin.index('    if (g_setup_mode) {'):]
         self.assertIn('write_notdone();\n        ExitProcess(g_state.pending_reboot ? 3010 : 0);', setup)
         self.assertNotIn('ExitProcess(failed', fin)
         # still listed in the log with its reason
-        self.assertIn('st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;', fin)
+        self.assertIn('st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;', text)
 
     def test_final_check_ignores_skipped_missing(self):
         start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
@@ -278,9 +279,9 @@ class FailedPackagesDoNotBlock(unittest.TestCase):
         self.assertIn('if (!listed) { DeleteFileA(path); return 0; }', body)
 
     def test_note_waits_for_the_desktop(self):
-        note = section(self.src, 'static void show_note(void) {', '/* After the last restart')
+        note = section(self.src, 'static void show_note(void) {', '/* The summary text')
         self.assertLess(note.index('FindWindowA("Shell_TrayWnd", 0)'), note.index('MessageBoxA('))
-        self.assertIn('MB_OK | MB_ICONWARNING', note)
+        self.assertIn('UINT icon = MB_ICONWARNING;', note)   # NOTDONE.TXT alone: warning as before
         start = self.src[self.src.index('void __cdecl ua_start(void) {'):]
         self.assertLess(start.index('if (exact_switch(cmdline, "note")) show_note();'), start.index('LEGACY.INI'))
 
@@ -293,6 +294,65 @@ class FailedPackagesDoNotBlock(unittest.TestCase):
         self.assertNotIn('child("C:\\\\USOS\\\\ADDONS\\\\USOSADD.EXE /note', final)  # not waited for
         self.assertIn('fail("add-on runner failed before the final restart (not a package failure)")', self.fb)
         self.assertNotIn('packages did not finish before final restart', self.fb)
+
+
+class SummaryOnFirstDesktop(unittest.TestCase):
+    """Regression (user, 2026-10-28): the end-of-chain summary dialog of
+    finish() is not shown under /setup (756ca823). The final /check writes
+    the same text to SUMMARY.TXT; USOSFB starts /note, which shows it once."""
+    src = ADD.read_text(encoding='latin-1')
+    fb = FB.read_text(encoding='latin-1')
+
+    def test_finish_and_check_share_the_original_text(self):
+        text = section(self.src, 'static int summary_text(char *text, int cap, int *missing_out) {', 'static void write_summary(void) {')
+        self.assertIn('"Pakiet zgodno\\234ci USOS: zainstalowano "', text)
+        self.assertIn('if (st != UA_ST_FAILED && st != UA_ST_SKIPPED && st != UA_ST_MISSING) continue;', text)
+        fin = section(self.src, 'static void finish(void) {', '/* ---- entry')
+        self.assertIn('failed = summary_text(text, sizeof text, &missing);', fin)
+        self.assertIn('MB_OK | (failed ? MB_ICONWARNING : MB_ICONINFORMATION) | MB_SETFOREGROUND', fin)
+        chk = self.src[self.src.index('if(g_setup_mode && exact_switch(cmdline,"check")){'):]
+        chk = chk[:chk.index('ExitProcess(0);')]
+        self.assertLess(chk.index('write_notdone();'), chk.index('write_summary();'))
+        ws = section(self.src, 'static void write_summary(void) {', '/* After the last restart')
+        self.assertIn('"SUMMARY.TXT"', ws)
+        self.assertIn('"SUMMARY.SHN"', ws)   # a new install shows it again
+
+    def test_note_shows_summary_once_with_the_original_icons(self):
+        note = section(self.src, 'static void show_note(void) {', '/* The summary text')
+        self.assertLess(note.index('if (exists(shown)) ExitProcess(0);'), note.index('"SUMMARY.TXT"'))
+        self.assertLess(note.index('"SUMMARY.TXT"'), note.index('"NOTDONE.TXT"'))
+        self.assertIn("icon = text[0] == '1' ? MB_ICONWARNING : MB_ICONINFORMATION;", note)
+        self.assertLess(note.index('write_file(shown'), note.index('MessageBoxA('))
+        self.assertLess(note.index('FindWindowA("Shell_TrayWnd", 0)'), note.index('MessageBoxA('))
+
+    def test_coordinator_starts_note_for_summary_or_notdone(self):
+        final = self.fb[self.fb.index('if(!save("FIRSTBT.OK"'):]
+        final = final[:final.index('ExitProcess(0);')]
+        self.assertIn('C:\\\\USOS\\\\ADDONS\\\\SUMMARY.TXT', final)
+        self.assertLess(final.index('SUMMARY.TXT'), final.index('USOSADD.EXE /note'))
+
+    def test_package_elapsed_time_logged(self):
+        chain = section(self.src, 'static void run_chain(void) {', '/* /setup: NOTDONE.TXT')
+        t = chain.index('timing_off();')
+        self.assertLess(t, chain.index('"  elapsed %lu:%02lu (%lu s)"'))
+        self.assertLess(chain.index('"  elapsed %lu:%02lu (%lu s)"'), chain.index('check = run_check(p);', t))
+
+
+class Vcache(unittest.TestCase):
+    fb = FB.read_text(encoding='latin-1')
+
+    def test_98_only_with_512_mib_before_the_final_restart(self):
+        body = section(self.fb, 'static void vcache_tune(void){', 'static void reboot(')
+        self.assertIn('if(!win98)return;', body)
+        self.assertIn('#define USOS_VCACHE_MIN_RAM (512UL*1024*1024)', self.fb)
+        self.assertLess(body.index('m.dwTotalPhys<USOS_VCACHE_MIN_RAM'), body.index('WritePrivateProfileStringA("vcache"'))
+        self.assertIn('"MinFileCache","ChunkSize","MaxFileCache"', body)
+        self.assertIn('"65536","512","262144"', body)
+        # existing values are kept, never overwritten
+        self.assertLess(body.index('GetPrivateProfileStringA("vcache",keys[i]'), body.index('WritePrivateProfileStringA("vcache"'))
+        rb = section(self.fb, 'static void reboot(const char*phase,const char*reason){', 'static DWORD child(')
+        last = rb[rb.index('if(last){'):]
+        self.assertLess(last.index('vcache_tune();'), last.index('shell_set(0)'))
 
 
 class DisplayFallback(unittest.TestCase):
@@ -336,6 +396,15 @@ class Manifest(unittest.TestCase):
         self.assertIn('\ncheck=regver:HKLM\\Software\\Microsoft\\Active Setup\\Installed Components\\'
                       '{6BF52A52-394A-11d3-B153-00C04F79FAA6},Version>=7.1.0.3055\n', body)
         self.assertNotIn('check=regver:HKLM\\Software\\Microsoft\\MediaPlayer\\PlayerUpgrade', body)
+
+    def test_wmp9_installed_check_is_the_active_setup_version(self):
+        text = PACK.read_text(encoding='utf-8')
+        body = section(text, '[pkg:wmp9-pl]', '\n[pkg:')
+        # Same broken PlayerVersion rule as 7.1; WMP 9's wmp.inf has the
+        # same WMP_GUID and no PlayerVersion write.
+        self.assertIn('\ncheck=regver:HKLM\\Software\\Microsoft\\Active Setup\\Installed Components\\'
+                      '{6BF52A52-394A-11d3-B153-00C04F79FAA6},Version>=9.0.0.2980\n', body)
+        self.assertNotIn('PlayerUpgrade,PlayerVersion', body)
 
     def test_nusb_only_on_98se(self):
         text = PACK.read_text(encoding='utf-8')

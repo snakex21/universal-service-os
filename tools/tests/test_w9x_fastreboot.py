@@ -45,4 +45,36 @@ class FirstbtReg(unittest.TestCase):
         for version in ('4 0 0 950','4 0 0 1111','4 0 0 1216'):
             self.assertNotIn(b'FastReboot',self.reg(version),version)
 
+    def test_no_reimport_after_firstbt_ok(self):
+        target=Path(tempfile.mkdtemp(dir=OUT));self.addCleanup(shutil.rmtree,target)
+        (target/'USOSFB.EXE').write_bytes(b'own helper fixture')
+        r=subprocess.run([r'C:\Program Files\Git\bin\sh.exe','-c','. "$1"; w9x_firstboot_write "$2" "$3"','test',
+                          str(ROOT/'tools/w9x_firstboot.sh').replace('\\','/'),str(target).replace('\\','/'),'4 10 0 1998'],
+                         capture_output=True,timeout=60)
+        self.assertEqual(r.returncode,0,r.stderr)
+        lines=(target/'FIRSTBT.BAT').read_bytes().decode('ascii').split('\r\n')
+        imp=lines.index(r'REGEDIT /L:SYSTEM.DAT /R:USER.DAT C:\USOS9X\FIRSTBT.REG')
+        ok=lines.index(r'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO END')
+        self.assertLess(ok,imp)
+        self.assertGreater(lines.index(':END'),imp)
+
+class Restore(unittest.TestCase):
+    """Only during the install: Setup's "1" back on the final desktop, after
+    the last restart decision (display re-final restarts included)."""
+    fb=(ROOT/'src/platform/win32_legacy/usosfb.c').read_text(encoding='latin-1')
+    def test_restore_after_the_last_restart_decision(self):
+        final=self.fb[self.fb.index('if(!lstrcmpA(phase,"reboot\\r\\n")){'):]
+        final=final[:final.index('ExitProcess(0);')]
+        r=final.index('fastreboot_restore();')
+        self.assertGreater(r,final.rindex('reboot("reboot\\r\\n"'))
+        self.assertGreater(r,final.index('if(!save("FIRSTBT.OK"'))
+        self.assertNotIn('reboot(',final[r:]);self.assertNotIn('fail(',final[r:])
+        self.assertEqual(self.fb.count('fastreboot_restore();'),1)
+    def test_restore_only_replaces_our_zero_on_98(self):
+        body=self.fb[self.fb.index('static void fastreboot_restore(void){'):self.fb.index('static void reboot(')]
+        self.assertIn('if(!win98)return;',body)
+        self.assertIn('"System\\\\CurrentControlSet\\\\Control\\\\Shutdown"',body)
+        self.assertLess(body.index('lstrcmpA(value,"0")'),body.index('RegSetValueExA'))
+        self.assertIn('RegSetValueExA(key,"FastReboot",0,REG_SZ,(const BYTE*)"1",2)',body)
+
 if __name__=='__main__':unittest.main()

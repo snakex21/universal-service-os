@@ -59,6 +59,26 @@ class BootSeq(unittest.TestCase):
         self.assertLess(block.index(r'IF NOT EXIST C:\USOS9X\LOGS\BOOTLOG.FRC GOTO BLDONE'),writes[1])
         self.assertEqual(block[block.index(':BLLOCK')+1],r'C:\WINDOWS\COMMAND\ATTRIB.EXE +H +S +R C:\MSDOS.SYS')
 
+    def test_bootlog_size_and_stale_marker(self):
+        _,lines=self.batch('4 10 0 1998')
+        shl=lines.index(':SHLEND');done=lines.index(r'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO END')
+        block=lines[shl:done]
+        i=block.index
+        dir_=i(r'DIR /A C:\BOOTLOG.TXT> C:\USOS9X\LOGS\BLDIR.TMP')
+        self.assertLess(i(r'IF NOT EXIST C:\BOOTLOG.TXT GOTO BMNONE'),dir_)
+        self.assertIn(r'C:\WINDOWS\COMMAND\FIND.EXE /I "BOOTLOG" < C:\USOS9X\LOGS\BLDIR.TMP>> C:\USOS9X\LOGS\BOOTSEQ.TXT',block)
+        look=i(r'C:\WINDOWS\COMMAND\FIND.EXE "USOS-BOOTSEQ-SEEN" < C:\BOOTLOG.TXT > NUL')
+        self.assertEqual(block[look+1],'IF ERRORLEVEL 1 GOTO BMFRESH')
+        self.assertTrue(block[look+2].startswith(r'ECHO C:\BOOTLOG.TXT stale:'))
+        # the marker goes in only after the check and after the copy
+        copy=i(r'TYPE C:\BOOTLOG.TXT> C:\USOS9X\LOGS\BOOT%U9BN%.TXT')
+        mark=i(r'ECHO USOS-BOOTSEQ-SEEN boot %U9BN%>> C:\BOOTLOG.TXT')
+        self.assertLess(look,copy);self.assertEqual(mark,copy+1)
+        self.assertLess(mark,i('SET U9BN='))
+        self.assertLess(i(':BMDONE'),i(r'IF EXIST C:\USOS9X\LOGS\BLDIR.TMP DEL C:\USOS9X\LOGS\BLDIR.TMP'))
+        # no ECHO > (truncate) of BOOTLOG.TXT, only the append
+        self.assertFalse([l for l in block if l.endswith(r'> C:\BOOTLOG.TXT') and '>>' not in l])
+
     def run_chain(self,lines,present):
         """Model of the counter: IF EXIST/GOTO/REN/SET/DEL up to :BNGO."""
         files=set(present);env={};i=lines.index(':SHLEND')+1;steps=0

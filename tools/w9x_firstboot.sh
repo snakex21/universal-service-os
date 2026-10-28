@@ -46,6 +46,11 @@
 # FIRSTBT.STA phase and the markers (WININIT.INI pending, MSDOS.SYS
 # BootLog=1), and C:\BOOTLOG.TXT as it stands is copied to LOGS\BOOTnn.TXT
 # (TYPE: also reads a hidden file; equal consecutive copies = no new log).
+# Its DIR /A line (size, date, time) goes to BOOTSEQ.TXT. Change marker
+# (X470 98 FE 2026-10-28: identical BOOTnn copies): after the copy a line
+# USOS-BOOTSEQ-SEEN is appended to C:\BOOTLOG.TXT; IO.SYS starts a new log
+# (the old one becomes BOOTLOG.PRV) before AUTOEXEC, so a C:\BOOTLOG.TXT
+# that still has the line was not rewritten and is logged as "stale".
 # DOS batch has no arithmetic: LOGS\BOOTNUM.nn is renamed one step per
 # boot, the copy twelve boots older is deleted (at most 12 copies), and
 # boot 40 is the last one recorded. 98 only (BOOTLOG.ON; 950 rejects the
@@ -81,7 +86,24 @@ IF EXIST C:\USOS9X\FIRSTBT.OK ECHO FIRSTBT.OK present: last record>> C:\USOS9X\L
 IF EXIST C:\USOS9X\FIRSTBT.ERR ECHO FIRSTBT.ERR present: last record>> C:\USOS9X\LOGS\BOOTSEQ.TXT
 IF EXIST C:\USOS9X\SHELL.ON ECHO SHELL.ON: shell=USOSFB boot>> C:\USOS9X\LOGS\BOOTSEQ.TXT
 IF EXIST C:\WINDOWS\WININIT.INI ECHO WININIT.INI pending: WIN.COM runs WININIT this boot>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+IF NOT EXIST C:\BOOTLOG.TXT GOTO BMNONE
+DIR /A C:\BOOTLOG.TXT> C:\USOS9X\LOGS\BLDIR.TMP
+IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO BMCOPY
+C:\WINDOWS\COMMAND\FIND.EXE /I "BOOTLOG" < C:\USOS9X\LOGS\BLDIR.TMP>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+C:\WINDOWS\COMMAND\FIND.EXE "USOS-BOOTSEQ-SEEN" < C:\BOOTLOG.TXT > NUL
+IF ERRORLEVEL 1 GOTO BMFRESH
+ECHO C:\BOOTLOG.TXT stale: not rewritten since the last boot>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+GOTO BMCOPY
+:BMFRESH
+ECHO C:\BOOTLOG.TXT new this boot (no USOS-BOOTSEQ-SEEN line)>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+:BMCOPY
 TYPE C:\BOOTLOG.TXT> C:\USOS9X\LOGS\BOOT%U9BN%.TXT
+ECHO USOS-BOOTSEQ-SEEN boot %U9BN%>> C:\BOOTLOG.TXT
+GOTO BMDONE
+:BMNONE
+ECHO (no C:\BOOTLOG.TXT)>> C:\USOS9X\LOGS\BOOTSEQ.TXT
+:BMDONE
+IF EXIST C:\USOS9X\LOGS\BLDIR.TMP DEL C:\USOS9X\LOGS\BLDIR.TMP
 SET U9BN=
 IF NOT EXIST C:\USOS9X\BOOTLOG.ON GOTO BLDONE
 IF NOT EXIST C:\WINDOWS\COMMAND\FIND.EXE GOTO BLDONE

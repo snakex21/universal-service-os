@@ -255,6 +255,33 @@ class RunValueAndStartPage(unittest.TestCase):
         self.assertNotIn('failures++',ini)
         self.assertIn('GetProcAddress(k32,"WritePrivateProfileStringA")',ini)
 
+class Lease98AndIcw(unittest.TestCase):
+    lan = (ROOT/'tools/windows_usos_lan.c').read_text()
+    def test_98_lease_read_from_separate_values(self):
+        # X470 98 FE SYSTEM.DAT 2026-10-28: DhcpInfo00 had no DhcpInfo blob but
+        # DhcpIPAddress c0a800d7 / DhcpSubnetMask / DhcpServer / Lease 7200.
+        body=self.lan[self.lan.index('static void dhcp_lease(const char *when){'):]
+        body=body[:body.index('\n}\n')]
+        blob=body.index('RegQueryValueExA(k,"DhcpInfo"')
+        for name in ('DhcpIPAddress','DhcpSubnetMask','DhcpServer','Lease'):
+            self.assertGreater(body.index('dhcp_value(k,"%s"'%name),blob,name)
+        self.assertIn('" without a readable DhcpInfo or DhcpIPAddress value"',body)
+        # the key stays open for the separate values and is closed on both paths
+        self.assertEqual(body.count('RegCloseKey(k);'),2)
+        val=self.lan[self.lan.index('static int dhcp_value('):self.lan.index('static void digits_text(')]
+        self.assertIn('&&n==4',val)
+    def test_icw_desktop_runonce_removed_only_when_completed(self):
+        body=self.lan[self.lan.index('static void icw_runonce(void){'):self.lan.index('static void desktop_links(')]
+        self.assertLess(body.index('"Completed"'),body.index('RegDeleteValueA'))
+        self.assertIn('if(done!=1){',body)
+        self.assertIn('"^SetupICWDesktop","SetupICWDesktop"',body)
+        self.assertIn('has_text(value,"icwconn1.exe")',body)
+        self.assertIn('has_text(value,"/desktop")',body)
+        sc=self.lan[self.lan.index('static void shortcuts(void) {'):]
+        sc=sc[:sc.index('\n}\n')]
+        self.assertLess(sc.index('desktop_links(HKEY_LOCAL_MACHINE,"Common Desktop",create);'),sc.index('icw_runonce();'))
+        self.assertIn('eq(base,"INETWIZ.EXE")',self.lan)
+
 class Render(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
