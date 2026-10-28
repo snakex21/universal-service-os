@@ -294,6 +294,11 @@ IF NOT "%U9SYS%"=="98" GOTO PNPDONE
 :PNPREG
 ECHO HKLM,"Software\Microsoft\Windows\CurrentVersion\Detect",IgnorePnPBIOS,,"1">>C:\%U9SRC%\MSBATCH.INF
 :PNPDONE
+REM 98/98 SE/Me: FastReboot "0" (Setup writes "1"). X470 98 FE PL B261028-114842
+REM and the run before: some restarts powered the PC off instead. 95 untouched.
+IF "%U9SYS%"=="95" GOTO FRBDONE
+ECHO HKLM,"System\CurrentControlSet\Control\Shutdown",FastReboot,,"0">>C:\%U9SRC%\MSBATCH.INF
+:FRBDONE
 REM Me: the mouse.drv switch (USOSMOUS.INF, written above) by machine RunOnce.
 IF NOT EXIST C:\USOS9X\USOSMOUS.INF GOTO MOUSRO
 ECHO HKLM,%%USOSRO%%,USOSMouse,,"%%USOSMC%%">>C:\%U9SRC%\MSBATCH.INF

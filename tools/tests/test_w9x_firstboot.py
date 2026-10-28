@@ -32,8 +32,11 @@ class FirstBoot(unittest.TestCase):
         base,result=self.generate('4 0 0 950');self.assertEqual(result.returncode,0,result.stderr)
         for version,label in (('4 10 0 1998','98 FE'),('4 10 0 2222','98 SE')):
             folder,result=self.generate(version);self.assertEqual(result.returncode,0,result.stderr)
-            for name in ('FIRSTBT.BAT','FIRSTBT.REG','SHELLHDR.INI'):
+            for name in ('FIRSTBT.BAT','SHELLHDR.INI'):
                 self.assertEqual((folder/name).read_bytes(),(base/name).read_bytes(),(version,name))
+            # 98 only: FastReboot "0" appended (tools/tests/test_w9x_fastreboot.py)
+            self.assertEqual((folder/'FIRSTBT.REG').read_bytes(),(base/'FIRSTBT.REG').read_bytes()+
+                             b'\r\n[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Shutdown]\r\n"FastReboot"="0"\r\n')
             self.assertEqual((folder/'FIRSTBT.ON').read_bytes(),f'{label} ({version}) first complete desktop\r\n'.encode())
         lines=(base/'FIRSTBT.BAT').read_bytes().split(b'\r\n')
         self.assertLess(lines.index(rb'IF NOT EXIST C:\USOS9X\REG95.OK GOTO LGNEND'),
