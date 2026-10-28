@@ -201,7 +201,7 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('windows-nt-3-51-server) tag=NT351S', text)
         self.assertIn("NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51'", text)
         self.assertIn("NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0'", text)
-        self.assertIn('NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
+        self.assertIn('NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
         self.assertIn('windows-nt-3-5) tag=NT35', text)
         self.assertIn('windows-nt-3-5-server) tag=NT35S', text)
         self.assertIn("NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5'", text)

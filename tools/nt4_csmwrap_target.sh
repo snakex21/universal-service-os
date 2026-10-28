@@ -51,6 +51,12 @@ EDITION=${NT4_EDITION:-}
 # 1 (default): usosusb also drives USB sticks (NT 4.0 only; DATA
 # usb-storage-off.txt -> 0, read by w9x_csmwrap_prepare.sh).
 USB_STORAGE=${NT4_USB_STORAGE:-1}
+# 1: text mode, GUI mode and the first start run natively on this PC after
+# the restart (no install VM; docs/nt-native-plan.md). NT 3.51 only so far.
+NATIVE=${NT_NATIVE:-0}
+# BOOT.INI options of the VM flow's finish step (nt4_qemu_install.sh
+# NT4_BOOT_OPTIONS), here through TXTSETUP.SIF OsLoadOptions.
+NT_NATIVE_LOAD_OPTIONS=${NT_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 SYSLINUX_DIR=${NT4_SYSLINUX_DIR:-/usr/share/syslinux}
 PART_START=63
@@ -319,6 +325,50 @@ nt3_standard_hal() {
               line = key " = hal.dll    " rest
           }
           printf "%s\r\n", line }'
+}
+
+# Native NT 3.51 text mode on this PC (NT_NATIVE=1, docs/nt-native-plan.md,
+# no install VM): TXTSETUP.SIF (stdin -> stdout, CR LF) with
+#   [SCSI.Load]  only the USOS miniports ($1: "ahcint" or "ahcint usosnvme"):
+#                SETUPLDR loads every row, and the ISA/EISA probes of the
+#                CD's 30+ miniports have no business on a modern board;
+#   [SCSI]       their names (text mode installs the miniport that found the
+#                boot disk as a boot driver of the new system);
+#   [Files]      a row per miniport, the CD's amsint.sys row fields (same
+#                media, directory 4 = system32\drivers, boot driver flag);
+#   [SetupData]  OsLoadOptions = $2: SETUPLDR passes it to the text-mode
+#                kernel and text mode writes it into BOOT.INI (the NT 4.0
+#                Enterprise CD's "/maxmem=256" reached BOOT.INI that way,
+#                2026-10-07), so text mode, GUI mode and the installed system
+#                run with the /MAXMEM the VM flow's finish step adds.
+# rc 1 (nothing written) when the SIF has no amsint.sys [Files] row.
+nt3_native_txtsetup() {
+    awk -v BINMODE=3 -v ports="$1" -v opts="$2" '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line }
+        END {
+            np = split(ports, port, " ")
+            for (i = 1; i <= n; i++) {
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                if (low ~ /^\[/) sec = low
+                else if (sec == "[files]" && low ~ /^amsint\.sys=/) { fields = lines[i]; sub(/^[^=]*=[ \t]*/, "", fields) }
+            }
+            if (fields == "") exit 1
+            for (i = 1; i <= n; i++) {
+                line = lines[i]; low = tolower(line); gsub(/[ \t]/, "", low)
+                if (low ~ /^\[/) {
+                    sec = low
+                    printf "%s\r\n", line
+                    if (sec == "[scsi.load]") for (p = 1; p <= np; p++) printf "%s = %s.sys,4\r\n", port[p], port[p]
+                    if (sec == "[scsi]") for (p = 1; p <= np; p++) printf "%s = \"%s\"\r\n", port[p], (port[p] == "usosnvme" ? "USOS NVMe" : "USOS AHCI (SATA)")
+                    if (sec == "[files]") for (p = 1; p <= np; p++) printf "%s.sys = %s\r\n", port[p], fields
+                    if (sec == "[setupdata]") printf "OsLoadOptions = \"%s\"\r\n", opts
+                    continue
+                }
+                if (sec == "[scsi.load]" && low != "" && low !~ /^;/) continue
+                if (sec == "[setupdata]" && low ~ /^osloadoptions=/) continue
+                printf "%s\r\n", line
+            }
+        }'
 }
 
 crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
@@ -596,12 +646,22 @@ if [ -z "$nt3" ]; then
         fail 'this Windows NT 4.0 CD asks for its product key, and the install runs in a VM where nobody can type it: add the key to the answer profile (or type it when the menu asks). No disk was changed'
     log "product key: $key_state"
 fi
+if [ "$NATIVE" = 1 ]; then
+    [ "$nt3:$minor" = yes:51 ] && [ -z "$nt31" ] ||
+        fail "the native install (no VM) covers Windows NT 3.51 only so far, not NT $major.$minor. No disk was changed"
+    log 'native: text mode on this PC after the restart (no install VM)'
+fi
 if [ -n "$nt3" ]; then
     nt4_resolve_time_zone "${lang:-}" yes < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" yes | nt3_detached_answer > "$work/WINNT.SIF" ||
         fail 'cannot prepare WINNT.SIF'
     profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work") || fail 'cannot read the answer profile values'
     log "answer profile: $profile_values"
-    if [ "$major:$minor" = 3:51 ]; then
+    if [ "$NATIVE" = 1 ]; then
+        # Native: the LAN INF fix-up runs between the install VM's starts
+        # (usos_nt351_vm_patch); there are none, so no network yet.
+        log 'NT351 LAN skipped: native install (the LAN step needs the install VM so far)'
+        _u351_enabled=off
+    elif [ "$major:$minor" = 3:51 ]; then
         . "$LIB/nt351_network_setup.sh"
         # LAN is optional, as on NT4 (network_setup.sh): a refused preflight
         # (no / two supported cards, static IP or DNS, driver check) installs
@@ -751,6 +811,24 @@ if [ -n "$nt3" ]; then
     done
     grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\.dll' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [hal] MPS row (not an NT 3.5 / 3.51 CD?)'
     log 'HAL: Standard PC (hal.dll) for the MPS machine types'
+    if [ "$NATIVE" = 1 ]; then
+        # Text mode reaches C: through our miniport (the PCI BIOS is hidden
+        # by the NT 3.x MBR; AHCINT / usosnvme find their controller through
+        # CF8h/CFCh). SETUPLDR loads it from ~BT, text mode copies it from
+        # the local source.
+        ports=ahcint
+        [ -z "$nvme" ] || ports='ahcint usosnvme'
+        for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do
+            [ -f "$sif" ] || continue
+            nt3_native_txtsetup "$ports" "/nodebug $NT_NATIVE_LOAD_OPTIONS" < "$sif" > "$work/txtsetup.nat" && cat "$work/txtsetup.nat" > "$sif" ||
+                fail 'cannot add the USOS miniports to TXTSETUP.SIF (no amsint.sys [Files] row?)'
+        done
+        for dir in "$bt_dir" "$ls_src"; do
+            cp "$drv/$ahci" "$dir/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS to the Setup source'
+            [ -z "$nvme" ] || cp "$drv/$nvme_sys" "$dir/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS to the Setup source'
+        done
+        log "native: TXTSETUP.SIF [SCSI.Load] = $ports, OsLoadOptions = /nodebug $NT_NATIVE_LOAD_OPTIONS"
+    fi
 fi
 # setupldr started from the hard disk runs \NTDETECT.COM of the boot
 # partition (QEMU 2026-10-07: "NTDETECT failed" without it).
