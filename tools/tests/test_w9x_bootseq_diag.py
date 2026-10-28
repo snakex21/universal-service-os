@@ -95,6 +95,26 @@ class BootSeq(unittest.TestCase):
         end,_,_=self.run_chain(lines,{f'{logs}BOOTSEQ.END'})
         self.assertEqual(end,':BSDONE')
 
+    def test_no_conditional_truncating_redirect(self):
+        # COMMAND.COM opens the redirection before IF is evaluated: a false
+        # "IF EXIST x ECHO y> FILE" still creates an empty FILE (X470 98 FE PL
+        # B261028-114842: 0-byte BOOTSEQ.END from boot 1, no later records).
+        _,lines=self.batch('4 10 0 1998')
+        bad=[l for l in lines if l.upper().startswith('IF ') and re.search(r'(?<!>)>(?!>)\s*(?!NUL\b)\S',l.upper())]
+        self.assertEqual(bad,[])
+        tail=lines[lines.index(':BLDONE'):lines.index(':BSDONE')+1]
+        self.assertEqual(tail,[':BLDONE',r'IF EXIST C:\USOS9X\FIRSTBT.OK GOTO BSEND',
+                               r'IF NOT EXIST C:\USOS9X\FIRSTBT.ERR GOTO BSDONE',':BSEND',
+                               r'ECHO FIRSTBT.OK or FIRSTBT.ERR seen> C:\USOS9X\LOGS\BOOTSEQ.END',':BSDONE'])
+        for present,written in (((),False),((r'C:\USOS9X\FIRSTBT.OK',),True),((r'C:\USOS9X\FIRSTBT.ERR',),True)):
+            files=set(present);i=0;made=False
+            while tail[i]!=':BSDONE':
+                l=tail[i];m=re.fullmatch(r'IF (NOT )?EXIST (\S+) GOTO (\S+)',l)
+                if m and (m.group(2) in files)!=bool(m.group(1)):i=tail.index(':'+m.group(3));continue
+                if l.startswith('ECHO ') and l.endswith('BOOTSEQ.END'):made=True
+                i+=1
+            self.assertEqual(made,written,present)
+
 class Sources(unittest.TestCase):
     def test_usosfb_first_line_before_any_work(self):
         src=(ROOT/'src/platform/win32_legacy/usosfb.c').read_text(encoding='ascii')

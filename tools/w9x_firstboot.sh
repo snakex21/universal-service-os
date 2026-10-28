@@ -51,7 +51,11 @@
 # boot 40 is the last one recorded. 98 only (BOOTLOG.ON; 950 rejects the
 # line): a MSDOS.SYS without BootLog=1 gets it back (its old BootLog lines
 # in LOGS\BOOTLOG.ORG, BOOTLOG.FRC set); the last record puts the profile's
-# own lines back. Every GOTO jumps forward.
+# own lines back. Every GOTO jumps forward. COMMAND.COM opens a line's
+# redirection before IF is evaluated, so "IF EXIST x ECHO y> FILE" creates
+# an empty FILE even when x is missing (X470 98 FE PL B261028-114842: an
+# empty BOOTSEQ.END from boot 1 stopped every later record); BOOTSEQ.END is
+# therefore written only behind GOTOs.
 w9x_bootseq_block() {
     printf '%s\n' 'IF EXIST C:\USOS9X\LOGS\BOOTSEQ.END GOTO BSDONE' \
         'IF NOT EXIST C:\USOS9X\LOGS\NUL MD C:\USOS9X\LOGS' \
@@ -114,8 +118,10 @@ DEL C:\USOS9X\LOGS\BOOTLOG.FRC
 :BLLOCK
 C:\WINDOWS\COMMAND\ATTRIB.EXE +H +S +R C:\MSDOS.SYS
 :BLDONE
-IF EXIST C:\USOS9X\FIRSTBT.OK ECHO FIRSTBT.OK seen> C:\USOS9X\LOGS\BOOTSEQ.END
-IF EXIST C:\USOS9X\FIRSTBT.ERR ECHO FIRSTBT.ERR seen> C:\USOS9X\LOGS\BOOTSEQ.END
+IF EXIST C:\USOS9X\FIRSTBT.OK GOTO BSEND
+IF NOT EXIST C:\USOS9X\FIRSTBT.ERR GOTO BSDONE
+:BSEND
+ECHO FIRSTBT.OK or FIRSTBT.ERR seen> C:\USOS9X\LOGS\BOOTSEQ.END
 :BSDONE
 EOF
 }
