@@ -13,6 +13,13 @@ from check_nt52_driver_imports import pe
 from test_w9x_phase1_qemu import sh
 from test_nt4_flow import function_text
 
+def c_function(text, name):
+    """A C function body: from the line naming it (definition) to the first '}' at column 0."""
+    lines=text.splitlines()
+    start=next(i for i,line in enumerate(lines) if (line.startswith(name+'(') or (' '+name+'(') in line) and not line.rstrip().endswith(';'))
+    end=next(i for i in range(start,len(lines)) if lines[i]=='}')
+    return '\n'.join(lines[start:end+1])
+
 class NativePrep(unittest.TestCase):
     def test_shared_binaries_unchanged(self):
         for leaf in ('usosnet4.sys','usosnet351.sys','usosnet351n.sys'):
@@ -118,9 +125,41 @@ class NativePrep(unittest.TestCase):
         block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
         self.assertIn('#define USOSRST_SHUTLOG 1',block)
         self.assertIn('#define USOSRST_RAMLOG 1',block)
-        self.assertIn(b'usosrst 1.8-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        self.assertIn(b'usosrst 1.9-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
         self.assertNotIn(b'usosrst 1.8',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
         self.assertIn('("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS")',
                       (ROOT/'tools/build_micro_linux.py').read_text())
+
+    def test_native_x470_round1_fixes(self):
+        # X470 2026-10-29 (B261029-205312): Polish BOOT.INI "[tryb VGA]" failed
+        # the finish check, Welcome window, manual logons, no power-off.
+        fin=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+        valid=c_function(fin,'boot_valid')
+        self.assertIn('"/basevideo"',valid)
+        self.assertNotIn('[vga mode]',valid)
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        post=src[src.index('crlf > "$usos/POST.CMD"'):]
+        post=post[:post.index('\nEOF\n')]
+        self.assertLess(post.index('echo drivers registered'),post.index('regedit.exe /s C:\\USOS\\NT4\\WELCOME.REG'))
+        self.assertLess(post.index('WELCOME.REG'),post.index('USOSNT4.EXE /finish'))
+        welcome=src[src.index('crlf > "$usos/WELCOME.REG"'):]
+        welcome=welcome[:welcome.index('\nEOF\n')]
+        self.assertIn('[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips]\n"Show"=hex:00,00,00,00',welcome)
+        native=src[src.index('if [ "$NT4_NATIVE_PREP" = 1 ]; then\n    crlf > "$usos/DONE.REG"'):]
+        native=native[:native.index('\nEOF\nfi\n')]
+        self.assertIn('"AutoAdminLogon"="1"',native)
+        self.assertIn('"PowerdownAfterShutdown"="1"',native)
+        self.assertNotIn('"AutoAdminLogon"="0"',native)
+        # the VM path's DONE.REG (written first, kept when not native) is unchanged
+        vm=src[src.index('crlf > "$usos/DONE.REG"'):]
+        self.assertIn('"AutoAdminLogon"="0"',vm[:vm.index('\nEOF\n')])
+        rst=(ROOT/'tools/w2k/usosrst/src/usosrst.c').read_text()
+        block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
+        self.assertIn('#define USOSRST_POWEROFF 1',block)
+        self.assertEqual(rst.count('#define USOSRST_POWEROFF'),1)
+        ret=c_function(rst,'SetupReturnToFirmware')
+        self.assertLess(ret.index('AcpiPowerOff()'),ret.index('g_HalReturnToFirmware(Routine)'))
+        self.assertIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        self.assertNotIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
 
 if __name__=='__main__': unittest.main()

@@ -38,12 +38,16 @@ static BOOL WINAPI finish_flush(HANDLE h)
     return ok;
 }
 
+/* The VGA entry is matched by its /basevideo switch, not by its text:
+   boot_ini_finish keeps the CD's own entry, whose description is
+   localized ("[tryb VGA]" on the Polish CD; X470 2026-10-29 the
+   "[vga mode]" test failed there, POST.CMD gave up before its restart). */
 static int boot_valid(void)
 {
     static char text[8192];
     int n = read_small("C:\\BOOT.INI", text, sizeof(text));
     return n>0 && has_ci(text,n,"timeout=5") && has_ci(text,n,"[usos /sos]") &&
-        has_ci(text,n,"[vga mode]") && !has_ci(text,n,"c:\\=");
+        has_ci(text,n,"/basevideo") && !has_ci(text,n,"c:\\=");
 }
 
 static BOOL WINAPI finish_delete(LPCSTR path)

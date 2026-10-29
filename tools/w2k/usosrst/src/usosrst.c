@@ -105,6 +105,7 @@ void __cdecl _enable(void);
 /* Exported by every NT HAL (stdcall, one argument); the WDK 7.1 headers no
    longer declare it. Routine values as in the NT 4.0-2003 DDKs
    (FIRMWARE_REENTRY). */
+#define USOS_HAL_POWERDOWN_ROUTINE 1
 #define USOS_HAL_RESTART_ROUTINE  2
 #define USOS_HAL_REBOOT_ROUTINE   3
 __declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
@@ -159,9 +160,11 @@ UsosActiveProcessors(VOID)
    the quiesce runs at DISPATCH_LEVEL on the restarting processor only;
    the full reset follows within milliseconds. The VM-path NT 4.0 build
    (bin/nt4, 1.5-nt4) is unchanged. */
-#define USOSRST_VERSION "usosrst 1.8-nt4n"
+#define USOSRST_VERSION "usosrst 1.9-nt4n"
 #define USOSRST_SHUTLOG 1
 #define USOSRST_RAMLOG 1
+/* 1.9: power-off (HalPowerDownRoutine) through ACPI S5, see AcpiPowerOff. */
+#define USOSRST_POWEROFF 1
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
 #endif
@@ -187,6 +190,12 @@ static ULONG g_AcpiRevision = 0xFF;    /* RSDP revision, FFh = no RSDP found */
 static ULONG g_HpetTable;           /* physical address of the HPET table */
 static ULONG g_MadtTable;           /* physical address of the MADT ("APIC") */
 static UCHAR g_CenturyIndex;        /* FADT CENTURY: CMOS index of the century byte, 0 = none */
+#ifdef USOSRST_POWEROFF
+static ULONG g_Pm1aCnt, g_Pm1bCnt;  /* FADT PM1a/PM1b_CNT_BLK (I/O ports), 0 = none */
+static ULONG g_Pm1aEvt, g_Pm1bEvt;  /* FADT PM1a/PM1b_EVT_BLK: PM1 status at the start */
+static UCHAR g_S5a, g_S5b;          /* SLP_TYPa / SLP_TYPb from the DSDT's \_S5 package */
+static CHAR g_S5State = '-';        /* load line: o found, - no FADT/DSDT, x no \_S5 */
+#endif
 
 typedef VOID (NTAPI *USOS_RETURN_TO_FIRMWARE)(IN ULONG Routine);
 static USOS_RETURN_TO_FIRMWARE g_HalReturnToFirmware;  /* the HAL's routine */
@@ -450,6 +459,53 @@ FindRsdpIn(ULONG Base, ULONG Length)
     return found;
 }
 
+#ifdef USOSRST_POWEROFF
+/* One AML integer of the \_S5 package: ZeroOp, OneOp, BytePrefix. */
+static BOOLEAN
+AmlSmallInt(PUCHAR p, PUCHAR end, PUCHAR *next, PUCHAR value)
+{
+    if (p >= end) return FALSE;
+    if (*p == 0x00 || *p == 0x01) { *value = *p; *next = p + 1; return TRUE; }
+    if (*p == 0x0A && p + 1 < end) { *value = p[1]; *next = p + 2; return TRUE; }
+    return FALSE;
+}
+
+/* SLP_TYPa/SLP_TYPb of the sleeping state S5 (soft off): the DSDT's
+   Name (_S5, Package () { a, b, ... }), AML NameOp 08h, the name "_S5_"
+   (optionally after the root prefix "\"), PackageOp 12h, PkgLength (1-4
+   bytes, the top two bits of the first byte count the extra bytes),
+   NumElements, then the elements. TRUE when both values were found. */
+static BOOLEAN
+FindS5(ULONG Dsdt)
+{
+    PUCHAR hdr, aml, p, end, q;
+    ULONG length, i;
+    BOOLEAN found = FALSE;
+
+    hdr = MapPhys(Dsdt, 36);
+    if (hdr == NULL) return FALSE;
+    length = (hdr[0] == 'D' && hdr[1] == 'S' && hdr[2] == 'D' && hdr[3] == 'T') ? *(PULONG)(hdr + 4) : 0;
+    MmUnmapIoSpace(hdr, 36);
+    if (length < 36 + 8 || length > 0x200000) return FALSE;
+    aml = MapPhys(Dsdt, length);
+    if (aml == NULL) return FALSE;
+    end = aml + length;
+    for (i = 36; i + 8 < length && !found; i++) {
+        p = aml + i;
+        if (p[0] != '_' || p[1] != 'S' || p[2] != '5' || p[3] != '_') continue;
+        if (!(p[-1] == 0x08 || (p[-1] == 0x5C && p[-2] == 0x08))) continue;
+        q = p + 4;
+        if (*q != 0x12) continue;
+        q += 1 + 1 + (q[1] >> 6);           /* PackageOp, PkgLength */
+        q++;                                /* NumElements */
+        if (AmlSmallInt(q, end, &q, &g_S5a) && AmlSmallInt(q, end, &q, &g_S5b)) found = TRUE;
+    }
+    MmUnmapIoSpace(aml, length);
+    return found;
+}
+
+#endif
+
 /* The FADT behind the RSDT (32-bit entries) or XSDT (64-bit entries, only
    those below 4 GB). */
 static VOID
@@ -517,6 +573,24 @@ FindResetRegister(VOID)
             if (g_ResetMapped != NULL) g_ResetSpace = 2;
         }
     }
+#ifdef USOSRST_POWEROFF
+    /* ACPI 1.0 FADT: DSDT at 40, PM1a/PM1b_EVT_BLK at 56/60, PM1a/PM1b_CNT_BLK
+       at 64/68 (32-bit I/O port numbers). */
+    if (*(PULONG)(fadt + 4) >= 72 && *(PULONG)(fadt + 64) != 0 && *(PULONG)(fadt + 64) < 0x10000) {
+        ULONG dsdt = *(PULONG)(fadt + 40);
+        g_Pm1aEvt = *(PULONG)(fadt + 56);
+        g_Pm1bEvt = *(PULONG)(fadt + 60);
+        g_Pm1aCnt = *(PULONG)(fadt + 64);
+        g_Pm1bCnt = *(PULONG)(fadt + 68);
+        if (g_Pm1aEvt >= 0x10000) g_Pm1aEvt = 0;
+        if (g_Pm1bEvt >= 0x10000) g_Pm1bEvt = 0;
+        if (g_Pm1bCnt >= 0x10000) g_Pm1bCnt = 0;
+        MmUnmapIoSpace(fadt, 129);
+        g_S5State = 'x';
+        if (dsdt != 0 && FindS5(dsdt)) g_S5State = 'o';
+        return;
+    }
+#endif
     MmUnmapIoSpace(fadt, 129);
 }
 
@@ -893,6 +967,51 @@ ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 /* Text-mode Setup restart                                             */
 /* ------------------------------------------------------------------ */
 
+#ifdef USOSRST_POWEROFF
+/* HalPowerDownRoutine (NT 4.0 NtShutdownSystem(ShutdownPowerOff), after the
+   file systems and disks are flushed): the shutdown log, the device quiesce
+   (NVMe shutdown notification, xHCI halt), then S5 the ACPI way: WAK_STS
+   cleared in PM1 status, SLP_TYP = \_S5 value and SLP_EN in PM1a_CNT (and
+   PM1b_CNT when the FADT has one), SCI_EN and the other bits kept. The NT
+   4.0 HALs have no ACPI power-off (the machine only stops with "It is now
+   safe to turn off your computer"). Returns only if the machine still runs:
+   the caller then goes on to the HAL. */
+static VOID
+AcpiPowerOff(VOID)
+{
+    KIRQL old = PASSIVE_LEVEL;
+    BOOLEAN raised = FALSE;
+    USHORT cnt;
+
+    if (g_S5State != 'o' || g_Pm1aCnt == 0) return;
+    SlStage('F');
+    SlStage('5');
+    SlStage('Z');
+    StallMs(1000);          /* as for a restart: writes the disk is still completing */
+    if (KeGetCurrentIrql() < DISPATCH_LEVEL) {
+        KeRaiseIrql(DISPATCH_LEVEL, &old);
+        raised = TRUE;
+    }
+    SlQuiesce();
+    RmStage('Q');
+    RmStage('O');
+    if (g_Pm1aEvt) WRITE_PORT_USHORT((PUSHORT)g_Pm1aEvt, 0x8000);     /* WAK_STS: write 1 to clear */
+    if (g_Pm1bEvt) WRITE_PORT_USHORT((PUSHORT)g_Pm1bEvt, 0x8000);
+    if (g_Pm1bCnt) {
+        cnt = READ_PORT_USHORT((PUSHORT)g_Pm1bCnt);
+        cnt = (USHORT)((cnt & ~(USHORT)(7 << 10)) | ((g_S5b & 7) << 10));
+        WRITE_PORT_USHORT((PUSHORT)g_Pm1bCnt, cnt);
+        WRITE_PORT_USHORT((PUSHORT)g_Pm1bCnt, (USHORT)(cnt | (1 << 13)));
+    }
+    cnt = READ_PORT_USHORT((PUSHORT)g_Pm1aCnt);
+    cnt = (USHORT)((cnt & ~(USHORT)(7 << 10)) | ((g_S5a & 7) << 10));
+    WRITE_PORT_USHORT((PUSHORT)g_Pm1aCnt, cnt);
+    WRITE_PORT_USHORT((PUSHORT)g_Pm1aCnt, (USHORT)(cnt | (1 << 13)));
+    StallMs(2000);
+    if (raised) KeLowerIrql(old);
+}
+#endif
+
 /* setupdd.sys calls this instead of the HAL's HalReturnToFirmware (see
    RedirectSetupRestart). */
 static VOID NTAPI
@@ -911,6 +1030,9 @@ SetupReturnToFirmware(IN ULONG Routine)
 #endif
         ResetMachine();
     }
+#ifdef USOSRST_POWEROFF
+    if (Routine == USOS_HAL_POWERDOWN_ROUTINE) AcpiPowerOff();
+#endif
     g_HalReturnToFirmware(Routine);
 }
 
@@ -2104,6 +2226,10 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_RAMLOG
     p = PutStr(p, end, g_Rm == NULL ? " m-" : g_RmBugData == NULL ? " m+" : " mk");
 #endif
+#endif
+#ifdef USOSRST_POWEROFF
+    p = PutStr(p, end, " s5");
+    *p++ = g_S5State;
 #endif
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);

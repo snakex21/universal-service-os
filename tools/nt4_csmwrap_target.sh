@@ -1218,10 +1218,10 @@ ADDONSCMD
 fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 if [ "$NT4_NATIVE_PREP" = 1 ]; then
-    # Native: usosrst 1.8-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
+    # Native: usosrst 1.9-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
     # full reset); USOSNT4.EXE /early registers it before the first boot.
     cp "$LIB/nt4/USOSRSTN.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
-    log 'native: usosrst 1.8-nt4n (restart: quiesce + CF9h full reset) from the first installed boot'
+    log 'native: usosrst 1.9-nt4n (restart: quiesce + CF9h full reset; power-off: ACPI S5) from the first installed boot'
 else
     cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 fi
@@ -1401,6 +1401,36 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\atapi]
 "Start"=dword:00000004
 EOF
+# Native NT 4.0 (X470 2026-10-29): no logon prompt after the restart. The
+# add-on chain (USOSADD from Run) restarts after its packages and the user
+# expects the desktop without input, so the automatic Administrator logon
+# (empty password, as Setup created it) stays on, as on the 9x path.
+# PowerdownAfterShutdown: Shut down powers the machine off; usosrst
+# 1.9-nt4n takes the kernel's HalPowerDownRoutine to ACPI S5 (\_S5 of the
+# DSDT, PM1a/PM1b_CNT). The VM path keeps the old DONE.REG.
+if [ "$NT4_NATIVE_PREP" = 1 ]; then
+    crlf > "$usos/DONE.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultPassword"=""
+"PowerdownAfterShutdown"="1"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\atapi]
+"Start"=dword:00000004
+EOF
+fi
+# The NT 4.0 Welcome window ("Witamy", Tips\Show of the user; Setup leaves
+# it on) at the first desktop covered the finishing work on the X470 and
+# waited for a click. POST.CMD runs as the logged-on Administrator, so
+# HKEY_CURRENT_USER is that profile.
+crlf > "$usos/WELCOME.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Tips]
+"Show"=hex:00,00,00,00
+EOF
 # The only logon in the VM (automatic, RunOnce from CMDLINES.TXT): drivers,
 # SP6a (-u unattended, -z no restart), the version and usosrst keys for the
 # check, no more automatic logon, DONE.TXT, then USOSOFF restarts the guest,
@@ -1450,6 +1480,8 @@ if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAI
 if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
+if exist C:\USOS\NT4\WELCOME.REG %SystemRoot%\regedit.exe /s C:\USOS\NT4\WELCOME.REG
+echo welcome window off >> C:\USOS\NT4\POST.LOG
 if not exist C:\USOS\Drivers\USOSNET\USOSNET4.SYS goto nonet4
 if not exist C:\USOS\NT4\USOSNET.REG goto nonet4
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\LOOPCHK.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NDISLoop1

@@ -112,7 +112,7 @@ def main():
     if protected != {p:sha(p) for p in protected}:
         raise ValueError('Protected shared/NT351 SYS changed')
     result = {'outputs':destinations,'protected_unchanged':True,'nt351_preprocessed_identical':True,
-        'nt351_preprocessed_sha256':cpp_sha,'finish_contract_cases':9,'finish_contract_pass':True,
+        'nt351_preprocessed_sha256':cpp_sha,'finish_contract_cases':10,'finish_contract_pass':True,
         'protected':{str(p.relative_to(ROOT)):s for p,s in protected.items()}, 'runtime_pass':False}
     (out/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(result,indent=2))

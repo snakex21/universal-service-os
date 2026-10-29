@@ -67,5 +67,17 @@ void entry(void)
     failed_flush=1;g_BootFlushed=0;removed=0;finish_boot();if(removed || g_BootFlushed)ExitProcess(7);
     reset();failed_write=1;finish_boot();if(removed || g_BootFlushed)ExitProcess(5);
     reset();failed_flush=1;finish_boot();if(removed || g_BootFlushed)ExitProcess(6);
+    /* Polish CD (X470 2026-10-29): Setup's own localized /basevideo entry
+       is kept; the result must still validate and remove the leftovers. */
+    {
+        static const char pl[]="[boot loader]\r\ntimeout=30\r\ndefault=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n[operating systems]\r\n"
+            "multi(0)disk(0)rdisk(0)partition(1)\\WINNT=\"Windows NT Workstation wersja 4.00\"\r\n"
+            "multi(0)disk(0)rdisk(0)partition(1)\\WINNT=\"Windows NT Workstation wersja 4.00 [tryb VGA]\" /basevideo /sos\r\n"
+            "C:\\ = \"Nierozpoznany system operacyjny na dysku C\"\r\n";
+        reset();bytes(image,pl,sizeof pl);size=sizeof pl-1;finish_boot();
+        if(!g_BootFlushed || !boot_valid() || removed==0)ExitProcess(11);
+        if(has_ci(image,size,"[vga mode]") || has_ci(image,size,"c:\\ =") ||
+           !has_ci(image,size,"[tryb vga]\" /basevideo /sos /numproc=2 /maxmem=1024\r\n"))ExitProcess(12);
+    }
     ExitProcess(0);
 }
