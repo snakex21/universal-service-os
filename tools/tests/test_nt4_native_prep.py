@@ -198,4 +198,37 @@ class NativePrep(unittest.TestCase):
         self.assertIn('code[0] = 0xE9;',c_function(rst,'HookHalInline'))
         self.assertIn(b'usosrst 1.11-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
 
+    def test_native_manual_setup_and_gui_mouse(self):
+        # Round 4: USB mouse from the first GUI Setup boot (TXTSETUP.SIF
+        # [Mouse] rows -> usosusb) and manual Setup (native only, key page).
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        fn=src[src.index('nt4_native_mouse() {'):]
+        fn=fn[:fn.index('\n}\n')+3]
+        sif=('[SourceDisksFiles]\r\nsermouse.sys = 1,,,,,,,4,1\r\n\r\n[Mouse]\r\n'
+             'msps2 = "PS/2 mouse",files.i8042,i8042prt\r\nnone = "No mouse",files.none,""\r\n\r\n'
+             '[Keyboard]\r\nSTANDARD = "Standard",files.i8042,i8042prt\r\n')
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'TXTSETUP.SIF'
+            path.write_bytes(sif.encode())
+            rc,out,err=sh(fn+'\nnt4_native_mouse < "'+path.as_posix()+'"\n')
+            self.assertEqual(rc,0,err)
+            out=out.replace('\r\n','\n')
+            self.assertIn('[SourceDisksFiles]\nusosusb.sys = 1,,,,,,,4,1\nsermouse.sys',out)
+            self.assertIn('msps2 = "PS/2 mouse",files.usosusb,usosusb\nnone = "No mouse",files.usosusb,usosusb\n',out)
+            self.assertIn('STANDARD = "Standard",files.i8042,i8042prt',out)      # keyboard row unchanged
+            self.assertTrue(out.endswith('[files.usosusb]\nusosusb.sys,4\n'))
+            path.write_bytes(b'[Mouse]\r\nnone = "No mouse",files.none,""\r\n')
+            rc,out,err=sh(fn+'\nnt4_native_mouse < "'+path.as_posix()+'"\n')
+            self.assertEqual(rc,1)                                           # no sermouse.sys row: refused
+        native=src[src.index('elif [ "$NATIVE" = 1 ]; then\n    # Native NT 4.0: text mode reaches C:'):]
+        native=native[:native.index('\nfi\n')]
+        self.assertIn('nt4_native_mouse < "$sif"',native)
+        self.assertIn('cp "$LIB/nt4/USOSUSB.SYS" "$ls_src/USOSUSB.SYS"',native)
+        gate=src[src.index('NT4_MANUAL=0\n'):]
+        gate=gate[:gate.index('    log "product key: $key_state"')]
+        self.assertLess(src.index('NT4_NATIVE_PREP=0\n'),src.index('NT4_MANUAL=0\n'))
+        self.assertIn("grep -aq '^;USOS-SETUP=manual'",gate)
+        self.assertIn('[ "$NT4_MANUAL" = 1 ] && [ "$NT4_NATIVE_PREP" != 1 ]',gate)
+        self.assertIn('elif [ -z "$nt3" ]; then\n    key_state=$(nt4_key_gate',gate)
+
 if __name__=='__main__': unittest.main()

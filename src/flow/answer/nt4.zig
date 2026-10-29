@@ -21,6 +21,19 @@
 //! (nt4_server_answer); without them GUI Setup waits on its Server Type and
 //! Licensing Mode pages (X470 2026-10-07). The CD decides, not the menu entry.
 //!
+//! Manual Setup (profile win9x_setup=manual, the same row as Windows 9x;
+//! native install only, tools/nt4_csmwrap_target.sh refuses it for the VM
+//! path): text mode stays automatic (USOS prepared the disk, its one disk
+//! question was asked in the menu), GUI Setup shows the pages whose answers
+//! are left out: Welcome, Name and Organization, the product key (only when
+//! the profile has none), Computer Name and Date/Time. Kept for the modern-PC
+//! path: [Data], [Unattended] (local source, MPS HAL, OemPreinstall for
+//! CMDLINES.TXT and POST.CMD), the blank Administrator password (the
+//! automatic logons of the post step and the add-on chain need it; USOSNT4
+//! /logon turns the automatic logon off at the end), [Display], [Network]
+//! (the loopback adapter usosnet4 takes over), add-ons and options.
+//! ";USOS-SETUP=manual" marks it for micro-Linux.
+//!
 //! NT 4.0 takes the time zone as the CD's own display string (localised,
 //! "(GMT+01:00) Warszawa, Praga, Budapeszt" on the Polish CD), so the
 //! renderer writes ";USOS-TZ=<9x zone key>" and micro-Linux replaces it for
@@ -85,25 +98,34 @@ fn quoted(w: *std.Io.Writer, value: []const u8, fallback: []const u8) !void {
 /// typed at start); left out unless it has an NT 4.0 shape.
 pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     var w: std.Io.Writer = .fixed(buffer);
+    const manual = p.win9x_setup == .manual;
     try w.writeAll("; WINNT.SIF rendered by USOS for Windows NT 4.0 (docs/nt4-2026-10-07.md)\r\n");
+    if (manual) try w.writeAll(";USOS-SETUP=manual\r\n");
     try w.writeAll("[Data]\r\nMsDosInitiated = 1\r\nFloppyless = 1\r\nUnattendedInstall = \"Yes\"\r\n\r\n");
     try w.writeAll("[Unattended]\r\nOemPreinstall = Yes\r\nOemSkipEula = Yes\r\nNoWaitAfterTextMode = 1\r\nNoWaitAfterGUIMode = 1\r\n");
     try w.writeAll("FileSystem = LeaveAlone\r\nExtendOemPartition = 0\r\nConfirmHardware = No\r\nNtUpgrade = No\r\nWin31Upgrade = No\r\n");
     try w.writeAll("TargetPath = \\WINNT\r\nOverwriteOemFilesOnUpgrade = No\r\nComputerType = \"MPS Multiprocessor PC\", Retail\r\n\r\n");
-    try w.writeAll("[UserData]\r\nFullName = ");
-    try quoted(&w, p.user.slice(), "USOS");
-    try w.writeAll("\r\nOrgName = ");
-    try quoted(&w, p.org.slice(), "USOS");
-    var name: [15]u8 = undefined;
-    try w.print("\r\nComputerName = {s}\r\n", .{netbiosName(p.computer.slice(), &name)});
+    try w.writeAll("[UserData]\r\n");
+    if (!manual) {
+        try w.writeAll("FullName = ");
+        try quoted(&w, p.user.slice(), "USOS");
+        try w.writeAll("\r\nOrgName = ");
+        try quoted(&w, p.org.slice(), "USOS");
+        var name: [15]u8 = undefined;
+        try w.print("\r\nComputerName = {s}\r\n", .{netbiosName(p.computer.slice(), &name)});
+    }
     if (validKey(key)) {
         try w.writeAll("ProductId = \"");
         for (key) |c| try w.writeByte(std.ascii.toUpper(c));
         try w.writeAll("\"\r\n");
     }
-    try w.writeAll("\r\n[GuiUnattended]\r\nOemSkipWelcome = 1\r\nOEMBlankAdminPassword = 1\r\n");
-    if (p.timeZone()) |zone| {
-        if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
+    try w.writeAll("\r\n[GuiUnattended]\r\n");
+    if (!manual) try w.writeAll("OemSkipWelcome = 1\r\n");
+    try w.writeAll("OEMBlankAdminPassword = 1\r\n");
+    if (!manual) {
+        if (p.timeZone()) |zone| {
+            if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
+        }
     }
     try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
     try @import("addons_profile.zig").metadata(p, &w);
@@ -149,6 +171,37 @@ test "NT 4.0 WINNT.SIF: typed options as USOS-REG comments, nothing by default" 
         ";USOS-REG=USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips|Show|dword|0\r\n" ++
         ";USOS-REG=DEFAULT\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2\r\n" ++
         ";USOS-REG=USER\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2\r\n"));
+}
+
+test "NT 4.0 WINNT.SIF: manual Setup leaves the GUI pages to the user, keeps the modern-PC path" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Jan Kowalski");
+    try p.computer.set("pracownia");
+    p.win9x_setup = .manual;
+    var buffer: [4096]u8 = undefined;
+    const text = try render(&p, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text, ";USOS-SETUP=manual\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "FullName") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OrgName") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "ComputerName") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "ProductId") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OemSkipWelcome") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, ";USOS-TZ=") == null);
+    // kept: local source, unattended text mode, OEM preinstall, blank password, display
+    try std.testing.expect(std.mem.indexOf(u8, text, "MsDosInitiated = 1\r\nFloppyless = 1\r\nUnattendedInstall = \"Yes\"\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OemPreinstall = Yes\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OEMBlankAdminPassword = 1\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "[Display]\r\n") != null);
+    // a profile key still skips the key page
+    const keyed = try render(&p, "12345-oem-0012345-12345", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, keyed, "ProductId = \"12345-OEM-0012345-12345\"\r\n") != null);
+    // automatic stays as it was
+    p.win9x_setup = .auto;
+    const auto = try render(&p, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "USOS-SETUP") == null);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "OemSkipWelcome = 1\r\nOEMBlankAdminPassword = 1\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "FullName = \"Jan Kowalski\"\r\n") != null);
 }
 
 test "NT 4.0 ids and key shapes" {

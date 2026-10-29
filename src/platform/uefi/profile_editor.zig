@@ -705,9 +705,10 @@ fn buildFields() void {
         // Off by default; Windows 3.1 / 3.11 / WfW 3.11 only.
         if (answer.dos.winsockCapable(system_id)) addField(.dos_winsock, .{ .kind = .toggle, .label = t(.profile_field_dos_winsock), .flag = &dos_winsock });
     }
-    // Windows 95 / 98 / Me: automatic (default) or manual Setup, first of
-    // the Setup rows (manual: the key and owner rows only feed USOS itself).
-    if (answer.msbatch.releaseFor(system_id) != null)
+    // Windows 95 / 98 / Me and NT 4.0: automatic (default) or manual Setup,
+    // first of the Setup rows (manual: the key and owner rows only feed USOS
+    // itself; NT 4.0 manual is a native-install option).
+    if (answer.msbatch.releaseFor(system_id) != null or answer.nt4.isNt4(system_id))
         addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
     if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
@@ -866,8 +867,8 @@ test "every system's profile editor fits the form; labels and help titles are va
     try std.testing.expect(widest > 40);
 }
 
-test "Windows 9x Setup row: 95/98/Me only, auto by default, manual saved" {
-    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-xp", false }, .{ "windows-3-11", false } }) |case| {
+test "Windows 9x / NT 4.0 Setup row: 95/98/Me and NT 4.0 only, auto by default, manual saved" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-nt-4", true }, .{ "windows-nt-4-server", true }, .{ "windows-xp", false }, .{ "windows-3-11", false }, .{ "windows-nt-3-51", false } }) |case| {
         const id, const offered = case;
         system_id = id;
         system_name = id;

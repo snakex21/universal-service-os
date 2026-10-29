@@ -406,6 +406,50 @@ nt3_native_txtsetup() {
         }'
 }
 
+# Native NT 4.0: USB mouse from the first GUI Setup boot (X470 2026-10-29: no
+# mouse in GUI Setup; USOSNT4 /early registers usosusb only at its end).
+# Text mode creates the service of the chosen [Mouse] row (third field,
+# Start 1, group "Pointer Port", spconfig.c SpConfigureMouseKeyboardDrivers)
+# and copies its [files.*] list, so every [Mouse] row (PS/2, serial, bus,
+# "no mouse": ntdetect finds none on a board without a PS/2 mouse) names
+# usosusb with [files.usosusb]; the [SourceDisksFiles] row copies the CD's
+# sermouse.sys fields (media 1, system32\drivers). "Pointer Port" loads
+# before "Keyboard Port": usosusb's ports become PointerPort0 and
+# KeyboardPort0, the ones the class drivers take before USOSNT4 /early sets
+# ConnectMultiplePorts, so the USB keyboard (which usosusb takes over from
+# the BIOS emulation) and mouse both work in GUI Setup. i8042prt stays the
+# keyboard row's driver (a PS/2 keyboard or mouse works again once
+# ConnectMultiplePorts is set). stdin -> stdout, CR LF; rc 1 when the SIF
+# has no [Mouse] section or no sermouse.sys row.
+nt4_native_mouse() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line }
+        END {
+            for (i = 1; i <= n; i++) {
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                if (low ~ /^\[/) sec = low
+                else if (sec == "[sourcedisksfiles]" && low ~ /^sermouse\.sys=/ && ser == "") { ser = lines[i]; sub(/^[^=]*=[ \t]*/, "", ser) }
+                else if (sec == "[mouse]" && low != "" && low !~ /^;/) rows++
+            }
+            if (ser == "" || rows == 0) exit 1
+            for (i = 1; i <= n; i++) {
+                line = lines[i]; low = tolower(line); gsub(/[ \t]/, "", low)
+                if (low ~ /^\[/) {
+                    sec = low
+                    printf "%s\r\n", line
+                    if (sec == "[sourcedisksfiles]" && !files_done) { printf "usosusb.sys = %s\r\n", ser; files_done = 1 }
+                    continue
+                }
+                if (sec == "[mouse]" && low != "" && low !~ /^;/ && match(line, /,[^,]*,[^,]*$/)) {
+                    printf "%s,files.usosusb,usosusb\r\n", substr(line, 1, RSTART - 1)
+                    continue
+                }
+                printf "%s\r\n", line
+            }
+            printf "\r\n[files.usosusb]\r\nusosusb.sys,4\r\n"
+        }'
+}
+
 # Native NT 4.0: the CD's [Computer] description of a machine type ($1, e.g.
 # mps_mp -> "MPS Multiprocessor PC"; stdin = TXTSETUP.SIF), for WINNT.SIF
 # [Unattended] ComputerType, which must name it exactly.
@@ -739,7 +783,17 @@ if [ -n "$tse" ] && [ "$EDITION" != tse ] && [ "${NT_MAJOR:-}" = 4 ]; then
     fail 'the ISO is the Windows NT 4.0 Terminal Server Edition CD: choose Windows NT 4.0 Terminal Server Edition for it (it needs its own service pack)'
 fi
 [ -z "$tse" ] || log 'edition: Terminal Server Edition (CDROM_TS.40)'
-if [ -z "$nt3" ]; then
+# Manual Setup (profile win9x_setup=manual, src/flow/answer/nt4.zig): GUI
+# Setup shows its pages, so somebody must be at the screen: native only.
+NT4_MANUAL=0
+grep -aq '^;USOS-SETUP=manual' "$ANSWER_SIF" && NT4_MANUAL=1
+if [ "$NT4_MANUAL" = 1 ] && [ "$NT4_NATIVE_PREP" != 1 ]; then
+    fail 'manual Windows NT 4.0 Setup needs the native install (nt4-native.flag): in the install VM nobody can answer its pages. Choose the automatic Setup in the profile. No disk was changed'
+fi
+[ "$NT4_MANUAL" != 1 ] || log 'Setup: manual (GUI Setup shows Welcome, name, key without a profile key, computer name, date/time; text mode, network, display and the USOS steps stay automatic)'
+if [ -z "$nt3" ] && [ "$NT4_MANUAL" = 1 ]; then
+    log 'product key: setup-page (manual Setup asks for it when the profile has none)'
+elif [ -z "$nt3" ]; then
     key_state=$(nt4_key_gate "$ANSWER_SIF" "$i386") ||
         fail 'this Windows NT 4.0 CD asks for its product key, and the install runs in a VM where nobody can type it: add the key to the answer profile (or type it when the menu asks). No disk was changed'
     log "product key: $key_state"
@@ -1039,7 +1093,11 @@ elif [ "$NATIVE" = 1 ]; then
         [ -f "$sif" ] || continue
         nt3_native_txtsetup "$ports" "/nodebug $NT_NATIVE_LOAD_OPTIONS" "$NT_NATIVE_LOAD_OPTIONS" < "$sif" > "$work/txtsetup.nat" && cat "$work/txtsetup.nat" > "$sif" ||
             fail 'cannot add the USOS miniports to TXTSETUP.SIF (no amsint.sys [SourceDisksFiles] row?)'
+        nt4_native_mouse < "$sif" > "$work/txtsetup.mou" && cat "$work/txtsetup.mou" > "$sif" ||
+            fail 'cannot point the TXTSETUP.SIF [Mouse] rows at usosusb (no [Mouse] section or sermouse.sys row?)'
     done
+    cp "$LIB/nt4/USOSUSB.SYS" "$ls_src/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS to the Setup source'
+    log 'native: TXTSETUP.SIF [Mouse] rows -> usosusb (USB keyboard and mouse from the first GUI Setup boot)'
     # The patched kernels (nt4_native_kernels) where SETUPLDR (~BT) and text
     # mode (local source) take them, as plain files: the CD's compressed
     # twin goes, so nothing can pick the unpatched copy.
