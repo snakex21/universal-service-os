@@ -281,6 +281,15 @@ typedef struct _ADAPTER {
     BOOLEAN Cf8;                /* found by the CF8h/CFCh scan (no HAL PCI bus) */
     BOOLEAN Halted;             /* MpHalt done; a late timer callback returns */
     ULONG BusType;              /* registry Parameters BusType (1 Isa for Cf8) */
+    /* durable breadcrumbs (usosnet.c, BcWrite): alive records at 1/2/5/10 s
+     * from a work item the 20 ms timer queues */
+    WORK_QUEUE_ITEM AliveWi;
+    volatile LONG AlivePending; /* work item queued, adapter memory must stay */
+    ULONG AliveIdx;             /* next entry of g_AliveAt */
+    ULONG AliveSec;             /* nominal second of the queued record */
+    ULONG LastOid;              /* last OID NDIS queried or set */
+    ULONG LastOidKind;          /* 1 query, 2 set */
+    ULONG OidCount;
 #endif
 } ADAPTER, *PADAPTER;
 

@@ -26,6 +26,17 @@ LIBRARY = ROOT / 'tools/nt351_network_setup.sh'
 HOST_TOOL = ROOT / 'zig-out/bin/usos-win3x-display.exe'
 
 
+def nt351_exports(module):
+    names, current = set(), None
+    for line in (Path(__file__).parent / 'data/nt351_exports.txt').read_text().splitlines():
+        line = line.strip()
+        if line.startswith('['):
+            current = line[1:-1].lower()
+        elif line and not line.startswith('#') and current == module:
+            names.add(line.split(' ')[0])
+    return names
+
+
 def bash():
     for candidate in (shutil.which('bash'), 'C:/Program Files/Git/bin/bash.exe', 'C:/msys64/usr/bin/bash.exe'):
         if candidate and Path(candidate).is_file():
@@ -59,8 +70,15 @@ class NativeBinary(unittest.TestCase):
                          'f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf')
 
     def test_only_original_ndis351_exports_with_the_miniport_timer(self):
-        self.assertEqual(self.dlls, {b'ndis.sys'})
-        self.assertTrue(self.imports <= set(CONTRACT['exports']), self.imports - set(CONTRACT['exports']))
+        # ntoskrnl only for the durable breadcrumbs (ZwFlushKey, work item)
+        self.assertEqual(self.dlls, {b'ndis.sys', b'ntoskrnl.exe'})
+        ndis = {i.name.decode() for m in self.pe.DIRECTORY_ENTRY_IMPORT if m.dll.lower() == b'ndis.sys'
+                for i in m.imports}
+        kernel = {i.name.decode() for m in self.pe.DIRECTORY_ENTRY_IMPORT if m.dll.lower() == b'ntoskrnl.exe'
+                  for i in m.imports}
+        self.assertTrue(ndis <= set(CONTRACT['exports']), ndis - set(CONTRACT['exports']))
+        self.assertEqual(kernel, {'ZwOpenKey', 'ZwSetValueKey', 'ZwFlushKey', 'ZwClose', 'ExQueueWorkItem'})
+        self.assertTrue(kernel <= nt351_exports('ntoskrnl.exe'), kernel - nt351_exports('ntoskrnl.exe'))
         self.assertTrue({'NdisMInitializeTimer', 'NdisSetTimer', 'NdisMCancelTimer'} <= self.imports)
         self.assertNotIn('NdisMSetPeriodicTimer', self.imports)
         self.assertNotIn('NdisMSetAttributesEx', self.imports)
@@ -125,6 +143,23 @@ class SourceContract(unittest.TestCase):
                     self.assertTrue(any(m == 'and' and o.endswith(', 0') for m, o in before) or
                                     any(m == 'mov' and o.endswith('], 0') for m, o in before), before)
         self.assertEqual(calls, 1)
+
+    def test_native_durable_breadcrumbs(self):
+        # X470 2026-10-29: the second NDISLoop boot blue-screened and no
+        # NDIS registry write reached the disk; every init point is now
+        # written with ZwSetValueKey and flushed with ZwFlushKey
+        source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
+        block = source[source.index('#define BC_VERSION'):source.index('#define BC(A, P) BcPoint((A), (P))')]
+        self.assertLess(block.index('ZwSetValueKey'), block.index('ZwFlushKey(h);'))
+        self.assertIn('*(PCWSTR *)((PUCHAR)Wcc + 0x5C)', block)
+        self.assertIn('static const ULONG g_AliveAt[] = { 1, 2, 5, 10 };', block)
+        self.assertIn('ExQueueWorkItem(&A->AliveWi, DelayedWorkQueue);', block)
+        init = source[source.index('static NDIS_STATUS MpInitialize('):source.index('static VOID MpHalt(')]
+        points = [int(p, 16) for p in __import__('re').findall(r'BC\(A, 0x([0-9A-F]{2})\);', init)]
+        self.assertEqual(points, list(range(1, 0x13)) + [0x1F, 0x1E])
+        self.assertLess(init.index('BC(A, 0x12);'), init.index('return NDIS_STATUS_SUCCESS;'))
+        self.assertIn('if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);', source)
+        self.assertIn('if (A->AlivePending) A->Halted = TRUE;', source)
 
     def test_native_bus_master_after_reset(self):
         # firmware-programmed queues must not DMA before the chip reset

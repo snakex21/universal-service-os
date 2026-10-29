@@ -423,6 +423,113 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
 #define WriteDiag(A, Cfg) ((void)0)
 #endif
 
+#if USOSNET_NT351
+/* Durable breadcrumbs. X470 2026-10-29, second boot with NDISLoop Start=2
+ * and the fixed WriteDiag: blue screen again, and nothing of that boot
+ * reached the disk (hives, event logs, FAT times unchanged): registry
+ * writes made through NDIS stay in memory until the lazy hive flush.
+ * Here every point goes through ZwSetValueKey and is forced out with
+ * ZwFlushKey (NT 3.51 ntoskrnl exports, tools/tests/data/nt351_exports.txt)
+ * on Services\<adapter key>\Parameters. PASSIVE_LEVEL only: MpInitialize
+ * calls BcPoint directly; after it returns, the 20 ms timer (DISPATCH)
+ * queues AliveWorker as a work item at nominal 1, 2, 5 and 10 s. The last
+ * UsosnetBcPoint / UsosnetAliveSec on disk tells how far the boot got. */
+#pragma warning(push)
+#pragma warning(disable:4996)
+#define BC_VERSION 0x351B0001UL
+static WCHAR g_BcKey[192];
+static BOOLEAN g_BcReady;
+static ULONG g_BcSeq;
+static const ULONG g_AliveAt[] = { 1, 2, 5, 10 };
+
+static void BcUs(PUNICODE_STRING U, PCWSTR S)
+{
+    USHORT n = 0;
+    while (S[n]) n++;
+    U->Buffer = (PWSTR)S;
+    U->Length = (USHORT)(n * sizeof(WCHAR));
+    U->MaximumLength = (USHORT)(U->Length + sizeof(WCHAR));
+}
+
+/* the adapter key name is the query table's [3].Name (WCC + 5Ch), the
+ * same pointer NDIS.SYS 3.51 NdisWriteConfiguration uses */
+static void BcInit(NDIS_HANDLE Wcc)
+{
+    static const WCHAR pre[] = L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\";
+    static const WCHAR suf[] = L"\\Parameters";
+    PCWSTR name = Wcc ? *(PCWSTR *)((PUCHAR)Wcc + 0x5C) : NULL;
+    ULONG n = 0, i;
+    if (!name || !name[0]) name = L"NDISLoop1";
+    for (i = 0; pre[i]; i++) g_BcKey[n++] = pre[i];
+    for (i = 0; name[i] && i < 64; i++) g_BcKey[n++] = name[i];
+    for (i = 0; suf[i]; i++) g_BcKey[n++] = suf[i];
+    g_BcKey[n] = 0;
+    g_BcReady = TRUE;
+}
+
+static void BcWrite(const PCWSTR *Names, const ULONG *Vals, ULONG Count)
+{
+    UNICODE_STRING ks, vs;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE h;
+    ULONG i, v;
+    if (!g_BcReady) return;
+    BcUs(&ks, g_BcKey);
+    InitializeObjectAttributes(&oa, &ks, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (!NT_SUCCESS(ZwOpenKey(&h, KEY_SET_VALUE, &oa))) return;
+    for (i = 0; i < Count; i++) {
+        v = Vals[i];
+        BcUs(&vs, Names[i]);
+        ZwSetValueKey(h, &vs, 0, REG_DWORD, &v, sizeof(v));
+    }
+    ZwFlushKey(h);
+    ZwClose(h);
+}
+
+/* init points: 1 entry .. 0x12 about to return SUCCESS, 0x1F fail path */
+static void BcPoint(PADAPTER A, ULONG Point)
+{
+    static const PCWSTR n[] = { L"UsosnetBcSeq", L"UsosnetBcPoint", L"UsosnetBcStage",
+                                L"UsosnetBcError", L"UsosnetBcVersion" };
+    ULONG v[5];
+    v[0] = ++g_BcSeq; v[1] = Point; v[2] = A->Stage; v[3] = A->Error; v[4] = BC_VERSION;
+    BcWrite(n, v, 5);
+}
+
+static VOID AliveWorker(PVOID Ctx)
+{
+    static const PCWSTR n[] = { L"UsosnetAliveSeq", L"UsosnetAliveSec", L"UsosnetAliveRx",
+                                L"UsosnetAliveTx", L"UsosnetAliveOid", L"UsosnetAliveOidKind",
+                                L"UsosnetAliveOidCount", L"UsosnetAliveTicks", L"UsosnetAliveFlags",
+                                L"UsosnetAliveRxErr", L"UsosnetAliveTxErr" };
+    PADAPTER A = (PADAPTER)Ctx;
+    ULONG v[11];
+    v[0] = ++g_BcSeq; v[1] = A->AliveSec; v[2] = A->RxOk; v[3] = A->TxOk;
+    v[4] = A->LastOid; v[5] = A->LastOidKind; v[6] = A->OidCount; v[7] = A->TimerCount;
+    v[8] = (A->PollMode & 3) | (A->LinkUp ? 4UL : 0) | (A->PacketFilter << 8);
+    v[9] = A->RxErr; v[10] = A->TxErr;
+    BcWrite(n, v, 11);
+    _InterlockedExchange(&A->AlivePending, 0);
+}
+
+/* TimerFn, once a nominal second (DISPATCH_LEVEL): queue the next record */
+static void AliveTick(PADAPTER A)
+{
+    ULONG sec = A->TimerCount / TICKS_PER_SEC;
+    if (A->AliveIdx >= sizeof(g_AliveAt) / sizeof(g_AliveAt[0]) || sec < g_AliveAt[A->AliveIdx]) return;
+    if (A->AlivePending) return;
+    A->AliveIdx++;
+    A->AliveSec = sec;
+    A->AlivePending = 1;
+    ExInitializeWorkItem(&A->AliveWi, AliveWorker, A);
+    ExQueueWorkItem(&A->AliveWi, DelayedWorkQueue);
+}
+#pragma warning(pop)
+#define BC(A, P) BcPoint((A), (P))
+#else
+#define BC(A, P) ((void)0)
+#endif
+
 static BOOLEAN DmaAlloc(PADAPTER A, DMAMEM *M, ULONG Len, ULONG Align)
 {
     ULONG pa, off, tries;
@@ -735,6 +842,9 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 #endif
     rx = A->RxOk;
     A->TimerCount++;
+#if USOSNET_NT351
+    if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);
+#endif
     /* serialized miniport: the timer never runs beside MpSend / the DPC */
     A->Chip->Ops->RxPoll(A);
     if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
@@ -997,6 +1107,10 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_ENTRY;
     A->PacketFilter = 0;
     A->Lookahead = ETH_MAX_DATA;
+#if USOSNET_NT351
+    BcInit(WrapperConfigurationContext);
+#endif
+    BC(A, 0x01);
 
     NdisOpenConfiguration(&st, &cfg, WrapperConfigurationContext);
     if (st != NDIS_STATUS_SUCCESS) cfg = NULL;
@@ -1016,6 +1130,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     }
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
+    BC(A, 0x02);
 
 #if USOSNET_NDIS30
     NdisMSetAttributes(MiniportAdapterHandle, (NDIS_HANDLE)A, TRUE, NdisInterfacePci);
@@ -1023,6 +1138,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
                          NDIS_ATTRIBUTE_BUS_MASTER, NdisInterfacePci);
 #endif
+    BC(A, 0x03);
 
 #if USOSNET_NT35
     A->Legacy = TRUE;
@@ -1074,6 +1190,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #endif
 
     /* PCI identity; memory decode + bus master on, INTx not disabled */
+    BC(A, 0x04);
     cfg32 = 0;
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0, &cfg32, 4);
     A->VendorId = (USHORT)(cfg32 & 0xFFFF);
@@ -1099,6 +1216,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Bar0Init = bar0;
 #endif
     A->Stage = ST_PCI;
+    BC(A, 0x05);
 
     /* BAR0 (CSR, 128 KiB) from config space; a 64-bit BAR has its high half at 0x14 */
     bar0hi = 0;
@@ -1177,6 +1295,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         goto fail;
     }
     if (A->MmioLen > 0x20000) A->MmioLen = 0x20000;
+    BC(A, 0x06);
 
     st = NdisMMapIoSpace((PVOID *)&A->Mmio, MiniportAdapterHandle, A->MmioPa, A->MmioLen);
     if (st != NDIS_STATUS_SUCCESS || !A->Mmio) { A->Mmio = NULL; st = NDIS_STATUS_RESOURCES; goto fail; }
@@ -1185,6 +1304,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (A->ProbeMap != 1 && A->BootBar0 && (bar0 & ~0xFUL) != A->BootBar0) MmioRemap(A, bar0);
 #endif
     A->Stage = ST_MMIO;
+    BC(A, 0x07);
 
     st = A->Chip->Ops->Reset(A);
     if (st != NDIS_STATUS_SUCCESS) goto fail;
@@ -1194,6 +1314,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
 #endif
     A->Stage = ST_RESET;
+    BC(A, 0x08);
 
     if (!A->Chip->Ops->ReadMac(A, A->PermAddr)) { st = NDIS_STATUS_FAILURE; goto fail; }
     UsCopy(A->CurAddr, A->PermAddr, ETH_ALEN);
@@ -1208,16 +1329,20 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UsLog(A, "mac %x%x", ((ULONG)A->CurAddr[0] << 24) | ((ULONG)A->CurAddr[1] << 16) |
           ((ULONG)A->CurAddr[2] << 8) | A->CurAddr[3], ((ULONG)A->CurAddr[4] << 24) | ((ULONG)A->CurAddr[5] << 16));
     A->Stage = ST_MAC;
+    BC(A, 0x09);
 
     st = NdisMAllocateMapRegisters(MiniportAdapterHandle, 0, NDIS_DMA_32BITS, 1, BUF_SIZE);
     if (st != NDIS_STATUS_SUCCESS) goto fail;
     A->MapRegs = TRUE;
+    BC(A, 0x0A);
     if (!AllocRings(A)) { st = NDIS_STATUS_RESOURCES; goto fail; }
     StatsInit(A);                             /* optional: no page, no live statistics */
     A->Stage = ST_DMA;
+    BC(A, 0x0B);
 
     A->Chip->Ops->Start(A);
     A->Stage = ST_RINGS;
+    BC(A, 0x0C);
 
 #if USOSNET_NT351
     /* Cf8: nobody routed the card's INTx (no PCI BIOS, no ACPI under the
@@ -1249,9 +1374,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #endif
     }
     A->Stage = ST_IRQ;
+    BC(A, 0x0D);
 
     if (!A->SkipPhy) A->Chip->Ops->PhyInit(A);
     A->Stage = ST_PHY;
+    BC(A, 0x0E);
 
     A->Chip->Ops->SetFilter(A);
     /* initial link state: OID_GEN_MEDIA_CONNECT_STATUS answers from it, the
@@ -1259,6 +1386,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Chip->Ops->LinkState(A, &A->LinkUp, &A->LinkMbps, &A->FullDuplex);
     A->LinkReported = TRUE;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
+    BC(A, 0x0F);
 #if USOSNET_DRVTIMER
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
@@ -1268,19 +1396,24 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
 #endif
 #endif
+    BC(A, 0x10);
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;
     A->Started = TRUE;
     A->Stage = ST_STARTED;
     UsLog(A, "started stage %x status %x", A->Stage, A->StatusAtInit);
+    BC(A, 0x11);
     if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
+    BC(A, 0x12);
     return NDIS_STATUS_SUCCESS;
 
 fail:
     A->Error = st;
     UsLog(A, "init failed stage %x status %x", A->Stage, st);
+    BC(A, 0x1F);
     if (A->Mmio) A->Chip->Ops->Stop(A);
     if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
+    BC(A, 0x1E);
     FreeAll(A);
     return st;
 }
@@ -1312,6 +1445,8 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
         /* a run NDIS already deferred may still come: keep the (small)
          * adapter block so it finds Halted, free everything else */
         if (armed && !cancelled) A->Halted = TRUE;
+        /* a queued alive record still reads the adapter block */
+        if (A->AlivePending) A->Halted = TRUE;
     }
 #else
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
@@ -1501,6 +1636,9 @@ static NDIS_STATUS MpQuery(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLe
 
     *Written = 0;
     *Needed = 0;
+#if USOSNET_NT351
+    A->LastOid = Oid; A->LastOidKind = 1; A->OidCount++;
+#endif
     switch (Oid) {
     case OID_GEN_SUPPORTED_LIST: src = g_Oids; len = sizeof(g_Oids); break;
     case OID_GEN_HARDWARE_STATUS: src = &hw; len = sizeof(hw); break;
@@ -1561,6 +1699,9 @@ static NDIS_STATUS MpSet(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLen,
     ULONG v;
     *Read = 0;
     *Needed = 0;
+#if USOSNET_NT351
+    A->LastOid = Oid; A->LastOidKind = 2; A->OidCount++;
+#endif
     switch (Oid) {
     case OID_GEN_CURRENT_PACKET_FILTER:
         if (BufLen < 4) { *Needed = 4; return NDIS_STATUS_INVALID_LENGTH; }
