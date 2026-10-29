@@ -186,7 +186,13 @@ ran with 2 GB under CSMWrap in QEMU. NT 3.5 stops with 0x7B above 128 MiB
 (docs/nt35-2026-10-09.md), so native NT 3.5 needs a RAM cap before the
 loader. Implemented: hook sector byte 508 (`HOOK_RAM_CAP`, 16 MiB units,
 0 = none) next to the options byte; `nt4_csmwrap_target.sh` sets it to 8
-(128 MiB) for a native NT 3.5 only (NT 3.51 / 4.0 / the VM path keep 0).
+(128 MiB) for a native NT 3.5 and, since 2026-10-29, to 64 (1024 MiB) for a
+native NT 3.51 (NT 4.0 / the VM path keep 0). NT 3.51 reason: text mode
+writes Setup's BOOT.INI entry from `[SetupData] OsLoadOptionsVar` (none on
+the 3.51 path), so GUI Setup's starts ran on 3 GB; the 3.51 MP kernel (1057)
+stopped with 0x0A (C0000000, 2, 0, 801207DC) in MiGrowWorkingSet (own
+disassembly; the 3.5 source's `MiGetPteAddress(&Wsle[Quota])` test, VA in
+page 0) during a Fastfat cache access (X470 B261029-161430).
 The hook then ends E820 RAM at 128 MiB (entries above become the
 F0000-FFFFF copy) and reports at most 0x700 64 KiB blocks above 16 MiB for
 AX=E801h; the 3.5 SETUPLDR's real-mode part calls AH=88h, AX=E801h and

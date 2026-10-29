@@ -11,6 +11,7 @@ below A0000h unchanged; every other non-RAM entry becomes F0000-FFFFF.
 RAM cap (hook sector byte 508, 16 MiB units): native NT 3.5 loses the boot
 disk above 128 MiB (docs/nt35-2026-10-09.md) and its SETUPLDR ignores
 /MAXMEM, so E820 RAM and the AH=88h / AX=E801h sizes end at the cap.
+Native NT 3.51 gets a 1024 MiB cap (STOP 0x0A on 3 GB in GUI Setup).
 """
 from pathlib import Path
 import os
@@ -192,8 +193,22 @@ class Nt3E820Hook(unittest.TestCase):
         self.assertEqual(self.e820(0xA0000, 0x60000, 2, cap=cap), ((0xF0000, 0x10000, 2), 0))
         self.assertEqual(self.e820(0x9FC00, 0x400, 2, cap=cap), ((0x9FC00, 0x400, 2), 0))
 
-    def test_no_cap_keeps_nt351_nt4_behaviour(self):
-        # Byte 508 = 0 (NT 3.51, NT 4.0, VM path): RAM up to 4 GiB as before.
+    def test_ram_cap_1024_nt351(self):
+        cap = 64                                 # 1024 MiB (native NT 3.51)
+        top = 1024 * MIB
+        seen = [self.e820(*entry, cap=cap)[0] for entry in BIG_MAP]
+        self.assertEqual(seen[3], (0x100000, 0x700000, 1))
+        self.assertEqual(seen[5], (0x808000, top - 0x808000, 1))
+        self.assertEqual(max(b + n for b, n, k in seen if k == 1), top)
+        self.assertEqual(self.e820(0xC0000000, 0x80000000, 1, cap=cap), ((0xF0000, 0x10000, 2), 0))
+        # (1024 - 16) MiB / 64 KiB = 0x3F00 blocks above 16 MiB.
+        ax, bx, cx, dx, cf = self.old_sizes(0xE801, BIG_MAP, cap=cap)
+        self.assertEqual((ax, bx, cx, dx, cf), (0x3C00, 0x3F00, 0x3C00, 0x3F00, 0))
+        ax, bx, cx, dx, cf = self.old_sizes(0x8800, BIG_MAP, cap=cap)
+        self.assertEqual((ax, cf), (0x3C00, 0))
+
+    def test_no_cap_keeps_nt4_behaviour(self):
+        # Byte 508 = 0 (NT 4.0, VM path): RAM up to 4 GiB as before.
         seen = [self.e820(*entry)[0] for entry in BIG_MAP]
         self.assertEqual(seen[5], (0x808000, 0xBE7F8000, 1))
         self.assertEqual(seen[3], (0x100000, 0x700000, 1))

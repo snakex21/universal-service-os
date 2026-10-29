@@ -427,13 +427,24 @@ class Nt4NativeWiring(unittest.TestCase):
         self.assertIn('    movzx eax, byte ptr cs:[HOOK_RAM_CAP]\n    shl eax, 24\n', src)
         self.assertIn('    mov ah, byte ptr cs:[HOOK_RAM_CAP]\n    sub ah, 1\n', src)
         text = TARGET.read_text(encoding='utf-8')
-        cond = 'if [ "$NATIVE" = 1 ] && [ "$nt3:$minor" = yes:50 ] && [ -n "$mbr_hook" ]; then'
+        cond = 'if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then\n    case "$nt3:$minor" in\n'
         self.assertEqual(text.count('seek=508'), 1)
         block = text[text.index(cond):]
-        block = block[:block.index(chr(10) + 'fi' + chr(10))]
-        self.assertIn("printf '\\010' | dd of=\"$work/hook35.bin\" bs=1 seek=508 count=1", block)
-        self.assertIn('mbr_hook=$work/hook35.bin', block)
-        self.assertLess(text.index(cond), text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
+        block = block[:block.index(chr(10) + '    esac' + chr(10))]
+        # NT 3.5: 128 MiB; NT 3.51: 1024 MiB (X470 B261029-161430: text mode's
+        # BOOT.INI entry has no /MAXMEM, GUI Setup on 3 GB -> STOP 0x0A).
+        self.assertIn("        yes:50) ram_cap=8 ram_oct='\\010' ;;\n", block)
+        self.assertIn("        yes:51) ram_cap=64 ram_oct='\\100' ;;", block)
+        self.assertNotIn(':4)', block)
+        write = text[text.index('if [ -n "$ram_cap" ]; then'):]
+        write = write[:write.index(chr(10) + 'fi' + chr(10))]
+        self.assertIn('printf "$ram_oct" | dd of="$work/hookcap.bin" bs=1 seek=508 count=1', write)
+        self.assertIn('= "$ram_cap" ] || fail', write)
+        self.assertIn('mbr_hook=$work/hookcap.bin', write)
+        self.assertLess(text.index(cond), text.index('if [ -n "$ram_cap" ]; then'))
+        self.assertLess(text.index('if [ -n "$ram_cap" ]; then'), text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
+        for octal, value in (('\\010', 8), ('\\100', 64)):
+            self.assertEqual(int(octal[1:], 8), value)
 
     def test_kernel_tool_entry_points(self):
         fb = (ROOT / 'src/platform/linux/fb_ui_main.zig').read_text(encoding='utf-8')

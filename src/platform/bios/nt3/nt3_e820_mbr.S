@@ -79,7 +79,10 @@
  * (docs/nt35-2026-10-09.md: 64 / 128 MiB boot, 256 MiB / 2 GiB stop; 2 GiB
  * with BOOT.INI /MAXMEM=128 boots), and its text-mode SETUPLDR ignores
  * /MAXMEM.  The 3.5 SETUPLDR sizes memory with AH=88h + AX=E801h and with
- * E820 (both are covered).  NT 3.51 and NT 4.0 keep the byte 0.
+ * E820 (both are covered).  Native NT 3.51 gets 64 (1024 MiB): text mode
+ * writes Setup's BOOT.INI entry without /MAXMEM and its memory manager
+ * stopped with 0x0A (working-set list growth) on 3 GB during GUI Setup
+ * (X470 B261029-161430).  NT 4.0 keeps the byte 0.
  *
  * CMOS century: the pre-ACPI x86 HALs (NT 3.x, NT 4.0 hal.dll) read the
  * century from CMOS 32h only when the classic checksum (bytes 10h-2Dh in
