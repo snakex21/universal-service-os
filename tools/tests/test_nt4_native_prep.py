@@ -125,7 +125,7 @@ class NativePrep(unittest.TestCase):
         block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
         self.assertIn('#define USOSRST_SHUTLOG 1',block)
         self.assertIn('#define USOSRST_RAMLOG 1',block)
-        self.assertIn(b'usosrst 1.9-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        self.assertIn(b'usosrst 1.10-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
         self.assertNotIn(b'usosrst 1.8',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
         self.assertIn('("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS")',
                       (ROOT/'tools/build_micro_linux.py').read_text())
@@ -162,5 +162,25 @@ class NativePrep(unittest.TestCase):
         self.assertIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
         self.assertNotIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
         self.assertIn('LoadLine'.encode('utf-16-le'),(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+
+    def test_native_x470_round2_fixes(self):
+        # X470 2026-10-29 round 2: autologon only once (empty DefaultPassword
+        # = one-shot in NT 4.0 msgina), power-off came straight back on
+        # (LoadLine handler=off: kernel slot write failed on large pages).
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        native=src[src.index('if [ "$NT4_NATIVE_PREP" = 1 ]; then\n    crlf > "$usos/DONE.REG"'):]
+        native=native[:native.index('\nfi\n')]
+        self.assertIn('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run]\n"USOSAutoLogon"="regedit.exe /s C:\\\\USOS\\\\NT4\\\\AUTOLOGON.REG"',native)
+        rearm=native[native.index('crlf > "$usos/AUTOLOGON.REG"'):]
+        self.assertIn('"AutoAdminLogon"="1"\n"DefaultPassword"=""\nEOF',rearm)
+        rst=(ROOT/'tools/w2k/usosrst/src/usosrst.c').read_text()
+        slot=c_function(rst,'WriteSlot')
+        self.assertLess(slot.index('#ifdef USOSRST_NT4N'),slot.index('MmBuildMdlForNonPagedPool'))
+        self.assertIn('MmGetPhysicalAddress(Slot)',slot)
+        off=c_function(rst,'AcpiPowerOff')
+        for call in ('AcpiGpeOff(g_Gpe0','AcpiPm1Off(g_Pm1aEvt)','PciPmeOff()'):
+            self.assertLess(off.index(call),off.index('(1 << 13)'))
+        self.assertIn('0xC731',c_function(rst,'AcpiPm1Off'))
+        self.assertIn(b'usosrst 1.10-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
 
 if __name__=='__main__': unittest.main()

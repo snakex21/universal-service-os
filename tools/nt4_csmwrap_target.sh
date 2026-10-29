@@ -1218,10 +1218,10 @@ ADDONSCMD
 fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 if [ "$NT4_NATIVE_PREP" = 1 ]; then
-    # Native: usosrst 1.9-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
+    # Native: usosrst 1.10-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
     # full reset); USOSNT4.EXE /early registers it before the first boot.
     cp "$LIB/nt4/USOSRSTN.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
-    log 'native: usosrst 1.9-nt4n (restart: quiesce + CF9h full reset; power-off: ACPI S5) from the first installed boot'
+    log 'native: usosrst 1.10-nt4n (restart: quiesce + CF9h full reset; power-off: ACPI S5) from the first installed boot'
 else
     cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 fi
@@ -1406,7 +1406,7 @@ EOF
 # expects the desktop without input, so the automatic Administrator logon
 # (empty password, as Setup created it) stays on, as on the 9x path.
 # PowerdownAfterShutdown: Shut down powers the machine off; usosrst
-# 1.9-nt4n takes the kernel's HalPowerDownRoutine to ACPI S5 (\_S5 of the
+# 1.10-nt4n takes the kernel's HalPowerDownRoutine to ACPI S5 (\_S5 of the
 # DSDT, PM1a/PM1b_CNT). The VM path keeps the old DONE.REG.
 if [ "$NT4_NATIVE_PREP" = 1 ]; then
     crlf > "$usos/DONE.REG" <<'EOF'
@@ -1417,8 +1417,23 @@ REGEDIT4
 "DefaultPassword"=""
 "PowerdownAfterShutdown"="1"
 
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
+"USOSAutoLogon"="regedit.exe /s C:\\USOS\\NT4\\AUTOLOGON.REG"
+
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\atapi]
 "Start"=dword:00000004
+EOF
+    # NT 4.0 msgina takes an empty DefaultPassword as a one-shot automatic
+    # logon: GetProfileString returns 0 characters, so it writes
+    # AutoAdminLogon=0 during that logon (X470 2026-10-29: the second restart
+    # asked for the password again). The Run value re-arms it after every
+    # logon; regedit /s shows no window.
+    crlf > "$usos/AUTOLOGON.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultPassword"=""
 EOF
 fi
 # The NT 4.0 Welcome window ("Witamy", Tips\Show of the user; Setup leaves

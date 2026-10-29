@@ -8,7 +8,7 @@
   "files": {
     "bin/i386/usosrst.sys": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
     "build.cmd": "512844bf0ca29c015f8b62e3d54196f8f635c20981682646a940ec8db31f8681",
-    "src/usosrst.c": "015f0b0cd3615fc855058222cbf8a1427a8e828069fc487b870749ddcf14cbcf",
+    "src/usosrst.c": "69a74a6a8ec3abbc61086ecca3b6ed8917fe75a8dcc75fc1b1021c8041db645d",
     "src/sources": "03dfc1b07f4f26033b333ed7eaa000f48a12a9e5b77e4c1cab10435dd6b0b8fb",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
     "build-nt4.cmd": "25c3bdf38fc39982f5bc0e98cf64e37e3d8819242f18b80432613ae42ee9b804",
@@ -20,7 +20,7 @@
     "build-nt31.cmd": "37a72af41a68904d190005d38bc966ba1fd572d7d4e5b65100d8327d2dabe31f",
     "bin/nt31/i386/usosrst.sys": "98b0bd71adee35db2586f5176a5049d95a5cf0e470c16be6631d0531a6c344a9",
     "build-nt4n.cmd": "1a5b44ec5672d49e65db1835a91d3cf160c1ac43673e73a188f72633f1419d88",
-    "bin/nt4n/i386/usosrst.sys": "6dcb1f775c3fcf569b86afcccd2b2beb793f5c64e94c43c74dc2764fcc4c4eaa"
+    "bin/nt4n/i386/usosrst.sys": "eae689be7f1ed1e908b53beb75a41ef65ecc0b10d82375c3187d6df4fa3722f9"
   },
   "build_nt4": "build-nt4.cmd (same source, -DUSOSRST_NT4, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/nt4/i386/usosrst.sys, version string usosrst 1.5-nt4",
   "imports_nt4": "40: ntoskrnl, hal; all resolve on the NT 4.0 RTM (1381.1) and SP6a (1381.335) ntoskrnl/ntkrnlmp and hal/halmps/halapic",
@@ -35,5 +35,6 @@
   "build_nt351_1_8": "1.8-nt351 (2026-10-29): RAM marker page at physical 50000000h (above /MAXMEM=1024, prepared by the pre-boot logger tools/nt_bootlog, written only when its USOSPRE1 header is valid, mapped non-cached): stage letters L/R/P/S/F/digit/Z/Q/C/K at any IRQL, bugcheck count and the five KiBugCheckData words (address from the five absolute stores at the start of KeBugCheckEx; found at 80147540h in the X470 install's 3.51 kernel). Load line m-/m+/mk. NT 3.51 build only (USOSRST_RAMLOG); the other binaries are unchanged.",
   "build_nt4n": "build-nt4n.cmd (same source, -DUSOSRST_NT4 -DUSOSRST_NT4N, PE version 4.00) -> bin/nt4n/i386/usosrst.sys, version string usosrst 1.8-nt4n: native NT 4.0 only (staged as USOSRSTN.SYS), the NT 3.51 1.7/1.8 shutdown log, NVMe/xHCI/NIC quiesce, CF9h full reset and RAM marker page; bin/nt4 (VM path, 1.5-nt4) unchanged",
   "build_nt4n_1_9": "1.9-nt4n (2026-10-29): power-off. The kernel HalReturnToFirmware(HalPowerDownRoutine) call (NtShutdownSystem(ShutdownPowerOff), Winlogon PowerdownAfterShutdown=1) goes to ACPI S5: SLP_TYPa/b from the DSDT _S5 package, WAK_STS cleared, SLP_TYP+SLP_EN in PM1a/PM1b_CNT after the shutdown log and the device quiesce; the HAL routine only if the machine still runs. Load line s5o/s5x/s5-, also stored as the Parameters value LoadLine (REG_BINARY ASCII) for offline readback. USOSRST_POWEROFF, NT4N build only; the other binaries are unchanged.",
+  "build_nt4n_1_10": "1.10-nt4n (2026-10-29 round 2): the kernel import slot is written through MmGetPhysicalAddress + MmMapIoSpace (NT 4.0 maps the kernel with large pages; the MDL path of 1.9 failed: LoadLine handler=off, restarts by triple fault, power-off came back on). Before S5: GPE0/GPE1 enables 0 and status cleared, PM1_EN = PWRBTN_EN only, PM1_STS W1C 0xC731, RTC alarm interrupt off, PCI PME_En off + PME_Status cleared on the quiesced NVMe/xHCI/NIC. LoadLine adds typ=, pm1=, gpe= (160-byte line). NT4N only.",
   "imports_nt4n": "61: ntoskrnl, hal; all resolve on the NT 4.0 RTM (1381.1) ntoskrnl/ntkrnlmp and hal/halmps/halapic (tools/tests/data/nt4rtm_exports.txt)"
 }

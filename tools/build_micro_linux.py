@@ -673,7 +673,7 @@ def main() -> int:
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
             ("tools/nt4/usosfinish/bin/i386/USOSNT4.EXE", "usr/lib/usos/nt4/USOSNT4.EXE"),
             ("tools/nt4/usosfinish/bin/i386/USOSANS4.EXE", "usr/lib/usos/nt4/USOSANS4.EXE"),
-            # Native NT 4.0 only: usosrst 1.9-nt4n (quiesce + CF9h full reset, ACPI S5 power-off).
+            # Native NT 4.0 only: usosrst 1.10-nt4n (quiesce + CF9h full reset, ACPI S5 power-off).
             ("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS"),
             # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme): staged only
             # for an NVMe target (docs/nvme-nt-2026-10-11.md).

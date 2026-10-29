@@ -160,10 +160,13 @@ UsosActiveProcessors(VOID)
    the quiesce runs at DISPATCH_LEVEL on the restarting processor only;
    the full reset follows within milliseconds. The VM-path NT 4.0 build
    (bin/nt4, 1.5-nt4) is unchanged. */
-#define USOSRST_VERSION "usosrst 1.9-nt4n"
+#define USOSRST_VERSION "usosrst 1.10-nt4n"
 #define USOSRST_SHUTLOG 1
 #define USOSRST_RAMLOG 1
 /* 1.9: power-off (HalPowerDownRoutine) through ACPI S5, see AcpiPowerOff. */
+/* 1.10: the NT 4.0 kernel import slot is written through its physical
+   address (large kernel pages: handler=off in 1.9), wake sources cleared
+   before S5 (GPE, PM1, RTC alarm, PCI PME), longer registry load line. */
 #define USOSRST_POWEROFF 1
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
@@ -193,6 +196,8 @@ static UCHAR g_CenturyIndex;        /* FADT CENTURY: CMOS index of the century b
 #ifdef USOSRST_POWEROFF
 static ULONG g_Pm1aCnt, g_Pm1bCnt;  /* FADT PM1a/PM1b_CNT_BLK (I/O ports), 0 = none */
 static ULONG g_Pm1aEvt, g_Pm1bEvt;  /* FADT PM1a/PM1b_EVT_BLK: PM1 status at the start */
+static ULONG g_Gpe0, g_Gpe1;        /* FADT GPE0/GPE1_BLK (I/O ports), 0 = none */
+static UCHAR g_Pm1EvtLen, g_Gpe0Len, g_Gpe1Len; /* FADT PM1_EVT_LEN, GPE0/GPE1_BLK_LEN */
 static UCHAR g_S5a, g_S5b;          /* SLP_TYPa / SLP_TYPb from the DSDT's \_S5 package */
 static CHAR g_S5State = '-';        /* load line: o found, - no FADT/DSDT, x no \_S5 */
 #endif
@@ -585,6 +590,16 @@ FindResetRegister(VOID)
         if (g_Pm1aEvt >= 0x10000) g_Pm1aEvt = 0;
         if (g_Pm1bEvt >= 0x10000) g_Pm1bEvt = 0;
         if (g_Pm1bCnt >= 0x10000) g_Pm1bCnt = 0;
+        /* GPE0_BLK 80, GPE1_BLK 84, PM1_EVT_LEN 88, GPE0_BLK_LEN 92, GPE1_BLK_LEN 93 */
+        if (*(PULONG)(fadt + 4) >= 94) {
+            g_Gpe0 = *(PULONG)(fadt + 80);
+            g_Gpe1 = *(PULONG)(fadt + 84);
+            g_Pm1EvtLen = fadt[88];
+            g_Gpe0Len = fadt[92];
+            g_Gpe1Len = fadt[93];
+            if (g_Gpe0 >= 0x10000 || g_Gpe0Len > 64) g_Gpe0 = 0;
+            if (g_Gpe1 >= 0x10000 || g_Gpe1Len > 64) g_Gpe1 = 0;
+        }
         MmUnmapIoSpace(fadt, 129);
         g_S5State = 'x';
         if (dsdt != 0 && FindS5(dsdt)) g_S5State = 'o';
@@ -968,6 +983,50 @@ ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 /* ------------------------------------------------------------------ */
 
 #ifdef USOSRST_POWEROFF
+/* One GPE block: the first half status (write 1 to clear), the second
+   half enable. */
+static VOID
+AcpiGpeOff(ULONG Block, UCHAR Length)
+{
+    ULONG i, half = Length / 2;
+    if (Block == 0 || half == 0) return;
+    for (i = 0; i < half; i++) WRITE_PORT_UCHAR((PUCHAR)(Block + half + i), 0);
+    for (i = 0; i < half; i++) WRITE_PORT_UCHAR((PUCHAR)(Block + i), 0xFF);
+}
+
+/* PM1 event block: PM1_STS at the start, PM1_EN at PM1_EVT_LEN / 2. */
+static VOID
+AcpiPm1Off(ULONG Block)
+{
+    if (Block == 0) return;
+    if (g_Pm1EvtLen >= 4) WRITE_PORT_USHORT((PUSHORT)(Block + g_Pm1EvtLen / 2), 0x0100);   /* PWRBTN_EN only */
+    WRITE_PORT_USHORT((PUSHORT)Block, 0xC731);
+}
+
+/* PCI power management capability of every quiesced device (NVMe, xHCI,
+   NIC, found by SlScanPci): PMCSR PME_En (bit 8) off, PME_Status (bit 15,
+   write 1 to clear) cleared, power state bits kept. */
+static VOID
+PciPmeOff(VOID)
+{
+    ULONG d, cap, n, id;
+    for (d = 0; d < g_SlDevs; d++) {
+        if (!(SlCfgRead(g_SlDev[d].Cfg, 4) & 0x00100000)) continue;     /* no capability list */
+        cap = SlCfgRead(g_SlDev[d].Cfg, 0x34) & 0xFC;
+        for (n = 0; cap >= 0x40 && n < 48; n++) {
+            id = SlCfgRead(g_SlDev[d].Cfg, cap);
+            if ((id & 0xFF) == 0x01) {
+                ULONG pmcsr = SlCfgRead(g_SlDev[d].Cfg, cap + 4) & 0xFFFF;
+                WRITE_PORT_ULONG((PULONG)0xCF8, g_SlDev[d].Cfg | (cap + 4));
+                WRITE_PORT_USHORT((PUSHORT)0xCFC, (USHORT)((pmcsr & ~0x0100UL) | 0x8000UL));
+                break;
+            }
+            cap = (id >> 8) & 0xFC;
+        }
+    }
+    WRITE_PORT_ULONG((PULONG)0xCF8, 0);
+}
+
 /* HalPowerDownRoutine (NT 4.0 NtShutdownSystem(ShutdownPowerOff), after the
    file systems and disks are flushed): the shutdown log, the device quiesce
    (NVMe shutdown notification, xHCI halt), then S5 the ACPI way: WAK_STS
@@ -995,8 +1054,21 @@ AcpiPowerOff(VOID)
     SlQuiesce();
     RmStage('Q');
     RmStage('O');
-    if (g_Pm1aEvt) WRITE_PORT_USHORT((PUSHORT)g_Pm1aEvt, 0x8000);     /* WAK_STS: write 1 to clear */
-    if (g_Pm1bEvt) WRITE_PORT_USHORT((PUSHORT)g_Pm1bEvt, 0x8000);
+    /* As Linux's acpi_enter_sleep_state / hw_legacy_sleep for S5, nothing
+       left to wake the machine (X470 2026-10-29: it came straight back):
+       every GPE disabled and its status cleared, the fixed events disabled
+       except the power button, every fixed status cleared (TMR, BM, GBL,
+       PWRBTN, SLPBTN, RTC, PCIEXP_WAKE, WAK), the RTC alarm interrupt off,
+       PME_En off and PME_Status cleared on the quiesced PCI devices. */
+    AcpiGpeOff(g_Gpe0, g_Gpe0Len);
+    AcpiGpeOff(g_Gpe1, g_Gpe1Len);
+    AcpiPm1Off(g_Pm1aEvt);
+    AcpiPm1Off(g_Pm1bEvt);
+    WRITE_PORT_UCHAR((PUCHAR)0x70, 0x0B);
+    WRITE_PORT_UCHAR((PUCHAR)0x71, (UCHAR)(READ_PORT_UCHAR((PUCHAR)0x71) & ~0x20));
+    WRITE_PORT_UCHAR((PUCHAR)0x70, 0x0C);
+    (VOID)READ_PORT_UCHAR((PUCHAR)0x71);                         /* clears the RTC flags */
+    PciPmeOff();
     if (g_Pm1bCnt) {
         cnt = READ_PORT_USHORT((PUSHORT)g_Pm1bCnt);
         cnt = (USHORT)((cnt & ~(USHORT)(7 << 10)) | ((g_S5b & 7) << 10));
@@ -1086,9 +1158,28 @@ FindModule(const char *Name)
 static BOOLEAN
 WriteSlot(PULONG Slot, ULONG Value)
 {
+#ifndef USOSRST_NT4N
     PMDL mdl;
+#endif
     PULONG writable;
 
+#ifdef USOSRST_NT4N
+    /* NT 4.0 maps the kernel image with large (4 MB) pages: there is no PTE
+       behind the kernel's import slots, so MmBuildMdlForNonPagedPool cannot
+       find their page (X470 2026-10-29: handler=off, every restart went the
+       HAL's way and ended in a triple fault; power-off too). The physical
+       address comes from MmGetPhysicalAddress, which walks large pages, and
+       a second (cached, as the image) mapping takes the write. */
+    {
+        PHYSICAL_ADDRESS pa = MmGetPhysicalAddress(Slot);
+        if (pa.QuadPart == 0) return FALSE;
+        writable = (PULONG)MmMapIoSpace(pa, sizeof(ULONG), MmCached);
+        if (writable == NULL) return FALSE;
+        InterlockedExchange((PLONG)writable, (LONG)Value);
+        MmUnmapIoSpace(writable, sizeof(ULONG));
+        return (BOOLEAN)(*Slot == Value);
+    }
+#else
     mdl = IoAllocateMdl(Slot, sizeof(ULONG), FALSE, FALSE, NULL);
     if (mdl == NULL) return FALSE;
     MmBuildMdlForNonPagedPool(mdl);
@@ -1101,6 +1192,7 @@ WriteSlot(PULONG Slot, ULONG Value)
     MmUnmapLockedPages(writable, mdl);
     IoFreeMdl(mdl);
     return (BOOLEAN)(*Slot == Value);
+#endif
 }
 
 /* 'o': redirected; '-': no setupdd.sys (not text mode); 'x': setupdd.sys
@@ -2136,8 +2228,13 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_NT4
     CHAR vgaWindow;
 #endif
+#ifdef USOSRST_POWEROFF
+    CHAR line[160];                 /* the registry copy has the whole line */
+    PCHAR p, end = line + 160;
+#else
     CHAR line[80];
     PCHAR p, end = line + 80;
+#endif
 
     g_OwnEntry = DriverObject->DriverSection;
     vga.QuadPart = 0xB8000;
@@ -2230,12 +2327,28 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_POWEROFF
     p = PutStr(p, end, " s5");
     *p++ = g_S5State;
+    p = PutStr(p, end, " typ=");
+    p = PutHex(p, end, g_S5a, 1);
+    p = PutStr(p, end, "/");
+    p = PutHex(p, end, g_S5b, 1);
+    p = PutStr(p, end, " pm1=");
+    p = PutHex(p, end, g_Pm1aEvt, 4);
+    p = PutStr(p, end, "/");
+    p = PutHex(p, end, g_Pm1aCnt, 4);
+    p = PutStr(p, end, " gpe=");
+    p = PutHex(p, end, g_Gpe0, 4);
+    p = PutStr(p, end, "+");
+    p = PutHex(p, end, g_Gpe0Len, 2);
 #endif
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);
     p = PutStr(p, end, "/");
     p = PutHex(p, end, g_Watches, 2);
+#ifdef USOSRST_POWEROFF
+    ShowRow(ROW_LOAD, line, (ULONG)(p - line) > 80 ? 80 : (ULONG)(p - line), 0x1F00);
+#else
     ShowRow(ROW_LOAD, line, (ULONG)(p - line), 0x1F00);
+#endif
 #ifdef USOSRST_POWEROFF
     /* The load line also as Parameters\LoadLine (REG_BINARY, ASCII), read
        back offline from the SYSTEM hive: whether the kernel restart/power-off
