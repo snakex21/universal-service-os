@@ -146,7 +146,9 @@ UsosActiveProcessors(VOID)
 #elif defined(USOSRST_NT35)
 #define USOSRST_VERSION "usosrst 1.6-nt35"
 #else
-#define USOSRST_VERSION "usosrst 1.6-nt351"
+#define USOSRST_VERSION "usosrst 1.7-nt351"
+/* NT 3.51 only (1.7): shutdown log, device quiesce and full reset (below). */
+#define USOSRST_SHUTLOG 1
 #endif
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
@@ -425,6 +427,319 @@ ResetMachine(VOID)
     StallMs(500);
 }
 
+#ifdef USOSRST_SHUTLOG
+/* ------------------------------------------------------------------ */
+/* NT 3.51: shutdown log, device quiesce, full reset (1.7)             */
+/* ------------------------------------------------------------------ */
+/*
+ * Why: on the X470 a restart of native NT 3.51 took long and froze, and
+ * the boot after a restart crashed early (0x0A, a zeroed working-set list)
+ * while a boot after a power cycle worked. NT 3.51's NtShutdownSystem runs
+ * (behaviour as in the NT 3.5 sources supplied by the user, read for the
+ * order only): I/O shutdown phase 0 (every IoRegisterShutdownNotification
+ * driver, the last registered first, each IRP waited for without a
+ * timeout), the registry and memory manager shutdown, I/O phase 1 (every
+ * disk file system flushes its volumes), then
+ * HalReturnToFirmware(HalRebootRoutine). The Standard HAL then pulses the
+ * 8042 (none on these boards) and halts with interrupts off; this driver
+ * already takes that call over (RedirectKernelRestart), but its reset left
+ * the NVMe controller enabled (usosnvme only flushes at SRB_FUNCTION_SHUTDOWN
+ * on NT 3.x), the xHCI controllers running, and used the FADT reset
+ * (CF9h = 06h on AMD, a hard reset) first.
+ *
+ * Shutdown log: disk sector 4 of the USOS NT 3.x disk (layout in
+ * src/platform/bios/nt3/nt3_e820_mbr.S; the MBR starts each boot's trail
+ * with "B" and keeps 7 previous boots). Stage letters appended here:
+ *   R  usosrst found the log disk (45 s after load; Windows is running)
+ *   P  shutdown phase 0 started (a notification registered at R, so it runs
+ *      first of all phase 0 handlers)
+ *   S  shutdown phase 0 ended (registered at load, so it runs last)
+ *   F  HalReturnToFirmware(restart / reboot) reached: phase 1 (file
+ *      systems) is done; the routine number follows as a digit
+ *   Z  the quiesce and full reset come next (nothing can be logged after:
+ *      the disk controller is shut down)
+ * The trail of the boot before tells where the restart stopped: no P = in
+ * user mode (Winlogon, services), P without S = in a phase 0 handler, S
+ * without F = registry / memory manager / file system flush, Z = the reset
+ * itself or the firmware after it. The disk is the one whose sectors 1 and 3
+ * carry "U3" and "Q3" and whose sector 4 already is a log ("USOSSHUT"); it is
+ * written only at PASSIVE_LEVEL, to the disk device below every file system
+ * (IoGetDeviceObjectPointer on \Device\HarddiskN\Partition0), each request
+ * waited for at most 3 s. After a timeout the log is off for that boot.
+ *
+ * Quiesce and full reset (restart / reboot only, any IRQL, so also the
+ * restart after a bugcheck): at DISPATCH_LEVEL (uniprocessor: usosusb's
+ * polling thread cannot run in between) every NVMe controller gets the
+ * CC.SHN normal shutdown notification (CSTS.SHST complete waited for at most
+ * 2 s), then CC.EN = 0 (CSTS.RDY = 0 at most 1 s); every xHCI controller
+ * USBCMD R/S = 0 (USBSTS.HCH at most 100 ms), then HCRST (at most 200 ms);
+ * every NVMe, xHCI and network function then loses PCI Bus Master Enable, so
+ * nothing can DMA into memory any more. Then CF9h 0Ah, 0Eh: the full reset
+ * (FullRst: the power planes are cycled and every device is reset, as with
+ * a power cycle), and only if the machine still runs, the old order (FADT
+ * reset register, CF9h 02h/06h/0Eh, 8042).
+ */
+#define SL_LBA          4
+#define SL_TRAIL        16
+#define SL_TRAIL_END    48
+#define SL_TIMES        48
+#define SL_MAX_DEV      12
+#define SL_NVME         1
+#define SL_XHCI         2
+#define SL_BUSMASTER    3
+
+typedef struct _SL_DEV {
+    ULONG Cfg;                      /* CF8h address of the function */
+    UCHAR Kind;
+    PUCHAR Regs;                    /* BAR0, 4 KiB, NVMe / xHCI only */
+} SL_DEV;
+
+static __declspec(align(64)) UCHAR g_SlBuf[512];
+static PDEVICE_OBJECT g_SlDisk;     /* the disk device (Partition0), via g_SlFile */
+static PFILE_OBJECT g_SlFile;
+static PDEVICE_OBJECT g_SlFirstDev, g_SlLastDev;
+static KEVENT g_SlEvent;
+static IO_STATUS_BLOCK g_SlIosb;
+static LONG g_SlBusy;
+static LARGE_INTEGER g_SlT0;
+static SL_DEV g_SlDev[SL_MAX_DEV];
+static ULONG g_SlDevs;
+
+static ULONG
+SlCfgRead(ULONG Cfg, ULONG Reg)
+{
+    WRITE_PORT_ULONG((PULONG)0xCF8, Cfg | (Reg & 0xFC));
+    return READ_PORT_ULONG((PULONG)0xCFC);
+}
+
+/* One sector of the log disk into / from g_SlBuf; the caller holds g_SlBusy. */
+static NTSTATUS
+SlIo(UCHAR Major, ULONG Lba)
+{
+    LARGE_INTEGER off, timeout;
+    PIRP irp;
+    NTSTATUS st;
+
+    if (g_SlDisk == NULL) return STATUS_UNSUCCESSFUL;
+    KeInitializeEvent(&g_SlEvent, NotificationEvent, FALSE);
+    off.QuadPart = (LONGLONG)Lba * 512;
+    irp = IoBuildSynchronousFsdRequest(Major, g_SlDisk, g_SlBuf, 512, &off, &g_SlEvent, &g_SlIosb);
+    if (irp == NULL) return STATUS_INSUFFICIENT_RESOURCES;
+    IoGetNextIrpStackLocation(irp)->Flags |= SL_OVERRIDE_VERIFY_VOLUME;
+    st = IoCallDriver(g_SlDisk, irp);
+    if (st == STATUS_PENDING) {
+        timeout.QuadPart = -30000000LL;                         /* 3 s */
+        if (KeWaitForSingleObject(&g_SlEvent, Executive, KernelMode, FALSE, &timeout) == STATUS_TIMEOUT) {
+            g_SlDisk = NULL;        /* the IRP still owns the event: log off */
+            return STATUS_IO_TIMEOUT;
+        }
+        st = g_SlIosb.Status;
+    }
+    return st;
+}
+
+static BOOLEAN
+SlIsLog(VOID)
+{
+    return (BOOLEAN)(*(PULONG)g_SlBuf == 0x534F5355UL && *(PULONG)(g_SlBuf + 4) == 0x54554853UL);
+}
+
+static BOOLEAN
+SlSigned(ULONG Lba, USHORT Signature)
+{
+    return (BOOLEAN)(NT_SUCCESS(SlIo(IRP_MJ_READ, Lba)) && *(PUSHORT)(g_SlBuf + 510) == Signature);
+}
+
+/* The USOS NT 3.x disk: "U3" in sector 1, "Q3" in sector 3, a log in 4. */
+static VOID
+SlFindDisk(VOID)
+{
+    WCHAR name[] = L"\\Device\\Harddisk0\\Partition0";
+    UNICODE_STRING us;
+    PFILE_OBJECT fo;
+    PDEVICE_OBJECT dev;
+    ULONG n;
+
+    for (n = 0; n < 8 && g_SlFile == NULL; n++) {
+        name[16] = (WCHAR)(L'0' + n);
+        RtlInitUnicodeString(&us, name);
+        if (!NT_SUCCESS(IoGetDeviceObjectPointer(&us, FILE_READ_ATTRIBUTES, &fo, &dev))) continue;
+        g_SlDisk = fo->DeviceObject;
+        if (SlSigned(1, 0x3355) && SlSigned(3, 0x3351) && NT_SUCCESS(SlIo(IRP_MJ_READ, SL_LBA)) && SlIsLog()) {
+            g_SlFile = fo;
+            return;
+        }
+        if (g_SlDisk == NULL) {     /* a request timed out: keep the reference, stop */
+            g_SlFile = fo;
+            return;
+        }
+        g_SlDisk = NULL;
+        ObDereferenceObject(fo);
+    }
+}
+
+/* Appends one stage letter (and, for the first 8, its time) to the current
+   record. */
+static VOID
+SlStage(CHAR Stage)
+{
+    ULONG i, secs;
+    LARGE_INTEGER now;
+
+    if (g_SlDisk == NULL || KeGetCurrentIrql() != PASSIVE_LEVEL) return;
+    if (InterlockedExchange(&g_SlBusy, 1) != 0) return;
+    if (NT_SUCCESS(SlIo(IRP_MJ_READ, SL_LBA)) && SlIsLog()) {
+        for (i = SL_TRAIL; i < SL_TRAIL_END - 1 && g_SlBuf[i] != 0; i++) ;
+        if (g_SlBuf[i] == 0) {
+            g_SlBuf[i] = (UCHAR)Stage;
+            if (i - SL_TRAIL < 8) {
+                KeQuerySystemTime(&now);
+                secs = (ULONG)((now.QuadPart - g_SlT0.QuadPart) / 10000000LL);
+                ((PUSHORT)(g_SlBuf + SL_TIMES))[i - SL_TRAIL] = (USHORT)(secs > 0xFFFF ? 0xFFFF : secs);
+            }
+            (VOID)SlIo(IRP_MJ_WRITE, SL_LBA);
+        }
+    } else {
+        g_SlDisk = NULL;            /* not a log (any more): never write */
+    }
+    InterlockedExchange(&g_SlBusy, 0);
+}
+
+static NTSTATUS
+SlShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+{
+    SlStage((CHAR)(DeviceObject == g_SlFirstDev ? 'P' : 'S'));
+    Irp->IoStatus.Status = STATUS_SUCCESS;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return STATUS_SUCCESS;
+}
+
+static VOID
+SlThread(IN PVOID Context)
+{
+    LARGE_INTEGER delay;
+
+    UNREFERENCED_PARAMETER(Context);
+    delay.QuadPart = -450000000LL;                              /* 45 s */
+    KeDelayExecutionThread(KernelMode, FALSE, &delay);
+    SlFindDisk();
+    SlStage('R');
+    if (g_SlFirstDev != NULL) (VOID)IoRegisterShutdownNotification(g_SlFirstDev);
+    PsTerminateSystemThread(STATUS_SUCCESS);
+}
+
+/* At load: every NVMe (010802h), xHCI (0C0330h) and network (02h) function
+   behind CF8h/CFCh (the 3.51 HAL may have no PCI bus), BAR0 mapped for the
+   first two (a memory BAR below 4 GB). */
+static VOID
+SlScanPci(VOID)
+{
+    ULONG bus, dev, fn, cfg, id, cls, hdr, bar;
+    UCHAR kind;
+    PHYSICAL_ADDRESS pa;
+    SL_DEV *e;
+
+    for (bus = 0; bus < 256; bus++) {
+        for (dev = 0; dev < 32; dev++) {
+            for (fn = 0; fn < 8; fn++) {
+                cfg = 0x80000000UL | (bus << 16) | (dev << 11) | (fn << 8);
+                id = SlCfgRead(cfg, 0);
+                if (id == 0xFFFFFFFF || (id & 0xFFFF) == 0xFFFF || id == 0) {
+                    if (fn == 0) break;
+                    continue;
+                }
+                cls = SlCfgRead(cfg, 8) >> 8;
+                hdr = (SlCfgRead(cfg, 0x0C) >> 16) & 0xFF;
+                kind = 0;
+                if ((hdr & 0x7F) == 0) {
+                    if (cls == 0x010802) kind = SL_NVME;
+                    else if (cls == 0x0C0330) kind = SL_XHCI;
+                    else if ((cls >> 16) == 0x02) kind = SL_BUSMASTER;
+                }
+                if (kind && g_SlDevs < SL_MAX_DEV) {
+                    e = &g_SlDev[g_SlDevs++];
+                    e->Cfg = cfg;
+                    e->Kind = kind;
+                    e->Regs = NULL;
+                    bar = SlCfgRead(cfg, 0x10);
+                    if (kind != SL_BUSMASTER && !(bar & 1) && (bar & ~0xFUL) != 0 &&
+                        ((bar & 6) != 4 || SlCfgRead(cfg, 0x14) == 0)) {
+                        pa.QuadPart = bar & ~0xFUL;
+                        e->Regs = (PUCHAR)MmMapIoSpace(pa, 0x1000, MmNonCached);
+                    }
+                }
+                if (fn == 0 && !(hdr & 0x80)) break;
+            }
+        }
+    }
+    WRITE_PORT_ULONG((PULONG)0xCF8, 0);
+}
+
+#define SL_RD(p, o)     READ_REGISTER_ULONG((PULONG)((p) + (o)))
+#define SL_WR(p, o, v)  WRITE_REGISTER_ULONG((PULONG)((p) + (o)), (v))
+
+static VOID
+SlQuiesce(VOID)
+{
+    ULONG d, i, cc, cmd;
+    PUCHAR r, op;
+
+    for (d = 0; d < g_SlDevs; d++) {
+        r = g_SlDev[d].Regs;
+        if (g_SlDev[d].Kind == SL_NVME && r != NULL) {
+            cc = SL_RD(r, 0x14);
+            if (cc != 0xFFFFFFFF && (cc & 1)) {
+                if ((SL_RD(r, 0x1C) & 3) == 1) {            /* RDY, no CFS */
+                    if (((cc >> 14) & 3) == 0) SL_WR(r, 0x14, cc | (1UL << 14));
+                    for (i = 0; i < 2000 && ((SL_RD(r, 0x1C) >> 2) & 3) != 2; i++) KeStallExecutionProcessor(1000);
+                }
+                SL_WR(r, 0x14, SL_RD(r, 0x14) & ~1UL);
+                for (i = 0; i < 1000 && (SL_RD(r, 0x1C) & 1); i++) KeStallExecutionProcessor(1000);
+            }
+        } else if (g_SlDev[d].Kind == SL_XHCI && r != NULL) {
+            op = r + READ_REGISTER_UCHAR(r);                /* CAPLENGTH */
+            cmd = SL_RD(op, 0);
+            if (cmd != 0xFFFFFFFF) {
+                SL_WR(op, 0, cmd & ~5UL);                       /* R/S, INTE off */
+                for (i = 0; i < 100 && !(SL_RD(op, 4) & 1); i++) KeStallExecutionProcessor(1000);
+                SL_WR(op, 0, 2);                                /* HCRST */
+                for (i = 0; i < 200 && (SL_RD(op, 0) & 2); i++) KeStallExecutionProcessor(1000);
+            }
+        }
+        /* PCI command register: Bus Master Enable (bit 2) off */
+        cmd = SlCfgRead(g_SlDev[d].Cfg, 4);
+        WRITE_PORT_ULONG((PULONG)0xCF8, g_SlDev[d].Cfg | 4);
+        WRITE_PORT_USHORT((PUSHORT)0xCFC, (USHORT)(cmd & 0xFFFB));
+    }
+    WRITE_PORT_ULONG((PULONG)0xCF8, 0);
+}
+
+/* Restart / reboot: log, quiesce, full reset; returns only if no reset
+   happened (the caller then goes on with the old order). */
+static VOID
+SlRestart(ULONG Routine)
+{
+    KIRQL old = PASSIVE_LEVEL;
+    BOOLEAN raised = FALSE;
+
+    SlStage('F');
+    SlStage((CHAR)('0' + (Routine & 7)));
+    SlStage('Z');
+    StallMs(1000);          /* as the HAL: writes the disk is still completing */
+    if (KeGetCurrentIrql() < DISPATCH_LEVEL) {
+        KeRaiseIrql(DISPATCH_LEVEL, &old);
+        raised = TRUE;
+    }
+    SlQuiesce();
+    WRITE_PORT_UCHAR((PUCHAR)0xCF9, 0x0A);
+    KeStallExecutionProcessor(50);
+    WRITE_PORT_UCHAR((PUCHAR)0xCF9, 0x0E);
+    StallMs(500);
+    if (raised) KeLowerIrql(old);
+}
+#endif
+
 #ifndef USOSRST_NT4
 static NTSTATUS
 ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
@@ -456,9 +771,13 @@ SetupReturnToFirmware(IN ULONG Routine)
 
     if (Routine == USOS_HAL_REBOOT_ROUTINE || Routine == USOS_HAL_RESTART_ROUTINE) {
         ShowRow(ROW_STOP, text, sizeof(text) - 1, 0x1F00);
+#ifdef USOSRST_SHUTLOG
+        SlRestart(Routine);         /* log, quiesce, full reset (NT 3.51) */
+#else
         /* A pause before the reset, as the HAL has before its 8042 pulse,
            for writes the disk is still completing. */
         StallMs(1000);
+#endif
         ResetMachine();
     }
     g_HalReturnToFirmware(Routine);
@@ -1593,6 +1912,25 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_NT4
     shutdownHandler = RedirectKernelRestart();
     vgaWindow = FreeVgaWindow();
+#ifdef USOSRST_SHUTLOG
+    KeQuerySystemTime(&g_SlT0);
+    SlScanPci();
+    DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = SlShutdownDispatch;
+    /* "S": registered now, so it runs last in phase 0; "P" (registered by
+       the thread 45 s later) runs first. */
+    if (NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &g_SlLastDev)) &&
+        !NT_SUCCESS(IoRegisterShutdownNotification(g_SlLastDev))) {
+        IoDeleteDevice(g_SlLastDev);
+        g_SlLastDev = NULL;
+    }
+    if (!NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &g_SlFirstDev)))
+        g_SlFirstDev = NULL;
+    {
+        HANDLE th;
+        if (NT_SUCCESS(PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, SlThread, NULL)))
+            ZwClose(th);
+    }
+#endif
 #else
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
@@ -1626,6 +1964,10 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutStr(p, end, restart == 'o' ? " txt=on" : restart == '-' ? " txt=no" : " txt=err");
     p = PutStr(p, end, " rtc");
     p = PutStr(p, end, g_RtcState == 'o' ? "o" : g_RtcState == 'x' ? "x" : "-");
+#ifdef USOSRST_SHUTLOG
+    p = PutStr(p, end, " q");
+    p = PutHex(p, end, g_SlDevs, 1);
+#endif
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);
     p = PutStr(p, end, "/");

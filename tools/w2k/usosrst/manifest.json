@@ -8,13 +8,13 @@
   "files": {
     "bin/i386/usosrst.sys": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
     "build.cmd": "512844bf0ca29c015f8b62e3d54196f8f635c20981682646a940ec8db31f8681",
-    "src/usosrst.c": "6059aad6dc54e48552e461c18ca37cc2b87d75ba1a007a7bab6abcae5e510318",
+    "src/usosrst.c": "2be896f09aa291859f3190396a19b2f5a9915c92c2b62cda61d6414582f2c4d7",
     "src/sources": "03dfc1b07f4f26033b333ed7eaa000f48a12a9e5b77e4c1cab10435dd6b0b8fb",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
     "build-nt4.cmd": "25c3bdf38fc39982f5bc0e98cf64e37e3d8819242f18b80432613ae42ee9b804",
     "bin/nt4/i386/usosrst.sys": "d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b",
     "build-nt351.cmd": "c2b77247cf6cdcefae51a08b4e794ccff0a9e47ebd4183fba6ff68e9d6411e8f",
-    "bin/nt351/i386/usosrst.sys": "2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c",
+    "bin/nt351/i386/usosrst.sys": "71fb5474013c5f1608b52d853e528246bfb817e36600f12d3321eaba5cba6fb1",
     "build-nt35.cmd": "f636bc8a8f3c028d27172ef173436db3a76d2ce2ddc928828849e9a93a7a34b4",
     "bin/nt35/i386/usosrst.sys": "f52d33255efa90172769b37a0828baaf0bd9dc896213ddd688855bdbc5b61938",
     "build-nt31.cmd": "37a72af41a68904d190005d38bc966ba1fd572d7d4e5b65100d8327d2dabe31f",
@@ -28,5 +28,6 @@
   "build_nt35": "build-nt35.cmd (same source, -DUSOSRST_NT4 -DUSOSRST_NT351 -DUSOSRST_NT35, PE version 3.51) -> bin/nt35/i386/usosrst.sys, version string usosrst 1.6-nt35: one heartbeat CPU DPC (NT 3.5 exports neither KeSetTargetProcessorDpc nor KeSetImportanceDpc); the other builds are unchanged (NT35-only code)",
   "imports_nt35": "every import resolves on the NT 3.5 (build 807) ntoskrnl/ntkrnlmp and hal/halmps (tools/tests/data/nt35_exports.txt)",
   "build_nt31": "build-nt31.cmd (same source, -DUSOSRST_NT4 -DUSOSRST_NT351 -DUSOSRST_NT35 -DUSOSRST_NT31, PE version 3.10) -> bin/nt31/i386/usosrst.sys, version string usosrst 1.6-nt31: no KeRegisterBugCheckCallback (no STOP-time record); the other builds are unchanged (NT31-only code)",
-  "imports_nt31": "every import resolves on the NT 3.1 (build 511) ntoskrnl/ntkrnlmp and hal (tools/tests/data/nt31_exports.txt)"
+  "imports_nt31": "every import resolves on the NT 3.1 (build 511) ntoskrnl/ntkrnlmp and hal (tools/tests/data/nt31_exports.txt)",
+  "build_nt351_1_7": "1.7-nt351 (2026-10-29): shutdown log in disk sector 4 of the USOS NT 3.x disk (stage letters R/P/S/F/Z, src/platform/bios/nt3/nt3_e820_mbr.S rotates it per boot), and on restart/reboot (also after a bugcheck) NVMe CC.SHN + CC.EN=0, xHCI R/S=0 + HCRST, Bus Master off on NVMe/xHCI/NIC, then CF9h 0Ah/0Eh full reset before the old order. NT 3.51 build only; the other binaries are unchanged (USOSRST_SHUTLOG code)."
 }

@@ -141,7 +141,7 @@ class Nt3MbrQuiesce(unittest.TestCase):
         self.assertEqual(sorted((c & 0xFFFFFF, s) for c, p, s, v in m.pci_writes),
                          [(bdf(0x03, 0, 1) | 4, 1), (bdf(0x25, 0, 0) | 4, 1)])
         self.assertEqual(m.cf8, 0)
-        self.assertEqual(sorted(m.writes), [2])                # E820 record only
+        self.assertEqual(sorted(m.writes), [2, 4])             # E820 record + new shutdown log
         self.assertEqual(m.quiesce_calls, 1)
 
     def test_quiesce_with_keep_pci_bios_bit(self):
@@ -164,6 +164,48 @@ class Nt3MbrQuiesce(unittest.TestCase):
         m = self.boot(OPT_QUIESCE, with_hook=False)
         self.assertEqual(m.pci_writes, [])
         self.assertEqual(struct.unpack('<H', m.u.mem_read(0x413, 2))[0], 640)
+
+    def test_shutdown_log_initialised_on_zero_sector(self):
+        m = self.boot(OPT_QUIESCE)
+        log = m.writes[4]
+        self.assertEqual(log[:8], b'USOSSHUT')
+        self.assertEqual(struct.unpack('<I', log[8:12])[0], 1)
+        self.assertEqual(log[16:48], b'B' + bytes(31))
+        self.assertEqual(log[48:64], bytes(16))
+        self.assertEqual(log[64:72], b'USOSSHUT')               # slot 1: the (empty) previous record
+        self.assertEqual(log[128:], bytes(384))
+
+    def test_shutdown_log_rotates_history(self):
+        sector = bytearray(512)
+        sector[:8] = b'USOSSHUT'
+        sector[8:12] = struct.pack('<I', 41)
+        sector[16:22] = b'BRPSFZ'
+        sector[48:52] = struct.pack('<HH', 45, 300)
+        for slot in range(1, 8):                                # old slots marked 1..7
+            sector[slot * 64:slot * 64 + 64] = bytes([slot]) * 64
+        m = PciMachine(self.mbr, self.hook, self.quiesce, x470_pci(), OPT_QUIESCE)
+        m.disk[4] = bytes(sector)
+        m.run(count=2_000_000)
+        log = m.writes[4]
+        self.assertEqual(log[:8], b'USOSSHUT')
+        self.assertEqual(struct.unpack('<I', log[8:12])[0], 42)
+        self.assertEqual(log[16:48], b'B' + bytes(31))
+        self.assertEqual(log[48:64], bytes(16))
+        self.assertEqual(log[64:128], bytes(sector[:64]))       # previous boot -> slot 1
+        for slot in range(2, 8):                                # 1..6 -> 2..7, 7 dropped
+            self.assertEqual(log[slot * 64:slot * 64 + 64], bytes([slot - 1]) * 64, slot)
+        self.assertEqual(bytes(m.u.mem_read(0x7C00, 1)), bytes([0xF4]))
+
+    def test_shutdown_log_never_overwrites_foreign_sector(self):
+        m = PciMachine(self.mbr, self.hook, self.quiesce, x470_pci(), OPT_QUIESCE)
+        m.disk[4] = b'\x00' * 100 + b'GRUB' + bytes(408)
+        m.run(count=2_000_000)
+        self.assertEqual(sorted(m.writes), [2])
+        self.assertEqual(bytes(m.u.mem_read(0x7C00, 1)), bytes([0xF4]))
+
+    def test_shutdown_log_needs_option_bit(self):
+        m = self.boot(OPT_KEEP_PCI_BIOS)
+        self.assertEqual(sorted(m.writes), [2])
 
     def test_boot_drive_and_vbr_kept(self):
         m = self.boot(OPT_QUIESCE)

@@ -116,6 +116,20 @@
  * keyboard in the NTLDR menu, USB disks behind INT 13h) and usosusb halts and
  * resets each one before it programs it.  Without the sector, the signature
  * or the option bit nothing changes.
+ *
+ * Shutdown log (with the same sector and option bit): disk sector 4 (unused,
+ * before the partition at 63) records how each boot ended, without any user
+ * action.  Layout: "USOSSHUT" at 0, the boot count at 8 (DWORD), the trail at
+ * 16 (32 ASCII stage letters), stage times at 48 (8 WORDs, seconds since
+ * usosrst loaded), then 7 history slots of 64 bytes at 64..511 (slot 1 = the
+ * previous boot, each one a copy of bytes 0..63).  At every boot the quiesce
+ * code moves the current record into slot 1 (the oldest slot drops out),
+ * increments the count and starts a new trail "B".  usosrst (NT 3.51 build)
+ * appends its stage letters while Windows runs and shuts down; see
+ * tools/w2k/usosrst/src/usosrst.c.  A sector that is neither zero nor a log
+ * is never written.  CMOS bytes were not used: the free-looking ones are
+ * firmware-owned or checksummed on the X470, and CSMWrap re-arms the RTC
+ * alarm bytes at every start (docs/dos-mouse-2026-10-18.md).
  */
 .intel_syntax noprefix
 .code16
@@ -137,6 +151,9 @@
 .equ OPT_QUIESCE,     2
 /* Bus-master quiesce sector (see the header). */
 .equ QUIESCE_LBA,     3
+/* Shutdown log sector and its buffer (the E820 buffer, free by then). */
+.equ SL_LBA,          4
+.equ SL_BUF,          0x1000
 /* RAM cap in 16 MiB units (0 = none), read by the resident hook as cs:[508]. */
 .equ HOOK_RAM_CAP,    508
 /* E820 record buffer (two sectors) and the sectors it goes to. */
@@ -605,9 +622,72 @@ quiesce_start:
     xor eax, eax
     mov dl, 0xF8
     out dx, eax
+
+    /* Shutdown log (sector 4, see the header): the record of the boot that
+       just ended moves into the history, the new boot starts with "B". */
+    xor ax, ax
+    mov es, ax
+    mov bx, SL_BUF
+    mov eax, SL_LBA
+    mov cx, 0x4200
+    .byte 0xE8                             /* near call sl_disk (16-bit) */
+    .word sl_disk - (. + 2)
+    jc 9f
+    cmp dword ptr [SL_BUF], 0x534F5355     /* "USOS" */
+    jne 3f
+    cmp dword ptr [SL_BUF + 4], 0x54554853 /* "SHUT" */
+    je 4f
+3:
+    /* Only a zeroed sector becomes a log; anything else is never touched. */
+    mov di, SL_BUF
+    mov cx, 256
+    xor ax, ax
+    repe scasw
+    jne 9f
+    mov dword ptr [SL_BUF], 0x534F5355
+    mov dword ptr [SL_BUF + 4], 0x54554853
+4:
+    /* History: slots 1-6 (64..447) -> 2-7 (128..511), current -> slot 1. */
+    std
+    mov si, SL_BUF + 447
+    mov di, SL_BUF + 511
+    mov cx, 384
+    rep movsb
+    cld
+    mov si, SL_BUF
+    mov di, SL_BUF + 64
+    mov cx, 32
+    rep movsw
+    /* New current record: boot count + 1, trail "B", times cleared. */
+    inc dword ptr [SL_BUF + 8]
+    mov di, SL_BUF + 16
+    mov cx, 24
+    xor ax, ax
+    rep stosw
+    mov byte ptr [SL_BUF + 16], 0x42       /* "B" */
+    mov eax, SL_LBA
+    mov cx, 0x4300
+    .byte 0xE8                             /* near call sl_disk (16-bit) */
+    .word sl_disk - (. + 2)
 9:
     pop es
     popad
     .byte 0xC3                             /* ret (16-bit near; "ret" assembles as 66 C3) */
+
+/* One sector of LBA EAX to / from ES:BX (CX = 4200h read, 4300h write;
+   INT 13h extensions, drive in BP). CF = error. */
+sl_disk:
+    .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
+    push eax
+    push es
+    push bx
+    .byte 0x6A, 0x01                       /* push word 1 (sectors) */
+    .byte 0x6A, 0x10                       /* push word 10h (size) */
+    mov si, sp
+    mov dx, bp
+    mov ax, cx
+    int 0x13
+    lea sp, [si + 16]
+    .byte 0xC3
     .org 510
     .byte 0x51, 0x33                       /* "Q3" */
