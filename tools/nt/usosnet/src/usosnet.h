@@ -163,8 +163,8 @@ typedef struct _USOSNET_CHIP_OPS {
 /* Diag() snapshot order */
 enum { DR_STATUS, DR_CTRL, DR_IMS, DR_RCTL, DR_TCTL, DR_RDH, DR_RDT, DR_TDH, DR_TDT,
        DR_RXDCTL, DR_TXDCTL, DR_RXCSUM,
-#if USOSNET_W95RTM
-       /* 95 RTM init log (USN4 / USN8): ring bases as read back, INTx setup */
+#if USOSNET_W95RTM || USOSNET_NT351
+       /* 95 RTM init log (USN4 / USN8), NT 3.51 BcRings: ring bases as read back, INTx setup */
        DR_TDBAL, DR_TDBAH, DR_TDLEN, DR_RDBAL, DR_RDBAH, DR_RDLEN, DR_GPIE, DR_EIMS, DR_IVAR0,
 #endif
        DIAG_REGS };
@@ -290,6 +290,10 @@ typedef struct _ADAPTER {
     ULONG LastOid;              /* last OID NDIS queried or set */
     ULONG LastOidKind;          /* 1 query, 2 set */
     ULONG OidCount;
+    BOOLEAN MmDirect;           /* BAR0 mapped with MmMapIoSpace (Cf8 path), not NDIS */
+    ULONG MapStatus;            /* NdisMMapIoSpace status as returned */
+    ULONG MapHow;               /* 1 NdisMMapIoSpace, 2 MmMapIoSpace */
+    ULONG Bar0Size;             /* sized through CF8h/CFCh, 0 = not sized */
 #endif
 } ADAPTER, *PADAPTER;
 

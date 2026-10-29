@@ -512,6 +512,57 @@ static VOID AliveWorker(PVOID Ctx)
     _InterlockedExchange(&A->AlivePending, 0);
 }
 
+/* BAR0 mapping: NdisMMapIoSpace status as returned, how it was mapped */
+static void BcMap(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetMapStatus", L"UsosnetMapHow", L"UsosnetMapVa",
+                                L"UsosnetMapLen", L"UsosnetBar0Size", L"UsosnetMapPa" };
+    ULONG v[6];
+    v[0] = A->MapStatus; v[1] = A->MapHow; v[2] = (ULONG)(ULONG_PTR)A->Mmio;
+    v[3] = A->MmioLen; v[4] = A->Bar0Size; v[5] = NdisGetPhysicalAddressLow(A->MmioPa);
+    BcWrite(n, v, 6);
+}
+
+/* shared memory as NDIS / the HAL gave it (Standard HAL: an ISA-style
+ * adapter object, common buffers below 16 MiB); DmaAlloc refuses any
+ * address above 4 GiB, DmaEnd = highest Pa + length over every block */
+static void BcDma(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetRxRingPa", L"UsosnetTxRingPa", L"UsosnetRxBuf0Pa",
+                                L"UsosnetTxBuf0Pa", L"UsosnetDmaEnd", L"UsosnetStatsPa" };
+    ULONG v[6], i, end = 0, e;
+    const DMAMEM *m[2 + RX_COUNT / BUFS_PER_PAGE + TX_COUNT / BUFS_PER_PAGE + 1];
+    ULONG k = 0;
+    m[k++] = &A->RxRing; m[k++] = &A->TxRing;
+    for (i = 0; i < RX_COUNT / BUFS_PER_PAGE; i++) m[k++] = &A->RxPage[i];
+    for (i = 0; i < TX_COUNT / BUFS_PER_PAGE; i++) m[k++] = &A->TxPage[i];
+    m[k++] = &A->StatsMem;
+    for (i = 0; i < k; i++) {
+        if (!m[i]->AllocVa) continue;
+        e = NdisGetPhysicalAddressLow(m[i]->AllocPa) + m[i]->AllocLen;
+        if (e > end) end = e;
+    }
+    v[0] = A->RxRing.Pa; v[1] = A->TxRing.Pa; v[2] = A->RxBufPa[0]; v[3] = A->TxBufPa[0];
+    v[4] = end; v[5] = A->Stats ? A->StatsMem.Pa : 0;
+    BcWrite(n, v, 6);
+}
+
+/* after the chip start: ring registers as read back, RX descriptor 0 */
+static void BcRings(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetRdbal", L"UsosnetRdbah", L"UsosnetRdlen", L"UsosnetTdbal",
+                                L"UsosnetTdbah", L"UsosnetTdlen", L"UsosnetRxDesc0", L"UsosnetHwStatus",
+                                L"UsosnetHwCtrl", L"UsosnetHwRctl" };
+    ULONG r[DIAG_REGS], v[10];
+    UsZero(r, sizeof(r));
+    A->Chip->Ops->Diag(A, r);
+    v[0] = r[DR_RDBAL]; v[1] = r[DR_RDBAH]; v[2] = r[DR_RDLEN]; v[3] = r[DR_TDBAL];
+    v[4] = r[DR_TDBAH]; v[5] = r[DR_TDLEN];
+    v[6] = A->RxRing.Va ? *(volatile ULONG *)A->RxRing.Va : 0;
+    v[7] = r[DR_STATUS]; v[8] = r[DR_CTRL]; v[9] = r[DR_RCTL];
+    BcWrite(n, v, 10);
+}
+
 /* TimerFn, once a nominal second (DISPATCH_LEVEL): queue the next record */
 static void AliveTick(PADAPTER A)
 {
@@ -610,9 +661,14 @@ static void FreeAll(PADAPTER A)
     for (i = 0; i < TX_COUNT / BUFS_PER_PAGE; i++) DmaFree(A, &A->TxPage[i]);
     if (A->MapRegs) NdisMFreeMapRegisters(A->Handle);
     A->MapRegs = FALSE;
+#if USOSNET_NT351
+    if (A->Mmio && A->MmDirect) MmUnmapIoSpace((PVOID)A->Mmio, A->MmioLen);
+    else
+#endif
     if (A->Mmio) NdisMUnmapIoSpace(A->Handle, (PVOID)A->Mmio, A->MmioLen);
     A->Mmio = NULL;
 #if USOSNET_NT351
+    A->MmDirect = FALSE;
     if (A->Halted) return;
 #endif
     NdisFreeMemory(A, sizeof(ADAPTER), 0);
@@ -997,6 +1053,22 @@ static BOOLEAN Cf8Find(PADAPTER A)
     }
     return FALSE;
 }
+
+/* BAR0 size through CF8h/CFCh: memory decode off, all ones, read back,
+ * restore BAR0 and the command register. 0 = not a sizeable memory BAR. */
+static ULONG Cf8Bar0Size(PADAPTER A)
+{
+    ULONG cmd, orig, v;
+    cmd = Cf8Read32(A->PciBus, A->PciSlot, 4) & 0xFFFF;
+    Cf8Write(A->PciBus, A->PciSlot, 4, cmd & ~0x0002UL, 2);
+    orig = Cf8Read32(A->PciBus, A->PciSlot, 0x10);
+    Cf8Write(A->PciBus, A->PciSlot, 0x10, 0xFFFFFFFFUL, 4);
+    v = Cf8Read32(A->PciBus, A->PciSlot, 0x10);
+    Cf8Write(A->PciBus, A->PciSlot, 0x10, orig, 4);
+    Cf8Write(A->PciBus, A->PciSlot, 4, cmd, 2);
+    if ((v & 1) || !(v & ~0xFUL) || v == 0xFFFFFFFFUL) return 0;
+    return ~(v & ~0xFUL) + 1;
+}
 #endif
 
 #if USOSNET_NT35
@@ -1298,6 +1370,27 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     BC(A, 0x06);
 
     st = NdisMMapIoSpace((PVOID *)&A->Mmio, MiniportAdapterHandle, A->MmioPa, A->MmioLen);
+#if USOSNET_NT351
+    /* X470 2026-10-29 (breadcrumbs, point 06 -> fail, 0xC000009A): on the
+     * Cf8 path NdisMMapIoSpace fails; it reports the range as a PCI-typed
+     * resource list on a HAL without a PCI bus. The CSR BAR is mapped
+     * directly then (non-cached, at most 128 KiB); FreeAll unmaps it with
+     * MmUnmapIoSpace. The NDIS status is kept as UsosnetMapStatus. */
+    A->MapStatus = st;
+    A->MapHow = (st == NDIS_STATUS_SUCCESS && A->Mmio) ? 1 : 0;
+    if (!A->MapHow && A->Cf8) {
+        PHYSICAL_ADDRESS pa;
+        A->Mmio = NULL;
+        A->Bar0Size = Cf8Bar0Size(A);
+        if (A->Bar0Size && A->Bar0Size < A->MmioLen) A->MmioLen = A->Bar0Size;
+        pa.LowPart = NdisGetPhysicalAddressLow(A->MmioPa);
+        pa.HighPart = 0;
+        A->Mmio = (volatile UCHAR *)MmMapIoSpace(pa, A->MmioLen, MmNonCached);
+        if (A->Mmio) { A->MmDirect = TRUE; A->MapHow = 2; st = NDIS_STATUS_SUCCESS; }
+    }
+    if (!A->MapHow) A->Mmio = NULL;
+    BcMap(A);
+#endif
     if (st != NDIS_STATUS_SUCCESS || !A->Mmio) { A->Mmio = NULL; st = NDIS_STATUS_RESOURCES; goto fail; }
 #if USOSNET_W95RTM
     A->ProbeMap = IgbMmioProbe(A);
@@ -1338,10 +1431,16 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (!AllocRings(A)) { st = NDIS_STATUS_RESOURCES; goto fail; }
     StatsInit(A);                             /* optional: no page, no live statistics */
     A->Stage = ST_DMA;
+#if USOSNET_NT351
+    BcDma(A);
+#endif
     BC(A, 0x0B);
 
     A->Chip->Ops->Start(A);
     A->Stage = ST_RINGS;
+#if USOSNET_NT351
+    BcRings(A);
+#endif
     BC(A, 0x0C);
 
 #if USOSNET_NT351

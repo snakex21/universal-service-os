@@ -77,7 +77,8 @@ class NativeBinary(unittest.TestCase):
         kernel = {i.name.decode() for m in self.pe.DIRECTORY_ENTRY_IMPORT if m.dll.lower() == b'ntoskrnl.exe'
                   for i in m.imports}
         self.assertTrue(ndis <= set(CONTRACT['exports']), ndis - set(CONTRACT['exports']))
-        self.assertEqual(kernel, {'ZwOpenKey', 'ZwSetValueKey', 'ZwFlushKey', 'ZwClose', 'ExQueueWorkItem'})
+        self.assertEqual(kernel, {'ZwOpenKey', 'ZwSetValueKey', 'ZwFlushKey', 'ZwClose', 'ExQueueWorkItem',
+                                  'MmMapIoSpace', 'MmUnmapIoSpace'})
         self.assertTrue(kernel <= nt351_exports('ntoskrnl.exe'), kernel - nt351_exports('ntoskrnl.exe'))
         self.assertTrue({'NdisMInitializeTimer', 'NdisSetTimer', 'NdisMCancelTimer'} <= self.imports)
         self.assertNotIn('NdisMSetPeriodicTimer', self.imports)
@@ -160,6 +161,26 @@ class SourceContract(unittest.TestCase):
         self.assertLess(init.index('BC(A, 0x12);'), init.index('return NDIS_STATUS_SUCCESS;'))
         self.assertIn('if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);', source)
         self.assertIn('if (A->AlivePending) A->Halted = TRUE;', source)
+
+    def test_native_cf8_direct_mmio_map(self):
+        # X470 2026-10-29: NdisMMapIoSpace failed on the Cf8 path (point 06
+        # -> fail); the NDIS status is recorded and BAR0 mapped directly
+        source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
+        init = source[source.index('static NDIS_STATUS MpInitialize('):source.index('static VOID MpHalt(')]
+        ndis = init.index('st = NdisMMapIoSpace((PVOID *)&A->Mmio')
+        self.assertLess(ndis, init.index('A->MapStatus = st;'))
+        self.assertLess(init.index('if (!A->MapHow && A->Cf8) {'),
+                        init.index('MmMapIoSpace(pa, A->MmioLen, MmNonCached);'))
+        self.assertLess(init.index('BcMap(A);'), init.index('BC(A, 0x07);'))
+        self.assertLess(init.index('BcDma(A);'), init.index('BC(A, 0x0B);'))
+        self.assertLess(init.index('BcRings(A);'), init.index('BC(A, 0x0C);'))
+        free = source[source.index('static void FreeAll('):source.index('/* link ')]
+        self.assertIn('if (A->Mmio && A->MmDirect) MmUnmapIoSpace((PVOID)A->Mmio, A->MmioLen);', free)
+        size = source[source.index('static ULONG Cf8Bar0Size('):]
+        size = size[:size.index('\n}\n')]
+        # decode off around the all-ones probe, BAR0 and command restored
+        self.assertLess(size.index('cmd & ~0x0002UL'), size.index('0xFFFFFFFFUL, 4'))
+        self.assertLess(size.index('0x10, orig, 4'), size.index('4, cmd, 2'))
 
     def test_native_bus_master_after_reset(self):
         # firmware-programmed queues must not DMA before the chip reset
