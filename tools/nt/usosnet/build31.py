@@ -13,7 +13,7 @@ def main():
     protected={str(p):sha(p) for tree,leaf in [('nt351-net','usosnet4.sys'),('nt351-net','usosnet.sys'),('nt351-net','usosnet351.sys'),('nt35-net','usosnet35.sys')] for p in [ROOT.parent/tree/'tools/nt/usosnet/bin/i386'/leaf]}
     out.mkdir(parents=True);tmp=out/'tmp';tmp.mkdir();src=out/'src';src.mkdir()
     inputs={}
-    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','u31_policy.h','cfg31_policy.h','client31_policy.h','client31_win32.h','policy_test.c','registration_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
+    for folder,names in [('src',('usosnet.h','usosnet_proto.h','usosnet_irq.h','usosnet_igb.c','makefile')),('src31',('usosnet31.h','usosnet31.c','native_diag.h','u31_policy.h','cfg31_policy.h','client31_policy.h','client31_win32.h','policy_test.c','registration_test.c','net31cfg.c','igb31.c','sources','legacy_imports.json'))]:
         for name in names:
             source=HERE/folder/name;shutil.copy(source,src/name);inputs[folder+'/'+name]=sha(source)
     driver_text=(src/'usosnet31.c').read_text(encoding='utf-8')

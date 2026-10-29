@@ -7,6 +7,7 @@
  */
 #include "usosnet31.h"
 #include "u31_policy.h"
+#include "native_diag.h"
 #pragma warning(disable:4054 4055 4152 4201 4214)
 unsigned long __cdecl __indword(unsigned short);
 unsigned short __cdecl __inword(unsigned short);
@@ -249,6 +250,9 @@ static VOID Worker(PVOID context)
         }
         if(a->QueueCount && !a->Removing)EthFilterIndicateReceiveComplete(a->Filter);
         CompleteCloses(a);KeLowerIrql(old);
+        a->Hw.TimerCount++;
+        if(a->Hw.TimerCount==50 || a->Hw.TimerCount==100 || a->Hw.TimerCount==250 || a->Hw.TimerCount==500)
+            D31Point(0x20,a->Hw.RxOk,a->Hw.TimerCount);
     }
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -461,6 +465,7 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
 {
     U31_FULL *a;NDIS_HANDLE cfg=NULL;NDIS_STATUS st;U31_INFO info;USHORT command;
     UNREFERENCED_PARAMETER(macContext);
+    D31Point(3,0,KeNumberProcessors);
     InitialTrace("US31 Add entry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1 || OnlyAdapter || KeGetCurrentIrql()!=PASSIVE_LEVEL)return NDIS_STATUS_NOT_SUPPORTED;
     a=Alloc(sizeof(*a));if(!a)return NDIS_STATUS_RESOURCES;
@@ -471,11 +476,13 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
     a->Hw.DebugPort=Cfg(cfg,L"DebugPort",0);NdisCloseConfiguration(cfg);cfg=NULL;
     if(a->Hw.DebugPort!=0 && a->Hw.DebugPort!=0xe9){st=NDIS_STATUS_NOT_SUPPORTED;goto failed;}
     if(!ValidatePci(a)){st=NDIS_STATUS_ADAPTER_NOT_FOUND;goto failed;}
+    D31Point(4,0,a->ConfigAddress);
     UsLog(&a->Hw,"US31 pci",a->ConfigAddress,a->Hw.MmioPa.LowPart);
     UsZero(&info,sizeof(info));info.Master=TRUE;info.InterfaceType=5;info.MapRegisters=1;info.MaximumMapping=4096;
     st=NdisRegisterAdapter(&a->Hw.Handle,Mac,a,configuration,name,&info);UsLog(&a->Hw,"US31 register",st,0);
     if(st!=NDIS_STATUS_SUCCESS)goto failed;a->Registered=TRUE;OnlyAdapter=a;
     NdisMapIoSpace(&st,(PVOID *)&a->Hw.Mmio,a->Hw.Handle,a->Hw.MmioPa,a->Hw.MmioLen);UsLog(&a->Hw,"US31 map",st,(ULONG)a->Hw.Mmio);
+    D31Point(5,st,(ULONG)a->Hw.Mmio);
     if(st!=NDIS_STATUS_SUCCESS || !a->Hw.Mmio)goto failed;
     /* Enable MMIO with DMA still disabled, then reset before allocating or
      * handing any buffer to the controller. Writes preserve PCI Status. */
@@ -483,6 +490,7 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
     command=(USHORT)((a->OriginalCommand|2|0x400)&~4);CommandWrite(a,command);a->CommandChanged=TRUE;
     if(((USHORT)ConfigRead(a,4)&6)!=2){st=NDIS_STATUS_HARD_ERRORS;goto failed;}
     a->HardwareTouched=TRUE;st=IgbOps.Reset(&a->Hw);if(st!=NDIS_STATUS_SUCCESS)goto failed;
+    D31Point(6,st,0);
     if(!IgbOps.ReadMac(&a->Hw,a->Hw.PermAddr) || a->Hw.MacSource==6){st=NDIS_STATUS_INVALID_ADDRESS;goto failed;}
     UsCopy(a->Hw.CurAddr,a->Hw.PermAddr,6);IgbOps.SetMac(&a->Hw,a->Hw.CurAddr);
     if(!Rings(a)){st=NDIS_STATUS_RESOURCES;goto failed;}
@@ -492,8 +500,10 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
     IgbOps.PhyInit(&a->Hw);IgbOps.Start(&a->Hw);
     a->Hw.PacketFilter=NDIS_PACKET_TYPE_PROMISCUOUS|NDIS_PACKET_TYPE_BROADCAST|NDIS_PACKET_TYPE_ALL_MULTICAST;IgbOps.SetFilter(&a->Hw);IgbOps.IrqDisable(&a->Hw);a->Hw.Started=TRUE;
     st=StartWorker(a);if(!NT_SUCCESS(st))goto failed;
+    D31Point(7,st,a->Hw.RxRing.Pa);
     UsLog(&a->Hw,"US31 started20ms",a->Hw.RxRing.Pa,a->Hw.TxRing.Pa);return NDIS_STATUS_SUCCESS;
 failed:
+    D31Point(0x1f,st,0);
     if(cfg)NdisCloseConfiguration(cfg);UsLog(&a->Hw,"US31 init-failed",st,0);Cleanup(a);return st;
 }
 static VOID __stdcall Remove(NDIS_HANDLE context) { Cleanup(context); }
@@ -506,12 +516,14 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver,PUNICODE_STRING path)
     U31_MAC chars;NDIS_STATUS st;NDIS_STRING name=NDIS_STRING_CONST("USOSNET31");
     /* The explicitly owned UP/QEMU diagnostic candidate uses E9 before an
      * adapter configuration exists, separating loader/registration failures. */
+    D31Init(path);D31Point(1,0,KeNumberProcessors);
     InitialTrace("US31 DriverEntry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1)return STATUS_NOT_SUPPORTED;
     UsZero(&chars,sizeof(chars));chars.Major=3;chars.Minor=0;chars.Open=Open;chars.Close=Close;chars.Send=Send;chars.Transfer=Transfer;
     chars.Reset=Reset;chars.Request=Request;chars.GlobalQuery=GlobalQuery;chars.Unload=Unload;chars.Add=Add;chars.Remove=Remove;chars.Name=name;
     NdisInitializeWrapper(&Wrapper,driver,path,NULL);InitialTrace("US31 wrapper",(ULONG)Wrapper,0);if(!Wrapper)return STATUS_INSUFFICIENT_RESOURCES;
     NdisRegisterMac(&st,&Mac,Wrapper,&Mac,&chars,sizeof(chars));
+    D31Point(2,st,(ULONG)Mac);
     InitialTrace("US31 RegisterMac",st,(ULONG)Mac);
     if(st!=NDIS_STATUS_SUCCESS)NdisTerminateWrapper(Wrapper,NULL);return st;
 }
