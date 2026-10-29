@@ -446,8 +446,9 @@ class Nt4NativeWiring(unittest.TestCase):
         self.assertIn('max is 500', ps1)
 
     def test_nt35_native_ram_cap(self):
-        # Native NT 3.5 only: hook byte 508 = 8 (128 MiB), set before the
-        # first disk write; NT 3.51 / 4.0 / the VM path leave it 0.
+        # Native hook byte 508 (16 MiB units), set before the first disk
+        # write: NT 3.5 = 8 (128 MiB), NT 3.51 and native NT 4.0 WS / Server
+        # (NT4_NATIVE_PREP) = 64 (1024 MiB); native TSE and the VM path 0.
         src = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
         self.assertIn('.equ HOOK_RAM_CAP,    508', src)
         self.assertIn('    movzx eax, byte ptr cs:[HOOK_RAM_CAP]\n    shl eax, 24\n', src)
@@ -462,6 +463,11 @@ class Nt4NativeWiring(unittest.TestCase):
         self.assertIn("        yes:50) ram_cap=8 ram_oct='\\010' ;;\n", block)
         self.assertIn("        yes:51) ram_cap=64 ram_oct='\\100' ;;", block)
         self.assertNotIn(':4)', block)
+        # NT 4.0 folds into the same selection (one seek=508 write).
+        sel = text[text.index(cond):]
+        sel = sel[:sel.index(chr(10) + 'fi' + chr(10))]
+        self.assertIn("    esac\n    [ \"$NT4_NATIVE_PREP\" != 1 ] || { ram_cap=64 ram_oct='\\100'; }", sel)
+        self.assertIn('NT4_NATIVE_PREP=1', text[:text.index(cond)])
         write = text[text.index('if [ -n "$ram_cap" ]; then'):]
         write = write[:write.index(chr(10) + 'fi' + chr(10))]
         self.assertIn('printf "$ram_oct" | dd of="$work/hookcap.bin" bs=1 seek=508 count=1', write)

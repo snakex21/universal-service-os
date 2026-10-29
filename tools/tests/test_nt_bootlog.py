@@ -83,7 +83,8 @@ class NtBootlog(unittest.TestCase):
         self.assertEqual(prepare.count('USOS_NT_BOOTLOG='), 1)
         native = prepare[prepare.index('if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then\n        # Native (docs/nt-native-plan.md)'):]
         native = native[:native.index('elif [ -n "$nt4" ]; then')]
-        self.assertIn('nt_bootlog=off\n        [ "$nt_major" != 3 ] || nt_bootlog=on\n', native)
+        # Native NT 3.5x and NT 4.0.
+        self.assertIn('nt_bootlog=off\n        case "$nt_major" in 3|4) nt_bootlog=on ;; esac\n', native)
         self.assertIn('USOS_NT_BOOTLOG=$nt_bootlog sh /usr/lib/usos/xp_csmwrap_esp.sh', native)
         # nt3-native.flag covers 3.51 / 3.5 only; NT 3.1 has no native path.
         self.assertIn('NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;', prepare)

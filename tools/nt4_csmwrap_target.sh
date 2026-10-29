@@ -866,12 +866,7 @@ if [ -n "$nt4_native_mbr" ]; then
         fail 'cannot prepare the MBR hook sector. No disk was changed'
     [ "$(od -An -tu1 -j509 -N1 "$work/hook.bin" | tr -d ' \n')" = 1 ] || fail 'the MBR hook options byte did not take. No disk was changed'
     mbr_hook=$work/hook.bin
-    # A 1 GiB firmware cap also protects text mode when its /MAXMEM is ignored.
-    if [ "$NT4_NATIVE_PREP" = 1 ]; then
-    printf '\100' | dd of="$work/hook.bin" bs=1 seek=508 count=1 conv=notrunc 2>/dev/null || fail 'cannot cap NT4 RAM'
-    [ "$(od -An -tu1 -j508 -N1 "$work/hook.bin" | tr -d ' \n')" = 64 ] || fail 'NT4 RAM cap did not take'
-    log 'MBR: NT4 PCI BIOS kept; text/GUI/installed RAM cap 1024 MiB (hook 508=64, 509=1)'
-    fi
+    log 'MBR: NT 3.x MBR + hook (E820 filter, HPET LegacyReplacement off), PCI BIOS kept (options byte 509 = 1)'
 fi
 # Native NT 3.5x: RAM cap in the hook sector (byte 508, 16 MiB units,
 # nt3_e820_mbr.S HOOK_RAM_CAP), from the first text-mode start on, whatever
@@ -880,13 +875,16 @@ fi
 # /MAXMEM. NT 3.51: 1024 MiB (64); text mode writes Setup's BOOT.INI entry
 # without /MAXMEM, so GUI Setup's starts ran on 3 GB and stopped with 0x0A
 # in the working-set list growth (X470 B261029-161430). The hook clips E820
-# and AH=88h / AX=E801h. NT 4.0 and the VM path keep 0.
+# and AH=88h / AX=E801h. Native NT 4.0 WS / Server (NT4_NATIVE_PREP):
+# 1024 MiB (64) too, so text mode stays capped where /MAXMEM is ignored.
+# Native TSE and the VM path keep 0.
 ram_cap=''
 if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then
     case "$nt3:$minor" in
         yes:50) ram_cap=8 ram_oct='\010' ;;
         yes:51) ram_cap=64 ram_oct='\100' ;;
     esac
+    [ "$NT4_NATIVE_PREP" != 1 ] || { ram_cap=64 ram_oct='\100'; }
 fi
 if [ -n "$ram_cap" ]; then
     cp "$mbr_hook" "$work/hookcap.bin" && printf "$ram_oct" | dd of="$work/hookcap.bin" bs=1 seek=508 count=1 conv=notrunc 2>/dev/null ||
@@ -895,12 +893,13 @@ if [ -n "$ram_cap" ]; then
     mbr_hook=$work/hookcap.bin
     log "MBR: NT 3.x MBR + hook, RAM cap $((ram_cap * 16)) MiB (hook byte 508 = $ram_cap; E820 + AH=88h/E801h)"
 fi
-# Native NT 3.x: bus-master quiesce (hook options byte 509 bit 1,
+# Native NT 3.x and NT 4.0: bus-master quiesce (hook options byte 509 bit 1,
 # nt3_e820_mbr.S OPT_QUIESCE): before the boot sector the MBR clears PCI Bus
 # Master Enable on every network controller, so a NIC the last NT boot left
 # receiving (warm reset after a bugcheck / restart; the X470 I211) cannot
-# write into the memory of the next boot before usosnet351n resets it.
-if [ "$NATIVE" = 1 ] && [ -n "$nt3" ] && [ -n "$mbr_hook" ]; then
+# write into the memory of the next boot before usosnet351n / usosnet4
+# resets it. The quiesce code is sector 3 (written with the hook below).
+if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then
     opt=$(od -An -tu1 -j509 -N1 "$mbr_hook" | tr -d ' \n')
     opt=$((opt | 2))
     cp "$mbr_hook" "$work/hookq.bin" && printf "\\$(printf %03o "$opt")" | dd of="$work/hookq.bin" bs=1 seek=509 count=1 conv=notrunc 2>/dev/null ||

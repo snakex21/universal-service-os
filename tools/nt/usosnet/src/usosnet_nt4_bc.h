@@ -6,6 +6,11 @@
  */
 #pragma warning(push)
 #pragma warning(disable:4996)
+/* Compiler intrinsics (lock-prefixed), no kernel import. */
+long __cdecl _InterlockedIncrement(long volatile *Addend);
+long __cdecl _InterlockedDecrement(long volatile *Addend);
+long __cdecl _InterlockedCompareExchange(long volatile *Target, long Value, long Comparand);
+#pragma intrinsic(_InterlockedIncrement, _InterlockedDecrement, _InterlockedCompareExchange)
 static WCHAR g_N4Key[256];
 static BOOLEAN g_N4Ready;
 typedef struct _N4_SAMPLE {
@@ -16,6 +21,7 @@ typedef struct _N4_SAMPLE {
 static N4_SAMPLE g_N4Samples[4];
 static KMUTEX g_N4Mutex;
 static volatile LONG g_N4Stopping;
+static volatile LONG g_N4InTick; /* N4Tick bodies running (any CPU) */
 static ULONG g_N4Seq, g_N4Next;
 static const ULONG g_N4At[] = {1, 2, 5, 10};
 
@@ -83,7 +89,15 @@ static void N4Tick(PADAPTER a)
 {
     N4_SAMPLE *sample;
     ULONG sec = a->TimerCount / TICKS_PER_SEC;
-    if (!g_N4Ready || g_N4Stopping || g_N4Next >= 4 || sec < g_N4At[g_N4Next]) return;
+    /* Announce first, then test g_N4Stopping (both interlocked = full
+     * barriers): N4Drain either sees this tick in g_N4InTick and waits for
+     * it, or this tick sees g_N4Stopping and queues nothing. */
+    _InterlockedIncrement(&g_N4InTick);
+    if (!g_N4Ready || _InterlockedCompareExchange(&g_N4Stopping, 0, 0) ||
+        g_N4Next >= 4 || sec < g_N4At[g_N4Next]) {
+        _InterlockedDecrement(&g_N4InTick);
+        return;
+    }
     /* Each of the four samples is queued once. Never reuse a work item or
      * its event while the previous callback is still returning. */
     sample = &g_N4Samples[g_N4Next++];
@@ -94,15 +108,22 @@ static void N4Tick(PADAPTER a)
     sample->Values[6] = a->LinkUp; sample->Values[7] = a->IrqStatus;
     ExInitializeWorkItem(&sample->Work, N4Worker, sample);
     ExQueueWorkItem(&sample->Work, DelayedWorkQueue);
+    _InterlockedDecrement(&g_N4InTick);
 }
 
-/* MpHalt is PASSIVE_LEVEL; the cancelled timer can queue no new sample.
+/* MpHalt is PASSIVE_LEVEL. NdisMCancelTimer does not wait for a timer DPC
+ * already running on another processor (MP kernel), so after g_N4Stopping
+ * wait for any tick still inside N4Tick before reading g_N4Next.
  * Drain before returning, so an unload cannot free code used by the worker. */
 static void N4Drain(void)
 {
     ULONG i;
+    LARGE_INTEGER ms;
     _InterlockedExchange(&g_N4Stopping, 1);
     if (!g_N4Ready) return;
+    ms.QuadPart = -10000; /* 1 ms, relative */
+    while (_InterlockedCompareExchange(&g_N4InTick, 0, 0) != 0)
+        KeDelayExecutionThread(KernelMode, FALSE, &ms);
     for (i = 0; i < g_N4Next; i++)
         KeWaitForSingleObject(&g_N4Samples[i].Done, Executive, KernelMode, FALSE, NULL);
 }

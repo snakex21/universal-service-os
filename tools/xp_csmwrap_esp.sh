@@ -62,7 +62,7 @@ if [ "${USOS_NT_BOOTLOG:-off}" = on ]; then
     [ -r "$BOOTLOG_EFI" ] || fail 'the NT pre-boot logger is missing (usr/lib/usos/nt3/NTBOOTLG.EFI)'
     [ "$(sha256sum "$BOOTLOG_EFI" | awk '{print $1}')" = "$PINNED_BOOTLOG" ] || fail 'the NT pre-boot logger does not match its pinned hash'
     CSMWRAP_NAME=CSMWRAPX.EFI
-    log 'NT 3.x native: pre-boot logger as BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, empty USOS/BOOTLOG.TXT'
+    log 'NT native: pre-boot logger as BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, empty USOS/BOOTLOG.TXT'
 fi
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'

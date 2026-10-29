@@ -48,7 +48,7 @@ def main():
     # preprocess exactly the NT351 configuration before/after at one path.
     shared = src/'usosnet.c'
     current = shared.read_bytes()
-    old = subprocess.check_output(['git','show','2d7f2a23:tools/nt/usosnet/src/usosnet.c'],cwd=ROOT,timeout=10)
+    old = subprocess.check_output(['git','show','a9129ba7:tools/nt/usosnet/src/usosnet.c'],cwd=ROOT,timeout=10)
     cpp_script=out/'cpp.cmd'
     cpp_script.write_text('@echo off\n'+
         f'call "{wdk}\\bin\\setenv.bat" {wdk} fre x86 WXP no_oacr >nul 2>&1\n'+

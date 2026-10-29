@@ -17,7 +17,7 @@ class NativePrep(unittest.TestCase):
     def test_shared_binaries_unchanged(self):
         for leaf in ('usosnet4.sys','usosnet351.sys','usosnet351n.sys'):
             rel = 'tools/nt/usosnet/bin/i386/'+leaf
-            original = subprocess.check_output(['git','show','2d7f2a23:'+rel],cwd=ROOT,timeout=10)
+            original = subprocess.check_output(['git','show','a9129ba7:'+rel],cwd=ROOT,timeout=10)
             self.assertEqual((ROOT/rel).read_bytes(), original)
 
     def test_nt4_kernel_imports_only_in_nt4_variant(self):
@@ -72,7 +72,10 @@ class NativePrep(unittest.TestCase):
         self.assertIn('if errorlevel 1 goto nativefailed',src)
         self.assertIn('echo native finish FAILED; no restart',src)
         self.assertIn('seek=508 count=1',src)
-        self.assertIn('= 64 ]',src)
+        # The NT4 1 GiB cap goes through the shared ram_cap selection.
+        self.assertEqual(src.count('seek=508'),1)
+        self.assertIn('[ "$NT4_NATIVE_PREP" != 1 ] || { ram_cap=64 ',src)
+        self.assertIn('if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then\n    opt=$(od -An -tu1 -j509',src)
         self.assertIn('NATIVE.TXT',src)
 
     def test_profile_key_route_no_embedded_value(self):
