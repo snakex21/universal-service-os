@@ -712,7 +712,7 @@ tse=''
 for name in CDROM_TS.40 cdrom_ts.40; do [ -f "$work/iso/$name" ] && tse=yes; done
 # This preparation round qualifies WS/Server only; TSE keeps its old path.
 NT4_NATIVE_PREP=0
-[ "$NATIVE:$major:${tse:-}" != 1:4: ] || NT4_NATIVE_PREP=1
+[ "${NATIVE:-0}:${major:-0}:${tse:-}" != 1:4: ] || NT4_NATIVE_PREP=1
 if [ "$EDITION" = tse ] && [ -z "$tse" ]; then
     fail 'the ISO is not the Windows NT 4.0 Terminal Server Edition CD (no CDROM_TS.40): choose Windows NT 4.0 or Windows NT 4.0 Server for it'
 fi
