@@ -710,6 +710,9 @@ log "source: NT $major.$minor ProductType=${product:-?} language=${lang:-?}"
 # Server CD: ProductType 1); only its own service pack applies.
 tse=''
 for name in CDROM_TS.40 cdrom_ts.40; do [ -f "$work/iso/$name" ] && tse=yes; done
+# This preparation round qualifies WS/Server only; TSE keeps its old path.
+NT4_NATIVE_PREP=0
+[ "$NATIVE:$major:${tse:-}" != 1:4: ] || NT4_NATIVE_PREP=1
 if [ "$EDITION" = tse ] && [ -z "$tse" ]; then
     fail 'the ISO is not the Windows NT 4.0 Terminal Server Edition CD (no CDROM_TS.40): choose Windows NT 4.0 or Windows NT 4.0 Server for it'
 fi
@@ -736,9 +739,11 @@ if [ "$NATIVE" = 1 ]; then
         # leaf limit raised, before any disk write; the MPS machine type for
         # ComputerType.
         command -v cmp >/dev/null 2>&1 || fail 'cmp is required. No disk was changed'
-        [ -r "$LIB/nt4/USOSNT4.EXE" ] || fail 'missing NT4 native finish helper. No disk was changed'
-        [ -r "$LIB/nt4/USOSANS4.EXE" ] || fail 'missing NT4 native page answerer. No disk was changed'
-        ans3=$LIB/nt4/USOSANS4.EXE
+        if [ "$NT4_NATIVE_PREP" = 1 ]; then
+            [ -r "$LIB/nt4/USOSNT4.EXE" ] || fail 'missing NT4 native finish helper. No disk was changed'
+            [ -r "$LIB/nt4/USOSANS4.EXE" ] || fail 'missing NT4 native page answerer. No disk was changed'
+            ans3=$LIB/nt4/USOSANS4.EXE
+        fi
         nt4_native_kernels
         nt4_mps_desc=$(nt4_computer_desc mps_mp < "$txtsetup")
         [ -n "$nt4_mps_desc" ] || fail 'TXTSETUP.SIF has no [Computer] mps_mp row (not an NT 4.0 CD?). No disk was changed'
@@ -840,9 +845,11 @@ if [ -n "$nt4_native_mbr" ]; then
     [ "$(od -An -tu1 -j509 -N1 "$work/hook.bin" | tr -d ' \n')" = 1 ] || fail 'the MBR hook options byte did not take. No disk was changed'
     mbr_hook=$work/hook.bin
     # A 1 GiB firmware cap also protects text mode when its /MAXMEM is ignored.
+    if [ "$NT4_NATIVE_PREP" = 1 ]; then
     printf '\100' | dd of="$work/hook.bin" bs=1 seek=508 count=1 conv=notrunc 2>/dev/null || fail 'cannot cap NT4 RAM'
     [ "$(od -An -tu1 -j508 -N1 "$work/hook.bin" | tr -d ' \n')" = 64 ] || fail 'NT4 RAM cap did not take'
     log 'MBR: NT4 PCI BIOS kept; text/GUI/installed RAM cap 1024 MiB (hook 508=64, 509=1)'
+    fi
 fi
 # Native NT 3.5: RAM cap 128 MiB in the hook sector (byte 508, 16 MiB units,
 # nt3_e820_mbr.S HOOK_RAM_CAP). Its kernel loses the boot disk above 128 MiB
@@ -1104,7 +1111,7 @@ for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
         printf '[Commands]\r\n'
         [ "$NATIVE" != 1 ] || printf '"C:\\USOS\\NT4\\USOSANS3.EXE /detach"\r\n'
         printf '"C:\\WINNT\\REGEDIT.EXE /s C:\\USOS\\NT4\\SETUP.REG"\r\n'
-        [ "$NATIVE" != 1 ] || printf '"C:\\USOS\\NT4\\USOSNT4.EXE /early"\r\n'
+        [ "$NT4_NATIVE_PREP" != 1 ] || printf '"C:\\USOS\\NT4\\USOSNT4.EXE /early"\r\n'
     } > "$oem/CMDLINES.TXT"
 done
 
@@ -1112,13 +1119,15 @@ usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
 if [ "$NATIVE" = 1 ]; then
     cp "$ans3" "$usos/USOSANS3.EXE" || fail 'cannot copy USOSANS3.EXE'
-    cp "$LIB/nt4/USOSNT4.EXE" "$usos/USOSNT4.EXE" || fail 'cannot copy native NT4 helper'
-    printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write native NT4 marker'
+    if [ "$NT4_NATIVE_PREP" = 1 ]; then
+        cp "$LIB/nt4/USOSNT4.EXE" "$usos/USOSNT4.EXE" || fail 'cannot copy native NT4 helper'
+        printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write native NT4 marker'
+    fi
     log 'native: GUI Setup page recorder USOSANS3.EXE (CMDLINES.TXT, log C:\USOS\NT4\USOSANS.TXT)'
 fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_SIF" NT4 > "$work/network.ini" || fail 'invalid LAN metadata'
-usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+USOS_NT4_NATIVE_DIAG=$NT4_NATIVE_PREP usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
 # Keep the requested $OEM$/$1 layout. NT4 is explicitly copied from it by
 # CMDLINES: unlike NT5, do not assume that NT4 maps $1 to the system drive.
@@ -1359,6 +1368,7 @@ EOF
 # installs at the first try and nothing is switched.
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
+if exist C:\USOS\NT4\POST.OK if exist C:\USOS\NT4\NATIVE.TXT goto nativeresume
 if exist C:\USOS\NT4\POST.OK goto end
 echo USOS NT4 post > C:\USOS\NT4\POST.LOG
 set NHI=%SystemRoot%\Profiles\All Users\Start Menu\Programs\Startup\Windows NT Server, Enterprise Edition Installer.cmd
@@ -1459,6 +1469,7 @@ echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSRST.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSVBE.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG
+:nativeresume
 if not exist C:\USOS\NT4\NATIVE.TXT goto nativefinished
 C:\USOS\NT4\USOSNT4.EXE /finish
 if errorlevel 1 goto nativefailed

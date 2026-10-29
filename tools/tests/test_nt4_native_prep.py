@@ -4,11 +4,14 @@ from pathlib import Path
 import hashlib
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/tests'))
 from check_nt52_driver_imports import pe
+from test_w9x_phase1_qemu import sh
+from test_nt4_flow import function_text
 
 class NativePrep(unittest.TestCase):
     def test_shared_binaries_unchanged(self):
@@ -37,9 +40,23 @@ class NativePrep(unittest.TestCase):
 
     def test_native_routes_preserve_95(self):
         src = (ROOT/'tools/network_setup.sh').read_text()
-        self.assertIn('NT4) _un_sys=nt4/usosnet4.sys;',src)
+        self.assertIn('NT4) _un_sys=usosnet4.sys;',src)
+        self.assertIn('[ "${USOS_NT4_NATIVE_DIAG:-0}" != 1 ] || _un_sys=nt4/usosnet4.sys',src)
         self.assertIn('95) _un_inf=usosnet95.inf; _un_sys=usosnet4.sys',src)
         self.assertIn('network/\' + relative', (ROOT/'tools/build_micro_linux.py').read_text())
+        start=src.index('    _un_sys=usosnet.sys _un_dsys=USOSNET.SYS _un_ndis=04')
+        block=src[start:src.index('    mkdir -p "$(dirname "$_un_log")"',start)]
+        for system,enabled,expected in (('NT4','1','nt4/usosnet4.sys'),('NT4','0','usosnet4.sys'),('95','1','usosnet4.sys'),('XP','1','usosnet.sys')):
+            rc,out,err=sh('_un_os='+system+'; USOS_NT4_NATIVE_DIAG='+enabled+'\n'+block+'\nprintf "%s" "$_un_sys"\n')
+            self.assertEqual((rc,out.strip()),(0,expected),err)
+
+    def test_tse_and_other_versions_keep_old_preparation(self):
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        start=src.index('NT4_NATIVE_PREP=0\n')
+        block=src[start:src.index('\n',src.index('|| NT4_NATIVE_PREP=1',start))]
+        for native,major,tse,expected in (('1','4','','1'),('1','4','yes','0'),('0','4','','0'),('1','3','','0')):
+            rc,out,err=sh('NATIVE='+native+'; major='+major+'; tse='+tse+'\n'+block+'\nprintf "%s" "$NT4_NATIVE_PREP"\n')
+            self.assertEqual((rc,out.strip()),(0,expected),err)
 
     def test_no_registry_io_from_timer(self):
         src=(ROOT/'tools/nt/usosnet/src/usosnet_nt4_bc.h').read_text()
@@ -64,5 +81,18 @@ class NativePrep(unittest.TestCase):
         self.assertIn('nt4.render(p, use_key, buffer)',src)
         placeholder='<KLUCZ-Z-PROFILU>'
         self.assertNotIn(placeholder,(ROOT/'src/flow/answer/nt4.zig').read_text().split('test "')[0])
+        wrapper=(ROOT/'src/platform/uefi/answer_profiles.zig').read_text()
+        self.assertIn('answer.render(profile, system_id, arch, null,',wrapper)
+
+    def test_key_gate_logs_only_presence_with_unformatted_placeholder(self):
+        parent=ROOT/'artifacts';parent.mkdir(exist_ok=True)
+        fn=function_text(ROOT/'tools/nt4_csmwrap_target.sh','nt4_key_gate')
+        with tempfile.TemporaryDirectory(dir=parent) as folder:
+            base=Path(folder);answer=base/'profile.sif'
+            for body,wanted,code in (('[UserData]\nProductId="KLUCZ-Z-PROFILU"\n','key',0),('[UserData]\n','needed',1)):
+                answer.write_text(body)
+                rc,out,err=sh(fn+'\nnt4_key_gate "'+answer.as_posix()+'" "'+base.as_posix()+'"\n')
+                self.assertEqual((rc,out.strip()),(code,wanted),err)
+                self.assertNotIn('KLUCZ-Z-PROFILU',out+err)
 
 if __name__=='__main__': unittest.main()

@@ -237,7 +237,11 @@ void entry(void)
     CreateMutexA(NULL, TRUE, "USOSANS3");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
         ExitProcess(0);
+#ifdef USOSANS_NT4
+    log_str("USOSANS4 mode=record+NT4-minor-warning-No (unknown pages unchanged)\r\n");
+#else
     log_str("USOSANS3 1.0 mode=record (GUI-mode Setup page recorder, presses nothing)\r\n");
+#endif
     for (;;) {
         DWORD now = GetTickCount() - start;
         if (now > 6UL * 3600UL * 1000UL || g_logged >= LOG_MAX)

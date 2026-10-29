@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -89,10 +90,29 @@ def main():
             *defs,str(ROOT/source),'-Wl,--entry,entry','-Wl,--subsystem,windows',*libs,'-o',str(target)])
         target.write_bytes(set_nt4(target.read_bytes(),4,0))
         destinations[str(target.relative_to(ROOT))] = sha(target)
+    # Exercise the actual production formatter and durability guards with
+    # every file API replaced by an in-memory model. Never a host C: test.
+    def function(text,name):
+        lines=text.splitlines()
+        start=next(i for i,line in enumerate(lines) if line.startswith('static ') and
+            re.search(r'\b'+re.escape(name)+r'\(',line) and not line.rstrip().endswith(';'))
+        end=next(i for i in range(start,len(lines)) if lines[i]=='}')
+        return '\n'.join(lines[start:end+1])+'\n'
+    nt3=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text()
+    nt4=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+    helpers=''.join(function(nt3,n) for n in ('read_small','copy_bytes','lower','has_ci','native_options','out_add','drop_maxmem'))
+    helpers+=''.join(function(nt4,n) for n in ('finish_create','finish_flush','boot_valid','finish_delete'))
+    (out/'finish_helpers_actual.inc').write_text(helpers)
+    (out/'finish_boot_actual.inc').write_text(function(nt3,'boot_ini_finish'))
+    harness=out/'finish-test.exe'
+    run('finish-test-compile',[str(zig),'cc','-target','x86-windows-gnu','-mcpu=i586','-Os','-nostdlib',
+        '-fno-builtin','-fno-stack-protector','-I'+str(zig.parent/'lib/libc/include/any-windows-any'),'-I'+str(out),
+        str(ROOT/'tools/tests/native_nt4_finish_test.c'),'-Wl,--entry,entry','-lkernel32','-o',str(harness)])
+    run('finish-test',[str(harness)])
     if protected != {p:sha(p) for p in protected}:
         raise ValueError('Protected shared/NT351 SYS changed')
     result = {'outputs':destinations,'protected_unchanged':True,'nt351_preprocessed_identical':True,
-        'nt351_preprocessed_sha256':cpp_sha,
+        'nt351_preprocessed_sha256':cpp_sha,'finish_contract_cases':6,'finish_contract_pass':True,
         'protected':{str(p.relative_to(ROOT)):s for p,s in protected.items()}, 'runtime_pass':False}
     (out/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(result,indent=2))
