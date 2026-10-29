@@ -1,6 +1,7 @@
 @echo off
 setlocal
 set "ROOT=%~dp0"
+if defined USOS_NT31_NATIVE_PREP goto nt31_native_prep
 set "ZIG=%ROOT%tools\zig\zig.exe"
 set "ZIG_GLOBAL_CACHE_DIR=%ROOT%tools\cache\zig-global"
 
@@ -125,3 +126,7 @@ echo [PASS] Release USB, manual test and embedded installer payload are consiste
 echo [PASS] Build: %USOS_BUILD_ID%
 echo [PASS] Installer: %ROOT%installer\USOS Installer.exe
 exit /b 0
+
+:nt31_native_prep
+python "%ROOT%tools\nt31_native_build.py"
+exit /b %ERRORLEVEL%
