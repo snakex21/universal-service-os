@@ -679,6 +679,11 @@ mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
 mbr_hook=''
 [ -z "$nt3$nt4_native_mbr" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin
 [ -z "$mbr_hook" ] || [ "$(wc -c < "$mbr_hook" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_hook"
+# Its bus-master quiesce, sector 3 ("Q3"), run by the MBR only with bit 1 of
+# the hook options byte (native NT 3.x, below).
+mbr_quiesce=''
+[ -z "$mbr_hook" ] || mbr_quiesce=$LIB/nt3-e820-quiesce-512.bin
+[ -z "$mbr_quiesce" ] || [ "$(wc -c < "$mbr_quiesce" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_quiesce"
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 # usosrst for NT 3.5 (USOSRST35.SYS, build-nt35.cmd): the 3.5 kernel lacks
@@ -860,6 +865,20 @@ if [ -n "$ram_cap" ]; then
     mbr_hook=$work/hookcap.bin
     log "MBR: NT 3.x MBR + hook, RAM cap $((ram_cap * 16)) MiB (hook byte 508 = $ram_cap; E820 + AH=88h/E801h)"
 fi
+# Native NT 3.x: bus-master quiesce (hook options byte 509 bit 1,
+# nt3_e820_mbr.S OPT_QUIESCE): before the boot sector the MBR clears PCI Bus
+# Master Enable on every network controller, so a NIC the last NT boot left
+# receiving (warm reset after a bugcheck / restart; the X470 I211) cannot
+# write into the memory of the next boot before usosnet351n resets it.
+if [ "$NATIVE" = 1 ] && [ -n "$nt3" ] && [ -n "$mbr_hook" ]; then
+    opt=$(od -An -tu1 -j509 -N1 "$mbr_hook" | tr -d ' \n')
+    opt=$((opt | 2))
+    cp "$mbr_hook" "$work/hookq.bin" && printf "\\$(printf %03o "$opt")" | dd of="$work/hookq.bin" bs=1 seek=509 count=1 conv=notrunc 2>/dev/null ||
+        fail 'cannot prepare the MBR hook sector. No disk was changed'
+    [ "$(od -An -tu1 -j509 -N1 "$work/hookq.bin" | tr -d ' \n')" = "$opt" ] || fail 'the MBR hook quiesce bit did not take. No disk was changed'
+    mbr_hook=$work/hookq.bin
+    log "MBR: NT 3.x MBR + hook, NIC bus-master quiesce (hook byte 509 = $opt, sector 3)"
+fi
 
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'
@@ -877,6 +896,8 @@ printf '\125\252' | dd of="$mbr" bs=1 seek=510 count=2 conv=notrunc 2>/dev/null
 dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR'
 [ -z "$mbr_hook" ] || dd if="$mbr_hook" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync 2>/dev/null ||
     fail 'cannot write the MBR hook sector'
+[ -z "$mbr_quiesce" ] || dd if="$mbr_quiesce" of="$TARGET_DEVICE" bs=512 seek=3 count=1 conv=notrunc,fsync 2>/dev/null ||
+    fail 'cannot write the MBR quiesce sector'
 
 part_loop=$(losetup -f) || fail 'no free loop device for the new partition'
 losetup -o $((PART_START * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot attach the new partition'

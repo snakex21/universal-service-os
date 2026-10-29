@@ -95,6 +95,17 @@ $sha = (Get-FileHash -LiteralPath $hookbin -Algorithm SHA256).Hash
 Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/500 bytes SHA256=$sha"
 Write-Host "OUTPUT=$hookbin"
 
+# Its bus-master quiesce: sector 3 of the disk, "Q3" (51 33) in the last two
+# bytes (the .quiesce section is exactly 512 bytes), called at 0000:7C00.
+$quiescebin = Join-Path $out 'nt3-e820-quiesce-512.bin'
+& $zig objcopy -O binary -j .quiesce $nt3elf $quiescebin
+if ($LASTEXITCODE -ne 0) { throw "NT3 MBR quiesce objcopy failed: $LASTEXITCODE" }
+$code = [IO.File]::ReadAllBytes($quiescebin)
+if ($code.Length -ne 512 -or $code[510] -ne 0x51 -or $code[511] -ne 0x33) { throw "NT3 MBR quiesce sector is not 512 bytes ending in Q3" }
+$sha = (Get-FileHash -LiteralPath $quiescebin -Algorithm SHA256).Hash
+Write-Host "[PASS] NT3 MBR quiesce sector: 512 bytes SHA256=$sha"
+Write-Host "OUTPUT=$quiescebin"
+
 # ReactOS (and own BIOS images) behind CSMWrap: the ELCR MBR marks the PCI
 # IRQs level-triggered, then chains to the image's MBR kept at LBA 1
 # (src/platform/bios/reactos/elcr_mbr.S, docs/custom-os-2026-10-11.md).

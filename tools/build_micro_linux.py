@@ -724,11 +724,13 @@ def main() -> int:
         nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
         # Its resident hooks (sector 1 of the NT 3.x disk).
         nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
+        # Its bus-master quiesce (sector 3 of the NT 3.x disk).
+        nt3_e820_quiesce = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-quiesce-512.bin"
         # ReactOS / own BIOS images behind CSMWrap: ELCR MBR (elcr_mbr.S).
         elcr_mbr = root / "zig-out/xp-geometry-fix-mbr/elcr-mbr-440.bin"
         # Windows 2000 with ACPI: the USOS_W2K_ACPI build of the geometry MBR.
         w2k_acpi_mbr = root / "zig-out/xp-geometry-fix-mbr/w2k-acpi-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr, w2k_acpi_mbr):
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, nt3_e820_quiesce, elcr_mbr, w2k_acpi_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -891,6 +893,10 @@ def main() -> int:
         if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
             raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")
         put(entries, Entry("usr/lib/usos/nt3-e820-hook-512.bin", stat.S_IFREG | 0o644, nt3_hook))
+        nt3_quiesce = nt3_e820_quiesce.read_bytes()
+        if len(nt3_quiesce) != 512 or nt3_quiesce[510:] != b"Q3":
+            raise RuntimeError(f"NT 3.x MBR quiesce sector must be 512 bytes ending in Q3: {nt3_e820_quiesce}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-quiesce-512.bin", stat.S_IFREG | 0o644, nt3_quiesce))
 
         module_root = modloop_out / "modules" / kernel_release
         qemu9x_module_set = set(qemu9x_modules)

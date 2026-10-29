@@ -161,7 +161,7 @@ class Machine:
         else:
             self.set_cf(True)
 
-    def run(self):
+    def run(self, count=200000):
         u = self.u
         u.reg_write(UC_X86_REG_EDX, 0x80)
         self.started = False
@@ -173,7 +173,7 @@ class Machine:
                 self.started = True
         h = u.hook_add(UC_HOOK_CODE, arm)
         try:
-            u.emu_start(0x7C00, 0xFFFFF, count=200000)
+            u.emu_start(0x7C00, 0xFFFFF, count=count)
         except Exception:
             if not self.done:
                 raise

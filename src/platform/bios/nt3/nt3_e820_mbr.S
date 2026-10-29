@@ -100,6 +100,22 @@
  * the partition starts at 63): up to 25 entries of 20 bytes, zero-filled
  * behind the last one, "E8" in bytes 510-511.  Read offline, never shown;
  * what the loader saw follows from it through the (tested) hook rules.
+ *
+ * Bus-master quiesce: sector 3 ("Q3" in its last two bytes, the .quiesce
+ * section, nt3-e820-quiesce-512.bin) is read to 0000:7C00 and called
+ * right before the active partition's boot sector.  With bit 1 of the hook
+ * sector's options byte (OPT_QUIESCE, set by nt4_csmwrap_target.sh for native
+ * NT 3.x) it clears PCI Bus Master Enable on every network controller (class
+ * 02h) through CF8h/CFCh.  A warm reset (HAL keyboard-controller reset after
+ * a bugcheck or a restart) does not necessarily reset the PCIe devices, and
+ * neither the AMI firmware nor SeaBIOS (CSMWrap) touches the Intel I211 when
+ * no PXE boot runs: a NIC whose receive ring the last NT boot programmed
+ * could keep writing frames into memory the next NT boot's loader and kernel
+ * reuse until usosnet351n resets the chip (late, as a network driver).  The
+ * xHCI controllers are left alone: SeaBIOS resets and drives them (USB
+ * keyboard in the NTLDR menu, USB disks behind INT 13h) and usosusb halts and
+ * resets each one before it programs it.  Without the sector, the signature
+ * or the option bit nothing changes.
  */
 .intel_syntax noprefix
 .code16
@@ -118,6 +134,9 @@
    script sets it per system (nt4_csmwrap_target.sh). */
 .equ HOOK_OPTIONS,    509
 .equ OPT_KEEP_PCI_BIOS, 1
+.equ OPT_QUIESCE,     2
+/* Bus-master quiesce sector (see the header). */
+.equ QUIESCE_LBA,     3
 /* RAM cap in 16 MiB units (0 = none), read by the resident hook as cs:[508]. */
 .equ HOOK_RAM_CAP,    508
 /* E820 record buffer (two sectors) and the sectors it goes to. */
@@ -257,6 +276,20 @@ boot_partition:
     push ds
     pop es
 
+    /* Bus-master quiesce (sector 3, "Q3"; see the header). */
+    xor eax, eax
+    mov al, QUIESCE_LBA
+    mov bx, VBR_LOAD
+    call read_sector
+    cmp word ptr [VBR_LOAD + 510], 0x3351
+    jne 1f
+    /* near call to 0000:7C00 (CS = 0; this code runs at RELOC_BASE but is
+       linked at 0x7C00) */
+    .byte 0xE8
+    .word VBR_LOAD - RELOC_BASE - (quiesce_back - nt3_e820_mbr_start)
+quiesce_back:
+1:
+
     mov si, RELOC_BASE + PART_TABLE_OFF
     mov cx, 4
 find_active:
@@ -268,7 +301,8 @@ find_active:
 
 active_found:
     mov eax, dword ptr [si + 8]
-    mov bx, VBR_LOAD
+    /* BX = VBR_LOAD still (quiesce read above; read_sector and the quiesce
+       code keep it) */
     call read_sector
     jc boot_error
 
@@ -522,3 +556,58 @@ hook_1a:
     .byte 0x2E, 0xFF, 0x2E                 /* jmp far cs:[OLD1A] (m16:16) */
     .word OLD1A
 hook_end:
+
+/* Bus-master quiesce: sector 3, read to 0000:7C00 and near-called from the
+   MBR (CS = DS = ES = 0, BP = boot drive; everything is preserved).  Only
+   relative jumps: the code runs wherever it is loaded. */
+.section .quiesce, "ax"
+.global quiesce_start
+quiesce_start:
+    pushad
+    push es
+    /* Only with the hook sector ("U3" at the INT 12h top) and its option bit. */
+    mov ax, word ptr [0x0413]
+    shl ax, 6
+    mov es, ax
+    cmp word ptr es:[510], 0x3355
+    jne 9f
+    test byte ptr es:[HOOK_OPTIONS], OPT_QUIESCE
+    jz 9f
+    /* Every bus/device/function, from FF:1F.7 down to 00:00.0. */
+    mov ebx, 0x80FFFF00
+    mov dx, 0x0CF8
+1:
+    mov eax, ebx
+    mov dl, 0xF8
+    out dx, eax
+    mov dl, 0xFC
+    in eax, dx
+    inc eax                                /* no function: FFFFFFFFh */
+    jz 2f
+    lea eax, [ebx + 8]
+    mov dl, 0xF8
+    out dx, eax
+    mov dl, 0xFF                           /* register 0Bh: base class */
+    in al, dx
+    cmp al, 0x02                           /* network controller */
+    jne 2f
+    lea eax, [ebx + 4]
+    mov dl, 0xF8
+    out dx, eax
+    mov dl, 0xFC
+    in al, dx
+    and al, 0xFB                           /* command bit 2: Bus Master Enable */
+    out dx, al
+2:
+    sub ebx, 0x100
+    js 1b
+    /* CF8h back to 0 (no configuration cycle selected). */
+    xor eax, eax
+    mov dl, 0xF8
+    out dx, eax
+9:
+    pop es
+    popad
+    .byte 0xC3                             /* ret (16-bit near; "ret" assembles as 66 C3) */
+    .org 510
+    .byte 0x51, 0x33                       /* "Q3" */
