@@ -26,6 +26,9 @@
  */
 #include "usosnet.h"
 #include "usosnet_irq.h"
+#ifndef USOSNET_NATIVE4
+#define USOSNET_NATIVE4 0
+#endif
 #if USOSNET_NDIS3
 #include "usosnet351_policy.h"
 #endif
@@ -603,6 +606,8 @@ static void FirstIndTick(PADAPTER A, ULONG Len)
 }
 #pragma warning(pop)
 #define BC(A, P) BcPoint((A), (P))
+#elif USOSNET_NATIVE4
+#include "usosnet_nt4_bc.h"
 #else
 #define BC(A, P) ((void)0)
 #endif
@@ -924,6 +929,9 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 #endif
     rx = A->RxOk;
     A->TimerCount++;
+#if USOSNET_NATIVE4
+    N4Tick(A);
+#endif
 #if USOSNET_NT351
     if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);
 #endif
@@ -1582,6 +1590,9 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
 #endif
 #endif
     A->TimerInit = FALSE;
+#if USOSNET_NATIVE4
+    N4Drain();
+#endif
     A->Chip->Ops->IrqDisable(A);
     A->Chip->Ops->Stop(A);
     FreeAll(A);
@@ -1880,14 +1891,19 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     NDIS_STATUS st;
     NDIS_MINIPORT_CHARACTERISTICS mc;
 
+#if USOSNET_NATIVE4
+    N4Init(RegistryPath);
+#endif
     NdisMInitializeWrapper(&g_Wrapper, DriverObject, RegistryPath, NULL);
     if (!g_Wrapper) return NDIS_STATUS_FAILURE;
     UsZero(&mc, sizeof(mc));
     mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;
     mc.MinorNdisVersion = 0;
     mc.CheckForHangHandler = MpCheckForHang;
-#if USOSNET_NT351
-    /* X470 2026-10-29 (fbd0fc8d): STOP 0xA (0, 2, 0, NDIS.SYS+7291) in a
+#if USOSNET_NT351 || USOSNET_NATIVE4
+    /* NT4 mini.h has the same unchecked Interrupt dereference. Both builds
+     * use RequestIsr=TRUE/shared IRQ, so enable/disable callbacks are unneeded.
+     * X470 2026-10-29 (fbd0fc8d): STOP 0xA (0, 2, 0, NDIS.SYS+7291) in a
      * DPC, MpInitialize had returned SUCCESS (BcPoint 0x12), no alive
      * record yet; MpHandleInterrupt and MpDisableInterrupt on the stack.
      * The NT 3.5 wrapper fires Miniport->DpcTimer after OID queries during

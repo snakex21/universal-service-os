@@ -27,6 +27,10 @@
  * Ends after 6 hours, at 1 MiB of log, or with GUI Setup's restart.
  */
 #include <windows.h>
+#ifdef USOSANS_NT4
+#include "nt4_policy.h"
+static int g_minor_warning;
+#endif
 
 #define LOG_PATH "C:\\USOS\\NT3\\USOSANS.TXT"
 #define DUMP_MAX 49152
@@ -96,7 +100,11 @@ static void log_str(const char *s)
 
 static BOOL CALLBACK child_proc(HWND w, LPARAM unused)
 {
+#ifdef USOSANS_NT4
+    char cls[64], text[512], line[96];
+#else
     char cls[64], text[128], line[96];
+#endif
     (void)unused;
     if (++g_children > MAX_CHILDREN)
         return FALSE;
@@ -110,6 +118,9 @@ static BOOL CALLBACK child_proc(HWND w, LPARAM unused)
         put(line);
     } else {
         GetWindowTextA(w, text, sizeof text);
+#ifdef USOSANS_NT4
+        if (!lstrcmpiA(cls, "Static") && nt4_minor_warning(text)) g_minor_warning = 1;
+#endif
         put("\" text=\"");
         put_text(text, 80);
         put("\"");
@@ -136,7 +147,21 @@ static BOOL CALLBACK top_proc(HWND w, LPARAM unused)
     wsprintfA(line, "\" enabled=%d\r\n", IsWindowEnabled(w) ? 1 : 0);
     put(line);
     g_children = 0;
+#ifdef USOSANS_NT4
+    g_minor_warning = 0;
+#endif
     EnumChildWindows(w, child_proc, 0);
+#ifdef USOSANS_NT4
+    if (!lstrcmpA(cls, "#32770") && g_minor_warning) {
+        HWND no = GetDlgItem(w, IDNO);
+        char button[32];
+        if (no && IsWindowVisible(no) && IsWindowEnabled(no) &&
+            GetClassNameA(no, button, sizeof button) && !lstrcmpiA(button, "Button")) {
+            log_str("action: NT4 Server minor-errors -> No (see setuplog)\r\n");
+            PostMessageA(no, BM_CLICK, 0, 0);
+        }
+    }
+#endif
     return TRUE;
 }
 
@@ -212,7 +237,11 @@ void entry(void)
     CreateMutexA(NULL, TRUE, "USOSANS3");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
         ExitProcess(0);
+#ifdef USOSANS_NT4
+    log_str("USOSANS4 mode=record+NT4-minor-warning-No (unknown pages unchanged)\r\n");
+#else
     log_str("USOSANS3 1.0 mode=record (GUI-mode Setup page recorder, presses nothing)\r\n");
+#endif
     for (;;) {
         DWORD now = GetTickCount() - start;
         if (now > 6UL * 3600UL * 1000UL || g_logged >= LOG_MAX)
