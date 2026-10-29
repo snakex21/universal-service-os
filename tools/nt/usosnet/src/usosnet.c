@@ -575,6 +575,32 @@ static void AliveTick(PADAPTER A)
     ExInitializeWorkItem(&A->AliveWi, AliveWorker, A);
     ExQueueWorkItem(&A->AliveWi, DelayedWorkQueue);
 }
+
+/* first receive indication returned (UsIndicateRx, DISPATCH_LEVEL): one
+ * record from a work item. FirstIndTicks = 20 ms ticks since the timer was
+ * armed, FirstIndDpc = MpHandleInterrupt runs so far (NdisMDpcTimer). */
+static VOID FirstIndWorker(PVOID Ctx)
+{
+    static const PCWSTR n[] = { L"UsosnetFirstIndSeq", L"UsosnetFirstIndTicks", L"UsosnetFirstIndLen",
+                                L"UsosnetFirstIndRx", L"UsosnetFirstIndDpc", L"UsosnetFirstIndFilter" };
+    PADAPTER A = (PADAPTER)Ctx;
+    ULONG v[6];
+    v[0] = ++g_BcSeq; v[1] = A->FirstIndTicks; v[2] = A->FirstIndLen;
+    v[3] = A->RxOk; v[4] = A->DpcCount; v[5] = A->PacketFilter;
+    BcWrite(n, v, 6);
+    _InterlockedExchange(&A->FirstIndPending, 0);
+}
+
+static void FirstIndTick(PADAPTER A, ULONG Len)
+{
+    if (A->FirstIndDone || A->Halted) return;
+    A->FirstIndDone = TRUE;
+    A->FirstIndTicks = A->TimerCount;
+    A->FirstIndLen = Len;
+    A->FirstIndPending = 1;
+    ExInitializeWorkItem(&A->FirstIndWi, FirstIndWorker, A);
+    ExQueueWorkItem(&A->FirstIndWi, DelayedWorkQueue);
+}
 #pragma warning(pop)
 #define BC(A, P) BcPoint((A), (P))
 #else
@@ -960,6 +986,9 @@ void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status)
 #else
     NdisMEthIndicateReceive(A->Handle, (NDIS_HANDLE)A, (PCHAR)Frame, ETH_HDR,
                             Frame + ETH_HDR, Len - ETH_HDR, Len - ETH_HDR);
+#endif
+#if USOSNET_NT351
+    FirstIndTick(A, Len);
 #endif
     A->CurRx = NULL;
     A->CurRxClasses = 0;
@@ -1546,6 +1575,7 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
         if (armed && !cancelled) A->Halted = TRUE;
         /* a queued alive record still reads the adapter block */
         if (A->AlivePending) A->Halted = TRUE;
+        if (A->FirstIndPending) A->Halted = TRUE;
     }
 #else
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
@@ -1625,6 +1655,7 @@ static VOID MpHandleInterrupt(NDIS_HANDLE Ctx)
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
 }
 
+#if !USOSNET_NT351
 static VOID MpDisableInterrupt(NDIS_HANDLE Ctx)
 {
     PADAPTER A = (PADAPTER)Ctx;
@@ -1636,6 +1667,7 @@ static VOID MpEnableInterrupt(NDIS_HANDLE Ctx)
     PADAPTER A = (PADAPTER)Ctx;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
 }
+#endif
 
 static NDIS_STATUS MpSend(NDIS_HANDLE Ctx, PNDIS_PACKET Packet, UINT Flags)
 {
@@ -1854,8 +1886,28 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;
     mc.MinorNdisVersion = 0;
     mc.CheckForHangHandler = MpCheckForHang;
+#if USOSNET_NT351
+    /* X470 2026-10-29 (fbd0fc8d): STOP 0xA (0, 2, 0, NDIS.SYS+7291) in a
+     * DPC, MpInitialize had returned SUCCESS (BcPoint 0x12), no alive
+     * record yet; MpHandleInterrupt and MpDisableInterrupt on the stack.
+     * The NT 3.5 wrapper fires Miniport->DpcTimer after OID queries during
+     * the adapter setup (WRAPPER.C) and later from deferred processing;
+     * NdisMDpcTimer then runs MINIPORT_SYNC_DISABLE_INTERRUPT, i.e.
+     * KeSynchronizeExecution(Miniport->Interrupt->InterruptObject, ...)
+     * whenever DisableInterruptHandler is not NULL, without checking
+     * Miniport->Interrupt. In PollMode 2 (Cf8 path) no interrupt is
+     * registered, Interrupt is NULL: read of address 0. Both SYNC macros
+     * skip NULL handlers. With RequestIsr = TRUE and a shared line (the
+     * only way this driver registers) NdisMIsr never calls
+     * DisableInterruptHandler (NormalInterrupts stays FALSE): MpIsr masks
+     * the chip through IrqRead and MpHandleInterrupt re-enables it, so the
+     * interrupt mode does not need the two handlers either. */
+    mc.DisableInterruptHandler = NULL;
+    mc.EnableInterruptHandler = NULL;
+#else
     mc.DisableInterruptHandler = MpDisableInterrupt;
     mc.EnableInterruptHandler = MpEnableInterrupt;
+#endif
     mc.HaltHandler = MpHalt;
     mc.HandleInterruptHandler = MpHandleInterrupt;
     mc.InitializeHandler = MpInitialize;

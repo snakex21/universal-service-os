@@ -162,6 +162,24 @@ class SourceContract(unittest.TestCase):
         self.assertIn('if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);', source)
         self.assertIn('if (A->AlivePending) A->Halted = TRUE;', source)
 
+    def test_native_no_sync_interrupt_handlers(self):
+        # X470 2026-10-29 (fbd0fc8d): STOP 0xA (0, 2, 0, NDIS.SYS+7291) in
+        # NdisMDpcTimer: with DisableInterruptHandler set the NT 3.5x wrapper
+        # uses Miniport->Interrupt->InterruptObject, NULL in PollMode 2
+        source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
+        entry = source[source.index('NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)\n{'):]
+        nt351 = entry[entry.index('#if USOSNET_NT351'):entry.index('#else')]
+        self.assertIn('mc.DisableInterruptHandler = NULL;', nt351)
+        self.assertIn('mc.EnableInterruptHandler = NULL;', nt351)
+        init = source[source.index('static NDIS_STATUS MpInitialize('):source.index('static VOID MpHalt(')]
+        # RequestIsr TRUE + shared: NdisMIsr never calls DisableInterruptHandler
+        self.assertIn('A->IrqLevel,\n                                    TRUE, TRUE, NdisInterruptLevelSensitive);', init)
+        # first receive indication breadcrumb, queued after the indication
+        rx = source[source.index('void UsIndicateRx('):source.index('void UsIndicateRxComplete(')]
+        self.assertLess(rx.index('NdisMEthIndicateReceive('), rx.index('FirstIndTick(A, Len);'))
+        self.assertIn('ExQueueWorkItem(&A->FirstIndWi, DelayedWorkQueue);', source)
+        self.assertIn('if (A->FirstIndPending) A->Halted = TRUE;', source)
+
     def test_native_cf8_direct_mmio_map(self):
         # X470 2026-10-29: NdisMMapIoSpace failed on the Cf8 path (point 06
         # -> fail); the NDIS status is recorded and BAR0 mapped directly

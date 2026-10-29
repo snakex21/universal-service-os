@@ -294,6 +294,11 @@ typedef struct _ADAPTER {
     ULONG MapStatus;            /* NdisMMapIoSpace status as returned */
     ULONG MapHow;               /* 1 NdisMMapIoSpace, 2 MmMapIoSpace */
     ULONG Bar0Size;             /* sized through CF8h/CFCh, 0 = not sized */
+    /* first receive indication breadcrumb (UsosnetFirstInd*) */
+    WORK_QUEUE_ITEM FirstIndWi;
+    volatile LONG FirstIndPending; /* work item queued, adapter memory must stay */
+    BOOLEAN FirstIndDone;
+    ULONG FirstIndTicks, FirstIndLen;
 #endif
 } ADAPTER, *PADAPTER;
 
