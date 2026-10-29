@@ -366,7 +366,9 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
 
     def test_usosrst_nt351_direct_config(self):
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
-        self.assertIn('#define USOSRST_VERSION "usosrst 1.7-nt351"', src)
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.8-nt351"', src)
+        self.assertIn("#define USOSRST_RAMLOG 1", src)
+        self.assertIn("#define RM_ADDRESS      0x50000000UL", src)
         self.assertIn('got = PciCfgHeader351(bus, slot.u.AsULONG, &cfg);', src)
         self.assertIn('WRITE_PORT_ULONG((PULONG)0xCF8, base | (i * 4));', src)
 

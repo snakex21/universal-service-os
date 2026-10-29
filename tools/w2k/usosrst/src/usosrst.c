@@ -146,9 +146,11 @@ UsosActiveProcessors(VOID)
 #elif defined(USOSRST_NT35)
 #define USOSRST_VERSION "usosrst 1.6-nt35"
 #else
-#define USOSRST_VERSION "usosrst 1.7-nt351"
+#define USOSRST_VERSION "usosrst 1.8-nt351"
 /* NT 3.51 only (1.7): shutdown log, device quiesce and full reset (below). */
 #define USOSRST_SHUTLOG 1
+/* NT 3.51 only (1.8): stage letters + STOP code in the RAM marker page. */
+#define USOSRST_RAMLOG 1
 #endif
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
@@ -210,6 +212,119 @@ ShowRow(ULONG Row, PCHAR Text, ULONG Length, USHORT Attr)
     for (i = 0; i < 80; i++) row[i] = (USHORT)(Attr | (UCHAR)(i < Length ? Text[i] : ' '));
 }
 
+#ifdef USOSRST_RAMLOG
+/* ------------------------------------------------------------------ */
+/* NT 3.51: RAM marker page (1.8)                                      */
+/* ------------------------------------------------------------------ */
+/*
+ * The USOS NT pre-boot logger (tools/nt_bootlog, \EFI\BOOT\BOOTX64.EFI of
+ * the disk's CSMWrap ESP, started before CSMWrap on every boot) prepares the
+ * page at physical 50000000h ("USOSPRE1", boot number, its complement) and,
+ * on the next boot, logs what it finds there into \USOS\BOOTLOG.TXT. The
+ * page lies above /MAXMEM=1024 (BOOT.INI of the USOS NT 3.51 install; the
+ * 3.51 osloader drops every memory descriptor above it), so NT never uses
+ * it; this driver writes it only when the logger's header is valid, mapped
+ * non-cached so each letter is in DRAM at once. When the RAM survives a
+ * warm reset, the record tells the last stage reached (and the STOP code)
+ * even when no disk write happened. Layout (tools/nt_bootlog/decode.zig):
+ *   +40h "USOSNT35"  +48h boot number (copied)  +4Ch stage count
+ *   +50h 64 stage letters  +90h bugcheck count  +94h 5 bugcheck words
+ *   +A8h seconds since load at the last letter
+ * Letters: L loaded, then the shutdown log letters (R P S F digit Z), Q the
+ * devices are quiesced, C the CF9h full reset is written next, K a bugcheck
+ * callback ran. NT 3.51 exports no KiBugCheckData; its address is taken from
+ * the five consecutive absolute stores at the start of KeBugCheckEx (the
+ * NT 3.5 behaviour: code and parameters stored before the callbacks run);
+ * when that pattern is not found the bugcheck words stay zero.
+ */
+#define RM_ADDRESS      0x50000000UL
+static volatile UCHAR *g_Rm;
+static LONG g_RmCount;
+static PULONG g_RmBugData;
+static LARGE_INTEGER g_RmT0;
+
+static VOID
+RmStage(CHAR Stage)
+{
+    LONG i;
+    LARGE_INTEGER now;
+
+    if (g_Rm == NULL) return;
+    i = InterlockedIncrement(&g_RmCount) - 1;
+    if (i < 0 || i >= 64) return;
+    g_Rm[0x50 + i] = (UCHAR)Stage;
+    *(volatile ULONG *)(g_Rm + 0x4C) = (ULONG)(i + 1);
+    KeQuerySystemTime(&now);
+    *(volatile ULONG *)(g_Rm + 0xA8) = (ULONG)((now.QuadPart - g_RmT0.QuadPart) / 10000000LL);
+}
+
+/* KiBugCheckData: five absolute stores (A3 moffs32 / 89 modrm=00rrr101
+   disp32) to X, X+4 .. X+16 in the first 200h bytes of KeBugCheckEx. */
+static PULONG
+RmFindBugCheckData(VOID)
+{
+    PUCHAR code = (PUCHAR)(ULONG_PTR)KeBugCheckEx;
+    ULONG disp[48], n = 0, i, j, k, hits;
+
+    if (!MmIsAddressValid(code) || !MmIsAddressValid(code + 0x1FF)) return NULL;
+    for (i = 0; i < 0x1F0 && n < 48; i++) {
+        if (code[i] == 0xA3) disp[n++] = *(ULONG UNALIGNED *)(code + i + 1);
+        else if (code[i] == 0x89 && (code[i + 1] & 0xC7) == 0x05) disp[n++] = *(ULONG UNALIGNED *)(code + i + 2);
+    }
+    for (i = 0; i < n; i++) {
+        if (disp[i] < 0x80000000UL || (disp[i] & 3)) continue;
+        hits = 0;
+        for (k = 1; k < 5; k++)
+            for (j = 0; j < n; j++)
+                if (disp[j] == disp[i] + 4 * k) { hits++; break; }
+        if (hits == 4 && MmIsAddressValid((PVOID)disp[i]) && MmIsAddressValid((PVOID)(disp[i] + 19)))
+            return (PULONG)disp[i];
+    }
+    return NULL;
+}
+
+static VOID
+RmInit(VOID)
+{
+    PHYSICAL_ADDRESS pa;
+    volatile UCHAR *page;
+    ULONG boot, i;
+
+    pa.QuadPart = RM_ADDRESS;
+    page = (volatile UCHAR *)MmMapIoSpace(pa, 0x1000, MmNonCached);
+    if (page == NULL) return;
+    boot = *(volatile ULONG *)(page + 8);
+    if (*(volatile ULONG *)page != 0x534F5355UL || *(volatile ULONG *)(page + 4) != 0x31455250UL ||
+        *(volatile ULONG *)(page + 12) != ~boot) {
+        MmUnmapIoSpace((PVOID)page, 0x1000);   /* no logger this boot: never write */
+        return;
+    }
+    for (i = 0x40; i < 0x100; i++) page[i] = 0;
+    *(volatile ULONG *)(page + 0x48) = boot;
+    *(volatile ULONG *)(page + 0x40) = 0x534F5355UL;   /* "USOS" */
+    *(volatile ULONG *)(page + 0x44) = 0x3533544EUL;   /* "NT35" */
+    KeQuerySystemTime(&g_RmT0);
+    g_RmBugData = RmFindBugCheckData();
+    g_Rm = page;
+    RmStage('L');
+}
+
+/* Bugcheck callback (any IRQL, interrupts off): count, STOP words, K. */
+static VOID
+RmBugCheck(VOID)
+{
+    ULONG i;
+
+    if (g_Rm == NULL) return;
+    *(volatile ULONG *)(g_Rm + 0x90) += 1;
+    if (g_RmBugData != NULL)
+        for (i = 0; i < 5; i++) *(volatile ULONG *)(g_Rm + 0x94 + 4 * i) = g_RmBugData[i];
+    RmStage('K');
+}
+#else
+#define RmStage(c) ((VOID)0)
+#endif
+
 /* ------------------------------------------------------------------ */
 /* STOP screen                                                         */
 /* ------------------------------------------------------------------ */
@@ -263,6 +378,9 @@ BugCheckCallback(IN PVOID Buffer, IN ULONG Length)
 
     UNREFERENCED_PARAMETER(Buffer);
     UNREFERENCED_PARAMETER(Length);
+#ifdef USOSRST_RAMLOG
+    RmBugCheck();
+#endif
 
     p = PutStr(line, end, "USOS: STOP 0x");
     p = PutHex(p, end, USOS_BUGCHECK_DATA[0], 8);
@@ -586,6 +704,7 @@ SlStage(CHAR Stage)
     ULONG i, secs;
     LARGE_INTEGER now;
 
+    RmStage(Stage);                 /* RAM marker: any IRQL, no disk */
     if (g_SlDisk == NULL || KeGetCurrentIrql() != PASSIVE_LEVEL) return;
     if (InterlockedExchange(&g_SlBusy, 1) != 0) return;
     if (NT_SUCCESS(SlIo(IRP_MJ_READ, SL_LBA)) && SlIsLog()) {
@@ -732,6 +851,8 @@ SlRestart(ULONG Routine)
         raised = TRUE;
     }
     SlQuiesce();
+    RmStage('Q');
+    RmStage('C');
     WRITE_PORT_UCHAR((PUCHAR)0xCF9, 0x0A);
     KeStallExecutionProcessor(50);
     WRITE_PORT_UCHAR((PUCHAR)0xCF9, 0x0E);
@@ -1912,6 +2033,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_NT4
     shutdownHandler = RedirectKernelRestart();
     vgaWindow = FreeVgaWindow();
+#ifdef USOSRST_RAMLOG
+    RmInit();
+#endif
 #ifdef USOSRST_SHUTLOG
     KeQuerySystemTime(&g_SlT0);
     SlScanPci();
@@ -1967,6 +2091,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #ifdef USOSRST_SHUTLOG
     p = PutStr(p, end, " q");
     p = PutHex(p, end, g_SlDevs, 1);
+#ifdef USOSRST_RAMLOG
+    p = PutStr(p, end, g_Rm == NULL ? " m-" : g_RmBugData == NULL ? " m+" : " mk");
+#endif
 #endif
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);
