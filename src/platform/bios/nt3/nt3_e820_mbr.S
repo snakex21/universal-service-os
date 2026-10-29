@@ -80,6 +80,23 @@
  * with BOOT.INI /MAXMEM=128 boots), and its text-mode SETUPLDR ignores
  * /MAXMEM.  The 3.5 SETUPLDR sizes memory with AH=88h + AX=E801h and with
  * E820 (both are covered).  NT 3.51 and NT 4.0 keep the byte 0.
+ *
+ * CMOS century: the pre-ACPI x86 HALs (NT 3.x, NT 4.0 hal.dll) read the
+ * century from CMOS 32h only when the classic checksum (bytes 10h-2Dh in
+ * 2Eh/2Fh) matches; otherwise (a "PS/1") from 37h.  CSMWrap rewrites the
+ * memory size bytes 15h-18h without the checksum, so on the X470 the HAL
+ * took 37h (00h) and HalQueryRealTimeClock returned Year = 26: the system
+ * time was invalid (event log 1970/2033, Winlogon "Invalid System Time",
+ * nt351fresh2 2026-10-29; usosrst RtcDiag: CMOS 32h = 20h, HAL year 26).
+ * When CMOS 32h holds a BCD century (19h-21h) and 37h is unused (00h or
+ * FFh), this MBR copies the century to 37h -- the byte the same HAL writes
+ * whenever the system time is set.
+ *
+ * E820 record: every boot writes the firmware's E820 map (CSMWrap/SeaBIOS,
+ * before the hook) to disk sector 2 (unused, zeroed by nt4_csmwrap_target.sh;
+ * the partition starts at 63): up to 25 entries of 20 bytes, zero-filled
+ * behind the last one, "E8" in bytes 510-511.  Read offline, never shown;
+ * what the loader saw follows from it through the (tested) hook rules.
  */
 .intel_syntax noprefix
 .code16
@@ -100,6 +117,10 @@
 .equ OPT_KEEP_PCI_BIOS, 1
 /* RAM cap in 16 MiB units (0 = none), read by the resident hook as cs:[508]. */
 .equ HOOK_RAM_CAP,    508
+/* E820 record buffer (two sectors) and the sectors it goes to. */
+.equ E820_BUF,        0x1000
+.equ E820_LBA,        2
+.equ E820_MAX,        25
 
 nt3_e820_mbr_start:
     cli
@@ -123,6 +144,55 @@ nt3_e820_mbr_start:
     .word 0x0000
 
 relocated:
+    /* CMOS century 32h -> 37h for the pre-ACPI HAL (see the header). */
+    mov al, 0x32
+    out 0x70, al
+    in al, 0x71
+    mov ah, al
+    cmp al, 0x19
+    je 1f
+    sub al, 0x20
+    cmp al, 1
+    ja 2f
+1:
+    mov al, 0x37
+    out 0x70, al
+    in al, 0x71
+    inc al                                 /* FFh -> 0, 00h -> 1 */
+    cmp al, 1
+    ja 2f
+    mov al, 0x37
+    out 0x70, al
+    mov al, ah
+    out 0x71, al
+2:
+    /* E820 record (see the header): the firmware map to sector 2. */
+    mov di, E820_BUF
+    push di
+    mov cx, 256
+    xor ax, ax
+    rep stosw
+    mov word ptr [E820_BUF + 510], 0x3845
+    pop di
+    xor ebx, ebx
+    mov si, E820_MAX
+4:
+    mov eax, 0xE820
+    mov ecx, 20
+    mov edx, 0x534D4150
+    int 0x15
+    jc 5f
+    add di, 20
+    test ebx, ebx
+    jz 5f
+    dec si
+    jnz 4b
+5:
+    mov cx, 0x4300
+    mov eax, E820_LBA
+    mov bx, E820_BUF
+    call disk_io
+
     /* Take 1 KiB from the top of conventional memory for the hooks and read
        them there (sector 1, "U3" at its end; without it no hooks). */
     dec word ptr [0x0413]
@@ -233,8 +303,10 @@ boot_error:
     jmp 1b
 
 /* One sector of LBA EAX to ES:BX (INT 13h AH=42h, packet on the stack,
-   drive in BP). CF = error. */
+   drive in BP). CF = error.  disk_io: AX = CX (4300h writes ES:BX). */
 read_sector:
+    mov cx, 0x4200
+disk_io:
     .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
     push eax
     push es
@@ -243,7 +315,7 @@ read_sector:
     .byte 0x6A, 0x10                       /* push word 10h (size) */
     mov si, sp
     mov dx, bp
-    mov ah, 0x42
+    mov ax, cx
     int 0x13
     lea sp, [si + 16]
     ret

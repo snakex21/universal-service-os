@@ -261,6 +261,26 @@ partition after C:.
 NTLDR 3.51 reads its files by INT 13h; the boot files must stay inside what
 the CSMWrap/SeaBIOS INT 13h serves (CHS ~8 GB without extensions).
 
+**Fresh native NT 3.51, B261029-110651 (X470, read offline 2026-10-29):**
+- Clock: Winlogon showed "Invalid System Time" (LOGGEDON.C: year <= 1990);
+  event times 1970/2033. The 3.51 HAL (IXCMOS.ASM `HalpGetCmosCenturyByte`)
+  reads the century from 37h when the CMOS 10h-2Dh checksum fails, and
+  CSMWrap (`e820_update_cmos`) rewrites 15h-18h without updating it. Earlier
+  `RtcDiag`: CMOS 32h = 20h, HAL year 26. Fix: the NT 3.x MBR copies a BCD
+  century in 32h to 37h when 37h is 00h/FFh (`nt3_e820_mbr.S`,
+  `tools/tests/legacy_bios/test_nt3_mbr_cmos_e820.py`). On the next boot the
+  check is the SysEvent 6005 time and no Winlogon message.
+- The logon notice did show: it was the GUI-Setup notice ("Poczekaj na
+  automatyczny restart (okolo 1-2 minuty)"); post clears it before its
+  restart, as designed.
+- STOP 0x0A after post (first start with usosnet351, usosvbe, RtcFix): no
+  dump, no Usosnet* values (the hive did not get them). Firmware DMA into
+  RAM given to NT is unlikely from the code: SeaBIOS keeps its xHCI/AHCI/NVMe
+  rings in HiPmm (EfiRuntimeServicesData -> E820 reserved), resets AHCI ports
+  and xHCI it takes over, and the hook never turns non-RAM into RAM. To rule
+  the map out on hardware, the MBR now writes the firmware E820 map to disk
+  sector 2 ("E8" at 510) every boot.
+
 ### 4.3 Slice 2 - NT 3.5 native + GUI page recorder (implemented, same flag)
 
 Rule (user, 2026-10-28): the native path needs **zero input**. NT 3.x/4 text
