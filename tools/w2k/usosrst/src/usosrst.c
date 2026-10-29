@@ -2236,6 +2236,31 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutStr(p, end, "/");
     p = PutHex(p, end, g_Watches, 2);
     ShowRow(ROW_LOAD, line, (ULONG)(p - line), 0x1F00);
+#ifdef USOSRST_POWEROFF
+    /* The load line also as Parameters\LoadLine (REG_BINARY, ASCII), read
+       back offline from the SYSTEM hive: whether the kernel restart/power-off
+       redirect took (handler=on) and what S5 the DSDT gave (s5o). The text
+       row is gone under the graphical boot screen (X470 2026-10-29: NT 4.0
+       restarts ended in a triple fault without the F stage). */
+    if (RegistryPath != NULL) {
+        WCHAR path[256];
+        UNICODE_STRING full, name;
+        OBJECT_ATTRIBUTES oa;
+        HANDLE key;
+        full.Buffer = path;
+        full.Length = 0;
+        full.MaximumLength = sizeof(path);
+        if (NT_SUCCESS(RtlAppendUnicodeStringToString(&full, RegistryPath)) &&
+            NT_SUCCESS(RtlAppendUnicodeToString(&full, L"\\Parameters"))) {
+            InitializeObjectAttributes(&oa, &full, OBJ_CASE_INSENSITIVE, NULL, NULL);
+            if (NT_SUCCESS(ZwCreateKey(&key, KEY_WRITE, &oa, 0, NULL, REG_OPTION_NON_VOLATILE, NULL))) {
+                RtlInitUnicodeString(&name, L"LoadLine");
+                ZwSetValueKey(key, &name, 0, REG_BINARY, line, (ULONG)(p - line));
+                ZwClose(key);
+            }
+        }
+    }
+#endif
 
     return STATUS_SUCCESS;
 }

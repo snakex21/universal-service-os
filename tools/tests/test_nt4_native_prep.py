@@ -161,5 +161,6 @@ class NativePrep(unittest.TestCase):
         self.assertLess(ret.index('AcpiPowerOff()'),ret.index('g_HalReturnToFirmware(Routine)'))
         self.assertIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
         self.assertNotIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
+        self.assertIn('LoadLine'.encode('utf-16-le'),(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
 
 if __name__=='__main__': unittest.main()
