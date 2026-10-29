@@ -231,11 +231,12 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('windows-nt-3-1) tag=NT31', text)
         self.assertIn('windows-nt-3-1-server) tag=NT31S', text)
         self.assertIn("NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1'", text)
-        # The staged profile files go in every profile arm (NT, 9x and, since
-        # the POSReady entry, POSR), and the SP6a lookup only for NT 4.0.
+        # The staged profile files go in every profile arm (NT, 9x, since
+        # the POSReady entry POSR, and since cd722449 the DOS regional arm),
+        # and the SP6a lookup only for NT 4.0.
         self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF'
                                     ' /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF'
-                                    ' /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF'), 3)
+                                    ' /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF'), 4)
         self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S|', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
         self.assertIn('if [ "$nt_major" = 4 ]; then', text)
         self.assertIn('3:none)', text)

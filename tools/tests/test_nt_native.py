@@ -157,7 +157,7 @@ class NativeWiring(unittest.TestCase):
         src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
         setup = src[src.index('static void setup(void)'):]
         setup = setup[:setup.index(chr(10) + '}' + chr(10))]
-        self.assertIn('if (native_install())\n        usb_early();', setup)
+        self.assertIn('if (native_install()) {\n        usb_early();', setup)
         early = src[src.index('static void usb_early(void)'):]
         early = early[:early.index(chr(10) + '}' + chr(10))]
         for piece in ('"\\\\drivers\\\\usosusb.sys"', 'set_dword("usosusb", NULL, "Start", 1);',
@@ -174,7 +174,16 @@ class NativeWiring(unittest.TestCase):
         # in the system working-set list growth. The finish now runs before
         # post() and already at /setup (after INITIAL.INF's timeout rewrite).
         self.assertLess(service.index('boot_ini_finish();'), service.index('if (!post()) goto failed;'))
-        self.assertIn('if (native_install()) {\n        Sleep(20000);\n        boot_ini_finish();\n    }', setup)
+        # X470 2026-10-29 (B261029-185936): the PagingFiles watch ran only
+        # after the 20 s BOOT.INI wait and missed GUI Setup's write; it now
+        # runs in its own thread started before the wait.
+        self.assertIn('if (native_install()) {\n        logon_notice(1);\n        setup_watch_start();\n'
+                      '        Sleep(20000);\n        boot_ini_finish();\n', setup)
+        self.assertIn('if (!g_watch_thread)\n            setup_watch();', setup)
+        start = src[src.index('static void setup_watch_start(void)'):]
+        start = start[:start.index(chr(10) + '}' + chr(10))]
+        self.assertIn('"CreateThread"', start)
+        self.assertIn('setup_watch_main', start)
         self.assertLess(setup.index('USOSANS3.EXE"'), setup.index('boot_ini_finish();'))
         finish =src[src.index('static void boot_ini_finish(void)' + chr(10) + '{'):]
         finish = finish[:finish.index(chr(10) + '}' + chr(10))]
@@ -188,14 +197,27 @@ class NativeWiring(unittest.TestCase):
         # 2000 MiB FAT16 C:. It writes PagingFiles late in GUI Setup, so the
         # first-start service (not /setup) sets a fixed 64-128 MiB file.
         src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
-        cap = src[src.index('static void pagefile_cap(void)' + chr(10) + '{'):]
+        cap = src[src.index('static int pagefile_cap_at(const char *key, int current)' + chr(10) + '{'):]
         cap = cap[:cap.index(chr(10) + '}' + chr(10))]
-        for piece in ('Session Manager\\\\Memory Management"', '":\\\\pagefile.sys 64 128"',
-                      'REG_MULTI_SZ', '(DWORD)n + 2', 'value[n + 1] = 0;'):
+        for piece in ('":\\\\pagefile.sys 64 128"', 'REG_MULTI_SZ', '(DWORD)n + 2', 'value[n + 1] = 0;'):
             self.assertIn(piece, cap)
+        # Every control set: the X470 hive of 2026-10-29 had 64 128 in
+        # ControlSet001 (Current = Default) but GUI Setup's 1031 in the
+        # LastKnownGood copy ControlSet002.
+        top = src[src.index('static int pagefile_cap(void)' + chr(10) + '{'):]
+        top = top[:top.index(chr(10) + '}' + chr(10))]
+        for piece in ('"SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\Memory Management", 1)',
+                      '"ControlSet001", "ControlSet002", "ControlSet003", "ControlSet004"',
+                      '"\\\\Control\\\\Session Manager\\\\Memory Management"', 'pagefile_cap_at(key, 0);'):
+            self.assertIn(piece, top)
+        # /setup reaches it only through the watch (setup_watch), which
+        # GUI Setup's own late PagingFiles write triggers.
         setup = src[src.index('static void setup(void)'):]
         setup = setup[:setup.index(chr(10) + '}' + chr(10))]
         self.assertNotIn('pagefile_cap', setup)
+        watch = src[src.index('static void setup_watch(void)'):]
+        watch = watch[:watch.index(chr(10) + '}' + chr(10))]
+        self.assertIn('if (pagefile_cap() && !first && !account_done)', watch)
         manual = src[src.index('if (lstrcmpA(opt, "finish") == 0)'):]
         manual = manual[:manual.index('ExitProcess(0);')]
         self.assertIn('pagefile_cap();', manual)

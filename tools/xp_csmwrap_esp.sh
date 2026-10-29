@@ -23,6 +23,14 @@ PINNED=0188057913ee7b4680027e45c53c45048deb8583c599c3c0672d98748704e0a4
 # tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
 DIAG_DIR=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}/csmwrap-diag
 PINNED_DIAG=a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
+# Native NT 3.51 / 3.5 (USOS_NT_BOOTLOG=on, exported by w9x_csmwrap_prepare.sh
+# only for a native NT 3.x target): the USOS pre-boot logger (own GPL,
+# tools/nt_bootlog, diagnostic) becomes \EFI\BOOT\BOOTX64.EFI, CSMWrap moves
+# to \EFI\BOOT\CSMWRAPX.EFI next to csmwrap.ini (the logger chainloads it),
+# and \USOS\BOOTLOG.TXT starts empty (the logger sizes its ring on the
+# first boot). Every other flow keeps CSMWrap as BOOTX64.EFI.
+BOOTLOG_EFI=${USOS_NT_BOOTLOG_EFI:-${USOS_LIB_DIR:-/usr/lib/usos}/nt3/NTBOOTLG.EFI}
+PINNED_BOOTLOG=5941eef0791bb3b85abe56fd6bd6db9e9067fddf39db3d9633980025ee5d1459
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
@@ -49,6 +57,13 @@ if [ "${USOS_W2K_DIAG:-off}" = on ]; then
     log 'Windows 2000 DIAGNOSTIC CSMWrap 3.1.2-usos11-diag (tick watcher + NMI snapshot)'
 fi
 ls "$SRC"/licenses/*.txt >/dev/null 2>&1 || fail 'the CSMWrap licence notices are missing next to CSMWrap'
+CSMWRAP_NAME=BOOTX64.EFI
+if [ "${USOS_NT_BOOTLOG:-off}" = on ]; then
+    [ -r "$BOOTLOG_EFI" ] || fail 'the NT pre-boot logger is missing (usr/lib/usos/nt3/NTBOOTLG.EFI)'
+    [ "$(sha256sum "$BOOTLOG_EFI" | awk '{print $1}')" = "$PINNED_BOOTLOG" ] || fail 'the NT pre-boot logger does not match its pinned hash'
+    CSMWRAP_NAME=CSMWRAPX.EFI
+    log 'NT 3.x native: pre-boot logger as BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, empty USOS/BOOTLOG.TXT'
+fi
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
 total=$((size / 512))
@@ -127,7 +142,13 @@ if [ "${USOS_W2K_DIAG:-off}" = on ]; then
     log 'csmwrap.ini w2k_nmi_snapshot=true (Windows 2000 diagnostic setup)'
 fi
 mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP ::/CSMWRAP/patches ::/CSMWRAP/licenses || fail 'cannot create ESP folders'
-mcopy -i "$image" "$EFI_INPUT" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
+mcopy -i "$image" "$EFI_INPUT" "::/EFI/BOOT/$CSMWRAP_NAME" || fail 'cannot copy CSMWrap'
+if [ "$CSMWRAP_NAME" != BOOTX64.EFI ]; then
+    mcopy -i "$image" "$BOOTLOG_EFI" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy the NT pre-boot logger'
+    mmd -i "$image" ::/USOS || fail 'cannot create the USOS folder on the ESP'
+    : > /tmp/csmwrap-bootlog.txt
+    mcopy -i "$image" /tmp/csmwrap-bootlog.txt ::/USOS/BOOTLOG.TXT || fail 'cannot create USOS/BOOTLOG.TXT'
+fi
 mcopy -i "$image" "$ini" ::/EFI/BOOT/csmwrap.ini || fail 'cannot copy csmwrap.ini'
 for file in $CSMWRAP_FILES; do
     mcopy -i "$image" "$SRC/$file" "::/CSMWRAP/$file" || fail "cannot copy $file"
@@ -162,7 +183,14 @@ off=$((446 + 16 * (free - 1)))
 [ "$(od -An -tu4 -j$((off + 8)) -N4 "$mbr" | tr -d ' \n')" = "$start" ] || fail 'read-back: ESP start differs'
 readback=/tmp/csmwrap-readback.efi
 rm -f "$readback"
-mcopy -i "$image" ::/EFI/BOOT/BOOTX64.EFI "$readback" || fail 'read-back: cannot read BOOTX64.EFI'
-[ "$(sha256sum "$readback" | awk '{print $1}')" = "$PINNED" ] || fail 'read-back: BOOTX64.EFI differs'
+mcopy -i "$image" "::/EFI/BOOT/$CSMWRAP_NAME" "$readback" || fail "read-back: cannot read $CSMWRAP_NAME"
+[ "$(sha256sum "$readback" | awk '{print $1}')" = "$PINNED" ] || fail "read-back: $CSMWRAP_NAME differs"
+if [ "$CSMWRAP_NAME" != BOOTX64.EFI ]; then
+    rm -f "$readback"
+    mcopy -i "$image" ::/EFI/BOOT/BOOTX64.EFI "$readback" || fail 'read-back: cannot read the logger BOOTX64.EFI'
+    [ "$(sha256sum "$readback" | awk '{print $1}')" = "$PINNED_BOOTLOG" ] || fail 'read-back: the logger BOOTX64.EFI differs'
+    mdir -i "$image" ::/USOS/BOOTLOG.TXT >/dev/null 2>&1 || fail 'read-back: USOS/BOOTLOG.TXT missing'
+    log 'read-back: logger BOOTX64.EFI, CSMWRAPX.EFI and USOS/BOOTLOG.TXT PASS'
+fi
 mdir -i "$image" ::/EFI/BOOT || true
 log "CSMWrap ESP PASS slot=$free start=$start; next boots: firmware -> this disk's UEFI entry -> CSMWrap -> XP"

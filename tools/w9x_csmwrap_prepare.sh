@@ -685,8 +685,12 @@ usos_w9x_csmwrap_prepare() {
     if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then
         # Native (docs/nt-native-plan.md): no VM and no finish step; the
         # target disk boots CSMWrap -> our NT 3.x MBR -> syslinux -> $LDR$
-        # (SETUPLDR) and text mode runs on this PC.
-        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_LOG/prepare.log" 2>&1; then
+        # (SETUPLDR) and text mode runs on this PC. NT 3.51 / 3.5: the
+        # pre-boot logger runs before CSMWrap (USOS_NT_BOOTLOG, ESP
+        # \USOS\BOOTLOG.TXT, tools/nt_bootlog); NT 4.0 keeps CSMWrap alone.
+        nt_bootlog=off
+        [ "$nt_major" != 3 ] || nt_bootlog=on
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 USOS_NT_BOOTLOG=$nt_bootlog sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_LOG/prepare.log" 2>&1; then
             stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
         fi
         w9x_csmwrap_log "NT native: disk ready, $nt_name Setup starts on this PC after the restart"

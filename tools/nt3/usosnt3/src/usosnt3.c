@@ -1564,10 +1564,33 @@ static void usb_early(void)
  * (MiB; SMSS parses "<path> <min> <max>"). On the next start SMSS creates
  * the paging file again (NtCreatePagingFile opens it FILE_SUPERSEDE with the
  * minimum as allocation size), so the large file shrinks to 64 MiB.
+ *
+ * Every control set (X470 2026-10-29, B261029-185936 hive: the service
+ * wrote 64 128 into CurrentControlSet = ControlSet001 = Select Default, the
+ * next normal start's set, while the LastKnownGood copy ControlSet002 kept
+ * GUI Setup's "C:\pagefile.sys 1031"; a Last Known Good start would bring
+ * the large file back). The return value reports a change in the current
+ * set only (setup_watch).
  */
+static int pagefile_cap_at(const char *key, int current);
+
 static int pagefile_cap(void)
 {
-    static const char key[] = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management";
+    static const char sets[][16] = { "ControlSet001", "ControlSet002", "ControlSet003", "ControlSet004" };
+    char key[128];
+    int i, changed;
+    changed = pagefile_cap_at("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", 1);
+    for (i = 0; i < (int)(sizeof sets / sizeof sets[0]); i++) {
+        lstrcpyA(key, "SYSTEM\\");
+        lstrcatA(key, sets[i]);
+        lstrcatA(key, "\\Control\\Session Manager\\Memory Management");
+        pagefile_cap_at(key, 0);
+    }
+    return changed;
+}
+
+static int pagefile_cap_at(const char *key, int current)
+{
     char sys[MAX_PATH], value[64], old[300];
     HKEY h;
     DWORD type, size = sizeof old - 2;
@@ -1582,7 +1605,8 @@ static int pagefile_cap(void)
     value[n + 1] = 0;                   /* REG_MULTI_SZ: second NUL */
     rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_ALL_ACCESS, &h);
     if (rc != ERROR_SUCCESS) {
-        say_hex("pagefile: cannot open Memory Management, rc ", (DWORD)rc);
+        if (current)                    /* ControlSet00N: absent is normal */
+            say_hex("pagefile: cannot open Memory Management, rc ", (DWORD)rc);
         return 0;
     }
     old[0] = 0;
@@ -1591,11 +1615,17 @@ static int pagefile_cap(void)
     else
         old[0] = 0;
     if (!lstrcmpiA(old, value)) {
-        say("pagefile: already ");
-        say(value);
-        say("\r\n");
+        if (current) {
+            say("pagefile: already ");
+            say(value);
+            say("\r\n");
+        }
     } else {
         rc = RegSetValueExA(h, "PagingFiles", 0, REG_MULTI_SZ, (const BYTE *)value, (DWORD)n + 2);
+        if (!current) {
+            say(key + 7);               /* "ControlSet00N\..." */
+            say(": ");
+        }
         say("pagefile: was \"");
         say(old);
         say(rc == ERROR_SUCCESS ? "\", now " : "\", WRITE FAILED: ");
@@ -1923,6 +1953,37 @@ static void setup_watch(void)
         } else {
             Sleep(5000);
         }
+    }
+}
+
+/* X470 2026-10-29 (B261029-185936): GUI Setup wrote "C:\pagefile.sys 1031"
+ * and the first start's service still found it: the watch, started only
+ * after setup()'s 20 s BOOT.INI wait, did not run before GUI Setup's
+ * PagingFiles write (the service redid the BOOT.INI step too). The watch
+ * now runs in its own thread from the start of /setup; the BOOT.INI step
+ * keeps its wait on the main thread. CreateThread through GetProcAddress
+ * as dhcp_setup_hold_start. */
+static int g_watch_thread;
+
+static DWORD WINAPI setup_watch_main(LPVOID unused)
+{
+    (void)unused;
+    setup_watch();
+    return 0;
+}
+
+static void setup_watch_start(void)
+{
+    typedef HANDLE (WINAPI *WATCH_CREATE)(LPSECURITY_ATTRIBUTES, DWORD, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
+    WATCH_CREATE create = (WATCH_CREATE)GetProcAddress(GetModuleHandleA("kernel32.dll"), "CreateThread");
+    DWORD id;
+    HANDLE t = create ? create(NULL, 0, setup_watch_main, NULL, 0, &id) : NULL;
+    if (t) {
+        CloseHandle(t);
+        g_watch_thread = 1;
+        say("pagefile watch thread started\r\n");
+    } else {
+        say("pagefile watch: CreateThread failed, runs after the BOOT.INI step\r\n");
     }
 }
 
@@ -2512,9 +2573,14 @@ static void setup(void)
        the service repeats the step if this one is lost ("[USOS /SOS]"). */
     if (native_install()) {
         logon_notice(1);
+        setup_watch_start();
         Sleep(20000);
         boot_ini_finish();
-        setup_watch();
+        say("boot.ini step done\r\n");
+        if (!g_watch_thread)
+            setup_watch();
+        for (;;)                        /* the watch thread runs until GUI Setup restarts */
+            Sleep(60000);
     }
 }
 

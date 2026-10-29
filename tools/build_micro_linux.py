@@ -684,6 +684,10 @@ def main() -> int:
             ("tools/w2k/usosrst/bin/nt35/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST35.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
             ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
+            # Native NT 3.51 / 3.5: the pre-boot logger (own GPL UEFI app,
+            # tools/nt_bootlog, tools/build_nt_bootlog.py) before CSMWrap
+            # on the target ESP (xp_csmwrap_esp.sh USOS_NT_BOOTLOG=on).
+            ("tools/nt_bootlog/bin/ntbootlg.efi", "usr/lib/usos/nt3/NTBOOTLG.EFI"),
             # VESA miniport, NT 3.x build (build-nt3.cmd; with the CD's own
             # framebuf.dll, docs/nt3-vesa-2026-10-14.md).
             ("tools/nt4/usosvbe/bin/nt3/i386/usosvbe.sys", "usr/lib/usos/nt3/USOSVBE.SYS"),
