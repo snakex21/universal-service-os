@@ -56,6 +56,11 @@ void entry(void)
     if(!g_BootFlushed || !boot_valid() || removed==0)ExitProcess(1);
     if(!has_ci(image,size,"/numproc=2 /maxmem=1024"))ExitProcess(2);
     for(i=0;i<size;i++)if(!image[i])ExitProcess(3);
+    /* 1 CPU A/B entry: after the default, /NUMPROC=1, default untouched, idempotent */
+    if(!boot_one_cpu() || !g_BootFlushed || !boot_valid())ExitProcess(8);
+    if(!has_ci(image,size,"\\winnt=\"windows nt [1 cpu]\" /numproc=1 /maxmem=1024\r\n") ||
+       !has_ci(image,size,"\\winnt=\"windows nt\" /numproc=2 /maxmem=1024\r\nmulti(0)disk(0)rdisk(0)partition(1)\\winnt=\"windows nt [1 cpu]\""))ExitProcess(9);
+    previous=size;if(!boot_one_cpu() || size!=previous)ExitProcess(10);
     previous=size;bytes(saved,image,size+1);
     g_BootFlushed=0;g_BootWrite=INVALID_HANDLE_VALUE;removed=0;finish_boot();
     if(size!=previous || lstrcmpA(image,saved) || !g_BootFlushed || !removed)ExitProcess(4);

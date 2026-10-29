@@ -98,4 +98,29 @@ class NativePrep(unittest.TestCase):
                 self.assertEqual((rc,out.strip()),(code,wanted),err)
                 self.assertNotIn('KLUCZ-Z-PROFILU',out+err)
 
+    def test_native_round_nt351_parity(self):
+        # Finishing screen, usosrst 1.8-nt4n from the first boot, NETCHECK,
+        # 1 CPU BOOT.INI entry (native NT 4.0 round 2026-10-29).
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        post=src[src.index('crlf > "$usos/POST.CMD"'):]
+        post=post[:post.index('\nEOF\n')]
+        self.assertIn('@echo off\nif exist C:\\USOS\\NT4\\NATIVE.TXT start "USOS" C:\\USOS\\NT4\\USOSNT4.EXE /notice\n',post)
+        failed=post[post.index(':nativefailed'):]
+        self.assertIn('C:\\USOS\\NT4\\USOSNT4.EXE /nonotice\n:end',failed)
+        self.assertIn('cp "$LIB/nt4/USOSRSTN.SYS" "$usos/USOSRST.SYS"',src)
+        self.assertIn("printf 'locale=0000%s\\r\\n' \"${lang:-0409}\" > \"$usos/INTL.TXT\"",src)
+        fin=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+        self.assertLess(fin.index('"notice")) notice_main();'),fin.index('open_log("NATIVE.LOG");\n    if (!lstrcmpA(opt, "early"))'))
+        self.assertIn('rst_early()',fin)
+        self.assertIn('DIR "USOSNT4.EXE /netcheck"',fin)
+        self.assertIn('if (!boot_one_cpu() || !g_BootFlushed || !boot_valid())',fin)
+        rst=(ROOT/'tools/w2k/usosrst/src/usosrst.c').read_text()
+        block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
+        self.assertIn('#define USOSRST_SHUTLOG 1',block)
+        self.assertIn('#define USOSRST_RAMLOG 1',block)
+        self.assertIn(b'usosrst 1.8-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        self.assertNotIn(b'usosrst 1.8',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
+        self.assertIn('("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS")',
+                      (ROOT/'tools/build_micro_linux.py').read_text())
+
 if __name__=='__main__': unittest.main()

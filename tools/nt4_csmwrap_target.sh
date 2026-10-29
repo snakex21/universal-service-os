@@ -764,6 +764,7 @@ if [ "$NATIVE" = 1 ]; then
         if [ "$NT4_NATIVE_PREP" = 1 ]; then
             [ -r "$LIB/nt4/USOSNT4.EXE" ] || fail 'missing NT4 native finish helper. No disk was changed'
             [ -r "$LIB/nt4/USOSANS4.EXE" ] || fail 'missing NT4 native page answerer. No disk was changed'
+            [ -r "$LIB/nt4/USOSRSTN.SYS" ] || fail 'missing native NT4 usosrst (USOSRSTN.SYS). No disk was changed'
             ans3=$LIB/nt4/USOSANS4.EXE
         fi
         nt4_native_kernels
@@ -1171,6 +1172,10 @@ if [ "$NATIVE" = 1 ]; then
     if [ "$NT4_NATIVE_PREP" = 1 ]; then
         cp "$LIB/nt4/USOSNT4.EXE" "$usos/USOSNT4.EXE" || fail 'cannot copy native NT4 helper'
         printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write native NT4 marker'
+        # The finishing screen's language (USOSNT4.EXE /notice reads
+        # locale= like usosnt3): the CD language, 0415 = Polish text.
+        printf 'locale=0000%s\r\n' "${lang:-0409}" > "$usos/INTL.TXT" || fail 'cannot write the native NT4 notice language'
+        log "native: finishing screen during POST.CMD (USOSNT4.EXE /notice, locale 0000${lang:-0409})"
     fi
     log 'native: GUI Setup page recorder USOSANS3.EXE (CMDLINES.TXT, log C:\USOS\NT4\USOSANS.TXT)'
 fi
@@ -1212,7 +1217,14 @@ ADDONSCMD
     done
 fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
-cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
+if [ "$NT4_NATIVE_PREP" = 1 ]; then
+    # Native: usosrst 1.8-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
+    # full reset); USOSNT4.EXE /early registers it before the first boot.
+    cp "$LIB/nt4/USOSRSTN.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
+    log 'native: usosrst 1.8-nt4n (restart: quiesce + CF9h full reset) from the first installed boot'
+else
+    cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
+fi
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
 cp "$LIB/nt4/USOSVBE.SYS" "$usos/USOSVBE.SYS" || fail 'cannot copy USOSVBE.SYS'
 cp "$LIB/nt4/USOSOFF.EXE" "$usos/USOSOFF.EXE" || fail 'cannot copy USOSOFF.EXE'
@@ -1417,6 +1429,7 @@ EOF
 # installs at the first try and nothing is switched.
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
+if exist C:\USOS\NT4\NATIVE.TXT start "USOS" C:\USOS\NT4\USOSNT4.EXE /notice
 if exist C:\USOS\NT4\POST.OK if exist C:\USOS\NT4\NATIVE.TXT goto nativeresume
 if exist C:\USOS\NT4\POST.OK goto end
 echo USOS NT4 post > C:\USOS\NT4\POST.LOG
@@ -1528,6 +1541,7 @@ C:\USOS\NT4\USOSOFF.EXE /r
 goto end
 :nativefailed
 echo native finish FAILED; no restart, inspect NATIVE.LOG >> C:\USOS\NT4\POST.LOG
+C:\USOS\NT4\USOSNT4.EXE /nonotice
 :end
 EOF
 printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${tse:+tse}" > "$usos/SOURCE.TXT"

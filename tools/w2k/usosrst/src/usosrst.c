@@ -152,6 +152,16 @@ UsosActiveProcessors(VOID)
 /* NT 3.51 only (1.8): stage letters + STOP code in the RAM marker page. */
 #define USOSRST_RAMLOG 1
 #endif
+#elif defined(USOSRST_NT4N)
+/* Native NT 4.0 (build-nt4n.cmd, bin/nt4n): the NT 3.51 1.7/1.8 restart
+   path (shutdown log, NVMe/xHCI/NIC quiesce, CF9h full reset) and the RAM
+   marker page for the USOS pre-boot logger. On the MPS multiprocessor HAL
+   the quiesce runs at DISPATCH_LEVEL on the restarting processor only;
+   the full reset follows within milliseconds. The VM-path NT 4.0 build
+   (bin/nt4, 1.5-nt4) is unchanged. */
+#define USOSRST_VERSION "usosrst 1.8-nt4n"
+#define USOSRST_SHUTLOG 1
+#define USOSRST_RAMLOG 1
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
 #endif
