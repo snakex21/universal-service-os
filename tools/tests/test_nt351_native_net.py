@@ -92,6 +92,35 @@ class SourceContract(unittest.TestCase):
         self.assertIn('if (A->Cf8 && !A->PollMode) {', source)
         self.assertIn('if (A->TimerInit) return FALSE;      /* NT 3.51: TimerFn does it every 20 ms */', source)
 
+    def test_native_registry_diagnostics(self):
+        # X470 2026-10-29: NDISLoop failed (SCM 7000, %%31) without a trace;
+        # the native build writes Usosnet* values under NDISLoop1 Parameters
+        pe = pefile.PE(str(NATIVE))
+        self.assertIn('NdisWriteConfiguration',
+                      {i.name.decode() for m in pe.DIRECTORY_ENTRY_IMPORT for i in m.imports})
+        source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
+        self.assertIn('#if !USOSNET_NDIS3 || USOSNET_NT351\nstatic void CfgPut(', source)
+
+    def test_usosnt3_setup_watch_account_notice(self):
+        source = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='latin-1')
+        setup = source[source.index('static void setup(void)'):]
+        setup = setup[:setup.index('\n}\n')]
+        # notice first, BOOT.INI finish, then the endless PagingFiles watch
+        self.assertLess(setup.index('logon_notice(1);'), setup.index('boot_ini_finish();'))
+        self.assertLess(setup.index('boot_ini_finish();'), setup.index('setup_watch();'))
+        watch = source[source.index('static void setup_watch(void)'):source.index('static void setup(void)')]
+        self.assertIn('"RegNotifyChangeKeyValue"', watch)
+        self.assertIn('REG_NOTIFY_CHANGE_LAST_SET', watch)
+        # account only after GUI Setup's own PagingFiles write (SAM final)
+        self.assertIn('if (pagefile_cap() && !first && !account_done) {', watch)
+        self.assertIn('"RegFlushKey"', source)
+        self.assertIn(r'":\\pagefile.sys 64 128"', source)
+        start = source.index('static void WINAPI service_main')
+        service = source[start:source.index('/* ----', start)]
+        self.assertEqual(service.count('logon_notice(0);'), 2)
+        self.assertIn('"LegalNoticeCaption"', source)
+        self.assertIn('ACCOUNT.SET', source)
+
     def test_usosnt3_bus_type(self):
         source = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text()
         self.assertIn('bus_type = net351_hal_pci() ? 5 : 1;', source)

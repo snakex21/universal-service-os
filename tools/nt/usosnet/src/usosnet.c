@@ -323,7 +323,9 @@ static ULONG CfgHexString(NDIS_HANDLE Cfg, NDIS_STRING *Key)
 }
 #endif
 
-#if !USOSNET_NDIS3
+/* NT 3.51 (native CF8 build): NDIS.SYS 3.51 exports NdisWriteConfiguration;
+ * the X470 2026-10-29 run failed (SCM 7000 NDISLoop %%31) without a trace. */
+#if !USOSNET_NDIS3 || USOSNET_NT351
 static void CfgPut(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG V)
 {
     NDIS_STATUS st;

@@ -431,7 +431,9 @@ static void account(void)
     const char *logon_user;
 
     if (size < 0) {
-        say("ACCOUNT.TXT: none (Administrator, blank password)\r\n");
+        say(GetFileAttributesA(DIR "ACCOUNT.SET") != 0xFFFFFFFF
+            ? "ACCOUNT.TXT: already applied during GUI Setup (SETUP.LOG)\r\n"
+            : "ACCOUNT.TXT: none (Administrator, blank password)\r\n");
         return;
     }
     text_value(text, "user", user, sizeof user);
@@ -1399,7 +1401,8 @@ static void vesa(void)
 
 static int native_install(void);
 static void boot_ini_finish(void);
-static void pagefile_cap(void);
+static int pagefile_cap(void);
+static void logon_notice(int on);
 
 static void WINAPI handler(DWORD control)
 {
@@ -1437,6 +1440,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
         set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
         write_file("DONE.TXT", "done\r\n");
     }
+    logon_notice(0);
     say("done\r\n");
     /* Let the other services finish starting (their failures reach the
        event log), then restart: the install VM ends there (-no-reboot). */
@@ -1445,6 +1449,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     goto stopped;
 failed:
     g_post_failed = 1;
+    logon_notice(0);
     say("POST refused: no DONE/restart; inspect own local records\r\n");
     g_status.dwWin32ExitCode = ERROR_GEN_FAILURE;
 stopped:
@@ -1545,7 +1550,7 @@ static void usb_early(void)
  * the paging file again (NtCreatePagingFile opens it FILE_SUPERSEDE with the
  * minimum as allocation size), so the large file shrinks to 64 MiB.
  */
-static void pagefile_cap(void)
+static int pagefile_cap(void)
 {
     static const char key[] = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management";
     char sys[MAX_PATH], value[64], old[300];
@@ -1563,7 +1568,7 @@ static void pagefile_cap(void)
     rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_ALL_ACCESS, &h);
     if (rc != ERROR_SUCCESS) {
         say_hex("pagefile: cannot open Memory Management, rc ", (DWORD)rc);
-        return;
+        return 0;
     }
     old[0] = 0;
     if (RegQueryValueExA(h, "PagingFiles", NULL, &type, (BYTE *)old, &size) == ERROR_SUCCESS)
@@ -1581,8 +1586,87 @@ static void pagefile_cap(void)
         say(rc == ERROR_SUCCESS ? "\", now " : "\", WRITE FAILED: ");
         say(value);
         say(rc == ERROR_SUCCESS ? " (MiB, applied at the next start)\r\n" : "\r\n");
+        if (rc == ERROR_SUCCESS) {
+            /* the hive must hold it even if GUI Setup ends right after */
+            typedef LONG (APIENTRY *REG_FLUSH_KEY)(HKEY);
+            HMODULE adv = GetModuleHandleA("advapi32.dll");
+            REG_FLUSH_KEY flush = adv ? (REG_FLUSH_KEY)GetProcAddress(adv, "RegFlushKey") : NULL;
+            if (flush)
+                flush(h);
+            RegCloseKey(h);
+            return 1;
+        }
     }
     RegCloseKey(h);
+    return 0;
+}
+
+/* Native install: a logon screen notice while the first-start service is
+ * still working (X470 2026-10-29: the logon screen refused the profile's
+ * user until post() had run, then the system restarted by itself).
+ * Winlogon shows LegalNoticeCaption / LegalNoticeText before the logon
+ * dialog (NT 3.5 WINLOGON\LOGON.C GetLegalNotices; both values exist,
+ * empty, in the installed 3.51 SOFTWARE hive). Set at /setup, emptied by
+ * the service when it finishes or gives up. ASCII only: the first start
+ * still runs on the CD's code pages (intl() switches them in post()). */
+static void logon_notice(int on)
+{
+    static const char winlogon[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon";
+    static char intl_txt[256];
+    int n, pl;
+    if (!native_install())
+        return;
+    n = read_small(DIR "INTL.TXT", intl_txt, sizeof intl_txt);
+    pl = n > 0 && has_ci(intl_txt, n, "locale=00000415");
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "LegalNoticeCaption",
+           !on ? "" : pl ? "USOS konczy instalacje" : "USOS is finishing the installation", 0);
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "LegalNoticeText",
+           !on ? "" : pl ? "Poczekaj na automatyczny restart (okolo 1-2 minuty). Po restarcie zaloguj sie."
+                       : "Wait for the automatic restart (about 1-2 minutes), then log on.", 0);
+}
+
+/* Native install, /setup: GUI Setup's virtual_config (INITIAL.INF ->
+ * VIRTUAL.INF ConfigureVirtual -> REGISTRY.INF SetPagingFiles) writes
+ * PagingFiles = "C:\pagefile.sys <RAM in MiB + 12>" near its end; SMSS then
+ * allocated an 1814 MiB file on the 2000 MiB FAT16 C: at the first start
+ * (X470 2026-10-28, prime suspect for the first-start STOP 0x0A). This
+ * process stays alive beside GUI Setup, watches the Memory Management key
+ * (RegNotifyChangeKeyValue, through GetProcAddress; 5 s polling without
+ * it) and puts "C:\pagefile.sys 64 128" back, flushed, every time someone
+ * else changes PagingFiles. The service's pagefile_cap() stays the
+ * fallback. The same INITIAL.INF runs SetAccountDomainSid and
+ * setuplocalaccount (WaitOnEvent SAM_SERVICE_STARTED,
+ * ChangeLocalUserPassword Administrator) before virtual_config, so once
+ * Setup's own PagingFiles write is seen the SAM is final: account() runs
+ * then, and the first logon screen already knows the profile's user and
+ * password. GUI Setup's restart ends this process. */
+static void setup_watch(void)
+{
+    static const char key[] = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management";
+    typedef LONG (APIENTRY *REG_NOTIFY)(HKEY, BOOL, DWORD, HANDLE, BOOL);
+    HMODULE adv = GetModuleHandleA("advapi32.dll");
+    REG_NOTIFY notify = adv ? (REG_NOTIFY)GetProcAddress(adv, "RegNotifyChangeKeyValue") : NULL;
+    HKEY h = NULL;
+    int first = 1, account_done = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &h) != ERROR_SUCCESS)
+        h = NULL;
+    say(notify && h ? "pagefile watch: RegNotifyChangeKeyValue\r\n" : "pagefile watch: polling every 5 s\r\n");
+    for (;;) {
+        if (pagefile_cap() && !first && !account_done) {
+            /* GUI Setup itself wrote PagingFiles: virtual_config ran */
+            say("pagefile watch: GUI Setup wrote PagingFiles, answer-profile account now\r\n");
+            account();
+            write_file("ACCOUNT.SET", "done\r\n");
+            account_done = 1;
+        }
+        first = 0;
+        if (notify && h) {
+            if (notify(h, FALSE, REG_NOTIFY_CHANGE_LAST_SET, NULL, FALSE) != ERROR_SUCCESS)
+                notify = NULL;
+        } else {
+            Sleep(5000);
+        }
+    }
 }
 
 /* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
@@ -1810,8 +1894,10 @@ static void setup(void)
        after it starts this DetachedProgram, so wait for that rewrite first;
        the service repeats the step if this one is lost ("[USOS /SOS]"). */
     if (native_install()) {
+        logon_notice(1);
         Sleep(20000);
         boot_ini_finish();
+        setup_watch();
     }
 }
 
