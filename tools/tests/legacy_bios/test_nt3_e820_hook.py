@@ -42,6 +42,21 @@ BIG_MAP = [(0, 0x9FC00, 1), (0x9FC00, 0x400, 2), (0xA0000, 0x60000, 2),
            (0x1_0000_0000, 0x7_4000_0000, 1)]
 
 
+# The firmware map the MBR recorded on the X470 (disk sector 2, CSMWrap,
+# 32 GiB, cold boot B261029-185936; identical below 1 GiB in every dump of
+# 2026-10-29; the small MMIO entries at FD2xxxxx-FEBxxxxx are left out and the
+# entry above 4 GiB is assumed: the record holds 25 entries).  Reserved / ACPI
+# NVS ranges sit at 155-176 MiB.
+X470_MAP = [(0, 0x9FC00, 1), (0x9FC00, 0x60400, 2), (0x100000, 0x9AFF000, 1),
+            (0x9BFF000, 0x401000, 2), (0xA000000, 0x200000, 1), (0xA200000, 0xE000, 4),
+            (0xA20E000, 0xDF2000, 1), (0xB000000, 0x20000, 2), (0xB020000, 0xAB451000, 1),
+            (0xB6471000, 0x200000, 2), (0xB6671000, 0x1D1000, 1), (0xB6842000, 0x2F000, 2),
+            (0xB6871000, 0x4978000, 1), (0xBB1E9000, 0x176B000, 2), (0xBC954000, 0x4D000, 3),
+            (0xBC9A1000, 0x6E0000, 4), (0xBD081000, 0xB7E000, 2), (0xBDBFF000, 0x1401000, 1),
+            (0xBF000000, 0x1000000, 2), (0xF0000000, 0x8000000, 2), (0xFEC10000, 0x1000, 2),
+            (0x1_0000_0000, 0x7_4000_0000, 1)]
+
+
 def build_hook():
     depguard.require_zig()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -236,6 +251,27 @@ class Nt3E820Hook(unittest.TestCase):
         ax, bx, cx, dx, cf = self.old_sizes(0xE801, BIG_MAP, cap=1)
         self.assertEqual((bx, dx), (0, 0))
 
+
+    def test_x470_map_nt351_no_reserved_range(self):
+        # The NT 3.51 SU module (same as the 3.5 one) makes its free memory
+        # list from E820 type 1 entries only; AH=88h / AX=E801h are its
+        # fallback.  With the 1 GiB cap no RAM it sees may touch a firmware
+        # reserved / NVS range of the real X470 map.
+        cap = 64
+        firmware_ram = [(b, b + n) for b, n, k in X470_MAP if k == 1]
+        seen = [self.e820(*entry, cap=cap)[0] for entry in X470_MAP]
+        ram = [(b, b + n) for b, n, k in seen if k == 1]
+        self.assertEqual(ram, [(0, HOOK_SEG << 4), (0x100000, 0x9BFF000), (0xA000000, 0xA200000),
+                               (0xA20E000, 0xB000000), (0xB020000, 1024 * MIB)])
+        for b, e in ram:
+            self.assertTrue(any(fb <= b and e <= fe for fb, fe in firmware_ram), hex(b))
+        for b, n, k in seen:
+            if k != 1:
+                self.assertIn((b, n), [(0xF0000, 0x10000), (0x9FC00, 0x60400)])
+        # The fallback ends at the first hole (9BFF000h), below the cap.
+        ax, bx, cx, dx, cf = self.old_sizes(0xE801, X470_MAP, cap=cap)
+        self.assertEqual((bx, dx, cf), (0x8BF, 0x8BF, 0))
+        self.assertLessEqual(16 * MIB + (bx << 16), 0x9BFF000)
 
 if __name__ == '__main__':
     unittest.main()
