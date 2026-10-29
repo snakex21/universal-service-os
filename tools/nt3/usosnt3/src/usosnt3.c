@@ -216,6 +216,13 @@ static void dump_value(char *out, const char *key, const char *name)
         data[size] = 0;
         lstrcpyA(p, (char *)data);
         lstrcatA(p, "\r\n");
+    } else if (type == REG_MULTI_SZ) {
+        DWORD i;
+        data[size] = 0;
+        for (i = 0; i + 1 < size; i++)           /* "a\0b\0\0" -> "a,b" */
+            if (!data[i] && data[i + 1]) data[i] = ',';
+        lstrcpyA(p, (char *)data);
+        lstrcatA(p, "\r\n");
     } else {
         lstrcpyA(p, "(other type)\r\n");
     }
@@ -1201,6 +1208,8 @@ static void display_profile(void)
     set_dword("usosdisplay", NULL, "Start", 2);
     say("DISPLAY hardware service registered (VM defers)\r\n");
 }
+static void net351_native_post(void);
+
 static int post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
@@ -1306,6 +1315,7 @@ static int post(void)
     }
     selected_state = g_client_config && g_client_config->minor == 51 ? network351_state : network35_state;
     if (!client_prepare(selected_state)) return 0;
+    if (network351_state == 2) net351_native_post();
     vesa();
     display_profile();
     return 1;
@@ -1669,6 +1679,364 @@ static void setup_watch(void)
     }
 }
 
+/* ------------------------------------------------------------------------
+ * Native NT 3.51 LAN (NET351.ON), GUI Setup: no DHCP wait.
+ * OEMNXPTC.INF sets EnableDHCPFlag = 1 whenever STF_GUI_UNATTENDED is YES
+ * and creates the DHCP client (services.exe share service, automatic,
+ * group "TDI"). NTLANMAN.INF then starts the network with NCPA STARTSVC
+ * LanmanWorkstation, which depends on the TDI group; the SCM starts every
+ * member of a group a service depends on (not only automatic ones) and
+ * treats the group as not started while a member is START_PENDING
+ * (NT 3.5 SC\SERVER\DEPEND.C ScGetCurrentGroupState). The DHCP client
+ * stays START_PENDING through its first lease attempt (CLIENT\NEWNT\DHCP.C:
+ * DhcpInitialize before SERVICE_RUNNING, wait hint 25 s), and the only
+ * adapter during GUI Setup is the MS Loopback adapter, which never gets an
+ * answer. A disabled member fails at once (ERROR_SERVICE_DISABLED) and the
+ * group counts as started through NetBT / Afd. So while GUI Setup runs,
+ * this thread waits for the DHCP service to exist and disables it through
+ * the SCM (its database record, not only the registry: the service was
+ * created in this boot); post() turns it back on for the boot that runs
+ * usosnet351 (EnableDHCP of the adapter is untouched). ChangeServiceConfigA
+ * has the NT 3.5 (11 argument) form: only called on 3.51. */
+typedef SC_HANDLE (WINAPI *SCM_OPEN)(LPCSTR, LPCSTR, DWORD);
+typedef SC_HANDLE (WINAPI *SVC_OPEN)(SC_HANDLE, LPCSTR, DWORD);
+typedef BOOL (WINAPI *SVC_CHANGE)(SC_HANDLE, DWORD, DWORD, DWORD, LPCSTR, LPCSTR, LPDWORD, LPCSTR, LPCSTR, LPCSTR, LPCSTR);
+typedef BOOL (WINAPI *SVC_CLOSE)(SC_HANDLE);
+typedef HANDLE (WINAPI *THREAD_CREATE)(LPSECURITY_ATTRIBUTES, DWORD, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
+
+static int net351_version(void)
+{
+    DWORD (WINAPI *get_version)(void) =
+        (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetVersion");
+    DWORD v;
+    if (!get_version) return 0;
+    v = get_version();
+    return !(v & 0x80000000) && (v & 0xff) == 3 && ((v >> 8) & 0xff) == 51;
+}
+
+static int net351_native_selected(void)
+{
+    return native_install() && GetFileAttributesA(DIR "NET351.ON") != 0xFFFFFFFF && net351_version();
+}
+
+static DWORD WINAPI dhcp_setup_hold(LPVOID unused)
+{
+    HMODULE adv = GetModuleHandleA("advapi32.dll");
+    SCM_OPEN scm_open = adv ? (SCM_OPEN)GetProcAddress(adv, "OpenSCManagerA") : NULL;
+    SVC_OPEN svc_open = adv ? (SVC_OPEN)GetProcAddress(adv, "OpenServiceA") : NULL;
+    SVC_CHANGE svc_change = adv ? (SVC_CHANGE)GetProcAddress(adv, "ChangeServiceConfigA") : NULL;
+    SVC_CLOSE svc_close = adv ? (SVC_CLOSE)GetProcAddress(adv, "CloseServiceHandle") : NULL;
+    DWORD i, error = 0, last = 0;
+    (void)unused;
+    if (!scm_open || !svc_open || !svc_change || !svc_close) {
+        say("dhcp hold: no SCM functions\r\n");
+        return 0;
+    }
+    /* 500 ms steps, at most 3 h; GUI Setup's restart ends the process. */
+    for (i = 0; i < 21600; i++) {
+        SC_HANDLE scm = scm_open(NULL, NULL, SC_MANAGER_CONNECT), svc = NULL;
+        int ok = 0;
+        if (scm) {
+            svc = svc_open(scm, "DHCP", SERVICE_CHANGE_CONFIG);
+            if (svc) {
+                ok = svc_change(svc, SERVICE_NO_CHANGE, SERVICE_DISABLED, SERVICE_NO_CHANGE,
+                                NULL, NULL, NULL, NULL, NULL, NULL, NULL) != 0;
+                if (!ok) error = GetLastError();
+                svc_close(svc);
+            } else {
+                error = GetLastError();
+            }
+            svc_close(scm);
+        } else {
+            error = GetLastError();
+        }
+        if (ok) {
+            say("dhcp hold: DHCP client disabled for GUI Setup (no lease wait on the Loopback adapter)\r\n");
+            write_file_checked("DHCP.OFF", "dhcp=disabled during GUI Setup\r\nrestore=post\r\n");
+            return 0;
+        }
+        if (error != last) {
+            say_hex("dhcp hold: waiting for the DHCP service, error ", error);
+            last = error;
+        }
+        Sleep(500);
+    }
+    return 0;
+}
+
+static void dhcp_setup_hold_start(void)
+{
+    THREAD_CREATE create = (THREAD_CREATE)GetProcAddress(GetModuleHandleA("kernel32.dll"), "CreateThread");
+    DWORD id;
+    HANDLE t;
+    if (!net351_native_selected()) return;
+    t = create ? create(NULL, 0, dhcp_setup_hold, NULL, 0, &id) : NULL;
+    if (t) {
+        CloseHandle(t);
+        say("dhcp hold: watching for the DHCP service\r\n");
+    } else {
+        say("dhcp hold: CreateThread failed\r\n");
+    }
+}
+
+/* post(), after a verified NET351 takeover on the native path: the DHCP
+ * client automatic again (the next boot runs usosnet351, lease in ~11 s
+ * on the X470 2026-10-29) and the one-shot connectivity check registered
+ * (usosnetc, USOSNT3.EXE /netcheck -> NETCHECK.TXT). Registry only: post()
+ * restarts the system right after. */
+static void net351_native_post(void)
+{
+    HKEY h;
+    DWORD start = 0, type, size = sizeof start;
+    if (!native_install()) return;
+    /* EnableDHCP 1 is required by the takeover: the client is automatic
+       (GUI Setup's own value) whether or not the hold above caught it. */
+    set_dword("DHCP", NULL, "Start", SERVICE_AUTO_START);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "DHCP", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+        if (RegQueryValueExA(h, "Start", NULL, &type, (BYTE *)&start, &size) || type != REG_DWORD) start = 0;
+        RegCloseKey(h);
+    }
+    say(start == SERVICE_AUTO_START ? "NET351: DHCP client automatic again (readback)\r\n"
+                                    : "NET351: DHCP client Start readback FAILED\r\n");
+    set_sz("usosnetc", "ImagePath", REG_EXPAND_SZ, DIR "USOSNT3.EXE /netcheck");
+    set_sz("usosnetc", "ObjectName", REG_SZ, "LocalSystem");
+    set_sz("usosnetc", "DisplayName", REG_SZ, "USOS network check");
+    set_dword("usosnetc", NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
+    set_dword("usosnetc", NULL, "ErrorControl", SERVICE_ERROR_IGNORE);
+    set_dword("usosnetc", NULL, "Start", SERVICE_AUTO_START);
+}
+
+/* ------------------------------------------------------------------------
+ * usosnetc (USOSNT3.EXE /netcheck): one silent record of the first boot
+ * with usosnet351. Waits up to 120 s for the DHCP lease of NDISLoop1
+ * (Parameters\Tcpip DhcpIPAddress, the NT 3.5 DHCP client's value names),
+ * writes the lease values and the usosnet351 alive record, then an ICMP
+ * echo to the DHCP gateway (icmp.dll IcmpSendEcho) and a TCP connect to
+ * 1.1.1.1:80 (wsock32), both through LoadLibrary / GetProcAddress, to
+ * C:\USOS\NT3\NETCHECK.TXT and turns itself off. */
+#define NC_TCP SVC_KEY "NDISLoop1\\Parameters\\Tcpip"
+typedef HANDLE (WINAPI *ICMP_CREATE)(void);
+typedef DWORD (WINAPI *ICMP_SEND)(HANDLE, DWORD, LPVOID, WORD, LPVOID, LPVOID, DWORD, DWORD);
+typedef BOOL (WINAPI *ICMP_CLOSE)(HANDLE);
+typedef int (WINAPI *WSA_STARTUP)(WORD, LPVOID);
+typedef int (WINAPI *WSA_CLEANUP)(void);
+typedef int (WINAPI *WSA_ERROR)(void);
+typedef UINT_PTR (WINAPI *WS_SOCKET)(int, int, int);
+typedef int (WINAPI *WS_CONNECT)(UINT_PTR, const void *, int);
+typedef int (WINAPI *WS_CLOSE)(UINT_PTR);
+
+static SERVICE_STATUS_HANDLE g_nc_handle;
+static SERVICE_STATUS g_nc_status;
+static BYTE g_nc_buf[1024];
+
+/* Dotted quad -> IPv4 in network byte order (in_addr layout); 0 if not one. */
+static DWORD nc_ipv4(const char *s)
+{
+    DWORD v = 0, part;
+    int i, digits;
+    for (i = 0; i < 4; i++) {
+        part = 0;
+        digits = 0;
+        while (*s >= '0' && *s <= '9' && digits < 3) {
+            part = part * 10 + (DWORD)(*s++ - '0');
+            digits++;
+        }
+        if (!digits || part > 255) return 0;
+        v |= part << (8 * i);
+        if (i < 3) {
+            if (*s != '.') return 0;
+            s++;
+        }
+    }
+    return (*s == 0 || *s == ',' || *s == '\r') ? v : 0;
+}
+
+/* HKLM\<key> <name> as text ("" when missing); REG_MULTI_SZ: first string. */
+static void nc_value(const char *key, const char *name, char *out, DWORD cap)
+{
+    HKEY h;
+    DWORD type, size = cap - 1;
+    out[0] = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &h) != ERROR_SUCCESS) return;
+    if (RegQueryValueExA(h, name, NULL, &type, (BYTE *)out, &size) != ERROR_SUCCESS ||
+        (type != REG_SZ && type != REG_MULTI_SZ && type != REG_EXPAND_SZ))
+        size = 0;
+    out[size < cap ? size : cap - 1] = 0;
+    RegCloseKey(h);
+}
+
+static void nc_line(const char *a, const char *b)
+{
+    if (len(g_text) + len(a) + len(b) + 3 >= (int)sizeof g_text) return;
+    lstrcatA(g_text, a);
+    lstrcatA(g_text, b);
+    lstrcatA(g_text, "\r\n");
+}
+
+static void nc_line_dec(const char *a, DWORD v)
+{
+    char b[12];
+    dec(b, v);
+    nc_line(a, b);
+}
+
+static void nc_ping(DWORD addr)
+{
+    HMODULE icmp = LoadLibraryA("icmp.dll");
+    ICMP_CREATE create = icmp ? (ICMP_CREATE)GetProcAddress(icmp, "IcmpCreateFile") : NULL;
+    ICMP_SEND echo = icmp ? (ICMP_SEND)GetProcAddress(icmp, "IcmpSendEcho") : NULL;
+    ICMP_CLOSE icmp_close = icmp ? (ICMP_CLOSE)GetProcAddress(icmp, "IcmpCloseHandle") : NULL;
+    static char data[32] = "USOS netcheck";
+    HANDLE h;
+    int i, ok = 0;
+    if (!create || !echo || !icmp_close) {
+        nc_line("gateway_ping=", "unavailable (icmp.dll)");
+        if (icmp) FreeLibrary(icmp);
+        return;
+    }
+    h = create();
+    if (h == INVALID_HANDLE_VALUE || !h) {
+        nc_line_dec("gateway_ping=failed IcmpCreateFile error ", GetLastError());
+        FreeLibrary(icmp);
+        return;
+    }
+    for (i = 0; i < 3 && !ok; i++) {
+        /* ICMP_ECHO_REPLY: Address, Status, RoundTripTime, ... */
+        DWORD n = echo(h, addr, data, sizeof data, NULL, g_nc_buf, sizeof g_nc_buf, 2000);
+        if (n && ((DWORD *)g_nc_buf)[1] == 0) {
+            ok = 1;
+            nc_line_dec("gateway_ping=ok rtt_ms=", ((DWORD *)g_nc_buf)[2]);
+        }
+    }
+    if (!ok) nc_line_dec("gateway_ping=failed status ", ((DWORD *)g_nc_buf)[1]);
+    icmp_close(h);
+    FreeLibrary(icmp);
+}
+
+static void nc_tcp(const char *label, DWORD addr, WORD port)
+{
+    HMODULE ws = LoadLibraryA("wsock32.dll");
+    WSA_STARTUP startup = ws ? (WSA_STARTUP)GetProcAddress(ws, "WSAStartup") : NULL;
+    WSA_CLEANUP cleanup = ws ? (WSA_CLEANUP)GetProcAddress(ws, "WSACleanup") : NULL;
+    WSA_ERROR error = ws ? (WSA_ERROR)GetProcAddress(ws, "WSAGetLastError") : NULL;
+    WS_SOCKET ws_socket = ws ? (WS_SOCKET)GetProcAddress(ws, "socket") : NULL;
+    WS_CONNECT ws_connect = ws ? (WS_CONNECT)GetProcAddress(ws, "connect") : NULL;
+    WS_CLOSE ws_close = ws ? (WS_CLOSE)GetProcAddress(ws, "closesocket") : NULL;
+    BYTE sa[16];
+    UINT_PTR s;
+    int i;
+    if (!startup || !cleanup || !error || !ws_socket || !ws_connect || !ws_close) {
+        nc_line(label, "unavailable (wsock32.dll)");
+        if (ws) FreeLibrary(ws);
+        return;
+    }
+    if (startup(0x0101, g_nc_buf)) {
+        nc_line(label, "failed WSAStartup");
+        FreeLibrary(ws);
+        return;
+    }
+    s = ws_socket(2, 1, 6);                  /* AF_INET, SOCK_STREAM, IPPROTO_TCP */
+    if (s == (UINT_PTR)~0) {
+        nc_line(label, "failed socket");
+    } else {
+        for (i = 0; i < (int)sizeof sa; i++) ((volatile BYTE *)sa)[i] = 0;
+        sa[0] = 2;                           /* sin_family AF_INET */
+        sa[2] = (BYTE)(port >> 8);           /* sin_port, network order */
+        sa[3] = (BYTE)port;
+        *(DWORD *)(sa + 4) = addr;
+        if (ws_connect(s, sa, sizeof sa) == 0) {
+            nc_line(label, "ok");
+        } else {
+            char b[48];
+            lstrcpyA(b, "failed WSA error ");
+            dec(b + len(b), (DWORD)error());
+            nc_line(label, b);
+        }
+        ws_close(s);
+    }
+    cleanup();
+    FreeLibrary(ws);
+}
+
+static void netcheck(void)
+{
+    static const char params[] = SVC_KEY "NDISLoop1\\Parameters";
+    static const char *const alive[] = { "UsosnetAliveSec", "UsosnetAliveRx", "UsosnetAliveTx",
+                                         "UsosnetAliveFlags", "UsosnetAliveRxErr", "UsosnetAliveTxErr",
+                                         "UsosnetBcPoint", "UsosnetBcError" };
+    char ip[64], gw[128];
+    DWORD waited = 0, gateway;
+    int i;
+    lstrcpyA(g_text, "USOS NT 3.51 network check\r\nstate=waiting for the DHCP lease\r\n");
+    write_file_checked("NETCHECK.TXT", g_text);
+    for (;;) {
+        nc_value(NC_TCP, "DhcpIPAddress", ip, sizeof ip);
+        if ((ip[0] && lstrcmpA(ip, "0.0.0.0")) || waited >= 120) break;
+        Sleep(2000);
+        waited += 2;
+    }
+    lstrcpyA(g_text, "USOS NT 3.51 network check\r\n");
+    nc_line("lease=", ip[0] && lstrcmpA(ip, "0.0.0.0") ? "yes" : "no");
+    nc_line_dec("waited_s=", waited);
+    dump_value(g_text, NC_TCP, "EnableDHCP");
+    dump_value(g_text, NC_TCP, "DhcpIPAddress");
+    dump_value(g_text, NC_TCP, "DhcpSubnetMask");
+    dump_value(g_text, NC_TCP, "DhcpDefaultGateway");
+    dump_value(g_text, NC_TCP, "DhcpServer");
+    dump_value(g_text, NC_TCP, "Lease");
+    dump_value(g_text, NC_TCP, "LeaseObtainedTime");
+    dump_value(g_text, NC_TCP, "LeaseTerminatesTime");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "DhcpNameServer");
+    dump_value(g_text, SVC_KEY "DHCP", "Start");
+    for (i = 0; i < (int)(sizeof alive / sizeof alive[0]); i++)
+        dump_value(g_text, params, alive[i]);
+    write_file_checked("NETCHECK.TXT", g_text);
+    if (ip[0] && lstrcmpA(ip, "0.0.0.0")) {
+        nc_value(NC_TCP, "DhcpDefaultGateway", gw, sizeof gw);
+        gateway = nc_ipv4(gw);
+        if (gateway) nc_ping(gateway);
+        else nc_line("gateway_ping=", "no gateway");
+        nc_tcp("tcp_1.1.1.1_80=", 0x01010101, 80);
+    } else {
+        nc_line("gateway_ping=", "skipped (no lease)");
+        nc_line("tcp_1.1.1.1_80=", "skipped (no lease)");
+    }
+    nc_line("done=", "1");
+    write_file_checked("NETCHECK.TXT", g_text);
+}
+
+static void WINAPI netcheck_handler(DWORD control)
+{
+    (void)control;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
+static void WINAPI netcheck_main(DWORD argc, LPSTR *argv)
+{
+    (void)argc;
+    (void)argv;
+    g_nc_handle = RegisterServiceCtrlHandlerA("usosnetc", netcheck_handler);
+    g_nc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_nc_status.dwCurrentState = SERVICE_RUNNING;
+    g_nc_status.dwControlsAccepted = 0;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+    netcheck();
+    /* one record only: the service turns itself off */
+    {
+        HKEY h;
+        DWORD off = SERVICE_DISABLED;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "usosnetc", 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+            RegSetValueExA(h, "Start", 0, REG_DWORD, (const BYTE *)&off, sizeof off);
+            RegCloseKey(h);
+        }
+    }
+    g_nc_status.dwCurrentState = SERVICE_STOPPED;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
 /* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
 static void native_options(char *opts, int size)
 {
@@ -1857,8 +2225,10 @@ static void setup(void)
     char image[MAX_PATH];
     open_log("SETUP.LOG");
     say("USOS NT 3.51 setup: registering the usosnt3 service\r\n");
-    if (native_install())
+    if (native_install()) {
         usb_early();
+        dhcp_setup_hold_start();
+    }
     lstrcpyA(image, DIR);
     lstrcatA(image, "USOSNT3.EXE /service");
     set_dword(SVC_NAME, NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
@@ -1930,6 +2300,7 @@ static void first_option(const char *p, char *out)
 void __stdcall entry(void)
 {
     static SERVICE_TABLE_ENTRYA table[] = { { SVC_NAME, service_main }, { NULL, NULL } };
+    static SERVICE_TABLE_ENTRYA netcheck_table[] = { { "usosnetc", netcheck_main }, { NULL, NULL } };
     char opt[16];
 
     first_option(GetCommandLineA(), opt);
@@ -1940,6 +2311,12 @@ void __stdcall entry(void)
             ExitProcess(2);
         }
         ExitProcess(g_post_failed ? 3 : 0);
+    }
+    /* usosnetc: the first boot with usosnet351 (net351_native_post) */
+    if (lstrcmpA(opt, "netcheck") == 0) {
+        if (!StartServiceCtrlDispatcherA(netcheck_table))
+            netcheck();             /* by hand: the same record without the SCM */
+        ExitProcess(0);
     }
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
