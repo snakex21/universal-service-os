@@ -125,7 +125,7 @@ class NativePrep(unittest.TestCase):
         block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
         self.assertIn('#define USOSRST_SHUTLOG 1',block)
         self.assertIn('#define USOSRST_RAMLOG 1',block)
-        self.assertIn(b'usosrst 1.10-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        self.assertIn(b'usosrst 1.11-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
         self.assertNotIn(b'usosrst 1.8',(ROOT/'tools/w2k/usosrst/bin/nt4/i386/usosrst.sys').read_bytes())
         self.assertIn('("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS")',
                       (ROOT/'tools/build_micro_linux.py').read_text())
@@ -170,9 +170,17 @@ class NativePrep(unittest.TestCase):
         src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
         native=src[src.index('if [ "$NT4_NATIVE_PREP" = 1 ]; then\n    crlf > "$usos/DONE.REG"'):]
         native=native[:native.index('\nfi\n')]
-        self.assertIn('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run]\n"USOSAutoLogon"="regedit.exe /s C:\\\\USOS\\\\NT4\\\\AUTOLOGON.REG"',native)
-        rearm=native[native.index('crlf > "$usos/AUTOLOGON.REG"'):]
-        self.assertIn('"AutoAdminLogon"="1"\n"DefaultPassword"=""\nEOF',rearm)
+        self.assertIn('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run]\n"USOSAutoLogon"="C:\\\\USOS\\\\NT4\\\\USOSNT4.EXE /logon"',native)
+        self.assertNotIn('AUTOLOGON.REG',src)
+        fin=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+        logon=c_function(fin,'logon_main')
+        # re-armed only while the add-on chain is pending, then removed
+        self.assertLess(logon.index('run_value("USOSAddons")'),logon.index('"AutoAdminLogon", 0, REG_SZ, (const BYTE *)"1"'))
+        self.assertLess(logon.index('(const BYTE *)"1"'),logon.index('(const BYTE *)"0"'))
+        self.assertIn('RegDeleteValueA(h, "DefaultPassword")',logon)
+        self.assertIn('RegDeleteValueA(h, "USOSAutoLogon")',logon)
+        self.assertIn('if (!lstrcmpA(opt, "logon")) logon_main();',fin)
+        self.assertLess(fin.index('"logon")) logon_main();'),fin.index('open_log("NATIVE.LOG");\n    if (!lstrcmpA(opt, "early"))'))
         rst=(ROOT/'tools/w2k/usosrst/src/usosrst.c').read_text()
         slot=c_function(rst,'WriteSlot')
         self.assertLess(slot.index('#ifdef USOSRST_NT4N'),slot.index('MmBuildMdlForNonPagedPool'))
@@ -181,6 +189,13 @@ class NativePrep(unittest.TestCase):
         for call in ('AcpiGpeOff(g_Gpe0','AcpiPm1Off(g_Pm1aEvt)','PciPmeOff()'):
             self.assertLess(off.index(call),off.index('(1 << 13)'))
         self.assertIn('0xC731',c_function(rst,'AcpiPm1Off'))
-        self.assertIn(b'usosrst 1.10-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
+        # round 3: handler=off with 1.10 too -> jmp at the HAL routine as fallback
+        entry_=c_function(rst,'DriverEntry')
+        self.assertLess(entry_.index('RedirectKernelRestart()'),entry_.index('if (!shutdownHandler) g_InlineHook = HookHalInline();'))
+        inl=c_function(rst,'InlineReturnToFirmware')
+        self.assertIn('AcpiPowerOff()',inl)
+        self.assertNotIn('g_HalReturnToFirmware',inl)        # the HAL routine is overwritten
+        self.assertIn('code[0] = 0xE9;',c_function(rst,'HookHalInline'))
+        self.assertIn(b'usosrst 1.11-nt4n',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())
 
 if __name__=='__main__': unittest.main()

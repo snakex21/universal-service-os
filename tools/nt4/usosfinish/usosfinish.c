@@ -229,6 +229,63 @@ static int erase_tree(const char *path, int depth)
     return ok && RemoveDirectoryA(path);
 }
 
+/* USOSNT4.EXE /logon (HKLM Run "USOSAutoLogon", from the native DONE.REG):
+ * automatic logon only while the installation still restarts by itself
+ * (user decision 2026-10-29). NT 4.0 msgina takes an empty DefaultPassword
+ * as a one-shot logon and writes AutoAdminLogon=0 at that logon, so while
+ * the add-on chain is pending (its Run value "USOSAddons" exists) this
+ * re-arms AutoAdminLogon=1 for the next restart. When the chain has ended
+ * (the value is gone, now or while this waits) the installation is over:
+ * AutoAdminLogon=0, DefaultPassword and this Run value are removed, and the
+ * next start shows the normal Ctrl+Alt+Del logon. Windows subsystem: no
+ * console window. LOGON.LOG gets one line per step. */
+#define WINLOGON_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+#define RUN_KEY "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+static int run_value(const char *name)
+{
+    HKEY h; LONG rc;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUN_KEY, 0, KEY_READ, &h) != ERROR_SUCCESS) return 0;
+    rc = RegQueryValueExA(h, name, NULL, NULL, NULL, NULL);
+    RegCloseKey(h);
+    return rc == ERROR_SUCCESS;
+}
+
+static void logon_main(void)
+{
+    HKEY h;
+    int waited;
+    open_log("LOGON.LOG");
+    if (run_value("USOSAddons")) {
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WINLOGON_KEY, 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+            RegSetValueExA(h, "AutoAdminLogon", 0, REG_SZ, (const BYTE *)"1", 2);
+            RegSetValueExA(h, "DefaultPassword", 0, REG_SZ, (const BYTE *)"", 1);
+            RegFlushKey(h);
+            RegCloseKey(h);
+        }
+        say("logon: add-on chain pending, automatic logon re-armed for its restart\r\n");
+        /* The chain ends in this session when USOSADD removes its Run value;
+           a restart ends this process first (the re-arm above covers it). */
+        for (waited = 0; run_value("USOSAddons"); waited++) {
+            if (waited > 6 * 3600 / 2) { say("logon: still pending after 6 h, automatic logon kept\r\n"); ExitProcess(0); }
+            Sleep(2000);
+        }
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WINLOGON_KEY, 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+        RegSetValueExA(h, "AutoAdminLogon", 0, REG_SZ, (const BYTE *)"0", 2);
+        RegDeleteValueA(h, "DefaultPassword");
+        RegFlushKey(h);
+        RegCloseKey(h);
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUN_KEY, 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+        RegDeleteValueA(h, "USOSAutoLogon");
+        RegFlushKey(h);
+        RegCloseKey(h);
+    }
+    say(run_value("USOSAutoLogon") ? "logon: Run value removal FAILED\r\n"
+                                   : "logon: installation finished, automatic logon off (AutoAdminLogon=0, no DefaultPassword)\r\n");
+    ExitProcess(0);
+}
+
 void __stdcall entry(void)
 {
     OSVERSIONINFOA os;
@@ -243,6 +300,7 @@ void __stdcall entry(void)
     /* Before NATIVE.LOG: these run beside /finish and must not hold it. */
     if (!lstrcmpA(opt, "notice")) notice_main();     /* POST.CMD: start "" ... /notice */
     if (!lstrcmpA(opt, "nonotice")) { notice_close(); ExitProcess(0); }
+    if (!lstrcmpA(opt, "logon")) logon_main();       /* HKLM Run USOSAutoLogon */
     if (!lstrcmpA(opt, "netcheck")) {
         static SERVICE_TABLE_ENTRYA table[] = { { "usosnetc", netcheck_main }, { NULL, NULL } };
         if (!StartServiceCtrlDispatcherA(table)) netcheck();

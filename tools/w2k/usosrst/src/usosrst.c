@@ -160,13 +160,16 @@ UsosActiveProcessors(VOID)
    the quiesce runs at DISPATCH_LEVEL on the restarting processor only;
    the full reset follows within milliseconds. The VM-path NT 4.0 build
    (bin/nt4, 1.5-nt4) is unchanged. */
-#define USOSRST_VERSION "usosrst 1.10-nt4n"
+#define USOSRST_VERSION "usosrst 1.11-nt4n"
 #define USOSRST_SHUTLOG 1
 #define USOSRST_RAMLOG 1
 /* 1.9: power-off (HalPowerDownRoutine) through ACPI S5, see AcpiPowerOff. */
 /* 1.10: the NT 4.0 kernel import slot is written through its physical
    address (large kernel pages: handler=off in 1.9), wake sources cleared
    before S5 (GPE, PM1, RTC alarm, PCI PME), longer registry load line. */
+/* 1.11: handler=off again with 1.10: when the kernel import slot cannot be
+   redirected, a jmp at the start of the HAL's HalReturnToFirmware takes
+   restart/power-off (handler=inl); load line k+/k- and the slot result. */
 #define USOSRST_POWEROFF 1
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
@@ -199,7 +202,12 @@ static ULONG g_Pm1aEvt, g_Pm1bEvt;  /* FADT PM1a/PM1b_EVT_BLK: PM1 status at the
 static ULONG g_Gpe0, g_Gpe1;        /* FADT GPE0/GPE1_BLK (I/O ports), 0 = none */
 static UCHAR g_Pm1EvtLen, g_Gpe0Len, g_Gpe1Len; /* FADT PM1_EVT_LEN, GPE0/GPE1_BLK_LEN */
 static UCHAR g_S5a, g_S5b;          /* SLP_TYPa / SLP_TYPb from the DSDT's \_S5 package */
-static CHAR g_S5State = '-';        /* load line: o found, - no FADT/DSDT, x no \_S5 */
+static CHAR g_S5State = '-';        /* load line: o found, - no FADT/DSDT, x no _S5 */
+#endif
+#ifdef USOSRST_NT4N
+static ULONG g_KernelFound;         /* load line k+/k- */
+static LONG g_KernelPatch = -2;     /* PatchImports result: slots, 0 none matched, -1 bad image or write */
+static BOOLEAN g_InlineHook;        /* load line handler=inl */
 #endif
 
 typedef VOID (NTAPI *USOS_RETURN_TO_FIRMWARE)(IN ULONG Routine);
@@ -1265,8 +1273,66 @@ RedirectKernelRestart(VOID)
     for (i = 0; i < 2 && kernel == NULL; i++) kernel = FindModule(kernels[i]);
     if (kernel == NULL) return FALSE;
     g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)(ULONG)HalReturnToFirmware;
+#ifdef USOSRST_NT4N
+    g_KernelFound = 1;
+    g_KernelPatch = PatchImports(kernel, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware);
+    return (BOOLEAN)(g_KernelPatch > 0);
+#else
     return (BOOLEAN)(PatchImports(kernel, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware) > 0);
+#endif
 }
+
+#ifdef USOSRST_NT4N
+/* The HAL's own HalReturnToFirmware, entered through the jump HookHalInline
+   puts at its start (the kernel's import slot could not be redirected:
+   X470 2026-10-29, handler=off with 1.9 and 1.10, every restart and the
+   power-off ended in the HAL's triple fault). The HAL routine is gone
+   then, so every routine is handled here: restart/reboot the full reset,
+   power-down ACPI S5, halt and anything else stop the processor (power-off
+   first for HalHaltRoutine is not wanted: NT 4.0 only uses it on request). */
+static VOID NTAPI
+InlineReturnToFirmware(IN ULONG Routine)
+{
+    if (Routine == USOS_HAL_POWERDOWN_ROUTINE) {
+        AcpiPowerOff();
+    } else if (Routine != 0) {
+        SlRestart(Routine);
+        ResetMachine();
+    }
+    _disable();
+    for (;;) {
+        __asm hlt
+    }
+}
+
+/* A 5-byte jmp rel32 over the first bytes of the HAL's HalReturnToFirmware
+   (its address is our own import of it). Written byte by byte, the jump
+   opcode last, through each byte's physical address (the HAL may sit in a
+   large page or a read-only one); nothing calls the routine while the
+   boot drivers load. TRUE when the jump reads back. */
+static BOOLEAN
+HookHalInline(VOID)
+{
+    PUCHAR f = (PUCHAR)(ULONG)HalReturnToFirmware;
+    UCHAR code[5];
+    LONG rel;
+    ULONG i;
+    if (!MmIsAddressValid(f) || !MmIsAddressValid(f + 4)) return FALSE;
+    rel = (LONG)((ULONG)InlineReturnToFirmware - ((ULONG)f + 5));
+    code[0] = 0xE9;
+    RtlCopyMemory(code + 1, &rel, 4);
+    for (i = 5; i-- > 0; ) {
+        PHYSICAL_ADDRESS pa = MmGetPhysicalAddress(f + i);
+        PUCHAR w;
+        if (pa.QuadPart == 0) return FALSE;
+        w = (PUCHAR)MmMapIoSpace(pa, 1, MmCached);
+        if (w == NULL) return FALSE;
+        *(volatile UCHAR *)w = code[i];
+        MmUnmapIoSpace(w, 1);
+    }
+    return (BOOLEAN)(RtlCompareMemory(f, code, 5) == 5);
+}
+#endif
 
 /* VGA window (1.5). CSMWrap's E820 map marks A0000h-FFFFFh as reserved;
    the NT 4.0 loader passes that on and the kernel puts it under
@@ -2261,6 +2327,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
 #ifdef USOSRST_NT4
     shutdownHandler = RedirectKernelRestart();
+#ifdef USOSRST_NT4N
+    if (!shutdownHandler) g_InlineHook = HookHalInline();
+#endif
     vgaWindow = FreeVgaWindow();
 #ifdef USOSRST_RAMLOG
     RmInit();
@@ -2313,7 +2382,13 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
     p = PutStr(p, end, "+8042 setup=");
     p = PutStr(p, end, g_InSetup ? "1" : "0");
+#ifdef USOSRST_NT4N
+    p = PutStr(p, end, shutdownHandler ? " handler=on" : g_InlineHook ? " handler=inl" : " handler=off");
+    p = PutStr(p, end, g_KernelFound ? " k+" : " k-");
+    p = PutStr(p, end, g_KernelPatch < 0 ? (g_KernelPatch == -1 ? "x" : "?") : g_KernelPatch == 0 ? "0" : "n");
+#else
     p = PutStr(p, end, shutdownHandler ? " handler=on" : " handler=off");
+#endif
     p = PutStr(p, end, restart == 'o' ? " txt=on" : restart == '-' ? " txt=no" : " txt=err");
     p = PutStr(p, end, " rtc");
     p = PutStr(p, end, g_RtcState == 'o' ? "o" : g_RtcState == 'x' ? "x" : "-");

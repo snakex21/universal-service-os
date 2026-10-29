@@ -1218,10 +1218,10 @@ ADDONSCMD
 fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 if [ "$NT4_NATIVE_PREP" = 1 ]; then
-    # Native: usosrst 1.10-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
+    # Native: usosrst 1.11-nt4n (shutdown log, NVMe/xHCI/NIC quiesce, CF9h
     # full reset); USOSNT4.EXE /early registers it before the first boot.
     cp "$LIB/nt4/USOSRSTN.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
-    log 'native: usosrst 1.10-nt4n (restart: quiesce + CF9h full reset; power-off: ACPI S5) from the first installed boot'
+    log 'native: usosrst 1.11-nt4n (restart: quiesce + CF9h full reset; power-off: ACPI S5) from the first installed boot'
 else
     cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 fi
@@ -1401,13 +1401,18 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\atapi]
 "Start"=dword:00000004
 EOF
-# Native NT 4.0 (X470 2026-10-29): no logon prompt after the restart. The
-# add-on chain (USOSADD from Run) restarts after its packages and the user
-# expects the desktop without input, so the automatic Administrator logon
-# (empty password, as Setup created it) stays on, as on the 9x path.
+# Native NT 4.0: automatic logon only while the installation restarts by
+# itself (user decision 2026-10-29): POST.CMD, then the add-on chain
+# (USOSADD from Run). NT 4.0 msgina takes the empty DefaultPassword (NT 4.0
+# profiles always use a blank Administrator password: OEMBlankAdminPassword)
+# as a one-shot logon and writes AutoAdminLogon=0 at that logon, so
+# USOSNT4.EXE /logon (Run, Windows subsystem: no console window) re-arms it
+# while the chain is pending and, once the chain has ended, removes
+# AutoAdminLogon, DefaultPassword and its own Run value: the installed
+# system shows the normal Ctrl+Alt+Del logon.
 # PowerdownAfterShutdown: Shut down powers the machine off; usosrst
-# 1.10-nt4n takes the kernel's HalPowerDownRoutine to ACPI S5 (\_S5 of the
-# DSDT, PM1a/PM1b_CNT). The VM path keeps the old DONE.REG.
+# 1.11-nt4n takes the HAL's HalReturnToFirmware(HalPowerDownRoutine) to ACPI
+# S5 (_S5 of the DSDT, PM1a/PM1b_CNT). The VM path keeps the old DONE.REG.
 if [ "$NT4_NATIVE_PREP" = 1 ]; then
     crlf > "$usos/DONE.REG" <<'EOF'
 REGEDIT4
@@ -1418,22 +1423,10 @@ REGEDIT4
 "PowerdownAfterShutdown"="1"
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
-"USOSAutoLogon"="regedit.exe /s C:\\USOS\\NT4\\AUTOLOGON.REG"
+"USOSAutoLogon"="C:\\USOS\\NT4\\USOSNT4.EXE /logon"
 
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\atapi]
 "Start"=dword:00000004
-EOF
-    # NT 4.0 msgina takes an empty DefaultPassword as a one-shot automatic
-    # logon: GetProfileString returns 0 characters, so it writes
-    # AutoAdminLogon=0 during that logon (X470 2026-10-29: the second restart
-    # asked for the password again). The Run value re-arms it after every
-    # logon; regedit /s shows no window.
-    crlf > "$usos/AUTOLOGON.REG" <<'EOF'
-REGEDIT4
-
-[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
-"AutoAdminLogon"="1"
-"DefaultPassword"=""
 EOF
 fi
 # The NT 4.0 Welcome window ("Witamy", Tips\Show of the user; Setup leaves
