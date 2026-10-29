@@ -52,13 +52,15 @@ static void reset(void)
 void entry(void)
 {
     DWORD i,previous;
-    reset();boot_ini_finish();
+    reset();finish_boot();
     if(!g_BootFlushed || !boot_valid() || removed==0)ExitProcess(1);
     if(!has_ci(image,size,"/numproc=2 /maxmem=1024"))ExitProcess(2);
     for(i=0;i<size;i++)if(!image[i])ExitProcess(3);
-    previous=size;bytes(saved,image,size+1);boot_ini_finish();
-    if(size!=previous || lstrcmpA(image,saved))ExitProcess(4);
-    reset();failed_write=1;boot_ini_finish();if(removed || g_BootFlushed)ExitProcess(5);
-    reset();failed_flush=1;boot_ini_finish();if(removed || g_BootFlushed)ExitProcess(6);
+    previous=size;bytes(saved,image,size+1);
+    g_BootFlushed=0;g_BootWrite=INVALID_HANDLE_VALUE;removed=0;finish_boot();
+    if(size!=previous || lstrcmpA(image,saved) || !g_BootFlushed || !removed)ExitProcess(4);
+    failed_flush=1;g_BootFlushed=0;removed=0;finish_boot();if(removed || g_BootFlushed)ExitProcess(7);
+    reset();failed_write=1;finish_boot();if(removed || g_BootFlushed)ExitProcess(5);
+    reset();failed_flush=1;finish_boot();if(removed || g_BootFlushed)ExitProcess(6);
     ExitProcess(0);
 }

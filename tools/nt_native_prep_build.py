@@ -103,7 +103,7 @@ def main():
     helpers=''.join(function(nt3,n) for n in ('read_small','copy_bytes','lower','has_ci','native_options','out_add','drop_maxmem'))
     helpers+=''.join(function(nt4,n) for n in ('finish_create','finish_flush','boot_valid','finish_delete'))
     (out/'finish_helpers_actual.inc').write_text(helpers)
-    (out/'finish_boot_actual.inc').write_text(function(nt3,'boot_ini_finish'))
+    (out/'finish_boot_actual.inc').write_text(function(nt3,'boot_ini_finish')+function(nt4,'finish_boot'))
     harness=out/'finish-test.exe'
     run('finish-test-compile',[str(zig),'cc','-target','x86-windows-gnu','-mcpu=i586','-Os','-nostdlib',
         '-fno-builtin','-fno-stack-protector','-I'+str(zig.parent/'lib/libc/include/any-windows-any'),'-I'+str(out),
@@ -112,7 +112,7 @@ def main():
     if protected != {p:sha(p) for p in protected}:
         raise ValueError('Protected shared/NT351 SYS changed')
     result = {'outputs':destinations,'protected_unchanged':True,'nt351_preprocessed_identical':True,
-        'nt351_preprocessed_sha256':cpp_sha,'finish_contract_cases':6,'finish_contract_pass':True,
+        'nt351_preprocessed_sha256':cpp_sha,'finish_contract_cases':7,'finish_contract_pass':True,
         'protected':{str(p.relative_to(ROOT)):s for p,s in protected.items()}, 'runtime_pass':False}
     (out/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(result,indent=2))

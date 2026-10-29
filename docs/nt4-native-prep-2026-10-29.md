@@ -15,7 +15,7 @@ previous selection. No merge, deployment, physical disk access or QEMU run.
 | CMOS century | Retain common conditional 32h→37h copy, only with valid BCD century and unused destination. | NT4 HAL `ixcmos.asm` normally uses 32h but switches to 37h when the ISA CMOS checksum is invalid; MPS includes the common implementation. Exact SP6a binary equivalence is not newly established. |
 | MSZIP stored NLEN | Do not transplant the NT351 fixed-Huffman requirement. | NT4 `nfmdeco.c` and `mdi.nt/sources` enable LARGE_STORED_BLOCKS and read NLEN normally. The native kernel patch already stages expanded PE data, not a rewritten Microsoft CAB. |
 | USB early | New NT4 helper `/early` registers existing usosusb Start=1, verifies SYS copy, Type/Start and Kbdclass/Mouclass ConnectMultiplePorts. Runs after SETUP.REG in late GUI CMDLINES. | Imports of helper and existing USB driver match original NT4 RTM media. This prepares the **first installed-system boot**; it does **not** establish HID availability earlier in GUI Setup. That remains an X470 qualification/integration gap. No i8042prt group-order rewrite. |
-| BOOT.INI / cleanup | New `/finish` reuses own formatter: normal entry plus `[USOS /SOS]`, `[VGA mode]`, timeout 5; retains native options, removes C-root bootstrap entry, cleans fixed Setup/syslinux leftovers. | Backup BOOT.OLD; POST.OK and USB readback required. Actual formatter exercised with fake file APIs: success, idempotence, create/flush failure. Source trees removed only after a successful flush and valid BOOT.INI. |
+| BOOT.INI / cleanup | New `/finish` reuses own formatter: normal entry plus `[USOS /SOS]`, `[VGA mode]`, timeout 5; retains native options, removes C-root bootstrap entry, cleans fixed Setup/syslinux leftovers. | Backup BOOT.OLD; POST.OK and USB readback required. Actual formatter exercised with fake file APIs: success, a fresh-process retry, create/flush failure. On retry an already valid BOOT.INI is opened and flushed again. Source trees removed only after a successful flush and valid BOOT.INI. |
 | Pagefile | Existing own pagefile helper invoked by NT4 finish: 64/128 MiB. | Firmware cap also limits RAM seen during Setup. Runtime pagefile size and free space remain to be checked on X470. |
 | setup_watch / logon_notice | NT4 uses its existing auto-logon/POST path rather than the NT3 service/watch/notice. | Failed finish records failure and suppresses automatic restart. POST.OK resumes finish without repeating service-pack installation. No claim that an NT3 service can be transplanted unchanged. |
 | Server minor-errors dialog | Separate NT4 answerer recognizes exact English warning text plus “log file”, visible dialog and enabled IDNO button. Other dialogs are recorded only. | Compiled/import-checked, not runtime-qualified on NT4 Server; localized wording can require another explicit rule. |
@@ -57,7 +57,7 @@ NT351 sources/build351/INF/registry/network tests were not changed or rebuilt.
 
 Build through `build.bat` with explicit `USOS_NT_NATIVE_PREP=4`, external WDK
 and Zig paths and fresh `USOS_NT_NATIVE_OUT` under own artifacts. The default
-release build is unchanged. The build exercises six actual formatter checks
+release build is unchanged. The build exercises seven actual formatter checks
 with an in-memory file model. Nine preparation tests and forty existing NT4
 flow tests pass; import audit checks three new executables/drivers and the
 existing USB SYS against original RTM exports. Emulator execution of the

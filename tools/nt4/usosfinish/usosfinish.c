@@ -53,6 +53,19 @@ static BOOL WINAPI finish_delete(LPCSTR path)
     return g_BootFlushed && boot_valid() ? DeleteFileA(path) : FALSE;
 }
 
+static void finish_boot(void)
+{
+    HANDLE h;
+    /* A previous process may already have finished BOOT.INI and stopped
+     * during cleanup. Revalidate and flush that existing file before retry.
+     * Do not depend on a flag left by an earlier invocation in this process. */
+    if (boot_valid()) {
+        h=finish_create("C:\\BOOT.INI",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+        if(h!=INVALID_HANDLE_VALUE){finish_flush(h);CloseHandle(h);}
+    }
+    boot_ini_finish();
+}
+
 static int service_value(const char *service,const char *part,const char *name,DWORD wanted)
 {
     char path[MAX_PATH];HKEY key;DWORD value,type,size=sizeof(value);LONG rc;
@@ -134,7 +147,7 @@ void __stdcall entry(void)
     if(!usb_ready()){say("USB readback FAILED; no cleanup/restart\r\n");ExitProcess(3);}
     if (!CopyFileA("C:\\BOOT.INI", DIR "BOOT.OLD", TRUE) && GetLastError() != ERROR_FILE_EXISTS) ExitProcess(3);
     pagefile_cap();
-    boot_ini_finish();
+    finish_boot();
     if (!g_BootFlushed || !boot_valid()) { say("BOOT.INI validation FAILED; source retained\r\n"); ExitProcess(3); }
     ok = erase_tree("C:\\$WIN_NT$.~BT", 0);
     if (!erase_tree("C:\\$WIN_NT$.~LS", 0)) ok = 0;
