@@ -175,6 +175,29 @@ class Nt3Target(unittest.TestCase):
                          b'ncr3x_mp    = halncr.dll  ,2,hal.dll\r\n')
         self.assertIn("grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\\.dll'", TARGET.read_text(encoding='utf-8'))
 
+    def test_uniprocessor_kernel_for_the_mp_machine_types(self):
+        # X470 2026-10-29: native text mode detected mps_mp ("_mp" ->
+        # SpInstallingMp) and installed ntkrnlmp.exe as ntoskrnl.exe next to
+        # the Standard PC hal.dll; the Multiprocessor row now names the UP one.
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-krnl-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sif = tmp / 'TXTSETUP.SIF'
+        sif.write_bytes(b'[SpecialFiles]\r\nMultiprocessor = ntkrnlmp.exe,2,ntoskrnl.exe\r\n'
+                        b'Uniprocessor   = ntoskrnl.exe,2\r\nAtdisk         = atdisk.sys,4\r\n'
+                        b'[Files]\r\nMultiprocessor = keep.exe\r\n'
+                        b'[hal]\r\nmps_mp      = halmps.dll  ,2,hal.dll\r\n')
+        script = tmp / 'run.sh'
+        script.write_bytes((function_text(TARGET, 'nt3_standard_hal') +
+                            f'\nnt3_standard_hal < "{sif.as_posix()}" > "{(tmp / "out.sif").as_posix()}"\n').encode('utf-8'))
+        rc, _, err = sh(f'. "{script.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual((tmp / 'out.sif').read_bytes(),
+                         b'[SpecialFiles]\r\nMultiprocessor = ntoskrnl.exe,2\r\n'
+                         b'Uniprocessor   = ntoskrnl.exe,2\r\nAtdisk         = atdisk.sys,4\r\n'
+                         b'[Files]\r\nMultiprocessor = keep.exe\r\n'
+                         b'[hal]\r\nmps_mp = hal.dll    ,2,hal.dll\r\n')
+        self.assertIn("grep -aiEq '^multiprocessor *= *ntoskrnl\\.exe' \"$work/c/TXTSETUP.SIF\"", TARGET.read_text(encoding='utf-8'))
+
     def test_install_vm_for_nt35(self):
         # NT 3.5 GUI Setup knows no CPU newer than a Pentium; its CD has no
         # amsint.sys, and its atdisk.sys works on QEMU IDE.

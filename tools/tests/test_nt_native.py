@@ -128,7 +128,11 @@ class NativeWiring(unittest.TestCase):
         # GUI Setup's processor check: the patched INITIAL.IN_ or a stop.
         self.assertIn('--nt35-initial "$initial" "$work/INITIAL.NEW"', block)
         self.assertIn("fail 'cannot patch the NT 3.5 INITIAL.INF processor check'", block)
-        self.assertIn('NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=128}', text)
+        self.assertIn('NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/MAXMEM=128}', text)
+        # X470 2026-10-29: Standard PC HAL + uniprocessor kernel, one processor:
+        # no /NUMPROC for NT 3.5x (NT 4.0 native keeps the shared default).
+        self.assertIn('[ "$nt3:$minor" != yes:51 ] || NT_NATIVE_LOAD_OPTIONS=${NT351_NATIVE_LOAD_OPTIONS:-/MAXMEM=1024}', text)
+        self.assertNotIn('NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC', text)
         # The page recorder is staged for every native start.
         self.assertIn('cp "$drv/USOSANS3.EXE" "$usos/USOSANS3.EXE"', text)
 

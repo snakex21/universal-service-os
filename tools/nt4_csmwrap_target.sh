@@ -318,15 +318,29 @@ nt3_profile_files() {
 # it). The PIT -> 8259 IRQ 0 path works there (DOS, 9x, Win2000 Standard PC).
 # NT 3.51 text-mode Setup has no [Unattended] ComputerType, hence the table.
 # [Hal.Load] (the text-mode HAL inside the VM) stays as it is.
+# [SpecialFiles] Multiprocessor takes the Uniprocessor row as well: text mode
+# installs the MP kernel (ntkrnlmp.exe as ntoskrnl.exe) for every machine
+# type whose id ends in "_mp" (SpInstallingMp), and natively on the X470 (MP
+# table, 16 threads) it detects mps_mp. The Standard PC hal.dll starts one
+# processor only, so the MP kernel brings nothing and is a pairing Setup never
+# makes on its own (X470 2026-10-29: ntkrnlmp + hal.dll, STOP 0x0A).
 nt3_standard_hal() {
     awk -v BINMODE=3 '
-        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low)
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
           if (low ~ /^\[/) sec = low
-          else if (sec == "[hal]" && low ~ /^mps[0-9]*_(up|mp)=/) {
-              key = line; sub(/[ \t]*=.*/, "", key); rest = line; sub(/^[^,]*/, "", rest)
-              line = key " = hal.dll    " rest
-          }
-          printf "%s\r\n", line }'
+          else if (sec == "[specialfiles]" && low ~ /^uniprocessor=/) { up = line; sub(/^[^=]*=[ \t]*/, "", up) } }
+        END {
+            for (i = 1; i <= n; i++) {
+                line = lines[i]; low = tolower(line); gsub(/[ \t]/, "", low)
+                if (low ~ /^\[/) sec = low
+                else if (sec == "[hal]" && low ~ /^mps[0-9]*_(up|mp)=/) {
+                    key = line; sub(/[ \t]*=.*/, "", key); rest = line; sub(/^[^,]*/, "", rest)
+                    line = key " = hal.dll    " rest
+                } else if (sec == "[specialfiles]" && up != "" && low ~ /^multiprocessor=/)
+                    line = "Multiprocessor = " up
+                printf "%s\r\n", line
+            }
+        }'
 }
 
 # Native NT 3.51 / 3.5 / 4.0 text mode on this PC (NT_NATIVE=1,
@@ -730,9 +744,12 @@ fi
 if [ "$NATIVE" = 1 ]; then
     { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ] || [ "$nt3:$major" = :4 ]; } && [ -z "$nt31" ] ||
         fail "the native install (no VM) covers Windows NT 4.0, 3.51 and 3.5 only so far, not NT $major.$minor. No disk was changed"
-    # NT 3.5: more than 128 MiB loses the boot disk (NT35_BOOT_OPTIONS in
+    # NT 3.5x: the Standard PC HAL and the uniprocessor kernel
+    # (nt3_standard_hal) run one processor, so no /NUMPROC. NT 3.5: more
+    # than 128 MiB loses the boot disk (NT35_BOOT_OPTIONS in
     # nt4_qemu_install.sh).
-    [ "$minor" != 50 ] || NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/NUMPROC=2 /MAXMEM=128}
+    [ "$nt3:$minor" != yes:51 ] || NT_NATIVE_LOAD_OPTIONS=${NT351_NATIVE_LOAD_OPTIONS:-/MAXMEM=1024}
+    [ "$minor" != 50 ] || NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/MAXMEM=128}
     # The GUI Setup page recorder (one build for NT 3.5x and 4.0, $LIB/nt3).
     ans3=$LIB/nt3/USOSANS3.EXE
     [ -r "$ans3" ] || fail "missing: $ans3 (GUI Setup page recorder). No disk was changed"
@@ -978,7 +995,8 @@ if [ -n "$nt3" ]; then
         nt3_standard_hal < "$sif" > "$work/txtsetup.hal" && cat "$work/txtsetup.hal" > "$sif" || fail 'cannot write TXTSETUP.SIF'
     done
     grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\.dll' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [hal] MPS row (not an NT 3.5 / 3.51 CD?)'
-    log 'HAL: Standard PC (hal.dll) for the MPS machine types'
+    grep -aiEq '^multiprocessor *= *ntoskrnl\.exe' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [SpecialFiles] Uniprocessor kernel row (not an NT 3.5 / 3.51 CD?)'
+    log 'HAL: Standard PC (hal.dll) for the MPS machine types, uniprocessor kernel (ntoskrnl.exe) for the _mp ones'
     if [ "$NATIVE" = 1 ]; then
         # Text mode reaches C: through our miniport (the PCI BIOS is hidden
         # by the NT 3.x MBR; AHCINT / usosnvme find their controller through
