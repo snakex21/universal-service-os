@@ -37,5 +37,22 @@ class Source(unittest.TestCase):
     def test_native_route_stays_closed_until_input_hook(self):
         text=(ROOT/'tools/w9x_csmwrap_prepare.sh').read_text()
         self.assertNotIn('NT31|NT31S) nt_native_flag',text)
+    def test_hook_copy_64mib_and_identity_guard(self):
+        sector=bytes(510)+b'U3'
+        out=source.hook_for_nt31(sector)
+        self.assertEqual((out[508],out[509]),(4,0))
+        self.assertEqual(sector,bytes(510)+b'U3')
+        with self.assertRaises(ValueError):source.hook_for_nt31(bytes(512))
+    def test_gui_uses_original_control_ids_and_no_getversionex(self):
+        src=(ROOT/'tools/nt3/native31/usosans31.c').read_text()
+        self.assertIn('control(w,740,"ComboBox")',src)
+        self.assertIn('IsDlgButtonChecked(w,1213)',src)
+        self.assertIn('SetDlgItemTextA(w,1211,domain)',src)
+        self.assertNotIn('GetVersionExA(',src)
+    def test_generic_finish_refuses_nt31_before_usb_start_one(self):
+        src=(ROOT/'tools/nt3/usosnt3/src/usosnt3.c').read_text()
+        block=src[src.index('if (lstrcmpA(opt, "finish") == 0)'):]
+        self.assertLess(block.index('GetVersion() & 0xFFFFUL'),block.index('usb_early();'))
+        self.assertLess(block.index('ExitProcess(3);'),block.index('open_log("POST.LOG")'))
 
 if __name__=='__main__':unittest.main()

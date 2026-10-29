@@ -44,7 +44,23 @@ def main():
     allowed={m:set(v['exports']) for m,v in evidence.items()}
     missing=[m+'!'+n for m,n in pe(binary)[1] if n not in allowed.get(m.lower(),set())]
     if missing:raise ValueError('Missing original imports: '+','.join(missing))
+    # Verify the generic helper remains import-compatible on NT31. Its
+    # /finish now refuses NT31; /polish remains the supported entry point.
+    sys.path.insert(0,str(ROOT/'tools'))
+    from build_windows_usos_res import build_nt3
+    registrar=build_nt3(ROOT,out/'registrar')
+    missing=[m+'!'+n for m,n in pe(registrar)[1] if n not in allowed.get(m.lower(),set())]
+    if missing:raise ValueError('Registrar imports absent on NT31: '+','.join(missing))
     include='-I'+str(zig.parent/'lib/libc/include/any-windows-any')
+    gui=ROOT/'tools/nt3/native31/bin/USOSANS31.EXE';gui.parent.mkdir(parents=True,exist_ok=True)
+    run('gui-compile',[str(zig),'cc','-target','x86-windows-gnu','-mcpu=i486','-Os','-nostdlib','-fno-builtin','-fno-stack-protector',include,
+        '-DWINVER=0x0400','-D_WIN32_WINNT=0x0400',str(ROOT/'tools/nt3/native31/usosans31.c'),
+        '-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-o',str(gui)])
+    gui.write_bytes(set_nt4(gui.read_bytes(),3,10))
+    missing=[m+'!'+n for m,n in pe(gui)[1] if n not in allowed.get(m.lower(),set())]
+    if missing:raise ValueError('GUI imports absent on original NT31: '+','.join(missing))
+    refused=subprocess.run([str(gui)],capture_output=True,timeout=5)
+    if refused.returncode!=3:raise ValueError('NT31 GUI must refuse this host before I/O')
     policy=out/'page-policy.exe'
     run('page-policy-compile',[str(zig),'cc','-target','x86-windows-gnu','-mcpu=i486','-Os','-nostdlib','-fno-builtin','-fno-stack-protector',include,
         str(ROOT/'tools/nt3/native31/page_policy_test.c'),'-Wl,--entry,entry','-lkernel32','-o',str(policy)])
@@ -56,7 +72,9 @@ def main():
     if protected!={p:sha(p) for p in protected}:raise ValueError('Protected SYS changed')
     result={'runtime_pass':False,'scope':'82576 UP candidate only; I211/native input hook NOT implemented',
         'binary_sha256':sha(binary),'binary_size':binary.stat().st_size,'imports_match_original_nt31':True,
-        'page_policy_cases':12,'page_policy_pass':True,'hook':str(hook.relative_to(ROOT)),'protected_unchanged':True,
+        'gui_sha256':sha(gui),'gui_imports_match_original_nt31':True,'gui_host_refusal':True,
+        'registrar_sha256':sha(registrar),'registrar_imports_match_original_nt31':True,'nt31_generic_finish_refused':True,
+        'page_policy_cases':16,'page_policy_pass':True,'hook':str(hook.relative_to(ROOT)),'protected_unchanged':True,
         'protected':{str(p.relative_to(ROOT)):v for p,v in protected.items()}}
     (out/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 if __name__=='__main__':main()

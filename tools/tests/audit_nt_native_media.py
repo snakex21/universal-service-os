@@ -42,7 +42,7 @@ def main():
         else: raw=subprocess.run([str(a.seven),'e','-so',str(path),'*.iso','-r'],capture_output=True,timeout=120,check=True).stdout
         v=ISO(io.BytesIO(raw));row={'source_name':path.name,'source_sha256':sha(path.read_bytes()),'iso_sha256':sha(raw),'files':{},'modules':{}}
         def get(leaf):
-            for name in ('i386/'+leaf,'i386/'+leaf[:-1]+'_'):
+            for name in ('i386/'+leaf,'i386/'+leaf+'.','i386/'+leaf+'._','i386/'+leaf[:-1]+'_'):
                 if name in v.entries:return name,v.read(name)
             return None,None
         for name in sorted(v.entries):
@@ -51,6 +51,12 @@ def main():
                     'maxmem_ascii':b'MAXMEM' in blob.upper(),
                     'ah88_sequences':[i for i in range(len(blob)) if blob[i:i+4]==b'\xb4\x88\xcd\x15'],
                     'e801_sequences':[i for i in range(len(blob)) if blob[i:i+5]==b'\xb8\x01\xe8\xcd\x15']}
+        for loader in ('ntldr','osloader.exe'):
+            name,blob=get(loader)
+            if blob is not None:
+                decoded=independent(blob)
+                row['files'][name]={'sha256':sha(blob),'decoded_sha256':sha(decoded),'size':len(blob),
+                    'maxmem_ascii':b'MAXMEM' in decoded.upper(),'numproc_ascii':b'NUMPROC' in decoded.upper()}
         for kind,leaf in (('initial','initial.inf'),('hardware','hardware.inf'),('ntlanman','ntlanman.inf'),('oemnadlb','oemnadlb.inf')):
             name,blob=get(leaf)
             if blob is None:continue
@@ -61,7 +67,7 @@ def main():
                 if ours!=data:raise ValueError('SZDD mismatch against 7-Zip: '+name)
                 info['szdd_matches_7zip']=True
                 if kind in ('initial','hardware') or tag=='nt31-as':
-                    patched=source.patch(blob,kind,advanced=tag=='nt31-as',nvme=True,shell=a.shell)
+                    patched=source.patch(blob,kind,advanced=tag=='nt31-as',nvme=True,shell=a.shell,gui_answerer=True)
                     unpacked=source.unpack(patched) if patched.startswith(b'SZDD') else patched
                     if independent(patched)!=unpacked:raise ValueError('Patched source mismatch against 7-Zip')
                     info.update(patched_sha256=sha(patched),patched_decoded_sha256=sha(unpacked),patched_7zip_match=True,
