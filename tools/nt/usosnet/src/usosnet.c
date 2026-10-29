@@ -324,14 +324,34 @@ static ULONG CfgHexString(NDIS_HANDLE Cfg, NDIS_STRING *Key)
 #endif
 
 /* NT 3.51 (native CF8 build): NDIS.SYS 3.51 exports NdisWriteConfiguration;
- * the X470 2026-10-29 run failed (SCM 7000 NDISLoop %%31) without a trace. */
+ * the X470 2026-10-29 run failed (SCM 7000 NDISLoop %%31) without a trace.
+ *
+ * NDIS.SYS 3.51 (SHA948d...ab1b, RVA 3B48, own disassembly; no bytes
+ * copied) does not take the NdisOpenConfiguration handle here: it reads
+ * the service key name (a PWSTR) at handle + 5Ch and writes to
+ * Services\<name>\Parameters with RtlWriteRegistryValue (RTL_REGISTRY_SERVICES).
+ * NdisReadConfiguration of the same NDIS reads that name at
+ * [handle] + 5Ch, [handle] = the WrapperConfigurationContext (its query
+ * table). The NdisOpenConfiguration handle is an 8-byte block, so + 5Ch
+ * was a read past it: X470 2026-10-29 STOP 0x1E C0000005 in wcslen(NULL)
+ * (ntoskrnl 8013665B) in the driver-load worker thread. NT 3.51 therefore
+ * passes the WrapperConfigurationContext (USOSNET_DIAG_HANDLE). Only
+ * NdisParameterInteger (REG_DWORD) and the two string types are written;
+ * NdisParameterHexInteger returns NDIS_STATUS_NOT_SUPPORTED. */
+#if USOSNET_NT351
+#define USOSNET_DIAG_HANDLE(Cfg, Wcc) (Wcc)
+#define USOSNET_DIAG_TYPE NdisParameterInteger
+#else
+#define USOSNET_DIAG_HANDLE(Cfg, Wcc) (Cfg)
+#define USOSNET_DIAG_TYPE NdisParameterHexInteger
+#endif
 #if !USOSNET_NDIS3 || USOSNET_NT351
 static void CfgPut(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG V)
 {
     NDIS_STATUS st;
     NDIS_CONFIGURATION_PARAMETER p;
     UsZero(&p, sizeof(p));
-    p.ParameterType = NdisParameterHexInteger;
+    p.ParameterType = USOSNET_DIAG_TYPE;
     p.ParameterData.IntegerData = V;
     NdisWriteConfiguration(&st, Cfg, Key, &p);
 }
@@ -1064,7 +1084,14 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UsLog(A, "pci %x rev %x", cfg32 = ((ULONG)A->VendorId << 16) | A->DeviceId, A->RevId);
     if (!A->Chip) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 4);
+#if USOSNET_NT351
+    /* native NT 3.51: memory decode only; bus master after the chip reset
+     * below, so queues the firmware (UEFI SNP / PXE) left programmed cannot
+     * DMA into its old ring addresses, now NT memory, in the meantime */
+    cfg32 = ((cfg32 & 0xFFFF) | 0x0002) & ~0x0004UL;
+#else
     cfg32 = (cfg32 & 0xFFFF) | 0x0006;
+#endif
     cfg32 &= ~0x0400UL;
     NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x10, &bar0, 4);
@@ -1161,6 +1188,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 
     st = A->Chip->Ops->Reset(A);
     if (st != NDIS_STATUS_SUCCESS) goto fail;
+#if USOSNET_NT351
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 4);
+    cfg32 = (cfg32 & 0xFFFF & ~0x0400UL) | 0x0006;
+    NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
+#endif
     A->Stage = ST_RESET;
 
     if (!A->Chip->Ops->ReadMac(A, A->PermAddr)) { st = NDIS_STATUS_FAILURE; goto fail; }
@@ -1241,14 +1273,14 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Started = TRUE;
     A->Stage = ST_STARTED;
     UsLog(A, "started stage %x status %x", A->Stage, A->StatusAtInit);
-    if (cfg) { WriteDiag(A, cfg); NdisCloseConfiguration(cfg); }
+    if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
     return NDIS_STATUS_SUCCESS;
 
 fail:
     A->Error = st;
     UsLog(A, "init failed stage %x status %x", A->Stage, st);
     if (A->Mmio) A->Chip->Ops->Stop(A);
-    if (cfg) { WriteDiag(A, cfg); NdisCloseConfiguration(cfg); }
+    if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
     FreeAll(A);
     return st;
 }

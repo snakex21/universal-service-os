@@ -100,6 +100,40 @@ class SourceContract(unittest.TestCase):
                       {i.name.decode() for m in pe.DIRECTORY_ENTRY_IMPORT for i in m.imports})
         source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
         self.assertIn('#if !USOSNET_NDIS3 || USOSNET_NT351\nstatic void CfgPut(', source)
+        # X470 2026-10-29 STOP 0x1E in wcslen(NULL): NDIS.SYS 3.51
+        # NdisWriteConfiguration reads the service name at handle + 5Ch, i.e.
+        # it takes the WrapperConfigurationContext, not the 8-byte
+        # NdisOpenConfiguration handle; HexInteger is NOT_SUPPORTED there.
+        self.assertIn('#if USOSNET_NT351\n#define USOSNET_DIAG_HANDLE(Cfg, Wcc) (Wcc)\n'
+                      '#define USOSNET_DIAG_TYPE NdisParameterInteger\n', source)
+        self.assertEqual(source.count('WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext))'), 2)
+        self.assertNotIn('WriteDiag(A, cfg)', source)
+        # NdisWriteConfiguration gets ParameterType 0 (and dword [ebp-10h], 0)
+        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+        imp = {i.address for m in pe.DIRECTORY_ENTRY_IMPORT for i in m.imports
+               if i.name == b'NdisWriteConfiguration'}
+        base = pe.OPTIONAL_HEADER.ImageBase
+        calls = 0
+        for s in pe.sections:
+            if not s.Characteristics & 0x20000000:
+                continue
+            code = list(md.disasm(s.get_data(), base + s.VirtualAddress))
+            for k, i in enumerate(code):
+                if i.mnemonic == 'call' and any(hex(a) in i.op_str for a in imp):
+                    calls += 1
+                    before = [(j.mnemonic, j.op_str) for j in code[max(0, k - 10):k]]
+                    self.assertTrue(any(m == 'and' and o.endswith(', 0') for m, o in before) or
+                                    any(m == 'mov' and o.endswith('], 0') for m, o in before), before)
+        self.assertEqual(calls, 1)
+
+    def test_native_bus_master_after_reset(self):
+        # firmware-programmed queues must not DMA before the chip reset
+        source = (ROOT / 'tools/nt/usosnet/src/usosnet.c').read_text(encoding='latin-1')
+        early = source.index('cfg32 = ((cfg32 & 0xFFFF) | 0x0002) & ~0x0004UL;')
+        reset = source.index('st = A->Chip->Ops->Reset(A);\n    if (st != NDIS_STATUS_SUCCESS) goto fail;\n#if USOSNET_NT351')
+        late = source.index('cfg32 = (cfg32 & 0xFFFF & ~0x0400UL) | 0x0006;')
+        self.assertLess(early, reset)
+        self.assertLess(reset, late)
 
     def test_usosnt3_setup_watch_account_notice(self):
         source = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='latin-1')
