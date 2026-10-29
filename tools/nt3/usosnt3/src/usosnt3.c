@@ -1413,6 +1413,9 @@ static int native_install(void);
 static void boot_ini_finish(void);
 static int pagefile_cap(void);
 static void logon_notice(int on);
+static void notice_start(void);
+static void notice_stop(void);
+static void notice_main(void);
 
 static void WINAPI handler(DWORD control)
 {
@@ -1432,6 +1435,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
+    notice_start();                 /* native: the desktop notice (until the restart) */
     /* Native: before post(), so a refused post (e.g. NET351 after a GUI
        Setup network failure) still leaves /MAXMEM in BOOT.INI and the
        small pagefile (X470 2026-10-28: post refused, BOOT.INI kept Setup's
@@ -1460,6 +1464,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
 failed:
     g_post_failed = 1;
     logon_notice(0);
+    notice_stop();
     say("POST refused: no DONE/restart; inspect own local records\r\n");
     g_status.dwWin32ExitCode = ERROR_GEN_FAILURE;
 stopped:
@@ -1609,6 +1614,248 @@ static int pagefile_cap(void)
     }
     RegCloseKey(h);
     return 0;
+}
+
+/* Native install: a large topmost notice on the desktop while the service
+ * works (X470 2026-10-29: the first desktop sat there for 1-3 minutes, then
+ * the system restarted by itself). The service starts "usosnt3.exe /notice"
+ * on the interactive desktop (STARTUPINFO lpDesktop WinSta0\Default; a
+ * LocalSystem service may open it), detached (no console window), and
+ * does not wait for it. The notice is a full-screen WS_EX_TOPMOST popup:
+ * three lines of text and, below them, the last line of POST.LOG
+ * (refreshed every 2 s), no buttons, no input. It ends with the restart
+ * (WM_ENDSESSION) or, when post() gives up and no restart follows, by
+ * TerminateProcess from the service. ASCII only, as the logon notice: the
+ * first start still runs on the CD's code pages. user32 / gdi32 through
+ * GetProcAddress: the static imports stay the NT 3.1 kernel32/advapi32 set. */
+static struct {
+    ATOM (WINAPI *RegisterClassA)(const WNDCLASSA *);
+    HWND (WINAPI *CreateWindowExA)(DWORD, LPCSTR, LPCSTR, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, LPVOID);
+    BOOL (WINAPI *ShowWindow)(HWND, int);
+    BOOL (WINAPI *UpdateWindow)(HWND);
+    BOOL (WINAPI *GetMessageA)(LPMSG, HWND, UINT, UINT);
+    LRESULT (WINAPI *DispatchMessageA)(const MSG *);
+    LRESULT (WINAPI *DefWindowProcA)(HWND, UINT, WPARAM, LPARAM);
+    HDC (WINAPI *BeginPaint)(HWND, LPPAINTSTRUCT);
+    BOOL (WINAPI *EndPaint)(HWND, const PAINTSTRUCT *);
+    BOOL (WINAPI *GetClientRect)(HWND, LPRECT);
+    int (WINAPI *DrawTextA)(HDC, LPCSTR, int, LPRECT, UINT);
+    UINT_PTR (WINAPI *SetTimer)(HWND, UINT_PTR, UINT, TIMERPROC);
+    BOOL (WINAPI *InvalidateRect)(HWND, const RECT *, BOOL);
+    int (WINAPI *GetSystemMetrics)(int);
+    int (WINAPI *FillRect)(HDC, const RECT *, HBRUSH);
+    COLORREF (WINAPI *SetTextColor)(HDC, COLORREF);
+    int (WINAPI *SetBkMode)(HDC, int);
+    HFONT (WINAPI *CreateFontA)(int, int, int, int, int, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, LPCSTR);
+    HGDIOBJ (WINAPI *SelectObject)(HDC, HGDIOBJ);
+    HBRUSH (WINAPI *CreateSolidBrush)(COLORREF);
+} g_ui;
+
+static const char *const g_ui_names[] = {
+    "RegisterClassA", "CreateWindowExA", "ShowWindow", "UpdateWindow", "GetMessageA", "DispatchMessageA",
+    "DefWindowProcA", "BeginPaint", "EndPaint", "GetClientRect", "DrawTextA", "SetTimer", "InvalidateRect",
+    "GetSystemMetrics", "FillRect", "SetTextColor", "SetBkMode", "CreateFontA", "SelectObject", "CreateSolidBrush",
+};
+#define UI_USER32_COUNT 15          /* the first 15 names are user32, the rest gdi32 */
+
+static HANDLE g_notice_process;
+static int g_notice_pl;
+static char g_notice_step[160];
+static HFONT g_notice_big, g_notice_text, g_notice_small;
+static HBRUSH g_notice_brush;
+
+static int notice_load(void)
+{
+    HMODULE user32 = LoadLibraryA("user32.dll"), gdi32 = LoadLibraryA("gdi32.dll");
+    FARPROC *slot = (FARPROC *)&g_ui;
+    int i;
+    if (!user32 || !gdi32)
+        return 0;
+    for (i = 0; i < (int)(sizeof g_ui_names / sizeof g_ui_names[0]); i++) {
+        slot[i] = GetProcAddress(i < UI_USER32_COUNT ? user32 : gdi32, g_ui_names[i]);
+        if (!slot[i])
+            return 0;
+    }
+    return 1;
+}
+
+/* The last complete line of POST.LOG (what the service is doing now). */
+static void notice_read_step(void)
+{
+    static char tail[512];
+    DWORD size, got = 0;
+    HANDLE h;
+    int end, start, i;
+    h = CreateFileA(DIR "POST.LOG", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return;
+    size = SetFilePointer(h, 0, NULL, FILE_END);
+    if (size != 0xFFFFFFFF) {
+        SetFilePointer(h, size > sizeof tail ? (LONG)(size - sizeof tail) : 0, NULL, FILE_BEGIN);
+        if (!ReadFile(h, tail, sizeof tail, &got, NULL))
+            got = 0;
+    }
+    CloseHandle(h);
+    end = (int)got;
+    while (end > 0 && (tail[end - 1] == '\r' || tail[end - 1] == '\n'))
+        end--;
+    start = end;
+    while (start > 0 && tail[start - 1] != '\n')
+        start--;
+    if (end - start >= (int)sizeof g_notice_step)
+        start = end - (int)sizeof g_notice_step + 1;
+    for (i = 0; start + i < end; i++) {
+        char c = tail[start + i];
+        g_notice_step[i] = (char)(c >= 32 && c < 127 ? c : ' ');
+    }
+    g_notice_step[i] = 0;
+}
+
+static void notice_line(HDC dc, RECT *area, HFONT font, int height, const char *text)
+{
+    RECT r = *area;
+    r.bottom = r.top + height;
+    g_ui.SelectObject(dc, font);
+    g_ui.DrawTextA(dc, text, -1, &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    area->top += height;
+}
+
+static LRESULT CALLBACK notice_proc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
+{
+    PAINTSTRUCT ps;
+    RECT r;
+    HDC dc;
+    int h;
+    switch (msg) {
+    case WM_PAINT:
+        dc = g_ui.BeginPaint(w, &ps);
+        g_ui.GetClientRect(w, &r);
+        g_ui.FillRect(dc, &r, g_notice_brush);
+        g_ui.SetBkMode(dc, TRANSPARENT);
+        g_ui.SetTextColor(dc, RGB(255, 255, 255));
+        h = r.bottom / 8;
+        r.top = r.bottom / 4;
+        notice_line(dc, &r, g_notice_big, h, g_notice_pl ? "USOS konczy instalacje" : "USOS is finishing the installation");
+        notice_line(dc, &r, g_notice_text, h / 2, g_notice_pl
+                    ? "Trwa dogrywanie sterownikow i ustawien. Nie wylaczaj komputera."
+                    : "Drivers and settings are being installed. Do not turn off the computer.");
+        notice_line(dc, &r, g_notice_text, h / 2, g_notice_pl
+                    ? "Komputer uruchomi sie ponownie automatycznie."
+                    : "The computer will restart automatically.");
+        r.top += h / 2;
+        notice_line(dc, &r, g_notice_small, h / 3, g_notice_step);
+        g_ui.EndPaint(w, &ps);
+        return 0;
+    case WM_TIMER:
+        notice_read_step();
+        g_ui.InvalidateRect(w, NULL, FALSE);
+        return 0;
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_CLOSE:
+        return 0;                   /* no way to close it: it ends with the restart */
+    case WM_QUERYENDSESSION:
+        return TRUE;
+    case WM_ENDSESSION:
+        if (wp)
+            ExitProcess(0);
+        return 0;
+    }
+    return g_ui.DefWindowProcA(w, msg, wp, lp);
+}
+
+static int notice_language_pl(void)
+{
+    static char intl_txt[256];
+    int n = read_small(DIR "INTL.TXT", intl_txt, sizeof intl_txt);
+    return n > 0 && has_ci(intl_txt, n, "locale=00000415");
+}
+
+/* usosnt3.exe /notice */
+static void notice_main(void)
+{
+    WNDCLASSA wc;
+    MSG m;
+    HWND w;
+    int cx, cy;
+    if (!notice_load())
+        ExitProcess(2);
+    g_notice_pl = notice_language_pl();
+    notice_read_step();
+    cx = g_ui.GetSystemMetrics(SM_CXSCREEN);
+    cy = g_ui.GetSystemMetrics(SM_CYSCREEN);
+    g_notice_brush = g_ui.CreateSolidBrush(RGB(0, 0, 128));
+    g_notice_big = g_ui.CreateFontA(-(cy / 12), 0, 0, 0, FW_BOLD, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                    VARIABLE_PITCH | FF_SWISS, "Arial");
+    g_notice_text = g_ui.CreateFontA(-(cy / 26), 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                     VARIABLE_PITCH | FF_SWISS, "Arial");
+    g_notice_small = g_ui.CreateFontA(-(cy / 40), 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                      FIXED_PITCH | FF_MODERN, "Courier New");
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = notice_proc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = GetModuleHandleA(NULL);
+    wc.hIcon = NULL;
+    wc.hCursor = NULL;
+    wc.hbrBackground = NULL;
+    wc.lpszMenuName = NULL;
+    wc.lpszClassName = "UsosNt3Notice";
+    if (!g_ui.RegisterClassA(&wc))
+        ExitProcess(3);
+    w = g_ui.CreateWindowExA(WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy,
+                             NULL, NULL, wc.hInstance, NULL);
+    if (!w)
+        ExitProcess(4);
+    g_ui.ShowWindow(w, SW_SHOW);
+    g_ui.UpdateWindow(w);
+    g_ui.SetTimer(w, 1, 2000, NULL);
+    while (g_ui.GetMessageA(&m, NULL, 0, 0) > 0)
+        g_ui.DispatchMessageA(&m);
+    ExitProcess(0);
+}
+
+/* Service side: start the notice, never wait for it. */
+static void notice_start(void)
+{
+    typedef DWORD (WINAPI *GET_MODULE_FILE_NAME)(HMODULE, LPSTR, DWORD);
+    GET_MODULE_FILE_NAME get_name =
+        (GET_MODULE_FILE_NAME)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetModuleFileNameA");
+    static char exe[MAX_PATH], cmd[MAX_PATH + 16];
+    static char desktop[] = "WinSta0\\Default";
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char *p;
+    if (!native_install() || !get_name || !get_name(NULL, exe, MAX_PATH))
+        return;
+    lstrcpyA(cmd, "\"");
+    lstrcatA(cmd, exe);
+    lstrcatA(cmd, "\" /notice");
+    for (p = (char *)&si; p < (char *)&si + sizeof si; p++)
+        *p = 0;
+    si.cb = sizeof si;
+    si.lpDesktop = desktop;
+    if (CreateProcessA(exe, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+        g_notice_process = pi.hProcess;
+        CloseHandle(pi.hThread);
+        say("notice: on the desktop\r\n");
+    } else {
+        say_hex("notice: CreateProcess failed, error ", GetLastError());
+    }
+}
+
+/* post() gave up: no restart follows, so the notice must not stay. */
+static void notice_stop(void)
+{
+    typedef BOOL (WINAPI *TERMINATE_PROCESS)(HANDLE, UINT);
+    TERMINATE_PROCESS terminate =
+        (TERMINATE_PROCESS)GetProcAddress(GetModuleHandleA("kernel32.dll"), "TerminateProcess");
+    if (g_notice_process && terminate)
+        terminate(g_notice_process, 0);
+    if (g_notice_process)
+        CloseHandle(g_notice_process);
+    g_notice_process = NULL;
 }
 
 /* Native install: a logon screen notice while the first-start service is
@@ -2318,6 +2565,9 @@ void __stdcall entry(void)
             netcheck();             /* by hand: the same record without the SCM */
         ExitProcess(0);
     }
+    /* the desktop notice the service starts on a native install */
+    if (lstrcmpA(opt, "notice") == 0)
+        notice_main();
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
         ExitProcess(post() ? 0 : 3);

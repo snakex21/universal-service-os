@@ -621,6 +621,32 @@ class Nt3AnswerProfile(unittest.TestCase):
         missing = [f'{m}!{n}' for m, n in imports if n not in nt31.get(m.lower(), set())]
         self.assertEqual(missing, [])
 
+    def test_usosnt3_desktop_notice(self):
+        # Native install: the service starts "/notice" on WinSta0\Default
+        # (detached, never waited for); a full-screen topmost popup with the
+        # ASCII Polish / English text and the POST.LOG tail, no input, ends
+        # with WM_ENDSESSION or TerminateProcess when post() gives up.
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='latin-1')
+        main = src[src.index('static void WINAPI service_main'):src.index('/* ----', src.index('static void WINAPI service_main'))]
+        self.assertLess(main.index('notice_start();'), main.index('if (!post()) goto failed;'))
+        self.assertIn('    logon_notice(0);\n    notice_stop();\n', main)
+        self.assertNotIn('notice_stop', main[:main.index('failed:')])     # success: until the restart
+        start = src[src.index('static void notice_start(void)\n{'):src.index('static void notice_stop(void)\n{')]
+        self.assertIn('si.lpDesktop = desktop;', start)
+        self.assertIn('"WinSta0\\\\Default"', start)
+        self.assertIn('DETACHED_PROCESS', start)
+        self.assertNotIn('WaitForSingleObject', start)
+        proc = src[src.index('static LRESULT CALLBACK notice_proc'):src.index('static int notice_language_pl')]
+        self.assertIn('case WM_CLOSE:\n        return 0;', proc)
+        self.assertIn('case WM_ENDSESSION:', proc)
+        self.assertIn('WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy', src)
+        from build_windows_usos_res import build_nt3
+        data = build_nt3(ROOT).read_bytes()
+        for text in (b'USOS konczy instalacje', b'Trwa dogrywanie sterownikow i ustawien. Nie wylaczaj komputera.',
+                     b'Komputer uruchomi sie ponownie automatycznie.', b'notice', b'WinSta0\\Default',
+                     b'user32.dll', b'CreateWindowExA', b'gdi32.dll', b'TerminateProcess'):
+            self.assertIn(text, data)
+
 
 if __name__ == '__main__':
     unittest.main()
