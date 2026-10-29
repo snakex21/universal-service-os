@@ -671,6 +671,8 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
             ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+            ("tools/nt4/usosfinish/bin/i386/USOSNT4.EXE", "usr/lib/usos/nt4/USOSNT4.EXE"),
+            ("tools/nt4/usosfinish/bin/i386/USOSANS4.EXE", "usr/lib/usos/nt4/USOSANS4.EXE"),
             # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme): staged only
             # for an NVMe target (docs/nvme-nt-2026-10-11.md).
             ("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS"),
@@ -842,6 +844,7 @@ def main() -> int:
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
         for relative, source in (
+            ('nt4/usosnet4.sys', 'tools/nt/usosnet/bin/nt4/i386/usosnet4.sys'),
             ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
             ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
         ):

@@ -736,6 +736,9 @@ if [ "$NATIVE" = 1 ]; then
         # leaf limit raised, before any disk write; the MPS machine type for
         # ComputerType.
         command -v cmp >/dev/null 2>&1 || fail 'cmp is required. No disk was changed'
+        [ -r "$LIB/nt4/USOSNT4.EXE" ] || fail 'missing NT4 native finish helper. No disk was changed'
+        [ -r "$LIB/nt4/USOSANS4.EXE" ] || fail 'missing NT4 native page answerer. No disk was changed'
+        ans3=$LIB/nt4/USOSANS4.EXE
         nt4_native_kernels
         nt4_mps_desc=$(nt4_computer_desc mps_mp < "$txtsetup")
         [ -n "$nt4_mps_desc" ] || fail 'TXTSETUP.SIF has no [Computer] mps_mp row (not an NT 4.0 CD?). No disk was changed'
@@ -836,7 +839,10 @@ if [ -n "$nt4_native_mbr" ]; then
         fail 'cannot prepare the MBR hook sector. No disk was changed'
     [ "$(od -An -tu1 -j509 -N1 "$work/hook.bin" | tr -d ' \n')" = 1 ] || fail 'the MBR hook options byte did not take. No disk was changed'
     mbr_hook=$work/hook.bin
-    log 'MBR: NT 3.x MBR + hook (E820 filter, HPET LegacyReplacement off), PCI BIOS kept (options byte 509 = 1)'
+    # A 1 GiB firmware cap also protects text mode when its /MAXMEM is ignored.
+    printf '\100' | dd of="$work/hook.bin" bs=1 seek=508 count=1 conv=notrunc 2>/dev/null || fail 'cannot cap NT4 RAM'
+    [ "$(od -An -tu1 -j508 -N1 "$work/hook.bin" | tr -d ' \n')" = 64 ] || fail 'NT4 RAM cap did not take'
+    log 'MBR: NT4 PCI BIOS kept; text/GUI/installed RAM cap 1024 MiB (hook 508=64, 509=1)'
 fi
 # Native NT 3.5: RAM cap 128 MiB in the hook sector (byte 508, 16 MiB units,
 # nt3_e820_mbr.S HOOK_RAM_CAP). Its kernel loses the boot disk above 128 MiB
@@ -1098,6 +1104,7 @@ for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
         printf '[Commands]\r\n'
         [ "$NATIVE" != 1 ] || printf '"C:\\USOS\\NT4\\USOSANS3.EXE /detach"\r\n'
         printf '"C:\\WINNT\\REGEDIT.EXE /s C:\\USOS\\NT4\\SETUP.REG"\r\n'
+        [ "$NATIVE" != 1 ] || printf '"C:\\USOS\\NT4\\USOSNT4.EXE /early"\r\n'
     } > "$oem/CMDLINES.TXT"
 done
 
@@ -1105,6 +1112,8 @@ usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
 if [ "$NATIVE" = 1 ]; then
     cp "$ans3" "$usos/USOSANS3.EXE" || fail 'cannot copy USOSANS3.EXE'
+    cp "$LIB/nt4/USOSNT4.EXE" "$usos/USOSNT4.EXE" || fail 'cannot copy native NT4 helper'
+    printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write native NT4 marker'
     log 'native: GUI Setup page recorder USOSANS3.EXE (CMDLINES.TXT, log C:\USOS\NT4\USOSANS.TXT)'
 fi
 . "$LIB/network_setup.sh"
@@ -1450,8 +1459,15 @@ echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSRST.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSVBE.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG
+if not exist C:\USOS\NT4\NATIVE.TXT goto nativefinished
+C:\USOS\NT4\USOSNT4.EXE /finish
+if errorlevel 1 goto nativefailed
+:nativefinished
 echo done > C:\USOS\NT4\DONE.TXT
 C:\USOS\NT4\USOSOFF.EXE /r
+goto end
+:nativefailed
+echo native finish FAILED; no restart, inspect NATIVE.LOG >> C:\USOS\NT4\POST.LOG
 :end
 EOF
 printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${tse:+tse}" > "$usos/SOURCE.TXT"

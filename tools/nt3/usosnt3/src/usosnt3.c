@@ -50,7 +50,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#ifndef DIR
 #define DIR "C:\\USOS\\NT3\\"
+#endif
 #define SVC_NAME "usosnt3"
 #define SVC_KEY "SYSTEM\\CurrentControlSet\\Services\\"
 

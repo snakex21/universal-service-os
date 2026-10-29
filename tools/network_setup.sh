@@ -81,7 +81,7 @@ usos_net_stage() {
             if [ "${USOS_NET_W95_VERSION:-}" = '4 0 0 950' ]; then
                 _un_inf=usosnet95rtm.inf; _un_sys=win95-rtm/usosnet4.sys; _un_ndis=03
             fi ;;
-        NT4) _un_sys=usosnet4.sys; _un_dsys=USOSNET4.SYS ;;
+        NT4) _un_sys=nt4/usosnet4.sys; _un_dsys=USOSNET4.SYS ;;
     esac
     mkdir -p "$(dirname "$_un_log")" || return 1
     usos_net_log "system=$_un_os network=on ip=$(usos_net_value "$_un_cfg" ip) dns=$(usos_net_value "$_un_cfg" dns) home=$(usos_net_value "$_un_cfg" home_page)"
