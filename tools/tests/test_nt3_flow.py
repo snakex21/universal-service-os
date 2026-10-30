@@ -627,7 +627,7 @@ class Nt3AnswerProfile(unittest.TestCase):
         nt31 = {
             'kernel32.dll': {'CloseHandle', 'CopyFileA', 'CreateFileA', 'DeleteFileA', 'ExitProcess', 'FlushFileBuffers',
                              'FindClose', 'FindFirstFileA', 'FindNextFileA', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess',
-                             'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError',
+                             'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError', 'GetVersion',
                              'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
                              'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFileAttributesA', 'SetFilePointer', 'Sleep', 'WriteFile',
                              'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
