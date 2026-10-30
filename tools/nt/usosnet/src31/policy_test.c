@@ -16,7 +16,8 @@ void __cdecl entry(void)
     CHECK(!U31PciValid(1,256,5,0,0x10c98086,0x02000001,0,0xfebc0000,0));
     CHECK(!U31PciValid(1,0,32,0,0x10c98086,0x02000001,0,0xfebc0000,0));
     CHECK(!U31PciValid(1,0,5,8,0x10c98086,0x02000001,0,0xfebc0000,0));
-    CHECK(!U31PciValid(1,0,5,0,0x15398086,0x02000001,0,0xfebc0000,0));
+    CHECK(U31PciValid(1,0,5,0,0x15398086,0x02000001,0,0xfebc0000,0));   /* I211 */
+    CHECK(!U31PciValid(1,0,5,0,0x15338086,0x02000001,0,0xfebc0000,0));  /* I210: not staged */
     CHECK(!U31PciValid(1,0,5,0,0x10c98086,0x01000001,0,0xfebc0000,0));
     CHECK(!U31PciValid(1,0,5,0,0x10c98086,0x02010001,0,0xfebc0000,0));
     CHECK(!U31PciValid(1,0,5,0,0x10c98086,0x02000001,0x10000,0xfebc0000,0));
@@ -29,8 +30,19 @@ void __cdecl entry(void)
     CHECK(!U31PciValid(1,0,5,0,0x10c98086,0x02000001,0,0xffffffff,0));
     CHECK(U31DmaValid(0x1000,0,4096));
     CHECK(U31DmaValid(0xfff000,0,4096));
-    CHECK(!U31DmaValid(0xfff000,0,4097));
-    CHECK(!U31DmaValid(0x1000000,0,1));
+    CHECK(U31DmaValid(0x1000000,0,1));
+    CHECK(U31DmaValid(0xfffff000,0,4096));
+    CHECK(!U31DmaValid(0xfffff000,0,4097));
+    CHECK(U31PciWriteAllowed(0,0,4,2));
+    CHECK(!U31PciWriteAllowed(0,0x44,0x44,2));
+    CHECK(U31PciWriteAllowed(1,0x44,0x44,2));
+    CHECK(!U31PciWriteAllowed(1,0,0x44,2));
+    CHECK(U31PciWriteAllowed(1,0x44,0x10,4));
+    CHECK(U31PciWriteAllowed(1,0x44,0x24,4));
+    CHECK(!U31PciWriteAllowed(1,0x44,0x28,4));
+    CHECK(!U31PciWriteAllowed(1,0x44,0x12,4));
+    CHECK(!U31PciWriteAllowed(1,0x44,0x10,2));
+    CHECK(!U31PciWriteAllowed(1,0x44,0x30,4));
     CHECK(!U31DmaValid(0x1000,1,4096));
     CHECK(!U31DmaValid(0x1000,0,0));
     CHECK(U31NeedsLoopback(own,own));

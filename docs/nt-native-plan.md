@@ -840,3 +840,80 @@ a mode the BIOS lists), reboot.
 - **Recommendation**: I211 gate in usosnet31 + option 2 with option 1 as the
   profile override (about 1.5 days), option 3 later if leases expire in
   practice.
+
+### 8.9 USB sticks and the I211 for native NT 3.1 (2026-10-30, host checks only)
+
+**Sticks.** Patched Micron after the VESA run (read-only copy of SYSTEM and
+SYSTEM.ALT): usosusb `Parameters\Diag` = `usosusb 1.2-nt31: hc0=01:00.0(22
+ports) hc1=0c:00.3(8 ports) p15-nohid p17-nohid p3:s1K- p4:s2-M`. The stick
+ports were enumerated, but the NT 3.1 build had no `USOSUSB_MSC` (the mass
+storage code was compiled only into the NT 3.5x/4.0 and NT 6 builds), so a
+stick was "not a HID device" and nothing else. Not a start-mode problem:
+usosusb is boot start on 3.1 and runs. **usosusb 1.4-nt31** takes the NT
+3.5x/4.0 stick path (`USOSUSB_NT4MSC`: plain `\DosDevices` letters after C:
+exists, hot plug / unplug, MBR or superfloppy, FAT12/FAT16/NTFS volumes,
+GPT/FAT32/exFAT skipped with a Diag tag). NT 3.1 specifics: the queue's
+spin locks and interlocked lists are imported in their stdcall forms
+(`KeAcquireSpinLock` / `KeReleaseSpinLock` from the HAL,
+`ExInterlockedInsertTailList` / `ExInterlockedRemoveHeadList`; 3.1 has no
+Kf/Exf exports; all imports checked against `nt31_exports.txt`), and a FAT
+volume with 32 KiB clusters gets no device (`pN:fat-32k-skip`): the NT 3.1
+fastfat stopped 0x1E on the 2000 MiB / 32 KiB C: of the VM flow, its 8 KiB
+C: works; whether the cluster size or the 32 reserved sectors caused that
+is not proven, so a 32 KiB stick is refused rather than risked. Template
+hive (fresh installs): `usosusb\Parameters LogFile =
+\DosDevices\C:\USOS\NT3\USOSUSB.LOG`. Host tests: volume publishing code run
+on stick images with `-DUSOSUSB_NT31` (`test_nt4_usosusb_storage.py`).
+
+Stick formats NT 3.1 can use: MBR or no partition table (superfloppy), FAT12
+or FAT16 with clusters up to 16 KiB (FAT16 partitions up to 1 GiB as
+Windows/mkfs.fat format them, e.g. `mkfs.fat -F 16 -s 32`); NTFS only as NT
+3.1 itself wrote it (later NTFS versions are not readable by its ntfs.sys).
+Not usable: FAT32, exFAT, GPT sticks (the USOS stick itself).
+
+The installed Micron got the new USOSUSB.SYS in place (system32\drivers and
+\USOS\NT3; registry untouched; PATCH-261030-221016 in the scratchpad).
+
+**Root cause of "NT 3.1 never runs our system-start drivers" (8.7.1).**
+Codex's full-MAC round measured it (docs/nt31-fullmac-port-contract.md,
+"Demand-loader contract"): the NT 3.1 kernel image loader used for
+system-start drivers returns C000007B when FileAlignment has any of the low
+9 bits set; WDK 7.1 links drivers with 0x80 file alignment. Boot-start
+drivers go through OSLOADER, which does not check. `DRIVER_ALIGNMENT=0x1000`
+(as in the usosnet31 `sources`) gives 0x200 file alignment and loads as a
+system driver. usosusb / usosvbe stay boot start (they work).
+
+**I211 in usosnet31.** `U31PciValid` accepts 0x15398086 (and 0x10C98086);
+the chip entry follows the device id (`CHIP_IGB_I210 | CHIP_IGB_I211`, so
+the shared backend takes the iNVM MAC and the PLL erratum path); config
+writes now allow, for the I211 only, the PMCSR word (PM capability + 4) and
+the BAR dwords 0x10..0x24 that the PLL erratum's D3hot -> D0 cycle restores
+(`U31PciWriteAllowed`, host cases); DMA buffers may sit anywhere below
+4 GiB (the 16 MiB limit was an assumption of the QEMU candidate);
+`NdisRegisterAdapter` tries PCIBus, then Isa, then Eisa masters
+(`UsosBusType` picks the first; NativeDiag stages 0x10..0x12), and a failed
+`NdisMapIoSpace` falls back to `MmMapIoSpace` (stage 0x18), both as on
+native 3.5x where the HAL has no PCI bus. 17920 B, PE 3.10, file alignment
+0x200, section alignment 0x1000, one new import (ntoskrnl MmMapIoSpace).
+
+**Not done: the install wiring.** The binary is not staged by any flow yet,
+so a fresh native 3.1 install still has no network. Findings for the next
+step (local reading of the 3.1 CD INFs): TCP/IP is not in the 3.1 Setup
+copy lists (only FILELIST.INF and OEMNXPTC.INF name TCPIP.SYS);
+NTLANMAN.INF installs `[ProtoData]` entries only (NBF), so TCP/IP needs a
+`ProtoData_2 = "OEMNXPTC.INF","TCPIP",0,Tcpip` row (billboard 0 = none);
+OEMNXPTC.INF in bind mode calls `CPlSetup TCPCFGCHK` and then
+`configureadapter`, whose `CPlTcpip` is the interactive address dialog: the
+patch has to write IPAddress/SubnetMask (adapter `Parameters\Tcpip`),
+DefaultGateway and NameServer (`Tcpip\Parameters`) itself and skip
+`CPlTcpip`; the adapter can reuse the AS path's Loopback install
+(`[InitialAdapterInstall]` -> LOOP, NDISLoop/NDISLoop1) for WS, followed by
+the 3.5x-style takeover of `NDISLoop` by USNET31.SYS with PciBus/PciDevice/
+PciFunction at the end of GUI Setup (POST.CMD), plus the client policy
+(Server/Browser off, as `NET31CFG /client`). Address source: the prep
+environment runs no DHCP client and ships no igb module, so "the prep
+Linux's lease" needs igb (+ptp/dca deps) in the micro Linux and a bounded
+udhcpc run first; a static profile address works without that. These GUI
+Setup INF changes need one QEMU or X470 fresh-install round before they
+can be the default; ICMP.DLL and WSOCK32.DLL are on the 3.1 CD, so a
+NETCHECK.TXT (ping gateway, TCP 1.1.1.1:80) is feasible from USOSNT3.
