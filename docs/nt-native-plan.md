@@ -774,6 +774,36 @@ X470 risks: the RX 560 VBIOS under 3.1's Ke386CallBios (unproven on 3.1;
 3.51 Full HD works with the same miniport code); if no listed mode works
 framebuf fails -> STOP C0000143 -> boot `[VGA mode]`.
 
+### 8.7.1 X470 run 1: VGA desktop, usosvbe never ran
+
+Patched Micron: desktop, no STOP, still 640x480. Read-only evidence: no
+`UsosVbeModes` (FindAdapter writes it first thing) nor `UsosVbeDiag`
+anywhere in SYSTEM, so the miniport never reached FindAdapter; no event
+log entry (3.1 logs no 7026). usosvbe was a system-start driver (Start
+1): NT 3.1 never ran our WDK-built system-start drivers (usosusb showed
+the same, docs/nt31-2026-10-09.md; every working USOS driver on 3.1 is
+boot start). Fix: `/vesa31` registers usosvbe **Start 0** (the loader
+brings videoprt.sys in as its import; usosvbe initialises with the boot
+drivers, so it is Video0 ahead of vga regardless of Tag). The 3.1 build
+also tries Isa, Eisa, MCA, PCIBus (first success, as vga.sys does) and
+writes `Services\usosvbe` `UsosVbeEntry` (REG_SZ, RtlWriteRegistryValue) =
+`usosvbe 1.2-nt31 entry isa=<status> ...` from DriverEntry, so the next
+run shows DriverEntry -> VideoPortInitialize -> FindAdapter
+(`UsosVbeModes`) -> CSRSS open (`UsosVbeDiag`: VBE list, `first=`, `set=`).
+
+SYSTEM.ALT: NT 3.1 writes the dirty ranges of SYSTEM into SYSTEM.ALT, so
+a structural offline patch of SYSTEM alone left ALT inconsistent (strict
+checker: double references, sk refcount). Offline hive patches must write
+the same image to both files.
+
+Manual resolution on NT 3.1: there is no Display applet; Windows NT Setup
+(Options > Change System Settings > Display) lists only VIDEO.INF options
+or an OEMSETUP.INF from a disk ("Other"), and VIDEO.INF registers drivers
+as system start (which 3.1 never runs for our builds). Until USOS ships its
+own OEMSETUP.INF: regedt32, `Services\usosvbe\Device0`
+`DefaultSettings.XResolution` / `YResolution` / `BitsPerPel` (REG_DWORD,
+a mode the BIOS lists), reboot.
+
 ### 8.8 Network for native NT 3.1: assessment (not implemented)
 
 - **The CD**: TCP/IP is there (TCPIP.SY_, OEMNXPTC.IN_, WSOCK32, PING, FTP,
