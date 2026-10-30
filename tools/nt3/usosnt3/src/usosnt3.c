@@ -1424,6 +1424,71 @@ static void vesa(void)
     say("vesa on\r\n");
 }
 
+/* VESA display on NT 3.1 (POST.CMD "/vesa31", end of GUI Setup; docs/
+   nt-native-plan.md section 8.7): usosvbe.sys (NT 3.1 build, which puts its
+   start mode first in the mode list) + the CD's framebuf.dll, expanded by
+   nt4_csmwrap_target.sh into \USOS\NT3\FRAMEBUF.DLL (NT 3.1 Setup installs
+   framebuf.dll only for Dell DGX and has no expand.exe). NT 3.1 winsrv walks
+   \\.\DISPLAY1.. (= \Device\Video0..) and uses the first device that has
+   InstalledDisplayDrivers; the video drivers load in Tag order of
+   GroupOrderList "Video", where vga has Tag 10, the last entry. usosvbe
+   gets Tag 2 (second entry; jazzg364, Start 4, is the only other user), so
+   it is \Device\Video0 and vga (kept, Start 1) is Video1: the VGA-
+   compatible device for full-screen consoles, and the display of the
+   [VGA mode] (/basevideo) entry, where usosvbe does not start. No
+   DefaultSettings.* for usosvbe: winsrv then passes an all-zero DEVMODE
+   and NT 3.1 framebuf.dll takes the first mode. */
+static void vesa31(void)
+{
+    static const WCHAR drivers[] = L"framebuf\0";
+    char sys[MAX_PATH], dst[MAX_PATH];
+    HKEY h;
+    LONG rc;
+
+    if (GetFileAttributesA(DIR "USOSVBE.SYS") == 0xFFFFFFFF) {
+        say("vesa off: no USOSVBE.SYS, VGA stays\r\n");
+        return;
+    }
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\framebuf.dll");
+    if (GetFileAttributesA(dst) == 0xFFFFFFFF) {
+        if (GetFileAttributesA(DIR "FRAMEBUF.DLL") == 0xFFFFFFFF || !CopyFileA(DIR "FRAMEBUF.DLL", dst, FALSE)) {
+            say("vesa off: no framebuf.dll, VGA stays\r\n");
+            return;
+        }
+        say("copied ");
+        say(dst);
+        say("\r\n");
+    }
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usosvbe.sys");
+    if (!CopyFileA(DIR "USOSVBE.SYS", dst, FALSE)) {
+        say("vesa off: COPY FAILED ");
+        say(dst);
+        say("\r\n");
+        return;
+    }
+    say("copied ");
+    say(dst);
+    say("\r\n");
+    set_dword("usosvbe", NULL, "Type", 1);
+    set_dword("usosvbe", NULL, "Start", 1);
+    set_dword("usosvbe", NULL, "ErrorControl", 0);
+    set_dword("usosvbe", NULL, "Tag", 2);
+    set_sz("usosvbe", "Group", REG_SZ, "Video");
+    rc = open_service_key("usosvbe", "Device0", &h);
+    if (rc == ERROR_SUCCESS) {
+        rc = RegSetValueExW(h, L"InstalledDisplayDrivers", 0, REG_MULTI_SZ, (const BYTE *)drivers, sizeof drivers);
+        RegCloseKey(h);
+    }
+    say(rc == ERROR_SUCCESS ? "usosvbe\\Device0 InstalledDisplayDrivers = framebuf\r\n"
+                            : "usosvbe\\Device0 InstalledDisplayDrivers FAILED\r\n");
+    set_dword("usosvbe", "Device0", "VgaCompatible", 0);
+    say("vesa on (NT 3.1: usosvbe Tag 2 before vga, start mode = the miniport's first mode)\r\n");
+}
+
 static int native_install(void);
 static int net351_version(void);
 static void boot_ini_finish(void);
@@ -2747,6 +2812,12 @@ void __stdcall entry(void)
             say(DeleteFileA("C:\\TXTSETUP.INF") ? "removed C:\\TXTSETUP.INF\r\n" : "CANNOT REMOVE C:\\TXTSETUP.INF\r\n");
         }
         say("finish31 done\r\n");
+        ExitProcess(0);
+    }
+    /* Native NT 3.1: POST.CMD at the end of GUI Setup, before /finish31. */
+    if (lstrcmpA(opt, "vesa31") == 0) {
+        open_log("POST.LOG");
+        vesa31();
         ExitProcess(0);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */

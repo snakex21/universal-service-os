@@ -786,9 +786,29 @@ nt31_native() {
     printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write NATIVE.TXT'
     # POST.CMD (end of GUI Setup): BOOT.INI as the VM finish step writes it
     # and the Setup leftovers removed (usosnt3 /finish31), before DONE.TXT.
-    awk -v BINMODE=3 '{ sub(/\r$/, "") } /^echo done > / { printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
+    # VESA (docs/nt-native-plan.md section 8.7): usosvbe NT 3.1 build
+    # (USOSVBE31.SYS: its start mode, Full HD else 1024x768 / 800x600, is
+    # first in its mode list) + the CD's FRAMEBUF.DL_ expanded here (NT 3.1
+    # has no expand.exe and installs framebuf.dll only for Dell DGX).
+    # USOSNT3 /vesa31 copies and registers them; without either file VGA.
+    vesa31=''
+    if [ -r "$LIB/nt3/USOSVBE31.SYS" ]; then
+        fb31=''
+        for name in FRAMEBUF.DL_ framebuf.dl_ FRAMEBUF.DLL framebuf.dll; do [ -f "$i386/$name" ] && fb31="$i386/$name" && break; done
+        if [ -n "$fb31" ] && "${USOS_FB_UI:-usos-fb-ui}" --szdd-get "$fb31" "$usos/FRAMEBUF.DLL" && [ -s "$usos/FRAMEBUF.DLL" ]; then
+            cp "$LIB/nt3/USOSVBE31.SYS" "$usos/USOSVBE.SYS" || fail 'cannot copy USOSVBE31.SYS'
+            vesa31='C:\USOS\NT3\USOSNT3.EXE /vesa31'
+            log 'display: VESA (usosvbe NT 3.1 build + the CD framebuf.dll; start mode 1920x1080x16, else 1024x768x16 / 800x600x16)'
+        else
+            rm -f "$usos/FRAMEBUF.DLL"
+            log 'display: VGA (640x480x16; the CD has no usable I386\FRAMEBUF.DL_)'
+        fi
+    else
+        log 'display: VGA (640x480x16; no USOSVBE31.SYS in this build)'
+    fi
+    VESA31="$vesa31" awk -v BINMODE=3 '{ sub(/\r$/, "") } /^echo done > / { if (ENVIRON["VESA31"] != "") printf "%s\r\n", ENVIRON["VESA31"]; printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
         cat "$work/post.cmd" > "$usos/POST.CMD" && grep -q 'finish31' "$usos/POST.CMD" || fail 'cannot write POST.CMD'
-    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE /finish31 (BOOT.INI, leftovers)"
+    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE ${vesa31:+/vesa31 + }/finish31 (BOOT.INI, leftovers)"
 }
 
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do

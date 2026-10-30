@@ -727,3 +727,49 @@ NtShutdownSystem(ShutdownNoReboot), which never calls
 HalReturnToFirmware. The last phase-0 shutdown handler wakes a thread;
 when no restart has started 20 s later (the file systems flushed in phase
 1), it logs stage N and powers off through ACPI S5.
+
+### 8.7 VESA for native NT 3.1 (host checks only, no X470 run yet)
+
+The NT 3.x usosvbe build already accepted the 3.1 structure sizes
+(`VIDEO_HW_INITIALIZATION_DATA` 0x20, config info 0x38) and its imports
+resolve on 3.1. What blocked 3.1 (local reading of the user's 3.1 CD
+WINSRV.DLL, FRAMEBUF.DLL, VIDEOPRT.SYS and SYSTEM._ template):
+
+- **Display selection.** 3.1 winsrv walks `\.\DISPLAY1..4`
+  (`\Device\Video0..`), reads `VgaCompatible` and, until a display works,
+  `InstalledDisplayDrivers` + `DefaultSettings.*`; the first device with
+  InstalledDisplayDrivers is used, and if its DLL fails the boot ends in
+  STOP C0000143 (no fall-through to the next device). There is no
+  VgaSave/VgaStart pair: `vga` (Group "Video", Start 1, Tag 10) is both the
+  desktop and the VGA-compatible device. The video drivers load in Tag
+  order of `GroupOrderList\Video` (1,2,3,4,6,7,8,12,13,9,11,14,15,17,18,16,10:
+  vga last; the 3.1 kernel reads GroupOrderList). usosvbe gets **Tag 2**
+  (second slot; only jazzg364, Start 4, has it), so it is Video0 and vga
+  stays Video1 (full-screen consoles; `[VGA mode]` = /basevideo, where
+  usosvbe refuses to start and vga is Video0 again).
+- **No mode API.** 3.1 USER32 has no ChangeDisplaySettings (only
+  EnumDisplayDevices/EnumDisplayDeviceModes), so usosres cannot apply a
+  mode. Missing `DefaultSettings.*` values give an all-zero DEVMODE, and
+  3.1 framebuf.dll then takes the first mode of the miniport's list (its
+  match loop accepts any mode when X, Y, bpp, flags and frequency are 0).
+  The **NT 3.1 build** (`build-nt31.cmd`, `-DUSOSVBE_NT3 -DUSOSVBE_NT31`,
+  `bin/nt31/i386/usosvbe.sys`, version `usosvbe 1.2-nt31`) moves the first
+  available of 1920x1080x16, 1920x1080x32, 1680x1050x16, 1600x900x16,
+  1280x1024x16, 1024x768x16, 800x600x16 to index 0 (UsosVbeDiag
+  ` first=WxHxB`). The NT 3.5x binary (`bin/nt3`) is unchanged.
+- **VideoPortInt10 on 3.1**: same mechanism as 3.51 (SeTcbPrivilege, first
+  call allocates 0..FFFFFh in the caller, frees the Vdm range, maps the
+  physical low MB, Ke386CallBios) but no ROM checksum before each call.
+- **framebuf.dll**: 3.1 Setup installs it only for Dell DGX and has no
+  expand.exe: `nt31_native` expands the CD's SZDD `FRAMEBUF.DL_` with
+  `usos-fb-ui --szdd-get` into `\USOS\NT3\FRAMEBUF.DLL` (not in git).
+
+Wiring: POST.CMD runs `USOSNT3.EXE /vesa31` before `/finish31`: copies
+framebuf.dll (when system32 has none) and usosvbe.sys, `Services\usosvbe`
+Type 1, Start 1, ErrorControl 0, Group "Video", Tag 2, `Device0`
+InstalledDisplayDrivers "framebuf", VgaCompatible 0, no DefaultSettings.
+vga untouched. Tests: `tools/tests/test_nt31_usosvbe.py`.
+
+X470 risks: the RX 560 VBIOS under 3.1's Ke386CallBios (unproven on 3.1;
+3.51 Full HD works with the same miniport code); if no listed mode works
+framebuf fails -> STOP C0000143 -> boot `[VGA mode]`.
