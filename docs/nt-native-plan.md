@@ -1026,3 +1026,26 @@ POST.CMD always runs `/net31`, which without a network sets NetDDE to
 demand start when no NetBIOS service exists. The installed Micron is not
 patched (no TCP/IP / NBF / Loopback registry to complete offline in the
 REGF 1.1 hives); a fresh install is the test.
+
+### 8.10.2 X470 fresh install 2 (B261030-224855): stack installed, takeover refused
+
+Read-only copy of the Micron: GUI Setup installed Loopback + NetBEUI +
+TCP/IP (TCPIP.SYS, STREAMS.SYS, NBT.SYS, PING.EXE present), IP / mask on
+the adapter and `Tcpip\Parameters DefaultGateway` (REG_SZ) as chosen from the
+prep DHCP lease (192.168.0.215/24, gw 192.168.0.1, lease 7200 s). Three bugs:
+- NT 3.1 NCPA names the Loopback instance **NDISLoop01** (`NDISLoop\Linkage
+  Bind = \Device\NDISLoop01`; NT 3.5x: NDISLoop1). `/net31` looked for
+  NDISLoop1 and refused, so loop.sys stayed and the I211 had no driver
+  (NET31.STS = FAILED, no NETCHECK.TXT). Now found at run time (NDISLoop01,
+  else NDISLoop1), also for NETCHECK.
+- The TCP/IP service (TCPIPSVC.DLL) needs per adapter, besides IPAddress /
+  SubnetMask, the DWORDs ForwardBroadcasts, KeepAlive, BroadcastType and
+  Trailers (RouterMTU optional); the skipped address dialog writes them.
+  Event 0x1132 TcpipSvc `...NDISLoop01\Parameters\Tcpip\ForwardBroadcasts`,
+  then SCM dependency failures (TCP/IP NetBIOS). Now written by the
+  OEMNXPTC patch during Setup (0, 0, 1, 0) and again by `/net31`.
+- The Date/Time answer required a 4-digit year; 3.1 MAIN.CPL shows two
+  digits, so the page waited (the zone entry in NATIVE31.INI was right).
+The installed Micron is not patched: completing it offline means adding
+values in both REGF 1.1 hives plus the driver swap, which the own hive
+writer (template keys only) does not do safely; a fresh install is the test.

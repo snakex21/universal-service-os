@@ -264,6 +264,19 @@ class FreshInstall1(unittest.TestCase):
         self.assertEqual(out.strip(), '[(GMT+1:00) Berlin][(GMT+1:00) Berlin][(GMT) ][(GMT+2:00) Athens][]')
         self.assertIn('CB_FINDSTRING', ANS31.read_text(encoding='utf-8'))
 
+    def test_fresh_install_2_fixes(self):
+        # X470 2026-10-31: NT 3.1 names the adapter NDISLoop01; TCPIPSVC needs
+        # four DWORDs per adapter; MAIN.CPL shows a 2-digit year.
+        c = USOSNT3.read_text(encoding='utf-8')
+        self.assertIn('{ "NDISLoop01", "NDISLoop1" }', c)
+        for v in ('"ForwardBroadcasts", 0', '"KeepAlive", 0', '"BroadcastType", 1', '"Trailers", 0'):
+            self.assertIn('n31_dw(tcp, ' + v + ')', c)
+        lib = LIB31.read_text(encoding='utf-8')
+        for v in ('ForwardBroadcasts', 'KeepAlive', 'BroadcastType', 'Trailers'):
+            self.assertIn('{' + v + ',0,$(!REG_VT_DWORD),', lib)
+        g = (ROOT / 'tools/nt3/native31/gui_policy.h').read_text(encoding='utf-8')
+        self.assertIn('if(i==2)return 1;', g)
+
 
 if __name__ == '__main__':
     unittest.main()

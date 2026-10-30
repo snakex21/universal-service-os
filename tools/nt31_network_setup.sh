@@ -235,6 +235,18 @@ usos_nt31_oemnxptc() {
                 out("                CloseRegKey $(UsosNet31Par)")
                 out("            endif")
             }
+            # TCPIPSVC needs these DWORDs per card (the NCPA dialog writes them).
+            out("            ForListDo *($(BindList),4)")
+            out("                Split-String $($), \"\\\", UsosNet31Bind")
+            out("                OpenRegKey $(!REG_H_LOCAL) \"\" $(!NTN_ServiceBase)\"\\\"*($(UsosNet31Bind),6)\"\\Parameters\\TCPIP\" 33554432 UsosNet31Tcp")
+            out("                ifstr(i) $(UsosNet31Tcp) != \"\"")
+            out("                    SetRegValue $(UsosNet31Tcp) {ForwardBroadcasts,0,$(!REG_VT_DWORD),0}")
+            out("                    SetRegValue $(UsosNet31Tcp) {KeepAlive,0,$(!REG_VT_DWORD),0}")
+            out("                    SetRegValue $(UsosNet31Tcp) {BroadcastType,0,$(!REG_VT_DWORD),1}")
+            out("                    SetRegValue $(UsosNet31Tcp) {Trailers,0,$(!REG_VT_DWORD),0}")
+            out("                    CloseRegKey $(UsosNet31Tcp)")
+            out("                endif")
+            out("            EndForListDo")
             out("            set CommonStatus = STATUS_SUCCESSFUL")
             out("            goto end")
             out("        endif")

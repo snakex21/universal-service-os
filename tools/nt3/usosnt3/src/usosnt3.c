@@ -2481,7 +2481,32 @@ static void WINAPI netcheck_main(DWORD argc, LPSTR *argv)
  *   - the marker key removed; usosnetc (/netcheck31) registered for one
  *     silent NETCHECK.TXT at the first boot.
  * NET31.STS (8.3) records each step. */
-#define N31_TCP SVC_KEY "NDISLoop1\\Parameters\\Tcpip"
+/* The Loopback adapter instance: NT 3.1 NCPA names it NDISLoop01 (NT 3.5x:
+   NDISLoop1; X470 fresh install 2 2026-10-31: /net31 looked for NDISLoop1). */
+static char g_n31_ad[16] = "NDISLoop01";
+static char g_n31_tcp[96];
+static const char *n31_adapter(void)
+{
+    static const char *const names[] = { "NDISLoop01", "NDISLoop1" };
+    HKEY h;
+    int i;
+    for (i = 0; i < 2; i++) {
+        char key[96];
+        lstrcpyA(key, SVC_KEY);
+        lstrcatA(key, names[i]);
+        lstrcatA(key, "\\Parameters");
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            RegCloseKey(h);
+            lstrcpyA(g_n31_ad, names[i]);
+            break;
+        }
+    }
+    lstrcpyA(g_n31_tcp, SVC_KEY);
+    lstrcatA(g_n31_tcp, g_n31_ad);
+    lstrcatA(g_n31_tcp, "\\Parameters\\Tcpip");
+    return g_n31_ad;
+}
+#define N31_TCP g_n31_tcp
 
 /* "key=value" of a CR LF text (value up to CR / LF); "" when missing. */
 static void n31_value(const char *text, const char *key, char *out, int cap)
@@ -2570,6 +2595,15 @@ static void n31_service_off(const char *svc)
     RegCloseKey(h);
 }
 
+static const char *g_n31_tcp_params(void)
+{
+    static char key[96];
+    n31_adapter();
+    lstrcpyA(key, SVC_KEY);
+    lstrcatA(key, g_n31_ad);
+    lstrcatA(key, "\\Parameters");
+    return key;
+}
 static void net31(void)
 {
     static char meta[2048];
@@ -2601,18 +2635,18 @@ static void net31(void)
         return;
     }
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop", 0, KEY_READ | KEY_WRITE, &svc) != ERROR_SUCCESS ||
-        RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop1\\Parameters", 0, KEY_READ | KEY_WRITE, &params) != ERROR_SUCCESS) {
-        say("net31 FAILED: no NDISLoop / NDISLoop1 (GUI Setup installed no Loopback adapter); network stays off\r\n");
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_n31_tcp_params(), 0, KEY_READ | KEY_WRITE, &params) != ERROR_SUCCESS) {
+        say("net31 FAILED: no NDISLoop / NDISLoop01 / NDISLoop1 (GUI Setup installed no Loopback adapter); network stays off\r\n");
         ok = 0;
         goto done;
     }
     /* TCP/IP's binding (3.1 STREAMS form \Device\Streams\NDISLoop1). */
     size = sizeof data;
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Tcpip\\Linkage", 0, KEY_READ, &link) == ERROR_SUCCESS &&
-        RegQueryValueExA(link, "Bind", NULL, &type, data, &size) == ERROR_SUCCESS && n31_contains((char *)data, size, "NDISLoop1"))
-        say("Tcpip\\Linkage Bind has NDISLoop1\r\n");
+        RegQueryValueExA(link, "Bind", NULL, &type, data, &size) == ERROR_SUCCESS && n31_contains((char *)data, size, g_n31_ad))
+        say("Tcpip\\Linkage Bind has the Loopback adapter\r\n");
     else
-        say("WARNING: Tcpip\\Linkage Bind without NDISLoop1 (TCP/IP not bound to the adapter?)\r\n");
+        say("WARNING: Tcpip\\Linkage Bind without the Loopback adapter (TCP/IP not bound to the adapter?)\r\n");
     if (link) RegCloseKey(link);
     size = sizeof data;
     if (RegQueryValueExA(svc, "Start", NULL, &type, data, &size) == ERROR_SUCCESS && type == REG_DWORD)
@@ -2658,6 +2692,12 @@ static void net31(void)
     ok &= nc_ipv4(v) != 0 && n31_sz(tcp, "IPAddress", REG_SZ, v);
     n31_value(meta, "mask", v, sizeof v);
     ok &= n31_sz(tcp, "SubnetMask", REG_SZ, v);
+    /* Required by the NT 3.1 TCP/IP service (TCPIPSVC reads them as DWORDs
+       and does not start without them; the skipped NCPA dialog writes them). */
+    ok &= n31_dw(tcp, "ForwardBroadcasts", 0);
+    ok &= n31_dw(tcp, "KeepAlive", 0);
+    ok &= n31_dw(tcp, "BroadcastType", 1);
+    ok &= n31_dw(tcp, "Trailers", 0);
     n31_value(meta, "gateway", v, sizeof v);
     if (v[0]) ok &= n31_sz(tparams, "DefaultGateway", REG_SZ, v);
     n31_value(meta, "dns", v, sizeof v);
@@ -2782,6 +2822,7 @@ static void netcheck31(void)
     int i;
     static const char *const diag[] = { "Stage", "Status", "Value", "Sequence" };
 
+    n31_adapter();
     lstrcpyA(g_text, "USOS NT 3.1 network check\r\nstate=waiting 45 s for TCP/IP\r\n");
     write_file_checked("NETCHECK.TXT", g_text);
     Sleep(45000);

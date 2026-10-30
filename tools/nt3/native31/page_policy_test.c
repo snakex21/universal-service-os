@@ -20,7 +20,7 @@ void entry(void)
     text("Unrecognized Setup failure");if(nt31_page(page,2000)!=NT31_NONE)ExitProcess(11);
     text("Express Setup (recommended)");if(nt31_page(page,2000)!=NT31_EXPRESS)ExitProcess(12);
     if(!nt31_year("2026") || !nt31_year("1990") || !nt31_year("2099"))ExitProcess(13);
-    if(nt31_year("26") || nt31_year("20261") || nt31_year("20x6") || nt31_year("1990extra"))ExitProcess(14);
+    if(!nt31_year("26") || nt31_year("2") || nt31_year("260") || nt31_year("20261") || nt31_year("20x6") || nt31_year("1990extra"))ExitProcess(14);
     if(!nt31_domain("USOSDOMAIN") || !nt31_domain("USOS-NT31") || !nt31_domain("ABCDEFGHIJKLMNO"))ExitProcess(15);
     if(nt31_domain("") || nt31_domain("ABCDEFGHIJKLMNOP") || nt31_domain("-BAD") || nt31_domain("BAD-") || nt31_domain("lower") || nt31_domain("BAD\\NAME"))ExitProcess(16);
     ExitProcess(0);
