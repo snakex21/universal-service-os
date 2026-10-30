@@ -140,7 +140,8 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
     // page); without one only the native Setup start is left.
     if (std.ascii.eqlIgnoreCase(system_id, "windows-95")) return if (has95Key(p)) null else .product_key;
     // Windows NT 4.0: ProductId (the 95 key shapes); without it GUI Setup waits.
-    if (@import("nt4.zig").isNt4(system_id)) return if (@import("nt4.zig").validKey(p.keyFor(system_id))) null else .product_key;
+    // Manual Setup (win9x_setup=manual, native): Setup's own key page asks.
+    if (@import("nt4.zig").isNt4(system_id)) return if (p.win9x_setup == .manual or @import("nt4.zig").validKey(p.keyFor(system_id))) null else .product_key;
     // POSReady 2009: a 5x5 key; without it Setup stops ("Invalid product key").
     if (@import("posready.zig").isPosReady(system_id)) return if (@import("posready.zig").validKey(p.keyFor(system_id))) null else .product_key;
     // Windows NT 3.51: no key (INITIAL.INF DisplayPidDlg = NO), nothing missing.
@@ -153,6 +154,15 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
     const client = family.client();
     if ((client == .windows_8 or client == .windows_8_1) and p.keyFor(system_id).len == 0) return .product_key;
     return null;
+}
+
+test "missing: NT 4.0 needs a key unless Setup is manual" {
+    var p = try profileFrom("name=A
+user=Bob
+");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-nt-4").?);
+    p.win9x_setup = .manual;
+    try std.testing.expect(missing(&p, "windows-nt-4") == null);
 }
 
 test "missing: Windows 8.1 family needs a key, Server 2008 R2 does not" {

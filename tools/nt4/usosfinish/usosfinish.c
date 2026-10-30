@@ -286,6 +286,98 @@ static void logon_main(void)
     ExitProcess(0);
 }
 
+/* USOSNT4.EXE /restart (native POST.CMD, started detached right before it
+ * ends): NT 4.0 Explorer runs the HKLM RunOnce values one after another and
+ * waits for each (initcab.c RunRegApps RRA_WAIT); POST.CMD is one of them.
+ * The values after it (registrations of SP6a / GUI Setup, "regsvr32 /s ...")
+ * only start once POST.CMD has ended, so a restart from POST.CMD itself met
+ * them half-way (X470 2026-10-30: "regsvr32.exe - DLL initialization failed
+ * ... the workstation is shutting down"). This waits until the RunOnce key
+ * is empty and no registration helper (regsvr32, rundll32, runonce, grpconv)
+ * runs, for 6 s in a row (at most 10 minutes), then restarts with USOSOFF /r.
+ * Processes come from NtQuerySystemInformation(SystemProcessInformation):
+ * NT 4.0 kernel32 has no Toolhelp32. RESTART.LOG gets the steps. */
+typedef LONG (WINAPI *NT_QSI)(ULONG, PVOID, ULONG, PULONG);
+static int name_is(const WCHAR *s, USHORT bytes, const char *want)
+{
+    int i, n = bytes / 2;
+    for (i = 0; i < n; i++) {
+        WCHAR c = s[i];
+        if (!want[i]) return 0;
+        if (c >= 'A' && c <= 'Z') c = (WCHAR)(c + 32);
+        if (c != (WCHAR)(unsigned char)want[i]) return 0;
+    }
+    return want[n] == 0;
+}
+
+static int helpers_running(NT_QSI qsi, char *found)
+{
+    static BYTE buf[256 * 1024];
+    static const char *const names[] = { "regsvr32.exe", "rundll32.exe", "runonce.exe", "grpconv.exe" };
+    ULONG off = 0, got = 0, i;
+    found[0] = 0;
+    if (!qsi || qsi(5, buf, sizeof buf, &got) < 0) return 0;      /* unknown: do not hold the restart */
+    for (;;) {
+        BYTE *e = buf + off;
+        USHORT len = *(USHORT *)(e + 0x38);
+        const WCHAR *name = *(const WCHAR **)(e + 0x3C);
+        if (name && len)
+            for (i = 0; i < sizeof names / sizeof names[0]; i++)
+                if (name_is(name, len, names[i])) { lstrcpyA(found, names[i]); return 1; }
+        if (!*(ULONG *)e) break;
+        off += *(ULONG *)e;
+        if (off >= sizeof buf) break;
+    }
+    return 0;
+}
+
+static int runonce_values(void)
+{
+    HKEY h; DWORD n = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce", 0, KEY_READ, &h) != ERROR_SUCCESS) return 0;
+    if (RegQueryInfoKeyA(h, NULL, NULL, NULL, NULL, NULL, NULL, &n, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) n = 0;
+    RegCloseKey(h);
+    return (int)n;
+}
+
+static void restart_main(void)
+{
+    NT_QSI qsi = (NT_QSI)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
+    char found[16], cmd[MAX_PATH];
+    int quiet = 0, ticks, last = -1;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    open_log("RESTART.LOG");
+    say("restart: waiting for the RunOnce queue and registration helpers\r\n");
+    for (ticks = 0; ticks < 600 && quiet < 6; ticks++) {
+        int values = runonce_values(), busy = helpers_running(qsi, found);
+        if (values || busy) {
+            quiet = 0;
+            if (values + busy * 100 != last) {
+                say("restart: busy, RunOnce values ");
+                say_hex("", (DWORD)values);
+                if (busy) { say("restart: running "); say(found); say("\r\n"); }
+                last = values + busy * 100;
+            }
+        } else {
+            quiet++;
+        }
+        Sleep(1000);
+    }
+    say(quiet >= 6 ? "restart: queue empty, restarting\r\n" : "restart: still busy after 10 minutes, restarting anyway\r\n");
+    lstrcpyA(cmd, DIR "USOSOFF.EXE /r");
+    for (ticks = 0; ticks < (int)sizeof si; ticks++) ((volatile char *)&si)[ticks] = 0;
+    si.cb = sizeof si;
+    if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    } else {
+        say_hex("restart: USOSOFF.EXE could not start, error ", GetLastError());
+    }
+    ExitProcess(0);
+}
+
 void __stdcall entry(void)
 {
     OSVERSIONINFOA os;
@@ -301,6 +393,7 @@ void __stdcall entry(void)
     if (!lstrcmpA(opt, "notice")) notice_main();     /* POST.CMD: start "" ... /notice */
     if (!lstrcmpA(opt, "nonotice")) { notice_close(); ExitProcess(0); }
     if (!lstrcmpA(opt, "logon")) logon_main();       /* HKLM Run USOSAutoLogon */
+    if (!lstrcmpA(opt, "restart")) restart_main();   /* POST.CMD: start "" ... /restart */
     if (!lstrcmpA(opt, "netcheck")) {
         static SERVICE_TABLE_ENTRYA table[] = { { "usosnetc", netcheck_main }, { NULL, NULL } };
         if (!StartServiceCtrlDispatcherA(table)) netcheck();

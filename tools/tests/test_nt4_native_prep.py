@@ -231,4 +231,26 @@ class NativePrep(unittest.TestCase):
         self.assertIn('[ "$NT4_MANUAL" = 1 ] && [ "$NT4_NATIVE_PREP" != 1 ]',gate)
         self.assertIn('elif [ -z "$nt3" ]; then\n    key_state=$(nt4_key_gate',gate)
 
+    def test_native_restart_after_runonce_queue(self):
+        # X470 2026-10-30: regsvr32 popup "workstation is shutting down" at
+        # the POST.CMD restart: the restart now waits for the RunOnce queue.
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        post=src[src.index('crlf > "$usos/POST.CMD"'):]
+        post=post[:post.index('\nEOF\n')]
+        tail=post[post.index(':nativefinished'):post.index(':nativefailed')]
+        self.assertLess(tail.index('if not exist C:\\USOS\\NT4\\NATIVE.TXT goto vmoff'),tail.index('start "USOS" C:\\USOS\\NT4\\USOSNT4.EXE /restart\ngoto end'))
+        self.assertIn(':vmoff\nC:\\USOS\\NT4\\USOSOFF.EXE /r',tail)     # VM path unchanged
+        fin=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+        body=c_function(fin,'restart_main')
+        self.assertLess(body.index('runonce_values()'),body.index('DIR "USOSOFF.EXE /r"'))
+        self.assertIn('quiet < 6',body)
+        names=c_function(fin,'helpers_running')
+        for name in ('regsvr32.exe','rundll32.exe','runonce.exe','grpconv.exe'):
+            self.assertIn(name,names)
+        self.assertIn('if (!lstrcmpA(opt, "restart")) restart_main();',fin)
+        self.assertLess(fin.index('"restart")) restart_main();'),fin.index('open_log("NATIVE.LOG");\n    if (!lstrcmpA(opt, "early"))'))
+        summary=(ROOT/'src/platform/uefi/manual_summary.zig').read_text()
+        self.assertIn('"\\\\EFI\\\\USOS\\\\win9x\\\\nt4-native.flag"',summary)
+        self.assertLess(summary.index('if (nt4ManualRow(root, system.id, chosen == null, unattended == null))'),summary.index('key_prompt.needed(system.id, chosen'))
+
 if __name__=='__main__': unittest.main()

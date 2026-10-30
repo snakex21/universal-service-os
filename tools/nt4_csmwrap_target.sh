@@ -1523,6 +1523,11 @@ EOF
 # to rsaenh.128 and runs update.exe again: the system drops to standard
 # encryption (SP6a installs that schannel.dll anyway). A real 128-bit SP6a
 # installs at the first try and nothing is switched.
+# Native: the restart goes to USOSNT4.EXE /restart, started detached so POST.CMD
+# ends first. Explorer runs the HKLM RunOnce values after POST.CMD one by one
+# (SP6a / Setup registrations, regsvr32), and a restart from inside POST.CMD
+# interrupted them (X470 2026-10-30, "regsvr32.exe - DLL initialization
+# failed"); the helper restarts once that queue has run.
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
 if exist C:\USOS\NT4\NATIVE.TXT start "USOS" C:\USOS\NT4\USOSNT4.EXE /notice
@@ -1635,6 +1640,10 @@ C:\USOS\NT4\USOSNT4.EXE /finish
 if errorlevel 1 goto nativefailed
 :nativefinished
 echo done > C:\USOS\NT4\DONE.TXT
+if not exist C:\USOS\NT4\NATIVE.TXT goto vmoff
+start "USOS" C:\USOS\NT4\USOSNT4.EXE /restart
+goto end
+:vmoff
 C:\USOS\NT4\USOSOFF.EXE /r
 goto end
 :nativefailed
