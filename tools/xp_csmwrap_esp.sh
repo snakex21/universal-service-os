@@ -30,7 +30,7 @@ PINNED_DIAG=a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
 # and \USOS\BOOTLOG.TXT starts empty (the logger sizes its ring on the
 # first boot). Every other flow keeps CSMWrap as BOOTX64.EFI.
 BOOTLOG_EFI=${USOS_NT_BOOTLOG_EFI:-${USOS_LIB_DIR:-/usr/lib/usos}/nt3/NTBOOTLG.EFI}
-PINNED_BOOTLOG=5941eef0791bb3b85abe56fd6bd6db9e9067fddf39db3d9633980025ee5d1459
+PINNED_BOOTLOG=48ef72c8e02c2a960276871d042f2d27c15c7baeefc69422bba1be4626039a7c
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'

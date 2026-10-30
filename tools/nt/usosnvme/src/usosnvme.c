@@ -57,6 +57,9 @@ static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN B
 static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext, ULONG Source);
 
 ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2);
+#ifdef USOSNVME_NT31
+static VOID NvmeRingInit(VOID);
+#endif
 static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID BusInformation,
                              IN PCHAR ArgumentString, IN OUT PPORT_CONFIGURATION_INFORMATION ConfigInfo,
                              OUT PBOOLEAN Again);
@@ -922,6 +925,9 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
 #ifdef USOSNVME_NT4
     if (!g_NvmeSosRead) { g_NvmeSos = NvmeBootSos(); g_NvmeSosRead = TRUE; }
 #endif
+#ifdef USOSNVME_NT31
+    NvmeRingInit();       /* once; silent request ring for the pre-boot logger */
+#endif
     if (ext->Regs != NULL) return SP_RETURN_FOUND;
 
     bus = ConfigInfo->SystemIoBusNumber;
@@ -1088,6 +1094,11 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     ext->IdentPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_IDENT * NVME_PAGE);
     ext->PrpList = (PULONG)(ext->Uncached + NVME_PG_PRPLIST * NVME_PAGE);
     ext->PrpListPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_PRPLIST * NVME_PAGE);
+#ifdef USOSNVME_NT31
+    ext->Ring = ext->Uncached + NVME_PG_RING * NVME_PAGE;
+    ext->RingPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_RING * NVME_PAGE);
+    NvmeZero(ext->Ring, NVME_PAGE);
+#endif
 #ifdef USOSNVME_W9X
     /* the queues need physically contiguous pages */
     for (i = 1; i < NVME_PAGES; i++) {
@@ -1886,6 +1897,134 @@ static VOID NvmeIoRow(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN
         Ext->Vga[NVME_IO_ROW * 80 + i] = (USHORT)(0x1F00 | ch);
     }
 }
+
+/* NT 3.1 silent request ring (2026-10-30): the USOS NT pre-boot logger
+   (tools/nt_bootlog) prepares the page at physical 50000000h on every boot
+   ("USOSPRE1", boot number, complement) and decodes it into
+   \USOS\BOOTLOG.TXT on the next boot, so after a reset-button reset the
+   last requests of the hung boot are on the ESP without any photo. NT 3.1
+   runs with 64 MiB (MBR RAM cap), so NT never owns the page; it is written
+   only when the logger's header is valid, mapped non-cached. Layout
+   (decode.zig, nvme_ring_*): +100h "USOSNVR1", +108h boot (copied), +10Ch
+   requests seen, +200h 64 entries of 16 bytes, entry (seq - 1) % 64:
+   seq, LBA, blocks (u16), opcode (CDB byte 0, or F0h + SRB function for a
+   non-SCSI request), SRB status (FFh while inside HwStartIo), time in
+   2^20 TSC ticks since the first request. */
+#define NVME_RING_ADDRESS 0x50000000UL
+static volatile UCHAR *g_NvmeRing;
+static ULONG g_NvmeRingT0;
+
+static ULONG NvmeTsc20(VOID)
+{
+    ULONG lo, hi;
+    __asm {
+        rdtsc
+        mov lo, eax
+        mov hi, edx
+    }
+    return (hi << 12) | (lo >> 20);
+}
+
+static VOID NvmeRingInit(VOID)
+{
+    PHYSICAL_ADDRESS pa;
+    volatile UCHAR *page;
+    ULONG boot, i;
+
+    if (g_NvmeRing != NULL) return;
+    pa.LowPart = NVME_RING_ADDRESS;
+    pa.HighPart = 0;
+    page = (volatile UCHAR *)MmMapIoSpace(pa, 0x1000, 0 /* non-cached */);
+    if (page == NULL) return;
+    boot = *(volatile ULONG *)(page + 8);
+    if (*(volatile ULONG *)page != 0x534F5355UL || *(volatile ULONG *)(page + 4) != 0x31455250UL ||
+        *(volatile ULONG *)(page + 12) != ~boot)
+        return;                              /* no logger this boot: never write */
+    for (i = 0x100; i < 0x600; i++) page[i] = 0;
+    *(volatile ULONG *)(page + 0x108) = boot;
+    *(volatile ULONG *)(page + 0x100) = 0x534F5355UL;   /* "USOS" */
+    *(volatile ULONG *)(page + 0x104) = 0x3152564EUL;   /* "NVR1" */
+    g_NvmeRing = page;
+}
+
+/* The same 1.5 KiB block (offsets as in the RAM page) is kept in the
+   uncached page NVME_PG_RING and, on /SOS boots, written to disk LBA 48-50
+   after every completed request: the gap before partition 1 (the NT 3.x
+   MBR uses LBA 0-5, the partition starts at 63), so the ring also survives
+   a reset whose firmware clears RAM (X470 2026-10-30 boot 7: the marker
+   page did not survive a reset-button reset after a 30 min hang). */
+#define NVME_RING_DISK_LBA 48
+static VOID NvmeRingPut(PHW_DEVICE_EXTENSION Ext, ULONG Off, const UCHAR *Src, ULONG Len)
+{
+    ULONG i;
+    for (i = 0; i < Len; i++) {
+        if (g_NvmeRing != NULL) g_NvmeRing[Off + i] = Src[i];
+        if (Ext->Ring != NULL) Ext->Ring[Off + i] = Src[i];
+    }
+}
+
+static VOID NvmeRingDisk(PHW_DEVICE_EXTENSION Ext)
+{
+    NVME_SQE c;
+
+    if (!g_NvmeSos || Ext->Ring == NULL || !Ext->ControllerUp || !Ext->NamespaceReady || Ext->NeedRestart) return;
+    if (Ext->NsBlocksHi == 0 && Ext->NsBlocksLo <= NVME_RING_DISK_LBA + 3) return;
+    NvmeZero(&c, sizeof(c));
+    c.Cdw0 = NVME_NVM_WRITE;
+    c.Nsid = Ext->Nsid;
+    c.Prp1Lo = Ext->RingPhys.LowPart;
+    c.Prp1Hi = (ULONG)Ext->RingPhys.HighPart;
+    c.Cdw10 = NVME_RING_DISK_LBA;
+    c.Cdw12 = 3 - 1;                     /* 3 blocks = block bytes 0 - 5FFh */
+    Ext->Dirty = TRUE;
+    (VOID)NvmeExec(Ext, &Ext->Io, &c, NVME_IO_TIMEOUT_US, NULL);
+}
+
+static VOID NvmeRingNote(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Done)
+{
+    static ULONG seq;
+    UCHAR e[16];
+    PUCHAR cdb = Srb->Cdb;
+    ULONG lba = 0, blocks = 0, now;
+    UCHAR op;
+
+    if (g_NvmeRing == NULL && Ext->Ring == NULL) return;
+    if (!Done) {
+        seq++;
+        if (seq == 1 && Ext->Ring != NULL) {
+            static const UCHAR sig[8] = { 'U', 'S', 'O', 'S', 'N', 'V', 'R', '1' };
+            ULONG boot = g_NvmeRing != NULL ? *(volatile ULONG *)(g_NvmeRing + 8) : 0;
+            NvmeCopy(Ext->Ring + 0x100, sig, 8);
+            NvmeCopy(Ext->Ring + 0x108, &boot, 4);
+        }
+        NvmeRingPut(Ext, 0x10C, (PUCHAR)&seq, 4);
+    }
+    if (seq == 0) return;
+    if (Srb->Function != SRB_FUNCTION_EXECUTE_SCSI) {
+        op = (UCHAR)(0xF0 + (Srb->Function & 0x0F));
+    } else {
+        op = cdb[0];
+        if (op == SCSIOP_READ || op == SCSIOP_WRITE) {
+            lba = NvmeGetBe32(cdb + 2);
+            blocks = ((ULONG)cdb[7] << 8) | cdb[8];
+        } else if (op == SCSIOP_READ6 || op == SCSIOP_WRITE6) {
+            lba = ((ULONG)(cdb[1] & 0x1F) << 16) | ((ULONG)cdb[2] << 8) | cdb[3];
+            blocks = cdb[4] ? cdb[4] : 256;
+        }
+    }
+    now = NvmeTsc20();
+    if (g_NvmeRingT0 == 0) g_NvmeRingT0 = now ? now : 1;
+    now -= g_NvmeRingT0;
+    NvmeCopy(e + 0, &seq, 4);
+    NvmeCopy(e + 4, &lba, 4);
+    e[8] = (UCHAR)blocks;
+    e[9] = (UCHAR)(blocks >> 8);
+    e[10] = op;
+    e[11] = Done ? Srb->SrbStatus : 0xFF;
+    NvmeCopy(e + 12, &now, 4);
+    NvmeRingPut(Ext, 0x200 + ((seq - 1) & 63) * 16, e, 16);
+    if (Done) NvmeRingDisk(Ext);
+}
 #endif
 
 static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
@@ -1894,6 +2033,7 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
 
 #ifdef USOSNVME_NT31
     ext->IoSrbs++;
+    NvmeRingNote(ext, Srb, FALSE);
     NvmeIoRow(ext, Srb, FALSE);
 #endif
     switch (Srb->Function) {
@@ -1983,6 +2123,7 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
     if ((ext->Srbs & 0x3FF) == 0) NvmeDbgCounters(ext, "io");
 #endif
 #ifdef USOSNVME_NT31
+    NvmeRingNote(ext, Srb, TRUE);
     NvmeIoRow(ext, Srb, TRUE);
 #endif
     ScsiPortNotification(RequestComplete, ext, Srb);

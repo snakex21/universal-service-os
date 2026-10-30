@@ -151,6 +151,7 @@ fn logMarker(out: *d.Out, bs: *uefi.tables.BootServices, boot: u32, tsc: u64) vo
     for (&copy, 0..) |*b, i| b.* = @as(*volatile u8, &page[i]).*;
     out.put("\r\n");
     d.formatMarker(out, d.parseMarker(&copy), boot -% 1);
+    d.formatNvmeRing(out, &copy);
     if (state.type != 7) {
         // Owned by the firmware (or another loader): never write it; usosrst
         // then finds no valid header and leaves the page alone too.

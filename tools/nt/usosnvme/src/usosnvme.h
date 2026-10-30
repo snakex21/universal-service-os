@@ -112,7 +112,12 @@
 #define NVME_PG_IOCQ       3
 #define NVME_PG_IDENT      4
 #define NVME_PG_PRPLIST    5
+#ifdef USOSNVME_NT31
+#define NVME_PG_RING       6   /* NT 3.1 diagnostics: request ring copy for disk LBA 48-50 */
+#define NVME_PAGES         7
+#else
 #define NVME_PAGES         6
+#endif
 
 #define NVME_BAR_MAP_SIZE  0x2000
 #define NVME_MAX_TRANSFER  (128UL * 1024UL)
@@ -234,6 +239,8 @@ typedef struct _HW_DEVICE_EXTENSION {
 #ifdef USOSNVME_NT31
     ULONG IoSrbs;                /* NT 3.1 /SOS I/O row: SRBs seen by HwStartIo */
     ULONG LastPrp1;              /* NT 3.1 /SOS I/O row: PRP1 of the last READ / WRITE */
+    PUCHAR Ring;                 /* NT 3.1 /SOS: 1.5 KiB ring block (page NVME_PG_RING) */
+    SCSI_PHYSICAL_ADDRESS RingPhys;
 #endif
 #ifdef USOSNVME_PRPCHECK
     BOOLEAN DmaHighLogged;       /* NVME_LOG_DMA_HIGH written for this start */

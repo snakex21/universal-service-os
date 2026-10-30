@@ -678,3 +678,23 @@ PRP1. Patched onto the Micron (PATCH-261030-184215.TXT), BOOT.INI keeps
 usosnvme (look at Scsidisk / ScsiPort queueing, map-register allocation);
 `>` frozen = a command inside usosnvme never returns; `<` with an error
 status = the failing request.
+
+### 8.5 X470 run 5: the NVMe path works; silent request ring
+
+Photo with the 8.4 build: row 10 `NVME io 80 < fn 00 cdb 28 ... len 06A00
+st 01 R 70 E 0`: 112 READ(10) requests completed with SRB_STATUS_SUCCESS,
+the last one left HwStartIo, then no further request; AHCINT's timer still
+ticks. The disk path works; NT waits on something after loading what it
+read. BOOTLOG.TXT of that run: the reset-button reset after a 30 min hang
+did NOT keep the RAM marker page (boot 7: ABSENT, POST took longer), while
+the earlier short hangs did (boots 4, 5).
+
+Silent measurement (no photo): usosnvme NT31 (14464 B) keeps the last 64
+requests (seq, LBA, blocks, opcode, SRB status, time in 2^20 TSC ticks) in
+the logger's RAM page at +100h ("USOSNVR1", only when the logger's header
+is valid) and, on /SOS boots, writes the same 1.5 KiB block to disk LBA
+48-50 (the free gap before partition 1; the NT 3.x MBR uses LBA 0-5) after
+every completed request, so the ring survives a RAM-clearing reset. The
+pre-boot logger (nt-bootlog, 70656 B, pinned hash updated) decodes the RAM
+copy into BOOTLOG.TXT ("NVMe ring" lines). A scratchpad tool maps the
+LBAs to files on the FAT16 C: offline.

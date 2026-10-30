@@ -148,6 +148,39 @@ pub fn formatMarker(out: *Out, m: Marker, previous_boot: u32) void {
     out.put("\r\n");
 }
 
+// ---------------------------------------------------------------- NVMe ring
+// usosnvme NT31 build (tools/nt/usosnvme/src/usosnvme.c, NvmeRingNote): the
+// last 64 requests seen by HwStartIo, written into the same page when the
+// PRE part is valid. Entry (seq - 1) % 64, 16 bytes: seq u32, LBA u32,
+// blocks u16, opcode u8 (CDB byte 0, or F0h + SRB function), SRB status u8
+// (FFh = still inside HwStartIo), time u32 in 2^20 TSC ticks since the first.
+pub const nvme_ring_signature = "USOSNVR1";
+pub const off_nvme_ring = 0x100;
+pub const off_nvme_ring_boot = 0x108;
+pub const off_nvme_ring_count = 0x10C;
+pub const off_nvme_ring_entries = 0x200;
+pub const nvme_ring_entries = 64;
+
+pub fn formatNvmeRing(out: *Out, page: []const u8) void {
+    if (page.len < 4096 or !std.mem.eql(u8, page[off_nvme_ring..][0..8], nvme_ring_signature)) return;
+    const count = le32(page, off_nvme_ring_count);
+    out.print("  NVMe ring (usosnvme NT31): boot {d} requests {d}; seq:op lba+blocks st t(2^20 tsc)\r\n", .{ le32(page, off_nvme_ring_boot), count });
+    const shown: u32 = @min(count, nvme_ring_entries);
+    var seq: u32 = count - shown + 1;
+    var col: u32 = 0;
+    while (shown != 0 and seq <= count) : (seq += 1) {
+        const e = page[off_nvme_ring_entries + ((seq - 1) % nvme_ring_entries) * 16 ..][0..16];
+        const blocks = std.mem.readInt(u16, e[8..10], .little);
+        out.print("{s}{d}:{x:0>2} {x}+{x} {x:0>2} {d}", .{ if (col == 0) "   " else " | ", le32(e, 0), e[10], le32(e, 4), blocks, e[11], le32(e, 12) });
+        col += 1;
+        if (col == 4) {
+            out.put("\r\n");
+            col = 0;
+        }
+    }
+    if (col != 0) out.put("\r\n");
+}
+
 // ---------------------------------------------------------------- ring file
 // \USOS\BOOTLOG.TXT: a 128-byte header line, then `slots` fixed 4 KiB text
 // slots (space padded, CRLF at the end); boot n goes to slot (n-1) % slots.
@@ -302,6 +335,36 @@ test "marker round trip and NT part layout" {
     // Stage count is bounded.
     std.mem.writeInt(u32, page[off_nt_count..][0..4], 0xFFFF, .little);
     try std.testing.expectEqual(@as(usize, nt_stages_max), parseMarker(&page).stages.len);
+}
+
+test "nvme ring decode" {
+    var page: [4096]u8 = undefined;
+    @memset(&page, 0);
+    var storage: [4096]u8 = undefined;
+    var out = Out{ .buf = &storage };
+    formatNvmeRing(&out, &page);
+    try std.testing.expectEqual(@as(usize, 0), out.len);
+    // What usosnvme NvmeRingInit / NvmeRingNote write (70 requests).
+    @memcpy(page[off_nvme_ring..][0..8], nvme_ring_signature);
+    std.mem.writeInt(u32, page[off_nvme_ring_boot..][0..4], 9, .little);
+    std.mem.writeInt(u32, page[off_nvme_ring_count..][0..4], 70, .little);
+    var seq: u32 = 1;
+    while (seq <= 70) : (seq += 1) {
+        const e = page[off_nvme_ring_entries + ((seq - 1) % 64) * 16 ..][0..16];
+        std.mem.writeInt(u32, e[0..4], seq, .little);
+        std.mem.writeInt(u32, e[4..8], 0x1000 + seq, .little);
+        std.mem.writeInt(u16, e[8..10], 0x35, .little);
+        e[10] = 0x28;
+        e[11] = if (seq == 70) 0xFF else 0x01;
+        std.mem.writeInt(u32, e[12..16], seq * 3, .little);
+    }
+    formatNvmeRing(&out, &page);
+    const s = out.slice();
+    try std.testing.expect(std.mem.indexOf(u8, s, "boot 9 requests 70") != null);
+    try std.testing.expect(std.mem.indexOf(u8, s, "   7:28 1007+35 01 21") != null);
+    try std.testing.expect(std.mem.indexOf(u8, s, "70:28 1046+35 ff 210") != null);
+    try std.testing.expect(std.mem.indexOf(u8, s, " 6:28") == null);
+    try std.testing.expect(!out.truncated);
 }
 
 test "ring header and slots" {
