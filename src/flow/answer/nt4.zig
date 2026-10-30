@@ -30,8 +30,14 @@
 //! 2026-10-30 also the licence agreement (no OemSkipEula), the Administrator
 //! password (no OEMBlankAdminPassword; with a password USOSNT4 /early turns
 //! the automatic logon off and the post step / add-on chain continue after
-//! the user's own logon), the display page with its test (no [Display]) and
-//! the workgroup / domain page (no JoinWorkgroup). Kept for the modern-PC
+//! the user's own logon) and the display page with its test (no
+//! [Display]). The workgroup stays answered (the profile's or WORKGROUP):
+//! NT 4.0's network wizard in unattended mode presses Next on its join page
+//! by itself and, without JoinWorkgroup, shows "Join\Workgroup is missing or
+//! invalid" first (netsetup wjoin.cpp; X470 2026-10-30); only [Network]
+//! Attended = Yes would make the page plain, and that hands the whole
+//! network wizard (adapter, protocols) to the user, which the loopback
+//! takeover cannot survive. Control Panel > Network changes it later. Kept for the modern-PC
 //! path: [Data], [Unattended] text mode (local source, MPS HAL, the USOS
 //! disk, OemPreinstall for CMDLINES.TXT and POST.CMD) and the network
 //! adapter and protocol ([Network] InstallAdapters: the MS Loopback adapter
@@ -137,7 +143,7 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     if (!manual) try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
     try @import("addons_profile.zig").metadata(p, &w);
     try optionLines(p, &w);
-    try @import("network_defaults.zig").nt4(p, if (manual) "" else if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &w);
+    try @import("network_defaults.zig").nt4(p, if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &w);
     return w.buffered();
 }
 
@@ -199,11 +205,12 @@ test "NT 4.0 WINNT.SIF: manual Setup leaves the GUI pages to the user, keeps the
     try std.testing.expect(std.mem.indexOf(u8, text, "OemSkipEula") == null);
     try std.testing.expect(std.mem.indexOf(u8, text, "OEMBlankAdminPassword") == null);
     try std.testing.expect(std.mem.indexOf(u8, text, "[Display]") == null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "JoinWorkgroup") == null);
+    // the workgroup stays answered (no "Join\\Workgroup" warning box)
+    try std.testing.expect(std.mem.indexOf(u8, text, "[Network]\r\nJoinWorkgroup=WORKGROUP\r\n") != null);
     // kept: local source, unattended text mode, OEM preinstall, the loopback adapter + TCP/IP
     try std.testing.expect(std.mem.indexOf(u8, text, "MsDosInitiated = 1\r\nFloppyless = 1\r\nUnattendedInstall = \"Yes\"\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "OemPreinstall = Yes\r\nNoWaitAfterTextMode = 1\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "[Network]\r\nInstallAdapters=USOS.Adapters\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "JoinWorkgroup=WORKGROUP\r\nInstallAdapters=USOS.Adapters\r\n") != null);
     // a profile key still skips the key page
     const keyed = try render(&p, "12345-oem-0012345-12345", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, keyed, "ProductId = \"12345-OEM-0012345-12345\"\r\n") != null);
