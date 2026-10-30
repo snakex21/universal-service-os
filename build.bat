@@ -1,8 +1,9 @@
 @echo off
 setlocal
 set "ROOT=%~dp0"
-rem Explicit preparation-only target; no release, signing or shared SYS writes.
+rem Explicit preparation-only targets; no release, signing or shared SYS writes.
 if defined USOS_NT_NATIVE_PREP goto nt_native_prep
+if defined USOS_NT31_NATIVE_PREP goto nt31_native_prep
 set "ZIG=%ROOT%tools\zig\zig.exe"
 set "ZIG_GLOBAL_CACHE_DIR=%ROOT%tools\cache\zig-global"
 
@@ -130,4 +131,8 @@ exit /b 0
 
 :nt_native_prep
 python "%ROOT%tools\nt_native_prep_build.py"
+exit /b %ERRORLEVEL%
+
+:nt31_native_prep
+python "%ROOT%tools\nt31_native_build.py"
 exit /b %ERRORLEVEL%

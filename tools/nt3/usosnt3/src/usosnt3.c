@@ -2689,6 +2689,12 @@ void __stdcall entry(void)
     /* By hand on a native install that predates the early USB / BOOT.INI
        steps: what /setup and the service add on the native path. */
     if (lstrcmpA(opt, "finish") == 0) {
+        /* NT31 needs USB Start=0, not usb_early()'s Start=1. It also has
+         * no /NUMPROC, which the current BOOT.INI idempotence guard uses.
+         * /polish is compatible; this NT35x-specific finish is not.
+         * GetVersion exists on the original NT31 CD, GetVersionEx does not. */
+        if ((GetVersion() & 0xFFFFUL) == 0x0A03UL)
+            ExitProcess(3);
         open_log("POST.LOG");
         say("USOS native finish (by hand)\r\n");
         if (!native_install()) {

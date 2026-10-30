@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+static int nt31_year(const char *s)
+{
+    int i,y=0;
+    for(i=0;i<4;i++){if(s[i]<'0' || s[i]>'9')return 0;y=y*10+s[i]-'0';}
+    return !s[4] && y>=1990 && y<=2099;
+}
+static int nt31_domain(const char *s)
+{
+    int i;
+    for(i=0;s[i];i++){
+        if(i==15 || !((s[i]>='A' && s[i]<='Z') || (s[i]>='0' && s[i]<='9') || s[i]=='-'))return 0;
+    }
+    return i>0 && s[0]!='-' && s[i-1]!='-';
+}
