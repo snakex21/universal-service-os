@@ -1543,7 +1543,6 @@ static volatile LONG g_dsnap_new;
 #define FS_FAT32 3
 #define FS_EXFAT 4
 #define FS_OTHER 5
-#define FS_FAT32K 6             /* NT 3.1: FAT12 / FAT16 with 32 KiB (or larger) clusters */
 
 static ULONG be32(const UCHAR *p) { return ((ULONG)p[0] << 24) | ((ULONG)p[1] << 16) | ((ULONG)p[2] << 8) | p[3]; }
 static ULONG le32(const UCHAR *p) { return p[0] | ((ULONG)p[1] << 8) | ((ULONG)p[2] << 16) | ((ULONG)p[3] << 24); }
@@ -1871,13 +1870,6 @@ static UCHAR fs_kind(const UCHAR *s)
         return FS_EXFAT;
     if (!is_boot_sector(s))
         return FS_OTHER;
-#ifdef USOSUSB_NT31
-    /* The NT 3.1 fastfat stopped with 0x1E on a FAT16 volume with 32 KiB
-       clusters (docs/nt31-2026-10-09.md, the 2000 MiB C:); its 8 KiB
-       cluster C: works. Such a stick gets no volume rather than a STOP. */
-    if ((s[22] | s[23]) && s[13] >= 64)
-        return FS_FAT32K;
-#endif
     return (s[22] | s[23]) ? FS_FAT : FS_FAT32;     /* BPB_FATSz16 = 0: FAT32 */
 }
 
@@ -1888,10 +1880,20 @@ static const WCHAR *fs_name(UCHAR fs)
     case FS_NTFS: return L"ntfs";
     case FS_FAT32: return L"fat32";
     case FS_EXFAT: return L"exfat";
-    case FS_FAT32K: return L"fat-32k";
     }
     return L"other";
 }
+
+#ifdef USOSUSB_NT31
+/* NT 3.1 Diag: the BPB of a FAT volume it gets (sectors per cluster,
+   reserved sectors, partition type, MiB); the NT 3.1 fastfat itself accepts
+   1..128 sectors per cluster (its FatIsBootSectorFat). */
+static void fat_note(const UCHAR *s, ULONG part, UCHAR ptype, ULONG count)
+{
+    diag_add(L" p%u:fat c%u r%u", part, s[13], s[14] | (s[15] << 8), 0);
+    diag_add(L" t%02x %uM", ptype, count >> 11, 0, 0);
+}
+#endif
 
 #ifdef USOSUSB_NT4MSC
 /* NT 4.0 / 3.5x read FAT12 / FAT16 and NTFS. A FAT32 or exFAT volume would
@@ -1991,8 +1993,13 @@ static void msc_attach(DEV *d)
         UCHAR fs = fs_kind(s);
         sig = RtlCompareMemory(s + 82, "FAT32", 5) == 5 ? le32(s + 67) : le32(s + 39);
 #ifdef USOSUSB_NT4MSC
-        if (nt4_fs_ok(fs, 0))
+        if (nt4_fs_ok(fs, 0)) {
+#ifdef USOSUSB_NT31
+            if (fs == FS_FAT)
+                fat_note(s, 0, 6, d->blocks);
+#endif
             vol_create(d, 0, d->blocks, (UCHAR)(fs == FS_NTFS ? 7 : 6), 0, sig, fs);
+        }
 #else
         vol_create(d, 0, d->blocks, (UCHAR)(RtlCompareMemory(s + 3, "NTFS", 4) == 4 ? 7 : 0x0C), 0, sig, fs);
 #endif
@@ -2023,6 +2030,14 @@ static void msc_attach(DEV *d)
                 fs = fs_kind(g_bva);
             if (!nt4_fs_ok(fs, i + 1))
                 continue;
+#ifdef USOSUSB_NT31
+            if (fs == FS_FAT)
+                fat_note(g_bva, i + 1, t, n);
+            /* 0x0E (FAT16 LBA, Windows 95) postdates NT 3.1: its disk
+               code knows 0x01 / 0x04 / 0x06; report the volume as 0x06 */
+            if (fs == FS_FAT && t == 0x0E)
+                t = 0x06;
+#endif
 #endif
             vol_create(d, st, n, t, e[0], sig, fs);
         }

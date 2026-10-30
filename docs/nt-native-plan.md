@@ -856,20 +856,29 @@ GPT/FAT32/exFAT skipped with a Diag tag). NT 3.1 specifics: the queue's
 spin locks and interlocked lists are imported in their stdcall forms
 (`KeAcquireSpinLock` / `KeReleaseSpinLock` from the HAL,
 `ExInterlockedInsertTailList` / `ExInterlockedRemoveHeadList`; 3.1 has no
-Kf/Exf exports; all imports checked against `nt31_exports.txt`), and a FAT
-volume with 32 KiB clusters gets no device (`pN:fat-32k-skip`): the NT 3.1
-fastfat stopped 0x1E on the 2000 MiB / 32 KiB C: of the VM flow, its 8 KiB
-C: works; whether the cluster size or the 32 reserved sectors caused that
-is not proven, so a 32 KiB stick is refused rather than risked. Template
+Kf/Exf exports; all imports checked against `nt31_exports.txt`). Template
 hive (fresh installs): `usosusb\Parameters LogFile =
 \DosDevices\C:\USOS\NT3\USOSUSB.LOG`. Host tests: volume publishing code run
 on stick images with `-DUSOSUSB_NT31` (`test_nt4_usosusb_storage.py`).
 
-Stick formats NT 3.1 can use: MBR or no partition table (superfloppy), FAT12
-or FAT16 with clusters up to 16 KiB (FAT16 partitions up to 1 GiB as
-Windows/mkfs.fat format them, e.g. `mkfs.fat -F 16 -s 32`); NTFS only as NT
-3.1 itself wrote it (later NTFS versions are not readable by its ntfs.sys).
-Not usable: FAT32, exFAT, GPT sticks (the USOS stick itself).
+X470 run with 1.4-nt31 (Micron read back, SYSTEM = SYSTEM.ALT): `p15:s1--S
+p1:fat-32k-skip(15296M wp0 0v)`, again after a replug: the stick (16 GB,
+bulk-only, ready, capacity read, partition 1 FAT12/16) was skipped by a
+guard of this build that refused FAT volumes with 32 KiB or larger
+clusters. That guard rested on an unproven guess (the 0x1E of the VM
+flow's 2000 MiB C:); the NT 3.1 fastfat's own boot-sector check
+(FatIsBootSectorFat, local reading of the 3.1 CD's FASTFAT.SYS) accepts
+1..128 sectors per cluster and 128..1024 bytes per sector. Guard removed
+(1.4-nt31, second build); Diag now notes each FAT volume's BPB and
+partition (`p1:fat c64 r1 t0e 2047M`), and a 0x0E (FAT16 LBA) entry is
+reported to NT 3.1 as 0x06 (3.1 predates type 0x0E). If the stick now
+STOPs on insertion, the cluster size / reserved sectors from that Diag
+line are the first suspects.
+
+Stick formats NT 3.1 can use: MBR or no partition table (superfloppy),
+FAT12 or FAT16 (FAT16 partitions up to 2 GiB, 4 GiB with 64 KiB clusters);
+NTFS only as NT 3.1 itself wrote it (later NTFS versions are not readable
+by its ntfs.sys). Not usable: FAT32, exFAT, GPT sticks (the USOS stick itself).
 
 The installed Micron got the new USOSUSB.SYS in place (system32\drivers and
 \USOS\NT3; registry untouched; PATCH-261030-221016 in the scratchpad).

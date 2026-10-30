@@ -193,8 +193,7 @@ class VolumeHostSimulation(unittest.TestCase):
         block = text[text.index('    /* volumes: begin'):text.index('    /* volumes: end */')]
         cls.tmp = tempfile.mkdtemp(prefix='nt4usb-')
         Path(cls.tmp, 'pieces.h').write_text('\n'.join(['#define FS_FAT 1', '#define FS_NTFS 2', '#define FS_FAT32 3',
-                                                        '#define FS_EXFAT 4', '#define FS_OTHER 5', '#define FS_FAT32K 6',
-                                                        le32, ibs, helpers]))
+                                                        '#define FS_EXFAT 4', '#define FS_OTHER 5', le32, ibs, helpers]))
         Path(cls.tmp, 'block.h').write_text(block)
         cls.exe = {}
         for mode, defs in (('nt4', ['-DUSOSUSB_NT4MSC']), ('nt6', []), ('nt31', ['-DUSOSUSB_NT4MSC', '-DUSOSUSB_NT31'])):
@@ -245,13 +244,21 @@ class VolumeHostSimulation(unittest.TestCase):
         self.assertEqual(self.run_img(image(lba0=fat32_bs(16384)), 'nt6'),
                          ['vol start=0 count=16384 type=0c boot=00 sig=0badf00d fs=3'])
 
-    def test_nt31_skips_32k_clusters(self):
-        # NT 3.1 fastfat: 0x1E on 32 KiB clusters; 16 KiB and smaller kept
-        img = image([(0x06, 63, 8000, fat16_bs(8000, 64)), (0x06, 8192, 8000, fat16_bs(8000, 32))])
-        self.assertEqual(self.run_img(img, 'nt31'), ['diag  p1:fat-32k-skip',
-                                                     'vol start=8192 count=8000 type=06 boot=00 sig=cafebabe fs=1'])
-        self.assertEqual(len([l for l in self.run_img(img) if l.startswith('vol ')]), 2)
-        self.assertEqual(self.run_img(image(lba0=fat16_bs(16384, 64)), 'nt31'), ['diag  p0:fat-32k-skip'])
+    def test_nt31_keeps_large_clusters_and_notes_the_bpb(self):
+        # X470 2026-10-30: the 1.4-nt31 32 KiB guard hid the user's stick
+        # ("p1:fat-32k-skip"); NT 3.1 fastfat accepts 1..128 sectors per
+        # cluster, so the volume is published and its BPB goes to Diag.
+        img = image([(0x06, 63, 8000, fat16_bs(8000, 64)), (0x0E, 8192, 8000, fat16_bs(8000, 128))])
+        out = self.run_img(img, 'nt31')
+        self.assertEqual([l for l in out if l.startswith('vol ')],
+                         ['vol start=63 count=8000 type=06 boot=80 sig=cafebabe fs=1',
+                          'vol start=8192 count=8000 type=06 boot=00 sig=cafebabe fs=1'])
+        self.assertIn('diag  p1:fat c64 r1', out)
+        self.assertIn('diag  t06 3M', out)
+        self.assertIn('diag  p2:fat c128 r1', out)
+        self.assertIn('diag  t0e 3M', out)
+        self.assertEqual([l for l in self.run_img(image(lba0=fat16_bs(16384, 64)), 'nt31') if l.startswith('vol ')],
+                         ['vol start=0 count=16384 type=06 boot=00 sig=1234abcd fs=1'])
 
     def test_gpt_skipped_on_nt4_only(self):
         img = image([(0xEE, 1, 16383, None)])
