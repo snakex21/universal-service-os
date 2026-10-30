@@ -1019,7 +1019,7 @@ static const USOSNET_CHIP *FindChip(ULONG VenDev)
     return NULL;
 }
 
-#if USOSNET_NDIS4 && !USOSNET_NT35
+#if USOSNET_NDIS4 && !USOSNET_NT35 && !USOSNET_NT35N
 /* NT4 (no PnP): every PCI bus, device and function for the first supported
  * card. NT4's NdisReadPciSlotInformation reads HAL bus data of the bus in
  * the miniport block with the slot number as given; NdisOverrideBusNumber
@@ -1249,7 +1249,18 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #endif
     BC(A, 0x03);
 
-#if USOSNET_NT35
+#if USOSNET_NT35N
+    /* native NT 3.5 (usosnet35n, 2026-10-30): the NT 3.51 native build
+     * without the NDIS 3.51 PCI services NDIS 3.5 lacks
+     * (NdisMQueryAdapterResources, NdisOverrideBusNumber,
+     * NdisMPciAssignResources): the NT 3.x MBR hides the PCI BIOS, so the
+     * HAL has no PCI bus and the card is found through CF8h/CFCh only. */
+    A->Legacy = TRUE;
+    if (!Cf8Find(A)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+    A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED;
+    UsLog(A, "cf8 scan: bus %x slot %x", A->PciBus, A->PciSlot);
+    UsLog(A, "cf8 bus type %x", A->BusType, 0);
+#elif USOSNET_NT35
     A->Legacy = TRUE;
     if (!ConfiguredFind35(A, cfg)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
     A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED; /* no full-MAC resources API */

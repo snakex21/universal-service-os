@@ -145,7 +145,19 @@ UsosActiveProcessors(VOID)
 #if defined(USOSRST_NT31)
 #define USOSRST_VERSION "usosrst 1.6-nt31"
 #elif defined(USOSRST_NT35)
-#define USOSRST_VERSION "usosrst 1.6-nt35"
+/* NT 3.5 (1.7-nt35, native NT 3.5 round 2026-10-30): the NT 3.51 1.7/1.8
+   restart path (shutdown log, NVMe/xHCI/NIC quiesce, CF9h full reset), the
+   RAM marker page, and the NT 4.0 1.9-1.11 power-off (ACPI S5 for
+   HalPowerDownRoutine: the NT 3.5 Winlogon has PowerdownAfterShutdown and
+   "Shutdown and Power off"). The kernel import slot is redirected as on
+   NT 3.51 (MDL write; NT 3.5 maps the kernel with small pages); when that
+   finds no slot, the jmp at the start of the HAL's HalReturnToFirmware
+   takes over (handler=inl). */
+#define USOSRST_VERSION "usosrst 1.7-nt35"
+#define USOSRST_SHUTLOG 1
+#define USOSRST_RAMLOG 1
+#define USOSRST_POWEROFF 1
+#define USOSRST_INLINE 1
 #else
 #define USOSRST_VERSION "usosrst 1.8-nt351"
 /* NT 3.51 only (1.7): shutdown log, device quiesce and full reset (below). */
@@ -171,6 +183,7 @@ UsosActiveProcessors(VOID)
    redirected, a jmp at the start of the HAL's HalReturnToFirmware takes
    restart/power-off (handler=inl); load line k+/k- and the slot result. */
 #define USOSRST_POWEROFF 1
+#define USOSRST_INLINE 1
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
 #endif
@@ -204,7 +217,7 @@ static UCHAR g_Pm1EvtLen, g_Gpe0Len, g_Gpe1Len; /* FADT PM1_EVT_LEN, GPE0/GPE1_B
 static UCHAR g_S5a, g_S5b;          /* SLP_TYPa / SLP_TYPb from the DSDT's \_S5 package */
 static CHAR g_S5State = '-';        /* load line: o found, - no FADT/DSDT, x no _S5 */
 #endif
-#ifdef USOSRST_NT4N
+#ifdef USOSRST_INLINE
 static ULONG g_KernelFound;         /* load line k+/k- */
 static LONG g_KernelPatch = -2;     /* PatchImports result: slots, 0 none matched, -1 bad image or write */
 static BOOLEAN g_InlineHook;        /* load line handler=inl */
@@ -233,6 +246,49 @@ PutHex(PCHAR p, PCHAR end, ULONG v, ULONG digits)
     return p;
 }
 
+#ifdef USOSRST_NT4
+/* Boot-screen rows (NT 4.0 / 3.x builds, 2026-10-30): the white rows (load
+   line, heartbeat, clock, the text-mode restart note) only on a boot whose
+   load options carry /SOS (the BOOT.INI entry "[USOS /SOS]"); the red rows
+   (STOP, stall, a heartbeat that saw stalls) always, they appear only when
+   something is wrong. The registry LoadLine and the disk/RAM logs are not
+   affected. SystemStartOptions is written by the kernel (CmInitSystem1)
+   before the boot drivers start; no value = no /SOS. */
+static BOOLEAN g_Sos;
+
+static BOOLEAN
+BootHasSos(VOID)
+{
+    UNICODE_STRING key, name;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE h;
+    ULONG buf[130], got = 0, n, i;
+    PWCHAR s;
+    BOOLEAN sos = FALSE;
+
+    RtlInitUnicodeString(&key, L"\\Registry\\Machine\\System\\CurrentControlSet\\Control");
+    RtlInitUnicodeString(&name, L"SystemStartOptions");
+    InitializeObjectAttributes(&oa, &key, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (!NT_SUCCESS(ZwOpenKey(&h, KEY_READ, &oa))) return FALSE;
+    if (NT_SUCCESS(ZwQueryValueKey(h, &name, KeyValuePartialInformation, buf, sizeof(buf) - 4, &got)) &&
+        (buf[1] == REG_SZ || buf[1] == REG_EXPAND_SZ)) {
+        s = (PWCHAR)&buf[3];
+        n = buf[2] / 2;
+        if (n > 250) n = 250;
+        for (i = 0; i + 3 <= n; i++) {
+            if ((s[i] | 0x20) == 's' && (s[i + 1] | 0x20) == 'o' && (s[i + 2] | 0x20) == 's' &&
+                (i == 0 || s[i - 1] == ' ' || s[i - 1] == '/') &&
+                (i + 3 == n || s[i + 3] == ' ' || s[i + 3] == '/' || s[i + 3] == 0)) {
+                sos = TRUE;
+                break;
+            }
+        }
+    }
+    ZwClose(h);
+    return sos;
+}
+#endif
+
 static VOID
 ShowRow(ULONG Row, PCHAR Text, ULONG Length, USHORT Attr)
 {
@@ -240,6 +296,9 @@ ShowRow(ULONG Row, PCHAR Text, ULONG Length, USHORT Attr)
     PUSHORT row;
 
     if (g_Vga == NULL) return;
+#ifdef USOSRST_NT4
+    if (!g_Sos && Attr != 0x4F00) return;
+#endif
     row = g_Vga + Row * 80;
     for (i = 0; i < 80; i++) row[i] = (USHORT)(Attr | (UCHAR)(i < Length ? Text[i] : ' '));
 }
@@ -1273,7 +1332,7 @@ RedirectKernelRestart(VOID)
     for (i = 0; i < 2 && kernel == NULL; i++) kernel = FindModule(kernels[i]);
     if (kernel == NULL) return FALSE;
     g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)(ULONG)HalReturnToFirmware;
-#ifdef USOSRST_NT4N
+#ifdef USOSRST_INLINE
     g_KernelFound = 1;
     g_KernelPatch = PatchImports(kernel, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware);
     return (BOOLEAN)(g_KernelPatch > 0);
@@ -1282,7 +1341,7 @@ RedirectKernelRestart(VOID)
 #endif
 }
 
-#ifdef USOSRST_NT4N
+#ifdef USOSRST_INLINE
 /* The HAL's own HalReturnToFirmware, entered through the jump HookHalInline
    puts at its start (the kernel's import slot could not be redirected:
    X470 2026-10-29, handler=off with 1.9 and 1.10, every restart and the
@@ -2303,6 +2362,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #endif
 
     g_OwnEntry = DriverObject->DriverSection;
+#ifdef USOSRST_NT4
+    g_Sos = BootHasSos();
+#endif
     vga.QuadPart = 0xB8000;
     g_Vga = (PUSHORT)MmMapIoSpace(vga, 80 * 50 * 2, MmNonCached);
     KeInitializeCallbackRecord(&g_BugCheckRecord);
@@ -2327,7 +2389,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
 #ifdef USOSRST_NT4
     shutdownHandler = RedirectKernelRestart();
-#ifdef USOSRST_NT4N
+#ifdef USOSRST_INLINE
     if (!shutdownHandler) g_InlineHook = HookHalInline();
 #endif
     vgaWindow = FreeVgaWindow();
@@ -2382,7 +2444,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
     p = PutStr(p, end, "+8042 setup=");
     p = PutStr(p, end, g_InSetup ? "1" : "0");
-#ifdef USOSRST_NT4N
+#ifdef USOSRST_INLINE
     p = PutStr(p, end, shutdownHandler ? " handler=on" : g_InlineHook ? " handler=inl" : " handler=off");
     p = PutStr(p, end, g_KernelFound ? " k+" : " k-");
     p = PutStr(p, end, g_KernelPatch < 0 ? (g_KernelPatch == -1 ? "x" : "?") : g_KernelPatch == 0 ? "0" : "n");
@@ -2414,6 +2476,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutHex(p, end, g_Gpe0, 4);
     p = PutStr(p, end, "+");
     p = PutHex(p, end, g_Gpe0Len, 2);
+#endif
+#ifdef USOSRST_NT4
+    p = PutStr(p, end, g_Sos ? " osd+" : " osd-");
 #endif
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);

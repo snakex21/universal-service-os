@@ -820,7 +820,14 @@ def main() -> int:
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.EXE', stat.S_IFREG | 0o644, logger35))
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(logger35).hexdigest()+'  USOSLOG35.EXE\n').encode('ascii')))
-        net351 = (root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
+        # Native NT 3.5 (no install VM, 2026-10-30): usosnet35n, the NT 3.51
+        # native code on NDIS 3.5 (CF8h/CFCh only); the VM path keeps the
+        # USOSNET35.SYS above.
+        net35n = (root / 'tools/nt/usosnet/bin/i386/usosnet35n.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SYS', stat.S_IFREG | 0o644, net35n))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net35n).hexdigest()+'  USOSNET35N.SYS\n').encode('ascii')))
+        net351 =(root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(net351).hexdigest()+'  USOSNET351.SYS\n').encode('ascii')))

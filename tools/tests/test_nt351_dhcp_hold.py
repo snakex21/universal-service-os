@@ -57,7 +57,7 @@ class DhcpHold(unittest.TestCase):
 
     def test_post_restores_dhcp_and_registers_netcheck(self):
         post = function(self.text, 'post')
-        self.assertIn('if (network351_state == 2) net351_native_post();', post)
+        self.assertIn('if (network351_state == 2 || network35_state == 2) net351_native_post();', post)
         self.assertLess(post.index('client_prepare(selected_state)'), post.index('net351_native_post();'))
         self.assertLess(post.index('net351_native_post();'), post.index('vesa();'))
         native = function(self.text, 'net351_native_post')

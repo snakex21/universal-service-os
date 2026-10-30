@@ -1129,7 +1129,7 @@ static int nt35_network(void)
     static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet35.sys";
     HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
     char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
-    DWORD version, type, size, medium, enabled, bus, slot;
+    DWORD version, type, size, medium, enabled, bus, slot, bus_type;
     DWORD (WINAPI *get_version)(void);
     int ok = 0, meta_len;
     meta_len=read_text("NET35.ON", meta, sizeof meta);
@@ -1169,7 +1169,19 @@ static int nt35_network(void)
     if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
     lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet35.sys");
     if (!CopyFileA(DIR "USOSNET35.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET35.SYS",dst)) goto done;
-    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"BusNumber",bus) ||
+    /* Native NT 3.5 (2026-10-30, usosnet35n): without a HAL PCI bus (the
+       NT 3.x MBR hides the PCI BIOS on the X470) NDIS 3.5 can neither
+       translate nor connect a PCI resource: BusType 1 (Isa, bus 0) as on
+       native NT 3.51; usosnet35n finds the card through CF8h/CFCh and
+       polls. With a HAL PCI bus (install VM) the exact bus/slot as before. */
+    if (!net351_hal_pci()) {
+        say("NET35: no HAL PCI bus (PCI BIOS hidden), BusType 1 + CF8h/CFCh in usosnet35n\r\n");
+        bus = 0;
+        bus_type = 1;
+    } else {
+        bus_type = 5;
+    }
+    if (!net351_dword(params,"BusType",bus_type) || !net351_dword(params,"BusNumber",bus) ||
         !net351_dword(params,"UsosPciSlot",slot) || !net351_dword(params,"PollMode",0) ||
         !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
         !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
@@ -1317,7 +1329,7 @@ static int post(void)
     }
     selected_state = g_client_config && g_client_config->minor == 51 ? network351_state : network35_state;
     if (!client_prepare(selected_state)) return 0;
-    if (network351_state == 2) net351_native_post();
+    if (network351_state == 2 || network35_state == 2) net351_native_post();
     vesa();
     display_profile();
     return 1;
@@ -1412,6 +1424,7 @@ static void vesa(void)
 }
 
 static int native_install(void);
+static int net351_version(void);
 static void boot_ini_finish(void);
 static int pagefile_cap(void);
 static void logon_notice(int on);
@@ -1446,6 +1459,14 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (native_install()) {
         pagefile_cap();
         boot_ini_finish();
+        /* Native NT 3.5 (2026-10-30): usosrst 1.7-nt35 takes the kernel's
+           HalReturnToFirmware(HalPowerDownRoutine) to ACPI S5, so the NT 3.5
+           Winlogon may offer "Shutdown and Power off" (its
+           PowerdownAfterShutdown value; NtShutdownSystem(ShutdownPowerOff)).
+           NT 3.51's usosrst has no S5 path yet: not set there. */
+        if (net351_version() == 50)
+            put_sz(HKEY_LOCAL_MACHINE, "HKLM", "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+                   "PowerdownAfterShutdown", "1", 0);
     }
     if (!post()) goto failed;
     polish();
@@ -1858,13 +1879,13 @@ static void notice_start(void)
     static char desktop[] = "WinSta0\\Default";
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    char *p;
+    volatile char *p;   /* volatile: no memset call (no C runtime) */
     if (!native_install() || !get_name || !get_name(NULL, exe, MAX_PATH))
         return;
     lstrcpyA(cmd, "\"");
     lstrcatA(cmd, exe);
     lstrcatA(cmd, "\" /notice");
-    for (p = (char *)&si; p < (char *)&si + sizeof si; p++)
+    for (p = (volatile char *)&si; p < (volatile char *)&si + sizeof si; p++)
         *p = 0;
     si.cb = sizeof si;
     si.lpDesktop = desktop;
@@ -2014,6 +2035,7 @@ typedef BOOL (WINAPI *SVC_CHANGE)(SC_HANDLE, DWORD, DWORD, DWORD, LPCSTR, LPCSTR
 typedef BOOL (WINAPI *SVC_CLOSE)(SC_HANDLE);
 typedef HANDLE (WINAPI *THREAD_CREATE)(LPSECURITY_ATTRIBUTES, DWORD, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
 
+/* The NT 3.x minor version (51, 50), 0 when not NT 3.x. */
 static int net351_version(void)
 {
     DWORD (WINAPI *get_version)(void) =
@@ -2021,12 +2043,19 @@ static int net351_version(void)
     DWORD v;
     if (!get_version) return 0;
     v = get_version();
-    return !(v & 0x80000000) && (v & 0xff) == 3 && ((v >> 8) & 0xff) == 51;
+    return (!(v & 0x80000000) && (v & 0xff) == 3) ? (int)((v >> 8) & 0xff) : 0;
 }
 
+/* Native NT 3.51 (NET351.ON) or, since 2026-10-30, native NT 3.5
+   (NET35.ON, usosnet35n): the same GUI Setup DHCP behaviour (the comment
+   above is from the NT 3.5 sources). */
 static int net351_native_selected(void)
 {
-    return native_install() && GetFileAttributesA(DIR "NET351.ON") != 0xFFFFFFFF && net351_version();
+    int minor;
+    if (!native_install()) return 0;
+    minor = net351_version();
+    return (minor == 51 && GetFileAttributesA(DIR "NET351.ON") != 0xFFFFFFFF) ||
+           (minor == 50 && GetFileAttributesA(DIR "NET35.ON") != 0xFFFFFFFF);
 }
 
 static DWORD WINAPI dhcp_setup_hold(LPVOID unused)

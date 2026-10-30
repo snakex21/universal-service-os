@@ -56,6 +56,13 @@
 #ifndef USOSNET_W95RTM
 #define USOSNET_W95RTM 0
 #endif
+/* Native NT 3.5 (usosnet35n): with USOSNET_NT351, the CF8h path only. */
+#ifndef USOSNET_NT35N
+#define USOSNET_NT35N 0
+#endif
+#if USOSNET_NT35N && !USOSNET_NT351
+#error USOSNET_NT35N builds on the NT 3.51 native code (USOSNET_NT351)
+#endif
 #define USOSNET_NDIS3 (USOSNET_NT351 || USOSNET_NT35)
 /* NDIS 3.0 registration (MajorNdisVersion 3, 0x3C characteristics, the
  * four-argument NdisMSetAttributes): the NT 3.5x family above and Windows 95

@@ -156,7 +156,8 @@ class NativePrep(unittest.TestCase):
         rst=(ROOT/'tools/w2k/usosrst/src/usosrst.c').read_text()
         block=rst[rst.index('#elif defined(USOSRST_NT4N)'):rst.index('#define USOSRST_VERSION "usosrst 1.5-nt4"')]
         self.assertIn('#define USOSRST_POWEROFF 1',block)
-        self.assertEqual(rst.count('#define USOSRST_POWEROFF'),1)
+        # NT4N and, since 2026-10-30, the native NT 3.5 build (1.7-nt35)
+        self.assertEqual(rst.count('#define USOSRST_POWEROFF'),2)
         ret=c_function(rst,'SetupReturnToFirmware')
         self.assertLess(ret.index('AcpiPowerOff()'),ret.index('g_HalReturnToFirmware(Routine)'))
         self.assertIn(b' s5',(ROOT/'tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys').read_bytes())

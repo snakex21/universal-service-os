@@ -385,7 +385,7 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
                 missing = [f'{m}!{n}' for m, n in imports if n not in view[m.lower()]]
                 self.assertEqual(missing, [], f'{rel} on {kernel}+{hal}')
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
-        self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt35"', src)
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.7-nt35"', src)
         self.assertIn('-DUSOSRST_NT35', (ROOT / 'tools/w2k/usosrst/build-nt35.cmd').read_text(encoding='utf-8'))
 
     def test_usosrst_nt351_direct_config(self):

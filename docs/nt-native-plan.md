@@ -433,3 +433,49 @@ files stay on C: (finish-step jobs, next round).
   target C:: `\WINNT\SYSTEM32` (text mode copied files), `setup.log` (text
   mode finished), `\USOS\NT4\USOSANS.TXT`, `POST.LOG` and CSDVersion 0x600
   (SP6a applied).
+
+## 7. Native NT 3.5 round (2026-10-30, host checks only, no X470 run yet)
+
+Audit of the NT 3.5 native path against the native NT 3.51 / NT 4.0 lessons
+(`tools/tests/test_nt35_native.py`):
+
+- Kernel / HAL: `nt3_standard_hal` also fits the NT 3.5 CD (its only MPS row
+  is `mps11_mp`, `Multiprocessor = ntkrnlmp.exe,2,ntoskrnl.exe` becomes the
+  Uniprocessor row); no `/NUMPROC`, `OsLoadOptions` `/nodebug /MAXMEM=128`.
+- MBR: RAM cap byte 508 = 8 (128 MiB), quiesce bit + sector 3, CMOS century
+  copy and E820 dump are the shared NT 3.x hook; the pre-boot logger runs for
+  `nt_major=3`.
+- usosrst 1.7-nt35: the 3.51 shutdown log, NVMe/xHCI/NIC quiesce, CF9h full
+  reset and RAM marker page, plus the NT 4.0 ACPI S5 power-off (kernel import
+  slot via MDL as on 3.51, HAL inline jmp as fallback). The NT 3.5 Winlogon
+  has `PowerdownAfterShutdown` / "Shutdown and Power off"; usosnt3 sets it
+  on native NT 3.5 only (3.51's usosrst has no S5 path).
+- LAN: `usosnet35n.sys` = the NT 3.51 native code (both 3.51 fixes: no
+  Enable/DisableInterrupt handlers in polling mode, direct MmMapIoSpace when
+  NdisMMapIoSpace fails; ZwFlushKey breadcrumbs, WriteDiag handle fix) built
+  for NDIS 3.5: the three NDIS 3.51 PCI services NDIS 3.5 lacks are not
+  used, the card is found through CF8h/CFCh only (`USOSNET_NT35N`). Native
+  NT 3.5 now runs the preflight (`native` variant), patches the local
+  source's `OEMNADLB.IN_` (pinned 37e16b... -> fff3c0..., the VM patch's
+  pair) and stages the driver under `USOSNET35.SYS`; usosnt3 writes BusType 1
+  without a HAL PCI bus, holds DHCP during GUI Setup and registers NETCHECK.
+- usosnt3 / usosans3 / usosachk / AHCINT / usosnvme / usosvbe / usosusb
+  imports resolve against the NT 3.5 (807) exports.
+- No product key and no manual mode on NT 3.x (renderer takes none; the key
+  prompt covers 95 / NT 4.0 / POSReady only). Autologon: the first-start
+  service needs no logon; after the restart the normal Ctrl+Alt+Del.
+
+Boot-screen rows (NT 4.0 and NT 3.x drivers): the white AHCINT status line,
+the usosnvme "OK" line and the usosrst load / heartbeat / clock rows are
+drawn only when `SystemStartOptions` carries `SOS` (BOOT.INI `[USOS /SOS]`);
+red rows (errors, stalls, STOP) as before; logs unchanged.
+
+Text-mode Setup screen only partly blue on the Full HD X470 (not changed;
+likely cause, not measured on the X470):
+the kernel-load screen comes from the HAL through INT 10h, i.e. the RX 560
+VBIOS, which also programs the display scaler; text-mode Setup then sets its
+720x400 text mode through `vga.sys` by writing the VGA registers directly
+(NT 5 `spvidvga.c` picks the 720x400 mode; NT 3.x/4.0 the same), without the
+VBIOS, so the GPU's scaler keeps the earlier source size and shows only part
+of the screen. A fix would need an INT 10h mode set after vga.sys starts
+(own text-mode helper) or a patched vga.sys; neither is low-risk.

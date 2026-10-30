@@ -151,3 +151,11 @@ exports neither KeRegisterBugCheckCallback (no STOP-time trace callback in
 that build) nor memset (own copy). QEMU 2026-10-09: NT 3.1 Workstation and
 Advanced Server reach the logon screen through AHCINT with OVMF + CSMWrap
 (ich9-ahci, 12 pcie-root-ports). The other builds are unchanged.
+
+usos8 (patches/0011-usos8-status-line-only-with-sos.patch, 2026-10-30;
+ahcisatl.c, NT 4.0 / 3.51 / 3.1 builds only, AHCI_NT4): the white status
+line (row 0) is drawn only when the boot's SystemStartOptions carry SOS
+(the BOOT.INI entry "[USOS /SOS]"); the red line (errors, stalls, STOP)
+and the stall rows are drawn as before. New imports ZwOpenKey,
+ZwQueryValueKey, ZwClose (NT 3.1 and later). bin/NT4, bin/NT351, bin/NT31
+rebuilt; bin/2KXP unchanged (no AHCI_NT4).

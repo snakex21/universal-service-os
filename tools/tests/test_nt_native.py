@@ -86,38 +86,36 @@ class NativeWiring(unittest.TestCase):
         # The miniports go next to SETUPLDR (~BT) and into the local source.
         block = text[text.index('nt3_native_txtsetup "$ports"'):]
         self.assertIn('for dir in "$bt_dir" "$ls_src"; do', block[:1200])
-        # Native NT 3.51 has LAN since docs/nt351-native-net-2026-10-28.md;
-        # native NT 3.5 still skips it.
-        self.assertIn("log 'NT35 LAN skipped: native install", text)
-        self.assertIn('if [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then', text)
+        # Native NT 3.51 has LAN since docs/nt351-native-net-2026-10-28.md,
+        # native NT 3.5 since 2026-10-30 (usosnet35n).
+        self.assertNotIn("log 'NT35 LAN skipped: native install", text)
+        self.assertIn('if [ "$NATIVE" = 1 ] && [ "$major:$minor" = 3:50 ]; then', text)
+        self.assertIn('usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" native', text)
         self.assertIn('if [ "$major:$minor" = 3:50 ] && [ "$NATIVE" != 1 ]; then', text)
 
     def test_native_nt3_lan_stage_needs_no_lan_library(self):
         # X470 2026-10-28 (B261028-165856): the native path never sourced
         # the LAN libraries, so "usos_nt351_stage: not found" stopped the
-        # prep. Since docs/nt351-native-net-2026-10-28.md native NT 3.51
-        # sources nt351_network_setup.sh (its stage functions exist), native
-        # NT 3.5 still sources nothing. Run the staging block as it is.
+        # prep. Native NT 3.51 sources nt351_network_setup.sh, native NT 3.5
+        # (2026-10-30, usosnet35n) nt35_network_setup.sh, as the VM path
+        # does: the staging block calls the functions of its own minor.
         nl = chr(10)
         text = TARGET.read_text(encoding='utf-8')
         start = text.index('[ "$minor" != 51 ] || usos_nt351_stage')
-        end = text.index('if [ "$NATIVE" != 1 ]; then' + nl + '[ "$minor" != 50 ] || usos_nt35_stage', start)
-        block = text[start:text.index(nl + 'fi' + nl, end) + 4]
-        self.assertIn('usos_nt35_client_request', block)
+        end = text.index('[ "$minor" != 50 ] || usos_nt35_client_request', start)
+        block = text[start:text.index(nl, end) + 1]
+        self.assertNotIn('if [ "$NATIVE" != 1 ]; then', block)
         stub = nl.join(['fail() { echo "FAIL $1"; exit 9; }', 'work=/x; product=0; ANSWER_KIND=PROFILE', ''])
         names = ('usos_nt351_stage', 'usos_nt351_client_request', 'usos_nt35_stage', 'usos_nt35_client_request')
         calls = ''.join(n + '() { echo ' + n + '; }' + nl for n in names)
-        nt351 = ''.join(n + '() { echo ' + n + '; }' + nl for n in names[:2])
-        # Native 3.5: no library, nothing called.
-        rc, out, err = sh(stub + 'NATIVE=1; minor=50' + nl + block + 'echo ok' + nl)
-        self.assertEqual((rc, out.strip()), (0, 'ok'), err)
-        # Native 3.51: the sourced 3.51 functions only.
-        rc, out, err = sh(stub + nt351 + 'NATIVE=1; minor=51' + nl + block)
-        self.assertEqual((rc, out.split()), (0, list(names[:2])), err)
-        # The install VM path still calls the sourced stage functions.
-        for minor, want in (('51', list(names[:2])), ('50', list(names[2:]))):
-            rc, out, err = sh(stub + calls + 'NATIVE=0; minor=' + minor + nl + block)
-            self.assertEqual((rc, out.split()), (0, want), err)
+        for native in ('0', '1'):
+            for minor, want in (('51', list(names[:2])), ('50', list(names[2:]))):
+                rc, out, err = sh(stub + calls + 'NATIVE=' + native + '; minor=' + minor + nl + block)
+                self.assertEqual((rc, out.split()), (0, want), err)
+        # The native NT 3.5 branch sources its library before the disk.
+        lan = text.index('if [ "$NATIVE" = 1 ] && [ "$major:$minor" = 3:50 ]; then')
+        self.assertIn('. "$LIB/nt35_network_setup.sh"', text[lan:lan + 600])
+        self.assertLess(lan, text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
 
     def test_target_nt35_needs_no_key_page(self):
         text = TARGET.read_text(encoding='utf-8')

@@ -232,12 +232,64 @@ static VOID LineDec(NVME_LINE *l, ULONG v)
     while (n && l->Len < 80) l->Text[l->Len++] = tmp[--n];
 }
 
+#ifdef USOSNVME_NT4
+/* Boot-screen line (2026-10-30, NT 4.0 / 3.x builds): the white line only
+   when the boot's SystemStartOptions carry SOS (BOOT.INI "[USOS /SOS]");
+   error lines (red) always. The kernel writes the value before the boot
+   drivers start; read once in NvmeFindAdapter (PASSIVE_LEVEL). Own minimal
+   structures: miniport.h declares no registry services. */
+typedef struct { USHORT Length, MaximumLength; PWSTR Buffer; } NVME_USTR;
+typedef struct { ULONG Length; PVOID RootDirectory; NVME_USTR *ObjectName; ULONG Attributes;
+                 PVOID SecurityDescriptor, SecurityQualityOfService; } NVME_OATTR;
+__declspec(dllimport) LONG __stdcall ZwOpenKey(OUT PVOID *KeyHandle, IN ULONG DesiredAccess, IN NVME_OATTR *Attributes);
+__declspec(dllimport) LONG __stdcall ZwQueryValueKey(IN PVOID KeyHandle, IN NVME_USTR *ValueName, IN ULONG Class,
+                                                     OUT PVOID Info, IN ULONG Length, OUT PULONG ResultLength);
+__declspec(dllimport) LONG __stdcall ZwClose(IN PVOID Handle);
+static BOOLEAN g_NvmeSos, g_NvmeSosRead;
+
+static BOOLEAN NvmeBootSos(VOID)
+{
+    static WCHAR key[] = L"\\Registry\\Machine\\System\\CurrentControlSet\\Control";
+    static WCHAR name[] = L"SystemStartOptions";
+    NVME_USTR k, v;
+    NVME_OATTR oa;
+    PVOID h;
+    ULONG buf[130], got = 0, n, i;
+    PWCHAR s;
+    BOOLEAN sos = FALSE;
+
+    k.Buffer = key; k.Length = sizeof(key) - 2; k.MaximumLength = sizeof(key);
+    v.Buffer = name; v.Length = sizeof(name) - 2; v.MaximumLength = sizeof(name);
+    oa.Length = sizeof(oa); oa.RootDirectory = NULL; oa.ObjectName = &k; oa.Attributes = 0x40;
+    oa.SecurityDescriptor = NULL; oa.SecurityQualityOfService = NULL;
+    if (ZwOpenKey(&h, 0x20019, &oa) < 0) return FALSE;
+    if (ZwQueryValueKey(h, &v, 2, buf, sizeof(buf) - 4, &got) >= 0 && (buf[1] == 1 || buf[1] == 2)) {
+        s = (PWCHAR)&buf[3];
+        n = buf[2] / 2;
+        if (n > 250) n = 250;
+        for (i = 0; i + 3 <= n; i++) {
+            if ((s[i] | 0x20) == 's' && (s[i + 1] | 0x20) == 'o' && (s[i + 2] | 0x20) == 's' &&
+                (i == 0 || s[i - 1] == ' ' || s[i - 1] == '/') &&
+                (i + 3 == n || s[i + 3] == ' ' || s[i + 3] == '/' || s[i + 3] == 0)) {
+                sos = TRUE;
+                break;
+            }
+        }
+    }
+    ZwClose(h);
+    return sos;
+}
+#endif
+
 static VOID NvmeShowLine(PHW_DEVICE_EXTENSION Ext, NVME_LINE *l, BOOLEAN Error)
 {
     PHYSICAL_ADDRESS vga;
     ULONG i;
     USHORT attr = Error ? 0x4F00 : 0x1F00;
 
+#ifdef USOSNVME_NT4
+    if (!Error && !g_NvmeSos) return;
+#endif
 #ifdef USOSNVME_W9X
     l->Text[l->Len < 80 ? l->Len : 80] = 0;
     NvmeDbgStr(l->Text);
@@ -867,6 +919,9 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     (VOID)BusInformation;
     (VOID)ArgumentString;
     *Again = FALSE;
+#ifdef USOSNVME_NT4
+    if (!g_NvmeSosRead) { g_NvmeSos = NvmeBootSos(); g_NvmeSosRead = TRUE; }
+#endif
     if (ext->Regs != NULL) return SP_RETURN_FOUND;
 
     bus = ConfigInfo->SystemIoBusNumber;

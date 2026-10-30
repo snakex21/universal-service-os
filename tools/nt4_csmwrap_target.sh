@@ -833,10 +833,24 @@ if [ -n "$nt3" ]; then
         fail 'cannot prepare WINNT.SIF'
     profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work") || fail 'cannot read the answer profile values'
     log "answer profile: $profile_values"
-    if [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then
-        # Native NT 3.5: its LAN INF fix-up still runs only between the
-        # install VM's starts (usos_nt35_vm_patch); no network yet.
-        log 'NT35 LAN skipped: native install (the NT 3.5 LAN step needs the install VM so far)'
+    if [ "$NATIVE" = 1 ] && [ "$major:$minor" = 3:50 ]; then
+        # Native NT 3.5 (2026-10-30): the USOSNET35N build (NT 3.51 native
+        # code on NDIS 3.5, CF8h/CFCh) and the OEMNADLB patch in the local
+        # source (usos_nt35_source_patch below), as on native NT 3.51. A
+        # refused preflight installs without network.
+        _u351_enabled=off
+        . "$LIB/nt35_network_setup.sh"
+        if ! usos_nt35_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" native; then
+            log 'NT35 LAN skipped: preflight refused (DHCP, one supported card and verified own driver required); installing without network'
+            _u35_enabled=off
+        fi
+        if [ "${_u35_enabled:-off}" = on ]; then
+            cp "$work/WINNT.SIF" "$work/WINNT.NONET" || fail 'cannot keep the answer without network'
+            usos_nt35_answer "$work/WINNT.SIF" > "$work/WINNT.NET35" &&
+              mv "$work/WINNT.NET35" "$work/WINNT.SIF" || fail 'cannot render original NT35 LAN answer'
+            log 'native NT 3.5 LAN: usosnet35n (CF8h/CFCh, polling), TCP/IP DHCP'
+        fi
+    elif [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then
         _u351_enabled=off
     elif [ "$major:$minor" = 3:51 ]; then
         . "$LIB/nt351_network_setup.sh"
@@ -1053,6 +1067,17 @@ if [ "$NATIVE" = 1 ] && [ -n "$nt3" ] && [ "$minor" = 51 ] && [ "${_u351_enabled
         _u351_enabled=off
     fi
 fi
+if [ "$NATIVE" = 1 ] && [ -n "$nt3" ] && [ "$minor" = 50 ] && [ "${_u35_enabled:-off}" = on ]; then
+    # Native NT 3.5 LAN: the same local-source OEMNADLB.IN_ patch (pinned
+    # NT 3.5 CD hash); a failed patch installs without network.
+    if net35_log=$(usos_nt35_source_patch "$ls_src" "$work"); then
+        log "$net35_log"
+    else
+        log 'NT35 LAN off: the local source OEMNADLB.IN_ is not the pinned original (or the cabinet rebuild failed); installing without network'
+        mv "$work/WINNT.NONET" "$work/WINNT.SIF" || fail 'cannot restore the answer without network'
+        _u35_enabled=off
+    fi
+fi
 rm -f "$work/WINNT.NONET"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
@@ -1147,10 +1172,10 @@ nt3_stage_profile
 # sources its library on both paths.
 [ "$minor" != 51 ] || usos_nt351_stage "$work/c" || fail 'cannot stage verified NT351 LAN driver'
 [ "$minor" != 51 ] || usos_nt351_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT351 Workstation client policy request'
-if [ "$NATIVE" != 1 ]; then
+# NT 3.5: its library is sourced on the VM path and, since 2026-10-30, on
+# the native path too (usosnet35n staged under the USOSNET35.SYS name).
 [ "$minor" != 50 ] || usos_nt35_stage "$work/c" || fail 'cannot stage verified NT35 LAN driver'
 [ "$minor" != 50 ] || usos_nt35_client_request "$work/c" "${product:-}" "$ANSWER_KIND" || fail 'cannot stage NT35 Workstation client policy request'
-fi
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

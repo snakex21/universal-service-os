@@ -244,8 +244,8 @@ class SourceContract(unittest.TestCase):
         self.assertLess(patch, copy)
         self.assertIn('mv "$work/WINNT.NONET" "$work/WINNT.SIF"', text)
         stage = text.index('[ "$minor" != 51 ] || usos_nt351_stage "$work/c"')
-        guard = text.index('if [ "$NATIVE" != 1 ]; then\n[ "$minor" != 50 ] || usos_nt35_stage')
-        self.assertLess(stage, guard)
+        stage35 = text.index('[ "$minor" != 50 ] || usos_nt35_stage "$work/c"')
+        self.assertLess(stage, stage35)
         build = (ROOT / 'tools/build_micro_linux.py').read_text()
         self.assertIn("'usr/lib/usos/nt3/USOSNET351N.SYS'", build)
 
