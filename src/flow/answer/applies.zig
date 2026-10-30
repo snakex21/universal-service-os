@@ -157,9 +157,7 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
 }
 
 test "missing: NT 4.0 needs a key unless Setup is manual" {
-    var p = try profileFrom("name=A
-user=Bob
-");
+    var p = try profileFrom("name=A\nuser=Bob\n");
     try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-nt-4").?);
     p.win9x_setup = .manual;
     try std.testing.expect(missing(&p, "windows-nt-4") == null);
