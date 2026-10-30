@@ -255,7 +255,11 @@ static void logon_main(void)
     HKEY h;
     int waited;
     open_log("LOGON.LOG");
-    if (run_value("USOSAddons")) {
+    /* Manual Setup with an Administrator password: never armed again. */
+    if (GetFileAttributesA(DIR "PWLOGON.TXT") != INVALID_FILE_ATTRIBUTES) {
+        say("logon: Administrator password (manual Setup), no automatic logon\r\n");
+        while (run_value("USOSAddons")) Sleep(2000);
+    } else if (run_value("USOSAddons")) {
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WINLOGON_KEY, 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
             RegSetValueExA(h, "AutoAdminLogon", 0, REG_SZ, (const BYTE *)"1", 2);
             RegSetValueExA(h, "DefaultPassword", 0, REG_SZ, (const BYTE *)"", 1);
@@ -284,6 +288,47 @@ static void logon_main(void)
     say(run_value("USOSAutoLogon") ? "logon: Run value removal FAILED\r\n"
                                    : "logon: installation finished, automatic logon off (AutoAdminLogon=0, no DefaultPassword)\r\n");
     ExitProcess(0);
+}
+
+/* Manual Setup (MANUAL.TXT from micro-Linux): the user may have set an
+ * Administrator password on Setup's page. CMDLINES.TXT runs this as
+ * LocalSystem at the end of GUI Setup, which may call LogonUser: when the
+ * blank password does not log the account on, the automatic logon goes off
+ * (AutoAdminLogon=0, no DefaultPassword) and PWLOGON.TXT tells POST.CMD and
+ * USOSNT4 /logon not to turn it on again; the post step (HKLM RunOnce) and
+ * the add-on chain (HKLM Run) then continue after the user's own logon.
+ * The password itself is never read, logged or stored. */
+static void manual_password_check(void)
+{
+    char user[64];
+    DWORD type, size = sizeof user;
+    HKEY h;
+    HANDLE token;
+    if (GetFileAttributesA(DIR "MANUAL.TXT") == INVALID_FILE_ATTRIBUTES) return;
+    lstrcpyA(user, "Administrator");
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WINLOGON_KEY, 0, KEY_READ, &h) == ERROR_SUCCESS) {
+        if (RegQueryValueExA(h, "DefaultUserName", NULL, &type, (BYTE *)user, &size) != ERROR_SUCCESS || type != REG_SZ || !user[0])
+            lstrcpyA(user, "Administrator");
+        RegCloseKey(h);
+    }
+    if (LogonUserA(user, ".", "", LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, &token)) {
+        CloseHandle(token);
+        say("manual Setup: blank Administrator password, automatic logon stays for the post step\r\n");
+        return;
+    }
+    say_hex("manual Setup: Administrator password set (blank logon refused, error ", GetLastError());
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WINLOGON_KEY, 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+        RegSetValueExA(h, "AutoAdminLogon", 0, REG_SZ, (const BYTE *)"0", 2);
+        RegDeleteValueA(h, "DefaultPassword");
+        RegFlushKey(h);
+        RegCloseKey(h);
+    }
+    {
+        HANDLE f = CreateFileA(DIR "PWLOGON.TXT", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        DWORD w;
+        if (f != INVALID_HANDLE_VALUE) { WriteFile(f, "password\r\n", 10, &w, NULL); FlushFileBuffers(f); CloseHandle(f); }
+    }
+    say("manual Setup: automatic logon off; the post step and add-ons continue after the user logs on\r\n");
 }
 
 /* USOSNT4.EXE /restart (native POST.CMD, started detached right before it
@@ -412,6 +457,7 @@ void __stdcall entry(void)
         }
         ok=usb_ready();
         say(ok ? "native NT4: USB registered before first installed-system boot\r\n" : "USB readback FAILED\r\n");
+        manual_password_check();
         ExitProcess(ok ? 0 : 3);
     }
     if (lstrcmpA(opt, "finish")) ExitProcess(3);

@@ -26,13 +26,18 @@
 //! path): text mode stays automatic (USOS prepared the disk, its one disk
 //! question was asked in the menu), GUI Setup shows the pages whose answers
 //! are left out: Welcome, Name and Organization, the product key (only when
-//! the profile has none), Computer Name and Date/Time. Kept for the modern-PC
-//! path: [Data], [Unattended] (local source, MPS HAL, OemPreinstall for
-//! CMDLINES.TXT and POST.CMD), the blank Administrator password (the
-//! automatic logons of the post step and the add-on chain need it; USOSNT4
-//! /logon turns the automatic logon off at the end), [Display], [Network]
-//! (the loopback adapter usosnet4 takes over), add-ons and options.
-//! ";USOS-SETUP=manual" marks it for micro-Linux.
+//! the profile has none), Computer Name and Date/Time, and since
+//! 2026-10-30 also the licence agreement (no OemSkipEula), the Administrator
+//! password (no OEMBlankAdminPassword; with a password USOSNT4 /early turns
+//! the automatic logon off and the post step / add-on chain continue after
+//! the user's own logon), the display page with its test (no [Display]) and
+//! the workgroup / domain page (no JoinWorkgroup). Kept for the modern-PC
+//! path: [Data], [Unattended] text mode (local source, MPS HAL, the USOS
+//! disk, OemPreinstall for CMDLINES.TXT and POST.CMD) and the network
+//! adapter and protocol ([Network] InstallAdapters: the MS Loopback adapter
+//! usosnet4 takes over, TCP/IP that POST.CMD switches to the profile's LAN
+//! settings), add-ons and options. ";USOS-SETUP=manual" marks it for
+//! micro-Linux.
 //!
 //! NT 4.0 takes the time zone as the CD's own display string (localised,
 //! "(GMT+01:00) Warszawa, Praga, Budapeszt" on the Polish CD), so the
@@ -102,7 +107,9 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     try w.writeAll("; WINNT.SIF rendered by USOS for Windows NT 4.0 (docs/nt4-2026-10-07.md)\r\n");
     if (manual) try w.writeAll(";USOS-SETUP=manual\r\n");
     try w.writeAll("[Data]\r\nMsDosInitiated = 1\r\nFloppyless = 1\r\nUnattendedInstall = \"Yes\"\r\n\r\n");
-    try w.writeAll("[Unattended]\r\nOemPreinstall = Yes\r\nOemSkipEula = Yes\r\nNoWaitAfterTextMode = 1\r\nNoWaitAfterGUIMode = 1\r\n");
+    try w.writeAll("[Unattended]\r\nOemPreinstall = Yes\r\n");
+    if (!manual) try w.writeAll("OemSkipEula = Yes\r\n");
+    try w.writeAll("NoWaitAfterTextMode = 1\r\nNoWaitAfterGUIMode = 1\r\n");
     try w.writeAll("FileSystem = LeaveAlone\r\nExtendOemPartition = 0\r\nConfirmHardware = No\r\nNtUpgrade = No\r\nWin31Upgrade = No\r\n");
     try w.writeAll("TargetPath = \\WINNT\r\nOverwriteOemFilesOnUpgrade = No\r\nComputerType = \"MPS Multiprocessor PC\", Retail\r\n\r\n");
     try w.writeAll("[UserData]\r\n");
@@ -121,16 +128,16 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     }
     try w.writeAll("\r\n[GuiUnattended]\r\n");
     if (!manual) try w.writeAll("OemSkipWelcome = 1\r\n");
-    try w.writeAll("OEMBlankAdminPassword = 1\r\n");
+    if (!manual) try w.writeAll("OEMBlankAdminPassword = 1\r\n");
     if (!manual) {
         if (p.timeZone()) |zone| {
             if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
         }
     }
-    try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
+    if (!manual) try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
     try @import("addons_profile.zig").metadata(p, &w);
     try optionLines(p, &w);
-    try @import("network_defaults.zig").nt4(p, if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &w);
+    try @import("network_defaults.zig").nt4(p, if (manual) "" else if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &w);
     return w.buffered();
 }
 
@@ -188,11 +195,15 @@ test "NT 4.0 WINNT.SIF: manual Setup leaves the GUI pages to the user, keeps the
     try std.testing.expect(std.mem.indexOf(u8, text, "ProductId") == null);
     try std.testing.expect(std.mem.indexOf(u8, text, "OemSkipWelcome") == null);
     try std.testing.expect(std.mem.indexOf(u8, text, ";USOS-TZ=") == null);
-    // kept: local source, unattended text mode, OEM preinstall, blank password, display
+    // 2026-10-30: the licence, password, display and workgroup pages too
+    try std.testing.expect(std.mem.indexOf(u8, text, "OemSkipEula") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OEMBlankAdminPassword") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "[Display]") == null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "JoinWorkgroup") == null);
+    // kept: local source, unattended text mode, OEM preinstall, the loopback adapter + TCP/IP
     try std.testing.expect(std.mem.indexOf(u8, text, "MsDosInitiated = 1\r\nFloppyless = 1\r\nUnattendedInstall = \"Yes\"\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "OemPreinstall = Yes\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "OEMBlankAdminPassword = 1\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "[Display]\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "OemPreinstall = Yes\r\nNoWaitAfterTextMode = 1\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "[Network]\r\nInstallAdapters=USOS.Adapters\r\n") != null);
     // a profile key still skips the key page
     const keyed = try render(&p, "12345-oem-0012345-12345", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, keyed, "ProductId = \"12345-OEM-0012345-12345\"\r\n") != null);
@@ -202,6 +213,9 @@ test "NT 4.0 WINNT.SIF: manual Setup leaves the GUI pages to the user, keeps the
     try std.testing.expect(std.mem.indexOf(u8, auto, "USOS-SETUP") == null);
     try std.testing.expect(std.mem.indexOf(u8, auto, "OemSkipWelcome = 1\r\nOEMBlankAdminPassword = 1\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, auto, "FullName = \"Jan Kowalski\"\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "OemPreinstall = Yes\r\nOemSkipEula = Yes\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "[Display]\r\nConfigureAtLogon = 0\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, auto, "[Network]\r\nJoinWorkgroup=WORKGROUP\r\n") != null);
 }
 
 test "NT 4.0 ids and key shapes" {

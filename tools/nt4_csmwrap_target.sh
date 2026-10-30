@@ -870,8 +870,12 @@ if [ -n "$nt3" ]; then
         fi
     fi
 else
-    nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
-    if [ -n "$tse" ]; then
+    # Manual Setup: the Server Type and Licensing Mode pages are the user's
+    # (no AdvServerType / LicenseFilePrintData), as are the TSE desktops.
+    server_product=${product:-0}
+    [ "$NT4_MANUAL" != 1 ] || server_product=0
+    nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "$server_product" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+    if [ -n "$tse" ] && [ "$NT4_MANUAL" != 1 ]; then
         nt4_tse_answer < "$work/WINNT.SIF" > "$work/WINNT.TSE" && mv "$work/WINNT.TSE" "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
         log 'Terminal Server: 5 client licenses (TerminalServerDesktops), no IE 4.0 during Setup'
     fi
@@ -1230,6 +1234,17 @@ if [ "$NATIVE" = 1 ]; then
     if [ "$NT4_NATIVE_PREP" = 1 ]; then
         cp "$LIB/nt4/USOSNT4.EXE" "$usos/USOSNT4.EXE" || fail 'cannot copy native NT4 helper'
         printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write native NT4 marker'
+        # Manual Setup: USOSNT4 /early checks whether the user set an
+        # Administrator password (then no automatic logon, PWLOGON.TXT).
+        if [ "$NT4_MANUAL" = 1 ]; then
+            printf 'setup=manual\r\n' > "$usos/MANUAL.TXT" || fail 'cannot write the manual Setup marker'
+            crlf > "$usos/NOAUTO.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="0"
+EOF
+        fi
         # The finishing screen's language (USOSNT4.EXE /notice reads
         # locale= like usosnt3): the CD language, 0415 = Polish text.
         printf 'locale=0000%s\r\n' "${lang:-0409}" > "$usos/INTL.TXT" || fail 'cannot write the native NT4 notice language'
@@ -1634,6 +1649,7 @@ echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSRST.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSVBE.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG
+if exist C:\USOS\NT4\PWLOGON.TXT %SystemRoot%\regedit.exe /s C:\USOS\NT4\NOAUTO.REG
 :nativeresume
 if not exist C:\USOS\NT4\NATIVE.TXT goto nativefinished
 C:\USOS\NT4\USOSNT4.EXE /finish

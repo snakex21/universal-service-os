@@ -252,7 +252,8 @@ class Nt4ServerAnswer(unittest.TestCase):
 
     def test_target_pipes_the_answer_through_it(self):
         text = TARGET.read_text(encoding='utf-8')
-        self.assertIn('| nt4_server_answer "${product:-0}" > "$work/WINNT.SIF"', text)
+        self.assertIn('| nt4_server_answer "$server_product" > "$work/WINNT.SIF"', text)
+        self.assertIn('server_product=${product:-0}', text)   # manual Setup: 0, the pages stay
 
 
 class Nt4Target(unittest.TestCase):

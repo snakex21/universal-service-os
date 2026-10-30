@@ -231,6 +231,30 @@ class NativePrep(unittest.TestCase):
         self.assertIn('[ "$NT4_MANUAL" = 1 ] && [ "$NT4_NATIVE_PREP" != 1 ]',gate)
         self.assertIn('elif [ -z "$nt3" ]; then\n    key_state=$(nt4_key_gate',gate)
 
+    def test_native_manual_password_and_server_pages(self):
+        # 2026-10-30: manual Setup shows the password / server pages too; a
+        # user password switches the automatic logon off for good.
+        src=(ROOT/'tools/nt4_csmwrap_target.sh').read_text()
+        self.assertIn('[ "$NT4_MANUAL" != 1 ] || server_product=0',src)
+        self.assertIn('if [ -n "$tse" ] && [ "$NT4_MANUAL" != 1 ]; then',src)
+        marker=src[src.index('if [ "$NT4_MANUAL" = 1 ]; then\n            printf \'setup=manual'):]
+        marker=marker[:marker.index('\n        fi\n')]
+        self.assertIn('"$usos/MANUAL.TXT"',marker)
+        self.assertIn('"AutoAdminLogon"="0"\nEOF',marker)
+        post=src[src.index('crlf > "$usos/POST.CMD"'):]
+        post=post[:post.index('\nEOF\n')]
+        self.assertIn('regedit.exe /s C:\\USOS\\NT4\\DONE.REG\nif exist C:\\USOS\\NT4\\PWLOGON.TXT %SystemRoot%\\regedit.exe /s C:\\USOS\\NT4\\NOAUTO.REG\n',post)
+        fin=(ROOT/'tools/nt4/usosfinish/usosfinish.c').read_text()
+        check=c_function(fin,'manual_password_check')
+        self.assertIn('DIR "MANUAL.TXT"',check)
+        self.assertIn('LogonUserA(user, ".", ""',check)
+        self.assertLess(check.index('LogonUserA'),check.index('DIR "PWLOGON.TXT"'))
+        self.assertNotIn('say(user',check)                                  # nothing about the account logged
+        early=fin[fin.index('if (!lstrcmpA(opt, "early")) {'):]
+        self.assertLess(early.index('usb_ready()'),early.index('manual_password_check();'))
+        logon=c_function(fin,'logon_main')
+        self.assertLess(logon.index('DIR "PWLOGON.TXT"'),logon.index('(const BYTE *)"1"'))
+
     def test_native_restart_after_runonce_queue(self):
         # X470 2026-10-30: regsvr32 popup "workstation is shutting down" at
         # the POST.CMD restart: the restart now waits for the RunOnce queue.
