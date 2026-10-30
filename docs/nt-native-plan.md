@@ -498,3 +498,54 @@ nothing connected, Kbdclass did not load. Fix: on native NT 3.5 usosnt3 puts
 usosusb in the "Base" group (before Pointer Port), so it owns KeyboardPort0 /
 PointerPort0; a PS/2 keyboard would still connect as port 1. The Micron was
 patched in place (SYSTEM + SYSTEM.ALT, both control sets).
+
+## 8. Native NT 3.1 / 3.1 AS (2026-10-30, host checks only, no X470 run yet)
+
+`nt3-native.flag` now also covers NT31 / NT31S (`w9x_csmwrap_prepare.sh`).
+Codex's preparation branch `codex/nt31-native-prep` is merged (SZDD reader,
+USOSANS31 GUI rules, page policy, usosnet31 candidate); the native route is
+`nt31_native` in `tools/nt4_csmwrap_target.sh`.
+
+- **Boot driver blocker (solved by the template hive).** NT 3.1 text mode
+  (SETUPAPP inside SETUPLDR, BIOS INT 13h) copies the SYSTEM hive template
+  `SYSTEM._` from the local source and only flips Start on the stock drivers
+  it picked; the first GUI-mode boot then had no AHCI/NVMe boot driver (the
+  VM flow added AHCINT only at the end of GUI Setup). `usos-fb-ui
+  --nt31-hive` (`src/compat/win3x/nt31_hive.zig`, own REGF 1.1 writer:
+  4-byte "previous cell" field per cell, new cells in appended 4 KiB bins,
+  sorted `li` list, shared `sk` refcount, header length + checksum) adds
+  `ahcint` [+ `usosnvme`] (Start 0, SCSI miniport), `usosrst` (+ Parameters
+  HpetLegacyOff / RtcFix) and `usosusb` (Start 0, Keyboard Port) and sets
+  Kbdclass / Mouclass `ConnectMultiplePorts = 1` - the values the VM flow's
+  `[UsosNt31Post]` writes - and writes it back as literal SZDD under the
+  same name. Checked offline on the user's CD template: the independent
+  REGF 1.1 reader (`tools/tests/coverage/regf11.py`) sees exactly these
+  changes; 7-Zip tests the container. TXTSETUP.INF `[WinntFiles]` gets
+  `d2,AHCINT.SYS,4` etc., so text mode copies the files to
+  `system32\drivers`. Rejected: TXTSETUP third-party registration
+  (`SppThirdPartyRegistry` is the OEM-disk path, needs key presses); a
+  pre-boot UEFI hive edit (the logger only reaches the ESP).
+- **Text-mode keys.** SETUPAPP reads keys through BIOS INT 16h. The NT 3.x
+  MBR's quiesce code loads sector 5 ("K3", `.keys` section) into the second
+  half of the reserved 1 KiB when hook byte 509 bit 2 is set (native 3.1
+  only) and hooks INT 16h: ENTER once per page for Welcome, Express Setup,
+  the partition, keep the file system, the `\WINNT` location (the VM
+  runner's rules), a CF9h full reset on "Setup has successfully configured
+  your computer". Unknown and error pages get nothing; real keys pass.
+  Unicorn test `tools/tests/legacy_bios/test_nt3_mbr_keys.py`.
+- **TXTSETUP.INF**: `[SCSI.ISA/EISA/MCA.Load]` emptied (no ISA probes).
+- **GUI**: INITIAL.IN_ / HARDWARE.IN_ (+ NTLANMAN.IN_ / OEMNADLB.IN_ on AS)
+  patched in the local source with the VM flow's `nt31_*_inf` filters, plus
+  `STF_PROCESSOR = I586` after `detect ProcessorVar` (Zen 3) and
+  `StartDetachedProcess` USOSANS31 after LoadSetupLibrary (Date/Time OK, AS
+  new domain USOSDOMAIN).
+- **Finish**: POST.CMD (end of GUI Setup) runs `USOSNT3.EXE /finish31`:
+  BOOT.INI as the VM finish step (timeout 5, no `C:\` entry, `/NODEBUG
+  /MAXMEM=64`, `[USOS /SOS]`, `[VGA mode]`) and the Setup leftovers.
+- **MBR**: RAM cap 64 MiB (byte 508 = 4, AH=88h/E801h; every NT 3.1 X470
+  PASS ran at 65,088 KB), quiesce + shutdown log (bit 1), keys (bit 2), PCI
+  BIOS hidden, HPET legacy off, CMOS century copy; pre-boot logger.
+- **Not covered**: network (the NT 3.1 CD has no DHCP; usosnet31 is
+  82576-only, the X470 has an I211), usosrst 1.7-style restart/power-off
+  for 3.1 (the 1.6-nt31 build stays), white boot-screen rows of the NT31
+  AHCINT build.

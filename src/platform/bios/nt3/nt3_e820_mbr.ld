@@ -10,5 +10,9 @@ SECTIONS
        independent, linked apart from .text and .hook. */
     .quiesce 0x1000 : AT(0x20000) SUBALIGN(1) { *(.quiesce*) }
     ASSERT(SIZEOF(.quiesce) == 512, "NT3 MBR quiesce sector must be 512 bytes")
+    /* NT 3.1 text-mode key answerer (sector 5), run at offset 200h of the
+       hook segment (the second half of the reserved 1 KiB). */
+    .keys 0x200 : AT(0x30000) SUBALIGN(1) { *(.keys*) }
+    ASSERT(SIZEOF(.keys) == 512, "NT3 MBR key answerer sector must be 512 bytes")
     /DISCARD/ : { *(.comment*) *(.note*) *(.eh_frame*) *(.data*) *(.bss*) }
 }

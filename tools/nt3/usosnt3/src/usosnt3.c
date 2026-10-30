@@ -2707,6 +2707,48 @@ void __stdcall entry(void)
         say("finish done\r\n");
         ExitProcess(0);
     }
+    /* Native NT 3.1 (docs/nt-native-plan.md section 8): POST.CMD at the end
+       of GUI Setup, after /polish. NT 3.1 runs no usosnt3 service and no
+       Linux finish step follows on the native path, so this does the VM
+       finish step's jobs: BOOT.INI (timeout=5, no C:\ entry, the NATIVE.TXT
+       options "/NODEBUG /MAXMEM=64" on every entry, [USOS /SOS] and [VGA
+       mode]) and the Setup leftovers on C:\, including the boot floppy
+       files nt4_csmwrap_target.sh listed in ROOTLIST.TXT and TXTSETUP.INF. */
+    if (lstrcmpA(opt, "finish31") == 0) {
+        static char list[4096];
+        char path[MAX_PATH];
+        int n, i, s;
+        open_log("POST.LOG");
+        say("USOS native NT 3.1 finish\r\n");
+        if (!native_install()) {
+            say("no NATIVE.TXT: not a native install, nothing done\r\n");
+            ExitProcess(3);
+        }
+        boot_ini_finish();
+        n = read_small(DIR "ROOTLIST.TXT", list, sizeof list);
+        for (i = 0, s = 0; n > 0 && i <= n; i++) {
+            if (i < n && list[i] != '\r' && list[i] != '\n')
+                continue;
+            if (i - s > 0 && i - s < 13) {
+                lstrcpyA(path, "C:\\");
+                copy_bytes(path + 3, list + s, i - s);
+                path[3 + i - s] = 0;
+                if (GetFileAttributesA(path) != 0xFFFFFFFF) {
+                    SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
+                    say(DeleteFileA(path) ? "removed " : "CANNOT REMOVE ");
+                    say(path);
+                    say("\r\n");
+                }
+            }
+            s = i + 1;
+        }
+        if (GetFileAttributesA("C:\\TXTSETUP.INF") != 0xFFFFFFFF) {
+            SetFileAttributesA("C:\\TXTSETUP.INF", FILE_ATTRIBUTE_NORMAL);
+            say(DeleteFileA("C:\\TXTSETUP.INF") ? "removed C:\\TXTSETUP.INF\r\n" : "CANNOT REMOVE C:\\TXTSETUP.INF\r\n");
+        }
+        say("finish31 done\r\n");
+        ExitProcess(0);
+    }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
     if (lstrcmpA(opt, "polish") == 0) {
         open_log("POST.LOG");

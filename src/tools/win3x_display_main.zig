@@ -13,6 +13,11 @@
 //!   usos-win3x-display nt3-cab-get CAB OUT | nt3-cab-put CAB FILE OUT
 //!                                         one-file NT 3.5x cabinet (micro-Linux:
 //!                                         usos-fb-ui --nt3-cab-get / --nt3-cab-put)
+//!   usos-win3x-display nt31-hive IN OUT [nvme] | szdd-get IN OUT |
+//!                      szdd-put ORIGINAL BODY OUT
+//!                                         native NT 3.1 SYSTEM._ template and
+//!                                         SZDD INFs (micro-Linux: usos-fb-ui
+//!                                         --nt31-hive / --szdd-get / --szdd-put)
 //!   usos-win3x-display w9x-mini SETUPDIR HELPERDIR|-
 //!                                         Windows 9x Setup MINI.CAB (the
 //!                                         micro-Linux runs it as
@@ -55,6 +60,21 @@ pub fn main(init: std.process.Init) !u8 {
         const cab_path = args.next() orelse return usage();
         const file_path = args.next() orelse return usage();
         return win3x.nt3_cab_file.runPut(io, init.gpa, cab_path, file_path, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "nt31-hive")) {
+        const in_path = args.next() orelse return usage();
+        const out_path = args.next() orelse return usage();
+        const nvme = if (args.next()) |a| std.mem.eql(u8, a, "nvme") else false;
+        return win3x.nt31_hive.run(io, init.gpa, in_path, out_path, nvme);
+    }
+    if (std.mem.eql(u8, command, "szdd-get")) {
+        const in_path = args.next() orelse return usage();
+        return win3x.nt31_hive.runGet(io, init.gpa, in_path, args.next() orelse return usage());
+    }
+    if (std.mem.eql(u8, command, "szdd-put")) {
+        const orig = args.next() orelse return usage();
+        const body = args.next() orelse return usage();
+        return win3x.nt31_hive.runPut(io, init.gpa, orig, body, args.next() orelse return usage());
     }
     if (std.mem.eql(u8, command, "expand")) {
         const in_path = args.next() orelse return usage();

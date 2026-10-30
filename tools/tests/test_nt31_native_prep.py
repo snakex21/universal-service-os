@@ -34,13 +34,16 @@ class Source(unittest.TestCase):
         with self.assertRaises(ValueError):source.patch(b'[Unknown]\r\n','initial',shell=shell)
     def test_unsafe_profile_refused(self):
         with self.assertRaises(ValueError):source.patch(b'[Unknown]','initial',owner='a"b')
-    def test_native_route_stays_closed_until_input_hook(self):
+    def test_native_route_opens_with_the_input_hook(self):
+        # 2026-10-30: the INT 16h key answerer (MBR sector 5) exists, so the
+        # nt3-native.flag route covers NT 3.1 (test_nt31_native.py).
         text=(ROOT/'tools/w9x_csmwrap_prepare.sh').read_text()
-        self.assertNotIn('NT31|NT31S) nt_native_flag',text)
+        self.assertIn('NT31|NT31S) nt_native_flag',text)
+        self.assertIn('.section .keys',(ROOT/'src/platform/bios/nt3/nt3_e820_mbr.S').read_text())
     def test_hook_copy_64mib_and_identity_guard(self):
         sector=bytes(510)+b'U3'
         out=source.hook_for_nt31(sector)
-        self.assertEqual((out[508],out[509]),(4,0))
+        self.assertEqual((out[508],out[509]),(4,6))
         self.assertEqual(sector,bytes(510)+b'U3')
         with self.assertRaises(ValueError):source.hook_for_nt31(bytes(512))
     def test_gui_uses_original_control_ids_and_no_getversionex(self):

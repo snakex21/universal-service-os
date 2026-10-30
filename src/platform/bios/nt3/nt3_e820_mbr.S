@@ -149,6 +149,10 @@
 .equ HOOK_OPTIONS,    509
 .equ OPT_KEEP_PCI_BIOS, 1
 .equ OPT_QUIESCE,     2
+/* NT 3.1 text-mode key answerer (sector 5, "K3", see the .keys section). */
+.equ OPT_KEYS31,      4
+.equ KEYS_LBA,        5
+.equ KEYS_AT,         0x200
 /* Bus-master quiesce sector (see the header). */
 .equ QUIESCE_LBA,     3
 /* Shutdown log sector and its buffer (the E820 buffer, free by then). */
@@ -588,6 +592,25 @@ quiesce_start:
     mov es, ax
     cmp word ptr es:[510], 0x3355
     jne 9f
+    /* Native NT 3.1: the text-mode key answerer (sector 5, "K3") into the
+       second half of the reserved 1 KiB, INT 16h pointed at it. */
+    test byte ptr es:[HOOK_OPTIONS], OPT_KEYS31
+    jz 8f
+    mov bx, KEYS_AT
+    mov eax, KEYS_LBA
+    mov cx, 0x4200
+    .byte 0xE8                             /* near call sl_disk (16-bit) */
+    .word sl_disk - (. + 2)
+    jc 8f
+    cmp word ptr es:[KEYS_AT + 510], 0x334B /* "K3" */
+    jne 8f
+    mov eax, dword ptr [0x16 * 4]
+    mov dword ptr es:[k_old16], eax
+    cli
+    mov word ptr [0x16 * 4], KEYS_AT
+    mov word ptr [0x16 * 4 + 2], es
+    sti
+8:
     test byte ptr es:[HOOK_OPTIONS], OPT_QUIESCE
     jz 9f
     /* Every bus/device/function, from FF:1F.7 down to 00:00.0. */
@@ -691,3 +714,161 @@ sl_disk:
     .byte 0xC3
     .org 510
     .byte 0x51, 0x33                       /* "Q3" */
+
+
+/* NT 3.1 text-mode key answerer: sector 5 ("K3"), read by the quiesce code
+ * to (INT 12h top):0200h when bit 2 of the hook options byte (OPT_KEYS31,
+ * native NT 3.1 only) is set, and hooked into INT 16h.  NT 3.1 text-mode
+ * Setup (SETUPAPP.EXE inside SETUPLDR) has no answer file; it reads its
+ * keys through BIOS INT 16h.  On every INT 16h read / peek the answerer
+ * looks at the 80x25 text page (B800:0000) for the pages of the express path
+ * that take ENTER -- the rules the install VM's runner used (nt31_vm_tick,
+ * nt4_qemu_install.sh): Welcome, Express Setup, the partition C:, keep the
+ * file system, the \WINNT location -- and returns ENTER (1C0Dh) once per
+ * page; the same page gets ENTER again only after about 30 s (TSC high
+ * dword +24).  The final page ("Setup has successfully configured your
+ * computer ... Press CTRL+ALT+DELETE") is answered with a full reset (CF9h,
+ * then the keyboard controller).  Any other page (errors included) gets
+ * nothing: a real key still goes through, the BIOS calls are passed on
+ * unchanged.  Later boots (NTLDR menu, the installed system) show none of
+ * these texts.
+ */
+.section .keys, "ax"
+.global keys_start
+keys_start:
+    cmp ah, 0x01
+    je k_peek
+    cmp ah, 0x11
+    je k_peek
+    cmp ah, 0x00
+    je k_read
+    cmp ah, 0x10
+    je k_read
+k_chain:
+    .byte 0x2E, 0xFF, 0x2E                 /* jmp far cs:[k_old16] (m16:16) */
+    .word k_old16
+k_peek:
+    cmp byte ptr cs:[k_pending], 0
+    jne 1f
+    .byte 0xE8                             /* near call k_check */
+    .word k_check - (. + 2)
+    jnc k_chain
+    mov byte ptr cs:[k_pending], 1
+1:
+    mov ax, 0x1C0D
+    push bp
+    mov bp, sp
+    and byte ptr [bp + 6], 0xBF            /* ZF = 0: a key is waiting */
+    pop bp
+    iret
+k_read:
+    sti
+1:
+    cmp byte ptr cs:[k_pending], 0
+    jne 2f
+    push ax
+    inc ah                                 /* 00h -> 01h, 10h -> 11h */
+    pushf
+    .byte 0x2E, 0xFF, 0x1E                 /* call far cs:[k_old16] (m16:16) */
+    .word k_old16
+    pop ax
+    jnz k_chain                            /* a real key: the BIOS reads it */
+    .byte 0xE8                             /* near call k_check */
+    .word k_check - (. + 2)
+    jnc 1b
+2:
+    mov byte ptr cs:[k_pending], 0
+    mov ax, 0x1C0D
+    iret
+
+/* CF = 1: answer ENTER now (the final page resets instead).  Keeps every
+   register. */
+k_check:
+    pushad
+    push ds
+    push 0xB800
+    pop ds
+    mov si, offset k_pages
+    mov cl, 1
+k_next:
+    cmp byte ptr cs:[si], 0
+    je k_none
+    xor bp, bp                             /* start offset on the page */
+k_scan:
+    mov bx, si
+    mov di, bp
+k_cmp:
+    mov al, byte ptr cs:[bx]
+    test al, al
+    jz k_found
+    cmp di, 4000
+    jae k_skip
+    cmp al, byte ptr [di]
+    jne k_mis
+    inc bx
+    add di, 2
+    jmp k_cmp
+k_mis:
+    add bp, 2
+    cmp bp, 4000
+    jb k_scan
+k_skip:
+    inc si
+    cmp byte ptr cs:[si - 1], 0
+    jne k_skip
+    inc cl
+    jmp k_next
+k_found:
+    rdtsc
+    cmp cl, byte ptr cs:[k_page]
+    jne 1f
+    mov eax, edx
+    sub eax, dword ptr cs:[k_tsc]
+    cmp eax, 24
+    jb k_none
+1:
+    mov byte ptr cs:[k_page], cl
+    mov dword ptr cs:[k_tsc], edx
+    cmp cl, 1
+    je k_reset
+    pop ds
+    popad
+    stc
+    .byte 0xC3                             /* ret (16-bit near) */
+k_none:
+    pop ds
+    popad
+    clc
+    .byte 0xC3
+k_reset:
+    cli
+    mov dx, 0x0CF9
+    mov al, 0x02
+    out dx, al
+    mov al, 0x06
+    out dx, al
+    mov al, 0xFE
+    out 0x64, al
+1:
+    hlt
+    jmp 1b
+
+/* The pages, in this order (1 = the final page); 0 ends the table. */
+k_pages:
+    .asciz "successfully configured your computer"
+    .asciz "Welcome to Setup."
+    .asciz "Express Setup (recommended)"
+    .asciz "select the partition where"
+    .asciz "select a file system option"
+    .asciz "Choose the location"
+    .byte 0
+k_old16:
+    .long 0
+k_tsc:
+    .long 0
+k_page:
+    .byte 0
+k_pending:
+    .byte 0
+    .org 510
+    .byte 0x4B, 0x33                       /* "K3" */

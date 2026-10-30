@@ -62,6 +62,31 @@ def build_nt3_answer(root: Path, output: Path | None = None) -> Path:
     return exe
 
 
+def build_nt31_answer(root: Path, output: Path | None = None) -> Path:
+    """USOSANS31.EXE (tools/nt3/native31): the native NT 3.1 GUI-mode Setup
+    page answerer (Date/Time, AS Domain Settings) on the USOSANS3 recorder,
+    Win32 GUI subsystem, kernel32 + user32 only, i486, PE 3.10."""
+    zig = Path(os.environ.get('USOS_ZIG', root/'tools/zig/zig.exe'))
+    output = output or root/'zig-out/windows-usos-res'
+    output.mkdir(parents=True, exist_ok=True)
+    temporary = output/'tmp'
+    temporary.mkdir(exist_ok=True)
+    env = dict(os.environ, TEMP=str(temporary), TMP=str(temporary),
+               ZIG_GLOBAL_CACHE_DIR=str(root/'tools/cache/zig-global'),
+               ZIG_LOCAL_CACHE_DIR=str(output/'zig-cache'))
+    exe = output/'USOSANS31.EXE'
+    subprocess.run([str(zig), 'cc', '-target', 'x86-windows-gnu', '-mcpu=i486', '-Os', '-nostdlib',
+                    '-fno-stack-protector', '-fno-builtin', '-I'+str(zig.parent/'lib/libc/include/any-windows-any'),
+                    '-DWINVER=0x0400', '-D_WIN32_WINNT=0x0400', str(root/'tools/nt3/native31/usosans31.c'),
+                    '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-luser32', '-o', str(exe)],
+                   env=env, check=True)
+    spec = importlib.util.spec_from_file_location('res_pe_version', root/'tools/nt4/pe_nt4_version.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    exe.write_bytes(module.set_nt4(exe.read_bytes(), 3, 10))
+    return exe
+
+
 def build_collector(root: Path, output: Path) -> Path:
     """Use an explicit toolchain, otherwise the buildkit's pinned resolver."""
     if os.environ.get('USOS_WATCOM'):

@@ -233,13 +233,13 @@ usos_w9x_csmwrap_prepare() {
     esac
     # Native NT 3.51 / 3.5 / 4.0 (no install VM, docs/nt-native-plan.md):
     # opt-in while it is tested on hardware, EFI/USOS/win9x/nt3-native.flag
-    # for NT 3.51 / 3.5 and nt4-native.flag for NT 4.0 / Server / TSE (the
+    # for NT 3.51 / 3.5 / 3.1 and nt4-native.flag for NT 4.0 / Server / TSE (the
     # RTM kernels with the raised CPUID leaf limit); the 9x
     # phase1-native.flag never switches NT.
     nt_native=no
     nt_native_flag=''
     case "$tag" in
-        NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;
+        NT351|NT351S|NT35|NT35S|NT31|NT31S) nt_native_flag=nt3-native.flag ;;
         NT4|NT4S|NT4T) nt_native_flag=nt4-native.flag ;;
     esac
     [ -z "$nt_native_flag" ] || [ ! -e "/mnt/esp/EFI/USOS/win9x/$nt_native_flag" ] || nt_native=yes

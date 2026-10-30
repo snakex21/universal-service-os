@@ -6,7 +6,7 @@ SZDD A/LZSS mechanics cross-checked with doors NT5
 base/win32/lz32/{winlza/lzexp.c,lzcommon.c}; original NT31 CDs independently
 verified. Own implementation; no Microsoft data in this module.
 The patch functions themselves are the existing USOS nt31_*_inf functions.
-No native install routing is enabled until the text-page input hook exists.
+The native route itself is tools/nt4_csmwrap_target.sh nt31_native (2026-10-30).
 """
 from pathlib import Path
 import argparse
@@ -18,9 +18,13 @@ MAX_SIZE = 16 * 1024 * 1024
 ROOT = Path(__file__).resolve().parents[1]
 
 def hook_for_nt31(data):
-    """Prepare a NEW sector-1 copy: 64 MiB, hidden PCI BIOS. No disk I/O."""
+    """Prepare a NEW sector-1 copy as the native NT 3.1 route writes it
+    (tools/nt4_csmwrap_target.sh): RAM cap 64 MiB (byte 508 = 4), options
+    byte 509 = NIC bus-master quiesce + shutdown log (bit 1, sector 3) and
+    the text-mode key answerer (bit 2, sector 5); bit 0 stays clear, so the
+    PCI BIOS stays hidden. No disk I/O."""
     if len(data)!=512 or data[510:]!=b'U3':raise ValueError('Expected an identified USOS hook sector')
-    result=bytearray(data);result[508]=4;result[509]=0
+    result=bytearray(data);result[508]=4;result[509]=2|4
     return bytes(result)
 
 def unpack(data):

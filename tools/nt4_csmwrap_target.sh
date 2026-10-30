@@ -643,6 +643,124 @@ echo done > C:\USOS\NT3\DONE.TXT
 EOF
 }
 
+# Native NT 3.1 (NT_NATIVE=1, docs/nt-native-plan.md section 8): TXTSETUP.INF
+# (stdin -> stdout, CR LF) with
+#   [SCSI.ISA.Load] / [SCSI.EISA.Load] / [SCSI.MCA.Load]  empty: SETUPLDR
+#       loads and runs every listed ISA/EISA/MCA miniport, whose port probes
+#       have no business on a modern board; text mode reaches C: through
+#       BIOS INT 13h (SETUPAPP inside the loader, CSMWrap/SeaBIOS);
+#   [WinntFiles]  the USOS drivers ($1 = "nvme": also usosnvme) to
+#       system32\drivers (directory 4) from the local source, so the first
+#       GUI-mode boot has them; their Services keys come from the patched
+#       SYSTEM._ template (usos-fb-ui --nt31-hive).
+# rc 1 when a section is missing.
+nt31_native_txtsetup() {
+    awk -v BINMODE=3 -v nvme="${1:-}" '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
+        low ~ /^\[/ {
+            sec = low; printf "%s\r\n", line
+            if (sec ~ /^\[scsi\.(isa|eisa|mca)\.load\]$/) hit++
+            if (sec == "[winntfiles]" && !files++) {
+                printf "d2,AHCINT.SYS,4\r\nd2,USOSRST.SYS,4\r\nd2,USOSUSB.SYS,4\r\n"
+                if (nvme == "nvme") printf "d2,USOSNVME.SYS,4\r\n"
+            }
+            next
+        }
+        sec ~ /^\[scsi\.(isa|eisa|mca)\.load\]$/ && low != "" && low !~ /^#/ { next }
+        { printf "%s\r\n", line }
+        END { if (files != 1 || hit != 3) { print "TXTSETUP.INF: no [WinntFiles] / [SCSI.*.Load] sections" > "/dev/stderr"; exit 1 } }'
+}
+
+# Native NT 3.1 INITIAL.INF additions (after nt31_initial_inf; stdin ->
+# stdout, CR LF): GUI Setup refuses a Zen 3 CPU (GetProcessor; the VM ran
+# -cpu pentium), so STF_PROCESSOR = I586 right after "detect ProcessorVar"
+# (as nt35_initial.zig does for 3.5), and the GUI page answerer USOSANS31
+# (tools/nt3/native31: Date/Time OK, AS "Controller in New Domain") starts
+# right after LoadSetupLibrary. rc 1 when an anchor is not there once.
+nt31_native_initial() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low); printf "%s\r\n", line }
+        low == "detectprocessorvar" { printf "    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n"; cpu++ }
+        low == "installloadsetuplibrary" { printf "    StartDetachedProcess STATUS \"\" \"\" \"C:\\USOS\\NT3\\USOSANS31.EXE\"\r\n"; ans++ }
+        END { if (cpu != 1 || ans != 1) { print "INITIAL.INF: detect ProcessorVar " cpu "/1, LoadSetupLibrary " ans "/1" > "/dev/stderr"; exit 1 } }'
+}
+
+# One SZDD file $1 of the local source through the filter "$2 ..." (the
+# remaining arguments), written back in the same container (literal SZDD,
+# read back by usos-fb-ui --szdd-put). A plain file is filtered as is.
+nt31_native_szdd() {
+    nf=$1
+    shift
+    [ -f "$nf" ] || fail "the NT 3.1 local source has no $(basename "$nf")"
+    rm -f "$work/sz.in" "$work/sz.out" "$work/sz.new"
+    "${USOS_FB_UI:-usos-fb-ui}" --szdd-get "$nf" "$work/sz.in" || fail "cannot expand $(basename "$nf")"
+    "$@" < "$work/sz.in" > "$work/sz.out" || fail "cannot patch $(basename "$nf") (anchors differ: another CD?)"
+    "${USOS_FB_UI:-usos-fb-ui}" --szdd-put "$nf" "$work/sz.out" "$work/sz.new" || fail "cannot pack $(basename "$nf")"
+    cat "$work/sz.new" > "$nf" || fail "cannot write $(basename "$nf")"
+    rm -f "$work/sz.in" "$work/sz.out" "$work/sz.new"
+}
+
+# Native NT 3.1 GUI INF filters (nt4_qemu_install.sh holds the VM flow's
+# versions; sourced in a subshell, it only defines variables and functions).
+nt31_initial_both() {
+    ( . "$LIB/nt4_qemu_install.sh"; nt31_initial_inf "$q_full" "$q_org" "$q_comp" "$q_net" "$q_nvme" ) | nt31_native_initial
+}
+nt31_hardware() { ( . "$LIB/nt4_qemu_install.sh"; nt31_hardware_inf ); }
+nt31_ntlanman() { ( . "$LIB/nt4_qemu_install.sh"; nt31_ntlanman_inf ); }
+nt31_oemnadlb() { ( . "$LIB/nt4_qemu_install.sh"; nt31_oemnadlb_inf ); }
+
+# Native NT 3.1: the local source and \USOS\NT3 for text mode, GUI mode and
+# POST.CMD on this PC (no install VM; docs/nt-native-plan.md section 8).
+nt31_native() {
+    q_nvme=''
+    [ -z "$nvme" ] || q_nvme=nvme
+    for inf in "$work/c/TXTSETUP.INF" "$ls_dir/TXTSETUP.INF"; do
+        [ -f "$inf" ] || continue
+        nt31_native_txtsetup "$q_nvme" < "$inf" > "$work/txtsetup.nat" && cat "$work/txtsetup.nat" > "$inf" ||
+            fail 'cannot prepare TXTSETUP.INF for the native NT 3.1 Setup'
+    done
+    log "native: TXTSETUP.INF [SCSI.*.Load] empty (text mode on BIOS INT 13h), [WinntFiles] + AHCINT USOSRST USOSUSB${nvme:+ USOSNVME}"
+    cp "$drv/$ahci" "$ls_dir/AHCINT.SYS" && cp "$drv/$rst" "$ls_dir/USOSRST.SYS" && cp "$drv/$usb" "$ls_dir/USOSUSB.SYS" ||
+        fail 'cannot copy the USOS drivers to the local source'
+    [ -z "$nvme" ] || cp "$drv/$nvme_sys" "$ls_dir/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS to the local source'
+    # The SYSTEM hive template: the USOS boot drivers registered before text
+    # mode copies it (src/compat/win3x/nt31_hive.zig).
+    hive=''
+    for name in SYSTEM._ SYSTEM; do [ -f "$ls_dir/$name" ] && hive="$ls_dir/$name" && break; done
+    [ -n "$hive" ] || fail 'the NT 3.1 local source has no SYSTEM._ (hive template)'
+    rm -f "$work/SYSTEM.NEW"
+    if "${USOS_FB_UI:-usos-fb-ui}" --nt31-hive "$hive" "$work/SYSTEM.NEW" $q_nvme > "$work/hive.log" 2>&1; then rc=0; else rc=$?; fi
+    while IFS= read -r line; do log "$line"; done < "$work/hive.log"
+    [ "$rc" = 0 ] && [ -s "$work/SYSTEM.NEW" ] || fail 'cannot add the USOS boot drivers to the SYSTEM._ template (not the NT 3.1 CD template?)'
+    cat "$work/SYSTEM.NEW" > "$hive" && cmp -s "$work/SYSTEM.NEW" "$hive" || fail 'read-back: SYSTEM._ differs'
+    rm -f "$work/SYSTEM.NEW"
+    # GUI Setup's INF files, patched here instead of between VM starts
+    # (nt31_vm_patch_initial): names, no network / printer / apps / ERD,
+    # [UsosNt31Post] (drivers, keys, POST.CMD) + the native additions.
+    q_full=$(tr -d '\r' < "$usos/NAMES.TXT" | awk -F= '$1 == "fullname" { sub(/^[^=]*=/, ""); print; exit }')
+    q_org=$(tr -d '\r' < "$usos/NAMES.TXT" | awk -F= '$1 == "org" { sub(/^[^=]*=/, ""); print; exit }')
+    q_comp=$(tr -d '\r' < "$usos/NAMES.TXT" | awk -F= '$1 == "computer" { sub(/^[^=]*=/, ""); print; exit }')
+    q_net=''
+    [ "${product:-0}" = 0 ] || q_net=net
+    nt31_native_szdd "$ls_dir/INITIAL.IN_" nt31_initial_both
+    nt31_native_szdd "$ls_dir/HARDWARE.IN_" nt31_hardware
+    if [ -n "$q_net" ]; then
+        nt31_native_szdd "$ls_dir/NTLANMAN.IN_" nt31_ntlanman
+        nt31_native_szdd "$ls_dir/OEMNADLB.IN_" nt31_oemnadlb
+        log 'native: Advanced Server: MS Loopback Adapter + new domain USOSDOMAIN (USOSANS31 answers Domain Settings)'
+    fi
+    log 'native: INITIAL.IN_ (names, I586, no network/printer/apps/ERD, [UsosNt31Post], USOSANS31) + HARDWARE.IN_ patched in the local source'
+    [ -r "$LIB/nt3/USOSANS31.EXE" ] || fail "missing: $LIB/nt3/USOSANS31.EXE (GUI Setup page answerer)"
+    cp "$LIB/nt3/USOSANS31.EXE" "$usos/USOSANS31.EXE" || fail 'cannot copy USOSANS31.EXE'
+    printf '[native]\r\ndomain=USOSDOMAIN\r\n' > "$usos/NATIVE31.INI" || fail 'cannot write NATIVE31.INI'
+    printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write NATIVE.TXT'
+    # POST.CMD (end of GUI Setup): BOOT.INI as the VM finish step writes it
+    # and the Setup leftovers removed (usosnt3 /finish31), before DONE.TXT.
+    awk -v BINMODE=3 '{ sub(/\r$/, "") } /^echo done > / { printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
+        cat "$work/post.cmd" > "$usos/POST.CMD" && grep -q 'finish31' "$usos/POST.CMD" || fail 'cannot write POST.CMD'
+    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE /finish31 (BOOT.INI, leftovers)"
+}
+
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
@@ -742,6 +860,11 @@ mbr_hook=''
 mbr_quiesce=''
 [ -z "$mbr_hook" ] || mbr_quiesce=$LIB/nt3-e820-quiesce-512.bin
 [ -z "$mbr_quiesce" ] || [ "$(wc -c < "$mbr_quiesce" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_quiesce"
+# Native NT 3.1: its text-mode key answerer, sector 5 ("K3"), loaded by the
+# quiesce code with bit 2 of the hook options byte (below).
+mbr_keys=''
+[ "$NATIVE:$nt31" != 1:yes ] || [ -z "$mbr_hook" ] || mbr_keys=$LIB/nt3-e820-keys-512.bin
+[ -z "$mbr_keys" ] || [ "$(wc -c < "$mbr_keys" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_keys. No disk was changed"
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 # usosrst for NT 3.5 (USOSRST35.SYS, build-nt35.cmd): the 3.5 kernel lacks
@@ -799,16 +922,22 @@ elif [ -z "$nt3" ]; then
     log "product key: $key_state"
 fi
 if [ "$NATIVE" = 1 ]; then
-    { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ] || [ "$nt3:$major" = :4 ]; } && [ -z "$nt31" ] ||
-        fail "the native install (no VM) covers Windows NT 4.0, 3.51 and 3.5 only so far, not NT $major.$minor. No disk was changed"
+    { [ "$nt3:$minor" = yes:51 ] || [ "$nt3:$minor" = yes:50 ] || [ "$nt3:$minor" = yes:10 ] || [ "$nt3:$major" = :4 ]; } ||
+        fail "the native install (no VM) covers Windows NT 4.0, 3.51, 3.5 and 3.1 only so far, not NT $major.$minor. No disk was changed"
+    # NT 3.1: no /NUMPROC in its loader; /NODEBUG (else its kernel debugger
+    # takes COM1) and 64 MiB, the size every NT 3.1 X470 PASS ran with
+    # (2026-10-10, winmsd 65,088 KB); the MBR hook caps text mode too.
+    [ -z "$nt31" ] || NT_NATIVE_LOAD_OPTIONS=${NT31_NATIVE_LOAD_OPTIONS:-/NODEBUG /MAXMEM=64}
     # NT 3.5x: the Standard PC HAL and the uniprocessor kernel
     # (nt3_standard_hal) run one processor, so no /NUMPROC. NT 3.5: more
     # than 128 MiB loses the boot disk (NT35_BOOT_OPTIONS in
     # nt4_qemu_install.sh).
     [ "$nt3:$minor" != yes:51 ] || NT_NATIVE_LOAD_OPTIONS=${NT351_NATIVE_LOAD_OPTIONS:-/MAXMEM=1024}
     [ "$minor" != 50 ] || NT_NATIVE_LOAD_OPTIONS=${NT35_NATIVE_LOAD_OPTIONS:-/MAXMEM=128}
-    # The GUI Setup page recorder (one build for NT 3.5x and 4.0, $LIB/nt3).
+    # The GUI Setup page recorder (one build for NT 3.5x and 4.0, $LIB/nt3;
+    # NT 3.1: its answerer USOSANS31.EXE, staged by nt31_native).
     ans3=$LIB/nt3/USOSANS3.EXE
+    [ -z "$nt31" ] || ans3=$LIB/nt3/USOSANS31.EXE
     [ -r "$ans3" ] || fail "missing: $ans3 (GUI Setup page recorder). No disk was changed"
     if [ -z "$nt3" ]; then
         # Native NT 4.0 (nt4-native.flag): the RTM kernels with the CPUID
@@ -956,6 +1085,8 @@ if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then
     case "$nt3:$minor" in
         yes:50) ram_cap=8 ram_oct='\010' ;;
         yes:51) ram_cap=64 ram_oct='\100' ;;
+        # NT 3.1: 64 MiB (4), through AH=88h / AX=E801h (its loaders know no E820).
+        yes:10) ram_cap=4 ram_oct='\004' ;;
     esac
     [ "$NT4_NATIVE_PREP" != 1 ] || { ram_cap=64 ram_oct='\100'; }
 fi
@@ -975,6 +1106,11 @@ fi
 if [ "$NATIVE" = 1 ] && [ -n "$mbr_hook" ]; then
     opt=$(od -An -tu1 -j509 -N1 "$mbr_hook" | tr -d ' \n')
     opt=$((opt | 2))
+    # NT 3.1 text mode reads its keys through BIOS INT 16h and has no answer
+    # file: bit 2 (OPT_KEYS31) makes the MBR load the key answerer
+    # (sector 5) that types ENTER on the express-path pages (the install VM
+    # runner's rules) and resets on the final page.
+    [ -z "$mbr_keys" ] || opt=$((opt | 4))
     cp "$mbr_hook" "$work/hookq.bin" && printf "\\$(printf %03o "$opt")" | dd of="$work/hookq.bin" bs=1 seek=509 count=1 conv=notrunc 2>/dev/null ||
         fail 'cannot prepare the MBR hook sector. No disk was changed'
     [ "$(od -An -tu1 -j509 -N1 "$work/hookq.bin" | tr -d ' \n')" = "$opt" ] || fail 'the MBR hook quiesce bit did not take. No disk was changed'
@@ -1000,6 +1136,9 @@ dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null |
     fail 'cannot write the MBR hook sector'
 [ -z "$mbr_quiesce" ] || dd if="$mbr_quiesce" of="$TARGET_DEVICE" bs=512 seek=3 count=1 conv=notrunc,fsync 2>/dev/null ||
     fail 'cannot write the MBR quiesce sector'
+[ -z "$mbr_keys" ] || dd if="$mbr_keys" of="$TARGET_DEVICE" bs=512 seek=5 count=1 conv=notrunc,fsync 2>/dev/null ||
+    fail 'cannot write the MBR key answerer sector'
+[ -z "$mbr_keys" ] || log 'MBR: NT 3.1 text-mode key answerer (sector 5, hook byte 509 bit 2): ENTER on Welcome / Express / partition C: / file system / \WINNT, reset on the final page'
 
 part_loop=$(losetup -f) || fail 'no free loop device for the new partition'
 losetup -o $((PART_START * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot attach the new partition'
@@ -1157,6 +1296,7 @@ fi
 # the NT 3.51 RTM kernel starts on Zen 3 (QEMU EPYC-Milan 2026-10-08).
 if [ -n "$nt31" ]; then
 nt31_usos
+[ "$NATIVE" != 1 ] || nt31_native
 elif [ -n "$nt3" ]; then
 usos="$work/c/USOS/NT3"
 mkdir -p "$usos"

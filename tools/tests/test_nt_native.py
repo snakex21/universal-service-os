@@ -253,12 +253,12 @@ class Recorder(unittest.TestCase):
 
     def test_prepare_flags_per_family_and_skip_the_vm(self):
         text = PREPARE.read_text(encoding='utf-8')
-        self.assertIn('NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;', text)
+        self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S) nt_native_flag=nt3-native.flag ;;', text)
         self.assertIn('NT4|NT4S|NT4T) nt_native_flag=nt4-native.flag ;;', text)
         self.assertIn('[ -z "$nt_native_flag" ] || [ ! -e "/mnt/esp/EFI/USOS/win9x/$nt_native_flag" ] || nt_native=yes', text)
         self.assertEqual(text.count('nt_native=yes'), 1)
-        # NT 3.1 and POSReady have no native flag.
-        self.assertNotIn('NT31|NT31S) nt_native_flag', text)
+        # POSReady has no native flag (NT 3.1 joined nt3-native.flag 2026-10-30).
+        self.assertNotIn('POSR) nt_native_flag', text)
         self.assertIn('NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)"', text)
         native = text.index('if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then\n        # Native')
         vm = text.index('nt4_vm_install "$TARGET_DEVICE"')
