@@ -37,7 +37,13 @@ INITIAL = (
     '[Shell Commands]\r\n    StartWait\r\n    install   LoadSetupLibrary\r\n    set-subst CR = "\\r"\r\n'
     '    read-syms ProcessorVar\r\n    detect    ProcessorVar\r\n'
     '    ifstr(i) $(STF_PROCESSOR) == $(ProcessorID_I386)\r\n'
+    '[UsosNt31Post]\r\n'
+    '    shell "registry.inf" CreateKey $(UsosSvc) {{Scsidisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),0}}\r\n'
+    '    ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n        CloseRegKey $($R1)\r\n    endif\r\n'
+    '    CloseRegKey $(UsosSvc)\r\n'
 )
+USOSDISK_OFF = ('    shell "registry.inf" CreateKey $(UsosSvc) {{usosdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}\r\n'
+                '    ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n        CloseRegKey $($R1)\r\n    endif\r\n')
 
 
 def run(fn_names, call, text, extra=''):
@@ -70,7 +76,7 @@ class Nt31NativeTxtsetup(unittest.TestCase):
         for sec in ('[SCSI.ISA.Load]', '[SCSI.MCA.Load]'):
             self.assertEqual(section(text, sec), [], sec)
         self.assertEqual(section(text, '[SCSI.EISA.Load]'), ['#d0,dce376nt'])
-        self.assertEqual(section(text, '[WinntFiles]')[:4], ['d2,AHCINT.SYS,4', 'd2,USOSRST.SYS,4', 'd2,USOSUSB.SYS,4', 'd2,DEFAULT,3'])
+        self.assertEqual(section(text, '[WinntFiles]')[:5], ['d2,AHCINT.SYS,4', 'd2,USOSRST.SYS,4', 'd2,USOSUSB.SYS,4', 'd2,USOSDISK.SYS,4', 'd2,DEFAULT,3'])
         self.assertNotIn('USOSNVME', text)
         # Everything else unchanged, CR LF kept.
         self.assertIn('[SCSI.ISA]\r\naha154x  = "Adaptec 154x",files.aha154x,aha154x,1\r\n', text)
@@ -94,8 +100,14 @@ class Nt31NativeInitial(unittest.TestCase):
         self.assertIn('    install   LoadSetupLibrary\r\n    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSANS31.EXE"\r\n', text)
         self.assertIn('    detect    ProcessorVar\r\n    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n    ifstr(i)', text)
         self.assertEqual(len(text), len(INITIAL) + len('    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSANS31.EXE"\r\n')
-                         + len('    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n'))
+                         + len('    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n') + len(USOSDISK_OFF))
+        # usosdisk (first-boot disk class driver, nt31_hive.zig) off right
+        # after [UsosNt31Post] turns Scsidisk on.
+        self.assertIn('{{Start,0,$(!REG_VT_DWORD),0}}\r\n    ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n        CloseRegKey $($R1)\r\n'
+                      '    endif\r\n' + USOSDISK_OFF + '    CloseRegKey $(UsosSvc)\r\n', text)
         rc, _, _ = run(['nt31_native_initial'], 'nt31_native_initial', INITIAL.replace('detect    ProcessorVar', 'x').encode())
+        self.assertNotEqual(rc, 0)
+        rc, _, _ = run(['nt31_native_initial'], 'nt31_native_initial', INITIAL.replace('{{Scsidisk,', '{{Other,').encode())
         self.assertNotEqual(rc, 0)
 
     @unittest.skipUnless(CD and (CD / 'INITIAL.IN_').is_file(), 'USOS_NT31_CD not set (local copy of the user CD)')
@@ -114,6 +126,7 @@ class Nt31NativeInitial(unittest.TestCase):
         self.assertIn('[UsosNt31Post]', text)
         self.assertEqual(text.count(';USOS-NT31-CPU'), 1)
         self.assertEqual(text.count('USOSANS31.EXE'), 1)
+        self.assertEqual(text.count('{{usosdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}'), 1)
         (tmp / 'body').write_bytes(out)
         subprocess.run([str(tool), 'szdd-put', str(CD / 'INITIAL.IN_'), str(tmp / 'body'), str(tmp / 'INITIAL.IN_')], check=True)
         subprocess.run([str(tool), 'szdd-get', str(tmp / 'INITIAL.IN_'), str(tmp / 'back')], check=True)
@@ -148,6 +161,9 @@ class Nt31NativeRouting(unittest.TestCase):
         for piece in ('--nt31-hive', 'INITIAL.IN_', 'HARDWARE.IN_', 'NTLANMAN.IN_', 'OEMNADLB.IN_', 'USOSANS31.EXE',
                       'NATIVE31.INI', 'NATIVE.TXT', '/finish31'):
             self.assertIn(piece, native)
+        # First GUI-mode boot disk class driver: the CD's SCSIDISK under the
+        # usosdisk service name, before the hive template is patched.
+        self.assertLess(native.index('cp "$ls_dir/$disk_src" "$ls_dir/USOSDISK.${disk_src##*.}"'), native.index('--nt31-hive'))
 
     def test_post_cmd_gets_finish31_before_done(self):
         post = '@echo off\r\nC:\\USOS\\NT3\\USOSNT3.EXE /polish\r\necho done > C:\\USOS\\NT3\\DONE.TXT\r\n'

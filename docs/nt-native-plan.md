@@ -572,3 +572,39 @@ unit test walks every bin for the alignment and for stray lists. The
 Micron (USB enclosure on the dev PC) did not answer reads on 2026-10-30,
 so the files text mode wrote were not read back.
 
+### 8.2 X470 run 2 of native NT 3.1 (B261030-152624-3C807DCB)
+
+Text mode now completes ("Setting Windows NT Configuration" passed, so the
+16-byte cells are accepted). The first GUI-mode boot stopped with STOP
+0x7B INACCESSIBLE_BOOT_DEVICE (0xFE393BA8, 0, 0, 0); the loaded modules
+were ntoskrnl, hal, ahcint, SCSIPORT, usosnvme, usosrst, Atdisk, Ftdisk,
+Fastfat, usosusb: no Scsidisk. Parameter 1 is a kernel stack address
+(esp FE393B8C), the UNICODE_STRING of the ARC boot device name that
+IopMarkBootPartition fails to open (the NT IoInitSystem pattern): no
+disk class driver ran, so no \Device\Harddisk0 behind
+multi(0)disk(0)rdisk(0).
+
+Evidence from the Micron (read-only copy): `SCSIDISK.SYS` is in
+`system32\drivers`, but the installed SYSTEM hive has Scsidisk Start 1
+and Atdisk Start 0, while the CD template has Scsidisk 0 and Atdisk 4.
+SETUPAPP.EXE does that itself after copying the template (the routine
+that references the "atdisk" / "scsidisk" strings): every SCSI miniport
+SETUPLDR loaded gets Start 0; Atdisk (machine type ISA/EISA, or abiosdsk
+on MCA) gets Start 0; and when the miniport list is empty, Scsidisk gets
+Start 1. On this path the list is always empty (`[SCSI.*.Load]`
+emptied), so a template value cannot keep Scsidisk at boot start.
+
+Fix: a second service for the class driver that SETUPAPP does not touch.
+`nt31_hive.zig` adds `usosdisk` (Type 1, Start 0, ErrorControl 0, "SCSI
+Class"), `nt31_native` copies the CD's `SCSIDISK.SY_` to `USOSDISK.SY_`
+in the local source, TXTSETUP `[WinntFiles]` gets `d2,USOSDISK.SYS,4`,
+and `nt31_native_initial` turns usosdisk to Start 4 right after
+`[UsosNt31Post]` sets Scsidisk Start 0 (end of GUI Setup), so the
+finished system is the VM flow's (Scsidisk 0, Atdisk 4). During GUI
+Setup Scsidisk (Start 1) loads again as a system driver; it finds the
+disk claimed and fails quietly (ErrorControl 0). Atdisk stays loaded
+during GUI Setup (harmless on this X470 run: it loaded without a hang).
+
+The interrupted install on the Micron was patched in place instead
+(SYSTEM: Scsidisk Start 1 -> 0, Atdisk 0 -> 4; scratchpad
+nt31native2/PATCH-261030-164625.TXT).

@@ -17,11 +17,20 @@
 //!   ControlSet001\Services\usosrst   Type 1, Start 0, ErrorControl 0, "SCSI miniport"
 //!                          \Parameters  HpetLegacyOff = 1, RtcFix = 1
 //!   ControlSet001\Services\usosusb   Type 1, Start 0, ErrorControl 0, "Keyboard Port"
+//!   ControlSet001\Services\usosdisk  Type 1, Start 0, ErrorControl 0, "SCSI Class"
 //!   ControlSet001\Services\Kbdclass\Parameters ConnectMultiplePorts = 1
 //!   ControlSet001\Services\Mouclass\Parameters ConnectMultiplePorts = 1
 //!
 //! the same values the VM flow's INITIAL.INF [UsosNt31Post] writes (which
-//! still runs at the end of GUI Setup and finds them in place).
+//! still runs at the end of GUI Setup and finds them in place), plus
+//! usosdisk: SETUPAPP itself sets Scsidisk Start = 1 when SETUPLDR loaded
+//! no SCSI miniport (the [SCSI.*.Load] lists are empty on this path) and
+//! Atdisk Start = 0, over the template values. Without a boot-start disk
+//! class driver the first GUI-mode boot stops with 0x7B (X470 2026-10-30,
+//! B261030-152624: no Scsidisk.sys among the loaded modules). usosdisk is
+//! a second service for the class driver (the CD's SCSIDISK.SYS, copied
+//! as USOSDISK.SYS by nt4_csmwrap_target.sh), a key SETUPAPP does not
+//! touch; [UsosNt31Post] later sets Scsidisk Start 0 and usosdisk Start 4.
 //!
 //! REGF 1.1 (the NT 3.1 hive format, measured on the user's CD template):
 //! every cell has a 4-byte "previous cell in this bin" field after its size,
@@ -363,6 +372,10 @@ pub fn patch(gpa: std.mem.Allocator, hive: []const u8, nvme: bool) Error![]u8 {
         .{ .name = "Type", .dword = 1 },        .{ .name = "Start", .dword = 0 },
         .{ .name = "ErrorControl", .dword = 0 }, .{ .name = "Group", .sz = "Keyboard Port" },
     }, like);
+    _ = try h.addKey(services, "usosdisk", &[_]Hive.Value{
+        .{ .name = "Type", .dword = 1 },        .{ .name = "Start", .dword = 0 },
+        .{ .name = "ErrorControl", .dword = 0 }, .{ .name = "Group", .sz = "SCSI Class" },
+    }, like);
     h.closeBin();
     wr32(h.data(), 508, checksum(h.data()));
     return h.buf.toOwnedSlice(gpa);
@@ -393,7 +406,7 @@ pub fn run(io: std.Io, gpa: std.mem.Allocator, in_path: []const u8, out_path: []
         std.debug.print("[NT31_HIVE] {s}: {s}\n", .{ out_path, @errorName(err) });
         return 3;
     };
-    std.debug.print("[NT31_HIVE] {s}: ahcint{s} usosrst usosusb Start 0, Kbdclass/Mouclass ConnectMultiplePorts 1 ({s}, hive {d} -> {d} bytes)\n", .{ in_path, if (nvme) " usosnvme" else "", @tagName(packed_kind), plain.len, hive.len });
+    std.debug.print("[NT31_HIVE] {s}: ahcint{s} usosrst usosusb usosdisk Start 0, Kbdclass/Mouclass ConnectMultiplePorts 1 ({s}, hive {d} -> {d} bytes)\n", .{ in_path, if (nvme) " usosnvme" else "", @tagName(packed_kind), plain.len, hive.len });
     return 0;
 }
 
@@ -555,10 +568,10 @@ test "the USOS services are added in order and the hive stays consistent" {
     defer h.buf.deinit(gpa);
     try h.buf.appendSlice(gpa, out);
     const sv = try h.mustChild(try h.mustChild(rd32(out, 36), "ControlSet001"), "Services");
-    // Sorted: Ahcint Beep Kbdclass Mouclass Ultra124 usosnvme usosrst usosusb.
+    // Sorted: Ahcint Beep Kbdclass Mouclass Ultra124 usosdisk usosnvme usosrst usosusb.
     const nk = try h.payload(sv, 76);
     const li = try h.payload(rd32(out, nk + 28), 4);
-    const want = [_][]const u8{ "AHCINT", "BEEP", "KBDCLASS", "MOUCLASS", "ULTRA124", "USOSNVME", "USOSRST", "USOSUSB" };
+    const want = [_][]const u8{ "AHCINT", "BEEP", "KBDCLASS", "MOUCLASS", "ULTRA124", "USOSDISK", "USOSNVME", "USOSRST", "USOSUSB" };
     try std.testing.expectEqual(@as(u16, want.len), rd16(out, li + 2));
     for (want, 0..) |w, i| {
         var buf: [64]u8 = undefined;

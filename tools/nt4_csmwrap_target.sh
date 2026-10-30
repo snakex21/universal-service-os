@@ -661,7 +661,7 @@ nt31_native_txtsetup() {
             sec = low; printf "%s\r\n", line
             if (sec ~ /^\[scsi\.(isa|eisa|mca)\.load\]$/) hit++
             if (sec == "[winntfiles]" && !files++) {
-                printf "d2,AHCINT.SYS,4\r\nd2,USOSRST.SYS,4\r\nd2,USOSUSB.SYS,4\r\n"
+                printf "d2,AHCINT.SYS,4\r\nd2,USOSRST.SYS,4\r\nd2,USOSUSB.SYS,4\r\nd2,USOSDISK.SYS,4\r\n"
                 if (nvme == "nvme") printf "d2,USOSNVME.SYS,4\r\n"
             }
             next
@@ -676,13 +676,21 @@ nt31_native_txtsetup() {
 # -cpu pentium), so STF_PROCESSOR = I586 right after "detect ProcessorVar"
 # (as nt35_initial.zig does for 3.5), and the GUI page answerer USOSANS31
 # (tools/nt3/native31: Date/Time OK, AS "Controller in New Domain") starts
-# right after LoadSetupLibrary. rc 1 when an anchor is not there once.
+# right after LoadSetupLibrary. [UsosNt31Post]: after its Scsidisk Start 0
+# the first-boot class driver service usosdisk (nt31_hive.zig) goes to
+# Start 4. rc 1 when an anchor is not there once.
 nt31_native_initial() {
     awk -v BINMODE=3 '
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low); printf "%s\r\n", line }
         low == "detectprocessorvar" { printf "    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n"; cpu++ }
         low == "installloadsetuplibrary" { printf "    StartDetachedProcess STATUS \"\" \"\" \"C:\\USOS\\NT3\\USOSANS31.EXE\"\r\n"; ans++ }
-        END { if (cpu != 1 || ans != 1) { print "INITIAL.INF: detect ProcessorVar " cpu "/1, LoadSetupLibrary " ans "/1" > "/dev/stderr"; exit 1 } }'
+        index(low, "createkey$(usossvc){{scsidisk,0,33554432}}") { pend = 1 }
+        pend && low == "endif" {
+            pend = 0; disk++
+            printf "    shell \"registry.inf\" CreateKey $(UsosSvc) {{usosdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}\r\n"
+            printf "    ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n        CloseRegKey $($R1)\r\n    endif\r\n"
+        }
+        END { if (cpu != 1 || ans != 1 || disk != 1) { print "INITIAL.INF: detect ProcessorVar " cpu "/1, LoadSetupLibrary " ans "/1, Scsidisk " disk "/1" > "/dev/stderr"; exit 1 } }'
 }
 
 # One SZDD file $1 of the local source through the filter "$2 ..." (the
@@ -719,10 +727,19 @@ nt31_native() {
         nt31_native_txtsetup "$q_nvme" < "$inf" > "$work/txtsetup.nat" && cat "$work/txtsetup.nat" > "$inf" ||
             fail 'cannot prepare TXTSETUP.INF for the native NT 3.1 Setup'
     done
-    log "native: TXTSETUP.INF [SCSI.*.Load] empty (text mode on BIOS INT 13h), [WinntFiles] + AHCINT USOSRST USOSUSB${nvme:+ USOSNVME}"
+    log "native: TXTSETUP.INF [SCSI.*.Load] empty (text mode on BIOS INT 13h), [WinntFiles] + AHCINT USOSRST USOSUSB USOSDISK${nvme:+ USOSNVME}"
     cp "$drv/$ahci" "$ls_dir/AHCINT.SYS" && cp "$drv/$rst" "$ls_dir/USOSRST.SYS" && cp "$drv/$usb" "$ls_dir/USOSUSB.SYS" ||
         fail 'cannot copy the USOS drivers to the local source'
     [ -z "$nvme" ] || cp "$drv/$nvme_sys" "$ls_dir/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS to the local source'
+    # The disk class driver of the first GUI-mode boot (service usosdisk,
+    # nt31_hive.zig): SETUPAPP sets Scsidisk Start 1 when SETUPLDR loaded
+    # no SCSI miniport (always here) -> STOP 0x7B (X470 2026-10-30). The
+    # CD's own SCSIDISK.SY_ under a second name (SZDD keeps only the last
+    # character of the name, S in both).
+    disk_src=''
+    for name in SCSIDISK.SY_ SCSIDISK.SYS; do [ -f "$ls_dir/$name" ] && disk_src=$name && break; done
+    [ -n "$disk_src" ] || fail 'the NT 3.1 local source has no SCSIDISK.SY_'
+    cp "$ls_dir/$disk_src" "$ls_dir/USOSDISK.${disk_src##*.}" || fail 'cannot copy SCSIDISK as USOSDISK to the local source'
     # The SYSTEM hive template: the USOS boot drivers registered before text
     # mode copies it (src/compat/win3x/nt31_hive.zig).
     hive=''
