@@ -773,3 +773,40 @@ vga untouched. Tests: `tools/tests/test_nt31_usosvbe.py`.
 X470 risks: the RX 560 VBIOS under 3.1's Ke386CallBios (unproven on 3.1;
 3.51 Full HD works with the same miniport code); if no listed mode works
 framebuf fails -> STOP C0000143 -> boot `[VGA mode]`.
+
+### 8.8 Network for native NT 3.1: assessment (not implemented)
+
+- **The CD**: TCP/IP is there (TCPIP.SY_, OEMNXPTC.IN_, WSOCK32, PING, FTP,
+  TELNET, ARP, ROUTE), static only: no DHCP anywhere (the INF asks for
+  IPAddress / SubnetMask / DefaultGateway; DHCP came with NT 3.5). WSOCK32
+  reads `NameServer` / `Domain` / `SearchList`, so DNS works with a static
+  configuration. Applying a new address needs a reboot (no 3.1 API).
+- **NDIS 3.1 has no miniport interface**: NDIS.SYS exports 97 names, no
+  `NdisMRegisterMiniport` / `NdisM*` (only NdisMapFile / NdisMapIoSpace),
+  no NdisRead/WritePciSlotInformation. usosnet35n / usosnet351n import
+  21 / 24 names 3.1 lacks, so they cannot load. usosnet31 (Codex) is
+  already a 3.1 full-MAC driver (25 NDIS imports, all present), polled
+  (no IRQ/MSI), CF8h/CFCh config access, UP only, and it compiles the
+  shared `usosnet_igb.c` backend, which already handles the I211 (iNVM
+  MAC, PLL erratum; X470 PASS on 3.5 / 3.51). Only its gate is 82576-only:
+  `U31PciValid` accepts id 0x10C98086, and the chip entry is the 82576.
+- **I211 for usosnet31**: accept 0x15398086 with the I210|I211 chip flags,
+  stage PciBus/PciDevice/PciFunction from the prep env (Linux runs on the
+  X470 itself during native prep, so the I211 BDF is known), the network
+  rows of INITIAL.INF for WS (today: no network on WS; AS uses the
+  Loopback adapter). Estimate: about 1 day + one X470 fresh install.
+- **Addressing without DHCP**, options:
+  1. static from the profile (IP/mask/gateway/DNS): 0.5 day; user must know
+     a free address;
+  2. the prep env's own DHCP lease: the prep Linux on the X470 uses the same
+     I211 MAC, so its lease (address, mask, router, DNS) written as the static
+     NT 3.1 configuration is the address the router already holds for that
+     MAC: 0.5 day on top of 1., no user input; risk: lease expiry/reuse on
+     routers that recycle addresses;
+  3. own DHCP client inside usosnet31 before NdisRegisterAdapter (DISCOVER/
+     REQUEST over its own polled rings, then the Tcpip values in the
+     registry before TCP/IP binds): 1-2 days, the cleanest; renewals would
+     need a timer in the driver.
+- **Recommendation**: I211 gate in usosnet31 + option 2 with option 1 as the
+  profile override (about 1.5 days), option 3 later if leases expire in
+  practice.
