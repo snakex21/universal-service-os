@@ -698,3 +698,32 @@ every completed request, so the ring survives a RAM-clearing reset. The
 pre-boot logger (nt-bootlog, 70656 B, pinned hash updated) decodes the RAM
 copy into BOOTLOG.TXT ("NVMe ring" lines). A scratchpad tool maps the
 LBAs to files on the FAT16 C: offline.
+
+### 8.6 X470 run 6: GUI Setup to the desktop; usosrst 1.7-nt31
+
+The disk ring of the hung run 5 ended with the image of I8042PRT.SYS
+(system-start drivers in group order: floppy, scsiflop, scsicdrm, fat_rec,
+hpfs_rec, null, beep, i8042prt; then no request). With i8042prt Start 4 on
+the Micron, GUI Setup ran on its own, the post step ran (POST.LOG:
+drivers copied, /polish, /finish31 with BOOT.INI and the leftovers
+removed, DONE.TXT), USB keyboard and mouse work, desktop. Code:
+`nt31_native_txtsetup` rewrites the TXTSETUP.INF [Keyboard] / [Mouse] rows
+that name i8042prt to beep (SETUPAPP sets the picked keyboard service to
+Start 1 over the template's 4; beep is Start 1 already). NT 3.5 / 3.51
+native: unchanged (they reach the desktop with their i8042prt).
+
+Nothing runs after the logon by design: the native 3.1 post step is
+POST.CMD at the end of GUI Setup. VGA 640x480: NT 3.1 has no usosvbe
+wiring (docs/nt3-vesa-2026-10-14.md "Not done: NT 3.1").
+
+usosrst 1.7-nt31 (bin/nt31): the 1.7-nt35 feature set (shutdown log,
+NVMe/xHCI/NIC quiesce, CF9h full reset, RAM marker, ACPI S5 with wake
+sources cleared, kernel import slot + HAL inline-jmp fallback); NT 3.1
+imports only stdcall forms (IoCallDriver, IoCompleteRequest,
+ObDereferenceObject, KeRaiseIrql/KeLowerIrql), no bugcheck callback.
+NT 3.1 Winlogon has no PowerdownAfterShutdown and no "Shutdown and Power
+off" (no such string in its WINLOGON.EXE): a plain Shutdown is
+NtShutdownSystem(ShutdownNoReboot), which never calls
+HalReturnToFirmware. The last phase-0 shutdown handler wakes a thread;
+when no restart has started 20 s later (the file systems flushed in phase
+1), it logs stage N and powers off through ACPI S5.

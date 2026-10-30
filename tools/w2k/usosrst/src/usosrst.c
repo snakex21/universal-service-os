@@ -82,6 +82,22 @@
  */
 #include <ntddk.h>
 
+#ifdef USOSRST_NT31
+/* NT 3.1 exports the stdcall forms only: no IofCallDriver /
+   IofCompleteRequest / ObfDereferenceObject (ntoskrnl) and no KfRaiseIrql /
+   KfLowerIrql (hal.dll), which the WDK 7.1 macros name. */
+#undef IoCallDriver
+#undef IoCompleteRequest
+#undef ObDereferenceObject
+#undef KeRaiseIrql
+#undef KeLowerIrql
+__declspec(dllimport) NTSTATUS __stdcall IoCallDriver(IN PDEVICE_OBJECT DeviceObject, IN OUT PIRP Irp);
+__declspec(dllimport) VOID __stdcall IoCompleteRequest(IN PIRP Irp, IN CCHAR PriorityBoost);
+__declspec(dllimport) VOID __stdcall ObDereferenceObject(IN PVOID Object);
+__declspec(dllimport) VOID __stdcall KeRaiseIrql(IN KIRQL NewIrql, OUT PKIRQL OldIrql);
+__declspec(dllimport) VOID __stdcall KeLowerIrql(IN KIRQL NewIrql);
+#endif
+
 #ifdef USOSRST_NT351
 /* NT 3.51 build (build-nt351.cmd, also USOSRST_NT4): the NT 3.51 kernel
    exports no KiBugCheckData, no KeSetTimerEx and no ZwSetSystemTime. The
@@ -143,7 +159,17 @@ UsosActiveProcessors(VOID)
 #define KeQueryActiveProcessors() UsosActiveProcessors()
 #ifdef USOSRST_NT351
 #if defined(USOSRST_NT31)
-#define USOSRST_VERSION "usosrst 1.6-nt31"
+/* NT 3.1 (1.7-nt31, native NT 3.1 round 2026-10-30): the 1.7-nt35 feature
+   set (shutdown log, NVMe/xHCI/NIC quiesce, CF9h full reset, RAM marker,
+   ACPI S5 power-off with wake sources cleared, kernel import slot with the
+   HAL inline-jmp fallback). NT 3.1 differences: no
+   KeRegisterBugCheckCallback (no STOP rows / RAM bugcheck words), see the
+   USOSRST_NT31 blocks. 1.6-nt31 was the heartbeat-only build. */
+#define USOSRST_VERSION "usosrst 1.7-nt31"
+#define USOSRST_SHUTLOG 1
+#define USOSRST_RAMLOG 1
+#define USOSRST_POWEROFF 1
+#define USOSRST_INLINE 1
 #elif defined(USOSRST_NT35)
 /* NT 3.5 (1.7-nt35, native NT 3.5 round 2026-10-30): the NT 3.51 1.7/1.8
    restart path (shutdown log, NVMe/xHCI/NIC quiesce, CF9h full reset), the
@@ -786,6 +812,19 @@ static KEVENT g_SlEvent;
 static IO_STATUS_BLOCK g_SlIosb;
 static LONG g_SlBusy;
 static LARGE_INTEGER g_SlT0;
+#ifdef USOSRST_NT31
+/* NT 3.1 has no power-off request: Winlogon (no PowerdownAfterShutdown,
+   no "Shutdown and Power off") ends a plain Shutdown with
+   NtShutdownSystem(ShutdownNoReboot), which returns after the I/O
+   shutdown phases instead of calling HalReturnToFirmware. The last phase-0
+   shutdown handler ('S') wakes SlOffThread; if no restart has started
+   USOS_NT31_OFF_DELAY seconds later (the file systems have flushed in
+   phase 1 by then), it powers off through ACPI S5. A restart sets
+   g_SlRestarting first (SlRestart) and resets the machine long before. */
+#define USOS_NT31_OFF_DELAY 20
+static KEVENT g_SlOffEvent;
+static volatile LONG g_SlRestarting;
+#endif
 static SL_DEV g_SlDev[SL_MAX_DEV];
 static ULONG g_SlDevs;
 
@@ -894,6 +933,9 @@ static NTSTATUS
 SlShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 {
     SlStage((CHAR)(DeviceObject == g_SlFirstDev ? 'P' : 'S'));
+#ifdef USOSRST_NT31
+    if (DeviceObject == g_SlLastDev) KeSetEvent(&g_SlOffEvent, 0, FALSE);
+#endif
     Irp->IoStatus.Status = STATUS_SUCCESS;
     Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
@@ -1008,6 +1050,9 @@ SlRestart(ULONG Routine)
     KIRQL old = PASSIVE_LEVEL;
     BOOLEAN raised = FALSE;
 
+#ifdef USOSRST_NT31
+    InterlockedExchange((PLONG)&g_SlRestarting, 1);
+#endif
     SlStage('F');
     SlStage((CHAR)('0' + (Routine & 7)));
     SlStage('Z');
@@ -1148,6 +1193,25 @@ AcpiPowerOff(VOID)
     WRITE_PORT_USHORT((PUSHORT)g_Pm1aCnt, (USHORT)(cnt | (1 << 13)));
     StallMs(2000);
     if (raised) KeLowerIrql(old);
+}
+#endif
+
+#ifdef USOSRST_NT31
+/* See g_SlOffEvent: a plain NT 3.1 Shutdown powers off after the flush. */
+static VOID
+SlOffThread(IN PVOID Context)
+{
+    LARGE_INTEGER delay;
+
+    UNREFERENCED_PARAMETER(Context);
+    KeWaitForSingleObject(&g_SlOffEvent, Executive, KernelMode, FALSE, NULL);
+    delay.QuadPart = -10000000LL * USOS_NT31_OFF_DELAY;
+    KeDelayExecutionThread(KernelMode, FALSE, &delay);
+    if (!g_SlRestarting) {
+        SlStage('N');               /* no restart came: ShutdownNoReboot */
+        AcpiPowerOff();             /* returns only when S5 did not happen */
+    }
+    PsTerminateSystemThread(STATUS_SUCCESS);
 }
 #endif
 
@@ -2409,6 +2473,14 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
     if (!NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &g_SlFirstDev)))
         g_SlFirstDev = NULL;
+#ifdef USOSRST_NT31
+    KeInitializeEvent(&g_SlOffEvent, NotificationEvent, FALSE);
+    if (g_SlLastDev != NULL && !g_InSetup) {
+        HANDLE oth;
+        if (NT_SUCCESS(PsCreateSystemThread(&oth, THREAD_ALL_ACCESS, NULL, NULL, NULL, SlOffThread, NULL)))
+            ZwClose(oth);
+    }
+#endif
     {
         HANDLE th;
         if (NT_SUCCESS(PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, SlThread, NULL)))

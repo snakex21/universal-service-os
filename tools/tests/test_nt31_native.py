@@ -155,6 +155,26 @@ class Nt31NativeInitial(unittest.TestCase):
         self.assertNotIn(',i8042prt', text)
 
 
+class Nt31NativeUsosrst(unittest.TestCase):
+    def test_usosrst_nt31_restart_and_power_off(self):
+        src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
+        block = src[src.index('#if defined(USOSRST_NT31)'):src.index('#elif defined(USOSRST_NT35)')]
+        for want in ('"usosrst 1.7-nt31"', '#define USOSRST_SHUTLOG 1', '#define USOSRST_RAMLOG 1',
+                     '#define USOSRST_POWEROFF 1', '#define USOSRST_INLINE 1'):
+            self.assertIn(want, block)
+        # NT 3.1 Winlogon has no power-off request: a plain Shutdown powers
+        # off after the flush unless a restart started.
+        for want in ('KeSetEvent(&g_SlOffEvent, 0, FALSE);', 'InterlockedExchange((PLONG)&g_SlRestarting, 1);',
+                     'SlStage(\'N\');', '#define USOS_NT31_OFF_DELAY 20'):
+            self.assertIn(want, src)
+        binary = (ROOT / 'tools/w2k/usosrst/bin/nt31/i386/usosrst.sys').read_bytes()
+        for want in (b'usosrst 1.7-nt31', b' s5', 'LoadLine'.encode('utf-16-le')):
+            self.assertIn(want, binary)
+        for gone in (b'IofCallDriver', b'IofCompleteRequest', b'ObfDereferenceObject', b'KfRaiseIrql', b'KfLowerIrql',
+                     b'KeRegisterBugCheckCallback'):
+            self.assertNotIn(gone, binary)
+
+
 class Nt31NativeRouting(unittest.TestCase):
     def test_target_gate_options_mbr_and_order(self):
         text = TARGET.read_text(encoding='utf-8')
