@@ -652,8 +652,17 @@ EOF
 #   [WinntFiles]  the USOS drivers ($1 = "nvme": also usosnvme) to
 #       system32\drivers (directory 4) from the local source, so the first
 #       GUI-mode boot has them; their Services keys come from the patched
-#       SYSTEM._ template (usos-fb-ui --nt31-hive).
-# rc 1 when a section is missing.
+#       SYSTEM._ template (usos-fb-ui --nt31-hive);
+#   [Keyboard] / [Mouse]  rows naming the service i8042prt name "beep"
+#       instead: SETUPAPP sets the picked keyboard (and PS/2 mouse) service
+#       to Start 1 over the template's 4, and NT 3.1's i8042prt never
+#       returns from its initialisation on the X470 (2026-10-30: the
+#       usosnvme request ring of the hung first GUI-mode boot ends with
+#       I8042PRT.SYS; with i8042prt Start 4 GUI Setup ran to the desktop).
+#       Beep is Start 1 in the template already, so that write changes
+#       nothing; USB keyboard and mouse are usosusb's. The file is still
+#       copied (files.i8042).
+# rc 1 when a section or the keyboard row is missing.
 nt31_native_txtsetup() {
     awk -v BINMODE=3 -v nvme="${1:-}" '
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
@@ -667,8 +676,12 @@ nt31_native_txtsetup() {
             next
         }
         sec ~ /^\[scsi\.(isa|eisa|mca)\.load\]$/ && low != "" && low !~ /^#/ { next }
+        (sec == "[keyboard]" || sec == "[mouse]") && low ~ /,i8042prt$/ {
+            sub(/i8042prt[ \t]*$/, "beep", line)
+            if (sec == "[keyboard]") kbd++
+        }
         { printf "%s\r\n", line }
-        END { if (files != 1 || hit != 3) { print "TXTSETUP.INF: no [WinntFiles] / [SCSI.*.Load] sections" > "/dev/stderr"; exit 1 } }'
+        END { if (files != 1 || hit != 3 || kbd < 1) { print "TXTSETUP.INF: no [WinntFiles] / [SCSI.*.Load] sections or no i8042prt [Keyboard] row" > "/dev/stderr"; exit 1 } }'
 }
 
 # Native NT 3.1 INITIAL.INF additions (after nt31_initial_inf; stdin ->

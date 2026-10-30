@@ -30,6 +30,9 @@ TXT = (
     '[SCSI.MCA.Load]\r\nd0,spock\r\n\r\n'
     '[WinntFiles]\r\nd2,DEFAULT,3\r\nd2,SYSTEM,3\r\nd2,SCSIPORT.SYS,4\r\n'
     '[SCSI.ISA]\r\naha154x  = "Adaptec 154x",files.aha154x,aha154x,1\r\n'
+    '[Mouse]\r\nmsps2 = "Microsoft Mouse Port Mouse (includes BallPoint)",files.i8042,i8042prt\r\n'
+    'msser = "Microsoft Serial Mouse",files.sermouse,sermouse\r\nnone = "No Mouse",files.none,""\r\n\r\n'
+    '[Keyboard]\r\nSTANDARD = "XT, AT, or Enhanced Keyboard (83-102 keys)",files.i8042,i8042prt\r\n\r\n'
 )
 
 INITIAL = (
@@ -81,6 +84,11 @@ class Nt31NativeTxtsetup(unittest.TestCase):
         # Everything else unchanged, CR LF kept.
         self.assertIn('[SCSI.ISA]\r\naha154x  = "Adaptec 154x",files.aha154x,aha154x,1\r\n', text)
         self.assertIn('DebugBoot = 0\r\n', text)
+        # i8042prt hangs NT 3.1 on the X470: the keyboard / PS/2 mouse rows name beep.
+        self.assertEqual(section(text, '[Keyboard]'), ['STANDARD = "XT, AT, or Enhanced Keyboard (83-102 keys)",files.i8042,beep'])
+        self.assertEqual(section(text, '[Mouse]'), ['msps2 = "Microsoft Mouse Port Mouse (includes BallPoint)",files.i8042,beep',
+                                                    'msser = "Microsoft Serial Mouse",files.sermouse,sermouse', 'none = "No Mouse",files.none,""'])
+        self.assertNotIn(',i8042prt', text)
 
     def test_nvme_and_missing_sections(self):
         rc, out, _ = run(['nt31_native_txtsetup'], 'nt31_native_txtsetup nvme', TXT.encode())
@@ -89,6 +97,8 @@ class Nt31NativeTxtsetup(unittest.TestCase):
         rc, _, _ = run(['nt31_native_txtsetup'], 'nt31_native_txtsetup ""', TXT.replace('[WinntFiles]', '[Other]').encode())
         self.assertNotEqual(rc, 0)
         rc, _, _ = run(['nt31_native_txtsetup'], 'nt31_native_txtsetup ""', TXT.replace('[SCSI.MCA.Load]', '[X]').encode())
+        self.assertNotEqual(rc, 0)
+        rc, _, _ = run(['nt31_native_txtsetup'], 'nt31_native_txtsetup ""', TXT.replace('[Keyboard]', '[Kb]').encode())
         self.assertNotEqual(rc, 0)
 
 
@@ -142,6 +152,7 @@ class Nt31NativeInitial(unittest.TestCase):
         for sec in ('[SCSI.ISA.Load]', '[SCSI.MCA.Load]'):
             self.assertEqual(section(text, sec), [])
         self.assertEqual(section(text, '[SCSI.EISA.Load]'), ['#d0,dce376nt'])
+        self.assertNotIn(',i8042prt', text)
 
 
 class Nt31NativeRouting(unittest.TestCase):
