@@ -199,7 +199,7 @@ class Nt31NativeRouting(unittest.TestCase):
     def test_post_cmd_gets_finish31_before_done(self):
         post = '@echo off\r\nC:\\USOS\\NT3\\USOSNT3.EXE /polish\r\necho done > C:\\USOS\\NT3\\DONE.TXT\r\n'
         native = function_text(TARGET, 'nt31_native')
-        awk = native[native.index("awk -v BINMODE=3 '{ sub(/\\r$/, \"\") } /^echo done"):]
+        awk = native[native.index("awk -v BINMODE=3 -v net31=\"$NT31_NET31\" '{ sub(/\\r$/, \"\") } /^echo done"):]
         awk = awk[:awk.index('"$usos/POST.CMD" >')]
         rc, out, err = run([], awk, post.encode())
         self.assertEqual(rc, 0, err)

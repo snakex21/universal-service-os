@@ -693,7 +693,20 @@ nt31_native_txtsetup() {
 # the first-boot class driver service usosdisk (nt31_hive.zig) goes to
 # Start 4. rc 1 when an anchor is not there once.
 nt31_native_initial() {
-    awk -v BINMODE=3 '
+    awk -v BINMODE=3 -v net31="${NT31_NET31:-}" '
+        net31 == "net31" { l = $0; sub(/\r$/, "", l); gsub(/[ \t]/, "", l)
+            if (tolower(l) == "shell\"ntlanman.inf\"donetwork") {
+                # USOS NT 3.1 LAN: the marker for the patched OEMNXPTC.INF
+                # (no TCP/IP address dialog; USOSNT3 /net31 deletes it).
+                printf "        OpenRegKey $(!REG_H_LOCAL) \"\" \"software\" 33554432 UsosNetSw\r\n"
+                printf "        ifstr(i) $(UsosNetSw) != \"\"\r\n"
+                printf "            shell \"registry.inf\" CreateKey $(UsosNetSw) {{USOS,0,33554432},{NT31NET,0,33554432}} {}\r\n"
+                printf "            ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n                CloseRegKey $($R1)\r\n            endif\r\n"
+                printf "            CloseRegKey $(UsosNetSw)\r\n"
+                printf "        endif\r\n"
+                mark++
+            }
+        }
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low); printf "%s\r\n", line }
         low == "detectprocessorvar" { printf "    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n"; cpu++ }
         low == "installloadsetuplibrary" { printf "    StartDetachedProcess STATUS \"\" \"\" \"C:\\USOS\\NT3\\USOSANS31.EXE\"\r\n"; ans++ }
@@ -703,7 +716,7 @@ nt31_native_initial() {
             printf "    shell \"registry.inf\" CreateKey $(UsosSvc) {{usosdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}\r\n"
             printf "    ifstr(i) $($R0) == STATUS_SUCCESSFUL\r\n        CloseRegKey $($R1)\r\n    endif\r\n"
         }
-        END { if (cpu != 1 || ans != 1 || disk != 1) { print "INITIAL.INF: detect ProcessorVar " cpu "/1, LoadSetupLibrary " ans "/1, Scsidisk " disk "/1" > "/dev/stderr"; exit 1 } }'
+        END { if (cpu != 1 || ans != 1 || disk != 1 || (net31 == "net31" && mark != 1)) { print "INITIAL.INF: detect ProcessorVar " cpu "/1, LoadSetupLibrary " ans "/1, Scsidisk " disk "/1, NT31NET marker " (mark + 0) > "/dev/stderr"; exit 1 } }'
 }
 
 # One SZDD file $1 of the local source through the filter "$2 ..." (the
@@ -729,6 +742,8 @@ nt31_initial_both() {
 nt31_hardware() { ( . "$LIB/nt4_qemu_install.sh"; nt31_hardware_inf ); }
 nt31_ntlanman() { ( . "$LIB/nt4_qemu_install.sh"; nt31_ntlanman_inf ); }
 nt31_oemnadlb() { ( . "$LIB/nt4_qemu_install.sh"; nt31_oemnadlb_inf ); }
+# Native NT 3.1 LAN (NET31.ON): also TCP/IP in NTLANMAN.
+nt31_ntlanman_net31() { nt31_ntlanman | usos_nt31_ntlanman_tcpip; }
 
 # Native NT 3.1: the local source and \USOS\NT3 for text mode, GUI mode and
 # POST.CMD on this PC (no install VM; docs/nt-native-plan.md section 8).
@@ -772,9 +787,29 @@ nt31_native() {
     q_comp=$(tr -d '\r' < "$usos/NAMES.TXT" | awk -F= '$1 == "computer" { sub(/^[^=]*=/, ""); print; exit }')
     q_net=''
     [ "${product:-0}" = 0 ] || q_net=net
+    # LAN (docs/nt-native-plan.md section 8.10): the address now (profile,
+    # else a DHCP lease of this PC's I211 here, else link-local), then GUI
+    # Setup keeps the network part on Workstation too: the MS Loopback
+    # Adapter + NetBEUI + TCP/IP (no address dialog), the workgroup page
+    # answered by USOSANS31; USOSNT3 /net31 (POST.CMD) swaps LOOP.SYS for
+    # usosnet31 and writes the static TCP/IP values.
+    NT31_NET31=''
+    if [ "${_u31_enabled:-off}" = on ]; then
+        usos_nt31_address "$work" "$q_comp" || fail 'cannot work out the NT 3.1 TCP/IP address'
+        stage_line=$(usos_nt31_stage "$work/c" "${product:-0}") || fail 'cannot stage the NT 3.1 LAN driver'
+        log "$stage_line"
+        NT31_NET31=net31 q_net=net
+    fi
+    export NT31_NET31
     nt31_native_szdd "$ls_dir/INITIAL.IN_" nt31_initial_both
     nt31_native_szdd "$ls_dir/HARDWARE.IN_" nt31_hardware
-    if [ -n "$q_net" ]; then
+    if [ -n "$NT31_NET31" ]; then
+        nt31_native_szdd "$ls_dir/NTLANMAN.IN_" nt31_ntlanman_net31
+        nt31_native_szdd "$ls_dir/OEMNADLB.IN_" nt31_oemnadlb
+        nt31_native_szdd "$ls_dir/OEMNXPTC.IN_" usos_nt31_oemnxptc
+        log "native: LAN: MS Loopback Adapter + NetBEUI + TCP/IP during GUI Setup (no address dialog), workgroup $_u31_group; POST.CMD USOSNT3 /net31 -> usosnet31 + static TCP/IP"
+        [ "${product:-0}" = 0 ] || log 'native: Advanced Server: new domain USOSDOMAIN (USOSANS31 answers Domain Settings)'
+    elif [ -n "$q_net" ]; then
         nt31_native_szdd "$ls_dir/NTLANMAN.IN_" nt31_ntlanman
         nt31_native_szdd "$ls_dir/OEMNADLB.IN_" nt31_oemnadlb
         log 'native: Advanced Server: MS Loopback Adapter + new domain USOSDOMAIN (USOSANS31 answers Domain Settings)'
@@ -782,7 +817,7 @@ nt31_native() {
     log 'native: INITIAL.IN_ (names, I586, no network/printer/apps/ERD, [UsosNt31Post], USOSANS31) + HARDWARE.IN_ patched in the local source'
     [ -r "$LIB/nt3/USOSANS31.EXE" ] || fail "missing: $LIB/nt3/USOSANS31.EXE (GUI Setup page answerer)"
     cp "$LIB/nt3/USOSANS31.EXE" "$usos/USOSANS31.EXE" || fail 'cannot copy USOSANS31.EXE'
-    printf '[native]\r\ndomain=USOSDOMAIN\r\n' > "$usos/NATIVE31.INI" || fail 'cannot write NATIVE31.INI'
+    printf '[native]\r\ndomain=USOSDOMAIN\r\nworkgroup=%s\r\n' "${_u31_group:-WORKGROUP}" > "$usos/NATIVE31.INI" || fail 'cannot write NATIVE31.INI'
     printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write NATIVE.TXT'
     # POST.CMD (end of GUI Setup): BOOT.INI as the VM finish step writes it
     # and the Setup leftovers removed (usosnt3 /finish31), before DONE.TXT.
@@ -806,9 +841,9 @@ nt31_native() {
     else
         log 'display: VGA (640x480x16; no USOSVBE31.SYS in this build)'
     fi
-    VESA31="$vesa31" awk -v BINMODE=3 '{ sub(/\r$/, "") } /^echo done > / { if (ENVIRON["VESA31"] != "") printf "%s\r\n", ENVIRON["VESA31"]; printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
+    VESA31="$vesa31" awk -v BINMODE=3 -v net31="$NT31_NET31" '{ sub(/\r$/, "") } /^echo done > / { if (ENVIRON["VESA31"] != "") printf "%s\r\n", ENVIRON["VESA31"]; if (net31 == "net31") printf "C:\\USOS\\NT3\\USOSNT3.EXE /net31\r\n"; printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
         cat "$work/post.cmd" > "$usos/POST.CMD" && grep -q 'finish31' "$usos/POST.CMD" || fail 'cannot write POST.CMD'
-    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE ${vesa31:+/vesa31 + }/finish31 (BOOT.INI, leftovers)"
+    log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE ${vesa31:+/vesa31 + }${NT31_NET31:+/net31 + }/finish31 (BOOT.INI, leftovers)"
 }
 
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
@@ -1029,6 +1064,17 @@ if [ -n "$nt3" ]; then
               mv "$work/WINNT.NET35" "$work/WINNT.SIF" || fail 'cannot render original NT35 LAN answer'
             log 'native NT 3.5 LAN: usosnet35n (CF8h/CFCh, polling), TCP/IP DHCP'
         fi
+    elif [ "$NATIVE" = 1 ] && [ "$major:$minor" = 3:10 ]; then
+        # Native NT 3.1 (docs/nt-native-plan.md section 8.10): usosnet31
+        # (NDIS 3.1 full-MAC) + the CD's TCP/IP with a static address; a
+        # refused preflight installs without network (AS: Loopback only).
+        _u351_enabled=off
+        . "$LIB/nt31_network_setup.sh"
+        if ! usos_nt31_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
+            log 'NT31 LAN skipped: preflight refused (one I211 / 82576, verified own driver, valid profile address required); installing without network'
+            _u31_enabled=off
+        fi
+        [ "${_u31_enabled:-off}" != on ] || log "native NT 3.1 LAN: usosnet31 at $_u31_bdf, TCP/IP static (profile, else DHCP lease taken now, else link-local)"
     elif [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then
         _u351_enabled=off
     elif [ "$major:$minor" = 3:51 ]; then

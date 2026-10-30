@@ -2461,6 +2461,385 @@ static void WINAPI netcheck_main(DWORD argc, LPSTR *argv)
         SetServiceStatus(g_nc_handle, &g_nc_status);
 }
 
+/* ------------------------------------------------------------------------
+ * Native NT 3.1 LAN (POST.CMD "/net31", end of GUI Setup, after /vesa31;
+ * docs/nt-native-plan.md section 8.10). GUI Setup installed the MS Loopback
+ * Adapter (service NDISLoop, adapter NDISLoop1) with NetBEUI and TCP/IP, and
+ * the patched OEMNXPTC.INF skipped the TCP/IP address dialog while
+ * HKLM\SOFTWARE\USOS\NT31NET existed. Here, from \USOS\NT3\NET31.ON
+ * (nt31_network_setup.sh: the profile address, else the prep Linux's DHCP
+ * lease for this PC's I211, else link-local):
+ *   - usnet31.sys (usosnet31, NDIS 3.1 full-MAC; file alignment 0x200, so
+ *     the 3.1 loader takes it with NDISLoop's own start mode) replaces
+ *     loop.sys as NDISLoop's ImagePath; NDISLoop1\Parameters gets the
+ *     card's PciBus / PciDevice / PciFunction;
+ *   - the static TCP/IP values, as the 3.1 INF / NCPA name them: adapter
+ *     NDISLoop1\Parameters\Tcpip IPAddress + SubnetMask (REG_SZ),
+ *     Tcpip\Parameters DefaultGateway, NameServer (space separated),
+ *     Domain, Hostname;
+ *   - Workstation: Server and Browser off (client without sharing);
+ *   - the marker key removed; usosnetc (/netcheck31) registered for one
+ *     silent NETCHECK.TXT at the first boot.
+ * NET31.STATUS records each step. */
+#define N31_TCP SVC_KEY "NDISLoop1\\Parameters\\Tcpip"
+
+/* "key=value" of a CR LF text (value up to CR / LF); "" when missing. */
+static void n31_value(const char *text, const char *key, char *out, int cap)
+{
+    int i = 0, k = len(key), o = 0;
+    out[0] = 0;
+    while (text[i]) {
+        if ((i == 0 || text[i - 1] == '\n') && has_ci(text + i, k, key) && text[i + k] == '=') {
+            i += k + 1;
+            while (text[i] && text[i] != '\r' && text[i] != '\n' && o < cap - 1)
+                out[o++] = text[i++];
+            out[o] = 0;
+            return;
+        }
+        i++;
+    }
+}
+
+static DWORD n31_decimal(const char *s)
+{
+    DWORD v = 0;
+    while (*s >= '0' && *s <= '9')
+        v = v * 10 + (DWORD)(*s++ - '0');
+    return v;
+}
+
+/* RegSetValueExA + read back (REG_SZ / REG_EXPAND_SZ / REG_DWORD). */
+static int n31_set(HKEY h, const char *name, DWORD type, const void *data, DWORD size)
+{
+    BYTE got[300];
+    DWORD t, n = sizeof got, i;
+    if (RegSetValueExA(h, name, 0, type, (const BYTE *)data, size) != ERROR_SUCCESS) return 0;
+    if (RegQueryValueExA(h, name, NULL, &t, got, &n) != ERROR_SUCCESS || t != type || n != size) return 0;
+    for (i = 0; i < size; i++)
+        if (got[i] != ((const BYTE *)data)[i]) return 0;
+    return 1;
+}
+
+static int n31_sz(HKEY h, const char *name, DWORD type, const char *v)
+{
+    int ok = n31_set(h, name, type, v, (DWORD)len(v) + 1);
+    say(ok ? "  " : "  FAILED ");
+    say(name);
+    say(" = ");
+    say(v);
+    say("\r\n");
+    return ok;
+}
+
+static int n31_dw(HKEY h, const char *name, DWORD v)
+{
+    int ok = n31_set(h, name, REG_DWORD, &v, sizeof v);
+    say(ok ? "  " : "  FAILED ");
+    say_hex(name, v);
+    return ok;
+}
+
+static int n31_contains(const char *data, DWORD size, const char *part)
+{
+    DWORD i;
+    int j;
+    for (i = 0; i < size; i++) {
+        for (j = 0; part[j] && i + j < size && (data[i + j] | 32) == (part[j] | 32); j++)
+            ;
+        if (!part[j]) return 1;
+    }
+    return 0;
+}
+
+static void n31_service_off(const char *svc)
+{
+    HKEY h;
+    char key[128];
+    lstrcpyA(key, SVC_KEY);
+    lstrcatA(key, svc);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE, &h) != ERROR_SUCCESS) {
+        say("  ");
+        say(svc);
+        say(": no service key (nothing to turn off)\r\n");
+        return;
+    }
+    say("  ");
+    say(svc);
+    say(":");
+    n31_dw(h, "Start", SERVICE_DISABLED);
+    RegCloseKey(h);
+}
+
+static void net31(void)
+{
+    static char meta[2048];
+    char v[128], sys[MAX_PATH], dst[MAX_PATH], host[40];
+    HKEY svc = NULL, params = NULL, tcp = NULL, tparams = NULL, link = NULL;
+    DWORD type, size, n, disp;
+    BYTE data[1024];
+    int ok = 1, i;
+
+    say("USOS NT 3.1 LAN (/net31)\r\n");
+    if ((GetVersion() & 0xFFFFUL) != 0x0A03UL) {
+        say("net31 refused: not Windows NT 3.1\r\n");
+        return;
+    }
+    if (read_text("NET31.ON", meta, sizeof meta) <= 0) {
+        say("net31 off: no NET31.ON\r\n");
+        return;
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop", 0, KEY_READ | KEY_WRITE, &svc) != ERROR_SUCCESS ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop1\\Parameters", 0, KEY_READ | KEY_WRITE, &params) != ERROR_SUCCESS) {
+        say("net31 FAILED: no NDISLoop / NDISLoop1 (GUI Setup installed no Loopback adapter); network stays off\r\n");
+        ok = 0;
+        goto done;
+    }
+    /* TCP/IP's binding (3.1 STREAMS form \Device\Streams\NDISLoop1). */
+    size = sizeof data;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Tcpip\\Linkage", 0, KEY_READ, &link) == ERROR_SUCCESS &&
+        RegQueryValueExA(link, "Bind", NULL, &type, data, &size) == ERROR_SUCCESS && n31_contains((char *)data, size, "NDISLoop1"))
+        say("Tcpip\\Linkage Bind has NDISLoop1\r\n");
+    else
+        say("WARNING: Tcpip\\Linkage Bind without NDISLoop1 (TCP/IP not bound to the adapter?)\r\n");
+    if (link) RegCloseKey(link);
+    size = sizeof data;
+    if (RegQueryValueExA(svc, "Start", NULL, &type, data, &size) == ERROR_SUCCESS && type == REG_DWORD)
+        say_hex("NDISLoop Start (kept) = ", *(DWORD *)data);
+
+    /* the driver */
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usnet31.sys");
+    if (!CopyFileA(DIR "USNET31.SYS", dst, FALSE) || !net351_equal_files(DIR "USNET31.SYS", dst)) {
+        say("net31 FAILED: copy of USNET31.SYS to ");
+        say(dst);
+        say("\r\n");
+        ok = 0;
+        goto done;
+    }
+    say("copied and compared ");
+    say(dst);
+    say("\r\n");
+    ok &= n31_sz(svc, "ImagePath", REG_EXPAND_SZ, "\\SystemRoot\\System32\\drivers\\usnet31.sys");
+    n31_value(meta, "bus", v, sizeof v);
+    ok &= n31_dw(params, "PciBus", n31_decimal(v));
+    n31_value(meta, "device", v, sizeof v);
+    ok &= n31_dw(params, "PciDevice", n31_decimal(v));
+    n31_value(meta, "function", v, sizeof v);
+    ok &= n31_dw(params, "PciFunction", n31_decimal(v));
+    ok &= n31_dw(params, "UsosBusType", 5);
+    ok &= n31_dw(params, "DebugPort", 0);
+
+    /* the static TCP/IP values */
+    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, N31_TCP, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &tcp, &disp) != ERROR_SUCCESS ||
+        RegCreateKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Tcpip\\Parameters", 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &tparams, &disp) != ERROR_SUCCESS) {
+        say("net31 FAILED: cannot open the TCP/IP keys\r\n");
+        ok = 0;
+        goto done;
+    }
+    n31_value(meta, "mode", v, sizeof v);
+    say("address source: ");
+    say(v);
+    say("\r\n");
+    n31_value(meta, "ip", v, sizeof v);
+    ok &= nc_ipv4(v) != 0 && n31_sz(tcp, "IPAddress", REG_SZ, v);
+    n31_value(meta, "mask", v, sizeof v);
+    ok &= n31_sz(tcp, "SubnetMask", REG_SZ, v);
+    n31_value(meta, "gateway", v, sizeof v);
+    if (v[0]) ok &= n31_sz(tparams, "DefaultGateway", REG_SZ, v);
+    n31_value(meta, "dns", v, sizeof v);
+    if (v[0]) ok &= n31_sz(tparams, "NameServer", REG_SZ, v);
+    n31_value(meta, "domain", v, sizeof v);
+    if (v[0]) ok &= n31_sz(tparams, "Domain", REG_SZ, v);
+    n = sizeof host;
+    if (GetComputerNameA(host, &n) && host[0]) {
+        for (i = 0; host[i]; i++)
+            if (host[i] >= 'A' && host[i] <= 'Z') host[i] = (char)(host[i] + 32);
+        ok &= n31_sz(tparams, "Hostname", REG_SZ, host);
+    }
+
+    /* Workstation: client without sharing (memory: network defaults). */
+    n31_value(meta, "client", v, sizeof v);
+    if (!lstrcmpiA(v, "no-sharing")) {
+        say("client without sharing:\r\n");
+        n31_service_off("LanmanServer");
+        n31_service_off("Browser");
+    }
+
+    /* usosnetc: one silent NETCHECK.TXT at the first boot. */
+    set_sz("usosnetc", "ImagePath", REG_EXPAND_SZ, DIR "USOSNT3.EXE /netcheck31");
+    set_sz("usosnetc", "ObjectName", REG_SZ, "LocalSystem");
+    set_sz("usosnetc", "DisplayName", REG_SZ, "USOS network check");
+    set_dword("usosnetc", NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
+    set_dword("usosnetc", NULL, "ErrorControl", SERVICE_ERROR_IGNORE);
+    set_dword("usosnetc", NULL, "Start", SERVICE_AUTO_START);
+done:
+    if (tparams) RegCloseKey(tparams);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    /* The OEMNXPTC.INF marker: Control Panel runs get the dialog again. */
+    i = RegDeleteKeyA(HKEY_LOCAL_MACHINE, "SOFTWARE\\USOS\\NT31NET");
+    say(i == ERROR_SUCCESS ? "marker SOFTWARE\\USOS\\NT31NET removed\r\n" : "marker SOFTWARE\\USOS\\NT31NET not removed (missing?)\r\n");
+    say(ok ? "net31: usosnet31 + static TCP/IP registered (readback verified); active after the restart\r\n"
+           : "net31 FAILED (see above); network unproven\r\n");
+    lstrcpyA(g_text, ok ? "net31=ok\r\n" : "net31=FAILED\r\n");
+    write_file("NET31.STATUS", g_text);
+}
+
+/* ------------------------------------------------------------------------
+ * usosnetc on NT 3.1 (USOSNT3.EXE /netcheck31): one silent record of the
+ * first boot with usosnet31, C:\USOS\NT3\NETCHECK.TXT: the configured
+ * address, usosnet31's NativeDiag stage, the CD's PING.EXE to the gateway
+ * and to 1.1.1.1 (NT 3.1 ICMP.DLL has no IcmpSendEcho; PING prints "ICMP
+ * Echo Reply:TTL n" per answer), a name lookup and a TCP connect to
+ * 1.1.1.1:80 (wsock32). Then the service turns itself off. */
+typedef void *(WINAPI *WS_GETHOST)(const char *);
+
+static void nc31_ping(const char *label, const char *addr)
+{
+    static char out[2048];
+    char cmd[MAX_PATH + 64], file[MAX_PATH];
+    SECURITY_ATTRIBUTES sa;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    HANDLE h;
+    DWORD n = 0, i, replies = 0;
+    char *p;
+    lstrcpyA(file, DIR);
+    lstrcatA(file, "PING31.TMP");
+    sa.nLength = sizeof sa;
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+    h = CreateFileA(file, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+        nc_line(label, "failed (temp file)");
+        return;
+    }
+    for (i = 0; i < sizeof si; i++) ((volatile BYTE *)&si)[i] = 0;
+    si.cb = sizeof si;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = NULL;
+    si.hStdOutput = h;
+    si.hStdError = h;
+    if (!GetSystemDirectoryA(cmd, MAX_PATH)) lstrcpyA(cmd, "C:\\WINNT\\system32");
+    lstrcatA(cmd, "\\ping.exe -n 3 ");
+    lstrcatA(cmd, addr);
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+        CloseHandle(h);
+        DeleteFileA(file);
+        nc_line(label, "failed (CreateProcess ping.exe)");
+        return;
+    }
+    if (WaitForSingleObject(pi.hProcess, 30000) != WAIT_OBJECT_0)
+        TerminateProcess(pi.hProcess, 1);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    SetFilePointer(h, 0, NULL, FILE_BEGIN);
+    if (!ReadFile(h, out, sizeof out - 1, &n, NULL)) n = 0;
+    out[n] = 0;
+    CloseHandle(h);
+    DeleteFileA(file);
+    for (p = out; *p; p++)
+        if (has_ci(p, 15, "Echo Reply:TTL ")) replies++;
+    {
+        char b[64];
+        lstrcpyA(b, replies ? "ok replies=" : "failed replies=");
+        dec(b + len(b), replies);
+        lstrcatA(b, "/3");
+        nc_line(label, b);
+    }
+    /* the PING output itself, one line per row, bounded */
+    for (p = out, i = 0; *p && i < 8; i++) {
+        char row[100];
+        int k = 0;
+        while (*p == '\r' || *p == '\n') p++;
+        while (*p && *p != '\r' && *p != '\n' && k < (int)sizeof row - 1) row[k++] = *p++;
+        while (*p && *p != '\r' && *p != '\n') p++;
+        row[k] = 0;
+        if (k) nc_line("  ping: ", row);
+    }
+}
+
+static void netcheck31(void)
+{
+    static char meta[2048];
+    char v[128], gw[64];
+    HMODULE ws;
+    int i;
+    static const char *const diag[] = { "Stage", "Status", "Value", "Sequence" };
+
+    lstrcpyA(g_text, "USOS NT 3.1 network check\r\nstate=waiting 45 s for TCP/IP\r\n");
+    write_file_checked("NETCHECK.TXT", g_text);
+    Sleep(45000);
+    lstrcpyA(g_text, "USOS NT 3.1 network check\r\n");
+    if (read_text("NET31.ON", meta, sizeof meta) > 0) {
+        static const char *const keys[] = { "mode", "ip", "mask", "gateway", "dns", "lease_s", "note", "bus", "device", "function" };
+        for (i = 0; i < (int)(sizeof keys / sizeof keys[0]); i++) {
+            char k[24];
+            n31_value(meta, keys[i], v, sizeof v);
+            lstrcpyA(k, "net31_");
+            lstrcatA(k, keys[i]);
+            lstrcatA(k, "=");
+            nc_line(k, v);
+        }
+    }
+    dump_value(g_text, N31_TCP, "IPAddress");
+    dump_value(g_text, N31_TCP, "SubnetMask");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "DefaultGateway");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "NameServer");
+    dump_value(g_text, SVC_KEY "NDISLoop", "ImagePath");
+    dump_value(g_text, SVC_KEY "NDISLoop", "Start");
+    for (i = 0; i < 4; i++)
+        dump_value(g_text, SVC_KEY "NDISLoop\\Parameters\\NativeDiag", diag[i]);
+    write_file_checked("NETCHECK.TXT", g_text);
+    nc_value(SVC_KEY "Tcpip\\Parameters", "DefaultGateway", gw, sizeof gw);
+    if (nc_ipv4(gw)) nc31_ping("gateway_ping=", gw);
+    else nc_line("gateway_ping=", "no gateway");
+    write_file_checked("NETCHECK.TXT", g_text);
+    nc31_ping("ping_1.1.1.1=", "1.1.1.1");
+    write_file_checked("NETCHECK.TXT", g_text);
+    ws = LoadLibraryA("wsock32.dll");
+    if (ws) {
+        WSA_STARTUP startup = (WSA_STARTUP)GetProcAddress(ws, "WSAStartup");
+        WSA_CLEANUP cleanup = (WSA_CLEANUP)GetProcAddress(ws, "WSACleanup");
+        WS_GETHOST gethost = (WS_GETHOST)GetProcAddress(ws, "gethostbyname");
+        if (startup && cleanup && gethost && !startup(0x0101, g_nc_buf)) {
+            nc_line("dns_one.one.one.one=", gethost("one.one.one.one") ? "ok" : "failed");
+            cleanup();
+        } else nc_line("dns_one.one.one.one=", "unavailable (wsock32.dll)");
+        FreeLibrary(ws);
+    }
+    nc_tcp("tcp_1.1.1.1_80=", 0x01010101, 80);
+    nc_line("done=", "1");
+    write_file_checked("NETCHECK.TXT", g_text);
+}
+
+static void WINAPI netcheck31_main(DWORD argc, LPSTR *argv)
+{
+    (void)argc;
+    (void)argv;
+    g_nc_handle = RegisterServiceCtrlHandlerA("usosnetc", netcheck_handler);
+    g_nc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_nc_status.dwCurrentState = SERVICE_RUNNING;
+    g_nc_status.dwControlsAccepted = 0;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+    netcheck31();
+    {
+        HKEY h;
+        DWORD off = SERVICE_DISABLED;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "usosnetc", 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+            RegSetValueExA(h, "Start", 0, REG_DWORD, (const BYTE *)&off, sizeof off);
+            RegCloseKey(h);
+        }
+    }
+    g_nc_status.dwCurrentState = SERVICE_STOPPED;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
 /* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
 static void native_options(char *opts, int size)
 {
@@ -2730,6 +3109,7 @@ void __stdcall entry(void)
 {
     static SERVICE_TABLE_ENTRYA table[] = { { SVC_NAME, service_main }, { NULL, NULL } };
     static SERVICE_TABLE_ENTRYA netcheck_table[] = { { "usosnetc", netcheck_main }, { NULL, NULL } };
+    static SERVICE_TABLE_ENTRYA netcheck31_table[] = { { "usosnetc", netcheck31_main }, { NULL, NULL } };
     char opt[16];
 
     first_option(GetCommandLineA(), opt);
@@ -2745,6 +3125,12 @@ void __stdcall entry(void)
     if (lstrcmpA(opt, "netcheck") == 0) {
         if (!StartServiceCtrlDispatcherA(netcheck_table))
             netcheck();             /* by hand: the same record without the SCM */
+        ExitProcess(0);
+    }
+    /* usosnetc on native NT 3.1 (net31) */
+    if (lstrcmpA(opt, "netcheck31") == 0) {
+        if (!StartServiceCtrlDispatcherA(netcheck31_table))
+            netcheck31();           /* by hand: the same record without the SCM */
         ExitProcess(0);
     }
     /* the desktop notice the service starts on a native install */
@@ -2821,6 +3207,12 @@ void __stdcall entry(void)
     if (lstrcmpA(opt, "vesa31") == 0) {
         open_log("POST.LOG");
         vesa31();
+        ExitProcess(0);
+    }
+    /* Native NT 3.1 LAN: POST.CMD at the end of GUI Setup, before /finish31. */
+    if (lstrcmpA(opt, "net31") == 0) {
+        open_log("POST.LOG");
+        net31();
         ExitProcess(0);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */

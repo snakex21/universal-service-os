@@ -926,3 +926,79 @@ udhcpc run first; a static profile address works without that. These GUI
 Setup INF changes need one QEMU or X470 fresh-install round before they
 can be the default; ICMP.DLL and WSOCK32.DLL are on the 3.1 CD, so a
 NETCHECK.TXT (ping gateway, TCP 1.1.1.1:80) is feasible from USOSNT3.
+
+### 8.10 Network for native NT 3.1: install wiring (2026-10-30, host checks only)
+
+Default for a fresh native NT 3.1 / 3.1 AS install when the profile has the
+network on (`;USOS-NT31-NETWORK=on`, `;USOS-NT31-WORKGROUP=`, rendered by
+`nt3.zig` for both 3.1 ids) and the prep Linux sees exactly one card
+usosnet31 drives (8086:1539 I211, 8086:10C9 82576). Library:
+`tools/nt31_network_setup.sh`; tests: `tools/tests/test_nt31_native_net.py`.
+
+**Driver start mode.** usosnet31 stays an NDIS MAC under the Loopback
+adapter's own service (NDISLoop, NCPA's start mode kept; NETCHECK.TXT
+records it). Not boot start: its `sources` already link with
+`DRIVER_ALIGNMENT=0x1000` (file alignment 0x200, section 0x1000), which the
+NT 3.1 system-image loader accepts (8.9, Codex measurement; Codex R24c ran
+the same binary family as an NCPA-installed system/auto-start MAC), and an
+NDIS MAC has to come up with NDIS and its bindings, after the boot drivers.
+
+**Address source: the prep Linux's DHCP lease** (8.8 option 2, profile as
+override). The micro Linux now carries igb.ko (+ i2c-algo-bit, dca, hwmon)
+and af_packet.ko from the pinned offline modloop (no download); busybox
+already has udhcpc. `usos_nt31_address`: static profile values
+(`;USOS-IP=a.b.c.d/n`, `GATEWAY`, `DNS`) when set; else `modprobe igb`, link
+up (15 s for carrier), `udhcpc -f -q -n -t 5 -T 4` with a script that only
+writes the lease values (no `-R`: the lease is not released, the router
+keeps the address for this MAC; usosnet31 uses the same iNVM MAC), link down,
+`modprobe -r igb`; profile DNS servers win over the lease's; no lease ->
+link-local 169.254.<mac5>.<mac6>/16 (TCP/IP and NetBT start without error
+popups, no route; `note=` says why). `NET31.ON` (\USOS\NT3) records mode,
+address, mask, gateway, DNS, domain, lease time, DHCP server, PCI
+bus/device/function, driver hash, workgroup, client policy. Risk: a router
+that hands the address to another device after the lease time (recorded in
+NETCHECK.TXT as `net31_lease_s`); then the profile's static address or a
+reservation is the answer. Option 3 (DHCP client in usosnet31) stays later.
+
+**GUI Setup (local source, before text mode):**
+- INITIAL.IN_: the network part stays on for Workstation too (as on AS);
+  right before `shell "ntlanman.inf" DoNetwork` it creates
+  `HKLM\SOFTWARE\USOS\NT31NET` (marker).
+- NTLANMAN.IN_: the AS path's Loopback bypass (`STF_NCOPTION = LOOP` during
+  Setup) + `ProtoData_2 = "OEMNXPTC.INF","TCPIP",0,Tcpip` (TCP/IP after
+  NetBEUI; its files come from the local source with the network copy list).
+- OEMNADLB.IN_: no media page (AS path).
+- OEMNXPTC.IN_ configureadapter, only while the marker exists: the INF's own
+  per-card default writer gets the chosen IP / mask (as ipinfo.inf defaults
+  would; ipinfo.inf is not copied by 3.1 text mode), the gateway goes to
+  `Tcpip\Parameters`, and the CPlTcpip address dialog and the "cannot
+  configure" note are skipped, so TCP/IP and LmHosts start with an address
+  when NTLANMAN starts the network (a failed LmHosts start would stop Setup
+  on a message box). Control Panel runs later (no marker) are the CD's.
+- USOSANS31: "Domain/Workgroup Settings" (NCPA dialog 6310, WS) -> member
+  of the configured workgroup (radio 1194, edit 1192), the "Welcome to the
+  ... workgroup." box -> OK; fallback only: "TCP/IP Configuration" (6290) ->
+  Cancel. AS keeps "Domain Settings" -> controller in USOSDOMAIN.
+
+**POST.CMD `USOSNT3 /net31`** (after /vesa31, before /finish31; NT 3.1
+only): copies USNET31.SYS (8.3 name) to system32\drivers and compares it,
+NDISLoop ImagePath -> `\SystemRoot\System32\drivers\usnet31.sys`,
+NDISLoop1\Parameters PciBus/PciDevice/PciFunction (+ UsosBusType 5, which
+usosnet31 retries as Isa/Eisa), the TCP/IP values as the 3.1 INF / NCPA
+name them (NDISLoop1\Parameters\Tcpip IPAddress + SubnetMask REG_SZ;
+Tcpip\Parameters DefaultGateway, NameServer space separated, Domain,
+Hostname), each read back; Workstation: LanmanServer + Browser Start 4
+(client without sharing, network defaults); removes the marker; registers
+`usosnetc` = `USOSNT3.EXE /netcheck31`. Log in POST.LOG, `NET31.STATUS`.
+
+**NETCHECK.TXT** (first boot, service usosnetc, then disabled): after 45 s
+the NET31.ON values, the registry readback, NDISLoop ImagePath / Start,
+usosnet31 `NativeDiag` Stage/Status/Value, the CD's PING.EXE (3.1 ICMP.DLL
+exports only do_echo_req/do_echo_rep, no IcmpSendEcho) `-n 3` to the gateway
+and to 1.1.1.1 (counted "Echo Reply:TTL" lines + the output), a
+gethostbyname("one.one.one.one") and a TCP connect to 1.1.1.1:80 (wsock32).
+
+All imports of USOSNT3.EXE and USOSANS31.EXE resolve against the 3.1 CD's
+KERNEL32/ADVAPI32/USER32 (host check). Not run anywhere yet: the GUI Setup
+network part on Workstation, TCP/IP on 3.1 in the native flow, the
+usosnet31 takeover on the X470; the fresh X470 install is the test.

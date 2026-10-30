@@ -491,6 +491,13 @@ def main() -> int:
             "kernel/drivers/cdrom/cdrom.ko",
             # efivarfs: firmware boot entries (tools/uefi_boot_entry.sh).
             "kernel/fs/efivarfs/efivarfs.ko",
+            # Native NT 3.1 (no DHCP client in NT 3.1): one bounded busybox
+            # udhcpc run on the X470's Intel I211 gives the address that
+            # becomes the static TCP/IP setting (tools/nt31_network_setup.sh).
+            # Loaded only by that step (micro_linux_init.sh loads storage
+            # modaliases only); udhcpc needs AF_PACKET.
+            "kernel/drivers/net/ethernet/intel/igb/igb.ko",
+            "kernel/net/packet/af_packet.ko",
         ]
         selected_modules = module_dependency_closure(
             dependencies, runtime_roots + legacy_ata_roots
@@ -611,6 +618,7 @@ def main() -> int:
             ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/nt351_network_setup.sh", "usr/lib/usos/nt351_network_setup.sh"),
             ("tools/nt35_network_setup.sh", "usr/lib/usos/nt35_network_setup.sh"),
+            ("tools/nt31_network_setup.sh", "usr/lib/usos/nt31_network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -835,6 +843,13 @@ def main() -> int:
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SYS', stat.S_IFREG | 0o644, net35n))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(net35n).hexdigest()+'  USOSNET35N.SYS\n').encode('ascii')))
+        # Native NT 3.1: usosnet31, the NDIS 3.1 full-MAC build (polled,
+        # CF8h/CFCh, I211 + 82576; file alignment 0x200 so the NT 3.1 loader
+        # accepts it as a system / auto start driver; tools/nt31_network_setup.sh).
+        net31 = (root / 'tools/nt/usosnet/bin/nt31-native/i386/usosnet31.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET31.SYS', stat.S_IFREG | 0o644, net31))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET31.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net31).hexdigest()+'  USOSNET31.SYS\n').encode('ascii')))
         net351 =(root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,

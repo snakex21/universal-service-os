@@ -631,7 +631,9 @@ class Nt3AnswerProfile(unittest.TestCase):
                              'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
                              'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFileAttributesA', 'SetFilePointer', 'Sleep', 'WriteFile',
                              'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
-                             'lstrcpyA'},
+                             'lstrcpyA',
+                             # native NT 3.1 LAN (/net31, /netcheck31), checked in the 3.1 CD KERNEL32.DLL 2026-10-30
+                             'GetComputerNameA', 'TerminateProcess'},
             'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',
                              'LookupPrivilegeValueA', 'OpenProcessToken', 'RegCloseKey', 'RegCreateKeyExA', 'RegDeleteKeyA',
                              'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegSetValueExW', 'RegUnLoadKeyA',
