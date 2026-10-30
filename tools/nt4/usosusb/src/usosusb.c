@@ -45,10 +45,8 @@
 #include <ntddkbd.h>
 #include <ntddmou.h>
 #include <kbdmou.h>
-#ifndef USOSUSB_NT31
 #include <ntdddisk.h>
 #include <ntddstor.h>
-#endif
 #ifdef USOSUSB_NT6
 #include <mountdev.h>
 #include <mountmgr.h>
@@ -64,7 +62,23 @@
 __declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityBoost);
 __declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
 __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
-#define USOSUSB_VERSION L"usosusb 1.2-nt31"
+/* The mass-storage queue: spin locks and interlocked lists in their NT 3.1
+   stdcall forms too (HAL KeAcquireSpinLock / KeReleaseSpinLock, kernel
+   ExInterlockedInsertTailList / ExInterlockedRemoveHeadList; no Kf / Exf). */
+#undef KeAcquireSpinLock
+#undef KeReleaseSpinLock
+#undef ExInterlockedInsertTailList
+#undef ExInterlockedRemoveHeadList
+__declspec(dllimport) VOID __stdcall KeAcquireSpinLock(PKSPIN_LOCK SpinLock, PKIRQL OldIrql);
+__declspec(dllimport) VOID __stdcall KeReleaseSpinLock(PKSPIN_LOCK SpinLock, KIRQL NewIrql);
+__declspec(dllimport) PLIST_ENTRY __stdcall ExInterlockedInsertTailList(PLIST_ENTRY ListHead, PLIST_ENTRY ListEntry, PKSPIN_LOCK Lock);
+__declspec(dllimport) PLIST_ENTRY __stdcall ExInterlockedRemoveHeadList(PLIST_ENTRY ListHead, PKSPIN_LOCK Lock);
+#define USOSUSB_VERSION L"usosusb 1.4-nt31"
+/* USB sticks as on NT 3.5x / 4.0 (USOSUSB_NT4MSC: plain \DosDevices letters,
+   FAT12 / FAT16 / NTFS volumes, Parameters\Storage = 0 turns it off). The
+   1.2-nt31 build had no mass storage: a stick showed as "pN-nohid". */
+#define USOSUSB_MSC 1
+#define USOSUSB_NT4MSC 1
 #elif defined(USOSUSB_NT6)
 /* Vista / Server 2008 SP2 x86 (build-nt6.cmd): same legacy port devices;
    kbdclass / mouclass connect them as legacy ports (\Device\KeyboardClassLegacyN,
@@ -1529,6 +1543,7 @@ static volatile LONG g_dsnap_new;
 #define FS_FAT32 3
 #define FS_EXFAT 4
 #define FS_OTHER 5
+#define FS_FAT32K 6             /* NT 3.1: FAT12 / FAT16 with 32 KiB (or larger) clusters */
 
 static ULONG be32(const UCHAR *p) { return ((ULONG)p[0] << 24) | ((ULONG)p[1] << 16) | ((ULONG)p[2] << 8) | p[3]; }
 static ULONG le32(const UCHAR *p) { return p[0] | ((ULONG)p[1] << 8) | ((ULONG)p[2] << 16) | ((ULONG)p[3] << 24); }
@@ -1856,6 +1871,13 @@ static UCHAR fs_kind(const UCHAR *s)
         return FS_EXFAT;
     if (!is_boot_sector(s))
         return FS_OTHER;
+#ifdef USOSUSB_NT31
+    /* The NT 3.1 fastfat stopped with 0x1E on a FAT16 volume with 32 KiB
+       clusters (docs/nt31-2026-10-09.md, the 2000 MiB C:); its 8 KiB
+       cluster C: works. Such a stick gets no volume rather than a STOP. */
+    if ((s[22] | s[23]) && s[13] >= 64)
+        return FS_FAT32K;
+#endif
     return (s[22] | s[23]) ? FS_FAT : FS_FAT32;     /* BPB_FATSz16 = 0: FAT32 */
 }
 
@@ -1866,6 +1888,7 @@ static const WCHAR *fs_name(UCHAR fs)
     case FS_NTFS: return L"ntfs";
     case FS_FAT32: return L"fat32";
     case FS_EXFAT: return L"exfat";
+    case FS_FAT32K: return L"fat-32k";
     }
     return L"other";
 }

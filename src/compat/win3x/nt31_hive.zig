@@ -17,6 +17,7 @@
 //!   ControlSet001\Services\usosrst   Type 1, Start 0, ErrorControl 0, "SCSI miniport"
 //!                          \Parameters  HpetLegacyOff = 1, RtcFix = 1
 //!   ControlSet001\Services\usosusb   Type 1, Start 0, ErrorControl 0, "Keyboard Port"
+//!                          \Parameters  LogFile = \DosDevices\C:\USOS\NT3\USOSUSB.LOG
 //!   ControlSet001\Services\usosdisk  Type 1, Start 0, ErrorControl 0, "SCSI Class"
 //!   ControlSet001\Services\Kbdclass\Parameters ConnectMultiplePorts = 1
 //!   ControlSet001\Services\Mouclass\Parameters ConnectMultiplePorts = 1
@@ -368,9 +369,13 @@ pub fn patch(gpa: std.mem.Allocator, hive: []const u8, nvme: bool) Error![]u8 {
     _ = try h.addKey(rst, "Parameters", &[_]Hive.Value{
         .{ .name = "HpetLegacyOff", .dword = 1 }, .{ .name = "RtcFix", .dword = 1 },
     }, like);
-    _ = try h.addKey(services, "usosusb", &[_]Hive.Value{
+    const usb = try h.addKey(services, "usosusb", &[_]Hive.Value{
         .{ .name = "Type", .dword = 1 },        .{ .name = "Start", .dword = 0 },
         .{ .name = "ErrorControl", .dword = 0 }, .{ .name = "Group", .sz = "Keyboard Port" },
+    }, like);
+    // usosusb 1.4-nt31 sticks: the silent stick log (letters, file systems).
+    _ = try h.addKey(usb, "Parameters", &[_]Hive.Value{
+        .{ .name = "LogFile", .sz = "\\DosDevices\\C:\\USOS\\NT3\\USOSUSB.LOG" },
     }, like);
     _ = try h.addKey(services, "usosdisk", &[_]Hive.Value{
         .{ .name = "Type", .dword = 1 },        .{ .name = "Start", .dword = 0 },
@@ -561,8 +566,8 @@ test "the USOS services are added in order and the hive stays consistent" {
             p += bs;
         }
         // One live list per key with subkeys: root, ControlSet001,
-        // Services, Kbdclass, Mouclass, usosrst.
-        try std.testing.expectEqual(@as(usize, 6), lists);
+        // Services, Kbdclass, Mouclass, usosrst, usosusb.
+        try std.testing.expectEqual(@as(usize, 7), lists);
     }
     var h = Hive{ .gpa = gpa, .buf = .empty };
     defer h.buf.deinit(gpa);
@@ -578,6 +583,7 @@ test "the USOS services are added in order and the hive stays consistent" {
         try std.testing.expectEqualStrings(w, try h.nkName(try h.payload(rd32(out, li + 4 + 4 * i), 76), &buf));
     }
     _ = try h.mustChild(try h.mustChild(sv, "usosrst"), "Parameters");
+    _ = try h.mustChild(try h.mustChild(sv, "usosusb"), "Parameters");
     // A second run refuses (keys present).
     try std.testing.expectError(error.AlreadyPatched, patch(gpa, out, true));
     // Without NVMe: no usosnvme.

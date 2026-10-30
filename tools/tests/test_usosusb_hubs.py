@@ -74,7 +74,7 @@ class HubSource(unittest.TestCase):
 
     def test_binaries_carry_hub_build(self):
         for rel, ver in (('bin/i386/usosusb.sys', 'usosusb 1.4-nt4'), ('bin/nt6/i386/usosusb.sys', 'usosusb 1.4-nt6'),
-                         ('bin/nt31/i386/usosusb.sys', 'usosusb 1.2-nt31')):
+                         ('bin/nt31/i386/usosusb.sys', 'usosusb 1.4-nt31')):
             data = (ROOT / 'tools/nt4/usosusb' / rel).read_bytes()
             self.assertIn(ver.encode('utf-16-le'), data, rel)
             self.assertIn('%s:s%uH%u%s'.encode('utf-16-le'), data, rel)
