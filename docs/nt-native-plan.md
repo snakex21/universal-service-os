@@ -608,3 +608,45 @@ during GUI Setup (harmless on this X470 run: it loaded without a hang).
 The interrupted install on the Micron was patched in place instead
 (SYSTEM: Scsidisk Start 1 -> 0, Atdisk 0 -> 4; scratchpad
 nt31native2/PATCH-261030-164625.TXT).
+
+### 8.3 X470 run 3 of native NT 3.1 (Micron patched per 8.2)
+
+After the Scsidisk patch the first GUI-mode boot hangs on the kernel
+banner ("... 65088 KB Memory"), no STOP, no further text (two attempts,
+reset button after ~10 s each; BOOTLOG.TXT boots 3-5: power-on, two
+SYS_RST_L resets, nothing else of note). Read-only evidence from the
+Micron: SYSTEM is byte-identical to the 8.2 patch result (NT never flushed
+it), no `PAGEFILE.SYS` although `PagingFiles` = `?:\pagefile.sys 15 60`
+(smss never reached the paging-file step), FAT16 clean bit still set.
+Boot-start services: ahcint, usosnvme, usosrst (SCSI miniport), Scsidisk
+(SCSI Class), Ftdisk (Filter), usosusb (Keyboard Port); Atdisk 4.
+
+Leading hypothesis: the kernel debugger. BOOT.INI is SETUPAPP's (it
+appends ` /DEBUG` only for `[debug] DebugBoot = 1`, never `/NODEBUG`); the
+native flow adds `/NODEBUG /MAXMEM=64` only in `USOSNT3 /finish31` at the
+end of GUI Setup, so every boot before that runs with the 3.1 debugger on
+COM1 (section "VM run 2" of docs/nt31-2026-10-09.md; the 3.1 KdInitSystem
+enables KD when the options carry DEBUG/DEBUGPORT/BAUDRATE and no NODEBUG,
+and the 3.1 KdInitSystem sends no packet itself). The first debugger
+packet is then the symbol load of the first system-start driver, right
+after IopMarkBootPartition, which is exactly where 8.2 stopped with 0x7B
+(so that boot never reached it). With no host on the port the state-change
+packet waits for an acknowledge forever; in QEMU (a real, silent 16550)
+GUI Setup still ran, so the X470 port behaviour is the suspected
+difference. Other candidates, lower: the NT31 usosnvme / AHCINT I/O path
+under the 3.1 Scsidisk (static review found no 3.1-specific difference in
+the I/O path; both mechanisms already ran on 3.1: AHCINT on X470,
+usosnvme in QEMU), a system-start driver probing absent hardware.
+
+Patch on the Micron (one variable): BOOT.INI default entry + `/NODEBUG
+/SOS` (/SOS only shows the driver list and the AHCINT / usosnvme rows),
+SYSTEM untouched (PATCH-261030-172437.TXT in the scratchpad). Side effect
+on this disk only: `/finish31` takes a `multi()` line with `/sos` for the
+[USOS /SOS] entry, so its final BOOT.INI keeps that single entry.
+
+If the boot gets past the banner, the code fix is needed for the native
+3.1 path: `/NODEBUG` must be in BOOT.INI before the first GUI-mode boot
+(SETUPAPP writes the file at the end of text mode; candidates: the
+TXTSETUP `LoadIdentifier` value if the 3.1 INF parser keeps an embedded
+quote, or an edit of C:\BOOT.INI from the pre-boot UEFI logger, which
+would first need the firmware's FAT16 access to the MBR partition).
