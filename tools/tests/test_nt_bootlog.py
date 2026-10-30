@@ -86,8 +86,8 @@ class NtBootlog(unittest.TestCase):
         # Native NT 3.5x and NT 4.0.
         self.assertIn('nt_bootlog=off\n        case "$nt_major" in 3|4) nt_bootlog=on ;; esac\n', native)
         self.assertIn('USOS_NT_BOOTLOG=$nt_bootlog sh /usr/lib/usos/xp_csmwrap_esp.sh', native)
-        # nt3-native.flag covers 3.51 / 3.5 only; NT 3.1 has no native path.
-        self.assertIn('NT351|NT351S|NT35|NT35S) nt_native_flag=nt3-native.flag ;;', prepare)
+        # nt3-native.flag covers 3.51 / 3.5 and (since 975f731f) NT 3.1.
+        self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S) nt_native_flag=nt3-native.flag ;;', prepare)
         for path in (ROOT / 'tools').glob('*.sh'):
             if path.name not in ('w9x_csmwrap_prepare.sh', 'xp_csmwrap_esp.sh'):
                 self.assertNotIn('USOS_NT_BOOTLOG', path.read_text(encoding='utf-8', errors='replace'), path.name)
