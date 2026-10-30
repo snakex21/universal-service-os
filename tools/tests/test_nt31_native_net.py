@@ -239,5 +239,31 @@ class Programs(unittest.TestCase):
             self.assertIn(piece, c)
 
 
+class FreshInstall1(unittest.TestCase):
+    """X470 2026-10-30 (B261030-222017): 8.3 names, default answer, zone."""
+    def test_names_on_c_are_8_3(self):
+        t = TARGET.read_text(encoding='utf-8')
+        self.assertIn('cp "$LIB/nt3/USOSANS31.EXE" "$usos/USOSAN31.EXE"', t)
+        self.assertNotIn('NT3\\\\USOSANS31.EXE', t)
+        c = USOSNT3.read_text(encoding='utf-8')
+        self.assertIn('write_file("NET31.STS", g_text)', c)
+        self.assertNotIn('"NET31.STATUS"', c)
+        import re
+        for name in re.findall(r'"([A-Z0-9_]+\.[A-Z0-9]+)"', LIB31.read_text(encoding='utf-8') + c[c.index('Native NT 3.1 LAN (POST.CMD'):]):
+            base, ext = name.split('.')
+            self.assertTrue(len(base) <= 8 and len(ext) <= 3, name)
+
+    def test_default_answer_has_nt31_lan(self):
+        prep = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        self.assertIn("      NT31|NT31S)\n        printf ';USOS-NT31-NETWORK=on\\r\\n;USOS-NETWORK=on\\r\\n;USOS-IP=dhcp\\r\\n' ;;", prep)
+
+    def test_zone_prefix(self):
+        fn = function_text(TARGET, 'nt31_zone_prefix')
+        rc, out, err = sh(fn + '\nfor z in "Central European" "W. Europe" GMT "E. Europe" Nowhere; do printf "[%s]" "$(nt31_zone_prefix "$z")"; done')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.strip(), '[(GMT+1:00) Berlin][(GMT+1:00) Berlin][(GMT) ][(GMT+2:00) Athens][]')
+        self.assertIn('CB_FINDSTRING', ANS31.read_text(encoding='utf-8'))
+
+
 if __name__ == '__main__':
     unittest.main()

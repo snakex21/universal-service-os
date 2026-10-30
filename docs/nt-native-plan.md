@@ -989,7 +989,7 @@ name them (NDISLoop1\Parameters\Tcpip IPAddress + SubnetMask REG_SZ;
 Tcpip\Parameters DefaultGateway, NameServer space separated, Domain,
 Hostname), each read back; Workstation: LanmanServer + Browser Start 4
 (client without sharing, network defaults); removes the marker; registers
-`usosnetc` = `USOSNT3.EXE /netcheck31`. Log in POST.LOG, `NET31.STATUS`.
+`usosnetc` = `USOSNT3.EXE /netcheck31`. Log in POST.LOG, `NET31.STS`.
 
 **NETCHECK.TXT** (first boot, service usosnetc, then disabled): after 45 s
 the NET31.ON values, the registry readback, NDISLoop ImagePath / Start,
@@ -1002,3 +1002,27 @@ All imports of USOSNT3.EXE and USOSANS31.EXE resolve against the 3.1 CD's
 KERNEL32/ADVAPI32/USER32 (host check). Not run anywhere yet: the GUI Setup
 network part on Workstation, TCP/IP on 3.1 in the native flow, the
 usosnet31 takeover on the X470; the fresh X470 install is the test.
+
+### 8.10.1 X470 fresh install 1 (B261030-222017): no network, answerer not started
+
+Read-only copy of the Micron's C: (USB enclosure; scratchpad m31):
+`\USOS\NT3` has no NET31.ON, POST.CMD has no `/net31`, system32 has no
+PING.EXE / TCPIP.SYS / NBF.SYS / LOOP.SYS: the network part never ran. GUI
+Setup's "Unable to open C:\USOS\NT3\USOSANS31.EXE": a 9-character name on
+FAT (Linux vfat wrote it with a long-name entry; NT 3.1's FAT sees only the
+short alias USOSAN~1.EXE), so no page was answered (Date/Time waited, GMT).
+System event log: NetDDE event 13 "NETBIOS" = the "service failed" box.
+
+Fixes: the answerer is staged and started as `USOSAN31.EXE` (8.3; status
+file `NET31.STS` likewise); the no-profile WINNT.SIF of
+w9x_csmwrap_prepare.sh (w9x_nt3_default_sif) now carries
+`;USOS-NT31-NETWORK=on` / `;USOS-NETWORK=on` / `;USOS-IP=dhcp` as for 3.5x
+(the profile-rendered answer already had them; the prep log of this run
+was not available, so the preflight's reason is now logged and written to
+the target as `\USOS\NT3\NET31.OFF`); the Date/Time page gets the profile
+zone (NATIVE31.INI `tz=`, the start of the 3.1 MAIN.CPL entry, e.g.
+"(GMT+1:00) Berlin" for Central European; CB_FINDSTRING + CBN_SELCHANGE);
+POST.CMD always runs `/net31`, which without a network sets NetDDE to
+demand start when no NetBIOS service exists. The installed Micron is not
+patched (no TCP/IP / NBF / Loopback registry to complete offline in the
+REGF 1.1 hives); a fresh install is the test.

@@ -44,45 +44,50 @@ usos_nt31_supported() {
 
 usos_nt31_preflight() {
     # ANSWER LIB PCI_ROOT. Before any target write. Sets _u31_enabled and,
-    # when on, the driver, the card's BDF and the profile address values.
-    _u31_answer=$1 _u31_lib=$2 _u31_pci=$3
-    _u31_enabled=$(usos_nt31_requested "$_u31_answer") || { _u31_enabled=off; return 1; }
-    [ "$_u31_enabled" = on ] || return 0
+    # when on, the driver, the card's BDF and the profile address values;
+    # _u31_off_why says why it stays off (logged and written to the target
+    # as \USOS\NT3\NET31.OFF by nt31_native).
+    _u31_answer=$1 _u31_lib=$2 _u31_pci=$3 _u31_off_why=''
+    _u31_enabled=$(usos_nt31_requested "$_u31_answer") || { _u31_enabled=off; _u31_off_why='bad ;USOS-NT31-NETWORK line'; return 1; }
+    [ "$_u31_enabled" = on ] || { _u31_off_why='network off in the answer profile (no ;USOS-NT31-NETWORK=on)'; return 0; }
     _u31_enabled=off
-    _u31_group=$(usos_nt31_workgroup "$_u31_answer") || return 1
-    . "$_u31_lib/network_setup.sh" || return 1
-    _u31_config=$(usos_net_answer_config "$_u31_answer" NT4) || return 1
-    printf '%s\n' "$_u31_config" | grep -qx 'network=on' || return 1
+    _u31_group=$(usos_nt31_workgroup "$_u31_answer") || { _u31_off_why='bad workgroup name'; return 1; }
+    . "$_u31_lib/network_setup.sh" || { _u31_off_why='network_setup.sh missing'; return 1; }
+    _u31_config=$(usos_net_answer_config "$_u31_answer" NT4) || { _u31_off_why='profile LAN keys unreadable (duplicate ;USOS-NETWORK/IP/GATEWAY/DNS?)'; return 1; }
+    printf '%s\n' "$_u31_config" | grep -qx 'network=on' || { _u31_off_why='no ;USOS-NETWORK=on'; return 1; }
     _u31_pip=$(printf '%s\n' "$_u31_config" | awk -F= '$1=="ip"{sub(/^[^=]*=/,"");print;exit}')
     _u31_pgw=$(printf '%s\n' "$_u31_config" | awk -F= '$1=="gateway"{sub(/^[^=]*=/,"");print;exit}')
     _u31_pdns=$(printf '%s\n' "$_u31_config" | awk -F= '$1=="dns"{sub(/^[^=]*=/,"");print;exit}')
     if [ "$_u31_pip" != dhcp ]; then
         printf '%s\n' "$_u31_config" > "${TMPDIR:-/tmp}/u31cfg.$$" && usos_net_valid_config "${TMPDIR:-/tmp}/u31cfg.$$" ||
-            { rm -f "${TMPDIR:-/tmp}/u31cfg.$$"; return 1; }
+            { rm -f "${TMPDIR:-/tmp}/u31cfg.$$"; _u31_off_why="invalid static profile address ($_u31_pip gw $_u31_pgw)"; return 1; }
         rm -f "${TMPDIR:-/tmp}/u31cfg.$$"
     fi
     _u31_sys=$_u31_lib/nt3/USOSNET31.SYS _u31_sha=$_u31_lib/nt3/USOSNET31.SHA256
-    [ -r "$_u31_sys" ] && [ -r "$_u31_sha" ] || return 1
+    [ -r "$_u31_sys" ] && [ -r "$_u31_sha" ] || { _u31_off_why='USOSNET31.SYS / .SHA256 missing from this build'; return 1; }
     _u31_expected=$(awk 'NR==1{print $1}' "$_u31_sha")
-    printf '%s\n' "$_u31_expected" | grep -Eq '^[0-9a-f]{64}$' || return 1
-    _u31_actual=$(sha256sum "$_u31_sys" | awk '{print $1}') || return 1
-    [ "$_u31_actual" = "$_u31_expected" ] || return 1
-    _u31_matches=0 _u31_bdf=''
+    printf '%s\n' "$_u31_expected" | grep -Eq '^[0-9a-f]{64}$' || { _u31_off_why='bad USOSNET31.SHA256'; return 1; }
+    _u31_actual=$(sha256sum "$_u31_sys" | awk '{print $1}') || { _u31_off_why='sha256sum failed'; return 1; }
+    [ "$_u31_actual" = "$_u31_expected" ] || { _u31_off_why='USOSNET31.SYS hash mismatch'; return 1; }
+    _u31_matches=0 _u31_bdf='' _u31_seen=''
     for _u31_node in "$_u31_pci"/*; do
         [ -d "$_u31_node" ] || continue
-        case "$(cat "$_u31_node/class" 2>/dev/null)" in 0x0200*) ;; *) continue ;; esac
-        usos_nt31_supported "$(cat "$_u31_node/vendor" 2>/dev/null)" "$(cat "$_u31_node/device" 2>/dev/null)" || continue
+        _u31_class=$(cat "$_u31_node/class" 2>/dev/null || true)
+        case "$_u31_class" in 0x0200*) ;; *) continue ;; esac
+        _u31_v=$(cat "$_u31_node/vendor" 2>/dev/null || true) _u31_d=$(cat "$_u31_node/device" 2>/dev/null || true)
+        _u31_seen="$_u31_seen ${_u31_node##*/}=$_u31_v:$_u31_d"
+        usos_nt31_supported "$_u31_v" "$_u31_d" || continue
         # The slot name (sysfs: the folder name, also PCI_SLOT_NAME in uevent).
-        _u31_slot=$(awk -F= '$1=="PCI_SLOT_NAME"{print $2;exit}' "$_u31_node/uevent" 2>/dev/null)
+        _u31_slot=$(awk -F= '$1=="PCI_SLOT_NAME"{print $2;exit}' "$_u31_node/uevent" 2>/dev/null || true)
         _u31_matches=$((_u31_matches + 1)) _u31_bdf=${_u31_slot:-${_u31_node##*/}} _u31_nodepath=$_u31_node
-        _u31_dev_id=$(cat "$_u31_node/device" 2>/dev/null)
+        _u31_dev_id=$_u31_d
     done
-    [ "$_u31_matches" = 1 ] || return 1
-    printf '%s\n' "$_u31_bdf" | grep -Eq '^0000:[0-9a-fA-F]{2}:[01][0-9a-fA-F]\.[0-7]$' || return 1
+    [ "$_u31_matches" = 1 ] || { _u31_off_why="$_u31_matches supported Ethernet cards (seen:${_u31_seen:- none})"; return 1; }
+    printf '%s\n' "$_u31_bdf" | grep -Eq '^0000:[0-9a-fA-F]{2}:[01][0-9a-fA-F]\.[0-7]$' || { _u31_off_why="unexpected PCI slot name $_u31_bdf"; return 1; }
     _u31_rest=${_u31_bdf#0000:}
-    _u31_bus=$(printf '%d' "0x${_u31_rest%%:*}") || return 1
+    _u31_bus=$(printf '%d' "0x${_u31_rest%%:*}") || { _u31_off_why="bad bus in $_u31_bdf"; return 1; }
     _u31_rest=${_u31_rest#*:}
-    _u31_dev=$(printf '%d' "0x${_u31_rest%.*}") || return 1
+    _u31_dev=$(printf '%d' "0x${_u31_rest%.*}") || { _u31_off_why="bad device in $_u31_bdf"; return 1; }
     _u31_fn=${_u31_rest#*.}
     _u31_enabled=on
 }

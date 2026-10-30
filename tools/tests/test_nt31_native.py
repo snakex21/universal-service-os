@@ -107,9 +107,9 @@ class Nt31NativeInitial(unittest.TestCase):
         rc, out, err = run(['nt31_native_initial'], 'nt31_native_initial', INITIAL.encode())
         self.assertEqual(rc, 0, err)
         text = out.decode()
-        self.assertIn('    install   LoadSetupLibrary\r\n    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSANS31.EXE"\r\n', text)
+        self.assertIn('    install   LoadSetupLibrary\r\n    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSAN31.EXE"\r\n', text)
         self.assertIn('    detect    ProcessorVar\r\n    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n    ifstr(i)', text)
-        self.assertEqual(len(text), len(INITIAL) + len('    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSANS31.EXE"\r\n')
+        self.assertEqual(len(text), len(INITIAL) + len('    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSAN31.EXE"\r\n')
                          + len('    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n') + len(USOSDISK_OFF))
         # usosdisk (first-boot disk class driver, nt31_hive.zig) off right
         # after [UsosNt31Post] turns Scsidisk on.
@@ -135,7 +135,7 @@ class Nt31NativeInitial(unittest.TestCase):
         text = out.decode('latin1')
         self.assertIn('[UsosNt31Post]', text)
         self.assertEqual(text.count(';USOS-NT31-CPU'), 1)
-        self.assertEqual(text.count('USOSANS31.EXE'), 1)
+        self.assertEqual(text.count('USOSAN31.EXE'), 1)
         self.assertEqual(text.count('{{usosdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}'), 1)
         (tmp / 'body').write_bytes(out)
         subprocess.run([str(tool), 'szdd-put', str(CD / 'INITIAL.IN_'), str(tmp / 'body'), str(tmp / 'INITIAL.IN_')], check=True)
@@ -203,7 +203,7 @@ class Nt31NativeRouting(unittest.TestCase):
         awk = awk[:awk.index('"$usos/POST.CMD" >')]
         rc, out, err = run([], awk, post.encode())
         self.assertEqual(rc, 0, err)
-        self.assertEqual(out.decode(), '@echo off\r\nC:\\USOS\\NT3\\USOSNT3.EXE /polish\r\nC:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n'
+        self.assertEqual(out.decode(), '@echo off\r\nC:\\USOS\\NT3\\USOSNT3.EXE /polish\r\nC:\\USOS\\NT3\\USOSNT3.EXE /net31\r\nC:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n'
                          'echo done > C:\\USOS\\NT3\\DONE.TXT\r\n')
 
     def test_prepare_flag_covers_nt31(self):

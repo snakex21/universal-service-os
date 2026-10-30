@@ -709,7 +709,7 @@ nt31_native_initial() {
         }
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low); printf "%s\r\n", line }
         low == "detectprocessorvar" { printf "    set STF_PROCESSOR = $(ProcessorID_I586) ;USOS-NT31-CPU\r\n"; cpu++ }
-        low == "installloadsetuplibrary" { printf "    StartDetachedProcess STATUS \"\" \"\" \"C:\\USOS\\NT3\\USOSANS31.EXE\"\r\n"; ans++ }
+        low == "installloadsetuplibrary" { printf "    StartDetachedProcess STATUS \"\" \"\" \"C:\\USOS\\NT3\\USOSAN31.EXE\"\r\n"; ans++ }
         index(low, "createkey$(usossvc){{scsidisk,0,33554432}}") { pend = 1 }
         pend && low == "endif" {
             pend = 0; disk++
@@ -742,6 +742,26 @@ nt31_initial_both() {
 nt31_hardware() { ( . "$LIB/nt4_qemu_install.sh"; nt31_hardware_inf ); }
 nt31_ntlanman() { ( . "$LIB/nt4_qemu_install.sh"; nt31_ntlanman_inf ); }
 nt31_oemnadlb() { ( . "$LIB/nt4_qemu_install.sh"; nt31_oemnadlb_inf ); }
+# The answer profile's ;USOS-TZ= name (Windows 98 zone names, msbatch.zig)
+# -> the start of the matching NT 3.1 MAIN.CPL zone entry ("" = keep the
+# CD default). NT 3.1 lists one entry per offset.
+nt31_zone_prefix() {
+    case "$1" in
+        GMT|Greenwich) printf '(GMT) ' ;;
+        "Central European"|"Central Europe"|"W. Europe"|Romance|"W. Central Africa") printf '(GMT+1:00) Berlin' ;;
+        "E. Europe"|GTB|FLE) printf '(GMT+2:00) Athens' ;;
+        Egypt) printf '(GMT+2:00) Cairo' ;;
+        "South Africa") printf '(GMT+2:00) Harare' ;;
+        Israel|Jerusalem) printf '(GMT+2:00) Israel' ;;
+        Arab|"E. Africa") printf '(GMT+3:00) Baghdad' ;;
+        "US Eastern"|Eastern) printf '(GMT-5:00) Eastern' ;;
+        Central) printf '(GMT-6:00) Central' ;;
+        "US Mountain"|Mountain) printf '(GMT-7:00) Mountain' ;;
+        Pacific) printf '(GMT-8:00) Pacific' ;;
+        Tokyo) printf '(GMT+9:00) Tokyo' ;;
+        *) ;;
+    esac
+}
 # Native NT 3.1 LAN (NET31.ON): also TCP/IP in NTLANMAN.
 nt31_ntlanman_net31() { nt31_ntlanman | usos_nt31_ntlanman_tcpip; }
 
@@ -799,6 +819,9 @@ nt31_native() {
         stage_line=$(usos_nt31_stage "$work/c" "${product:-0}") || fail 'cannot stage the NT 3.1 LAN driver'
         log "$stage_line"
         NT31_NET31=net31 q_net=net
+    else
+        # The reason on the target disk too (the prep log stays on the stick).
+        printf 'network=off\r\nreason=%s\r\n' "${_u31_off_why:-not requested}" > "$usos/NET31.OFF" || fail 'cannot write NET31.OFF'
     fi
     export NT31_NET31
     nt31_native_szdd "$ls_dir/INITIAL.IN_" nt31_initial_both
@@ -816,8 +839,15 @@ nt31_native() {
     fi
     log 'native: INITIAL.IN_ (names, I586, no network/printer/apps/ERD, [UsosNt31Post], USOSANS31) + HARDWARE.IN_ patched in the local source'
     [ -r "$LIB/nt3/USOSANS31.EXE" ] || fail "missing: $LIB/nt3/USOSANS31.EXE (GUI Setup page answerer)"
-    cp "$LIB/nt3/USOSANS31.EXE" "$usos/USOSANS31.EXE" || fail 'cannot copy USOSANS31.EXE'
-    printf '[native]\r\ndomain=USOSDOMAIN\r\nworkgroup=%s\r\n' "${_u31_group:-WORKGROUP}" > "$usos/NATIVE31.INI" || fail 'cannot write NATIVE31.INI'
+    # 8.3 name: NT 3.1 FAT has no long names (USOSANS31.EXE became USOSAN~1.EXE
+    # on C:, GUI Setup could not start it; X470 2026-10-30).
+    cp "$LIB/nt3/USOSANS31.EXE" "$usos/USOSAN31.EXE" || fail 'cannot copy USOSANS31.EXE as USOSAN31.EXE'
+    # Date/Time page: the profile's zone as the prefix of the NT 3.1 MAIN.CPL
+    # list entry (3.1 has one entry per offset, e.g. "(GMT+1:00) Berlin,
+    # Paris, ..." for Central European); USOSAN31 selects it before OK.
+    tz31=$(nt31_zone_prefix "$(awk '{ sub(/\r$/, "") } /^;USOS-TZ=/ { sub(/^[^=]*=/, ""); print; exit }' "$ANSWER_SIF")")
+    printf '[native]\r\ndomain=USOSDOMAIN\r\nworkgroup=%s\r\ntz=%s\r\n' "${_u31_group:-WORKGROUP}" "$tz31" > "$usos/NATIVE31.INI" || fail 'cannot write NATIVE31.INI'
+    log "native: Date/Time zone ${tz31:-unchanged (CD default)}"
     printf 'boot_options=%s\r\n' "$NT_NATIVE_LOAD_OPTIONS" > "$usos/NATIVE.TXT" || fail 'cannot write NATIVE.TXT'
     # POST.CMD (end of GUI Setup): BOOT.INI as the VM finish step writes it
     # and the Setup leftovers removed (usosnt3 /finish31), before DONE.TXT.
@@ -841,7 +871,7 @@ nt31_native() {
     else
         log 'display: VGA (640x480x16; no USOSVBE31.SYS in this build)'
     fi
-    VESA31="$vesa31" awk -v BINMODE=3 -v net31="$NT31_NET31" '{ sub(/\r$/, "") } /^echo done > / { if (ENVIRON["VESA31"] != "") printf "%s\r\n", ENVIRON["VESA31"]; if (net31 == "net31") printf "C:\\USOS\\NT3\\USOSNT3.EXE /net31\r\n"; printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
+    VESA31="$vesa31" awk -v BINMODE=3 -v net31="$NT31_NET31" '{ sub(/\r$/, "") } /^echo done > / { if (ENVIRON["VESA31"] != "") printf "%s\r\n", ENVIRON["VESA31"]; printf "C:\\USOS\\NT3\\USOSNT3.EXE /net31\r\n"; printf "C:\\USOS\\NT3\\USOSNT3.EXE /finish31\r\n" } { printf "%s\r\n", $0 }' "$usos/POST.CMD" > "$work/post.cmd" &&
         cat "$work/post.cmd" > "$usos/POST.CMD" && grep -q 'finish31' "$usos/POST.CMD" || fail 'cannot write POST.CMD'
     log "native: NATIVE.TXT boot_options=$NT_NATIVE_LOAD_OPTIONS, POST.CMD runs USOSNT3.EXE ${vesa31:+/vesa31 + }${NT31_NET31:+/net31 + }/finish31 (BOOT.INI, leftovers)"
 }
@@ -1071,9 +1101,10 @@ if [ -n "$nt3" ]; then
         _u351_enabled=off
         . "$LIB/nt31_network_setup.sh"
         if ! usos_nt31_preflight "$work/WINNT.SIF" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}"; then
-            log 'NT31 LAN skipped: preflight refused (one I211 / 82576, verified own driver, valid profile address required); installing without network'
+            log "NT31 LAN skipped: preflight refused: ${_u31_off_why:-?}; installing without network"
             _u31_enabled=off
         fi
+        [ "${_u31_enabled:-off}" = on ] || [ -z "${_u31_off_why:-}" ] || log "NT31 LAN off: $_u31_off_why"
         [ "${_u31_enabled:-off}" != on ] || log "native NT 3.1 LAN: usosnet31 at $_u31_bdf, TCP/IP static (profile, else DHCP lease taken now, else link-local)"
     elif [ "$NATIVE" = 1 ] && [ "$major:$minor" != 3:51 ]; then
         _u351_enabled=off

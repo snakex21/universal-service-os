@@ -91,6 +91,8 @@ w9x_nt3_default_sif() {
         printf ';USOS-NT351-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
       NT35|NT35S)
         printf ';USOS-NT35-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
+      NT31|NT31S)
+        printf ';USOS-NT31-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
     esac
 }
 

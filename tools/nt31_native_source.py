@@ -96,7 +96,7 @@ def patch(data, kind, *, owner='USOS', org='USOS', computer='USOS-NT31', advance
         import re
         anchor=rb'(?im)^([ \t]*install[ \t]+LoadSetupLibrary[ \t]*\r?\n)'
         if len(re.findall(anchor,result))!=1:raise ValueError('Ambiguous GUI answerer startup anchor')
-        result=re.sub(anchor,lambda m:m[0]+b'    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSANS31.EXE"\r\n',result)
+        result=re.sub(anchor,lambda m:m[0]+b'    StartDetachedProcess STATUS "" "" "C:\\USOS\\NT3\\USOSAN31.EXE"\r\n',result)
     if not result or len(result)>MAX_SIZE: raise ValueError('Invalid patched INF')
     return pack(result,data[9:10]) if compressed else result
 
@@ -107,7 +107,7 @@ def main():
     p.add_argument('--owner',default='USOS');p.add_argument('--org',default='USOS')
     p.add_argument('--computer',default='USOS-NT31');p.add_argument('--advanced',action='store_true')
     p.add_argument('--nvme',action='store_true');p.add_argument('--shell',required=True)
-    p.add_argument('--gui-answerer',action='store_true',help='Opt-in; separately stage USOSANS31.EXE in C:\\USOS\\NT3')
+    p.add_argument('--gui-answerer',action='store_true',help='Opt-in; separately stage USOSAN31.EXE (8.3) in C:\\USOS\\NT3')
     a=p.parse_args()
     if a.input.resolve()==a.output.resolve() or a.output.exists(): raise ValueError('New separate output required; original left intact')
     result=patch(a.input.read_bytes(),a.kind,owner=a.owner,org=a.org,computer=a.computer,advanced=a.advanced,nvme=a.nvme,shell=a.shell,gui_answerer=a.gui_answerer)

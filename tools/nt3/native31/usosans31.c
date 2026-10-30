@@ -10,7 +10,7 @@
 #undef entry
 #include "gui_policy.h"
 
-static char config[MAX_PATH],domain[16],workgroup[16];
+static char config[MAX_PATH],domain[16],workgroup[16],zone[64];
 static HWND last_window;
 static DWORD last_action;
 
@@ -64,7 +64,18 @@ static BOOL CALLBACK answer_window(HWND w,LPARAM unused)
     if(!lstrcmpA(title,"Date/Time") && control(w,701,"Edit") && control(w,704,"Edit") &&
         control(w,706,"Edit") && control(w,740,"ComboBox")) {
         GetDlgItemTextA(w,706,year,sizeof year);
-        if(!nt31_year(year) || SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)==CB_ERR)return TRUE;
+        if(!nt31_year(year))return TRUE;
+        /* The profile's zone (NATIVE31.INI tz=, the start of a MAIN.CPL list
+           entry such as "(GMT+1:00) Berlin"): select it, tell the applet. */
+        if(zone[0]) {
+            LRESULT i=SendDlgItemMessageA(w,740,CB_FINDSTRING,(WPARAM)-1,(LPARAM)zone);
+            if(i!=CB_ERR && SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)!=i) {
+                SendDlgItemMessageA(w,740,CB_SETCURSEL,(WPARAM)i,0);
+                SendMessageA(w,WM_COMMAND,MAKEWPARAM(740,CBN_SELCHANGE),(LPARAM)GetDlgItem(w,740));
+                log_str("action: NT31 Date/Time zone -> profile zone\r\n");
+            }
+        }
+        if(SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)==CB_ERR)return TRUE;
         log_str("action: NT31 Date/Time -> OK (existing date and selected zone)\r\n");
     } else if(!lstrcmpA(title,"Domain Settings") && control(w,1213,"Button") &&
         control(w,1211,"Edit") && control(w,1212,"Edit")) {
@@ -104,6 +115,8 @@ void entry(void)
     GetPrivateProfileStringA("native","workgroup","WORKGROUP",configured,sizeof configured,config);
     if(!nt31_domain(configured))lstrcpyA(configured,"WORKGROUP");
     lstrcpyA(workgroup,configured);
+    GetPrivateProfileStringA("native","tz","",zone,sizeof zone,config);
+    if(zone[0]!='(')zone[0]=0;
     log_next_to_exe();CreateMutexA(NULL,TRUE,"USOSANS31");if(GetLastError()==ERROR_ALREADY_EXISTS)ExitProcess(0);
     log_str("USOSANS31 candidate: exact NT31 GUI rules; runtime unqualified\r\n");
     while(GetTickCount()-start<6UL*3600UL*1000UL && g_logged<LOG_MAX) {

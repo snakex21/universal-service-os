@@ -2480,7 +2480,7 @@ static void WINAPI netcheck_main(DWORD argc, LPSTR *argv)
  *   - Workstation: Server and Browser off (client without sharing);
  *   - the marker key removed; usosnetc (/netcheck31) registered for one
  *     silent NETCHECK.TXT at the first boot.
- * NET31.STATUS records each step. */
+ * NET31.STS (8.3) records each step. */
 #define N31_TCP SVC_KEY "NDISLoop1\\Parameters\\Tcpip"
 
 /* "key=value" of a CR LF text (value up to CR / LF); "" when missing. */
@@ -2585,7 +2585,19 @@ static void net31(void)
         return;
     }
     if (read_text("NET31.ON", meta, sizeof meta) <= 0) {
-        say("net31 off: no NET31.ON\r\n");
+        HKEY h;
+        say("net31 off: no NET31.ON (NET31.OFF has the prep reason)\r\n");
+        /* Without a network NT 3.1's NetDDE fails at every boot (event 13,
+           "NETBIOS"; the "service failed" box, X470 2026-10-30): demand
+           start then, as Network DDE needs NetBIOS. */
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NetBIOS", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            RegCloseKey(h);
+            say("NetBIOS present: NetDDE unchanged\r\n");
+        } else if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NetDDE", 0, KEY_READ | KEY_WRITE, &h) == ERROR_SUCCESS) {
+            say("no network:");
+            n31_dw(h, "Start", SERVICE_DEMAND_START);
+            RegCloseKey(h);
+        }
         return;
     }
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop", 0, KEY_READ | KEY_WRITE, &svc) != ERROR_SUCCESS ||
@@ -2685,7 +2697,7 @@ done:
     say(ok ? "net31: usosnet31 + static TCP/IP registered (readback verified); active after the restart\r\n"
            : "net31 FAILED (see above); network unproven\r\n");
     lstrcpyA(g_text, ok ? "net31=ok\r\n" : "net31=FAILED\r\n");
-    write_file("NET31.STATUS", g_text);
+    write_file("NET31.STS", g_text);
 }
 
 /* ------------------------------------------------------------------------
