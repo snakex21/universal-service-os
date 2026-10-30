@@ -26,12 +26,18 @@
 //! REGF 1.1 (the NT 3.1 hive format, measured on the user's CD template):
 //! every cell has a 4-byte "previous cell in this bin" field after its size,
 //! so the payload starts at cell + 8; nk/vk/sk/li payloads as in later
-//! versions with UTF-16 names. New cells go into new 4 KiB bins appended at
-//! the end; existing cells are only changed in place (the Services subkey
-//! list pointer and count, the Services MaxNameLen, the shared security
-//! descriptor's reference count, two inline DWORDs). The old Services 'li'
-//! cell stays allocated (unreferenced, as after a CM reallocation without
-//! free). The header length and checksum are rewritten. Anything unexpected
+//! versions with UTF-16 names. Cells of this old format are padded to 16
+//! bytes: the hive code of NT 3.1 text-mode Setup (SETUPAPP.EXE,
+//! HvIsCellAllocated) rejects a cell index that is not a multiple of 16,
+//! and its CmCheckRegistry then fails the whole template (rc 4110 on
+//! Services; X470 2026-10-30: "Setup was unable to set Windows NT
+//! configuration"). New cells go into new 4 KiB bins appended at the end;
+//! existing cells are only changed in place (the Services subkey list
+//! pointer and count, the Services MaxNameLen, the shared security
+//! descriptor's reference count, two inline DWORDs). Each replaced Services
+//! 'li' cell becomes a free cell, as HvFreeCell leaves it, so every
+//! allocated cell stays referenced. The header length and checksum are
+//! rewritten. Anything unexpected
 //! (other version, unclean hive, missing key, keys already present) writes
 //! nothing.
 //! Exit: 0 patched, 1 not a usable NT 3.1 template, 2 usage, 3 I/O error.
@@ -41,6 +47,8 @@ const lz = @import("lz.zig");
 const max_file = 4 * 1024 * 1024;
 const bin_base = 4096;
 const bin_size = 4096;
+/// HCELL_PAD of a REGF 1.1 hive (old cell format).
+const cell_pad = 16;
 const nil: u32 = 0xFFFF_FFFF;
 
 pub const Error = error{ NotTemplate, OutOfMemory, AlreadyPatched };
@@ -121,7 +129,7 @@ const Hive = struct {
 
     /// A new allocated cell with `n` payload bytes (zeroed); its hive offset.
     fn alloc(h: *Hive, n: usize) Error!u32 {
-        const size: u32 = @intCast((n + 8 + 7) & ~@as(usize, 7));
+        const size: u32 = @intCast((n + 8 + cell_pad - 1) & ~@as(usize, cell_pad - 1));
         if (size > bin_size - 32) return error.NotTemplate;
         if (h.alloc_at == 0 or h.alloc_end - h.alloc_at < size) try h.newBin();
         const off = h.alloc_at;
@@ -280,7 +288,8 @@ const Hive = struct {
         // The parent's subkey list: a new, sorted 'li' cell.
         const pnk = try h.payload(parent, 76);
         const count = rd32(h.data(), pnk + 20);
-        const old_li: ?usize = if (count == 0) null else try h.payload(rd32(h.data(), pnk + 28), 4 + 4 * @as(usize, count));
+        const old_li_off = rd32(h.data(), pnk + 28);
+        const old_li: ?usize = if (count == 0) null else try h.payload(old_li_off, 4 + 4 * @as(usize, count));
         const new_li_off = try h.alloc(4 + 4 * (@as(usize, count) + 1));
         const new_li = try h.payload(new_li_off, 4);
         d = h.data();
@@ -309,6 +318,13 @@ const Hive = struct {
         wr32(d, pnk2 + 20, count + 1);
         wr32(d, pnk2 + 28, new_li_off);
         if (rd32(d, pnk2 + 52) < 2 * name.len) wr32(d, pnk2 + 52, @intCast(2 * name.len));
+        // The replaced list becomes a free cell (positive size; its "last"
+        // field stays, the next cell's still points at it).
+        if (old_li != null) {
+            const at = @as(usize, bin_base) + old_li_off;
+            const size = std.mem.readInt(i32, d[at..][0..4], .little);
+            std.mem.writeInt(i32, d[at..][0..4], -size, .little);
+        }
         return key;
     }
 };
@@ -458,6 +474,10 @@ fn testHive(gpa: std.mem.Allocator) ![]u8 {
                 wr16(dd, lp + 2, @intCast(count + 1));
                 var i: usize = 0;
                 while (i < count) : (i += 1) wr32(dd, lp + 4 + 4 * i, rd32(dd, (try hh.payload(rd32(dd, pp + 28), 4)) + 4 + 4 * i));
+                if (count != 0) {
+                    const at = @as(usize, bin_base) + rd32(dd, pp + 28);
+                    std.mem.writeInt(i32, dd[at..][0..4], -std.mem.readInt(i32, dd[at..][0..4], .little), .little);
+                }
                 wr32(dd, lp + 4 + 4 * count, k);
                 wr32(dd, pp + 20, count + 1);
                 wr32(dd, pp + 28, li);
@@ -506,6 +526,31 @@ test "the USOS services are added in order and the hive stays consistent" {
     defer gpa.free(out);
     try std.testing.expectEqual(checksum(out), rd32(out, 508));
     try std.testing.expectEqual(@as(usize, bin_base) + rd32(out, 40), out.len);
+    // REGF 1.1: every cell at a 16-byte boundary with a 16-byte multiple
+    // size (NT 3.1 SETUPAPP HvIsCellAllocated), the bins add up, and no
+    // allocated 'li' cell is left behind unreferenced.
+    {
+        var p: usize = bin_base;
+        var lists: usize = 0;
+        while (p < out.len) {
+            try std.testing.expectEqualStrings("hbin", out[p..][0..4]);
+            const bs = rd32(out, p + 8);
+            var c = p + 32;
+            while (c < p + bs) {
+                try std.testing.expectEqual(@as(usize, 0), (c - bin_base) % cell_pad);
+                const sz = std.mem.readInt(i32, out[c..][0..4], .little);
+                const n: usize = @intCast(if (sz < 0) -sz else sz);
+                try std.testing.expect(n != 0 and n % cell_pad == 0);
+                if (sz < 0 and std.mem.eql(u8, out[c + 8 ..][0..2], "li")) lists += 1;
+                c += n;
+            }
+            try std.testing.expectEqual(p + bs, c);
+            p += bs;
+        }
+        // One live list per key with subkeys: root, ControlSet001,
+        // Services, Kbdclass, Mouclass, usosrst.
+        try std.testing.expectEqual(@as(usize, 6), lists);
+    }
     var h = Hive{ .gpa = gpa, .buf = .empty };
     defer h.buf.deinit(gpa);
     try h.buf.appendSlice(gpa, out);

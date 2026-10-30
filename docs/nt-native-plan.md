@@ -549,3 +549,26 @@ USOSANS31 GUI rules, page policy, usosnet31 candidate); the native route is
   82576-only, the X470 has an I211), usosrst 1.7-style restart/power-off
   for 3.1 (the 1.6-nt31 build stays), white boot-screen rows of the NT31
   AHCINT build.
+
+### 8.1 X470 run 1 of native NT 3.1 (B261030-141317-FD7BD00C)
+
+Text mode stopped with "Setup was unable to set Windows NT configuration"
+(F3 = Exit). In SETUPAPP.EXE that screen is shown only when
+SpConfigureRegistry returns FALSE; its first step loads
+`\WINNT\system32\config\system` (the expanded `SYSTEM._`) with the hive
+library linked into SETUPAPP (HvInitializeHive + CmCheckRegistry). Running
+that loader code of the user's SETUPAPP.EXE in unicorn (local check only,
+the MS binary never goes into git) on the staged template:
+CmCheckRegistry rc 4110 on `Services` - its new subkey list was at hive
+offset 0x1EA88. SETUPAPP's HvIsCellAllocated rejects every cell index that
+is not a multiple of 16 (`test bl, 0Fh`): REGF 1.1 has the old cell format
+with 16-byte cell padding (HCELL_PAD 16; NT 3.5+ hives use 8), and every
+cell of the CD template sits on a 16-byte boundary. `nt31_hive.zig` padded
+new cells to 8 bytes. Fix: 16-byte padding, and each replaced Services
+`li` cell is freed (a positive size, as HvFreeCell leaves it) instead of
+left allocated and unreferenced. The same SETUPAPP code now loads and
+checks the patched template (NVMe and SATA variants) without error; the
+unit test walks every bin for the alignment and for stray lists. The
+Micron (USB enclosure on the dev PC) did not answer reads on 2026-10-30,
+so the files text mode wrote were not read back.
+
