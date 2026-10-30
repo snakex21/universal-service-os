@@ -159,7 +159,7 @@ class NativeWiring(unittest.TestCase):
         early = src[src.index('static void usb_early(void)'):]
         early = early[:early.index(chr(10) + '}' + chr(10))]
         for piece in ('"\\\\drivers\\\\usosusb.sys"', 'set_dword("usosusb", NULL, "Start", 1);',
-                      'set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");',
+                      'set_sz("usosusb", "Group", REG_SZ, usb_group());',
                       'set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);',
                       'set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);'):
             self.assertIn(piece, early)

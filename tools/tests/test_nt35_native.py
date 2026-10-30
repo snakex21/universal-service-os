@@ -144,3 +144,20 @@ class BootScreenRows(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Nt35Kbdclass(unittest.TestCase):
+    """X470 2026-10-30 (B261030-125748): Kbdclass failed (7026; Kbdclass 8
+    C000000E, 7) on native NT 3.5: its kbdclass keeps the appended port
+    number after a failed connect (KeyboardPort0 = i8042prt without a PS/2
+    keyboard), so usosusb must load first and own KeyboardPort0."""
+
+    def test_usosusb_group_base_on_native_nt35(self):
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='latin-1')
+        fn = src[src.index('static const char *usb_group(void)' + NL + '{'):]
+        fn = fn[:fn.index(NL + '}' + NL)]
+        self.assertIn('native_install() && net351_version() == 50', fn)
+        self.assertIn('"Base" : "Keyboard Port"', fn)
+        self.assertEqual(src.count('set_sz("usosusb", "Group", REG_SZ, usb_group());'), 2)
+        self.assertNotIn('set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");', src)
+        self.assertIn(b'Base', (ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe').read_bytes())

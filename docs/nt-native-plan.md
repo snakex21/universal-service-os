@@ -479,3 +479,22 @@ VBIOS, which also programs the display scaler; text-mode Setup then sets its
 VBIOS, so the GPU's scaler keeps the earlier source size and shows only part
 of the screen. A fix would need an INT 10h mode set after vga.sys starts
 (own text-mode helper) or a patched vga.sys; neither is low-risk.
+
+### 7.1 X470 run 1 of native NT 3.5 (B261030-125748, read offline from the Micron)
+
+Desktop reached, LAN works (NETCHECK.TXT: DHCP lease, gateway ping, TCP to
+1.1.1.1:80; usosnet35n alive, BcPoint 12), no white boot-screen line. But
+"At least one service or driver failed" at every start and no keyboard:
+SysEvent 7026 (Kbdclass), Kbdclass 8 (could not connect, C000000E) then 7
+(no port device object); i8042prt 0x10/0x11 (no PS/2 devices); usosusb Diag
+found the keyboard (p3 K) and mouse (p4 M). Cause (own disassembly of the
+user's 3.50 KBDCLASS.SYS DriverEntry): with ConnectMultiplePorts = 1 it
+walks \Device\KeyboardPort0..N-1 (N = DEVICEMAP\KeyboardPort values) and,
+after a port whose connect fails, skips the step that removes the number it
+appended, so the next name is "KeyboardPort01". i8042prt (group Pointer
+Port, before usosusb's Keyboard Port) owns KeyboardPort0 without a PS/2
+keyboard and refuses the connect; usosusb's KeyboardPort1 was never opened,
+nothing connected, Kbdclass did not load. Fix: on native NT 3.5 usosnt3 puts
+usosusb in the "Base" group (before Pointer Port), so it owns KeyboardPort0 /
+PointerPort0; a PS/2 keyboard would still connect as port 1. The Micron was
+patched in place (SYSTEM + SYSTEM.ALT, both control sets).

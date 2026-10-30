@@ -1223,6 +1223,7 @@ static void display_profile(void)
     say("DISPLAY hardware service registered (VM defers)\r\n");
 }
 static void net351_native_post(void);
+static const char *usb_group(void);
 
 static int post(void)
 {
@@ -1282,7 +1283,7 @@ static int post(void)
     set_dword("usosusb", NULL, "Type", 1);
     set_dword("usosusb", NULL, "Start", 1);
     set_dword("usosusb", NULL, "ErrorControl", 0);
-    set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");
+    set_sz("usosusb", "Group", REG_SZ, usb_group());
     set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
     set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
     /* IDE: the VM's disk only; the real machine boots through AHCINT. */
@@ -1556,6 +1557,22 @@ static int has_ci(const char *line, int n, const char *w)
     return 0;
 }
 
+/* usosusb's service group. Native NT 3.5 (X470 2026-10-30, B261030-125748):
+ * "Base", so it loads before i8042prt ("Pointer Port") and owns
+ * \Device\KeyboardPort0 / PointerPort0. The NT 3.5 kbdclass (3.50 build,
+ * own disassembly of the user's KBDCLASS.SYS) walks KeyboardPort0..N-1 (N =
+ * values in DEVICEMAP\KeyboardPort) and, after a port whose connect fails,
+ * does not strip the number it appended: the next name becomes
+ * "KeyboardPort01". i8042prt creates KeyboardPort0 without a PS/2 keyboard
+ * and refuses the connect (C000000E), so usosusb's KeyboardPort1 was never
+ * opened, no port connected, Kbdclass failed to load (event 7026, Kbdclass
+ * 7 + 8) and there was no keyboard at all. With usosusb first, a PS/2
+ * keyboard still connects as port 1. Everything else keeps "Keyboard Port". */
+static const char *usb_group(void)
+{
+    return (native_install() && net351_version() == 50) ? "Base" : "Keyboard Port";
+}
+
 static void usb_early(void)
 {
     char sys[MAX_PATH], dst[MAX_PATH];
@@ -1573,7 +1590,7 @@ static void usb_early(void)
     set_dword("usosusb", NULL, "Type", 1);
     set_dword("usosusb", NULL, "Start", 1);
     set_dword("usosusb", NULL, "ErrorControl", 0);
-    set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");
+    set_sz("usosusb", "Group", REG_SZ, usb_group());
     set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
     set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
 }
