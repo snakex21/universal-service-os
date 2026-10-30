@@ -1375,7 +1375,7 @@ static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUC
    in a form the PRPs can carry: nothing was sent to the controller. */
 #define NVME_BADPA_STATUS 0xFFFFFFFEUL
 
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
 /* amd64 (Vista / Server 2008 x64, RAM above 4 GiB). The miniport declares
    Dma64BitAddresses, so ScsiPort hands out full 64-bit data addresses; they
    go into the PRPs unmodified (both dwords). Before anything reaches the
@@ -1389,7 +1389,11 @@ static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUC
      - a contiguous run that ends inside a page while data continues there
        (the PRP model cannot express a break inside a page);
      - more entries than one PRP list page holds.
-   The x86 builds keep their unchanged, hardware-tested inline code below.
+   The x86 builds keep their unchanged, hardware-tested inline code below,
+   except NT 3.1 (USOSNVME_PRPCHECK, usosnvme.h): its ScsiPort returns
+   SP_UNINITIALIZED_VALUE with length 0 for a data address when the
+   request has no scatter/gather list; unchecked, that became PRP1 =
+   FFFFFFFFh.
    Returns 0, else the 1-based number of the refused entry. *Above4G is set
    when any entry lies above 4 GiB. */
 static BOOLEAN NvmePaUsable(SCSI_PHYSICAL_ADDRESS Pa, ULONG Len, ULONG Need, ULONG AlignMask)
@@ -1452,7 +1456,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
 {
     NVME_SQE c;
     ULONG status;
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
     ULONG bytes = Blocks << 9, refused;
     BOOLEAN above4g = FALSE;
 #else
@@ -1479,7 +1483,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
         c.Prp2Lo = Ext->PrpListPhys.LowPart;
         c.Prp2Hi = Ext->PrpListPhys.HighPart;
     }
-#elif defined(_WIN64)
+#elif defined(USOSNVME_PRPCHECK)
     refused = NvmeBuildPrps(Ext, Srb, Va, bytes, &c, &above4g);
     if (refused != 0) {
         Ext->LastStatus = refused;
@@ -1517,6 +1521,9 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
             c.Prp2Hi = Ext->PrpListPhys.HighPart;
         }
     }
+#endif
+#ifdef USOSNVME_NT31
+    Ext->LastPrp1 = c.Prp1Lo;
 #endif
     c.Cdw10 = LbaLo;
     c.Cdw11 = LbaHi;
@@ -1606,7 +1613,7 @@ static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULON
     ULONG sct, sc;
 
     Ext->Errors++;
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
     if (Status == NVME_BADPA_STATUS) {
         /* nothing reached the controller; LastStatus = refused PRP entry */
         Ext->BadPa++;
@@ -1840,10 +1847,55 @@ static VOID NvmeIoControl(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb)
     Srb->SrbStatus = SRB_STATUS_SUCCESS;
 }
 
+#ifdef USOSNVME_NT31
+/* NT 3.1 /SOS diagnostics (2026-10-30, X470 first GUI-mode boot hung right
+   after the start line): row 10 shows every request on its way in (">")
+   and out ("<"), so a photo tells whether the disk class driver's requests
+   reach the miniport and which one does not return. Only on a /SOS boot,
+   only when the start line already mapped the VGA buffer. */
+#define NVME_IO_ROW 10
+static VOID NvmeIoRow(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Done)
+{
+    NVME_LINE l;
+    ULONG i;
+
+    if (!g_NvmeSos || Ext->Vga == NULL) return;
+    l.Len = 0;
+    LineStr(&l, "NVME io ");
+    LineDec(&l, Ext->IoSrbs);
+    LineStr(&l, Done ? " < fn " : " > fn ");
+    LineHex(&l, Srb->Function, 2);
+    LineStr(&l, " cdb ");
+    LineHex(&l, Srb->Cdb[0], 2);
+    LineStr(&l, " t");
+    LineDec(&l, Srb->TargetId);
+    LineStr(&l, " l");
+    LineDec(&l, Srb->Lun);
+    LineStr(&l, " len ");
+    LineHex(&l, Srb->DataTransferLength, 5);
+    LineStr(&l, " st ");
+    LineHex(&l, Done ? Srb->SrbStatus : 0, 2);
+    LineStr(&l, " R ");
+    LineDec(&l, Ext->Reads);
+    LineStr(&l, " E ");
+    LineDec(&l, Ext->Errors);
+    LineStr(&l, " prp ");
+    LineHex(&l, Ext->LastPrp1, 8);
+    for (i = 0; i < 80; i++) {
+        UCHAR ch = (UCHAR)(i < l.Len ? l.Text[i] : ' ');
+        Ext->Vga[NVME_IO_ROW * 80 + i] = (USHORT)(0x1F00 | ch);
+    }
+}
+#endif
+
 static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
 {
     PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
 
+#ifdef USOSNVME_NT31
+    ext->IoSrbs++;
+    NvmeIoRow(ext, Srb, FALSE);
+#endif
     switch (Srb->Function) {
     case SRB_FUNCTION_EXECUTE_SCSI:
         if (Srb->PathId != 0 || Srb->TargetId != 0 || Srb->Lun != 0) {
@@ -1929,6 +1981,9 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
         NvmeDbgCounters(ext, Srb->Function == SRB_FUNCTION_SHUTDOWN ? "shutdown" : "flush");
     }
     if ((ext->Srbs & 0x3FF) == 0) NvmeDbgCounters(ext, "io");
+#endif
+#ifdef USOSNVME_NT31
+    NvmeIoRow(ext, Srb, TRUE);
 #endif
     ScsiPortNotification(RequestComplete, ext, Srb);
     ScsiPortNotification(NextRequest, ext, NULL);

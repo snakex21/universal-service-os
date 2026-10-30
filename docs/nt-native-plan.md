@@ -650,3 +650,31 @@ If the boot gets past the banner, the code fix is needed for the native
 TXTSETUP `LoadIdentifier` value if the 3.1 INF parser keeps an embedded
 quote, or an edit of C:\BOOT.INI from the pre-boot UEFI logger, which
 would first need the firmware's FAT16 access to the MBR partition).
+
+### 8.4 X470 run 4: `/NODEBUG /SOS` - still hangs (debugger ruled out)
+
+Photo: AHCINT row 0 `43C8p- --/-- R:0 W:0 ... TM:0A7 ID:41` (its 250 ms
+ScsiPort timer still ran ~42 s in, so DPCs run and the system is not
+frozen at high IRQL; no SATA disk), usosrst 1.6-nt31 row, usosnvme row 9
+`1344:5407 NS1 488386 MiB ... OK`, no red row. Something waits for an I/O
+that never finishes, or the boot waits elsewhere.
+
+NT 3.1 SCSIPORT (local reading of the user's SCSIPORT.SYS): with level and
+vector 0 it connects no interrupt and synchronises through its own spin
+lock; after HwStartIo it queues the completion DPC itself when the miniport
+notified, so the polled completion model of AHCINT and usosnvme is
+supported (interrupt hypothesis ruled out). Data addresses: for a request
+without a scatter/gather list (no adapter object / map registers)
+ScsiPortGetPhysicalAddress returns SP_UNINITIALIZED_VALUE with length 0;
+the x86 usosnvme builds put any value into PRP1 unchecked.
+
+Diagnostic + defensive build (usosnvme NT31 only, 13568 B): every data
+address is checked as on amd64 (`USOSNVME_PRPCHECK`; a refused one fails
+the request with red row 9 "unusable data address"), and on /SOS boots row
+10 shows each request entering (`>`) and leaving (`<`) HwStartIo: SRB
+function, CDB opcode, target/LUN, length, SRB status, reads, errors, last
+PRP1. Patched onto the Micron (PATCH-261030-184215.TXT), BOOT.INI keeps
+`/NODEBUG /SOS`. Reading the next photo: no row 10 = no request reached
+usosnvme (look at Scsidisk / ScsiPort queueing, map-register allocation);
+`>` frozen = a command inside usosnvme never returns; `<` with an error
+status = the failing request.
