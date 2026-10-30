@@ -49,8 +49,19 @@ class Binary(unittest.TestCase):
         self.assertEqual(struct.unpack_from('<HH', b, opt + 48), (3, 10))
         self.assertIn('usosvbe 1.2-nt31'.encode('utf-16-le'), b)
         self.assertIn(' first='.encode('utf-16-le'), b)
+        for word in ('UsosVbeEntry', ' entry', ' isa=', ' eisa=', ' mca=', ' pci='):
+            self.assertIn(word.encode('utf-16-le'), b)
         for name in (b'memset', b'memcpy', b'__security_check_cookie', b'PsGetCurrentProcessId'):
             self.assertNotIn(name, b)
+
+    def test_nt31_driver_entry_trace_and_buses(self):
+        src = SRC.read_text(encoding='utf-8')
+        fn = body(src, 'ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)')
+        self.assertIn('static const INTERFACE_TYPE buses[] = { Isa, Eisa, MicroChannel, PCIBus };', fn)
+        self.assertIn('for (i = 0; i < 4 && st != NO_ERROR; i++) {', fn)
+        self.assertLess(fn.index('entry_cat(USOSVBE_VERSION L" entry", 0, FALSE);'), fn.index('basevideo()'))
+        _, imports = pe(SYS31)
+        self.assertIn(('ntoskrnl.exe', 'RtlWriteRegistryValue'), [(m.lower(), n) for m, n in imports])
 
     def test_nt35x_binary_untouched(self):
         # The NT 3.5 / 3.51 build (X470 PASS) is a separate file.
@@ -77,7 +88,7 @@ class Flow(unittest.TestCase):
     def test_usosnt3_vesa31(self):
         src = USOSNT3.read_text(encoding='utf-8')
         fn = body(src, 'static void vesa31(void)\n{')
-        for want in ('set_dword("usosvbe", NULL, "Start", 1);', 'set_dword("usosvbe", NULL, "Tag", 2);',
+        for want in ('set_dword("usosvbe", NULL, "Start", 0);', 'set_dword("usosvbe", NULL, "Tag", 2);',
                      'set_sz("usosvbe", "Group", REG_SZ, "Video");',
                      'RegSetValueExW(h, L"InstalledDisplayDrivers", 0, REG_MULTI_SZ',
                      'set_dword("usosvbe", "Device0", "VgaCompatible", 0);',

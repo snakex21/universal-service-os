@@ -644,12 +644,41 @@ static BOOLEAN basevideo(void)
 }
 #endif
 
+#ifdef USOSVBE_NT31
+/* Silent boot trace (NT 3.1 X470 2026-10-30: no UsosVbeModes / UsosVbeDiag
+ * at all, so nothing showed whether DriverEntry ran): Services\usosvbe
+ * UsosVbeEntry (REG_SZ) = "usosvbe 1.2-nt31 entry" + the VideoPortInitialize
+ * status per bus type tried, written with the kernel's RtlWriteRegistryValue
+ * (no device extension yet). FindAdapter then writes Device0 UsosVbeModes,
+ * the first CSRSS open Device0 UsosVbeDiag. */
+__declspec(dllimport) LONG __stdcall RtlWriteRegistryValue(ULONG RelativeTo, PWSTR Path, PWSTR ValueName,
+                                                           ULONG ValueType, PVOID ValueData, ULONG ValueLength);
+static WCHAR g_entry[96];
+static void entry_cat(const WCHAR *t, ULONG v, BOOLEAN hex)
+{
+    ULONG n = 0, k;
+    WCHAR b[8];
+    while (g_entry[n]) n++;
+    while (*t && n < 86) g_entry[n++] = *t++;
+    if (hex) {
+        for (k = 0; k < 8; k++) { ULONG dg = (v >> (28 - 4 * k)) & 15; b[k] = (WCHAR)(dg < 10 ? L'0' + dg : L'A' + dg - 10); }
+        for (k = 0; k < 8 && n < 94; k++) g_entry[n++] = b[k];
+    }
+    g_entry[n] = 0;
+    RtlWriteRegistryValue(1 /* RTL_REGISTRY_SERVICES */, L"usosvbe", L"UsosVbeEntry", 1 /* REG_SZ */, g_entry,
+                          (n + 1) * sizeof(WCHAR));
+}
+#endif
+
 ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)
 {
     VIDEO_HW_INITIALIZATION_DATA d;
     ULONG st;
 
-#ifdef USOSVBE_NT3
+#ifdef USOSVBE_NT31
+    entry_cat(USOSVBE_VERSION L" entry", 0, FALSE);
+    if (basevideo()) { entry_cat(L" basevideo", 0, FALSE); return 0xC000000EUL; }
+#elif defined(USOSVBE_NT3)
     if (basevideo()) return 0xC000000EUL;   /* STATUS_NO_SUCH_DEVICE */
 #endif
     VideoPortZeroMemory(&d, sizeof(d));
@@ -662,11 +691,28 @@ ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)
     d.HwInitialize = Initialize;
     d.HwStartIO = StartIO;
     d.HwDeviceExtensionSize = sizeof(DEVEXT);
+#ifdef USOSVBE_NT31
+    /* NT 3.1 videoprt only knows the buses NTDETECT reported (IoQuery-
+     * DeviceDescription; 3.1 has no PCIBus type): Isa, Eisa, MCA as
+     * vga.sys tries them, the first that works. */
+    {
+        static const INTERFACE_TYPE buses[] = { Isa, Eisa, MicroChannel, PCIBus };
+        static const WCHAR *const names[] = { L" isa=", L" eisa=", L" mca=", L" pci=" };
+        ULONG i;
+        st = 0xC000000EUL;
+        for (i = 0; i < 4 && st != NO_ERROR; i++) {
+            d.AdapterInterfaceType = buses[i];
+            st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
+            entry_cat(names[i], st, TRUE);
+        }
+    }
+#else
     d.AdapterInterfaceType = Isa;
     st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
     if (st != NO_ERROR) {
         d.AdapterInterfaceType = PCIBus;
         st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
     }
+#endif
     return st;
 }

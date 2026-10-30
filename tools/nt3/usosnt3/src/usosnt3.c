@@ -1430,9 +1430,7 @@ static void vesa(void)
    nt4_csmwrap_target.sh into \USOS\NT3\FRAMEBUF.DLL (NT 3.1 Setup installs
    framebuf.dll only for Dell DGX and has no expand.exe). NT 3.1 winsrv walks
    \\.\DISPLAY1.. (= \Device\Video0..) and uses the first device that has
-   InstalledDisplayDrivers; the video drivers load in Tag order of
-   GroupOrderList "Video", where vga has Tag 10, the last entry. usosvbe
-   gets Tag 2 (second entry; jazzg364, Start 4, is the only other user), so
+   InstalledDisplayDrivers. usosvbe is a boot-start driver (see below), so
    it is \Device\Video0 and vga (kept, Start 1) is Video1: the VGA-
    compatible device for full-screen consoles, and the display of the
    [VGA mode] (/basevideo) entry, where usosvbe does not start. No
@@ -1474,7 +1472,12 @@ static void vesa31(void)
     say(dst);
     say("\r\n");
     set_dword("usosvbe", NULL, "Type", 1);
-    set_dword("usosvbe", NULL, "Start", 1);
+    /* Boot start: as a system-start (Start 1) driver it never ran on NT 3.1
+       (X470 2026-10-30: no UsosVbeModes, VGA desktop), like usosusb before
+       (docs/nt31-2026-10-09.md). The loader brings videoprt.sys in as its
+       import; usosvbe then initialises with the boot drivers and is
+       \Device\Video0 ahead of vga (system start). */
+    set_dword("usosvbe", NULL, "Start", 0);
     set_dword("usosvbe", NULL, "ErrorControl", 0);
     set_dword("usosvbe", NULL, "Tag", 2);
     set_sz("usosvbe", "Group", REG_SZ, "Video");
@@ -1486,7 +1489,7 @@ static void vesa31(void)
     say(rc == ERROR_SUCCESS ? "usosvbe\\Device0 InstalledDisplayDrivers = framebuf\r\n"
                             : "usosvbe\\Device0 InstalledDisplayDrivers FAILED\r\n");
     set_dword("usosvbe", "Device0", "VgaCompatible", 0);
-    say("vesa on (NT 3.1: usosvbe Tag 2 before vga, start mode = the miniport's first mode)\r\n");
+    say("vesa on (NT 3.1: usosvbe boot start, Video0 before vga; start mode = the miniport's first mode)\r\n");
 }
 
 static int native_install(void);
