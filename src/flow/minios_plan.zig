@@ -132,6 +132,41 @@ test "menu disk handoff: config lines, bus names and the MiniOS rules" {
     try std.testing.expectError(error.InvalidDisk, appendDisk(&buffer, base, &empty));
 }
 
+/// MiniOS skips Windows Setup's edition page, so without a profile edition
+/// it decides itself: the only image; else the Pro edition (EditionID
+/// "Professional", else a name ending in " Pro"); else the first image.
+pub fn defaultImage(list: ?*const answer.editions.List) ?*const answer.editions.Image {
+    const images = (list orelse return null).slice();
+    if (images.len == 0) return null;
+    if (images.len == 1) return &images[0];
+    for (images) |*image| if (std.ascii.eqlIgnoreCase(image.edition_id.slice(), "Professional")) return image;
+    for (images) |*image| {
+        const name = image.name.slice();
+        if (name.len >= 4 and std.ascii.eqlIgnoreCase(name[name.len - 4 ..], " Pro")) return image;
+    }
+    return &images[0];
+}
+
+test "MiniOS default edition: one image, else Pro, else the first" {
+    var list: answer.editions.List = .{};
+    try std.testing.expect(defaultImage(&list) == null and defaultImage(null) == null);
+    const Entry = struct { name: []const u8, id: []const u8 };
+    const entries = [_]Entry{ .{ .name = "Windows 10 Home", .id = "Core" }, .{ .name = "Windows 10 Pro N", .id = "ProfessionalN" }, .{ .name = "Windows 10 Pro", .id = "Professional" }, .{ .name = "Windows 10 Education", .id = "Education" } };
+    for (entries, 1..) |e, i| {
+        list.items[i - 1] = .{ .index = @intCast(i) };
+        list.items[i - 1].name.set(e.name);
+        list.items[i - 1].edition_id.set(e.id);
+    }
+    list.len = 1;
+    try std.testing.expectEqual(@as(u16, 1), defaultImage(&list).?.index);
+    list.len = 4;
+    try std.testing.expectEqual(@as(u16, 3), defaultImage(&list).?.index);
+    list.items[2].edition_id.set("");
+    try std.testing.expectEqual(@as(u16, 3), defaultImage(&list).?.index);
+    list.items[2].name.set("Windows 10 Something");
+    try std.testing.expectEqual(@as(u16, 1), defaultImage(&list).?.index);
+}
+
 /// The install image MiniOS applies: the profile's edition on this ISO
 /// (MiniOS has no edition list of its own).
 pub fn imageIndex(p: *const answer.Profile, system_id: []const u8, images: ?*const answer.editions.List) ?u16 {

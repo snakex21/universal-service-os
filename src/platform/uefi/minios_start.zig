@@ -38,6 +38,11 @@ fn fallbackName(route: Route) []const u8 {
     return if (route == .mbr_csmwrap) "the Alpine preparation (CSMWrap)" else "Windows Setup";
 }
 
+/// The edition of this start ("4 Windows 10 Pro (MiniOS default)"), in
+/// every later record line.
+var edition_text: [128]u8 = undefined;
+var edition_len: usize = 0;
+
 fn record(root: *uefi.protocol.File, comptime fmt: []const u8, args: anytype) void {
     var text: [512]u8 = undefined;
     const line = std.fmt.bufPrint(&text, "USOS {s} MiniOS start: " ++ fmt ++ "\r\n", .{usos.build_info.id} ++ args) catch return;
@@ -107,7 +112,7 @@ pub fn showFailure(root: *uefi.protocol.File, err: anyerror) void {
         view.trFormat(&b, std.fmt.bufPrint(&eb, "Reason: {s}", .{reason}) catch reason),
         view.trFormat(&c, std.fmt.bufPrint(&ec, "No other preparation was started. Log on the USB drive: {s}", .{log_path}) catch log_path),
     };
-    record(root, "FAILED stage={s} reason={s}; no other preparation started (MiniOS only); back to the menu", .{ stage, reason });
+    record(root, "FAILED stage={s} reason={s} edition={s}; no other preparation started (MiniOS only); back to the menu", .{ stage, reason, edition_text[0..edition_len] });
     view.refreshFramebuffer();
     view.notice(view.tr("MiniOS did not finish"), .warning, .warning, view.tr("Windows was not installed"), &lines);
     view.waitForDismiss();
@@ -130,20 +135,25 @@ pub fn run(root: *uefi.protocol.File, route: Route, system: *const usos.catalog.
         @import("windows_media_probe.zig").readEditions(system, name, &own.list) catch break :blk null;
         break :blk &own.list;
     };
-    // The profile's edition; else (no profile, or no edition on this ISO)
-    // the edition is chosen here, from the ISO's images.
+    // The profile's edition; else MiniOS decides (it skips Setup's edition
+    // page): the only image, else Pro, else the first (plan.defaultImage).
     const from_profile: ?u16 = if (profile) |p| plan.imageIndex(p, system_id, list) else null;
-    const index = from_profile orelse switch (minios_disk.askEdition(list, shown_name)) {
-        .index => |i| i,
-        .cancelled => {
-            record(root, "edition question cancelled in the menu, nothing written; back to the menu", .{});
-            return error.MiniosDiskCancelled;
-        },
-        .none => {
+    edition_len = 0;
+    const index = from_profile orelse blk: {
+        const image = plan.defaultImage(list) orelse {
             record(root, "not started ({s}): no install image list on this ISO", .{@tagName(route)});
             return error.MiniosNeedsEdition;
-        },
+        };
+        break :blk image.index;
     };
+    {
+        var line: [160]u8 = undefined;
+        const label: []const u8 = if (list) |l| for (l.slice()) |*image| {
+            if (image.index == index) break image.label();
+        } else "?" else "?";
+        serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] edition index={d} {s} ({s})\r\n", .{ index, label, if (from_profile != null) "profile" else "MiniOS default" }) catch "[MINIOS] edition\r\n");
+        edition_len = if (std.fmt.bufPrint(&edition_text, "{d} {s} ({s})", .{ index, label, if (from_profile != null) "profile" else "MiniOS default" })) |t| t.len else |_| 0;
+    }
     var catalog = data_volume.openCatalog() catch |err| {
         record(root, "not started: DATA not readable ({s})", .{@errorName(err)});
         return err;
@@ -200,7 +210,7 @@ pub fn run(root: *uefi.protocol.File, route: Route, system: *const usos.catalog.
     };
     switch (status) {
         .success => {
-            record(root, "PASS route={s} image={d}; restarting into the new Windows", .{ @tagName(route), index });
+            record(root, "PASS route={s} edition={s}; restarting into the new Windows", .{ @tagName(route), edition_text[0..edition_len] });
             deleteFile(root, answer_path);
             uefi.system_table.runtime_services.resetSystem(.cold, .success, null);
         },
