@@ -1122,3 +1122,20 @@ write), then the same image to SYSTEM and SYSTEM.ALT. TCP/IP then starts
 without an adapter (no network, but the desktop). Alternatives: copy the
 CD's LOOP.SYS over `drivers\usnet31.sys` (same name, so no registry change),
 or at the boot menu "Last Known Good" if ControlSet002 predates `/net31`.
+
+### 8.10.4 STOP 0x0D on the X470 (fresh install 3): cause and fix
+
+User photo: STOP 0x0000000D MUTEX_LEVEL_NUMBER_VIOLATION, usnet31.sys at
+FBCA0000; return addresses map (build of 5e269ad8, image base 0x10000) to
+DriverEntry (RVA 0x2ef8, first D31Point) -> D31Point -> KeWaitForSingleObject
+(0x11d6) on g_31Mutex (0x600c), a level-0 KMUTEX (KeInitializeMutex at
+0x1191). NT 3.1 kernel mutexes carry a level; the loading thread already
+owned a higher one. Micron read (read-only): /net31 ok (NDISLoop ImagePath
+usnet31.sys, PciBus 4 / 0 / 0, the TCP/IP values and the four DWORDs), no
+NativeDiag key at all (the crash came before the first breadcrumb), no
+NETCHECK.TXT, no SYSEVENT.EVT. Fix b55cd134: busy flag instead of the mutex,
+driver rebuilt (sha256 19cfb189...). Both USNET31.SYS copies on the
+installed Micron replaced with it (registry unchanged; backup and
+\USOS\NT3\PATCH31.TXT). Date/Time was still not answered (no action line;
+the edits' text is not visible to the recorder): the page is now answered
+on title + controls, and the year, zone search and selection are logged.

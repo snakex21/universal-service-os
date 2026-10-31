@@ -63,19 +63,27 @@ static BOOL CALLBACK answer_window(HWND w,LPARAM unused)
     if(!control(w,IDOK,"Button") || !IsWindowEnabled(ok))return TRUE;
     if(!lstrcmpA(title,"Date/Time") && control(w,701,"Edit") && control(w,704,"Edit") &&
         control(w,706,"Edit") && control(w,740,"ComboBox")) {
+        /* The page is identified by its title and controls; the date and
+           time stay as the applet shows them. X470 2026-10-31: neither the
+           4-digit nor the 2-digit year check let it pass (the year edit's
+           text is not what the check expected), so the year is only logged. */
+        LRESULT found=CB_ERR,sel;
+        char line[160];
         GetDlgItemTextA(w,706,year,sizeof year);
-        if(!nt31_year(year))return TRUE;
         /* The profile's zone (NATIVE31.INI tz=, the start of a MAIN.CPL list
            entry such as "(GMT+1:00) Berlin"): select it, tell the applet. */
         if(zone[0]) {
-            LRESULT i=SendDlgItemMessageA(w,740,CB_FINDSTRING,(WPARAM)-1,(LPARAM)zone);
-            if(i!=CB_ERR && SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)!=i) {
-                SendDlgItemMessageA(w,740,CB_SETCURSEL,(WPARAM)i,0);
+            found=SendDlgItemMessageA(w,740,CB_FINDSTRING,(WPARAM)-1,(LPARAM)zone);
+            if(found!=CB_ERR && SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)!=found) {
+                SendDlgItemMessageA(w,740,CB_SETCURSEL,(WPARAM)found,0);
                 SendMessageA(w,WM_COMMAND,MAKEWPARAM(740,CBN_SELCHANGE),(LPARAM)GetDlgItem(w,740));
                 log_str("action: NT31 Date/Time zone -> profile zone\r\n");
             }
         }
-        if(SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0)==CB_ERR)return TRUE;
+        sel=SendDlgItemMessageA(w,740,CB_GETCURSEL,0,0);
+        wsprintfA(line,"NT31 Date/Time: year edit \"%.6s\" valid=%d zone found=%ld selected=%ld\r\n",
+            year,nt31_year(year),(long)found,(long)sel);
+        log_str(line);
         log_str("action: NT31 Date/Time -> OK (existing date and selected zone)\r\n");
     } else if(!lstrcmpA(title,"Domain Settings") && control(w,1213,"Button") &&
         control(w,1211,"Edit") && control(w,1212,"Edit")) {
