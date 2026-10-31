@@ -909,6 +909,26 @@ fn drawNotice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, headin
     presentFullFrame(interactive);
 }
 
+/// A full interactive frame drawn by `draw` under the menu's header (the
+/// MiniOS disk question uses the micro-Linux picker renderer). False: no
+/// graphics (console), nothing drawn.
+pub fn customFrame(context: *const anyopaque, draw: *const fn (*const anyopaque, *const Ui, gui.ui.HeaderInfo) void) bool {
+    active = .none;
+    header_clock_active = true;
+    setFooter(&.{}, "");
+    beginFullFrame();
+    var u = ui() orelse return false;
+    var clock: [48]u8 = undefined;
+    draw(context, &u, headerInfo(&clock, &u));
+    presentFullFrame(true);
+    return true;
+}
+
+/// The Ui of the visible screen (layout and hit tests of a customFrame).
+pub fn screenUi() ?Ui {
+    return ui();
+}
+
 /// Blocks until Enter, Esc or a mouse click.
 /// Like waitForDismiss, but any key or button closes the notice (the
 /// "Secure Boot must be off" notices: nothing else happens on that screen).
@@ -1052,20 +1072,29 @@ pub fn vistaCsmwrapStatus(stage: usos.flow.preparation_boot_progress.VistaCsmwra
 /// preparation page at "Preparing the disk" (CSMWrap route) or the direct
 /// ISO page, the heading naming the environment ("Windows 10 - MiniOS").
 pub fn miniosStatus(route: usos.flow.minios_plan.Route, detail: []const u8, system_name: []const u8) void {
-    var heading: [96]u8 = undefined;
-    const title = std.fmt.bufPrint(&heading, "{s} - MiniOS", .{system_name}) catch system_name;
     if (route == .gpt_uefi) {
         windowsIsoStatus(.loading, detail);
         return;
     }
     const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    miniosStage(4, Stage.labels[3], detail, system_name);
+}
+
+/// The CSMWrap route's five-stage page at `current` with the micro-Linux
+/// step's own title (vista_csmwrap_prepare.sh usos_ui_stage: "Detecting
+/// disks", "Inspecting disk", "Preparing the disk"), headed
+/// "<system> - MiniOS".
+pub fn miniosStage(current: u8, title: []const u8, detail: []const u8, system_name: []const u8) void {
+    var heading: [96]u8 = undefined;
+    const head = std.fmt.bufPrint(&heading, "{s} - MiniOS", .{system_name}) catch system_name;
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
     progress(.{
         .mode = .stage,
-        .current = 4,
+        .current = current,
         .total = @intCast(Stage.labels.len),
         .labels = &Stage.labels,
-        .heading = title,
-        .title = Stage.labels[3],
+        .heading = head,
+        .title = title,
         .detail = detail,
     });
 }

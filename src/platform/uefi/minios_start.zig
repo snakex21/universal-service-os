@@ -212,14 +212,15 @@ pub fn run(root: *uefi.protocol.File, system: *const usos.catalog.SystemEntry, s
 pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
     edition_len = if (std.fmt.bufPrint(&edition_text, "Windows Setup", .{})) |t| t.len else |_| 0;
-    var shown: [96]u8 = undefined;
-    const shown_name = std.fmt.bufPrint(&shown, "{s} (MiniOS)", .{system_name}) catch system_name;
     const source = try dataSource(root);
     const token = randomToken() catch |err| {
         record(root, "not started: no firmware RNG ({s})", .{@errorName(err)});
         return err;
     };
-    const disk = switch (minios_disk.ask(.mbr_csmwrap, shown_name)) {
+    // vista_csmwrap_prepare.sh stage 3, then its disk picker (the same
+    // renderer, minios_disk.zig) named by the system as on Alpine.
+    view.miniosStage(3, "Detecting disks", "The disk will only be changed after your confirmation.", system_name);
+    const disk = switch (minios_disk.ask(.mbr_csmwrap, system_name)) {
         .disk => |d| d,
         .cancelled => {
             record(root, "disk question cancelled in the menu, nothing written; back to the menu", .{});
@@ -236,10 +237,9 @@ pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
     try settings_store.replaceFile(root, config_path, cfg);
     deleteFile(root, answer_path);
     serial.writeAscii("[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1 mode=mbr profile=csmwrap-setup)\r\n");
-    // MiniOS runs quietly (ui=quiet): the Alpine route's stage 4 page.
-    var detail_en: [160]u8 = undefined;
-    var detail_tr: [256]u8 = undefined;
-    view.miniosStatus(.mbr_csmwrap, view.trFormat(&detail_tr, std.fmt.bufPrint(&detail_en, "Copying {s} Setup, the USOS helpers and CSMWrap to the selected disk.", .{system_name}) catch "Preparing the disk"), system_name);
+    // MiniOS runs quietly (ui=quiet, nothing on the text console): the
+    // Alpine route's stage 4 page with its own detail line.
+    view.miniosStatus(.mbr_csmwrap, "Copying the Windows PE helper and CSMWrap to the selected disk.", system_name);
     switch (try start(root, .mbr_csmwrap)) {
         .success => {},
         .cancelled => return error.MiniosCancelled,

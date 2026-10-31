@@ -1960,7 +1960,12 @@ fn stackSwitch() callconv(.naked) void {
 }
 
 pub fn main() uefi.Status {
-    var output: Output = .{ .qemu = qemuDetected() };
+    // A real machine: started by the USOS menu, whose graphical page stays
+    // up (ui=quiet). Nothing reaches the text console before USOSPREP.CFG
+    // says otherwise: X470 2026-10-31 (B261031-170724) printed the first
+    // log lines (BEGIN, CPU, ENTROPY, CONFIG) over the menu's page.
+    const qemu = qemuDetected();
+    var output: Output = .{ .qemu = qemu, .quiet = !qemu };
     if (uefi.system_table.boot_services) |bs| {
         output.serial = bs.locateProtocol(uefi.protocol.SerialIo, null) catch null;
         if (output.serial) |serial| {

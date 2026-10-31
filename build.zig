@@ -500,6 +500,15 @@ fn addInteractiveX86UefiApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *
     });
     app_module.addImport("usos", usos_module);
     app_module.addImport("ps2_mouse", ps2_mouse_module);
+    // The micro-Linux choice-menu renderer (pure gui code): the MiniOS disk
+    // question in the menu draws exactly the Alpine route's disk picker.
+    const fb_menu_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux/fb_menu_render.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    fb_menu_module.addImport("usos", usos_module);
+    app_module.addImport("fb_menu", fb_menu_module);
 
     const app = b.addExecutable(.{
         .name = "usos-x86_64",

@@ -18,12 +18,36 @@ fn hex(text: []const u8) !u64 {
     return std.fmt.parseInt(u64, text, 16) catch error.CorruptCpio;
 }
 /// Reads the flat helper archives the Alpine route unpacks with `cpio -idm`.
+/// The release archives (tools/build_windows_native_support.py NewcWriter)
+/// have no TRAILER!!! entry: Core appends one when it sends them, and the
+/// micro-Linux `cpio -idm` reads the files as they are. Their end is the
+/// end of the last entry (optionally zero padding), as for cpio.
 pub fn listCpio(archive: update.Source, out: []CpioFile) !usize {
     var at: u64 = 0;
     var count: usize = 0;
-    while (at + 110 <= archive.size) {
+    while (at < archive.size) {
+        if (archive.size - at < 110) {
+            // Only zero padding may follow the last entry.
+            var tail: [110]u8 = undefined;
+            const rest: usize = @intCast(archive.size - at);
+            try archive.read_fn(archive.context, at, tail[0..rest]);
+            if (!std.mem.allEqual(u8, tail[0..rest], 0)) return error.CorruptCpio;
+            return count;
+        }
         var h: [110]u8 = undefined;
         try archive.read_fn(archive.context, at, &h);
+        if (std.mem.allEqual(u8, &h, 0)) {
+            // Zero padding after the last entry (block-padded archives).
+            var rest = at + h.len;
+            var chunk: [512]u8 = undefined;
+            while (rest < archive.size) {
+                const n: usize = @intCast(@min(chunk.len, archive.size - rest));
+                try archive.read_fn(archive.context, rest, chunk[0..n]);
+                if (!std.mem.allEqual(u8, chunk[0..n], 0)) return error.CorruptCpio;
+                rest += n;
+            }
+            return count;
+        }
         if (!std.mem.eql(u8, h[0..6], "070701") and !std.mem.eql(u8, h[0..6], "070702")) return error.CorruptCpio;
         const mode = try hex(h[14..22]);
         const size = try hex(h[54..62]);
@@ -52,9 +76,11 @@ pub fn listCpio(archive: update.Source, out: []CpioFile) !usize {
             out[i] = .{ .name = undefined, .name_len = base.len, .offset = data, .size = size };
             @memcpy(out[i].name[0..base.len], base);
         }
+        // The last entry's data may end the file without the 4-byte pad.
+        if (data + size >= archive.size) return count;
         at = (data + size + 3) & ~@as(u64, 3);
     }
-    return error.CorruptCpio;
+    return count;
 }
 
 pub const Request = struct {
@@ -281,6 +307,67 @@ const NtfsMemory = struct {
         return .{ .context = self, .sectors = self.bytes.len / 512, .read_fn = read, .write_fn = write, .flush_fn = flush };
     }
 };
+
+test "helper archives without TRAILER (the release support.cpio / modern-support.cpio) are read" {
+    // X470 2026-10-31 B261031-170724: "USOSPREP UEFI FAIL CorruptCpio" at
+    // stage=target disk: the release archives end after the last file
+    // (NewcWriter writes no trailer; Core appends one when it sends them).
+    const a = testing.allocator;
+    var bare: std.ArrayList(u8) = .empty;
+    defer bare.deinit(a);
+    try cpioEntry(&bare, "usos-x86-csmwrap.cmd", "@echo off", 0o100644);
+    try cpioEntry(&bare, "usosnvme-nt6.sys", "NVME", 0o100644);
+    var listed: [8]CpioFile = undefined;
+    var m: update.Mem = .{ .bytes = bare.items };
+    try testing.expectEqual(@as(usize, 2), try listCpio(m.src(), &listed));
+    try testing.expectEqualStrings("usosnvme-nt6.sys", listed[1].name[0..listed[1].name_len]);
+    try testing.expectEqual(@as(u64, 4), listed[1].size);
+    // The last file's data unpadded at the very end ("@echo off" = 9 bytes).
+    var unpadded: std.ArrayList(u8) = .empty;
+    defer unpadded.deinit(a);
+    try cpioEntry(&unpadded, "a.cmd", "@echo off", 0o100644);
+    unpadded.shrinkRetainingCapacity(unpadded.items.len - 3);
+    m = .{ .bytes = unpadded.items };
+    try testing.expectEqual(@as(usize, 1), try listCpio(m.src(), &listed));
+    // Zero block padding after the last entry, short or long.
+    for ([_]usize{ 4, 108, 512, 1500 }) |pad| {
+        var padded: std.ArrayList(u8) = .empty;
+        defer padded.deinit(a);
+        try cpioEntry(&padded, "a.cmd", "x", 0o100644);
+        try padded.appendNTimes(a, 0, pad);
+        m = .{ .bytes = padded.items };
+        try testing.expectEqual(@as(usize, 1), try listCpio(m.src(), &listed));
+    }
+    // Anything else after the last entry is still corrupt.
+    var junk: std.ArrayList(u8) = .empty;
+    defer junk.deinit(a);
+    try cpioEntry(&junk, "a.cmd", "x", 0o100644);
+    try junk.appendSlice(a, "garbage");
+    m = .{ .bytes = junk.items };
+    try testing.expectError(error.CorruptCpio, listCpio(m.src(), &listed));
+    try junk.appendNTimes(a, 'z', 200);
+    m = .{ .bytes = junk.items };
+    try testing.expectError(error.CorruptCpio, listCpio(m.src(), &listed));
+    // A data size past the end is corrupt too.
+    var short: std.ArrayList(u8) = .empty;
+    defer short.deinit(a);
+    try cpioEntry(&short, "a.cmd", "12345678", 0o100644);
+    short.shrinkRetainingCapacity(short.items.len - 6);
+    m = .{ .bytes = short.items };
+    try testing.expectError(error.CorruptCpio, listCpio(m.src(), &listed));
+    // The injection builds from trailer-less archives as well.
+    var support: std.ArrayList(u8) = .empty;
+    defer support.deinit(a);
+    try cpioEntry(&support, "winpeshl.ini", "old", 0o100644);
+    var helpers: std.ArrayList(u8) = .empty;
+    defer helpers.deinit(a);
+    for ([_][2][]const u8{ .{ "usos-x86-csmwrap.exe", "MZ" }, .{ "usos-x86-csmwrap.cmd", "@echo off" }, .{ "winpeshl.ini", "[LaunchApps]" } }) |f| try cpioEntry(&helpers, f[0], f[1], 0o100644);
+    var s1: update.Mem = .{ .bytes = support.items };
+    var s2: update.Mem = .{ .bytes = helpers.items };
+    var inj: Injection = .{};
+    try inj.build(.{ .support = s1.src(), .helpers = s2.src(), .source_ini = "s", .target_ini = "t" });
+    try testing.expectEqual(@as(usize, 6), inj.list().len);
+}
 
 test "PE10 injection: helper archives, flags, answer and the stornvme swap land in staging boot.wim" {
     const a = testing.allocator;
