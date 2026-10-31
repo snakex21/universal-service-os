@@ -771,7 +771,7 @@ fn showError(title: []const u8, err: anyerror) void {
         error.NoLinuxEntry => view.t(.error_linux_no_entry),
         error.HelperMissing => view.t(.error_linux_helper),
         error.XpPackageMissing => view.t(.xp_prep_package_missing),
-        error.MicroLinuxMissing => view.t(.minios_no_alpine),
+        error.MicroLinuxMissing => view.tr("This USB drive has no micro-Linux preparation environment (MiniOS-only test). A normal USOS update restores it."),
         else => view.t(.error_stopped),
     };
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };

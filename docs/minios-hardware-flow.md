@@ -182,7 +182,7 @@ BIOS boot files are copied at run time from the applied Windows image.
   `EFI\USOS\micro-linux\vmlinuz-virt`, `initramfs-usos` and `qemu9x.cpio`
   from the stick ESP and records it in `EFI\USOS\minios-only.txt`; every
   micro-Linux start then shows "This USB drive has no micro-Linux
-  preparation environment" (boot.minios.no_alpine) instead. The next normal
+  preparation environment" (boot.lx.minios_no_alpine) instead. The next normal
   deploy writes the full payload again (the updater rewrites every payload
   file) and removes the marker.
 - First X470 run (B261031-144307): MiniOS refused the DATA volume

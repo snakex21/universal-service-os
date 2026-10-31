@@ -95,17 +95,21 @@ pub fn showFailure(root: *uefi.protocol.File, err: anyerror) void {
     } else |_| {}
     var log_buf: [96]u8 = undefined;
     const log_path = std.fmt.bufPrint(&log_buf, "EFI\\USOS\\Logs\\MINIOS-{s}.LOG", .{usos.build_info.id}) catch "EFI\\USOS\\Logs";
+    // boot.lx.minios_* (the micro-Linux table: not in the Legacy Core).
     var a: [160]u8 = undefined;
     var b: [160]u8 = undefined;
     var c: [256]u8 = undefined;
+    var ea: [96]u8 = undefined;
+    var eb: [96]u8 = undefined;
+    var ec: [160]u8 = undefined;
     const lines = [_][]const u8{
-        view.format(&a, .minios_failed_stage, &.{stage}),
-        view.format(&b, .minios_failed_reason, &.{reason}),
-        view.format(&c, .minios_failed_log, &.{log_path}),
+        view.trFormat(&a, std.fmt.bufPrint(&ea, "Stage: {s}", .{stage}) catch stage),
+        view.trFormat(&b, std.fmt.bufPrint(&eb, "Reason: {s}", .{reason}) catch reason),
+        view.trFormat(&c, std.fmt.bufPrint(&ec, "No other preparation was started. Log on the USB drive: {s}", .{log_path}) catch log_path),
     };
     record(root, "FAILED stage={s} reason={s}; no other preparation started (MiniOS only); back to the menu", .{ stage, reason });
     view.refreshFramebuffer();
-    view.notice(view.t(.minios_failed_title), .warning, .warning, view.t(.minios_failed_heading), &lines);
+    view.notice(view.tr("MiniOS did not finish"), .warning, .warning, view.tr("Windows was not installed"), &lines);
     view.waitForDismiss();
 }
 

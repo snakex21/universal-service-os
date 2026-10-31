@@ -206,12 +206,6 @@ pub const Key = enum(u16) {
     methods_none,
     methods_subtitle,
     methods_title,
-    minios_failed_heading,
-    minios_failed_log,
-    minios_failed_reason,
-    minios_failed_stage,
-    minios_failed_title,
-    minios_no_alpine,
     notice_no_image_line1,
     notice_no_image_title,
     power_apm_line1,
@@ -1051,12 +1045,6 @@ pub const hashes = [_]u32{
     0x9593c94b, // methods.none
     0x88241669, // methods.subtitle
     0x616e0619, // methods.title
-    0x7943dcee, // minios.failed_heading
-    0x3d559b52, // minios.failed_log
-    0xc105518c, // minios.failed_reason
-    0x46a3d7ee, // minios.failed_stage
-    0x3d70fba6, // minios.failed_title
-    0x0cdebca5, // minios.no_alpine
     0xe2e6f917, // notice.no_image.line1
     0x2b57a9a0, // notice.no_image.title
     0x4542418f, // power.apm.line1
@@ -2027,12 +2015,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
     false,
     false,
     false,
@@ -2536,7 +2518,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 341;
+pub const bios_count = 335;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2743,12 +2725,6 @@ pub const english = [_][]const u8{
     "No boot methods are configured for this system.",
     "Choose how the selected image should be started",
     "Boot method",
-    "Windows was not installed",
-    "No other preparation was started. Log on the USB drive: {0}",
-    "Reason: {0}",
-    "Stage: {0}",
-    "MiniOS did not finish",
-    "This USB drive has no micro-Linux preparation environment (MiniOS-only test). A normal USOS update restores it.",
     "No supported image files were found. Copy a file to:",
     "No images found",
     "APM power-off is unavailable on this computer.",
