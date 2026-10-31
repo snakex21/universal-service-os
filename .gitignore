@@ -85,3 +85,9 @@ tools/WinDDK71/
 # Secure Boot signing key in data\signing) never enters the repository.
 /data/
 installer/data/
+
+# Local MiniOS preflight compiler caches and complete private transcripts.
+/runtime/preflight-index/
+
+# Local test data and evidence; never publish payloads or images.
+/runtime/

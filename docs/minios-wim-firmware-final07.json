@@ -1,0 +1,662 @@
+{
+  "schema": "minios-wim-firmware-final07-evidence-v1",
+  "scope": "QEMU only; final07 firmware; no physical media or deploy",
+  "core_source_commit": "836e5ae9",
+  "oracle_source_commit": "8bd962ca",
+  "firmware_cases": [
+    {
+      "name": "fw07-large-x64-xpress-64",
+      "arch": "x86_64",
+      "partition_kind": "gpt",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "source_wim_sha256": "208aa2fa29b6d8f010d1ecbd921f0695e8cf0eee7ac408df923d8007fb18d9f9",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 1711788,
+        "physical_heap": null,
+        "conservative_own_bytes": 2068140,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 36.1803046999994,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-x64-xpress-64/completed.json",
+        "sha256": "87f1fe2986a6fd3d5189c6073f355d1792ffc557afd2db642ee4bd1d0424418c"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-x64-xpress-64/windows-completed.json",
+        "sha256": "40faaa60569ebd54422043e7134ff6dff65761be6b5677b5a42eb4b1919dd4e5"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-x64-xpress-64/windows-oracle/result.json",
+        "sha256": "0591dc3ca2fda0ca66394834efa62594193ee49553ef30b849598bbb13975fcf"
+      }
+    },
+    {
+      "name": "fw07-large-ia32-xpress-64",
+      "arch": "ia32",
+      "partition_kind": "gpt",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "source_wim_sha256": "208aa2fa29b6d8f010d1ecbd921f0695e8cf0eee7ac408df923d8007fb18d9f9",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 1711332,
+        "physical_heap": null,
+        "conservative_own_bytes": 2055396,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 46.827053900000465,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-xpress-64/completed.json",
+        "sha256": "c844c86652ce1d760f0695fefc5c8acdefffb958b9db97e50be8b44ce079373e"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-xpress-64/windows-completed.json",
+        "sha256": "60dcc864614d57117285c5c17f8e72caed784994185245334521004390919856"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-ia32-xpress-64/windows-oracle/result.json",
+        "sha256": "b5ece1d0ca48972afe61176cd9ce2144d6ad5e71f866b756b7ec74c3e7c136ac"
+      }
+    },
+    {
+      "name": "fw07-large-x64-lzx-64",
+      "arch": "x86_64",
+      "partition_kind": "mbr",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "source_wim_sha256": "bfc70793bfcc2eab64f09b02f7cef050d07e65502d17bcbf8a0145c3aac46574",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 1723416,
+        "physical_heap": null,
+        "conservative_own_bytes": 2079768,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 39.65341350000381,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-x64-lzx-64/completed.json",
+        "sha256": "616df7c4cffb027a5af39e2480c486e5bb82ce0168e27b47e9394820a1202668"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-x64-lzx-64/windows-completed.json",
+        "sha256": "d8fd589f30b090bcc73a2f18ff6c92df1ab98938c2d01a2fa00d899919d96367"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-x64-lzx-64/windows-oracle/result.json",
+        "sha256": "e3fa713e06b185215060cfe75f48ad11c1d5412e305b0dd2eab19aff324b3b5a"
+      }
+    },
+    {
+      "name": "fw07-large-x64-lzms-64",
+      "arch": "x86_64",
+      "partition_kind": "gpt",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "13667e52e68ff7f5fcd9144d43c7a53aafeefc28abca47c3c79021497e88e5c8",
+      "source_wim_sha256": "74ad02c85060ec8550c56267cd8a3c8577c36a0fb174894443923b4e6a0fd31a",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 2362848,
+        "physical_heap": null,
+        "conservative_own_bytes": 2719200,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 44.94872049999685,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-x64-lzms-64/completed.json",
+        "sha256": "d1733d957a3ee7f70839d02ccdaed297c8875ce8af1834cd691ffb988a9d7921"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-x64-lzms-64/windows-completed.json",
+        "sha256": "5d7cbc320b210f93d64b00e7476260a79937d00627584afc79f7b4edcfa2fbdc"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-x64-lzms-64/windows-oracle/result.json",
+        "sha256": "1ede702c4a5b11566d116c34b17f1ff63a06fc185ce95e6c90409c9177ff0273"
+      }
+    },
+    {
+      "name": "fw07-large-ia32-lzx-64",
+      "arch": "ia32",
+      "partition_kind": "mbr",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "source_wim_sha256": "bfc70793bfcc2eab64f09b02f7cef050d07e65502d17bcbf8a0145c3aac46574",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 1722960,
+        "physical_heap": null,
+        "conservative_own_bytes": 2067024,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 48.85336030000326,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-lzx-64/completed.json",
+        "sha256": "e305660d463c95df11d58b69f7f91b9d88ce35a407c613f745d250668cfc4ec7"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-lzx-64/windows-completed.json",
+        "sha256": "07ade044b25630c8d4388b08fb6a68e23b2a8cbace7e99be693f5dcce89d25d9"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-ia32-lzx-64/windows-oracle/result.json",
+        "sha256": "60eaaace95eadaa521f9c47a3afc615cdad6273b5b597428f45c3d196020c7e7"
+      }
+    },
+    {
+      "name": "fw07-large-ia32-lzms-64",
+      "arch": "ia32",
+      "partition_kind": "gpt",
+      "cpu": "max",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 1208,
+        "directories": 20
+      },
+      "program_sha256": "4984b7a52cdc93d2d14c622d5ef3d2a5cc88092eb01324e278fe19550d1de9b7",
+      "source_wim_sha256": "74ad02c85060ec8550c56267cd8a3c8577c36a0fb174894443923b4e6a0fd31a",
+      "target_bytes": 268435456,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 2362392,
+        "physical_heap": null,
+        "conservative_own_bytes": 2706456,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 56.24308759999985,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-lzms-64/completed.json",
+        "sha256": "8b553e502500092527ac417e586a35d246bd52e1b53e76b4a32eb34a19f4ad61"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-large-ia32-lzms-64/windows-completed.json",
+        "sha256": "e532dcaad1dc81e2524af035be95ac545d153db42d872ac26221b6288303625d"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-large-ia32-lzms-64/windows-oracle/result.json",
+        "sha256": "293ff79820b6141cb5cd02a6a60257b8c51bee6369387c37175cc97b77c36602"
+      }
+    },
+    {
+      "name": "fw07-bios-xpress-64",
+      "arch": "bios",
+      "partition_kind": "gpt",
+      "cpu": "486",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 391,
+        "directories": 20
+      },
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "source_wim_sha256": "a64f469791de432c43c331534411bf59f476f55637906fedf3a8f388b1e73bc6",
+      "target_bytes": 134217728,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 11.62915090000024,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-bios-xpress-64/completed.json",
+        "sha256": "f5870321fb7430db201bd9fba5778232f7ef6dbd43e74a191837f661144c7102"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-bios-xpress-64/windows-completed.json",
+        "sha256": "4ed629f4150b255fe70280466c1ef48bbe65d0e87ba575aa22ea13666c2a6e61"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-bios-xpress-64/windows-oracle/result.json",
+        "sha256": "ae6b9b6628c31195a6f9f8e0ff01194015c1b0e11137117983973d853d049c45"
+      }
+    },
+    {
+      "name": "fw07-bios-lzx-64",
+      "arch": "bios",
+      "partition_kind": "mbr",
+      "cpu": "486",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 391,
+        "directories": 20
+      },
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "source_wim_sha256": "64c09433f86a925ac1c02b5dd2f80914ccff32215ecaa162fbe8edd8eb7b96f0",
+      "target_bytes": 134217728,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 654720,
+        "physical_heap": {
+          "current": 0,
+          "peak": 655140,
+          "extent_peak": 656420,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 11.628501099999994,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-bios-lzx-64/completed.json",
+        "sha256": "a747e0da697a12d9f22780a4ffffa40d1fdebbddff12be7365121ee57c7457d5"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-bios-lzx-64/windows-completed.json",
+        "sha256": "36f7bc8a4d8e8d4c09f2a6025d11eda18933165f753ad6b1ddbd162895e3a033"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-bios-lzx-64/windows-oracle/result.json",
+        "sha256": "d8e3a706292f0ad0b6006c2680f2c40848e5a3bf1f8082edf763bdcf0daaccd2"
+      }
+    },
+    {
+      "name": "fw07-bios-lzms-64",
+      "arch": "bios",
+      "partition_kind": "gpt",
+      "cpu": "486",
+      "physical_vm_ram_mib": 64,
+      "input_counts": {
+        "files": 391,
+        "directories": 20
+      },
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "source_wim_sha256": "89924f7bb17f9e9a3814a6452f709617ee0fccf47ede70d057790fe9a7968435",
+      "target_bytes": 134217728,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 1294152,
+        "physical_heap": {
+          "current": 0,
+          "peak": 1294572,
+          "extent_peak": 1295852,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 11.646843000002264,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-bios-lzms-64/completed.json",
+        "sha256": "52df479d38675b24925d6681849548d6731eb0fd00f4a3df5db70fa2ec39d6f8"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-bios-lzms-64/windows-completed.json",
+        "sha256": "9f7abcac7a141614df856c1dc6c8967ab78efadbc8dd3e3e0b9192b920a0a2d7"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-bios-lzms-64/windows-oracle/result.json",
+        "sha256": "609eef73331416e440c084b05840a2e70b915721b330b331db7486e2245fde9d"
+      }
+    },
+    {
+      "name": "fw07-bios-486-xpress-32",
+      "arch": "bios",
+      "partition_kind": "gpt",
+      "cpu": "486",
+      "physical_vm_ram_mib": 32,
+      "input_counts": {
+        "files": 391,
+        "directories": 20
+      },
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "source_wim_sha256": "a64f469791de432c43c331534411bf59f476f55637906fedf3a8f388b1e73bc6",
+      "target_bytes": 134217728,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 10.452800200000638,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-bios-486-xpress-32/completed.json",
+        "sha256": "a7f5a34e5420e9e2b50ccbc934316cc212e0568c3daad09419051b27c6911dba"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-bios-486-xpress-32/windows-completed.json",
+        "sha256": "37caaaadd21cfd56c7748262520fdd549578d42fb39cbf2653d8f5e5801fc324"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-bios-486-xpress-32/windows-oracle/result.json",
+        "sha256": "f94ad98770fc506b4e8d287c01f3b34fbc208264a91ee78aabae7d3893541bc2"
+      }
+    },
+    {
+      "name": "fw07-bios-pentium-xpress-32",
+      "arch": "bios",
+      "partition_kind": "gpt",
+      "cpu": "pentium",
+      "physical_vm_ram_mib": 32,
+      "input_counts": {
+        "files": 391,
+        "directories": 20
+      },
+      "program_sha256": "75b426813a82f1db464cd10552317522fa2d8c879cf5f87f9e2a5da04281416e",
+      "source_wim_sha256": "a64f469791de432c43c331534411bf59f476f55637906fedf3a8f388b1e73bc6",
+      "target_bytes": 134217728,
+      "application_pass": true,
+      "native_windows_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "bases_unchanged": true,
+      "own_memory": {
+        "allocator_peak": 643092,
+        "physical_heap": {
+          "current": 0,
+          "peak": 643512,
+          "extent_peak": 644792,
+          "reserved": 12582912
+        },
+        "conservative_own_bytes": 13173568,
+        "firmware_excluded": true
+      },
+      "guest_and_closed_export_seconds": 10.523236000000907,
+      "application_receipt": {
+        "path": "firmware-tests/fw07-bios-pentium-xpress-32/completed.json",
+        "sha256": "1a90281b05b240ecc2eb6dc53139c6907bea49470ef1bca142925c60e782c4c9"
+      },
+      "windows_receipt": {
+        "path": "firmware-tests/fw07-bios-pentium-xpress-32/windows-completed.json",
+        "sha256": "320635fafe4429aa19b936d158906f265277266f081e109cd09e617e0c806233"
+      },
+      "native_result": {
+        "path": "firmware-tests/fw07-bios-pentium-xpress-32/windows-oracle/result.json",
+        "sha256": "020f0e470c75a25011bbcb22e0534d3772b13cb9c1856c74c6cc0609545a671d"
+      }
+    }
+  ],
+  "all11_application_and_native_windows_pass": true,
+  "ram_minima": [
+    {
+      "arch": "x64",
+      "lowest_pass_mib": 49,
+      "next_lower_fail_mib": 48,
+      "resolution_mib": 1,
+      "lower_failure": "USOSPREP TERMINAL FAIL stack-allocation, exit35, before WIM apply",
+      "workload": "set02large LZMS non-solid; 1,208 files and 20 directories; largest file 134,217,851 B",
+      "own_memory_at_minimum": {
+        "allocator_peak": 2362848,
+        "physical_heap": null,
+        "conservative_own_bytes": 2719200,
+        "firmware_excluded": true
+      },
+      "minimum_native_windows_pass": true,
+      "minimum_native_result": {
+        "path": "ram-windows-final07/x64/windows01/result.json",
+        "sha256": "d38d6c7e0bdb51d3e4a5c7c19ae11ddac73d9324b52c5607dcd5f9f5d1cf323d"
+      },
+      "winner_receipt": {
+        "path": "ram-final07/x64-m049/completed.json",
+        "sha256": "ae00e33d0016c8724da1e7908879819ca7c77df4357fd0ee2fc59a70ca18b5d8"
+      },
+      "lower_receipt": {
+        "path": "ram-final07/x64-m048/completed.json",
+        "sha256": "92a5fd3e326d080736e95768f3dc50e99be9faffb2240b44e2b2e4117aca2526"
+      },
+      "lower_serial_log": {
+        "path": "ram-final07/x64-m048/serial.log",
+        "sha256": "ff97c5b187dc2b95ce9ba0835020888f84e3e9b57a99715e9afd830e6b4048ea"
+      },
+      "probes": [
+        {
+          "memory_mib": 32,
+          "application_pass": false,
+          "returncode": 1,
+          "timed_out": true,
+          "receipt": {
+            "path": "ram-final07/x64-m032/completed.json",
+            "sha256": "855c063f52d1d9d5ef1d7760dbe86f80c3c6e8e007d0347ec5dcc131d91000e6"
+          }
+        },
+        {
+          "memory_mib": 48,
+          "application_pass": false,
+          "returncode": 35,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/x64-m048/completed.json",
+            "sha256": "92a5fd3e326d080736e95768f3dc50e99be9faffb2240b44e2b2e4117aca2526"
+          }
+        },
+        {
+          "memory_mib": 56,
+          "application_pass": true,
+          "returncode": 33,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/x64-m056/completed.json",
+            "sha256": "17de219fecb71f1eb94001583138a229570edac24556d8b21786271abe26d34e"
+          }
+        },
+        {
+          "memory_mib": 52,
+          "application_pass": true,
+          "returncode": 33,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/x64-m052/completed.json",
+            "sha256": "e7efd667f7875c1b94de50e15fffed3f2caa09712f1de7aeae71b24e1eceffc6"
+          }
+        },
+        {
+          "memory_mib": 50,
+          "application_pass": true,
+          "returncode": 33,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/x64-m050/completed.json",
+            "sha256": "7b1aef64f248394adb4222715f622a8d72749b57d3c86be0c2fbeba2196756e6"
+          }
+        },
+        {
+          "memory_mib": 49,
+          "application_pass": true,
+          "returncode": 33,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/x64-m049/completed.json",
+            "sha256": "ae00e33d0016c8724da1e7908879819ca7c77df4357fd0ee2fc59a70ca18b5d8"
+          }
+        }
+      ]
+    },
+    {
+      "arch": "ia32",
+      "lowest_pass_mib": 48,
+      "next_lower_fail_mib": 47,
+      "resolution_mib": 1,
+      "lower_failure": "USOSPREP TERMINAL FAIL stack-allocation, exit35, before WIM apply",
+      "workload": "set02large LZMS non-solid; 1,208 files and 20 directories; largest file 134,217,851 B",
+      "own_memory_at_minimum": {
+        "allocator_peak": 2362392,
+        "physical_heap": null,
+        "conservative_own_bytes": 2706456,
+        "firmware_excluded": true
+      },
+      "minimum_native_windows_pass": true,
+      "minimum_native_result": {
+        "path": "ram-windows-final07/ia32/windows01/result.json",
+        "sha256": "bf19c2c3a3aee82306444db5a6c1b18a874f2649f89874a7dc1b8932d5e9b1da"
+      },
+      "winner_receipt": {
+        "path": "ram-final07/ia32-m048/completed.json",
+        "sha256": "bbacb2961de53d5d841c95f695c706704e053fe095011e85240d82356cc13622"
+      },
+      "lower_receipt": {
+        "path": "ram-final07/ia32-m047/completed.json",
+        "sha256": "847758765d78bead2afa1bdf8f3ef898a2e9db104d6a32f542c60ab14d25bfe0"
+      },
+      "lower_serial_log": {
+        "path": "ram-final07/ia32-m047/serial.log",
+        "sha256": "af9f1656cef24d833c8364879530be018679b8db9f2c37b16487045ec159df3e"
+      },
+      "probes": [
+        {
+          "memory_mib": 32,
+          "application_pass": false,
+          "returncode": 1,
+          "timed_out": true,
+          "receipt": {
+            "path": "ram-final07/ia32-m032/completed.json",
+            "sha256": "4472bd47fc8a8a23ea0c478e4125ada9541af70f4d5730f84a370072254413c6"
+          }
+        },
+        {
+          "memory_mib": 48,
+          "application_pass": true,
+          "returncode": 33,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/ia32-m048/completed.json",
+            "sha256": "bbacb2961de53d5d841c95f695c706704e053fe095011e85240d82356cc13622"
+          }
+        },
+        {
+          "memory_mib": 40,
+          "application_pass": false,
+          "returncode": 1,
+          "timed_out": true,
+          "receipt": {
+            "path": "ram-final07/ia32-m040/completed.json",
+            "sha256": "55ee107fdfcb436035afb9411155b69933c691b5483db40e6ff4aa34aef1db74"
+          }
+        },
+        {
+          "memory_mib": 44,
+          "application_pass": false,
+          "returncode": 1,
+          "timed_out": true,
+          "receipt": {
+            "path": "ram-final07/ia32-m044/completed.json",
+            "sha256": "fd163b66de5d6ba4223436057647648d4a6e0dfed2ea45f420681c729c4a0163"
+          }
+        },
+        {
+          "memory_mib": 46,
+          "application_pass": false,
+          "returncode": 35,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/ia32-m046/completed.json",
+            "sha256": "c75663fa2f048b480958b8cc22e7c685c58bc429d2f5fa3eb8d5883915bfb2a4"
+          }
+        },
+        {
+          "memory_mib": 47,
+          "application_pass": false,
+          "returncode": 35,
+          "timed_out": false,
+          "receipt": {
+            "path": "ram-final07/ia32-m047/completed.json",
+            "sha256": "847758765d78bead2afa1bdf8f3ef898a2e9db104d6a32f542c60ab14d25bfe0"
+          }
+        }
+      ]
+    }
+  ],
+  "ram_probe_count": 12,
+  "ram_scope_closed_logical_bytes": 1606849921,
+  "ram_scope_cap_bytes": 2684354560,
+  "ram_workload_scope": "Only this pinned QEMU/EDK2 LZMS non-solid set02large; minimum physical VM RAM includes firmware; own_memory excludes firmware",
+  "ram_bisection": {
+    "path": "ram-final07/bisection.json",
+    "sha256": "16793d222f169d3f94ad7664ca014bb5ecefe96f580eaae44cf4d653fcab9631"
+  },
+  "winning_cow_pins": {
+    "path": "ram-final07/winning-minimum-pins.json",
+    "sha256": "ab33e7f28e695646edd599e218ff8b46f388cd719efffe3763cde58700753e49"
+  },
+  "minimum_native_summary": {
+    "path": "ram-windows-final07/summary.json",
+    "sha256": "3f967b873c904ed9ec9d25f570668f8e205d3a495ee2f8fb295c32e35c10d817"
+  },
+  "firmware_native_queue": {
+    "path": "firmware-final07-windows-queue02.json",
+    "sha256": "ade8cb4c8296b079cb7052c574444e33944e1fccdbeed568562a0e7ebfa43ab3"
+  },
+  "code_commits": {
+    "small_esp_geometry": "2a325be6",
+    "explicit_pool150": "e8a9b603",
+    "ram_fresh_cow_helper": "872b3244",
+    "ram_strict_baseline_and_full_bound": "08e2681d"
+  },
+  "old_failed_launcher_kept": {
+    "path": "firmware-final07-windows-queue.json",
+    "sha256": "ba107d0c6143ac6e6d6d4d5f70b4ccd0e5b0ae94f36be08a4fa4b5193ab14518"
+  },
+  "all_images_and_logs_retained": true,
+  "cleanup_performed": false,
+  "merge_push_deploy_performed": false
+}

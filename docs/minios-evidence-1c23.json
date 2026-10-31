@@ -1,0 +1,56 @@
+{
+  "schema": "minios-1c23-evidence-v1",
+  "status": "STOP_GATE1C2_TIMEOUT",
+  "code_head": "63a8cc45cc3f1a45ddb31b35740a4fb94150767b",
+  "real_firmware_head": "310cf37611e2d64122d95ac5a858cf84b896dcea",
+  "real_windows_preparation": {
+    "x86_64": {
+      "result": "qemu-x64/win11-prep03/result.json",
+      "sha256": "583569a6fb835c4e5d505ae3094c12611e1c401b633c08a930a6529fa9d50153",
+      "passed": false,
+      "timed_out": true,
+      "diagnosis": "qemu-x64/win11-prep03/diagnosis.json"
+    },
+    "ia32": {
+      "result": "qemu-ia32/win10-prep01/result.json",
+      "sha256": "b5aadefd23d8cb19a52fa61ff2e01fa613741b2b5f6b83cf2c88e15b293aba2d",
+      "passed": false,
+      "timed_out": true,
+      "diagnosis": "qemu-ia32/win10-prep01/closed-diagnosis.json"
+    },
+    "bios": {
+      "status": "NOT_RUN_FIRST_FAILED_GATE"
+    }
+  },
+  "all_guests_finished": true,
+  "real_native_pass": false,
+  "real_bcdboot_pass": false,
+  "real_bootfiles_pass": false,
+  "windows_firstboot_pass": false,
+  "win11_type4_boot_verified": false,
+  "small_xpress_smoke_pass": true,
+  "closed_image_inventory": {
+    "path": "final-logs/closed-images.json",
+    "sha256": "d2616c3153f982895eae99cf0db3dd65fb0532d557e81f01cb6b5600ebefce13",
+    "count": 51,
+    "bytes": 12576913408
+  },
+  "capacity": {
+    "path": "final-logs/closed-capacity.json",
+    "sha256": "09fde74e08614ba924a9cd9158a77ae34d102c994d4c7f166d9df377e60eb5b2",
+    "projected_bytes": 73974951472,
+    "cap_bytes": 161061273600,
+    "free_bytes": 171777355776
+  },
+  "current_images_deleted": [],
+  "approved_prior_cleanup": "docs/minios-cleanup-accepted-1c1-vhds.json",
+  "no_merge_push_deploy_physical": true,
+  "limitations": [
+    "No full Windows firmware gate passed",
+    "Unknown actual large-WIM RAM and stack peak",
+    "4Kn NTFS target explicitly unsupported",
+    "BIOS bootmgr experimental contiguous-run binding",
+    "Firstboot overlay2GiB budget needs admission review",
+    "74 vs34 legacy SYS/CER before integration"
+  ]
+}

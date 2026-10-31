@@ -131,6 +131,8 @@ pub const Field = enum {
     onedrive_off,
     user_script,
     beta_clock,
+    // Windows 10/11 x64 on UEFI: preparation environment (2026-10-28).
+    prep_env,
     // MS-DOS 6.22 / Windows 1.x-3.x regional settings (dos.zig, 2026-10-24).
     dos_regional,
     dos_keyb,
@@ -163,6 +165,8 @@ pub const ProtectPc = enum(u2) {
 };
 
 /// The network location page of Vista and 7 (OOBE/NetworkLocation).
+pub const PrepEnv = enum { setup, minios };
+
 pub const NetworkLocation = enum {
     work,
     home,
@@ -332,6 +336,10 @@ pub const Profile = struct {
     workgroup: Text(15) = .{},
     /// Empty/off: unchanged; auto: exact detected beta build; or YYYY-MM-DD.
     beta_clock: Text(10) = .{},
+    /// Windows 10/11 x64 on UEFI: setup = the ISO's own WinPE + Windows Setup
+    /// (default); minios = MiniOS applies install.wim itself (experimental,
+    /// src/prep, docs/minios-hardware-flow.md). Other systems ignore it.
+    prep_env: PrepEnv = .setup,
     /// Legacy LAN defaults; other families ignore these fields.
     network: @import("network_values.zig").Mode = .on,
     dialup: @import("network_values.zig").Mode = .off,
@@ -1074,6 +1082,7 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             if (checkEdition(value)) |problem| return .{ .field = field, .problem = problem };
             p.edition.set(value) catch return .{ .field = field, .problem = .too_long };
         },
+        .prep_env => p.prep_env = enumByName(PrepEnv, value) orelse return .{ .field = field, .problem = .bad_choice },
         .beta_clock => {
             if (!@import("beta_clock.zig").validSetting(value)) return .{ .field = field, .problem = .bad_choice };
             p.beta_clock.set(value) catch return .{ .field = field, .problem = .too_long };
@@ -1181,6 +1190,7 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     // editor saves through here: before 2026-10-14 they were dropped).
     if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
     if (p.beta_clock.len > 0) try w.print("beta_clock={s}\r\n", .{p.beta_clock.slice()});
+    if (p.prep_env != .setup) try w.print("prep_env={s}\r\n", .{@tagName(p.prep_env)});
     if (p.network == .off) try w.writeAll("network=off\r\n");
     if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
     if (p.dos_regional != .auto) try w.print("dos_regional={s}\r\n", .{@tagName(p.dos_regional)});
@@ -1682,4 +1692,18 @@ test "beta clock profile strict parse, round trip, invalid calendar and injectio
         var line: [100]u8 = undefined;
         try std.testing.expect(parse(try std.fmt.bufPrint(&line, "name=Beta\nuser=Tester\nbeta_clock={s}\n", .{bad}), &p) == .invalid);
     }
+}
+
+test "prep_env: default setup, minios round trip, unknown refused" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=A\nuser=Bob\n", &p) == .ok);
+    try std.testing.expectEqual(PrepEnv.setup, p.prep_env);
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(std.mem.indexOf(u8, try write(&p, &buffer), "prep_env") == null);
+    try std.testing.expect(parse("name=A\nuser=Bob\nprep_env=minios\n", &p) == .ok);
+    try std.testing.expectEqual(PrepEnv.minios, p.prep_env);
+    var again = Profile{};
+    try std.testing.expect(parse(try write(&p, &buffer), &again) == .ok);
+    try std.testing.expectEqual(PrepEnv.minios, again.prep_env);
+    try std.testing.expect(parse("name=A\nuser=Bob\nprep_env=alpine\n", &p) == .invalid);
 }

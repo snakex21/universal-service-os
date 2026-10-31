@@ -1,0 +1,514 @@
+{
+  "schema": "minios-1c1-final-evidence-v1",
+  "date": "2026-10-25",
+  "head": "240d6a07c3ae827414036a9fb1a68dea782c638a",
+  "branch": "codex/minios-etap1",
+  "stage": "host common reader and direct apply; firmware integration later",
+  "program": {
+    "scope": "repo",
+    "path": "zig-out/1c1-final04/bin/usosprep-optical.exe",
+    "bytes": 1106944,
+    "sha256": "1036ab077f7d4a3bcbd4e0c1ccae2dd1a872d3e6c8d414a70f96b6602b790936"
+  },
+  "tests": {
+    "zig": 721,
+    "python": 210,
+    "skipped": 0,
+    "logs": {
+      "build": {
+        "scope": "repo",
+        "path": "zig-out/1c1-build-final04.log",
+        "bytes": 3831,
+        "sha256": "984f4b152abae2c8c09412d5047f88c2921540da19a9fdc6f2ec5d1378c5a78e"
+      },
+      "python": {
+        "scope": "repo",
+        "path": "zig-out/1c1-python-final04.log",
+        "bytes": 2041,
+        "sha256": "2d7d79ad2b770c0227309741c3846e77853bb611aea607878bf12dfe7697d9e8"
+      },
+      "hardlink": {
+        "scope": "repo",
+        "path": "zig-out/1c1-hardlink-final03.log",
+        "bytes": 531,
+        "sha256": "f1e14e0ba32717e162f62145f50098232312775a542d74738f46e36838a83b09"
+      }
+    }
+  },
+  "real_iso": [
+    {
+      "name": "win7",
+      "receipt": {
+        "scope": "runtime",
+        "path": "1c1/oracle-real/win7-02/result.json",
+        "bytes": 1398,
+        "sha256": "e40b6832035223332f184bd980b606d5ed8b0d8fb44bda812b70fbd07e30a20e"
+      },
+      "kind": "udf",
+      "entries": 1077,
+      "files": 877,
+      "directories": 200,
+      "iso_bytes": 2440128512,
+      "iso_sha256": "709d041ac53f57d44b5451a757491b9e730feac8b807cf0ace625aadde7e4675",
+      "files_above_4g": [],
+      "own_heap_peak": 463565,
+      "difference_count": 0,
+      "sevenzip_exit": 0
+    },
+    {
+      "name": "win11",
+      "receipt": {
+        "scope": "runtime",
+        "path": "1c1/oracle-real/win11-02/result.json",
+        "bytes": 1482,
+        "sha256": "9de40633c797755590efd7746de833011dc4cbaae98f9968b6be1c1559f538c5"
+      },
+      "kind": "udf",
+      "entries": 1166,
+      "files": 1064,
+      "directories": 102,
+      "iso_bytes": 8345856000,
+      "iso_sha256": "9453d410298e50c36ce31153326857848256e0980ff8fda501b4d3817540beb9",
+      "files_above_4g": [
+        {
+          "path": "sources/install.wim",
+          "size": 7437390947
+        }
+      ],
+      "own_heap_peak": 463696,
+      "difference_count": 0,
+      "sevenzip_exit": 0
+    },
+    {
+      "name": "xp",
+      "receipt": {
+        "scope": "runtime",
+        "path": "1c1/oracle-real/xp-02/result.json",
+        "bytes": 1400,
+        "sha256": "716ddfbda41c5363b77e89a98aaf22d28b3f0ad5f84d0282e3409caa3f2cb319"
+      },
+      "kind": "iso9660",
+      "entries": 6969,
+      "files": 6810,
+      "directories": 159,
+      "iso_bytes": 621182976,
+      "iso_sha256": "3cddb947741333d7049539f6ff69a5c06071b41761f0e420eed64ad41bddba15",
+      "files_above_4g": [],
+      "own_heap_peak": 463515,
+      "difference_count": 0,
+      "sevenzip_exit": 0
+    }
+  ],
+  "small_matrix": {
+    "receipt": {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/result.json",
+      "bytes": 21901,
+      "sha256": "99631b2588d0182a909b92e3c2ee1f20408fa708409040cbfa5532db7763b27c"
+    },
+    "positive": 15,
+    "negative": 9,
+    "fuzz_mutations": 3072
+  },
+  "sparse": {
+    "receipt": {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/sparse-recheck02/result.json",
+      "bytes": 1475,
+      "sha256": "0506582d4b1ed1097a7c9e0a0bc7134159e868f2475122ccae854d8719ec3848"
+    },
+    "probes": {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/sparse-recheck02/sparse-probes.json",
+      "bytes": 1576,
+      "sha256": "64b2ed919a760ea62fe5a493a6efd46002abff307500291e901ac3f995295bcd"
+    },
+    "files_above_4g": [
+      {
+        "path": "SOURCES/LARGE.BIN",
+        "size": 4294975489
+      }
+    ]
+  },
+  "pack": {
+    "receipt": {
+      "scope": "runtime",
+      "path": "1c1/source-ntfs-win11-01/result.json",
+      "bytes": 1347,
+      "sha256": "055c34dd8b79d5d79b3e65e4e4f6cc7a3f0c2e3ac62d9df963ef1d9f7310695f"
+    },
+    "entries": 1166,
+    "source_unchanged": true,
+    "ntfs_manifest_verified": true
+  },
+  "integration": [
+    {
+      "name": "win11",
+      "receipt": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/result.json",
+        "bytes": 1731,
+        "sha256": "63dc8c20f20d5f471e8862584110066880d14f8cfdec2752cbfe3a07cbebf5f9"
+      },
+      "native": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/native/result.json",
+        "bytes": 3997,
+        "sha256": "1c32ee22589283896b75630f8d1c9a51261dac012f5a010dda6316646bf7de1b"
+      },
+      "target": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/target.raw",
+        "bytes": 17179869184,
+        "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080"
+      },
+      "checked_entries": 168751,
+      "differences": 0,
+      "short_names_checked": 82533,
+      "raw_security_pass": true,
+      "chkdsk_exit": 0,
+      "exact_size_readonly_virtual_guard": true,
+      "source_unchanged": true,
+      "heap_peak": 8800392,
+      "seconds": 353,
+      "rpfix": "WIM_RP_FIX header=true target_drive=C fixed=0 rpfix_eligible_unmatched=0 strict=true",
+      "compression": "LZX",
+      "index": 2,
+      "install_wim_sha256": "de1f5d0d14b9337cb32790d718a84bcfbc94425660b224c705833da5d9e88a51",
+      "intermediate_wim_copy": false,
+      "program_log": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/program.log",
+        "bytes": 3069,
+        "sha256": "18c7d2a617f351f7683eff4eb35eab756234fe799ce91a09e2f37b078c8dc8b4"
+      },
+      "native_metadata": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/native/wim-native-metadata.jsonl",
+        "bytes": 160440269,
+        "sha256": "b155db7c1a90ad0e52ff2bd67ecf6a3ef0c72411083978961fe2bb1eaeb67cd8"
+      },
+      "chkdsk_log": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win11-01/native/chkdsk-stdout.txt",
+        "bytes": 6478,
+        "sha256": "3ddb20a0b31f934413dcf7e7dd080b4af049be2232593455016398e050969b54"
+      }
+    },
+    {
+      "name": "win7",
+      "receipt": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/result.json",
+        "bytes": 1728,
+        "sha256": "6af5509bdb1902e627586ce17a0d31baca7e0afc5d9641118062d349085af07d"
+      },
+      "native": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/native/result.json",
+        "bytes": 3986,
+        "sha256": "5ced739475cdad7e20fa6c0abbea50ac4b9076bbb7540f8573db7d9dcb6ef0be"
+      },
+      "target": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/target.raw",
+        "bytes": 6442450944,
+        "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57"
+      },
+      "checked_entries": 57146,
+      "differences": 0,
+      "short_names_checked": 30285,
+      "raw_security_pass": true,
+      "chkdsk_exit": 0,
+      "exact_size_readonly_virtual_guard": true,
+      "source_unchanged": true,
+      "heap_peak": 3996900,
+      "seconds": 96,
+      "rpfix": "WIM_RP_FIX header=true target_drive=C fixed=44 rpfix_eligible_unmatched=0 strict=true",
+      "compression": "LZX",
+      "index": 1,
+      "install_wim_sha256": "edc80120ba3b6325141a3fa1fb9087c7bfd9ccfa6040c7676e0ef26f78d72128",
+      "intermediate_wim_copy": false,
+      "program_log": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/program.log",
+        "bytes": 2044,
+        "sha256": "44161e1ed985d95d26cf15e9272432e979f223a95a2c8cd9626e98d76a4888a5"
+      },
+      "native_metadata": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/native/wim-native-metadata.jsonl",
+        "bytes": 53574933,
+        "sha256": "7516c8241279393f28f86a68752e9f9d2cbb506fa0cf12c692a92d707f412200"
+      },
+      "chkdsk_log": {
+        "scope": "runtime",
+        "path": "1c1/e2e-win7-01/native/chkdsk-stdout.txt",
+        "bytes": 5976,
+        "sha256": "78284d19512e57d5c5011e253f2a781e790ee00b186d9a6f059217e33e30184a"
+      }
+    }
+  ],
+  "duplicates": {
+    "receipt": {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/result.json",
+      "bytes": 3337,
+      "sha256": "fa7e08547f0aa8e9adc37674d36d0608347050ee60a91df385f735036b5d9cd0"
+    },
+    "cases": [
+      {
+        "case": "original",
+        "sha256": "9f3298196ed3bd47652e0317ebc0f985296ce7bb2fd35742e168480b20d0107a",
+        "wimlib_exit": 0,
+        "own_exit": 0,
+        "wimlib_log_sha256": "63948503e3a8b5bab139235c787017df414a75fca52df5a0dafef911db6b66c4",
+        "own_log_sha256": "f42bb2741f3696682d6b65c5a423f2cf4eff1c8b2ef61ba0741408275dafc43c",
+        "own_hash_or_conflict_refusal": false
+      },
+      {
+        "case": "identical-duplicate",
+        "sha256": "7c7f6d6dd76be7b65e3be46a18fbbcf22796b858635141754405e42a3fcdb6bc",
+        "wimlib_exit": 0,
+        "own_exit": 0,
+        "wimlib_log_sha256": "b4386705ded06784afdea7b7c18b8c7a2636187682fa43560a11eec3f0e15e4d",
+        "own_log_sha256": "62effb92d33dac98ab7cbcd7bc9bd809d275d31069f48487879250d26626f3d4",
+        "own_hash_or_conflict_refusal": false
+      },
+      {
+        "case": "relocated-identical-duplicate",
+        "sha256": "7e3a4e674710a1c96d5fbda9adf516940af728f36cce22b3b6f33fcad8667e42",
+        "wimlib_exit": 0,
+        "own_exit": 0,
+        "wimlib_log_sha256": "c8f6fd80b8b579115877d01958ca2b6b03f3f6b764b97f3e055a1aebf26e915c",
+        "own_log_sha256": "361da6977f5a9bd9c4a4197f4ad0e35e18e51b7a0772fad018e510d103d78ea8",
+        "own_hash_or_conflict_refusal": false
+      },
+      {
+        "case": "conflicting-duplicate",
+        "sha256": "b397233573b5c57f5378a455ac014f6cd20ecfa04fbd2aab51902adfe4e94744",
+        "wimlib_exit": 0,
+        "own_exit": 1,
+        "wimlib_log_sha256": "895a9961eb465739e64337cce8d5244e65022797c0994850d94d411cc602672c",
+        "own_log_sha256": "dcc0b3bf1084ac772b2ce70cfc5bce9a23c0bd2709ff01136c46986053da2656",
+        "own_hash_or_conflict_refusal": true
+      },
+      {
+        "case": "size-conflicting-duplicate",
+        "sha256": "013ab2262c7913a753d6448b8662f562aa87eedfd8751096f4d07edb1a4e86f5",
+        "wimlib_exit": 0,
+        "own_exit": 1,
+        "wimlib_log_sha256": "384d59f4ab7b1331f753fe13950b1a023dac1191514981027ea1fc641c3334a7",
+        "own_log_sha256": "32b27a89e74297bab1a9a1ebfdcc44a93400bfea6ecf1d8777a14da2f88a3b97",
+        "own_hash_or_conflict_refusal": true
+      }
+    ]
+  },
+  "capacity": {
+    "schema": "usos-wim-pool-v1",
+    "cap_bytes": 161061273600,
+    "closed_file_count": 5437,
+    "closed_logical_bytes": 107620901184,
+    "closed_top_level_bytes": {
+      "1c0-win7-extras01.jsonl": 10051906,
+      "build-all05.log": 1529,
+      "build-final07.log": 4372,
+      "build-firmware01.log": 2396,
+      "build-host03.log": 653,
+      "build-host04.log": 336,
+      "build-host06.log": 335,
+      "capacity-audit01.json": 3143,
+      "capacity-audit02.json": 4070,
+      "capacity-audit03.json": 4294,
+      "capacity-audit06.json": 4981,
+      "capacity-audit07.json": 5207,
+      "capacity-audit08.json": 5556,
+      "capacity-audit09.json": 5625,
+      "capacity-audit11.json": 5450,
+      "capacity-audit12.json": 5128,
+      "capacity-diagnostic14.json": 5461,
+      "capacity-enforce14.json": 5591,
+      "capacity-final-after-cleanup.json": 4666,
+      "capacity-plan-final-closed.json": 398,
+      "capacity-plan01.json": 1597,
+      "capacity-plan02.json": 2547,
+      "capacity-plan03.json": 2710,
+      "capacity-plan04.json": 3054,
+      "capacity-plan05.json": 3147,
+      "capacity-plan06.json": 3238,
+      "capacity-plan07.json": 3434,
+      "capacity-plan08.json": 3646,
+      "capacity-plan09.json": 3669,
+      "capacity-plan10.json": 4167,
+      "capacity-plan11.json": 4643,
+      "capacity-plan12.json": 5302,
+      "capacity-plan13.json": 5382,
+      "capacity-plan14.json": 5094,
+      "cleanup-authorization01.json": 529,
+      "cleanup-candidates01.json": 38076,
+      "cleanup-plan01.json": 105582,
+      "cleanup-result01.json": 105672,
+      "closure-receipt01.json": 666,
+      "final07-artifacts.json": 8901,
+      "firmware-closed-summary01.json": 5292,
+      "firmware-final07-application-summary.json": 7564,
+      "firmware-final07-windows-queue.json": 284,
+      "firmware-final07-windows-queue02.json": 2336,
+      "KOTWICA-before-1b2-close.md": 6803,
+      "ntfs-attribute-order.json": 882,
+      "python-final-build05.log": 21752,
+      "python-final07-abi.log": 250,
+      "python-final07.log": 28088,
+      "python-final08-helper-closure.log": 28370,
+      "report-results.md": 11628,
+      "report-static.md": 7770,
+      "retained-sentinels-after-cleanup01.json": 599,
+      "retained-sentinels01.json": 255459,
+      "root-closed-firmware-verification01.json": 17432,
+      "root-closed-real-host-verification01.json": 8849,
+      "root5-diagnostic01.json": 7731,
+      "test-final-build05.log": 3070,
+      "win7-final07": 80706186,
+      "win7-diagnostic02": 2312,
+      "win7-apply02": 61680247,
+      "win7-apply01": 1915,
+      "win10-final07": 141673954,
+      "win10-apply02": 191544569,
+      "win10-apply01": 1822,
+      "synthetic": 197974990,
+      "root-si6-diagnostic07": 669234,
+      "root-metadata06-smoke": 501680,
+      "root-cache": 159314075,
+      "ram-windows-final07": 3538856,
+      "ram-final07": 162177,
+      "oracle-ps-guard03": 19821,
+      "oracle-ps-guard02": 11166,
+      "oracle-ps-guard01": 9402,
+      "oracle": 300394817,
+      "legacy-ms-audit01": 224159,
+      "inputs": 16157334568,
+      "host-synthetic-large-final01": 14380,
+      "host-synthetic-final01": 3640443,
+      "host-synthetic-ads-final01": 6051,
+      "host-final07": 21713658,
+      "firmware-tests": 14242949,
+      "firmware-cache": 27902952,
+      "feature-expected01": 4390159,
+      "feature-case03": 1650,
+      "feature-case02": 5608058,
+      "feature-case01": 6998947,
+      "1c1": 88446144292,
+      "1c0": 1783625383
+    },
+    "reservations": [
+      {
+        "path": "oracle-native-mini01",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini02",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini03",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini04",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini05",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini06",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini07",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini08",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini09",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini10",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-mini11",
+        "bytes": 67108864
+      },
+      {
+        "path": "oracle-native-1c0-01",
+        "bytes": 67108864
+      },
+      {
+        "path": "1c1/final-logs",
+        "bytes": 1073741824
+      }
+    ],
+    "reserved_bytes": 1879048192,
+    "projected_total_bytes": 109499949376,
+    "headroom_bytes": 51561324224,
+    "passed": true,
+    "reserved_paths_not_traversed": true,
+    "unreserved_files_declared_closed": true,
+    "opaque_reparse_leaves_not_followed": [],
+    "logical_not_sparse_allocated_accounting": true,
+    "cleanup_performed": false,
+    "actual_free_bytes": 137102512128,
+    "minimum_free_bytes": 107374182400
+  },
+  "accepted_1c0_cleanup": {
+    "receipt": {
+      "scope": "runtime",
+      "path": "1c1/accepted-1c0-cleanup.json",
+      "bytes": 18458,
+      "sha256": "9eb9f8811ef63fc62ec921e5e5479550550184d17df4dc7da6e9f9305f5bc827"
+    },
+    "deleted_count": 77,
+    "deleted_bytes": 101927891982,
+    "small_evidence_preserved": true
+  },
+  "limitations": [
+    "2048-byte optical logical blocks; bounded extents/depth/metadata",
+    "VAT/sparable/indirect/transformed/surrogate names refused",
+    "NTFS ISO source:128 runs; ATTRIBUTE_LIST,compressed,encrypted,sparse refused",
+    "UDF AED continuation:known generated SHA oracle;7-Zip extraction unsupported",
+    "General8.3 generator for future USOS-added long names deferred;INSTALL.ISO valid8.3",
+    "WIM tagged type4 omitted/reported;Win11 first boot stage1c3",
+    "Historic SYS/CER not restored;exclude historic acpi.sys at integration",
+    "Heap numbers exclude stack,PE code,Windows RSS and firmware"
+  ],
+  "collection_log": {
+    "scope": "runtime",
+    "path": "1c1/final-logs/final-evidence-collection.log",
+    "sha256": "7caa82df1511471c5413e9c33857d26d491a86b96b257130438947b0d43dd696"
+  },
+  "followups": {
+    "F1": "strict full-count path/target preflight;VolumeGUID/no-letter/long path;Win7 fixed44 unmatched0;Win11 fixed0 unmatched0",
+    "F2": "each same-SHA1+size duplicate decoded/verified;conflicts refused;wimlib verify accepts both intentional conflicting fixtures",
+    "F3": "clean HEAD/dirty0 before and after every final run;final03 and final04 program bytes identical",
+    "F4": "INSTALL.ISO valid8.3;general generator for future USOS long names deferred",
+    "F5": "Win11 tagged type4:86217 source entries,applied0,omitted/reported;boot stage1c3",
+    "F6": "no SYS/CER delta in stage;master audit0ba50f6e retained;do not restore historical acpi.sys"
+  },
+  "retained_images": {
+    "path": "docs/minios-retained-images-1c1.json",
+    "count": 126,
+    "cleanup_performed": false
+  },
+  "payload_audit": {
+    "master": "0ba50f6e",
+    "accepted_base": "fa7ca354",
+    "new_sys_cer_paths": [],
+    "historic_acpi_restore_allowed": false
+  }
+}

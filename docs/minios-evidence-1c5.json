@@ -1,0 +1,95 @@
+{
+  "schema": "minios-1c5-final-evidence-v1",
+  "status": "STOP_WITH_PROGRESS",
+  "code_head": "4431f6e66839d05062c74adefcdbaea210342314",
+  "evidence_head_before_report": "53f676c792efe6e7655cdc853f558e4f695d6d38",
+  "qemu_only": true,
+  "profiling_default": false,
+  "combine_default": true,
+  "pm_reads_only_during_startup_calibration": true,
+  "full_zig_tests": 862,
+  "full_python_tests": 340,
+  "python_skipped": 0,
+  "full_zig_log": {
+    "path": "1c5/logs/final-core05.log",
+    "sha256": "8654f31c96e2114c7d0275e88833590ce74090b92db83d41e8c30a5d79b71377"
+  },
+  "full_python_log": {
+    "path": "1c5/logs/all-python-clean03.log",
+    "sha256": "4032b18a7701b1edee0d1f5158362622c4ffb8ca9c119540332dde0cd8c38f3d"
+  },
+  "ab": {
+    "path": "1c5/probes-result.json",
+    "sha256": "c3472517eb43cd7febb2153e2b88db6f6db1b393566ea428a0f9b48999dda743"
+  },
+  "win11_128": {
+    "firmware_pass": true,
+    "native_fat32_chkdsk": 0,
+    "native_ntfs_chkdsk": 0,
+    "native_tree_entries": 168751,
+    "native_differences": 0,
+    "guest_seconds": 559.3557379999993,
+    "proof": "docs/minios-win11-1c5-128.json",
+    "proof_sha256": "cb2242e83f02f5d9cc07c0c8c989677bff40ef096b5c093290bbc0b713352ab8"
+  },
+  "bios_cpu": {
+    "cpu486_32m_own_data_pass": true,
+    "pentium_32m_pass": false,
+    "pentium_timeout_seconds": 900,
+    "pentium_scan_fraction": 0.96875,
+    "pentium_virtual_target_unchanged": true,
+    "native_cpu_fixture_gates_run": false,
+    "proof": "docs/minios-bios-1c5.json",
+    "proof_sha256": "328e41a7686144454381f28e79d9ef97dea8fbf32d9442c1cfc77fb478d2d67a"
+  },
+  "next64_capacity": {
+    "path": "1c5/capacity-next64-01-result.json",
+    "sha256": "d29bbad1c3bcb65de6d89afa53b957085397749ffbb629481ef28b99634e0d17"
+  },
+  "win11_64_run": false,
+  "win10_ia32_run": false,
+  "win7_bios_run": false,
+  "bcdboot_reference_run": false,
+  "bootfiles_run": false,
+  "windows_firstboot_run": false,
+  "win11_type4_boot_verified": false,
+  "all_own_processes_completed": true,
+  "automatic_resume": false,
+  "retained": {
+    "count": 72,
+    "logical_bytes": 41489868800,
+    "path": "docs/minios-retained-images-1c5.json",
+    "sha256": "a4153aa94f8da2e21af285bf53cfc67d03d1e63279bbb583aef15a57d5519ebf"
+  },
+  "capacity": {
+    "path": "1c5/closed-capacity.json",
+    "sha256": "395e99c938ae9b46cae13ecfc3cc5dcfcf8ab45046be0a63f6e30d3461e8393b",
+    "planned_bytes": 119400163110,
+    "limit_bytes": 161061273600,
+    "free_bytes": 110705827840
+  },
+  "accepted_old_cleanup": {
+    "path": "1c5/accepted-1c4-cleanup.json",
+    "sha256": "d2d5be787ffa96e32d7decd4fb827e37442651960b503d7af8a94161fe35da09"
+  },
+  "further_cleanup": {
+    "path": "1c5/capacity-cleanup-proposal.json",
+    "sha256": "468d0ae88b61f1d980e8618aeaff9f8c275b78b26c6985c378ba070e5653f90b",
+    "approved": false,
+    "deleted": []
+  },
+  "firstboot_candidate": {
+    "path": "1c5/operators/firstboot-candidate",
+    "applied": false,
+    "tested": false,
+    "whole_scope_bound_proven": false
+  },
+  "final_readonly_validation": {
+    "path": "1c5/logs/closed-evidence02.log",
+    "sha256": "967c4b9568bae57264885b16bcf5fc99565aeb229481ab843741d2561b29620d"
+  },
+  "changed_sys_cer": false,
+  "merge_push_deploy": false,
+  "physical_media_opened": false,
+  "drive_g_used": false
+}

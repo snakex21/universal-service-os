@@ -1,0 +1,660 @@
+{
+  "schema": "minios-1c5-retained-images-v1",
+  "head": "ffe7620e4e812672ab752b6593baa8428cd33dba",
+  "dirty": 0,
+  "files": [
+    {
+      "path": "1c5/artifacts-final/usosprep-install-bios-1c5.img",
+      "bytes": 1048576,
+      "sha256": "60111b65f563f3d73481ed52b21eee440fac6ba89cacfd5493707d86e1c6d1a7",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "465ad6d48dad88c53dc1dae139bbcec43c9e1e51eb5501249916b86fd1ef8a37",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/boot.qcow2",
+      "bytes": 917504,
+      "sha256": "4d33e986ad4bc35f233e522c2c4565716ffab1363b0b20ebfddf8a15ae6dc5b9",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "d48b40be50b5c0b50837b6cb230d1b87695694b1112b8593f97ecd8df421c48e",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "1af08d11e41f111907e7cc7d9286da703dd0d8a2b1a2cce36a49f36efa078787",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/buffer-reverse/off/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "c6891a0a63aec875c0ea65c158ef1eb85ce7debd60558eb0bb08711404deb754",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/boot.qcow2",
+      "bytes": 917504,
+      "sha256": "1b7d4d465b82a8d9ab208079dc1669470f6ad1e45a3acffb658ad1d6f9e2eea2",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "b0bbfa2303b45e93a503488000c2cf5e58ddcfc8f52210160a6b6a852d02dd2f",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "dccc94164994bb381fa47f90f5af1d3d43490f8018d324b70d23b26a029ee2ee",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/buffer-reverse/on/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "ca3cf0e70532a3870f57841db32528babc6bb362c010da3e4b15b49246fad8d7",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "1b78b31c7daa6c91001c07e6a61b0c45b4558c7e8db0b00edfc6230f2550564b",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "76f48aa0e7a240266a9a2202eb8c95bfca511348e04a56dc60bf6c32e7f6b01a",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "907c85ecf9a4cef8723df10615d9727dd14f533c06bf7f1252ff5f7e9a81fc17",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/buffer-reverse/production-off/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "c4a769e7df2bfaefb990bcee9cbcd01456a4427b67506db259be87f98791ca76",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/boot.qcow2",
+      "bytes": 917504,
+      "sha256": "9a522614ed20d971b1ee96813b50119feb419c18c8508bc23822046924c5a405",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "fde6e73c15aa6e491ea20d7ef5a574b46d285a5554855934954c39b6778468e3",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "9a06080f39681c73b02534d8b81e5392fe8292817be3368b304ebe32c2ce5dab",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/isolated-probes/no-combine/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "bc275057cfafe5a3aeed3fa1141e3aba4c2b3335268d54a10e4fafe80c26b40e",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/boot.qcow2",
+      "bytes": 786432,
+      "sha256": "796fccbddc1279443411052910a73a987f60cea1691c8c8dde8f26025fe951d8",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "80e5a57d797ded759ea26a5ea84ba7ef217f2c774c9e9e433322fbaa5a50df51",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "f9823ab3db107ad230f72b23832a6bb0a9aaf090041c3ce49a1fc12f66bc743c",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/isolated-probes/pm-off/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "2edffb5aefc8adcde8131e5d938c32929f04e2eed75c799a91818a5213020dd6",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "f1ab11e2316357fff133a5e6ecefe33a5f7596c823c0634c31f68080b595e177",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "b97ba276f70db3910ab5c6d404ba7212a3e26f75a695b7ab0303e13238876ac4",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "c9fad76c422fe9d4a9464c8420a1118ddb86288c5718109fc3597c31d4f3e2a0",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/isolated-probes/pm-on/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "5aa9ae77ec20393c27bf9cee44cde25cf978261a0bb3112015716cf33999af58",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "58d5db32fb19cccc23f7063739a0dd6c7199a2bac3cfa867e1a21c9fe876cdcc",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "374f98a5302ab63b715d8c89904d8424e02282bacc606f7f8eba5e017c4c0fac",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "3a6874e23c36c3806b2cdcdba344b3610231c1bb64d139acfac3f20a82cde5fd",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/isolated-probes/tsc-off/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "a0a84bc9ebfdacca34ce816a1a3e29dd6f483fe1c64ee36e1907afc25875eb7f",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/boot.qcow2",
+      "bytes": 917504,
+      "sha256": "faa370713c0a97109b8f28a84a6bfa8d8213352dfd8f9741e3ef1e7f1c3bff43",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "e39be87e856391693797e471b875ea169ae1c9b8790777f7b07fd9db1ab974c3",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "cab286b662bc0ec440ea6ea11dafe701b88debb866da2f9f90cb8993949ec525",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/isolated-probes/tsc-on/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/native-win11-128/readonly-install.vhd",
+      "bytes": 15027732480,
+      "sha256": "7ff67181a910ee9461211ea5fe9b2e34958be41a30c102cd9356a40560848907",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/native-win11-128/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "56b1e2805a3dd808a8481858e9ea7b1ae47bb1e4f53833ccb6453553f5e88b66",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/off/boot.qcow2",
+      "bytes": 786432,
+      "sha256": "9f43ef3f19e39f899e9aa370ca79fc0bd6794c283519d95b23cd2ed2a55a53ba",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "07b3c0e573f1b502d444df905db93aa981d0b0d527010fc5723563c433f3ac71",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "23d27ab268b0e10ef9c167cb80a3b8f8667135fcc2f583812a1e144bc2a7612b",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/pm-probes/off/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/on/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "0a052be3970bceb9181a7edd5f772a458a399e7d3c1667857019811bb358d3cf",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/on/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "aaa28197ca49da9fa2d77f223f543868cc94ab2af9d776c1a6cd757e8e6165ac",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/on/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "0a66d143d6c2513b3717d76f10d040d508e9d5edb4834b08a4829fadbf08bd26",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "18a783f65e8ea02962c890723f7d17c7aad55d52806ae9ded59198b1d2b6558a",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/pm-probes/on/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/pm-probes/on/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "6f66fc555e81503282f62cc2cc06fd3d1dd4948c4eb8fec547d480c7e7a57467",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/boot.qcow2",
+      "bytes": 786432,
+      "sha256": "e2e5652ffa3e42ca3ee8411bb31f16c90996aed6fc04de1590e78395ec8f19f5",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "cf42df9b78641bc9c5c32eb6ec9fb70922716a321cfb236c8e28226eff4f066b",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/target.qcow2",
+      "bytes": 197120,
+      "sha256": "5e81d1eed9c30e0af81c97defb17264e54cf80ab0639d41a28cce180bb6f63bd",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/win11-final/whpx128-01/boot-base.raw",
+      "bytes": 68157440,
+      "sha256": "b0ff53bc4f176b21f4b2bbbcdee8f6c94c5eca53265dbfe09e98b28e53c8aeff",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/win11-final/whpx128-01/boot.qcow2",
+      "bytes": 851968,
+      "sha256": "e13fd5c0847eda95e07bac83aa7110c783fefc6f19c21a8dfaf1c4aa07d185c3",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/win11-final/whpx128-01/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "fd3848fc248fb5a9326a056d11f9072197e148550bf1cc2962adf88fbe8f0146",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/win11-final/whpx128-01/target.qcow2",
+      "bytes": 15036318208,
+      "sha256": "8677e5452ba4d749a8f7873fc7da4855625bed819d5678e0524a6c3a50a47142",
+      "hash_basis": "closed immutable receipt; no subsequent writer opened",
+      "receipt": "1c5/win11-final/whpx128-01/result.json",
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c5/win11-final/whpx128-01/vars.fd",
+      "bytes": 540672,
+      "sha256": "b0bcd83a209785521235492decc423f5cd4dc451e7ab309eabf46379f7fcf062",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcg486-1c5-01/boot-base.raw",
+      "bytes": 1048576,
+      "sha256": "8ded36d0e720423c331ec112fe589f6c8a01af4879706d614415d9b949bdd1ee",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcg486-1c5-01/boot.qcow2",
+      "bytes": 393216,
+      "sha256": "0af0d2fd259c873f6fe75fc732079b0b3a36ef23d2ec3677bdbb26e2ecd6b1d2",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcg486-1c5-01/source.qcow2",
+      "bytes": 197120,
+      "sha256": "b273ca9fbd96c1a6c79f517c147878c5ea4f50d829c8594ec121fe2ff099763c",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcg486-1c5-01/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "b4595ffccda389c1647c7b94600fc898a29b1b34557847005ddd720395f7e117",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcg486-1c5-01/target.qcow2",
+      "bytes": 20840960,
+      "sha256": "e3b5886be01f14837b527bac02b274480a3d0c691d57ac0ab1fee02d60d5341b",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcgpentium-1c5-01/boot-base.raw",
+      "bytes": 1048576,
+      "sha256": "fb52c71077f55fa523a117934bb69b9d5805b9c122be97b752dd378dfeba6151",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcgpentium-1c5-01/boot.qcow2",
+      "bytes": 393216,
+      "sha256": "5c8ab2d794907a5af17b6bb31d7ce050f0de12c84bd12ddd298410904d515844",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcgpentium-1c5-01/source.qcow2",
+      "bytes": 197120,
+      "sha256": "b273ca9fbd96c1a6c79f517c147878c5ea4f50d829c8594ec121fe2ff099763c",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcgpentium-1c5-01/target-base.qcow2",
+      "bytes": 459264,
+      "sha256": "b2fadee9ecb05fda4e435913965da41dfc7bbd44b6455579619bed0fb3b0166f",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    },
+    {
+      "path": "1c23/qemu-bios/tcgpentium-1c5-01/target.qcow2",
+      "bytes": 197120,
+      "sha256": "2070baf14db84f85bccb1ea4a05997873da3d433d70f950465442f7658424907",
+      "hash_basis": "rehashed after all own operations completed",
+      "receipt": null,
+      "retained": true,
+      "deletion_authorized": false
+    }
+  ],
+  "count": 72,
+  "logical_bytes": 41489868800,
+  "own_operations_closed": true,
+  "deleted_current_stage": [],
+  "delete_only_after_user_acceptance": true
+}

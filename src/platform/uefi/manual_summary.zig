@@ -466,6 +466,27 @@ fn start(
         if (secure_boot.enforced()) return showSecureBootRequired(system);
         const nt6 = manual_images.nt6Legacy(system);
         vista_csmwrap_heading = if (nt6) windows_native_iso.legacyFolder(system) else windows_native_iso.systemFolder(system.image_directory) catch system.name;
+        // Profile option prep_env=minios (experimental, 32-bit Windows 10):
+        // MiniOS prepares the MBR disk itself (image, BIOS boot files, CSMWrap
+        // ESP) and restarts on success; any failure or a cancelled disk
+        // question is logged and falls through to the Alpine preparation.
+        const minios = @import("minios_start.zig");
+        if (!nt6 and minios.wantedX86Csmwrap(profile, system.id)) {
+            view.vistaCsmwrapStatus(.validating, "Starting MiniOS (disk question follows)", vista_csmwrap_heading);
+            minios_x86: {
+                const rendered = answer_profiles.render(profile.?, system.id, .x86) catch |err| {
+                    var line: [96]u8 = undefined;
+                    @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] x86 answer not rendered ({s}); Alpine\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
+                    break :minios_x86;
+                };
+                minios.run(root, .mbr_csmwrap, system.id, system.image_directory, image.name.slice(), profile.?, rendered.bytes, answer_profiles.images()) catch |err| {
+                    var line: [96]u8 = undefined;
+                    @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to the Alpine preparation: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
+                };
+            }
+            view.refreshFramebuffer();
+            view.vistaCsmwrapStatus(.validating, "MiniOS did not finish; Alpine preparation instead (EFI\\USOS\\Logs\\minios-start.txt)", vista_csmwrap_heading);
+        }
         view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
         var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
         if (profile) |p| {
@@ -490,6 +511,19 @@ fn start(
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
+        // Profile option prep_env=minios (experimental): MiniOS applies the
+        // image itself and restarts on success; any failure or a cancelled
+        // disk question is logged and falls through to Windows Setup.
+        const minios = @import("minios_start.zig");
+        if (minios.wanted(profile, system.id)) {
+            view.windowsIsoStatus(.starting, "Starting MiniOS (disk question follows)");
+            minios.run(root, .gpt_uefi, system.id, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+                var line: [96]u8 = undefined;
+                @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to Windows Setup: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
+            };
+            view.refreshFramebuffer();
+            view.windowsIsoStatus(.validating, "MiniOS did not finish; starting Windows Setup (EFI\\USOS\\Logs\\minios-start.txt)");
+        }
         windows_native_iso.startModern(root, system.image_directory, image.name.slice(), unattended, rendered, false, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);

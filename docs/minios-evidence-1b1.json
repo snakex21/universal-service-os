@@ -1,0 +1,1747 @@
+{
+  "schema": 2,
+  "stage": "1b-1 NTFS scaling, no WIM",
+  "overall": "PASS",
+  "qemu_platforms_only": true,
+  "host_cases": 3,
+  "firmware_cases": 3,
+  "evidence_root": "caller-selected new1b-1 runtime; paths below are relative",
+  "cases": [
+    {
+      "case": "host/tree150k-01",
+      "profile": "tree150k",
+      "backend": "host regular-file writer",
+      "architecture": "host-x86_64",
+      "files": 150000,
+      "directories": 301,
+      "data_bytes": 9830400000,
+      "image_bytes": 17179869184,
+      "image_sha256": "4be996425ea08a12d58f4e2723eb5779819fe7bb2611d025842ac5d1be26d33b",
+      "elapsed_writer_seconds": 37.09751950000009,
+      "memory": {
+        "allocator_peak_bytes": 395328,
+        "host_image": {
+          "loaded_image_bytes": 1085440,
+          "stack_reserve_bytes": 1048576,
+          "stack_commit_bytes": 4096,
+          "stack_high_water_measured": false,
+          "allocator_counter_scope": "explicit Zig core requests; entire reserved host stack and loaded PE image counted separately; OS/host IO runtime excluded"
+        },
+        "program_ram_conservative_upper_bound_bytes": 2529344
+      },
+      "metadata_workload_evidence": [
+        "TREE files=150000 directories=300 bytes=9830400000 seconds=21 alloc_peak=395328",
+        "MFT records=262144 runs=13 reused_clusters=7 record_reuses=0"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 262144,
+        "mft_runs": 13,
+        "mft_physical_extent_count": 13,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            16,
+            615
+          ],
+          [
+            32,
+            32,
+            1655
+          ],
+          [
+            64,
+            64,
+            3743
+          ],
+          [
+            128,
+            128,
+            9170
+          ],
+          [
+            256,
+            256,
+            17507
+          ],
+          [
+            512,
+            512,
+            34174
+          ],
+          [
+            1024,
+            1024,
+            67522
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 150320,
+        "files": 150000,
+        "directories": 301,
+        "extension_records": 0,
+        "fragmented_files": []
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 17179869184,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "host/tree150k-01/prepared.json",
+          "bytes": 1056,
+          "sha256": "7ae0f3714fa9e1870f9f6c9b940f192ba18024e411ca753245f9c3a48b3d3329"
+        },
+        {
+          "path": "host/tree150k-01/manifest.json",
+          "bytes": 18154535,
+          "sha256": "01b915fb0fbb339884b2bfac80d2bafa3ba5be132fed638127ba4acc54f18082"
+        },
+        {
+          "path": "host/tree150k-01/writer.log",
+          "bytes": 561,
+          "sha256": "1e0d11777ce82fdec89838ce85f2cc5fa38bb89a0530fecd919ec56a995a9e44"
+        },
+        {
+          "path": "host/tree150k-01/windows/result.json",
+          "bytes": 26559463,
+          "sha256": "1d705b5696a93cd5f70423752fac1740c31cfb719b71b3ef49d0f45f3fa0a682"
+        },
+        {
+          "path": "host/tree150k-01/windows/chkdsk-stdout.txt",
+          "bytes": 4878,
+          "sha256": "e2d9a63f27f67546177fd8fbb5ab3159122dd60255769ba96e424c324c87df5d"
+        },
+        {
+          "path": "host/tree150k-01/windows-invocation.json",
+          "bytes": 850,
+          "sha256": "0b9a3f9fa983f5746fc9fbd0acf6a2b0cdd2e2de37c6b3e277b1fee2eea0ae12"
+        },
+        {
+          "path": "host/tree150k-01/completed.json",
+          "bytes": 691,
+          "sha256": "745138fb591497ed8e703724d2683d74e9e818add92f0950aa750c6bd6ba43fd"
+        },
+        {
+          "path": "host/tree150k-01/structure.json",
+          "bytes": 669,
+          "sha256": "81f7244c01fe1d50591e6156a04bc2bf9d056a080e680c26e93418973cfc84de"
+        }
+      ]
+    },
+    {
+      "case": "host/single50k-02",
+      "profile": "single50k",
+      "backend": "host regular-file writer",
+      "architecture": "host-x86_64",
+      "files": 50000,
+      "directories": 1,
+      "data_bytes": 204800000,
+      "image_bytes": 536870912,
+      "image_sha256": "a59760614a7d434a8400466944d38423a14d46ab8db6a3b27ba8bef0efa01ed5",
+      "elapsed_writer_seconds": 3.864244100000178,
+      "memory": {
+        "allocator_peak_bytes": 395576,
+        "host_image": {
+          "loaded_image_bytes": 1085440,
+          "stack_reserve_bytes": 1048576,
+          "stack_commit_bytes": 4096,
+          "stack_high_water_measured": false,
+          "allocator_counter_scope": "explicit Zig core requests; entire reserved host stack and loaded PE image counted separately; OS/host IO runtime excluded"
+        },
+        "program_ram_conservative_upper_bound_bytes": 2529592
+      },
+      "metadata_workload_evidence": [
+        "WIDE checkpoint=10000 seconds=1 alloc_peak=395416",
+        "WIDE checkpoint=25000 seconds=1 alloc_peak=395424",
+        "WIDE files=50000 seconds=3 alloc_peak=395576",
+        "MFT records=65536 runs=11 reused_clusters=1 record_reuses=0"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 65536,
+        "mft_runs": 11,
+        "mft_physical_extent_count": 11,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            16,
+            82
+          ],
+          [
+            32,
+            32,
+            162
+          ],
+          [
+            64,
+            64,
+            330
+          ],
+          [
+            128,
+            128,
+            666
+          ],
+          [
+            256,
+            256,
+            1338
+          ],
+          [
+            512,
+            512,
+            2682
+          ],
+          [
+            1024,
+            1024,
+            6497
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 50020,
+        "files": 50000,
+        "directories": 1,
+        "extension_records": 0,
+        "fragmented_files": []
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 536870912,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "host/single50k-02/prepared.json",
+          "bytes": 1054,
+          "sha256": "0907be35ff37fc184f0b9be0bdc52662d730a792dac267186b79ef887bf5767c"
+        },
+        {
+          "path": "host/single50k-02/manifest.json",
+          "bytes": 5600035,
+          "sha256": "741fba8c22ed81751d2c79bb14a07e8feef8a3f5568f6e6f249b69930ad8eba9"
+        },
+        {
+          "path": "host/single50k-02/writer.log",
+          "bytes": 621,
+          "sha256": "2e9cf4671c2f20b4fbee750d849d2cd49663ab509ed449842a06ed73bf69c123"
+        },
+        {
+          "path": "host/single50k-02/windows/result.json",
+          "bytes": 8402555,
+          "sha256": "97739a3b98552b513e584f8184215ffb6d2ca572bb1790206f30dee381277949"
+        },
+        {
+          "path": "host/single50k-02/windows/chkdsk-stdout.txt",
+          "bytes": 4581,
+          "sha256": "4226da6c6f27d3c1c859c09e70116729f50d34fdd118dd5c29e2972fda9186bc"
+        },
+        {
+          "path": "host/single50k-02/windows-invocation.json",
+          "bytes": 850,
+          "sha256": "ef7e5e4fd379ad1cb32d4c201e8abf9eeb5590dfeb0e9d0aef9a41fa16658fca"
+        },
+        {
+          "path": "host/single50k-02/completed.json",
+          "bytes": 691,
+          "sha256": "4d9bc521dea8b32067d7f075ef83d1b042d13929792baaf016c5c42f0d7b0fd9"
+        },
+        {
+          "path": "host/single50k-02/structure.json",
+          "bytes": 657,
+          "sha256": "888f1d39c517a93ba20e61dbd19342c29026905373889a22f90956632b63e1ff"
+        }
+      ]
+    },
+    {
+      "case": "host/fragment5g-01",
+      "profile": "fragment5g",
+      "backend": "host regular-file writer",
+      "architecture": "host-x86_64",
+      "files": 1025,
+      "directories": 1,
+      "data_bytes": 5435817984,
+      "image_bytes": 8589934592,
+      "image_sha256": "e2be9015151df2b8f7569df524b2476e9b6ec01fe57ac4649b90fd0ee99090a5",
+      "elapsed_writer_seconds": 18.337724300000446,
+      "memory": {
+        "allocator_peak_bytes": 456888,
+        "host_image": {
+          "loaded_image_bytes": 1085440,
+          "stack_reserve_bytes": 1048576,
+          "stack_commit_bytes": 4096,
+          "stack_high_water_measured": false,
+          "allocator_counter_scope": "explicit Zig core requests; entire reserved host stack and loaded PE image counted separately; OS/host IO runtime excluded"
+        },
+        "program_ram_conservative_upper_bound_bytes": 2590904
+      },
+      "metadata_workload_evidence": [
+        "FRAGMENT bytes=5368709120 runs=1025 attribute_list_records=8 actual_holes=1024",
+        "FRAGMENT READBACK sha256=1fa58631ed843f8402858c503cccefb9e5ee51cf7b69441241b3fa6af31c2bf0 OK",
+        "MFT records=4096 runs=7 reused_clusters=16384 record_reuses=9"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 4096,
+        "mft_runs": 7,
+        "mft_physical_extent_count": 7,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            16,
+            622
+          ],
+          [
+            32,
+            32,
+            1662
+          ],
+          [
+            64,
+            64,
+            3750
+          ],
+          [
+            128,
+            128,
+            9113
+          ],
+          [
+            256,
+            256,
+            17465
+          ],
+          [
+            512,
+            512,
+            34169
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 1053,
+        "files": 1025,
+        "directories": 1,
+        "extension_records": 8,
+        "fragmented_files": [
+          {
+            "record": 28,
+            "size": 5368709120,
+            "run_count": 1025,
+            "physical_extent_count": 1025,
+            "attribute_list": true,
+            "extension_records": 8,
+            "first_runs": [
+              [
+                0,
+                16,
+                37
+              ],
+              [
+                16,
+                16,
+                78
+              ],
+              [
+                32,
+                16,
+                110
+              ],
+              [
+                48,
+                16,
+                142
+              ],
+              [
+                64,
+                16,
+                174
+              ],
+              [
+                80,
+                16,
+                206
+              ],
+              [
+                96,
+                16,
+                238
+              ],
+              [
+                112,
+                16,
+                270
+              ]
+            ],
+            "last_runs": [
+              [
+                16272,
+                16,
+                34905
+              ],
+              [
+                16288,
+                16,
+                34937
+              ],
+              [
+                16304,
+                16,
+                34969
+              ],
+              [
+                16320,
+                16,
+                35001
+              ],
+              [
+                16336,
+                16,
+                35033
+              ],
+              [
+                16352,
+                16,
+                35065
+              ],
+              [
+                16368,
+                16,
+                35097
+              ],
+              [
+                16384,
+                1294336,
+                35129
+              ]
+            ]
+          }
+        ]
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 8589934592,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "host/fragment5g-01/prepared.json",
+          "bytes": 1062,
+          "sha256": "067db6aff5b7b88240fc9f972e0efd019696a9f93655358cc283a06e2b35ff29"
+        },
+        {
+          "path": "host/fragment5g-01/manifest.json",
+          "bytes": 115865,
+          "sha256": "3fe5cb0c4b03a7f779414f7ec82837f80c355b4e565395451b5d550d54dd64a7"
+        },
+        {
+          "path": "host/fragment5g-01/writer.log",
+          "bytes": 650,
+          "sha256": "39a3bdd755eefebb7f4208d2c8359ea724d3ba705b61fa46bf841daf73500837"
+        },
+        {
+          "path": "host/fragment5g-01/windows/result.json",
+          "bytes": 175791,
+          "sha256": "273934e93b7de7b39612a53bb28738e232b1469cb2c45b2ae4958abe19a39804"
+        },
+        {
+          "path": "host/fragment5g-01/windows/chkdsk-stdout.txt",
+          "bytes": 4496,
+          "sha256": "e00fcc0f9d8f634cb4f3f0aee2b1251d2e9bac146a56da9a09b25eeeca37a614"
+        },
+        {
+          "path": "host/fragment5g-01/windows-invocation.json",
+          "bytes": 854,
+          "sha256": "2150b2da7787daa67245b489d1bb91c0cfe3d663c0fb6de059727aade7c5eadc"
+        },
+        {
+          "path": "host/fragment5g-01/completed.json",
+          "bytes": 695,
+          "sha256": "657fee5566a69eee110f83791b7a0a771e98288bfd68cf81e369de1fe8e633cb"
+        },
+        {
+          "path": "host/fragment5g-01/structure.json",
+          "bytes": 1902,
+          "sha256": "795bf7a01344c1f1644f47162f4a065220b44db1674ae4c228dd33f1f2a1f698"
+        }
+      ]
+    },
+    {
+      "case": "firmware/final-cpu-01/cases/scale-x86_64-gpt",
+      "profile": "firmware",
+      "backend": "QEMU64MiB firmware",
+      "architecture": "x86_64",
+      "files": 10257,
+      "directories": 104,
+      "data_bytes": 34194432,
+      "image_bytes": 2147483648,
+      "image_sha256": "3ca5837bb83d54c6b43928d436537b430a1e2f50984eb48f313661a9f3ca792f",
+      "elapsed_writer_seconds": 66.4624987999996,
+      "memory": {
+        "program_footprint": {
+          "artifact_sha256": "e956ba5a3d495cf6eed6054d15298163b32e473c94a6a3c9cf411a40aeb54537",
+          "loaded_image_bytes": 221184,
+          "image_format": "PE32+",
+          "own_stack_bytes": 1048576,
+          "own_stack_already_in_allocator_peak": true,
+          "untracked_entry_stack_budget_bytes": 4096,
+          "firmware_allocations_included": false
+        },
+        "allocator_peak_bytes": 1463144,
+        "program_ram_conservative_upper_bound_bytes": 1688424,
+        "physical_heap": null
+      },
+      "metadata_workload_evidence": [
+        "WIDE files=5000 seconds=31 alloc_peak=1443456",
+        "TREE files=5000 directories=100 bytes=320000 seconds=57 alloc_peak=1443624",
+        "FRAGMENT bytes=16777216 runs=256 attribute_list_records=2 actual_holes=256",
+        "FRAGMENT READBACK sha256=6cfe26f79c2c02703fc93e25397b406cf04b1fe63fd1180b8e1c5eb1c6792fda OK",
+        "EMPTY-INDEX delete-all files=64 directory=Scratch OK",
+        "MFT records=16384 runs=9 reused_clusters=4096 record_reuses=68"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 16384,
+        "mft_runs": 9,
+        "mft_physical_extent_count": 9,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            48,
+            46
+          ],
+          [
+            64,
+            64,
+            102
+          ],
+          [
+            128,
+            128,
+            182
+          ],
+          [
+            256,
+            256,
+            342
+          ],
+          [
+            512,
+            512,
+            662
+          ],
+          [
+            1024,
+            1024,
+            1302
+          ],
+          [
+            2048,
+            1203,
+            2893
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 10382,
+        "files": 10257,
+        "directories": 104,
+        "extension_records": 2,
+        "fragmented_files": [
+          {
+            "record": 10130,
+            "size": 16777216,
+            "run_count": 256,
+            "physical_extent_count": 256,
+            "attribute_list": true,
+            "extension_records": 2,
+            "first_runs": [
+              [
+                0,
+                16,
+                6422
+              ],
+              [
+                16,
+                16,
+                6463
+              ],
+              [
+                32,
+                16,
+                6495
+              ],
+              [
+                48,
+                16,
+                6527
+              ],
+              [
+                64,
+                16,
+                6559
+              ],
+              [
+                80,
+                16,
+                6591
+              ],
+              [
+                96,
+                16,
+                6623
+              ],
+              [
+                112,
+                16,
+                6655
+              ]
+            ],
+            "last_runs": [
+              [
+                3968,
+                16,
+                14391
+              ],
+              [
+                3984,
+                16,
+                14423
+              ],
+              [
+                4000,
+                16,
+                14455
+              ],
+              [
+                4016,
+                16,
+                14487
+              ],
+              [
+                4032,
+                16,
+                14519
+              ],
+              [
+                4048,
+                16,
+                14551
+              ],
+              [
+                4064,
+                16,
+                14583
+              ],
+              [
+                4080,
+                16,
+                14615
+              ]
+            ]
+          }
+        ]
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 2147483648,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/prepared.json",
+          "bytes": 388,
+          "sha256": "862c234521f9dd4c7fa0ff01d4b538976816071f88a8217c91d24d1955424480"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/manifest.json",
+          "bytes": 1448077,
+          "sha256": "d7ab470b878d78cf227214cc0ca83f017c445b36b4182c49aa72b7e8e8f3124b"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/run-64m/USOSPREP.LOG",
+          "bytes": 1752,
+          "sha256": "0ae2eebdce374e34875b0c72ad6f459b620776288e3eab6aeb7cc4f5540c5b01"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-x86_64-gpt-windows01/result.json",
+          "bytes": 1748452,
+          "sha256": "b4a5ac50ea1a4cadb12a37fd7dd9ff1bcbab531c8830539f584928b7c89f3ec9"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-x86_64-gpt-windows01/chkdsk-stdout.txt",
+          "bytes": 4510,
+          "sha256": "4b9cb8d87cb7c7572cc36646a8e6d9cead746464b4c14483b310afc5ae2a3454"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-x86_64-gpt/windows-invocation.json",
+          "bytes": 1353,
+          "sha256": "6391591220e70752b7faab61e2e29eedaa4d8d22a5cffcc8ae29a68a27bbd1f0"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/program-footprint.json",
+          "bytes": 316,
+          "sha256": "438ec4c9f43b1e92b90026339696d08e29c8f1f9cd5fb2c8000daebb2a303622"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/run-64m/completed.json",
+          "bytes": 2366,
+          "sha256": "7811b6455743220044e9290ca32050259184fcebada314570c9ac77711b33a0b"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-x86_64-gpt/export.json",
+          "bytes": 1106,
+          "sha256": "5064999d12b9ae2e59f5fdb215e6ff944a4c37a4d60805179684b75bfc1fddf7"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-x86_64-gpt/identifiers.json",
+          "bytes": 186,
+          "sha256": "79d2eeb698926cfc4405d36d27da926a4b25c9c1cd2ab428e23f180577fafa7b"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-x86_64-gpt/metadata-inspection.json",
+          "bytes": 1948,
+          "sha256": "fa983a95ca2e6af351824ada6524d245909980781e1e21c9db1d6cc735b2a2e2"
+        }
+      ]
+    },
+    {
+      "case": "firmware/final-cpu-01/cases/scale-ia32-gpt",
+      "profile": "firmware",
+      "backend": "QEMU64MiB firmware",
+      "architecture": "ia32",
+      "files": 10257,
+      "directories": 104,
+      "data_bytes": 34194432,
+      "image_bytes": 2147483648,
+      "image_sha256": "f9b6ec8c64303290769cf6a4eeb66ff74efcf5515ed17e7a262ed3fa3b711ab4",
+      "elapsed_writer_seconds": 105.17531679999956,
+      "memory": {
+        "program_footprint": {
+          "artifact_sha256": "58ffecf06730991072fa9b156f6661f88f7658b1459d907c31f4e4a9eada0c65",
+          "loaded_image_bytes": 225280,
+          "image_format": "PE32",
+          "own_stack_bytes": 1048576,
+          "own_stack_already_in_allocator_peak": true,
+          "untracked_entry_stack_budget_bytes": 4096,
+          "firmware_allocations_included": false
+        },
+        "allocator_peak_bytes": 1463704,
+        "program_ram_conservative_upper_bound_bytes": 1693080,
+        "physical_heap": null
+      },
+      "metadata_workload_evidence": [
+        "WIDE files=5000 seconds=50 alloc_peak=1443248",
+        "TREE files=5000 directories=100 bytes=320000 seconds=92 alloc_peak=1443280",
+        "FRAGMENT bytes=16777216 runs=256 attribute_list_records=2 actual_holes=256",
+        "FRAGMENT READBACK sha256=6cfe26f79c2c02703fc93e25397b406cf04b1fe63fd1180b8e1c5eb1c6792fda OK",
+        "EMPTY-INDEX delete-all files=64 directory=Scratch OK",
+        "MFT records=16384 runs=9 reused_clusters=4096 record_reuses=68"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 16384,
+        "mft_runs": 9,
+        "mft_physical_extent_count": 9,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            48,
+            46
+          ],
+          [
+            64,
+            64,
+            102
+          ],
+          [
+            128,
+            128,
+            182
+          ],
+          [
+            256,
+            256,
+            342
+          ],
+          [
+            512,
+            512,
+            662
+          ],
+          [
+            1024,
+            1024,
+            1302
+          ],
+          [
+            2048,
+            1203,
+            2893
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 10382,
+        "files": 10257,
+        "directories": 104,
+        "extension_records": 2,
+        "fragmented_files": [
+          {
+            "record": 10130,
+            "size": 16777216,
+            "run_count": 256,
+            "physical_extent_count": 256,
+            "attribute_list": true,
+            "extension_records": 2,
+            "first_runs": [
+              [
+                0,
+                16,
+                6422
+              ],
+              [
+                16,
+                16,
+                6463
+              ],
+              [
+                32,
+                16,
+                6495
+              ],
+              [
+                48,
+                16,
+                6527
+              ],
+              [
+                64,
+                16,
+                6559
+              ],
+              [
+                80,
+                16,
+                6591
+              ],
+              [
+                96,
+                16,
+                6623
+              ],
+              [
+                112,
+                16,
+                6655
+              ]
+            ],
+            "last_runs": [
+              [
+                3968,
+                16,
+                14391
+              ],
+              [
+                3984,
+                16,
+                14423
+              ],
+              [
+                4000,
+                16,
+                14455
+              ],
+              [
+                4016,
+                16,
+                14487
+              ],
+              [
+                4032,
+                16,
+                14519
+              ],
+              [
+                4048,
+                16,
+                14551
+              ],
+              [
+                4064,
+                16,
+                14583
+              ],
+              [
+                4080,
+                16,
+                14615
+              ]
+            ]
+          }
+        ]
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 2147483648,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/prepared.json",
+          "bytes": 384,
+          "sha256": "37858996681893ba40581b4869bed008c546afc65634bf62bd7279a11f5891ec"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/manifest.json",
+          "bytes": 1448077,
+          "sha256": "d7ab470b878d78cf227214cc0ca83f017c445b36b4182c49aa72b7e8e8f3124b"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/run-64m/USOSPREP.LOG",
+          "bytes": 1748,
+          "sha256": "b8406186584eb1f3d5b7d1296cf3aae2a793b6c91a8ba092ba62a042526dee2e"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-ia32-gpt-windows01/result.json",
+          "bytes": 1748446,
+          "sha256": "3f6771f54a4a89ac868dfcd96f329fbb54c6236538eef43a5dc5b3aeb7977090"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-ia32-gpt-windows01/chkdsk-stdout.txt",
+          "bytes": 4510,
+          "sha256": "f7305bf3261007e0e26fd51c93bc0be26a1babf98a35a05a2ea3cf96b915665d"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-ia32-gpt/windows-invocation.json",
+          "bytes": 1345,
+          "sha256": "92775b8e4f148bfadff59ceed416addb4aba853e2c25c43555e91f515f354482"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/program-footprint.json",
+          "bytes": 315,
+          "sha256": "653f40f50740f2fa0416a4a95e42eacbdaee4ab601ca4f5cb765024ce6853021"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/run-64m/completed.json",
+          "bytes": 2350,
+          "sha256": "d1c1d15f4337f4751eeecaf028c50bc256a3bd13550445635e20b18700d56369"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-ia32-gpt/export.json",
+          "bytes": 1096,
+          "sha256": "f4e032d66b003e79fd471aa2b284c921f5891af36f40b5ec1d36c14c97d4ed41"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-ia32-gpt/identifiers.json",
+          "bytes": 186,
+          "sha256": "c69842a47669ee84145c3cea18a1676893955d4d856448f7d9d75f4c70909867"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-ia32-gpt/metadata-inspection.json",
+          "bytes": 1948,
+          "sha256": "fa983a95ca2e6af351824ada6524d245909980781e1e21c9db1d6cc735b2a2e2"
+        }
+      ]
+    },
+    {
+      "case": "firmware/final-cpu-01/cases/scale-bios-gpt",
+      "profile": "firmware",
+      "backend": "QEMU64MiB firmware",
+      "architecture": "bios",
+      "files": 10257,
+      "directories": 104,
+      "data_bytes": 34194432,
+      "image_bytes": 2147483648,
+      "image_sha256": "65ca90c3945acad4d591b651442ef6aab2843bcd5759216b392821a2884e1090",
+      "elapsed_writer_seconds": 176.68872120000015,
+      "memory": {
+        "program_footprint": {
+          "artifact_sha256": "906c4b1e87937300f5c09d77e9704d9e6296ed34aaf9b9cb6b0cc63adff8c028",
+          "linked_elf_sha256": "9033c083a077ea0bfa2a7b69d3ac010f025b42b10346e103f7fa2a6fc8e217be",
+          "payload_sha256": "8f3550cdb256a333691e30d97fc055da1abb42021f6722926bb25018428f5418",
+          "linked_elf_matches_payload": true,
+          "loaded_image_bytes": 153228,
+          "allocated_sections": [
+            {
+              "type": 1,
+              "address": 131072,
+              "bytes": 4144
+            },
+            {
+              "type": 1,
+              "address": 135216,
+              "bytes": 89582
+            },
+            {
+              "type": 1,
+              "address": 224800,
+              "bytes": 59500
+            }
+          ],
+          "image_format": "ELF32 flat BIOS payload",
+          "own_stack_reserved_bytes": 253952,
+          "thunk_and_bootstrap_low_memory_budget_bytes": 131072,
+          "own_stack_already_in_allocator_peak": false,
+          "firmware_allocations_included": false
+        },
+        "allocator_peak_bytes": 410420,
+        "program_ram_conservative_upper_bound_bytes": 8926860,
+        "physical_heap": {
+          "physical_current_bytes": 0,
+          "physical_peak_bytes": 410700,
+          "extent_peak_bytes": 410900,
+          "reserved_bytes": 8388608,
+          "arbitrary_order_free": true
+        }
+      },
+      "metadata_workload_evidence": [
+        "WIDE files=5000 seconds=72 alloc_peak=394704",
+        "TREE files=5000 directories=100 bytes=320000 seconds=152 alloc_peak=394704",
+        "FRAGMENT bytes=16777216 runs=256 attribute_list_records=2 actual_holes=256",
+        "FRAGMENT READBACK sha256=6cfe26f79c2c02703fc93e25397b406cf04b1fe63fd1180b8e1c5eb1c6792fda OK",
+        "EMPTY-INDEX delete-all files=64 directory=Scratch OK",
+        "MFT records=16384 runs=9 reused_clusters=4096 record_reuses=68"
+      ],
+      "independent_structure": {
+        "kind": "independent-readonly-NTFS-byte-inspection",
+        "mft_records": 16384,
+        "mft_runs": 9,
+        "mft_physical_extent_count": 9,
+        "mft_first_runs": [
+          [
+            0,
+            16,
+            4
+          ],
+          [
+            16,
+            48,
+            46
+          ],
+          [
+            64,
+            64,
+            102
+          ],
+          [
+            128,
+            128,
+            182
+          ],
+          [
+            256,
+            256,
+            342
+          ],
+          [
+            512,
+            512,
+            662
+          ],
+          [
+            1024,
+            1024,
+            1302
+          ],
+          [
+            2048,
+            1203,
+            2893
+          ]
+        ],
+        "mft_mirror_equal": true,
+        "used_records": 10382,
+        "files": 10257,
+        "directories": 104,
+        "extension_records": 2,
+        "fragmented_files": [
+          {
+            "record": 10130,
+            "size": 16777216,
+            "run_count": 256,
+            "physical_extent_count": 256,
+            "attribute_list": true,
+            "extension_records": 2,
+            "first_runs": [
+              [
+                0,
+                16,
+                6422
+              ],
+              [
+                16,
+                16,
+                6463
+              ],
+              [
+                32,
+                16,
+                6495
+              ],
+              [
+                48,
+                16,
+                6527
+              ],
+              [
+                64,
+                16,
+                6559
+              ],
+              [
+                80,
+                16,
+                6591
+              ],
+              [
+                96,
+                16,
+                6623
+              ],
+              [
+                112,
+                16,
+                6655
+              ]
+            ],
+            "last_runs": [
+              [
+                3968,
+                16,
+                14391
+              ],
+              [
+                3984,
+                16,
+                14423
+              ],
+              [
+                4000,
+                16,
+                14455
+              ],
+              [
+                4016,
+                16,
+                14487
+              ],
+              [
+                4032,
+                16,
+                14519
+              ],
+              [
+                4048,
+                16,
+                14551
+              ],
+              [
+                4064,
+                16,
+                14583
+              ],
+              [
+                4080,
+                16,
+                14615
+              ]
+            ]
+          }
+        ]
+      },
+      "windows": {
+        "passed": true,
+        "exact_file_bytes_and_paths": true,
+        "readonly_chkdsk_pass": true,
+        "chkdsk_exit": 0,
+        "chkdsk_flags": [],
+        "actual_virtual_disk_bytes": 2147483648,
+        "source_image_unchanged": true,
+        "vhd_unchanged": true,
+        "temporary_alias_removed": true,
+        "vhd_detached": true
+      },
+      "receipts": [
+        {
+          "path": "firmware/final-cpu-01/cases/scale-bios-gpt/prepared.json",
+          "bytes": 391,
+          "sha256": "2b1ab31fb2b3bfa3e61341d5f88246a3476ba15bde2f61eabd0ecdaf91972cab"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-bios-gpt/manifest.json",
+          "bytes": 1448077,
+          "sha256": "d7ab470b878d78cf227214cc0ca83f017c445b36b4182c49aa72b7e8e8f3124b"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-bios-gpt/run-64m/USOSPREP.LOG",
+          "bytes": 1065,
+          "sha256": "dee28f9c099ad7d658546f8930d9192e0ec6f27461b0684a65a221125e77869a"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-bios-gpt-windows01/result.json",
+          "bytes": 1748446,
+          "sha256": "b910ba47f209ff05d2470cf0577bcc83173636e006a4d2e74cb5ea5408af264a"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/scale-bios-gpt-windows01/chkdsk-stdout.txt",
+          "bytes": 4510,
+          "sha256": "ff75975aaef0d820e269b2112d95b661c6b35358a2a15f6fbc79ef152b6d159a"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-bios-gpt/windows-invocation.json",
+          "bytes": 1345,
+          "sha256": "68ff578cf6714ca8f09ca149289a89f28f6d7bb4826026d368b1fe3f6dddd226"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-bios-gpt/program-footprint.json",
+          "bytes": 828,
+          "sha256": "ef1567b5259999152ba24c38fb796ef4ebfb571d926c1a733d99d8063f1dafa8"
+        },
+        {
+          "path": "firmware/final-cpu-01/cases/scale-bios-gpt/run-64m/completed.json",
+          "bytes": 2099,
+          "sha256": "5b494b8dc97d48d4932c21f3840febbc0e4dedac8404fa70171590cc393f1575"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-bios-gpt/export.json",
+          "bytes": 1096,
+          "sha256": "9971b4568c82315245d44a6439fae7b32e6a77d639f48507d756fe2686c04c32"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-bios-gpt/identifiers.json",
+          "bytes": 186,
+          "sha256": "75fc8e8e86cfed5b906933543e8ad98dbf5c717f6b8f5667802848c0bccd1c2e"
+        },
+        {
+          "path": "firmware/final-cpu-01/oracle/inputs/scale-bios-gpt/metadata-inspection.json",
+          "bytes": 1948,
+          "sha256": "fa983a95ca2e6af351824ada6524d245909980781e1e21c9db1d6cc735b2a2e2"
+        }
+      ]
+    }
+  ],
+  "cleanup": [
+    {
+      "receipt": {
+        "path": "cleanup-accepted-final-completed.json",
+        "bytes": 3170,
+        "sha256": "361fed324881031c9547946134320a360caee9826799a7560842878a4372ded3"
+      },
+      "removed_bytes": 106490602688,
+      "images_count": 41,
+      "report_before_cleanup": {
+        "path": "validation/final-report-pre-cleanup.md",
+        "bytes": 14113,
+        "sha256": "2885905cc6237137e00d614fbe2eaf696ecee6dec115239bb727b0379d018515"
+      }
+    },
+    {
+      "receipt": {
+        "path": "cleanup-auxiliary-completed.json",
+        "bytes": 1600,
+        "sha256": "4e3fb0144a1750cebe5adecda5ce5bc9ccee14b1ec5e69d8050cc2596d7e6c3c"
+      },
+      "removed_bytes": 4833024000,
+      "images_count": 15,
+      "report_before_cleanup": {
+        "path": "validation/final-report-pre-cleanup.md",
+        "bytes": 14113,
+        "sha256": "2885905cc6237137e00d614fbe2eaf696ecee6dec115239bb727b0379d018515"
+      }
+    },
+    {
+      "receipt": {
+        "path": "cleanup-cpu-completed.json",
+        "bytes": 6954,
+        "sha256": "976fcab27af86b259d21e65f527952e335fcb8259cffa8d3777aa904733609ab"
+      },
+      "removed_bytes": 28468060864,
+      "images_count": 83,
+      "report_before_cleanup": {
+        "path": "validation/final-report-pre-cleanup.md",
+        "bytes": 14113,
+        "sha256": "2885905cc6237137e00d614fbe2eaf696ecee6dec115239bb727b0379d018515"
+      }
+    }
+  ],
+  "owned_images_remaining": 0,
+  "validation": {
+    "summary": {
+      "path": "validation/acceptance-tests.json",
+      "bytes": 787,
+      "sha256": "ca975c869c065b9affda48857c25e13926eb94dc5cc263386be55fb695fd6a45"
+    },
+    "suites": [
+      {
+        "kind": "zig-build",
+        "tests": 652,
+        "returncode": 0,
+        "scope": "final firmware i486/BIOS heap build and complete shared Zig unit suite; host executable preserved",
+        "transcript": {
+          "path": "validation/build-cpu-heap02.log",
+          "bytes": 3899,
+          "sha256": "4cbff07cda723a24ecd4b467593287b1edb73e2fbef3da86dc2b045ebf7f11fa"
+        }
+      },
+      {
+        "kind": "zig-standalone",
+        "tests": 4,
+        "returncode": 0,
+        "scope": "bounded coalescing allocator non-LIFO/alignment/realloc/pressure regressions",
+        "transcript": {
+          "path": "validation/fixed-heap-tests01.log",
+          "bytes": 379,
+          "sha256": "e472bf43cce156ca22711894598c985cc62cc9fa9a4bb14270f1be37dcd3a488"
+        }
+      },
+      {
+        "kind": "python-unittest",
+        "tests": 59,
+        "returncode": 0,
+        "scope": "final guard/scaling/CPU/RAM/exact evidence plus final-report-before-cleanup policy",
+        "transcript": {
+          "path": "validation/python-final04.log",
+          "bytes": 9906,
+          "sha256": "bc2d7227ef175b54620df51a894b9b29179e2398d45a2df45298dec0f6870896"
+        }
+      }
+    ]
+  },
+  "cpu_and_machine_ram": {
+    "summary": {
+      "path": "validation/cpu-ram.json",
+      "bytes": 14013,
+      "sha256": "4096318adb697f977563c3e5123e12954130b0ed481f52b14f6d6b51b50e529c"
+    },
+    "architectures": {
+      "bios": {
+        "application_cpu_baseline": "i486",
+        "artifact_sha256": "906c4b1e87937300f5c09d77e9704d9e6296ed34aaf9b9cb6b0cc63adff8c028",
+        "minimum_ram_mib": 2,
+        "preceding_failure_ram_mib": 1,
+        "adjacent_lower_failure_proven": true,
+        "minimum_scope": "Lowest completed SeaBIOS/QEMU486 scaling workload:2MiB PASS,1MiB explicit NoSpace; full independent Windows gates additionally passed for486 and Pentium32MiB. Not a physical-hardware or Windows-installation RAM minimum.",
+        "firmware_cpu_requirements": "QEMU486 and Pentium complete the exact same i486-built workload at32MiB; application clock is BDA and entropy is host-CSPRNG fw_cfg PIO.",
+        "qemu_cpu_runs": [
+          {
+            "cpu": "486",
+            "memory_mib": 64,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/final-cpu-01/cases/scale-bios-gpt/run-64m/completed.json",
+              "bytes": 2099,
+              "sha256": "5b494b8dc97d48d4932c21f3840febbc0e4dedac8404fa70171590cc393f1575"
+            },
+            "log": {
+              "path": "firmware/final-cpu-01/cases/scale-bios-gpt/run-64m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "dee28f9c099ad7d658546f8930d9192e0ec6f27461b0684a65a221125e77869a"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 16,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-16m/completed.json",
+              "bytes": 2051,
+              "sha256": "0c628b51fa8ea1cd1d49bb78e6775787ce61600e0a5ea985d9119903531f58ef"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-16m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "4e53b0720567ab5767314b5da6e33de11835777d739da0836cc1160622bb8ffa"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 1,
+            "application_pass": false,
+            "returncode": 35,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-1m/completed.json",
+              "bytes": 2045,
+              "sha256": "806d821c66cc961f785204bbdc5ef9fa2d2cfd922c5d0d0d3f2d94f42cac434c"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-1m/USOSPREP.LOG",
+              "bytes": 31,
+              "sha256": "4e0a6f136d3beda68bbdf376139ce5e4e99598f729007a66e737ff4f4f936d2d"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 2,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-2m/completed.json",
+              "bytes": 2044,
+              "sha256": "e40d704894508a208c797ad8517a2e214f79c13e0897fc1df40be2d7f7b09964"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-2m/USOSPREP.LOG",
+              "bytes": 1062,
+              "sha256": "34394daa93f76c05b3787788b482b2fa0c77bf54e79795a642777b7c28be763e"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 32,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-32m/completed.json",
+              "bytes": 2051,
+              "sha256": "1d9fecc2177abcaff542799b518f7e0f8f53df62685f99a90770348f63b89c7b"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-32m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "113ea511767baed303e80da14efa4fcb3106646e416c23ae64dd5a5ee59cc772"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 4,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-4m/completed.json",
+              "bytes": 2044,
+              "sha256": "3c8432d3c71760e94c788df2990ba5352f28ab91a4ecd74655be12ee46eb0ebf"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-4m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "1244e7550518e2a2e908881144ab6b617d027643bb53ba2089f4ab5a63fb6259"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 8,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-8m/completed.json",
+              "bytes": 2044,
+              "sha256": "4e2d698aa44c7ce8c9a7a71ef34c752e2de6b01f017a5db12cae40600b3d0973"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-486/run-8m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "4bce0bdc14bb582e1b0050f0b5b04d422dd6e523885405d56f68e114f13cc6db"
+            }
+          },
+          {
+            "cpu": "pentium",
+            "memory_mib": 32,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/bios-pentium/run-32m/completed.json",
+              "bytes": 2079,
+              "sha256": "b555784a011e1ab24d56de438e1e7b478d68384b5ef868fd6c0b199b4e9f89cc"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/bios-pentium/run-32m/USOSPREP.LOG",
+              "bytes": 1065,
+              "sha256": "9de9a889979f8e338722dfa868abc6802a54fa628c3bd8588c26db4e0c191e92"
+            }
+          }
+        ]
+      },
+      "ia32": {
+        "application_cpu_baseline": "i486",
+        "artifact_sha256": "58ffecf06730991072fa9b156f6661f88f7658b1459d907c31f4e4a9eada0c65",
+        "minimum_ram_mib": 43,
+        "preceding_failure_ram_mib": 42,
+        "adjacent_lower_failure_proven": true,
+        "minimum_scope": "Lowest completed supplied IA32 OVMF plus QEMU486 workload:43MiB PASS,42MiB exit35 failure.32MiB and40MiB timed out without an extracted application log; their precise failure point is unproven. Program allocator peak is separate from whole-firmware RAM.",
+        "firmware_cpu_requirements": "The supplied IA32 OVMF completed on the tested QEMU486 model. The application is explicitly compiled i486 and generated assembly audited without SIMD/CMOV; physical486 firmware behavior is unverified.",
+        "qemu_cpu_runs": [
+          {
+            "cpu": "max",
+            "memory_mib": 64,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/run-64m/completed.json",
+              "bytes": 2350,
+              "sha256": "d1c1d15f4337f4751eeecaf028c50bc256a3bd13550445635e20b18700d56369"
+            },
+            "log": {
+              "path": "firmware/final-cpu-01/cases/scale-ia32-gpt/run-64m/USOSPREP.LOG",
+              "bytes": 1748,
+              "sha256": "b8406186584eb1f3d5b7d1296cf3aae2a793b6c91a8ba092ba62a042526dee2e"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 32,
+            "application_pass": false,
+            "returncode": 1,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-32m/completed.json",
+              "bytes": 2293,
+              "sha256": "0adb9da93230174757cbf9b7007825f9af1d805cf743ddc0bc464271fc117704"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 40,
+            "application_pass": false,
+            "returncode": 1,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-40m/completed.json",
+              "bytes": 2293,
+              "sha256": "e78c043b5dc177766a4df01bef69dd3b91517a48da0391afbd8a9f71c1ede7d3"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 42,
+            "application_pass": false,
+            "returncode": 35,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-42m/completed.json",
+              "bytes": 2296,
+              "sha256": "c459042551e624f75aaca0f587388f1d1a92d42b1f75a91ee43f3d5552347bb4"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 43,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-43m/completed.json",
+              "bytes": 2294,
+              "sha256": "f46cfd23e92b831695187b30ee98db3ebd5cb3ccf978a6476f8d472876e692e8"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-43m/USOSPREP.LOG",
+              "bytes": 1749,
+              "sha256": "0ea03e0bd4fa75fc5a5d6a169308dbddca59b9db175023bf609857b2c1748d24"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 44,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-44m/completed.json",
+              "bytes": 2294,
+              "sha256": "3ee06ed13d37a1b290de412bb46d56f371fbbf9c6bad7ce6ef2a93f9e884b7eb"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-44m/USOSPREP.LOG",
+              "bytes": 1749,
+              "sha256": "2505d2ec875c39e7993da15bf2e128b3a75fc2168d42270668e2b9a743f75e66"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 48,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-48m/completed.json",
+              "bytes": 2294,
+              "sha256": "3f9be6ec863a82b6021cb1c7a7a9b6ac396d877db4bfe6f5b82efb6dd07a192d"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-48m/USOSPREP.LOG",
+              "bytes": 1748,
+              "sha256": "2911a6b9dd07667f7101b06c1e70727ed54bc0f801308ab1f19f58297830e87c"
+            }
+          },
+          {
+            "cpu": "486",
+            "memory_mib": 64,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-64m/completed.json",
+              "bytes": 2293,
+              "sha256": "fb09f6c52fc79fa264624903baae92c380d758bbd6193fd074bf56f42affaa36"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/ia32-486/run-64m/USOSPREP.LOG",
+              "bytes": 1748,
+              "sha256": "265a19d5b32464073a97b9ae1a024caf67cce53a557a9639e35b83d54b116cad"
+            }
+          }
+        ]
+      },
+      "x86_64": {
+        "application_cpu_baseline": "x86_64",
+        "artifact_sha256": "e956ba5a3d495cf6eed6054d15298163b32e473c94a6a3c9cf411a40aeb54537",
+        "minimum_ram_mib": 52,
+        "preceding_failure_ram_mib": null,
+        "adjacent_lower_failure_proven": false,
+        "minimum_scope": "Lowest completed supplied x64 OVMF plus QEMU qemu64 workload:52MiB PASS.48MiB and32MiB timed out without an extracted application log; their precise failure point is unproven.50MiB and51MiB were not run after the operator boundary stop, so no adjacent lower bound is claimed.",
+        "firmware_cpu_requirements": "QEMU qemu64 completed the workload; x86_64 application baseline includes SSE2. This does not establish the minimum of every physical x86_64 implementation.",
+        "qemu_cpu_runs": [
+          {
+            "cpu": "max",
+            "memory_mib": 64,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/run-64m/completed.json",
+              "bytes": 2366,
+              "sha256": "7811b6455743220044e9290ca32050259184fcebada314570c9ac77711b33a0b"
+            },
+            "log": {
+              "path": "firmware/final-cpu-01/cases/scale-x86_64-gpt/run-64m/USOSPREP.LOG",
+              "bytes": 1752,
+              "sha256": "0ae2eebdce374e34875b0c72ad6f459b620776288e3eab6aeb7cc4f5540c5b01"
+            }
+          },
+          {
+            "cpu": "qemu64",
+            "memory_mib": 32,
+            "application_pass": false,
+            "returncode": 1,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-32m/completed.json",
+              "bytes": 2336,
+              "sha256": "f3652d020c9b61234d78491383f1f0fbfc17ca62fd8a7e3fab84eefd9aeb995b"
+            }
+          },
+          {
+            "cpu": "qemu64",
+            "memory_mib": 48,
+            "application_pass": false,
+            "returncode": 1,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-48m/completed.json",
+              "bytes": 2335,
+              "sha256": "9e34097f141cafa34a2f5875cba06c1ad91c953a0214b23762a55729ec4f8de1"
+            }
+          },
+          {
+            "cpu": "qemu64",
+            "memory_mib": 52,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-52m/completed.json",
+              "bytes": 2335,
+              "sha256": "5359ad0b16b4d93a754305a7a69040e27bc08c3442d09f8122f3881e5d9391c1"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-52m/USOSPREP.LOG",
+              "bytes": 1752,
+              "sha256": "cc70cf6d14ccb10f66b1ee11a11374c5dabba3869999ec46252881b755d43f73"
+            }
+          },
+          {
+            "cpu": "qemu64",
+            "memory_mib": 56,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-56m/completed.json",
+              "bytes": 2335,
+              "sha256": "7665a88830f54b7dcb418a99f48211ecd8b3cb6f278ea2731bc36bee95018456"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-56m/USOSPREP.LOG",
+              "bytes": 1752,
+              "sha256": "5347fc97d19ebe635a0663f9c06bca550a2d4a6dc1aa3915bfc81502505ebea1"
+            }
+          },
+          {
+            "cpu": "qemu64",
+            "memory_mib": 64,
+            "application_pass": true,
+            "returncode": 33,
+            "receipt": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-64m/completed.json",
+              "bytes": 2335,
+              "sha256": "7b8a17a3a0a53472b3ddb7bcd9b69d0b4af61c3a934aefa8ffc6268b6164c356"
+            },
+            "log": {
+              "path": "firmware/cpu-ram-01/cases/x86_64-qemu64/run-64m/USOSPREP.LOG",
+              "bytes": 1752,
+              "sha256": "e52c61fbabc0fa9b66dded0383e6d8b3f2f4545c10d2733c65390884ddc27745"
+            }
+          }
+        ]
+      }
+    },
+    "hardware_verified": false,
+    "minimum_unit": "MiB; lowest passing completed attempt, not an untested universal minimum"
+  },
+  "scope": {
+    "wim_started": false,
+    "physical_devices_used": false,
+    "merge_deploy_push_performed": false,
+    "memory_note": "Conservative own-program upper bounds include loaded code/static and entire reserved stack; firmware and OS/host IO runtime excluded; no stack high-water claim"
+  }
+}
