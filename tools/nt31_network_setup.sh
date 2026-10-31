@@ -147,6 +147,19 @@ EOF
     [ -z "$_u31_gw" ] || usos_nt31_ipv4 "$_u31_gw" || _u31_gw=''
     return 0
 }
+# The card's MAC without DHCP (static profile address): igb loaded only to
+# read it, then unloaded. Sets _u31_mac ('' when it cannot).
+usos_nt31_read_mac() {
+    _u31_if='' _u31_mac=''
+    modprobe igb 2>/dev/null || return 0
+    _u31_i=0
+    while [ "$_u31_i" -lt 10 ] && [ -z "$_u31_if" ]; do
+        for _u31_n in "$_u31_nodepath"/net/*; do [ -e "$_u31_n" ] && _u31_if=${_u31_n##*/}; done
+        [ -n "$_u31_if" ] || { sleep 1; _u31_i=$((_u31_i + 1)); }
+    done
+    [ -z "$_u31_if" ] || _u31_mac=$(cat "${USOS_NET_CLASS:-/sys/class/net}/$_u31_if/address" 2>/dev/null || true)
+    modprobe -r igb 2>/dev/null || true
+}
 usos_nt31_dhcp_end() {
     [ -z "$_u31_if" ] || usos_nt31_bb ip link set dev "$_u31_if" down 2>/dev/null || true
     modprobe -r igb 2>/dev/null || true
@@ -159,6 +172,7 @@ usos_nt31_address() {
         _u31_mode=profile _u31_ip=${_u31_pip%/*}
         _u31_mask=$(usos_nt31_mask "${_u31_pip#*/}") || return 1
         _u31_gw=$_u31_pgw _u31_dns=$(printf '%s' "$_u31_pdns" | tr ',' ' ')
+        usos_nt31_read_mac
         return 0
     fi
     if usos_nt31_dhcp "$1" "$2"; then
@@ -190,9 +204,9 @@ usos_nt31_stage() {
     cp "$_u31_sys" "$_u31_dir/USNET31.SYS" && cmp -s "$_u31_sys" "$_u31_dir/USNET31.SYS" || return 1
     _u31_client=keep
     [ "$2" != 0 ] || _u31_client=no-sharing
-    printf 'network=on\r\nmode=%s\r\nip=%s\r\nmask=%s\r\ngateway=%s\r\ndns=%s\r\ndomain=%s\r\nlease_s=%s\r\ndhcp_server=%s\r\nnote=%s\r\nbus=%s\r\ndevice=%s\r\nfunction=%s\r\npci_id=8086:%s\r\nsha256=%s\r\nworkgroup=%s\r\nclient=%s\r\n' \
+    printf 'network=on\r\nmode=%s\r\nip=%s\r\nmask=%s\r\ngateway=%s\r\ndns=%s\r\ndomain=%s\r\nlease_s=%s\r\ndhcp_server=%s\r\nnote=%s\r\nbus=%s\r\ndevice=%s\r\nfunction=%s\r\npci_id=8086:%s\r\nsha256=%s\r\nworkgroup=%s\r\nclient=%s\r\nmac=%s\r\n' \
         "$_u31_mode" "$_u31_ip" "$_u31_mask" "$_u31_gw" "$_u31_dns" "$_u31_domain" "$_u31_lease" "$_u31_server" "$_u31_why" \
-        "$_u31_bus" "$_u31_dev" "$_u31_fn" "${_u31_dev_id#0x}" "$_u31_actual" "$_u31_group" "$_u31_client" > "$_u31_dir/NET31.ON" || return 1
+        "$_u31_bus" "$_u31_dev" "$_u31_fn" "${_u31_dev_id#0x}" "$_u31_actual" "$_u31_group" "$_u31_client" "$(printf %s "${_u31_mac:-}" | tr -d : | tr a-f A-F)" > "$_u31_dir/NET31.ON" || return 1
     printf '[NET31] usosnet31 sha256=%s at %s; TCP/IP static %s %s/%s gw %s dns %s%s\n' "$_u31_actual" "$_u31_bdf" \
         "$_u31_mode" "$_u31_ip" "$_u31_mask" "${_u31_gw:-none}" "${_u31_dns:-none}" "${_u31_why:+ ($_u31_why)}"
 }

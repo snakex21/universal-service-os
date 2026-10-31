@@ -1154,3 +1154,20 @@ writes it), SCM 0x1b6f TCP/IP NetBIOS, then NetDDE 0xd "NETBIOS". Fixed:
 ScopeID = "" during Setup (OEMNXPTC patch) and by `/net31`. Not patched on
 the installed Micron (a new value in both hives); there: Control Panel >
 Network > TCP/IP > Configure > OK writes it (or regedt32), then restart.
+
+### 8.10.6 Fresh install 4 (B261031-110036): hands-free incl. Date/Time; NbtSvc PermanentName, DNS order
+
+Fresh NT 3.1 install on the X470: Setup fully hands-free including the
+Date/Time page (25d7383a), internet (ping 1.1.1.1). NETCHECK.TXT: gateway
+and 1.1.1.1 3/3, TCP 1.1.1.1:80 ok, DNS lookup failed. Popup again: event
+0x1132 NbtSvc `...Nbt\Parameters\PermanentName` (ScopeID now present).
+NBTSVC copies PermanentName as a string into a 16-character NetBIOS name
+buffer; `/net31` now writes the card's MAC in hex (12 characters; NET31.ON
+`mac=`, read in the prep env also for a static profile address), else
+"USOS" + the IP in hex. DNS: WSOCK32 reads `NameServer` space separated (as
+written) and maps DNSLookupOrder 1..4 to its lookup flags; OEMNXPTC.INF
+installs 4 (the last of the NCPA order choices, hosts file only), which the
+skipped dialog would change. `/net31` writes 3 when a name server is set.
+Micron: DNSLookupOrder 4 -> 3 patched in place (2 bytes, CS001 + CS002, the
+same image to SYSTEM and SYSTEM.ALT, PATCH32.TXT); PermanentName not (new
+value): the popup stays there until a fresh install or the TCP/IP dialog.

@@ -118,7 +118,7 @@ class Library(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         on = result['c/USOS/NT3/NET31.ON'].decode()
         for row in ('mode=dhcp', 'ip=192.168.1.57', 'mask=255.255.255.0', 'gateway=192.168.1.1',
-                    'dns=192.168.1.1 8.8.8.8', 'domain=lan', 'lease_s=86400', 'dhcp_server=192.168.1.1', 'client=keep'):
+                    'dns=192.168.1.1 8.8.8.8', 'domain=lan', 'lease_s=86400', 'dhcp_server=192.168.1.1', 'client=keep', 'mac=7085C2001122'):
             self.assertIn(row + '\r\n', on)
         calls = result['calls'].decode()
         self.assertIn('modprobe igb', calls)
@@ -314,6 +314,15 @@ class FullMacFailurePath(unittest.TestCase):
         self.assertIn('n31_sz(nbt, "ScopeID", REG_SZ, "")', c)
         self.assertIn('has_ci(p, 15, "echo reply:ttl ")', c)
         self.assertIn('{ScopeID,0,$(!REG_VT_SZ),', LIB31.read_text(encoding='utf-8'))
+
+
+    def test_nbt_permanent_name_and_dns_order(self):
+        # X470 fresh install 2026-10-31: NbtSvc then wanted PermanentName;
+        # DNSLookupOrder 4 from the INF kept DNS off.
+        c = USOSNT3.read_text(encoding='utf-8')
+        self.assertIn('n31_sz(nbt, "PermanentName", REG_SZ, pn)', c)
+        self.assertIn('n31_dw(tparams, "DNSLookupOrder", 3)', c)
+        self.assertIn('usos_nt31_read_mac', LIB31.read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

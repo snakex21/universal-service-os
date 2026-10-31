@@ -2707,6 +2707,23 @@ static void net31(void)
         DWORD disp2;
         if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Nbt\\Parameters", 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &nbt, &disp2) == ERROR_SUCCESS) {
             ok &= n31_sz(nbt, "ScopeID", REG_SZ, "");
+            /* ...and PermanentName (X470 2026-10-31, the next event 0x1132):
+               NBTSVC copies it as a string into a 16-character NetBIOS name
+               buffer. The card's MAC in hex (12 characters, unique), from
+               NET31.ON; without one "USOS" + the IP address in hex. */
+            {
+                char pn[20];
+                n31_value(meta, "mac", pn, sizeof pn);
+                if (len(pn) != 12) {
+                    char ipv[32];
+                    DWORD a4;
+                    n31_value(meta, "ip", ipv, sizeof ipv);
+                    a4 = nc_ipv4(ipv);
+                    lstrcpyA(pn, "USOS");
+                    hex(pn + 4, ((a4 & 0xff) << 24) | ((a4 & 0xff00) << 8) | ((a4 >> 8) & 0xff00) | (a4 >> 24));
+                }
+                ok &= n31_sz(nbt, "PermanentName", REG_SZ, pn);
+            }
             RegCloseKey(nbt);
         } else {
             say("FAILED: cannot open Nbt\\Parameters\r\n");
@@ -2716,7 +2733,15 @@ static void net31(void)
     n31_value(meta, "gateway", v, sizeof v);
     if (v[0]) ok &= n31_sz(tparams, "DefaultGateway", REG_SZ, v);
     n31_value(meta, "dns", v, sizeof v);
-    if (v[0]) ok &= n31_sz(tparams, "NameServer", REG_SZ, v);
+    if (v[0]) {
+        ok &= n31_sz(tparams, "NameServer", REG_SZ, v);
+        /* OEMNXPTC.INF installs DNSLookupOrder 4 (the NCPA dialog's last
+           choice, hosts file only: X470 2026-10-31 "host not found" with
+           NameServer set); the skipped dialog would change it. 3 = the third
+           choice (hosts file first, then DNS); WSOCK32 maps 1..4 to its
+           lookup flags. */
+        ok &= n31_dw(tparams, "DNSLookupOrder", 3);
+    }
     n31_value(meta, "domain", v, sizeof v);
     if (v[0]) ok &= n31_sz(tparams, "Domain", REG_SZ, v);
     n = sizeof host;
