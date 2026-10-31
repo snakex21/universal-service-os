@@ -226,7 +226,7 @@ class Programs(unittest.TestCase):
                       '"PciBus"', '"PciDevice"', '"PciFunction"', '"IPAddress", REG_SZ', '"SubnetMask", REG_SZ',
                       '"DefaultGateway", REG_SZ', '"NameServer", REG_SZ', '"Hostname", REG_SZ',
                       'n31_service_off("LanmanServer")', 'RegDeleteKeyA(HKEY_LOCAL_MACHINE, "SOFTWARE\\\\USOS\\\\NT31NET")',
-                      'DIR "USOSNT3.EXE /netcheck31"', '"Echo Reply:TTL "', '"ping_1.1.1.1="', '"tcp_1.1.1.1_80="'):
+                      'DIR "USOSNT3.EXE /netcheck31"', '"echo reply:ttl "', '"ping_1.1.1.1="', '"tcp_1.1.1.1_80="'):
             self.assertIn(piece, c)
         # the NT 3.1 path only (GetVersion low word 0x0A03)
         self.assertIn('if ((GetVersion() & 0xFFFFUL) != 0x0A03UL) {\n        say("net31 refused', c)
@@ -304,6 +304,16 @@ class FullMacFailurePath(unittest.TestCase):
         names = [i.name.decode() for e in pe.DIRECTORY_ENTRY_IMPORT for i in e.imports]
         self.assertFalse([n for n in names if 'Mutex' in n], names)
         self.assertEqual(pe.OPTIONAL_HEADER.FileAlignment, 0x200)
+
+
+    def test_nbt_scope_and_ping_count(self):
+        # X470 2026-10-31: NbtSvc failed without Nbt Parameters ScopeID (then
+        # NetDDE, the "service or driver failed" box); NETCHECK counted 0
+        # replies because has_ci wants a lower-case word.
+        c = USOSNT3.read_text(encoding='utf-8')
+        self.assertIn('n31_sz(nbt, "ScopeID", REG_SZ, "")', c)
+        self.assertIn('has_ci(p, 15, "echo reply:ttl ")', c)
+        self.assertIn('{ScopeID,0,$(!REG_VT_SZ),', LIB31.read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

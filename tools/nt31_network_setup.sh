@@ -247,6 +247,12 @@ usos_nt31_oemnxptc() {
             out("                    CloseRegKey $(UsosNet31Tcp)")
             out("                endif")
             out("            EndForListDo")
+            # NbtSvc needs Nbt\Parameters ScopeID (empty = no scope).
+            out("            OpenRegKey $(!REG_H_LOCAL) \"\" $(!NTN_ServiceBase)\"\\Nbt\\Parameters\" 33554432 UsosNet31Nbt")
+            out("            ifstr(i) $(UsosNet31Nbt) != \"\"")
+            out("                SetRegValue $(UsosNet31Nbt) {ScopeID,0,$(!REG_VT_SZ),\"\"}")
+            out("                CloseRegKey $(UsosNet31Nbt)")
+            out("            endif")
             out("            set CommonStatus = STATUS_SUCCESSFUL")
             out("            goto end")
             out("        endif")

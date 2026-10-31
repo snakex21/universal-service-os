@@ -2698,6 +2698,21 @@ static void net31(void)
     ok &= n31_dw(tcp, "KeepAlive", 0);
     ok &= n31_dw(tcp, "BroadcastType", 1);
     ok &= n31_dw(tcp, "Trailers", 0);
+    /* TCP/IP NetBIOS (NbtSvc) does not start without Nbt\Parameters ScopeID
+       (X470 2026-10-31: event 0x1132 NbtSvc ...Nbt\Parameters\ScopeID, then
+       NetDDE without NetBIOS = the "service or driver failed" box); the
+       skipped NCPA dialog writes it, empty = no scope. */
+    {
+        HKEY nbt;
+        DWORD disp2;
+        if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Nbt\\Parameters", 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &nbt, &disp2) == ERROR_SUCCESS) {
+            ok &= n31_sz(nbt, "ScopeID", REG_SZ, "");
+            RegCloseKey(nbt);
+        } else {
+            say("FAILED: cannot open Nbt\\Parameters\r\n");
+            ok = 0;
+        }
+    }
     n31_value(meta, "gateway", v, sizeof v);
     if (v[0]) ok &= n31_sz(tparams, "DefaultGateway", REG_SZ, v);
     n31_value(meta, "dns", v, sizeof v);
@@ -2794,7 +2809,8 @@ static void nc31_ping(const char *label, const char *addr)
     CloseHandle(h);
     DeleteFileA(file);
     for (p = out; *p; p++)
-        if (has_ci(p, 15, "Echo Reply:TTL ")) replies++;
+        /* has_ci wants the word in lower case (it was never matched) */
+        if (has_ci(p, 15, "echo reply:ttl ")) replies++;
     {
         char b[64];
         lstrcpyA(b, replies ? "ok replies=" : "failed replies=");

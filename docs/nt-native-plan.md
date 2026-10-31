@@ -1139,3 +1139,18 @@ installed Micron replaced with it (registry unchanged; backup and
 \USOS\NT3\PATCH31.TXT). Date/Time was still not answered (no action line;
 the edits' text is not visible to the recorder): the page is now answered
 on title + controls, and the year, zone search and selection are logged.
+
+### 8.10.5 X470, patched Micron: internet works; NbtSvc ScopeID
+
+With the b55cd134 driver: no blue screen, `ping 1.1.1.1` answered (TTL 54).
+NETCHECK.TXT (first boot): usosnet31 alive (NativeDiag stage 0x20, 0x15
+frames received after 500 polls), TCP 1.1.1.1:80 ok; the gateway and
+1.1.1.1 pings got 3/3 replies but were counted 0/3 (has_ci wants its word in
+lower case; fixed); `gethostbyname("one.one.one.one")` failed (DNS with
+NameServer "1.1.1.1 192.168.0.1", DNSLookupOrder 4: open). The "service or
+driver failed" box: event 0x1132 NbtSvc
+`...\Services\Nbt\Parameters\ScopeID` missing (the skipped NCPA dialog
+writes it), SCM 0x1b6f TCP/IP NetBIOS, then NetDDE 0xd "NETBIOS". Fixed:
+ScopeID = "" during Setup (OEMNXPTC patch) and by `/net31`. Not patched on
+the installed Micron (a new value in both hives); there: Control Panel >
+Network > TCP/IP > Configure > OK writes it (or regedt32), then restart.
