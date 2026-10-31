@@ -326,6 +326,17 @@ test "BIOS synthetic provisioning preserves source Windows and BPB then refuses 
     try disk.read(prepared.system.start_bytes, &after);
     try t.expectEqualSlices(u8, original_pbr[0..84], after[0..84]);
     try t.expectEqual(result.bootmgr_lba, std.mem.readInt(u64, after[480..488], .little));
+    // The PBR loads the pinned MBR-gap copy, byte-identical to \bootmgr.
+    try t.expectEqual(boot.pinned_bootmgr_lba, result.bootmgr_lba);
+    {
+        var pinned: [12289]u8 = undefined;
+        try disk.read(boot.pinned_bootmgr_lba * 512, &pinned);
+        var want: [12289]u8 = undefined;
+        var gen: Data = .{ .fragmented = false };
+        try Data.read(&gen, 0, &want);
+        try t.expectEqualSlices(u8, &want, &pinned);
+        try t.expect((boot.pinned_bootmgr_lba + result.bootmgr_sectors) * 512 <= prepared.system.start_bytes);
+    }
     try t.expectEqual(result.bootmgr_sectors, std.mem.readInt(u16, after[488..490], .little));
     var backup: [512]u8 = undefined;
     try disk.read(prepared.system.start_bytes + prepared.system.size_bytes - 512, &backup);
@@ -334,4 +345,30 @@ test "BIOS synthetic provisioning preserves source Windows and BPB then refuses 
     try t.expectError(error.BootSystemNotEmpty, boot.provisionBios(disk, prepared, id, &tracker, options, code, log));
     try t.expectEqual(writes, memory.writes);
     try t.expectEqual(@as(usize, 0), tracker.current);
+}
+test "NTFS overwriteFile changes bytes in place and refuses size changes or resident data" {
+    var memory = Sparse.init();
+    defer memory.pages.deinit();
+    const disk = memory.disk();
+    const id = try ids();
+    const prepared = try wl.create(disk, .bios, id, .{ .explicit = true, .source_identity = 1, .target_identity = 2, .boot_identity = 3 }, t.allocator);
+    const fs = try t.allocator.create(ntfs.Ntfs);
+    defer t.allocator.destroy(fs);
+    fs.* = try ntfs.Ntfs.init(disk, prepared.windows, t.allocator, id.base.ntfs_serial);
+    defer fs.deinit();
+    try fs.format();
+    var data: Data = .{ .fragmented = false };
+    const big = try fs.writeFile(5, u("SYSTEM"), .{ .context = &data, .size = 20000, .read_fn = Data.read }, .{});
+    const small = try fs.writeFile(5, u("tiny"), .{ .context = &data, .size = 40, .read_fn = Data.read }, .{});
+    const patch = "0123456789abcdef";
+    try fs.overwriteFile(big, 12345, patch);
+    var back: [20000]u8 = undefined;
+    try t.expectEqual(@as(usize, 20000), try fs.readFile(big, 0, &back));
+    var want: [20000]u8 = undefined;
+    try Data.read(&data, 0, &want);
+    @memcpy(want[12345..][0..16], patch);
+    try t.expectEqualSlices(u8, &want, &back);
+    try t.expectError(error.Bounds, fs.overwriteFile(big, 19990, patch));
+    try t.expectError(error.Unsupported, fs.overwriteFile(small, 0, patch[0..4]));
+    try fs.finish();
 }

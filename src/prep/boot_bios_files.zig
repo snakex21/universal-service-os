@@ -1,4 +1,5 @@
-//! Experimental BIOS boot provisioning; BOOTMGR must retain one physical run.
+//! Experimental BIOS boot provisioning; the PBR loads a pinned BOOTMGR copy
+//! from the MBR gap (pinBootmgr), independent of the NTFS file's placement.
 //! SPDX-License-Identifier: GPL-3.0-or-later
 const std = @import("std");
 const p = @import("platform.zig");
@@ -206,8 +207,34 @@ pub fn bootmgrRun(disk: p.Disk, system: parts.Partition, size: u64, expected: [3
     if (!std.mem.eql(u8, &actual, &expected)) return error.BootManagerReadbackHashMismatch;
     return .{ .lba = (system.start_bytes + start) / 512, .sectors = @intCast(count) };
 }
-/// Experimental first-boot proof only: a later update relocating BOOTMGR
-/// invalidates the fixed run binding and requires reprovisioning.
+/// The PBR's BOOTMGR copy: a pinned image in the MBR gap (sectors 1..2047,
+/// before the 1 MiB system partition), outside every file system. Windows
+/// (servicing, defrag/optimise, chkdsk) may move or rewrite \bootmgr on the
+/// system partition; the PBR keeps loading this verified copy, which no file
+/// system owns. BOOTMGR finds BCD through its own NTFS driver from the BPB at
+/// 0x7c00 (system partition), so where its own bytes came from does not
+/// matter. LBA 1024 + 960 sectors ends at 1983 < 2048.
+pub const pinned_bootmgr_lba: u64 = 1024;
+pub fn pinBootmgr(disk: p.Disk, system: parts.Partition, run_lba: u64, sectors: u16, size: u64, expected: [32]u8, a: std.mem.Allocator) !u64 {
+    if (disk.sector_bytes != 512 or sectors == 0 or sectors > max_bootmgr_sectors or size > @as(u64, sectors) * 512 or size + 511 < @as(u64, sectors) * 512) return error.BootManagerPinBounds;
+    if (system.start_bytes / 512 < pinned_bootmgr_lba + max_bootmgr_sectors) return error.BootManagerPinBounds;
+    const bytes = try a.alloc(u8, @as(usize, sectors) * 512);
+    defer a.free(bytes);
+    try disk.read(run_lba * 512, bytes);
+    var actual: [32]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(bytes[0..@intCast(size)], &actual, .{});
+    if (!std.mem.eql(u8, &actual, &expected)) return error.BootManagerReadbackHashMismatch;
+    try disk.write(pinned_bootmgr_lba * 512, bytes);
+    try disk.flush();
+    const check = try a.alloc(u8, bytes.len);
+    defer a.free(check);
+    try disk.read(pinned_bootmgr_lba * 512, check);
+    if (!std.mem.eql(u8, check, bytes)) return error.BootManagerPinReadbackMismatch;
+    return pinned_bootmgr_lba;
+}
+/// The NTFS \bootmgr is checked (one verified run, hash), then pinned into
+/// the MBR gap (pinBootmgr); the PBR loads the pinned copy, so a later move
+/// or update of the file on the system partition does not break the boot.
 pub fn provisionBios(disk: p.Disk, prepared: wl.Layout, ids: wl.Ids, tracker: *p.TrackedAllocator, options: Options, code: OwnBootCode, log: app.Logger) !Stats {
     // Hardware flow (USOSPREP_HW_V1): this run applied the disk itself; the
     // host bcdboot comparison is not rerun there (as provisionUefi).
@@ -303,7 +330,9 @@ pub fn provisionBios(disk: p.Disk, prepared: wl.Layout, ids: wl.Ids, tracker: *p
     std.crypto.hash.sha2.Sha256.hash(store, &stats.bcd_sha256, .{});
     try target.finish();
     const run = try bootmgrRun(disk, prepared.system, loader.size, loader.sha256, a, buffer);
-    stats.bootmgr_lba = run.lba;
+    const pinned = try pinBootmgr(disk, prepared.system, run.lba, run.sectors, loader.size, loader.sha256, a);
+    log.say("BOOT_BIOS_PIN bootmgr file_lba={d} pinned_lba={d} sectors={d}; PBR loads the pinned copy (MBR gap)\n", .{ run.lba, pinned, run.sectors });
+    stats.bootmgr_lba = pinned;
     stats.bootmgr_sectors = run.sectors;
     // Publish executable boot sectors last, after filesystem completion and
     // read-only BOOTMGR run resolution plus independent read-back hashing.
@@ -313,12 +342,12 @@ pub fn provisionBios(disk: p.Disk, prepared: wl.Layout, ids: wl.Ids, tracker: *p
     _ = try ntfsBoot(disk, prepared.system, system_serial, &pbr);
     @memcpy(mbr[0..440], code.mbr[0..440]);
     @memcpy(pbr[84..510], code.pbr[84..510]);
-    put(u64, &pbr, 480, run.lba);
+    put(u64, &pbr, 480, pinned);
     put(u16, &pbr, 488, run.sectors);
     try disk.write(prepared.system.start_bytes + prepared.system.size_bytes - 512, &pbr);
     try disk.write(prepared.system.start_bytes, &pbr);
     try disk.write(0, &mbr);
     try disk.flush();
-    log.say("BOOT_BIOS PASS files={d} bytes={d} bootmgr_lba={d} sectors={d} bcd_sha256={s}; relocation_requires_reprovision=true\n", .{ stats.files, stats.bytes, run.lba, run.sectors, std.fmt.bytesToHex(stats.bcd_sha256, .lower) });
+    log.say("BOOT_BIOS PASS files={d} bytes={d} bootmgr_lba={d} sectors={d} bcd_sha256={s}; pinned copy in the MBR gap\n", .{ stats.files, stats.bytes, pinned, run.sectors, std.fmt.bytesToHex(stats.bcd_sha256, .lower) });
     return stats;
 }

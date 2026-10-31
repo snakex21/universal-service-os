@@ -22,6 +22,7 @@ const tsc_clock = @import("tsc_clock.zig");
 const profiling = @import("profiling.zig");
 const writecombine = @import("writecombine.zig");
 const hw = @import("hw_target.zig");
+const hw_nvme = @import("hw_nvme.zig");
 const W = std.unicode.utf8ToUtf16LeStringLiteral;
 // Separate root client opts into provisioning at compile time. The default
 // prep binary keeps its existing reachable code and config format.
@@ -576,7 +577,18 @@ fn runInstall(cfg: Config, boot: uefi.Handle, target: *Device, tracker: *platfor
 
 /// State main() needs after run(): the menu gets a status instead of a
 /// power-off, and the log is copied to EFI\USOS\Logs\MINIOS-<build>.LOG.
-var hw_run: struct { active: bool = false, cancelled: bool = false, target_written: bool = false, build: [32]u8 = @splat(0), build_len: usize = 0 } = .{};
+var hw_run: struct {
+    active: bool = false,
+    cancelled: bool = false,
+    target_written: bool = false,
+    build: [32]u8 = @splat(0),
+    build_len: usize = 0,
+    /// CSMWrap route: the usosnvme modern package is on the stick ESP
+    /// (EFI\USOS\minios\nvme), so NVMe disks are offered.
+    nvme_ready: bool = false,
+    /// The disk question picked an NVMe disk.
+    target_nvme: bool = false,
+} = .{};
 
 fn logName(buffer: *[48:0]u16, generation: usize) ![:0]const u16 {
     var ascii: [32]u8 = undefined;
@@ -692,16 +704,19 @@ fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, mbr: bool, log: app.Logge
         if (body.len == 0 or std.mem.startsWith(u8, boot_body, body)) continue;
         if (media.last_block + 1 < 64 * 1024 * 1024 / 512 * 256) continue; // < 16 GiB: not a Windows 10/11 target
         if (mbr) {
-            // The CSMWrap MBR route: at most 2 TiB (MBR), and no NVMe disk
-            // (the Alpine route gates 32-bit Windows 10 on NVMe behind its own
-            // usosnvme-modern package, which MiniOS does not stage).
+            // The CSMWrap MBR route: at most 2 TiB (MBR). NVMe only with the
+            // usosnvme modern package on the stick (hw_nvme.zig stages it as
+            // the Alpine route's tools/windows_nvme_modern.cmd does).
             if (media.last_block + 1 > hw.mbr_max_sectors) {
                 log.say("HW_DISK skipped bus={s} sectors={d}: larger than 2 TiB (MBR)\n", .{ busName(body), media.last_block + 1 });
                 continue;
             }
             if (std.mem.eql(u8, busName(body), "NVMe")) {
-                log.say("HW_DISK skipped NVMe sectors={d}: 32-bit Windows on NVMe stays on the Alpine route\n", .{media.last_block + 1});
-                continue;
+                if (!hw_run.nvme_ready) {
+                    log.say("HW_DISK skipped NVMe sectors={d}: usosnvme package missing on the stick; 32-bit Windows on NVMe stays on the Alpine route\n", .{media.last_block + 1});
+                    continue;
+                }
+                log.say("HW_DISK NVMe sectors={d} offered: usosnvme modern package staged by MiniOS\n", .{media.last_block + 1});
             }
         }
         var table: []const u8 = "no partition table";
@@ -752,6 +767,7 @@ fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, mbr: bool, log: app.Logge
     const marker = try std.fmt.bufPrint(sector[0..512], "USOSPREP TARGET v1\n{s}\n", .{token});
     _ = marker;
     hw_run.target_written = true;
+    hw_run.target_nvme = std.mem.eql(u8, chosen.bus, "NVMe");
     try blockWrite(chosen.io, 0, sector[0..512], .target_io);
     chosen.io.flushBlocks() catch {};
     log.say("HW_DISK confirmed bus={s} sectors={d} previous_table={s}; marker written to sector 0 of this disk only\n", .{ chosen.bus, chosen.sectors, chosen.table });
@@ -774,10 +790,27 @@ const HwApply = struct {
     display: ?[]const u8 = null,
     root: ?*uefi.protocol.File = null,
     allocator: ?std.mem.Allocator = null,
+    /// CSMWrap route, NVMe target: usosnvme staged (hw_nvme.zig).
+    nvme: bool = false,
     /// Windows\Panther\unattend.xml: Windows reads it in specialize and
     /// oobeSystem after an image apply (the windowsPE pass is ignored).
     fn post(ctx: *anyopaque, fs: *ntfs.Ntfs, log: app.Logger) anyerror!void {
         const self: *HwApply = @ptrCast(@alignCast(ctx));
+        // NVMe first: a refusal here fails the run (the menu then starts the
+        // Alpine route, which formats the disk again with its own NVMe path).
+        var nvme_xml: ?[]u8 = null;
+        defer if (nvme_xml) |bytes| if (self.allocator) |a| a.free(bytes);
+        if (self.nvme) {
+            try self.stageNvme(fs, log);
+            const a = self.allocator orelse return error.InvalidArgument;
+            const had_answer = self.xml != null;
+            const base = self.xml orelse "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<unattend xmlns=\"urn:schemas-microsoft-com:unattend\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\">\n</unattend>\n";
+            const buffer = try a.alloc(u8, base.len + 2048);
+            nvme_xml = buffer;
+            const merged = try hw_nvme.addSpecializeCommand(buffer, base, hw_nvme.specialize_path);
+            self.xml = merged;
+            log.say("HW_NVME answer: specialize RunSynchronous usos-nvme-online.cmd added, answer bytes={d} (profile answer={any})\n", .{ merged.len, had_answer });
+        }
         if (self.xml) |xml| {
             const windows = (try fs.lookup(5, W("Windows"))) orelse return error.WindowsDirectoryMissing;
             const panther = (try fs.lookup(windows, W("Panther"))) orelse try fs.mkdir(windows, W("Panther"), .{ .attributes = 0x10 });
@@ -787,8 +820,82 @@ const HwApply = struct {
             log.say("HW_UNATTEND Windows\\Panther\\unattend.xml bytes={d}\n", .{xml.len});
         } else log.say("HW_UNATTEND none: Windows starts its own OOBE (manual mode)\n", .{});
         if (self.display) |request| self.stageDisplay(fs, request, log) catch |err| log.say("HW_DISPLAY not staged ({s}); Windows keeps its own mode\n", .{@errorName(err)});
+        self.copyLog(fs, log) catch |err| log.say("HW_LOG target copy skipped ({s}); the stick keeps EFI\\USOS\\Logs\\MINIOS-<build>.LOG\n", .{@errorName(err)});
         self.high_water = fs.next_lcn * 4096;
     }
+    /// \USOS\MINIOS-PREP.LOG on the new Windows volume: this run's log up to
+    /// the end of the image apply (the full log stays on the stick ESP).
+    fn copyLog(self: *HwApply, fs: *ntfs.Ntfs, log: app.Logger) !void {
+        const root = self.root orelse return error.InvalidArgument;
+        const allocator = self.allocator orelse return error.InvalidArgument;
+        log.say("HW_LOG this log (up to here) -> \\USOS\\MINIOS-PREP.LOG on the Windows volume\n", .{});
+        const bytes = try readSmallFile(root, W("\\USOSPREP.LOG"), allocator, 4 * 1024 * 1024);
+        defer allocator.free(bytes);
+        const usos_dir = (try fs.lookup(5, W("USOS"))) orelse try fs.mkdir(5, W("USOS"), .{ .attributes = 0x10 });
+        if (try fs.lookup(usos_dir, W("MINIOS-PREP.LOG")) != null) try fs.removeFile(usos_dir, W("MINIOS-PREP.LOG"));
+        var source: MemorySource = .{ .bytes = bytes };
+        _ = try fs.writeFile(usos_dir, W("MINIOS-PREP.LOG"), .{ .context = &source, .size = bytes.len, .read_fn = MemorySource.read }, .{});
+    }
+    /// hw_nvme.zig step 1: package files from the stick ESP, usosnvme.sys in
+    /// System32\drivers, \USOS\nvme-modern (+ the specialize script), then
+    /// the same-length stornvme ImagePath edit in the SYSTEM hive, read back.
+    fn stageNvme(self: *HwApply, fs: *ntfs.Ntfs, log: app.Logger) !void {
+        const root = self.root orelse return error.InvalidArgument;
+        const allocator = self.allocator orelse return error.InvalidArgument;
+        var files: [hw_nvme.package_files.len][]u8 = undefined;
+        var loaded: usize = 0;
+        defer for (files[0..loaded]) |bytes| allocator.free(bytes);
+        for (hw_nvme.package_files, 0..) |name, i| {
+            var path_buf: [96]u8 = undefined;
+            const path = try std.fmt.bufPrint(&path_buf, "{s}\\{s}", .{ hw_nvme.package_dir, name });
+            var wide: [96:0]u16 = undefined;
+            const n = try std.unicode.utf8ToUtf16Le(wide[0..95], path);
+            wide[n] = 0;
+            files[i] = try readSmallFile(root, wide[0..n :0], allocator, 1024 * 1024);
+            loaded = i + 1;
+        }
+        if (files[0].len < 1024 or !std.mem.eql(u8, files[0][0..2], "MZ")) return error.NvmePackageInvalid;
+        const windows = (try fs.lookup(5, W("Windows"))) orelse return error.WindowsDirectoryMissing;
+        const system32 = (try fs.lookup(windows, W("System32"))) orelse return error.NvmeSystem32Missing;
+        const config_dir = (try fs.lookup(system32, W("config"))) orelse return error.NvmeConfigMissing;
+        const drivers = (try fs.lookup(system32, W("drivers"))) orelse return error.NvmeDriversMissing;
+        const hive = (try fs.lookup(config_dir, W("SYSTEM"))) orelse return error.NvmeSystemHiveMissing;
+        const stats = try fs.fileStats(hive);
+        var reader: HiveFile = .{ .fs = fs, .number = hive };
+        const patch = hw_nvme.findStornvmeImagePath(.{ .context = &reader, .size = stats.size, .read_fn = HiveFile.read }) catch |err| {
+            log.say("HW_NVME refused: SYSTEM hive ({d} bytes) stornvme ImagePath not patchable ({s})\n", .{ stats.size, @errorName(err) });
+            return err;
+        };
+        log.say("HW_NVME SYSTEM hive bytes={d} ControlSet{d:0>3}\\Services\\stornvme ImagePath={s} offset={d}\n", .{ stats.size, patch.control_set, patch.found[0..patch.found_len], patch.offset });
+        if (try fs.lookup(drivers, W("usosnvme.sys")) != null) try fs.removeFile(drivers, W("usosnvme.sys"));
+        var sys_source: MemorySource = .{ .bytes = files[0] };
+        _ = try fs.writeFile(drivers, W("usosnvme.sys"), .{ .context = &sys_source, .size = files[0].len, .read_fn = MemorySource.read }, .{});
+        const usos_dir = (try fs.lookup(5, W("USOS"))) orelse try fs.mkdir(5, W("USOS"), .{ .attributes = 0x10 });
+        const pkg = (try fs.lookup(usos_dir, W("nvme-modern"))) orelse try fs.mkdir(usos_dir, W("nvme-modern"), .{ .attributes = 0x10 });
+        for (hw_nvme.package_files, 0..) |name, i| {
+            var wide: [32]u16 = undefined;
+            const n = try std.unicode.utf8ToUtf16Le(&wide, name);
+            if (try fs.lookup(pkg, wide[0..n]) != null) try fs.removeFile(pkg, wide[0..n]);
+            var source: MemorySource = .{ .bytes = files[i] };
+            _ = try fs.writeFile(pkg, wide[0..n], .{ .context = &source, .size = files[i].len, .read_fn = MemorySource.read }, .{});
+        }
+        if (try fs.lookup(pkg, W("usos-nvme-online.cmd")) != null) try fs.removeFile(pkg, W("usos-nvme-online.cmd"));
+        var cmd_source: MemorySource = .{ .bytes = hw_nvme.online_cmd };
+        _ = try fs.writeFile(pkg, W("usos-nvme-online.cmd"), .{ .context = &cmd_source, .size = hw_nvme.online_cmd.len, .read_fn = MemorySource.read }, .{});
+        const new = std.mem.sliceAsBytes(hw_nvme.replacement);
+        try fs.overwriteFile(hive, patch.offset, new);
+        var check: [16]u8 = undefined;
+        if (try fs.readFile(hive, patch.offset, &check) != check.len or !std.mem.eql(u8, &check, new)) return error.NvmeHivePatchReadback;
+        log.say("HW_NVME PASS usosnvme.sys bytes={d} -> Windows\\System32\\drivers; package + usos-nvme-online.cmd -> \\USOS\\nvme-modern; stornvme ImagePath -> System32\\drivers\\usosnvme.sys (read back)\n", .{files[0].len});
+    }
+    const HiveFile = struct {
+        fs: *ntfs.Ntfs,
+        number: u64,
+        fn read(ctx: *anyopaque, at: u64, out: []u8) anyerror!void {
+            const self: *HiveFile = @ptrCast(@alignCast(ctx));
+            if (try self.fs.readFile(self.number, at, out) != out.len) return error.HiveShortRead;
+        }
+    };
     /// Optional, like the Alpine route: any refusal keeps Windows' own mode.
     /// Both files are read completely before the first NTFS change.
     fn stageDisplay(self: *HwApply, fs: *ntfs.Ntfs, request: []const u8, log: app.Logger) !void {
@@ -984,6 +1091,23 @@ fn stickFileSize(file: *uefi.protocol.File) !u64 {
 }
 /// Before the disk question (nothing written yet): CSMWrap present with the
 /// pinned hash and its licence files next to it, as the Alpine route checks.
+/// The four usosnvme modern package files are on the stick ESP.
+fn nvmePackageReady(root: *uefi.protocol.File, log: app.Logger) bool {
+    for (hw_nvme.package_files) |name| {
+        var path_buf: [96]u8 = undefined;
+        const path = std.fmt.bufPrint(&path_buf, "{s}\\{s}", .{ hw_nvme.package_dir, name }) catch return false;
+        var wide: [96:0]u16 = undefined;
+        const n = std.unicode.utf8ToUtf16Le(wide[0..95], path) catch return false;
+        wide[n] = 0;
+        const file = root.open(wide[0..n :0], .read, .{}) catch |err| {
+            log.say("HW_NVME package missing {s} ({s}); NVMe disks are not offered\n", .{ path, @errorName(err) });
+            return false;
+        };
+        file.close() catch {};
+    }
+    log.say("HW_NVME package present ({s}); NVMe disks are offered\n", .{hw_nvme.package_dir});
+    return true;
+}
 fn checkCsmwrap(root: *uefi.protocol.File, log: app.Logger) !void {
     const file = openStick(root, csmwrap_dir ++ "\\csmwrapx64.efi") catch |err| {
         log.say("CSMWRAP missing {s}\\csmwrapx64.efi ({s})\n", .{ csmwrap_dir, @errorName(err) });
@@ -1108,10 +1232,12 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     const xml: ?[]u8 = if (cfg.hw.unattend) try readUnattend(root, allocator) else null;
     defer if (xml) |bytes| allocator.free(bytes);
     apply.xml = xml;
+    apply.root = root;
+    apply.allocator = allocator;
+    apply.nvme = mbr and hw_run.target_nvme;
+    if (apply.nvme) log.say("HW_NVME target is NVMe: usosnvme is staged after the image apply\n", .{});
     if (mbr) {
         apply.display = hw.displayRequest(xml);
-        apply.root = root;
-        apply.allocator = allocator;
         if (apply.display == null) log.say("HW_DISPLAY keep (profile display=keep or the answer's own mode): USOSRES not staged\n", .{});
     }
     const source = try allocator.create(Device);
@@ -1303,6 +1429,7 @@ fn run(output: *Output) anyerror!void {
     // CSMWrap route: CSMWrap and its licences are checked before the disk
     // question, so a stick without them writes nothing.
     if (cfg.hardware and cfg.kind == .mbr) try checkCsmwrap(root, log);
+    if (cfg.hardware and cfg.kind == .mbr) hw_run.nvme_ready = nvmePackageReady(root, log);
     try connectStorage(log);
     // Hardware: the flow's one disk question. Only the chosen disk receives
     // this run's token; choose() below then requires exactly one disk with

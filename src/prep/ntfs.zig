@@ -1929,6 +1929,28 @@ pub const Ntfs = struct {
         try self.readRuns(stream.list.items, offset, out[0..n]);
         return n;
     }
+    /// In-place change of existing bytes of a file's unnamed non-resident,
+    /// uncompressed $DATA (no size, run or MFT change). Used by the hardware
+    /// flow for a same-length registry value edit in an applied hive.
+    pub fn overwriteFile(self: *Ntfs, number: u64, offset: u64, data: []const u8) !void {
+        var attrs = try self.collectAttributes(number);
+        defer self.freeAttributes(&attrs);
+        var stream: Stream = .{};
+        defer stream.deinit(self.allocator);
+        var initialized: u64 = 0;
+        var found = false;
+        for (attrs.items) |attr| if (attrMatches(attr.bytes, 0x80, &.{})) {
+            found = true;
+            if (attr.bytes[8] == 0) return error.Unsupported;
+            if (get(u64, attr.bytes, 16) == 0) initialized = get(u64, attr.bytes, 56);
+            try self.decodeAttribute(attr.bytes, &stream);
+        };
+        if (!found) return error.Corrupt;
+        if (stream.flags != 0) return error.Unsupported;
+        const end = std.math.add(u64, offset, data.len) catch return error.Bounds;
+        if (end > stream.bytes or end > initialized) return error.Bounds;
+        try self.writeRuns(stream.list.items, offset, data);
+    }
     pub fn hashFile(self: *Ntfs, number: u64) ![32]u8 {
         var attrs = try self.collectAttributes(number);
         defer self.freeAttributes(&attrs);

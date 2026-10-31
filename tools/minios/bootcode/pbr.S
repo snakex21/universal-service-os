@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Own QEMU experimental NT6 chain loader. The installer binds one verified
- * contiguous BOOTMGR run; later relocation of that file needs reprovision.
+ * contiguous BOOTMGR run: a pinned copy in the MBR gap (LBA 1024, outside
+ * every file system), so a later move of the NTFS bootmgr file does not matter.
  * Public handoff contract consulted: GNU GRUB ntldr.c, GPLv3+, real-mode
  * CS2000:0, segments0/SP7c00, DL BIOS disk, NTFS BPB at7c00, A20 enabled.
  * No Microsoft bootstrap bytes are incorporated.
