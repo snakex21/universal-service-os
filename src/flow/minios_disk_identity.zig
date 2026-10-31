@@ -101,6 +101,71 @@ pub fn parse(kind: Interface, data: []const u8) Identity {
     return id;
 }
 
+/// SCSI INQUIRY standard data (SPC: vendor bytes 8-15, product 16-31): the
+/// model Linux shows for a USB / SCSI disk (sysfs device/model = product).
+pub fn setInquiryModel(id: *Identity, data: []const u8) void {
+    if (data.len < 32) return;
+    id.model_len = clean(&id.model, data[16..32]);
+}
+
+/// SCSI VPD page 0x80 (unit serial number: length at byte 3, text from 4),
+/// as tools/target_disk_identity.sh reads vpd_pg80.
+pub fn setVpdSerial(id: *Identity, page: []const u8) void {
+    if (page.len < 4 or page[1] != 0x80) return;
+    const len = @min(@as(usize, page[3]), page.len - 4);
+    id.serial_len = clean(&id.serial, page[4..][0..@min(len, id.serial.len)]);
+}
+
+/// A USB string descriptor's text (UTF-16LE units, as EFI_USB_IO
+/// UsbGetStringDescriptor returns it), ASCII only, trimmed: the USB
+/// iSerialNumber is Linux's serial of a USB disk (udev ID_SERIAL_SHORT).
+fn utf16Clean(out: []u8, units: []const u16) usize {
+    var raw: [64]u8 = undefined;
+    var n: usize = 0;
+    for (units) |unit| {
+        if (unit == 0 or n == raw.len) break;
+        raw[n] = if (unit >= 0x20 and unit < 0x7f) @intCast(unit) else ' ';
+        n += 1;
+    }
+    var cleaned: [64]u8 = undefined;
+    const len = @min(clean(&cleaned, raw[0..n]), out.len);
+    @memcpy(out[0..len], cleaned[0..len]);
+    return len;
+}
+pub fn setSerialUtf16(id: *Identity, units: []const u16) void {
+    id.serial_len = utf16Clean(&id.serial, units);
+}
+/// USB iProduct: the model when the disk gives no INQUIRY data.
+pub fn setModelUtf16(id: *Identity, units: []const u16) void {
+    id.model_len = utf16Clean(&id.model, units);
+}
+
+/// USB device descriptor (USB 2.0 9.6.1): iProduct and iSerialNumber
+/// string indexes (0 = none).
+pub const UsbStrings = struct { product: u8, serial: u8 };
+pub fn usbStrings(descriptor: []const u8) ?UsbStrings {
+    if (descriptor.len < 18 or descriptor[1] != 1) return null;
+    return .{ .product = descriptor[15], .serial = descriptor[16] };
+}
+
+/// The NVMe Identify Controller admin command (opcode 06h, CNS 01h in
+/// CDW10, NSID 0) as EFI_NVM_EXPRESS_COMMAND fields.
+pub const nvme_identify = struct {
+    pub const opcode: u32 = 0x06;
+    pub const cdw10: u32 = 0x01;
+    pub const flags: u8 = 0x04; // CDW10_VALID
+    pub const bytes: u32 = 4096;
+};
+/// ATA IDENTIFY DEVICE (ECh, PIO data-in, 512 bytes).
+pub const ata_identify = struct {
+    pub const command: u8 = 0xec;
+    pub const protocol_pio_in: u8 = 0x04;
+    pub const length: u8 = 0x80 | 0x20; // LENGTH_BYTES | LENGTH_SECTOR_COUNT
+    pub fn deviceHead(port_multiplier: u16) u8 {
+        return 0xe0 | (if (port_multiplier == 0xffff) 0 else @as(u8, @truncate(port_multiplier << 4)));
+    }
+};
+
 /// Bus chip token from the device path bus (minios_plan.busName) and the
 /// DISK_INFO interface (null: unknown, no chip).
 pub fn busToken(bus: []const u8, kind: Interface) ?[]const u8 {
@@ -264,6 +329,51 @@ test "NVMe and ATA identify data give the Linux model, serial and media" {
     var buffer: [96]u8 = undefined;
     try std.testing.expectEqualStrings("SATA SSD", typeText(&buffer, &s).?);
     try std.testing.expectEqualStrings("Samsung SSD 860 EVO 250GB (232 GiB)", try pickerTitle(&buffer, &s, 250059350016));
+}
+
+test "USB disk: INQUIRY product, VPD 80h / iSerialNumber serial, device descriptor indexes" {
+    var inquiry: [36]u8 = @splat(' ');
+    inquiry[0] = 0;
+    @memcpy(inquiry[8..16], "Kingston");
+    @memcpy(inquiry[16..32], "DataTraveler 3.0");
+    @memcpy(inquiry[32..36], "PMAP");
+    var id: Identity = .{ .interface = .usb };
+    setInquiryModel(&id, &inquiry);
+    try std.testing.expectEqualStrings("DataTraveler 3.0", id.modelText());
+    setInquiryModel(&id, inquiry[0..20]); // too short: unchanged
+    try std.testing.expectEqualStrings("DataTraveler 3.0", id.modelText());
+
+    const vpd = [_]u8{ 0, 0x80, 0, 8 } ++ "AB12CD34".*;
+    setVpdSerial(&id, &vpd);
+    try std.testing.expectEqualStrings("AB12CD34", id.serialText());
+    setVpdSerial(&id, &[_]u8{ 0, 0x83, 0, 0 }); // other page: unchanged
+    try std.testing.expectEqualStrings("AB12CD34", id.serialText());
+
+    const units = std.unicode.utf8ToUtf16LeStringLiteral(" 0123456789ABCDEF0123456789 ");
+    setSerialUtf16(&id, units);
+    // Longer than Identity.serial (20): cut like the picker's S/N field.
+    try std.testing.expectEqualStrings("0123456789ABCDEF0123", id.serialText());
+    setModelUtf16(&id, std.unicode.utf8ToUtf16LeStringLiteral("USB DISK 3.0\x00junk"));
+    try std.testing.expectEqualStrings("USB DISK 3.0", id.modelText());
+
+    var device: [18]u8 = @splat(0);
+    device[0] = 18;
+    device[1] = 1;
+    device[15] = 2;
+    device[16] = 3;
+    try std.testing.expectEqual(UsbStrings{ .product = 2, .serial = 3 }, usbStrings(&device).?);
+    device[1] = 2;
+    try std.testing.expect(usbStrings(&device) == null);
+}
+
+test "pass-thru IDENTIFY commands: NVMe CNS 1 admin, ATA ECh PIO in" {
+    try std.testing.expectEqual(@as(u32, 6), nvme_identify.opcode);
+    try std.testing.expectEqual(@as(u32, 1), nvme_identify.cdw10);
+    try std.testing.expectEqual(@as(u8, 0x04), nvme_identify.flags);
+    try std.testing.expectEqual(@as(u8, 0xec), ata_identify.command);
+    try std.testing.expectEqual(@as(u8, 0xa0), ata_identify.length);
+    try std.testing.expectEqual(@as(u8, 0xe0), ata_identify.deviceHead(0xffff));
+    try std.testing.expectEqual(@as(u8, 0xf0), ata_identify.deviceHead(1));
 }
 
 test "interface GUIDs and bus tokens follow DiskInfo.h and target_disk_identity.sh" {

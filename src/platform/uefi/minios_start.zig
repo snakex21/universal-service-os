@@ -204,6 +204,14 @@ pub fn run(root: *uefi.protocol.File, system: *const usos.catalog.SystemEntry, s
     }
 }
 
+/// The logon sentence the menu wrote for this start (usos_logon_take).
+fn logonLine(root: *uefi.protocol.File, buffer: []u8) []const u8 {
+    const file = root.open(std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\USOS\\answer\\logon.ini"), .read, .{}) catch return "";
+    defer file.close() catch {};
+    const n = file.read(buffer) catch return "";
+    return usos.flow.answer.logon.iniLine(buffer[0..n]) orelse "";
+}
+
 /// CSMWrap route (32-bit Windows 10 without CSM): request.ini,
 /// usos-source.ini and the answer plan are already on the ESP (the caller
 /// ran the Alpine route's menu half). The one disk question, MiniOS, then
@@ -212,6 +220,9 @@ pub fn run(root: *uefi.protocol.File, system: *const usos.catalog.SystemEntry, s
 pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
     edition_len = if (std.fmt.bufPrint(&edition_text, "Windows Setup", .{})) |t| t.len else |_| 0;
+    // Stage 2 "Loading the preparation environment", as the Alpine route's
+    // last UEFI frame (its detail names micro-Linux; here MiniOS).
+    view.vistaCsmwrapStatus(.loading, "Loading MiniOS from the USB drive", system_name);
     const source = try dataSource(root);
     const token = randomToken() catch |err| {
         record(root, "not started: no firmware RNG ({s})", .{@errorName(err)});
@@ -244,17 +255,23 @@ pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
         .success => {},
         .cancelled => return error.MiniosCancelled,
     }
-    // Stage 5 of vista_csmwrap_prepare.sh (x86_self=1): the notice, then the
-    // restart when the user confirms.
+    // Stage 5 of vista_csmwrap_prepare.sh (x86_self=1,
+    // usos_ui_notice_continue): the preparation page in done mode with the
+    // notice, the logon line (usos_logon_take: EFI\USOS\answer\logon.ini)
+    // and the Enter action, then the restart when the user confirms. The
+    // renderer translates the texts, as fb_ui_render does on Alpine.
     var title_en: [96]u8 = undefined;
-    var title_tr: [160]u8 = undefined;
     var body_en: [320]u8 = undefined;
-    var body_tr: [480]u8 = undefined;
-    const lines = [_][]const u8{
-        view.trFormat(&body_tr, std.fmt.bufPrint(&body_en, "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the {s} installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.", .{system_name}) catch system_name),
-    };
+    var logon_buf: [256]u8 = undefined;
+    const logon = logonLine(root, &logon_buf);
     view.refreshFramebuffer();
-    view.notice(view.trFormat(&title_tr, std.fmt.bufPrint(&title_en, "{s}: start the prepared disk", .{system_name}) catch system_name), .info, .success, view.tr("Restart"), &lines);
+    view.miniosDone(
+        std.fmt.bufPrint(&title_en, "{s}: start the prepared disk", .{system_name}) catch system_name,
+        std.fmt.bufPrint(&body_en, "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the {s} installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.", .{system_name}) catch system_name,
+        "Restart",
+        logon,
+        system_name,
+    );
     view.waitForDismiss();
     record(root, "PASS route=mbr_csmwrap; restart confirmed, restarting into Windows Setup", .{});
     uefi.system_table.runtime_services.resetSystem(.cold, .success, null);

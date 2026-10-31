@@ -476,9 +476,9 @@ fn start(
         // failure shows the MiniOS error page and returns to the menu.
         const minios = @import("minios_start.zig");
         if (!nt6 and (minios.wantedX86Csmwrap(profile, system.id) or (std.mem.eql(u8, system.id, "windows-10") and minios.defaultFlag(root)))) {
-            // The environment is named in the heading ("Windows 10 - MiniOS").
+            // The heading is the system, as on the Alpine route ("Windows 10";
+            // X470 2026-10-31: "Windows 10 - MiniOS" was not 1:1).
             const system_heading = vista_csmwrap_heading;
-            vista_csmwrap_heading = std.fmt.bufPrint(&env_heading, "{s} - MiniOS", .{system_heading}) catch system_heading;
             view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
             var minios_answer: windows_native_iso.CsmwrapAnswer = .none;
             if (profile) |p| {
@@ -799,8 +799,6 @@ fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
 /// Vista" or "Windows Server 2008"; tools/vista_csmwrap_prepare.sh uses the
 /// request's folder the same way).
 var vista_csmwrap_heading: []const u8 = "Windows Vista";
-/// "<system> - MiniOS" / "<system> - Alpine" (prep_env=minios starts).
-var env_heading: [128]u8 = undefined;
 
 /// Every ISO / PE10 donor check of prepareCsmwrap is stage 1 of the flow.
 fn showVistaCsmwrapIso(_: usos.flow.preparation_boot_progress.DirectIsoStage, detail: []const u8) void {

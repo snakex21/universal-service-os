@@ -1082,21 +1082,45 @@ pub fn miniosStatus(route: usos.flow.minios_plan.Route, detail: []const u8, syst
 
 /// The CSMWrap route's five-stage page at `current` with the micro-Linux
 /// step's own title (vista_csmwrap_prepare.sh usos_ui_stage: "Detecting
-/// disks", "Inspecting disk", "Preparing the disk"), headed
-/// "<system> - MiniOS".
+/// disks", "Inspecting disk", "Preparing the disk"), headed by the system
+/// as on Alpine (USOS_UI_HEADING=$NT5_NAME, e.g. "Windows 10").
 pub fn miniosStage(current: u8, title: []const u8, detail: []const u8, system_name: []const u8) void {
-    var heading: [96]u8 = undefined;
-    const head = std.fmt.bufPrint(&heading, "{s} - MiniOS", .{system_name}) catch system_name;
+    progress(miniosStageState(current, title, detail, system_name));
+}
+
+pub fn miniosStageState(current: u8, title: []const u8, detail: []const u8, system_name: []const u8) gui.preparation_screen.State {
     const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
-    progress(.{
+    return .{
         .mode = .stage,
         .current = current,
         .total = @intCast(Stage.labels.len),
         .labels = &Stage.labels,
-        .heading = head,
+        .heading = system_name,
         .title = title,
         .detail = detail,
-    });
+    };
+}
+
+/// vista_csmwrap_prepare.sh stage 5 (usos_ui_notice_continue): the
+/// preparation page in done mode, every stage done, the notice and the
+/// logon line under the card, the Enter action ("Restart").
+pub fn miniosDoneState(title: []const u8, notice_text: []const u8, action: []const u8, logon: []const u8, system_name: []const u8) gui.preparation_screen.State {
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    return .{
+        .mode = .done,
+        .current = @intCast(Stage.labels.len),
+        .total = @intCast(Stage.labels.len),
+        .labels = &Stage.labels,
+        .heading = system_name,
+        .title = title,
+        .percent = 100,
+        .notice = notice_text,
+        .action = action,
+        .logon = logon,
+    };
+}
+pub fn miniosDone(title: []const u8, notice_text: []const u8, action: []const u8, logon: []const u8, system_name: []const u8) void {
+    progress(miniosDoneState(title, notice_text, action, logon, system_name));
 }
 
 fn progress(state: gui.preparation_screen.State) void {

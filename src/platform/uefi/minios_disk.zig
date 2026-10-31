@@ -84,20 +84,180 @@ const DiskInfo = extern struct {
     };
 };
 
-var identify_buffer: [4096]u8 align(8) = undefined;
+var identify_buffer: [4096]u8 align(4096) = undefined;
 
-/// Model, serial and media of `handle` from EFI_DISK_INFO (empty when the
-/// firmware has none: the picker then names the bus, as Linux names the
-/// kernel device).
-fn readIdentity(handle: uefi.Handle) identity.Identity {
-    const bs = uefi.system_table.boot_services orelse return .{};
-    const info = (bs.handleProtocol(DiskInfo, handle) catch return .{}) orelse return .{};
+/// EFI_NVM_EXPRESS_PASS_THRU_PROTOCOL (UEFI 2.10 13.15).
+const NvmePassThru = extern struct {
+    mode: *const extern struct { attributes: u32, io_align: u32, nvme_version: u32 },
+    pass_thru: *const fn (*NvmePassThru, u32, *NvmePacket, ?*anyopaque) callconv(uefi.cc) uefi.Status,
+    get_next_namespace: *const anyopaque,
+    build_device_path: *const anyopaque,
+    get_namespace: *const anyopaque,
+    pub const guid align(8) = uefi.Guid{ .time_low = 0x52c78312, .time_mid = 0x8edc, .time_high_and_version = 0x4233, .clock_seq_high_and_reserved = 0x98, .clock_seq_low = 0xf2, .node = .{ 0x1a, 0x1a, 0xa5, 0xe3, 0x88, 0xa5 } };
+};
+const NvmeCommand = extern struct { cdw0: u32, flags: u8, nsid: u32, cdw2: u32 = 0, cdw3: u32 = 0, cdw10: u32 = 0, cdw11: u32 = 0, cdw12: u32 = 0, cdw13: u32 = 0, cdw14: u32 = 0, cdw15: u32 = 0 };
+const NvmeCompletion = extern struct { dw0: u32 = 0, dw1: u32 = 0, dw2: u32 = 0, dw3: u32 = 0 };
+const NvmePacket = extern struct {
+    timeout: u64,
+    transfer_buffer: ?*anyopaque,
+    transfer_length: u32,
+    metadata_buffer: ?*anyopaque = null,
+    metadata_length: u32 = 0,
+    queue_type: u8 = 0, // admin
+    command: *NvmeCommand,
+    completion: *NvmeCompletion,
+};
+
+/// EFI_ATA_PASS_THRU_PROTOCOL (UEFI 2.10 13.13).
+const AtaPassThru = extern struct {
+    mode: *const extern struct { attributes: u32, io_align: u32 },
+    pass_thru: *const fn (*AtaPassThru, u16, u16, *AtaPacket, ?*anyopaque) callconv(uefi.cc) uefi.Status,
+    pub const guid align(8) = uefi.Guid{ .time_low = 0x1d3de7f0, .time_mid = 0x0807, .time_high_and_version = 0x424f, .clock_seq_high_and_reserved = 0xaa, .clock_seq_low = 0x69, .node = .{ 0x11, 0xa5, 0x4e, 0x19, 0xa4, 0x6f } };
+};
+const AtaPacket = extern struct {
+    asb: *[20]u8,
+    acb: *[20]u8,
+    timeout: u64,
+    in_data: ?*anyopaque,
+    out_data: ?*anyopaque = null,
+    in_length: u32,
+    out_length: u32 = 0,
+    protocol: u8,
+    length: u8,
+};
+
+/// EFI_USB_IO_PROTOCOL (UEFI 2.10 17.2.4), the calls used here.
+const UsbIo = extern struct {
+    control: *const anyopaque,
+    bulk: *const anyopaque,
+    async_interrupt: *const anyopaque,
+    sync_interrupt: *const anyopaque,
+    isochronous: *const anyopaque,
+    async_isochronous: *const anyopaque,
+    get_device_descriptor: *const fn (*UsbIo, *[18]u8) callconv(uefi.cc) uefi.Status,
+    get_config_descriptor: *const anyopaque,
+    get_interface_descriptor: *const anyopaque,
+    get_endpoint_descriptor: *const anyopaque,
+    get_string_descriptor: *const fn (*UsbIo, u16, u8, *?[*:0]u16) callconv(uefi.cc) uefi.Status,
+    get_supported_languages: *const fn (*UsbIo, *?[*]u16, *u16) callconv(uefi.cc) uefi.Status,
+    pub const guid align(8) = uefi.Guid{ .time_low = 0x2b2f68d6, .time_mid = 0x0cd2, .time_high_and_version = 0x44cf, .clock_seq_high_and_reserved = 0x8e, .clock_seq_low = 0x8b, .node = .{ 0xbb, 0xa2, 0x0b, 0x1b, 0x5b, 0x75 } };
+};
+
+const Source = enum { nvme_passthru, ata_passthru, usb, disk_info, none };
+var identity_source: Source = .none;
+
+/// NVMe Identify Controller (CNS 1) through the controller's pass-thru:
+/// model bytes 24-63, serial 4-23, as Linux reads them.
+fn nvmeIdentity(path: *const uefi.protocol.DevicePath) ?identity.Identity {
+    const bs = uefi.system_table.boot_services orelse return null;
+    const located = (bs.locateDevicePath(path, NvmePassThru) catch return null) orelse return null;
+    const node: [*]const u8 = @ptrCast(located[0]);
+    if (node[0] != 3 or node[1] != 0x17) return null; // NVMe namespace node
+    const pt = (bs.handleProtocol(NvmePassThru, located[1]) catch return null) orelse return null;
+    if (pt.mode.io_align > identify_buffer.len) return null;
+    @memset(&identify_buffer, 0);
+    var command: NvmeCommand = .{ .cdw0 = identity.nvme_identify.opcode, .flags = identity.nvme_identify.flags, .nsid = 0, .cdw10 = identity.nvme_identify.cdw10 };
+    var completion: NvmeCompletion = .{};
+    var packet: NvmePacket = .{ .timeout = 50_000_000, .transfer_buffer = &identify_buffer, .transfer_length = identity.nvme_identify.bytes, .command = &command, .completion = &completion };
+    if (pt.pass_thru(pt, 0, &packet, null) != .success) return null;
+    const id = identity.parse(.nvme, &identify_buffer);
+    return if (id.model_len > 0) id else null;
+}
+
+/// ATA IDENTIFY DEVICE through the SATA controller's pass-thru (port and
+/// port multiplier port from the SATA device path node).
+fn ataIdentity(path: *const uefi.protocol.DevicePath) ?identity.Identity {
+    const bs = uefi.system_table.boot_services orelse return null;
+    const located = (bs.locateDevicePath(path, AtaPassThru) catch return null) orelse return null;
+    const node: [*]const u8 = @ptrCast(located[0]);
+    if (node[0] != 3 or node[1] != 0x12) return null; // SATA node
+    const port = std.mem.readInt(u16, node[4..6], .little);
+    const pmp = std.mem.readInt(u16, node[6..8], .little);
+    const pt = (bs.handleProtocol(AtaPassThru, located[1]) catch return null) orelse return null;
+    if (pt.mode.io_align > identify_buffer.len) return null;
+    @memset(identify_buffer[0..512], 0);
+    var acb: [20]u8 align(8) = @splat(0);
+    var asb: [20]u8 align(8) = @splat(0);
+    acb[2] = identity.ata_identify.command;
+    acb[7] = identity.ata_identify.deviceHead(pmp);
+    acb[14] = 1; // sector count
+    var packet: AtaPacket = .{ .asb = &asb, .acb = &acb, .timeout = 50_000_000, .in_data = &identify_buffer, .in_length = 512, .protocol = identity.ata_identify.protocol_pio_in, .length = identity.ata_identify.length };
+    if (pt.pass_thru(pt, port, pmp, &packet, null) != .success) return null;
+    const id = identity.parse(.ahci, identify_buffer[0..512]);
+    return if (id.model_len > 0) id else null;
+}
+
+fn usbString(io: *UsbIo, lang: u16, index: u8, out: *identity.Identity, serial_field: bool) void {
+    if (index == 0) return;
+    const bs = uefi.system_table.boot_services orelse return;
+    var text: ?[*:0]u16 = null;
+    if (io.get_string_descriptor(io, lang, index, &text) != .success) return;
+    const str = text orelse return;
+    const units = std.mem.span(str);
+    if (serial_field) identity.setSerialUtf16(out, units) else identity.setModelUtf16(out, units);
+    bs.freePool(@ptrCast(@alignCast(str))) catch {};
+}
+
+/// USB disk: the model from the disk's SCSI INQUIRY (EFI_DISK_INFO of the
+/// USB mass storage driver; product, as Linux), else the USB iProduct
+/// string; the serial from the USB iSerialNumber string (Linux's serial).
+fn usbIdentity(path: *const uefi.protocol.DevicePath, handle: uefi.Handle) ?identity.Identity {
+    const bs = uefi.system_table.boot_services orelse return null;
+    const located = (bs.locateDevicePath(path, UsbIo) catch return null) orelse return null;
+    const io = (bs.handleProtocol(UsbIo, located[1]) catch return null) orelse return null;
+    var id: identity.Identity = .{ .interface = .usb };
+    if (bs.handleProtocol(DiskInfo, handle) catch null) |info| {
+        @memset(identify_buffer[0..96], 0);
+        var size: u32 = 96;
+        if (info._inquiry(info, &identify_buffer, &size) == .success) identity.setInquiryModel(&id, identify_buffer[0..@min(size, 96)]);
+    }
+    var device: [18]u8 = undefined;
+    if (io.get_device_descriptor(io, &device) != .success) return if (id.model_len > 0) id else null;
+    const strings = identity.usbStrings(&device) orelse return if (id.model_len > 0) id else null;
+    var lang: u16 = 0x0409;
+    var table: ?[*]u16 = null;
+    var table_size: u16 = 0;
+    if (io.get_supported_languages(io, &table, &table_size) == .success and table != null and table_size >= 2) lang = table.?[0];
+    if (id.model_len == 0) usbString(io, lang, strings.product, &id, false);
+    usbString(io, lang, strings.serial, &id, true);
+    return if (id.model_len > 0 or id.serial_len > 0) id else null;
+}
+
+/// EFI_DISK_INFO IDENTIFY data (the fallback).
+fn diskInfoIdentity(handle: uefi.Handle) ?identity.Identity {
+    const bs = uefi.system_table.boot_services orelse return null;
+    const info = (bs.handleProtocol(DiskInfo, handle) catch return null) orelse return null;
     const kind = identity.interfaceKind(info.interface);
-    if (kind == .other) return .{};
+    if (kind == .other) return null;
     @memset(&identify_buffer, 0);
     var size: u32 = identify_buffer.len;
     if (info._identify(info, &identify_buffer, &size) != .success) return .{ .interface = kind };
     return identity.parse(kind, identify_buffer[0..@min(size, identify_buffer.len)]);
+}
+
+/// Model, serial and media of `handle` read from the device as Linux reads
+/// them: NVMe Identify Controller (NVMe pass-thru), ATA IDENTIFY DEVICE
+/// (ATA pass-thru, the X470's AMD AHCI), USB descriptors / INQUIRY, and
+/// EFI_DISK_INFO only when those fail. Empty: the picker names the bus.
+fn readIdentity(handle: uefi.Handle, path: *const uefi.protocol.DevicePath, bus: []const u8) identity.Identity {
+    if (std.mem.eql(u8, bus, "NVMe")) if (nvmeIdentity(path)) |id| {
+        identity_source = .nvme_passthru;
+        return id;
+    };
+    if (std.mem.eql(u8, bus, "SATA")) if (ataIdentity(path)) |id| {
+        identity_source = .ata_passthru;
+        return id;
+    };
+    if (std.mem.eql(u8, bus, "USB")) if (usbIdentity(path, handle)) |id| {
+        identity_source = .usb;
+        return id;
+    };
+    if (diskInfoIdentity(handle)) |id| {
+        identity_source = if (id.model_len > 0) .disk_info else .none;
+        return id;
+    }
+    identity_source = .none;
+    return .{};
 }
 
 var sector_buffer: [4096]u8 align(4096) = undefined;
@@ -141,7 +301,7 @@ fn collect(route: plan.Route) usize {
         const sectors = media.last_block +% 1;
         const bus = plan.busName(b);
         const info: plan.DiskInfo = .{ .block_size = media.block_size, .sectors = sectors, .read_only = media.read_only, .present = media.media_present, .bus = bus, .boot = std.mem.startsWith(u8, boot, b) };
-        var line: [192]u8 = undefined;
+        var line: [320]u8 = undefined;
         if (plan.refusal(route, info)) |why| {
             serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] disk not offered bus={s} sectors={d}: {s}\r\n", .{ bus, sectors, why }) catch "[MINIOS] disk not offered\r\n");
             continue;
@@ -151,7 +311,7 @@ fn collect(route: plan.Route) usize {
         row.* = .{ .disk = .{ .sectors = sectors } };
         @memcpy(row.disk.path[0..b.len], b);
         row.disk.path_len = b.len;
-        row.id = readIdentity(handle);
+        row.id = readIdentity(handle, path, bus);
         row.id.bus = identity.busToken(bus, row.id.interface);
         row.layout = readPartitions(io);
         const bytes = sectors * 512;
@@ -160,7 +320,7 @@ fn collect(route: plan.Route) usize {
         const tenths = bytes * 10 / (1024 * 1024 * 1024);
         const label: []const u8 = std.fmt.bufPrint(&row.label, "{s}   {d}.{d} GiB   ({s})", .{ bus, tenths / 10, tenths % 10, @tagName(row.layout.table) }) catch "disk";
         row.label_len = label.len;
-        serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] disk offered {s} model=\"{s}\" bus={s} media={s} partitions={d}\r\n", .{ row.label[0..row.label_len], row.id.modelText(), row.id.bus orelse "-", row.id.media orelse "-", row.layout.count }) catch "[MINIOS] disk offered\r\n");
+        serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] disk offered {s} model=\"{s}\" bus={s} media={s} partitions={d} identity={s} serial_known={any}\r\n", .{ row.label[0..row.label_len], row.id.modelText(), row.id.bus orelse "-", row.id.media orelse "-", row.layout.count, @tagName(identity_source), row.id.serial_len > 0 }) catch "[MINIOS] disk offered\r\n");
         count += 1;
     }
     return count;
