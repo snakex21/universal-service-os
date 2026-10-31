@@ -276,9 +276,12 @@ pub fn checkCleanVolume(fs: *const FileSystem,reader: Reader) Error!void {
     const info=attr[at..][0..n];
     if(info[8]!=3 or info[9]>1) return error.UnsupportedNtfsVersion;
     // NT4-mounted and historical chkdsk bits do not request replay/repair.
-    // Dirty, resize-log, upgrade, delete-USN, object-ID repair or unknown state
-    // is refused rather than silently clearing it.
-    if(le16(info[10..12])&~@as(u16,0xc008)!=0) return error.UnsupportedVolumeState;
+    // 0x0080: set by Windows 10 on a volume it has mounted read-write and that
+    // was removed without a dismount (the Kingston DATA, X470 2026-10-31,
+    // "fsutil dirty" not dirty); no replay or repair is requested, and this
+    // reader never writes. Dirty, resize-log, upgrade, delete-USN, object-ID
+    // repair or unknown state is refused rather than silently clearing it.
+    if(le16(info[10..12])&~@as(u16,0xc088)!=0) return error.UnsupportedVolumeState;
 }
 
 pub fn namesEqual(fs: *const FileSystem,left: []const u16,right: []const u16) bool {

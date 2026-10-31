@@ -95,6 +95,15 @@ pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []cons
 /// The optional Windows 9x phase-1 VM initrd (build_micro_linux.py qemu9x.cpio).
 pub const win9x_vm_initrd = " initrd=\\EFI\\USOS\\micro-linux\\qemu9x.cpio";
 
+/// The micro-Linux kernel and initramfs are on the USOS ESP.
+pub fn microLinuxPresent(root: *uefi.protocol.File) bool {
+    for ([_][*:0]const u16{ wide("\\EFI\\USOS\\micro-linux\\vmlinuz-virt"), wide("\\EFI\\USOS\\micro-linux\\initramfs-usos") }) |path| {
+        const file = root.open(path, .read, .{}) catch return false;
+        file.close() catch {};
+    }
+    return true;
+}
+
 pub fn start(root: *uefi.protocol.File) !void {
     return startMode(root, .disk, "");
 }
@@ -137,6 +146,9 @@ pub fn headingOption(buffer: []u8, name: []const u8) []const u8 {
 }
 
 fn startMode(root: *uefi.protocol.File, mode: Mode, heading: []const u8) !void {
+    // A MiniOS-only test stick (deploy -MiniOsOnly) has no micro-Linux:
+    // refused here with a clear page instead of a load failure.
+    if (!microLinuxPresent(root)) return error.MicroLinuxMissing;
     var id: [36]u8 = undefined;
     try espPartuuid(root, &id);
     const lang_initrd = if (root.open(wide("\\EFI\\USOS\\lang.cpio"), .read, .{})) |file| blk: {

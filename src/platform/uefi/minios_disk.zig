@@ -130,3 +130,30 @@ pub fn ask(route: plan.Route, name: []const u8, nvme_package: bool) Outcome {
         }
     }
 }
+
+pub const EditionOutcome = union(enum) { index: u16, cancelled, none };
+var edition_fields: [33]form.Field = undefined;
+
+/// No profile edition: the ISO's images as a USOS list ("Edition"), before
+/// the disk question. One image: taken without asking.
+pub fn askEdition(list: ?*const usos.flow.answer.editions.List, name: []const u8) EditionOutcome {
+    const images = (list orelse return .none).slice();
+    if (images.len == 0) return .none;
+    if (images.len == 1) return .{ .index = images[0].index };
+    const count = @min(images.len, edition_fields.len - 1);
+    for (images[0..count], 0..) |*image, i| edition_fields[i] = .{ .kind = .action, .label = image.label(), .id = @intCast(i + 1), .primary = i == 0 };
+    edition_fields[count] = .{ .kind = .action, .label = view.t(.profile_cancel), .id = cancel_id };
+    var selected: usize = 0;
+    while (true) {
+        switch (form.run(view.tr("Edition"), name, edition_fields[0 .. count + 1], .{ .context = @ptrCast(&dummy) }, &selected)) {
+            .back => return .cancelled,
+            .x_on, .y_on => continue,
+            .action => |id| {
+                if (id == cancel_id or id == 0 or id > count) return .cancelled;
+                var line: [128]u8 = undefined;
+                serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] edition {d} {s}\r\n", .{ images[id - 1].index, images[id - 1].label() }) catch "[MINIOS] edition\r\n");
+                return .{ .index = images[id - 1].index };
+            },
+        }
+    }
+}

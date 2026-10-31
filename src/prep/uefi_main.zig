@@ -602,7 +602,30 @@ var hw_run: struct {
     nvme_ready: bool = false,
     /// The disk question picked an NVMe disk.
     target_nvme: bool = false,
+    /// The current step, for the menu's error page (minios-result.txt).
+    stage: []const u8 = "start",
 } = .{};
+
+/// \EFI\USOS\Logs\minios-result.txt: stage= / reason= of a failed hardware
+/// run (removed at the start of every run). The menu shows it on its error
+/// page instead of starting another preparation.
+const result_path = W("\\EFI\\USOS\\Logs\\minios-result.txt");
+fn writeResult(root: *uefi.protocol.File, reason: []const u8) void {
+    for ([_][:0]const u16{ W("\\EFI"), W("\\EFI\\USOS"), W("\\EFI\\USOS\\Logs") }) |dir| {
+        const handle = root.open(dir, .read_write_create, .{ .directory = true }) catch return;
+        handle.close() catch {};
+    }
+    const file = root.open(result_path, .read_write_create, .{}) catch return;
+    defer file.close() catch {};
+    var text: [256]u8 = undefined;
+    const body = std.fmt.bufPrint(&text, "stage={s}\r\nreason={s}\r\n", .{ hw_run.stage, reason }) catch return;
+    _ = file.write(body) catch return;
+    file.flush() catch {};
+}
+fn clearResult(root: *uefi.protocol.File) void {
+    const file = root.open(result_path, .read_write, .{}) catch return;
+    _ = file.delete() catch {};
+}
 
 fn logName(buffer: *[48:0]u16, generation: usize) ![:0]const u16 {
     var ascii: [32]u8 = undefined;
@@ -925,6 +948,7 @@ const HwApply = struct {
     /// System32\drivers, \USOS\nvme-modern (+ the specialize script), then
     /// the same-length stornvme ImagePath edit in the SYSTEM hive, read back.
     fn stageNvme(self: *HwApply, fs: *ntfs.Ntfs, log: app.Logger) !void {
+        hw_run.stage = "NVMe driver";
         const root = self.root orelse return error.InvalidArgument;
         const allocator = self.allocator orelse return error.InvalidArgument;
         var files: [hw_nvme.package_files.len][]u8 = undefined;
@@ -1358,12 +1382,14 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     if (count == 0) return error.InvalidArgument;
     const iso = try allocator.create(optical_ntfs.Source);
     defer allocator.destroy(iso);
+    hw_run.stage = "ISO on DATA";
     try optical_ntfs.Source.openInto(.{ .context = source, .size = src_cfg.bytes, .read_fn = sourceRead }, src_cfg.start, src_cfg.size, components[0..count], allocator, iso);
     defer iso.deinit();
     errdefer if (iso.last_error) |err| log.say("SOURCE original_error={s}\n", .{@errorName(err)});
     const ids = try layout.Ids.fromSeed64(seed);
     var marker: [84]u8 = undefined;
     const marker_text = try std.fmt.bufPrint(&marker, "USOSPREP TARGET v1\n{s}\n", .{cfg.token});
+    hw_run.stage = "image apply";
     const result = try install_app.run(target_disk, if (mbr) .bios else .uefi, ids, .{ .explicit = true, .source_identity = @intFromPtr(source.io), .target_identity = @intFromPtr(target.io), .boot_identity = @intFromPtr(boot), .marker = marker_text, .virtual_blank = true }, tracker, .{ .context = iso, .size = iso.file.size(), .read_fn = iso.reader().read_fn }, cfg.wim_index.?, .{ .verify_scope = cfg.verify_scope, .post_apply_context = &apply, .post_apply = HwApply.post }, log);
     if (combined) |cache| log.say("TARGET_COMBINE capacity={d} logical_writes={d} upstream_writes={d} drains={d} failures={d}\n", .{ writecombine.capacity, cache.stats.logical_writes, cache.stats.upstream_writes, cache.stats.drains, cache.stats.failures });
     // Byte-identical to a fresh image wherever Windows reads metadata.
@@ -1382,6 +1408,7 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
     if (mbr) {
         // BIOS boot: own MBR + NTFS PBR (tools/minios/bootcode), BOOTMGR and
         // Boot\ from Windows\Boot\PCAT, an offline BIOS BCD (REGF writer).
+        hw_run.stage = "boot files";
         const code = @import("bios_boot_code");
         const bios_stats = try @import("boot_bios_files.zig").provisionBios(install_disk, result, ids, tracker, .{
             .loader_guid = loader_guid,
@@ -1395,6 +1422,7 @@ fn runHardwareInstall(cfg: Config, root: *uefi.protocol.File, boot: uefi.Handle,
         try blank.fillRange(esp_start * 512, (esp_start + hw.csmwrap_esp_sectors) * 512);
         var fat_serial = std.mem.readInt(u32, ids.msr[0..4], .little) ^ 0x43534d57;
         if (fat_serial == 0 or fat_serial == 0xffffffff) fat_serial = 0x55534f53;
+        hw_run.stage = "CSMWrap partition";
         try writeCsmwrapEsp(root, blank.disk(), esp_start, fat_serial, allocator, log);
         try blank.disk().flush();
         var sector0: [512]u8 = undefined;
@@ -1492,7 +1520,14 @@ fn run(output: *Output) anyerror!void {
     try rotateLogs(root);
     output.file = try root.open(W("\\USOSPREP.LOG"), .read_write_create, .{});
     const log = output.logger();
-    errdefer |err| log.say("USOSPREP UEFI FAIL {s}\n", .{@errorName(err)});
+    clearResult(root);
+    errdefer |err| {
+        log.say("USOSPREP UEFI FAIL {s}\n", .{@errorName(err)});
+        if (hw_run.active) {
+            log.say("HW_RESULT stage={s} reason={s}\n", .{ hw_run.stage, @errorName(err) });
+            writeResult(root, @errorName(err));
+        }
+    }
     log.say("USOSPREP UEFI {s} BEGIN; explicit token target (QEMU host token or hardware disk question)\n", .{@tagName(builtin.cpu.arch)});
     log.say("CPU application_baseline={s}; firmware_cpu_requirement_measured_separately\n", .{builtin.cpu.model.name});
     log.say("ENTROPY source={s} bytes=64 qemu_detected={any} no-weak-fallback\n", .{ @tagName(random.source), output.qemu });
@@ -1514,12 +1549,14 @@ fn run(output: *Output) anyerror!void {
     }
     // CSMWrap route: CSMWrap and its licences are checked before the disk
     // question, so a stick without them writes nothing.
+    hw_run.stage = "CSMWrap check";
     if (cfg.hardware and cfg.kind == .mbr) try checkCsmwrap(root, log);
     if (cfg.hardware and cfg.kind == .mbr) hw_run.nvme_ready = nvmePackageReady(root, log);
     try connectStorage(log);
     // Hardware: the flow's one disk question. Only the chosen disk receives
     // this run's token; choose() below then requires exactly one disk with
     // that size and token, as in the QEMU gate.
+    hw_run.stage = "target disk";
     if (cfg.hardware) cfg.sectors = if (cfg.hw.disk_path_len != 0)
         try takeMenuTarget(cfg.token, boot_handle, cfg.kind == .mbr, cfg.hw.disk_path[0..cfg.hw.disk_path_len], cfg.hw.disk_sectors, log)
     else

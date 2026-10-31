@@ -68,15 +68,77 @@ fn nvmePackage(root: *uefi.protocol.File) bool {
     return true;
 }
 
+/// \EFI\USOS\win9x\minios.flag (experimental stick switch, next to
+/// nt3-native / nt4-native / phase1-native): 32-bit Windows 10 without CSM
+/// goes through MiniOS by default, without a profile and without any
+/// fallback to the Alpine preparation.
+pub fn defaultFlag(root: *uefi.protocol.File) bool {
+    return @import("directory_scan.zig").exists(root, "\\EFI\\USOS\\win9x\\minios.flag");
+}
+
+/// The menu's error page after a failed MiniOS run (no other preparation
+/// starts): the stage and reason MiniOS wrote to
+/// EFI\USOS\Logs\minios-result.txt (else the menu's own error), and the
+/// log path. Waits for the user, then the caller returns to the menu.
+pub fn showFailure(root: *uefi.protocol.File, err: anyerror) void {
+    var raw: [256]u8 = undefined;
+    var stage: []const u8 = "menu";
+    var reason: []const u8 = @errorName(err);
+    if (root.open(std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\USOS\\Logs\\minios-result.txt"), .read, .{})) |file| {
+        defer file.close() catch {};
+        const n = file.read(&raw) catch 0;
+        var lines = std.mem.tokenizeAny(u8, raw[0..n], "\r\n");
+        while (lines.next()) |line| {
+            if (std.mem.startsWith(u8, line, "stage=")) stage = line[6..];
+            if (std.mem.startsWith(u8, line, "reason=")) reason = line[7..];
+        }
+    } else |_| {}
+    var log_buf: [96]u8 = undefined;
+    const log_path = std.fmt.bufPrint(&log_buf, "EFI\\USOS\\Logs\\MINIOS-{s}.LOG", .{usos.build_info.id}) catch "EFI\\USOS\\Logs";
+    var a: [160]u8 = undefined;
+    var b: [160]u8 = undefined;
+    var c: [256]u8 = undefined;
+    const lines = [_][]const u8{
+        view.format(&a, .minios_failed_stage, &.{stage}),
+        view.format(&b, .minios_failed_reason, &.{reason}),
+        view.format(&c, .minios_failed_log, &.{log_path}),
+    };
+    record(root, "FAILED stage={s} reason={s}; no other preparation started (MiniOS only); back to the menu", .{ stage, reason });
+    view.refreshFramebuffer();
+    view.notice(view.t(.minios_failed_title), .warning, .warning, view.t(.minios_failed_heading), &lines);
+    view.waitForDismiss();
+}
+
 /// Returns only when MiniOS did not finish (the caller falls back to Setup),
 /// or with error.MiniosDiskCancelled when the user left the disk question
 /// (the caller then returns to the menu: no second disk question).
 /// `system_name` names the system on the USOS screens ("Windows 10").
-pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, system_name: []const u8, image_directory: []const u8, name: []const u8, profile: *const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
+pub fn run(root: *uefi.protocol.File, route: Route, system: *const usos.catalog.SystemEntry, system_name: []const u8, image_directory: []const u8, name: []const u8, profile: ?*const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
-    const index = plan.imageIndex(profile, system_id, images) orelse {
-        record(root, "not started ({s}): the profile names no edition found on this ISO (MiniOS has no edition list); {s} instead", .{ @tagName(route), fallbackName(route) });
-        return error.MiniosNeedsEdition;
+    const system_id = system.id;
+    var shown: [96]u8 = undefined;
+    const shown_name = std.fmt.bufPrint(&shown, "{s} (MiniOS)", .{system_name}) catch system_name;
+    // The images of this ISO: the summary's list (a profile), else read here.
+    const own = struct {
+        var list: answer.editions.List = .{};
+    };
+    const list: ?*const answer.editions.List = images orelse blk: {
+        @import("windows_media_probe.zig").readEditions(system, name, &own.list) catch break :blk null;
+        break :blk &own.list;
+    };
+    // The profile's edition; else (no profile, or no edition on this ISO)
+    // the edition is chosen here, from the ISO's images.
+    const from_profile: ?u16 = if (profile) |p| plan.imageIndex(p, system_id, list) else null;
+    const index = from_profile orelse switch (minios_disk.askEdition(list, shown_name)) {
+        .index => |i| i,
+        .cancelled => {
+            record(root, "edition question cancelled in the menu, nothing written; back to the menu", .{});
+            return error.MiniosDiskCancelled;
+        },
+        .none => {
+            record(root, "not started ({s}): no install image list on this ISO", .{@tagName(route)});
+            return error.MiniosNeedsEdition;
+        },
     };
     var catalog = data_volume.openCatalog() catch |err| {
         record(root, "not started: DATA not readable ({s})", .{@errorName(err)});
@@ -98,8 +160,6 @@ pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, syste
         return err;
     };
     // The flow's one disk question, in the USOS menu; MiniOS asks nothing.
-    var shown: [96]u8 = undefined;
-    const shown_name = std.fmt.bufPrint(&shown, "{s} (MiniOS)", .{system_name}) catch system_name;
     const nvme_package = nvmePackage(root);
     const disk = switch (minios_disk.ask(route, shown_name, nvme_package)) {
         .disk => |d| d,
@@ -113,7 +173,7 @@ pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, syste
         },
     };
     var text: [2560]u8 = undefined;
-    const base_cfg = try plan.formatConfig(&text, route, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
+    const base_cfg = try plan.formatConfig(&text, route, token, index, source, iso_path, usos.build_info.id, if (profile) |p| plan.localeTag(p) else "en-US", xml != null);
     const cfg = try plan.appendDisk(&text, base_cfg, &disk);
     try settings_store.replaceFile(root, config_path, cfg);
     if (xml) |bytes| try settings_store.replaceFile(root, answer_path, bytes) else deleteFile(root, answer_path);

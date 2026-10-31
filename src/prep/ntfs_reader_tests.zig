@@ -75,8 +75,12 @@ test "MiniOS reads volume UpCase and refuses dirty or unknown NTFS state" {
     const value=try r.value(attr.bytes);MftFixture.put(u16,value,10,1);try r.protect(raw);
     try libstd.testing.expectError(error.UnsupportedVolumeState,nt.mountAllocated(f.reader(),.{.start_bytes=0,.size_bytes=f.bytes.len},libstd.testing.allocator));
     try r.unprotect(raw);const unknown=(try r.find(raw,0x70,&.{})).?;
-    const unknown_value=try r.value(unknown.bytes);MftFixture.put(u16,unknown_value,10,0x80);try r.protect(raw);
+    const unknown_value=try r.value(unknown.bytes);MftFixture.put(u16,unknown_value,10,0x100);try r.protect(raw);
     try libstd.testing.expectError(error.UnsupportedVolumeState,nt.mountAllocated(f.reader(),.{.start_bytes=0,.size_bytes=f.bytes.len},libstd.testing.allocator));
+    // 0x0080 (Windows 10 mounted, not dismounted) mounts.
+    try r.unprotect(raw);const seen=(try r.find(raw,0x70,&.{})).?;
+    const seen_value=try r.value(seen.bytes);MftFixture.put(u16,seen_value,10,0x80);try r.protect(raw);
+    var mounted=try nt.mountAllocated(f.reader(),.{.start_bytes=0,.size_bytes=f.bytes.len},libstd.testing.allocator);mounted.deinit();
     try r.unprotect(raw);const a=(try r.find(raw,0x70,&.{})).?;
     const v=try r.value(a.bytes);MftFixture.put(u16,v,10,0);v[8]=4;try r.protect(raw);
     try libstd.testing.expectError(error.UnsupportedNtfsVersion,nt.mountAllocated(f.reader(),.{.start_bytes=0,.size_bytes=f.bytes.len},libstd.testing.allocator));

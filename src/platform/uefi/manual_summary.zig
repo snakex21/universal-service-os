@@ -471,32 +471,28 @@ fn start(
         // ESP) and restarts on success; any failure or a cancelled disk
         // question is logged and falls through to the Alpine preparation.
         const minios = @import("minios_start.zig");
-        if (!nt6 and minios.wantedX86Csmwrap(profile, system.id)) {
-            // The environment is named in the heading ("Windows 10 - MiniOS",
-            // after a fallback "Windows 10 - Alpine", also on the micro-Linux
-            // pages, which take this heading).
+        // MiniOS: the stick flag EFI\USOS\win9x\minios.flag (Windows 10, no
+        // profile needed) or a profile with prep_env=minios. No fallback to
+        // the Alpine preparation (user decision 2026-10-31): a failure shows
+        // the MiniOS error page and returns to the menu.
+        if (!nt6 and (minios.wantedX86Csmwrap(profile, system.id) or (std.mem.eql(u8, system.id, "windows-10") and minios.defaultFlag(root)))) {
+            // The environment is named in the heading ("Windows 10 - MiniOS").
             const system_heading = vista_csmwrap_heading;
             view.vistaCsmwrapStatus(.validating, "Starting preparation environment", std.fmt.bufPrint(&env_heading, "{s} - MiniOS", .{system_heading}) catch system_heading);
-            minios_x86: {
-                const rendered = answer_profiles.render(profile.?, system.id, .x86) catch |err| {
-                    var line: [96]u8 = undefined;
-                    @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] x86 answer not rendered ({s}); Alpine\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
-                    break :minios_x86;
+            var xml: ?[]const u8 = null;
+            if (profile) |p| {
+                const rendered = answer_profiles.render(p, system.id, .x86) catch |err| {
+                    minios.showFailure(root, err);
+                    return;
                 };
-                minios.run(root, .mbr_csmwrap, system.id, system_heading, system.image_directory, image.name.slice(), profile.?, rendered.bytes, answer_profiles.images()) catch |err| {
-                    // Cancelled in the menu's disk question: back to the
-                    // menu, never a second disk question in Alpine.
-                    if (err == error.MiniosDiskCancelled) {
-                        view.refreshFramebuffer();
-                        return;
-                    }
-                    var line: [96]u8 = undefined;
-                    @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to the Alpine preparation: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
-                };
+                xml = rendered.bytes;
             }
+            minios.run(root, .mbr_csmwrap, system, system_heading, system.image_directory, image.name.slice(), profile, xml, if (profile != null) answer_profiles.images() else null) catch |err| {
+                // Cancelled in the menu (edition or disk): back to the menu.
+                if (err != error.MiniosDiskCancelled) minios.showFailure(root, err);
+            };
             view.refreshFramebuffer();
-            vista_csmwrap_heading = std.fmt.bufPrint(&env_heading, "{s} - Alpine", .{system_heading}) catch system_heading;
-            view.vistaCsmwrapStatus(.validating, "Starting preparation environment", vista_csmwrap_heading);
+            return;
         }
         view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
         var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
@@ -528,7 +524,7 @@ fn start(
         const minios = @import("minios_start.zig");
         if (minios.wanted(profile, system.id)) {
             view.windowsIsoStatus(.starting, "Starting preparation environment");
-            minios.run(root, .gpt_uefi, system.id, system.name, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+            minios.run(root, .gpt_uefi, system, system.name, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
                 if (err == error.MiniosDiskCancelled) {
                     view.refreshFramebuffer();
                     return;
@@ -775,6 +771,7 @@ fn showError(title: []const u8, err: anyerror) void {
         error.NoLinuxEntry => view.t(.error_linux_no_entry),
         error.HelperMissing => view.t(.error_linux_helper),
         error.XpPackageMissing => view.t(.xp_prep_package_missing),
+        error.MicroLinuxMissing => view.t(.minios_no_alpine),
         else => view.t(.error_stopped),
     };
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };

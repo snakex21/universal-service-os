@@ -163,3 +163,29 @@ windows_nvme_modern.c); no Microsoft code. Host-tested only (synthetic hives
 plus one real Windows 10 22H2 x86 SYSTEM hive read locally, not stored);
 X470 is the acceptance gate. No Microsoft code or binaries in the repository; the
 BIOS boot files are copied at run time from the applied Windows image.
+
+## Stick switch and MiniOS-only test deploys (2026-10-31)
+
+- `EFI\USOS\win9x\minios.flag` on the USOS ESP (next to nt3-native /
+  nt4-native / phase1-native): Windows 10 x86 without CSM goes through
+  MiniOS by default, without a profile. No profile edition: the menu asks
+  for the edition (USOS list "Edition", from the ISO's images; one image is
+  taken without asking), then the one disk question. Without the flag and
+  without `prep_env=minios`, nothing changes (Alpine).
+- With the flag or `prep_env=minios`, a MiniOS failure never starts Alpine:
+  MiniOS writes `EFI\USOS\Logs\minios-result.txt` (`stage=`, `reason=`;
+  stages: CSMWrap check, target disk, ISO on DATA, image apply, NVMe
+  driver, boot files, CSMWrap partition), the menu shows the translated
+  error page "MiniOS nie zakończył pracy" (stage, reason, log
+  `EFI\USOS\Logs\MINIOS-<build>.LOG`) and returns to the menu.
+- A MiniOS-only deploy (deploy script `-MiniOsOnly`) removes
+  `EFI\USOS\micro-linux\vmlinuz-virt`, `initramfs-usos` and `qemu9x.cpio`
+  from the stick ESP and records it in `EFI\USOS\minios-only.txt`; every
+  micro-Linux start then shows "This USB drive has no micro-Linux
+  preparation environment" (boot.minios.no_alpine) instead. The next normal
+  deploy writes the full payload again (the updater rewrites every payload
+  file) and removes the marker.
+- First X470 run (B261031-144307): MiniOS refused the DATA volume
+  (`UnsupportedVolumeState`): its `$Volume` flags were 0x0080, which
+  Windows 10 leaves on a volume removed without a dismount (`fsutil dirty`:
+  not dirty). The read-only NTFS reader now accepts 0x0080.
