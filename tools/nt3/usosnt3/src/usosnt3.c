@@ -1910,15 +1910,27 @@ static int notice_language_pl(void)
     return n > 0 && has_ci(intl_txt, n, "locale=00000415");
 }
 
-/* usosnt3.exe /notice */
+/* usosnt3.exe /notice. NOTICE.LOG records each stage (X470 2026-10-31:
+   no notice seen on native NT 3.5 although the service logged "notice: on
+   the desktop"). The service may start it before Winlogon has the
+   interactive window station ready, so user32 / the window are retried
+   every 3 s for up to 2 minutes instead of giving up at once. */
 static void notice_main(void)
 {
     WNDCLASSA wc;
     MSG m;
-    HWND w;
-    int cx, cy;
-    if (!notice_load())
-        ExitProcess(2);
+    HWND w = NULL;
+    int cx, cy, tries, registered = 0;
+    open_log("NOTICE.LOG");
+    say("notice: start\r\n");
+    for (tries = 0; !notice_load(); tries++) {
+        if (tries == 40) {
+            say("notice: user32/gdi32 not usable after 2 minutes\r\n");
+            ExitProcess(2);
+        }
+        Sleep(3000);
+    }
+    say("notice: user32/gdi32 loaded\r\n");
     g_notice_pl = notice_language_pl();
     notice_read_step();
     cx = g_ui.GetSystemMetrics(SM_CXSCREEN);
@@ -1940,12 +1952,24 @@ static void notice_main(void)
     wc.hbrBackground = NULL;
     wc.lpszMenuName = NULL;
     wc.lpszClassName = "UsosNt3Notice";
-    if (!g_ui.RegisterClassA(&wc))
-        ExitProcess(3);
-    w = g_ui.CreateWindowExA(WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy,
-                             NULL, NULL, wc.hInstance, NULL);
-    if (!w)
+    for (tries = 0; tries < 40; tries++) {
+        if (!registered)
+            registered = g_ui.RegisterClassA(&wc) != 0;
+        if (registered)
+            w = g_ui.CreateWindowExA(WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy,
+                                     NULL, NULL, wc.hInstance, NULL);
+        if (w)
+            break;
+        say_hex("notice: no window yet, error ", GetLastError());
+        Sleep(3000);
+        cx = g_ui.GetSystemMetrics(SM_CXSCREEN);
+        cy = g_ui.GetSystemMetrics(SM_CYSCREEN);
+    }
+    if (!w) {
+        say("notice: no window after 2 minutes\r\n");
         ExitProcess(4);
+    }
+    say("notice: window shown\r\n");
     g_ui.ShowWindow(w, SW_SHOW);
     g_ui.UpdateWindow(w);
     g_ui.SetTimer(w, 1, 2000, NULL);
