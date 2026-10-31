@@ -437,7 +437,8 @@ pub fn stage(root: *uefi.protocol.File, profile: *const Profile, system_id: []co
         .name = profile.name.slice(),
         .format = result.format,
         .arch = if (result.format == .autounattend_xml) arch else null,
-        .key = profile.keyFor(system_id).len > 0,
+        // NT 3.x Setup takes no key: a key line in the profile is ignored.
+        .key = profile.keyFor(system_id).len > 0 and !answer.nt3.isNt3(system_id),
         .beta_clock = profile.beta_clock.slice(),
     }, &plan_bytes);
     try settings_store.replaceFile(root, plan_file.plan_path, plan);

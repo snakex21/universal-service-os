@@ -144,7 +144,8 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
     if (@import("nt4.zig").isNt4(system_id)) return if (p.win9x_setup == .manual or @import("nt4.zig").validKey(p.keyFor(system_id))) null else .product_key;
     // POSReady 2009: a 5x5 key; without it Setup stops ("Invalid product key").
     if (@import("posready.zig").isPosReady(system_id)) return if (@import("posready.zig").validKey(p.keyFor(system_id))) null else .product_key;
-    // Windows NT 3.51: no key (INITIAL.INF DisplayPidDlg = NO), nothing missing.
+    // Windows NT 3.x: no key (3.5 / 3.51 INITIAL.INF DisplayPidDlg = NO, 3.1
+    // has no PID page at all), nothing missing.
     if (@import("nt3.zig").isNt3(system_id)) return null;
     const family = target.familyFor(system_id) orelse return null;
     if (family.nt5()) return if (p.keyFor(system_id).len == 0) .product_key else null;
