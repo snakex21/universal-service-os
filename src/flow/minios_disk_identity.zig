@@ -3,8 +3,14 @@
 //! tools/xp_disk_overview.sh, tools/vista_csmwrap_prepare.sh): the model and
 //! serial number from the controller's IDENTIFY data (EFI_DISK_INFO), the
 //! bus and media chip tokens, the partition count and the erase-confirmation
-//! overview with the CSMWrap layout. Pure: host-tested.
+//! overview with the CSMWrap layout (tools/xp_disk_overview.sh: the
+//! partition list with file system, label, size, used / free space and the
+//! detected system). Pure: host-tested.
 const std = @import("std");
+pub const fs_probe = @import("minios_fs_probe.zig");
+test {
+    _ = fs_probe;
+}
 
 /// EFI_DISK_INFO interface GUIDs (MdePkg/Include/Protocol/DiskInfo.h).
 pub const Interface = enum { ide, ahci, nvme, scsi, usb, sd, other };
@@ -74,21 +80,38 @@ fn cleanAta(out: []u8, raw: []const u8) usize {
     return clean(out, swapped[0..i]);
 }
 
+/// IDENTIFY strings are space-padded printable ASCII. Anything else is not
+/// the expected structure: EDK2-style NVMe EFI_DISK_INFO.Identify returns
+/// the Identify *Namespace* data (binary NSZE/NCAP at the same offsets),
+/// which must not become a model text.
+pub fn printableField(raw: []const u8) bool {
+    var any = false;
+    for (raw) |c| {
+        if (c == 0 or c == ' ') continue;
+        if (c < 0x21 or c > 0x7e) return false;
+        any = true;
+    }
+    return any;
+}
+
 /// IDENTIFY data of `kind`: NVMe Identify Controller (SN bytes 4-23, MN
 /// 24-63; NVMe is always SSD, as usos_disk_media) or ATA IDENTIFY DEVICE
 /// (serial words 10-19, model 27-46, nominal media rotation rate word 217:
-/// 1 = SSD, 0x0401-0xfffe = HDD).
+/// 1 = SSD, 0x0401-0xfffe = HDD). A model field that is not text (e.g.
+/// Identify Namespace data) leaves the identity empty.
 pub fn parse(kind: Interface, data: []const u8) Identity {
     var id: Identity = .{ .interface = kind };
     switch (kind) {
         .nvme => {
             if (data.len < 64) return id;
+            id.media = "ssd";
+            if (!printableField(data[24..64])) return id;
             id.serial_len = clean(&id.serial, data[4..24]);
             id.model_len = clean(&id.model, data[24..64]);
-            id.media = "ssd";
         },
         .ahci, .ide => {
             if (data.len < 94) return id;
+            if (!printableField(data[54..94])) return id;
             id.serial_len = cleanAta(&id.serial, data[20..40]);
             id.model_len = cleanAta(&id.model, data[54..94]);
             if (data.len >= 436) {
@@ -223,28 +246,104 @@ pub const GptHeader = struct {
     }
 };
 
+/// One partition as lsblk lists it (number = the Linux partition number:
+/// GPT entry index + 1, MBR slot 1-4, logical partitions from 5).
+pub const Entry = struct {
+    number: u16,
+    start: u64,
+    sectors: u64,
+    /// An MBR extended partition (lsblk: 1 KiB, no file system).
+    container: bool = false,
+    probe: fs_probe.Probe = .{},
+
+    /// lsblk SIZE of the node in MiB (sysfs size / 2048).
+    pub fn mib(self: *const Entry) u64 {
+        return (if (self.container) 2 else self.sectors) / 2048;
+    }
+};
+
+pub fn isExtended(kind: u8) bool {
+    return kind == 0x05 or kind == 0x0f or kind == 0x85;
+}
+
 pub const Partitions = struct {
     table: enum { none, mbr, gpt } = .none,
     count: u32 = 0,
     allocated: u64 = 0,
+    /// The first max_entries partitions in lsblk order.
+    entries: [max_entries]Entry = undefined,
+    entry_count: usize = 0,
+    /// The MBR extended partition (EBR chain start), if any.
+    extended_start: ?u64 = null,
+    /// The next logical partition number (Linux: 5, 6, ...).
+    next_logical: u16 = 5,
 
-    pub fn addGpt(self: *Partitions, entry: []const u8) void {
+    pub const max_entries = 16;
+
+    pub fn shown(self: *const Partitions) []const Entry {
+        return self.entries[0..self.entry_count];
+    }
+
+    fn add(self: *Partitions, entry: Entry) void {
+        self.count += 1;
+        // Linux sizes an extended partition node at 2 sectors (1 KiB).
+        self.allocated +|= if (entry.container) 2 else entry.sectors;
+        if (self.entry_count < max_entries) {
+            self.entries[self.entry_count] = entry;
+            self.entry_count += 1;
+        }
+    }
+
+    pub fn addGpt(self: *Partitions, entry: []const u8, index: u32) void {
         if (entry.len < 48 or std.mem.allEqual(u8, entry[0..16], 0)) return;
         const first = std.mem.readInt(u64, entry[32..40], .little);
         const last = std.mem.readInt(u64, entry[40..48], .little);
-        self.count += 1;
-        if (last >= first) self.allocated +|= last - first + 1;
+        self.add(.{ .number = @intCast(@min(index + 1, 0xffff)), .start = first, .sectors = if (last >= first) last - first + 1 else 0 });
     }
 
-    /// Primary MBR entries (a GPT disk is read through its GPT instead).
+    /// Primary MBR entries (a GPT disk is read through its GPT instead);
+    /// the logical partitions follow with addLogical.
     pub fn fromMbr(sector: []const u8) Partitions {
         if (sector.len < 512 or sector[510] != 0x55 or sector[511] != 0xaa) return .{};
         var result: Partitions = .{ .table = .mbr };
         for (0..4) |i| {
             const e = sector[446 + i * 16 ..][0..16];
             if (e[4] == 0) continue;
-            result.count += 1;
-            result.allocated +|= std.mem.readInt(u32, e[12..16], .little);
+            const start: u64 = std.mem.readInt(u32, e[8..12], .little);
+            const container = isExtended(e[4]);
+            if (container and result.extended_start == null) result.extended_start = start;
+            result.add(.{ .number = @intCast(i + 1), .start = start, .sectors = std.mem.readInt(u32, e[12..16], .little), .container = container });
+        }
+        return result;
+    }
+
+    pub fn addLogical(self: *Partitions, start: u64, sectors: u64) void {
+        self.add(.{ .number = self.next_logical, .start = start, .sectors = sectors });
+        self.next_logical +|= 1;
+    }
+};
+
+/// One EBR of the logical partition chain: the logical partition (start
+/// relative to this EBR) and the next EBR (relative to the extended
+/// partition's start).
+pub const Ebr = struct {
+    logical: ?Logical = null,
+    next: ?u64 = null,
+
+    pub const Logical = struct { start: u64, sectors: u64 };
+
+    pub fn parse(sector: []const u8, extended_start: u64, this_lba: u64) ?Ebr {
+        if (sector.len < 512 or sector[510] != 0x55 or sector[511] != 0xaa) return null;
+        var result: Ebr = .{};
+        const first = sector[446..][0..16];
+        const second = sector[462..][0..16];
+        if (first[4] != 0 and !isExtended(first[4])) {
+            const rel = std.mem.readInt(u32, first[8..12], .little);
+            result.logical = .{ .start = this_lba + rel, .sectors = std.mem.readInt(u32, first[12..16], .little) };
+        }
+        if (isExtended(second[4])) {
+            const rel = std.mem.readInt(u32, second[8..12], .little);
+            if (rel != 0) result.next = extended_start + rel;
         }
         return result;
     }
@@ -263,8 +362,8 @@ pub fn csmwrapFreeGib(sectors: u64) u64 {
 /// "ERASE ALL DATA ON THIS DISK", the disk overview, the erase line and the
 /// new MBR layout.
 pub const Overview = struct {
-    storage: [12][224]u8 = undefined,
-    texts: [12][]const u8 = undefined,
+    storage: [32][224]u8 = undefined,
+    texts: [32][]const u8 = undefined,
     count: usize = 0,
 
     fn add(self: *Overview, comptime fmt: []const u8, args: anytype) void {
@@ -288,6 +387,32 @@ pub const Overview = struct {
         self.add("Size: {d} GiB", .{sectors * 512 / 1073741824});
         self.add("Status: not currently in use.", .{});
         self.add("Partitions: {d}; unallocated: approx. {d} MiB", .{ parts.count, (sectors -| parts.allocated) / 2048 });
+        // xp_disk_overview.sh: the mounted file systems' df totals, the
+        // first four partitions, the rest as a count, the detection note.
+        var known: usize = 0;
+        var used: u64 = 0;
+        var free: u64 = 0;
+        for (parts.shown()) |*e| {
+            if (e.probe.used == null or e.probe.free == null) continue;
+            known += 1;
+            used += e.probe.used.? / 1024;
+            free += e.probe.free.? / 1024;
+        }
+        if (known > 0) {
+            self.add("Readable file systems: {d}; used {d} MiB, free {d} MiB", .{ known, used / 1024, free / 1024 });
+        } else self.add("Used/free space in file systems: unknown.", .{});
+        for (parts.shown()[0..@min(parts.entry_count, 4)]) |*e| {
+            const p = &e.probe;
+            if (p.label_len > 0) {
+                self.add("Partition {d}: {s} {s} ({d} MiB)", .{ e.number, p.fs.name(), p.labelText(), e.mib() });
+            } else self.add("Partition {d}: {s} ({d} MiB)", .{ e.number, p.fs.name(), e.mib() });
+            const found = p.system orelse "System unknown";
+            if (p.used != null and p.free != null) {
+                self.add("  Used: {d} MiB, free: {d} MiB; {s}", .{ p.used.? / 1048576, p.free.? / 1048576, found });
+            } else self.add("  Used/free: unknown; {s}", .{found});
+        }
+        if (parts.count > 4) self.add("(Other partitions: {d})", .{parts.count - 4});
+        self.add("File detection does not verify whether a system works.", .{});
         self.add("", .{});
         self.add("All partitions, systems and files on this disk will be erased.", .{});
         if (csmwrap) self.add("New layout (MBR): {d} GiB NTFS (drive C:) for {s}, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.", .{ csmwrapFreeGib(sectors), system });
@@ -398,9 +523,35 @@ test "partition count from MBR and GPT entries" {
     std.mem.writeInt(u32, mbr[446 + 12 ..][0..4], 204800, .little);
     mbr[462 + 4] = 0x0c;
     std.mem.writeInt(u32, mbr[462 + 12 ..][0..4], 2048, .little);
-    const p = Partitions.fromMbr(&mbr);
+    var p = Partitions.fromMbr(&mbr);
     try std.testing.expectEqual(@as(u32, 2), p.count);
     try std.testing.expectEqual(@as(u64, 206848), p.allocated);
+    try std.testing.expectEqual(@as(u16, 2), p.shown()[1].number);
+    // An extended partition: lsblk lists it at 1 KiB, then its logicals.
+    mbr[478 + 4] = 0x0f;
+    std.mem.writeInt(u32, mbr[478 + 8 ..][0..4], 1000000, .little);
+    std.mem.writeInt(u32, mbr[478 + 12 ..][0..4], 500000, .little);
+    p = Partitions.fromMbr(&mbr);
+    try std.testing.expectEqual(@as(?u64, 1000000), p.extended_start);
+    try std.testing.expect(p.shown()[2].container);
+    try std.testing.expectEqual(@as(u64, 0), p.shown()[2].mib());
+    var ebr: [512]u8 = @splat(0);
+    ebr[510] = 0x55;
+    ebr[511] = 0xaa;
+    ebr[446 + 4] = 0x07;
+    std.mem.writeInt(u32, ebr[446 + 8 ..][0..4], 2048, .little);
+    std.mem.writeInt(u32, ebr[446 + 12 ..][0..4], 100000, .little);
+    ebr[462 + 4] = 0x05;
+    std.mem.writeInt(u32, ebr[462 + 8 ..][0..4], 102048, .little);
+    const link = Ebr.parse(&ebr, 1000000, 1000000).?;
+    try std.testing.expectEqual(@as(u64, 1002048), link.logical.?.start);
+    try std.testing.expectEqual(@as(?u64, 1102048), link.next);
+    p.addLogical(link.logical.?.start, link.logical.?.sectors);
+    try std.testing.expectEqual(@as(u32, 4), p.count);
+    try std.testing.expectEqual(@as(u16, 5), p.shown()[3].number);
+    try std.testing.expectEqual(@as(u64, 206848 + 2 + 100000), p.allocated);
+    ebr[462 + 4] = 0;
+    try std.testing.expect(Ebr.parse(&ebr, 1000000, 1000000).?.next == null);
     mbr[511] = 0;
     try std.testing.expectEqual(@as(u32, 0), Partitions.fromMbr(&mbr).count);
 
@@ -413,12 +564,13 @@ test "partition count from MBR and GPT entries" {
     try std.testing.expectEqual(@as(u64, 2), h.entries_lba);
     var gpt: Partitions = .{ .table = .gpt };
     var entry: [128]u8 = @splat(0);
-    gpt.addGpt(&entry);
+    gpt.addGpt(&entry, 0);
     entry[0] = 1;
     std.mem.writeInt(u64, entry[32..40], 2048, .little);
     std.mem.writeInt(u64, entry[40..48], 4095, .little);
-    gpt.addGpt(&entry);
+    gpt.addGpt(&entry, 2);
     try std.testing.expectEqual(@as(u32, 1), gpt.count);
+    try std.testing.expectEqual(@as(u16, 3), gpt.shown()[0].number);
     try std.testing.expectEqual(@as(u64, 2048), gpt.allocated);
     std.mem.writeInt(u32, header[84..88], 100, .little);
     try std.testing.expect(GptHeader.parse(&header) == null);
@@ -431,7 +583,16 @@ test "erase confirmation overview: the X470 Micron 3400 (1000215216 sectors)" {
     @memcpy(id.serial[0..4], "SN01");
     id.serial_len = 4;
     id.bus = "nvme";
-    const parts: Partitions = .{ .table = .mbr, .count = 3, .allocated = 1000083456 - 2048 };
+    var parts: Partitions = .{ .table = .mbr };
+    // The X470 Micron after a Win10 x86 CSMWrap run: C:, the 1 GiB helper,
+    // the 64 MiB CSMWrap ESP.
+    parts.add(.{ .number = 1, .start = 2048, .sectors = 1000083456 - 2048 - 2097152 - 133120, .probe = .{ .fs = .ntfs, .used = 20 * 1073741824, .free = 450 * 1073741824, .system = "Windows (system files)" } });
+    parts.entries[0].probe.setLabel("");
+    parts.add(.{ .number = 2, .start = 0, .sectors = 2097152, .probe = .{ .fs = .ntfs } });
+    parts.entries[1].probe.setLabel("USOSPE");
+    parts.add(.{ .number = 3, .start = 0, .sectors = 133120, .probe = .{ .fs = .vfat, .used = 5 * 1048576, .free = 59 * 1048576, .system = "No system detected" } });
+    parts.entries[2].probe.setLabel("CSMWRAP");
+    try std.testing.expectEqual(@as(u64, 1000083456 - 2048), parts.allocated);
     var o: Overview = .{};
     o.build(&id, &parts, 1000215216, "Windows 10", true);
     const want = [_][]const u8{
@@ -443,6 +604,14 @@ test "erase confirmation overview: the X470 Micron 3400 (1000215216 sectors)" {
         "Size: 476 GiB",
         "Status: not currently in use.",
         "Partitions: 3; unallocated: approx. 65 MiB",
+        "Readable file systems: 2; used 20485 MiB, free 460859 MiB",
+        "Partition 1: ntfs (487232 MiB)",
+        "  Used: 20480 MiB, free: 460800 MiB; Windows (system files)",
+        "Partition 2: ntfs USOSPE (1024 MiB)",
+        "  Used/free: unknown; System unknown",
+        "Partition 3: vfat CSMWRAP (65 MiB)",
+        "  Used: 5 MiB, free: 59 MiB; No system detected",
+        "File detection does not verify whether a system works.",
         "",
         "All partitions, systems and files on this disk will be erased.",
         "New layout (MBR): 475 GiB NTFS (drive C:) for Windows 10, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.",
@@ -450,4 +619,28 @@ test "erase confirmation overview: the X470 Micron 3400 (1000215216 sectors)" {
     try std.testing.expectEqual(want.len, o.lines().len);
     for (want, o.lines()) |a, b| try std.testing.expectEqualStrings(a, b);
     try std.testing.expectEqual(@as(u64, 0), csmwrapFreeGib(1000));
+
+    // Nothing readable, five partitions: the script's unknown line and count.
+    var many: Partitions = .{ .table = .gpt };
+    for (0..5) |i| many.add(.{ .number = @intCast(i + 1), .start = 0, .sectors = 2048 });
+    o.build(&id, &many, 1000215216, "Windows 10", false);
+    try std.testing.expectEqualStrings("Used/free space in file systems: unknown.", o.lines()[8]);
+    try std.testing.expectEqualStrings("Partition 1: unknown (1 MiB)", o.lines()[9]);
+    try std.testing.expectEqualStrings("(Other partitions: 1)", o.lines()[17]);
+}
+
+test "NVMe Identify Namespace data from EFI_DISK_INFO is not a model" {
+    var ns: [4096]u8 = @splat(0);
+    std.mem.writeInt(u64, ns[0..8], 1000215216, .little); // NSZE
+    std.mem.writeInt(u64, ns[8..16], 1000215216, .little); // NCAP
+    std.mem.writeInt(u64, ns[16..24], 30000000, .little); // NUSE
+    ns[25] = 0x01;
+    ns[26] = 0x1f;
+    const id = parse(.nvme, &ns);
+    try std.testing.expectEqual(@as(usize, 0), id.model_len);
+    try std.testing.expectEqualStrings("ssd", id.media.?);
+    try std.testing.expect(!printableField(&[_]u8{0} ** 8));
+    try std.testing.expect(printableField("  X  "));
+    var ata: [512]u8 = @splat(0xff);
+    try std.testing.expectEqual(@as(usize, 0), parse(.ahci, &ata).model_len);
 }

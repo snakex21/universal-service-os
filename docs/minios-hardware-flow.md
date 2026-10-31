@@ -215,3 +215,62 @@ NTFS timestamp (`src/prep/uefi_main.zig` `Output.checkedClock`).
   time zone and runs no `hwclock --localtime`; the kernel reads the RTC as UTC,
   so ntfs-3g stamps local time as UTC there too. Not changed (Alpine is the
   fallback being replaced).
+
+## 2026-10-31: disk picker and erase confirmation = Alpine content
+
+**Why no `identity=` line in B261031-185528:** the identity code did run
+(`collect` -> `readIdentity` in `src/platform/uefi/minios_disk.zig`), but
+every line of the disk question went only to `serial.writeAscii`
+(`src/platform/uefi/serial.zig`: the EFI_SERIAL_IO UART, nothing else). The X470
+has no serial capture, and `minios-start.txt` keeps one replaced line
+(`minios_start.zig` `record`). `MINIOS-<build>.LOG` is MiniOS's own log
+(usosprep), written after the menu. So the lines never reached any file.
+Now each line also goes to `EFI\USOS\Logs\minios-disks.txt` (written after
+the scan, after the inspection and after the confirmation), one line per
+probe attempt: `identity disk=N probe=nvme_passthru|ata_passthru|usb_io|disk_info
+protocol=yes|no status=<EFI status or reason> interface=... model="..."
+serial_known=true|false`, then `identity disk=N source=...`. The serial
+number is never logged.
+
+Probe fixes at the same time: the ATA pass-thru sector count was written to
+ACB byte 14 (reserved), now byte 12 (`AtaSectorCount`); ACB/ASB are 64-byte
+aligned static blocks (IoAlign); IDENTIFY strings must be printable text, so
+the EDK2-style NVMe `EFI_DISK_INFO.Identify` (it returns Identify *Namespace*
+data) no longer turns binary NSZE/NCAP bytes into a model name. NVMe goes
+through `LocateDevicePath(EFI_NVM_EXPRESS_PASS_THRU)`, which walks the
+namespace path up to the controller handle (PciRoot/Pci) that carries the
+protocol. The remaining node must be the NVMe namespace node. AHCI without
+EFI_ATA_PASS_THRU falls back to `EFI_DISK_INFO` (AHCI/IDE interface, IDENTIFY).
+
+Parity (Alpine: `tools/xp_menu_ui.sh` usos_xp_choose_disk,
+`tools/target_disk_identity.sh`, `tools/xp_disk_overview.sh`,
+`tools/xp_detect_system.sh`, `tools/vista_csmwrap_prepare.sh`; MiniOS:
+`minios_disk.zig`, `src/flow/minios_disk_identity.zig`,
+`src/flow/minios_fs_probe.zig`):
+
+| Alpine field | Alpine source | MiniOS field / source | Status |
+|---|---|---|---|
+| Picker title `<model> (<n> GiB)` | lsblk MODEL / sysfs model | NVMe Identify Controller MN, ATA IDENTIFY words 27-46, USB INQUIRY product / iProduct, DISK_INFO | same; on hardware depends on which protocols AMI installs (see log) |
+| Picker detail `S/N: ...` | lsblk SERIAL / vpd_pg80 / USB serial | NVMe SN, ATA words 10-19, USB iSerialNumber | same |
+| Bus chip (nvme/sata/usb/...) | TRAN / host driver | device path node, else DISK_INFO interface | same (no virtio/emmc/sd split) |
+| Media chip ssd/hdd | NVMe = ssd; smartctl word 217, else rotational | NVMe = ssd; IDENTIFY word 217 | no rotational fallback (no SSHD from word 78) |
+| `Disk:` / `Type:` / `S/N:` / `Size: N GiB` | as above | as above | same |
+| `Status: not currently in use.` | findmnt / swaps / holders | fixed text (the USOS stick and refused disks are not offered) | same text |
+| `Partitions: n; unallocated: approx. M MiB` | lsblk parts, merged extents | GPT entries / MBR + EBR chain; extended = 2 sectors as sysfs | same (sum, not merged) |
+| `Readable file systems: k; used U MiB, free F MiB` / `...unknown.` | df of the ro mounts | sums of the probes below | same |
+| `<node>: <fstype> <label> (<MiB> MiB)` (first 4) | lsblk FSTYPE / LABEL | `Partition <n>:` (Linux number), boot sector / superblock type, label filtered like `tr -cd`, 18 chars | node name differs (no Linux name); no double space for an empty label |
+| fs types | blkid | ntfs, vfat (FAT12/16/32), exfat, ext2/3/4, swap, xfs, btrfs, BitLocker, else unknown | others (e.g. hfsplus, iso9660) show `unknown` |
+| `Used: X MiB, free: Y MiB` | df on ntfs3 / vfat / ext4 | NTFS $Bitmap set bits (<= 64 MiB bitmap); FAT FSInfo, else FAT entries counted (<= 32 MiB FAT); ext superblock blocks/free/reserved | ext: metadata overhead not subtracted (df bsddf), small difference |
+| `Used/free: unknown` | not mountable | exfat, swap, xfs, btrfs, BitLocker, read failures | same |
+| System: `Windows (system files)` / `XP installation files` / `Windows boot files` / `No system detected` | marker files on the mount | NTFS via `usos.storage.ntfs`, FAT12/16/32 via own directory walk (<= 512 clusters per directory) | same markers |
+| System: `Linux: <PRETTY_NAME>` | /etc/os-release | not read (no ext reader in the menu): `System unknown` | missing |
+| `(Other partitions: n)` | count > 4 | same | same |
+| `File detection does not verify whether a system works.` | fixed | same | same |
+| `New layout (MBR): ...` | vista_csmwrap_prepare.sh arithmetic | `csmwrapFreeGib` (same arithmetic) | same |
+
+The inspection runs once per disk when it is chosen (Alpine: "Inspecting
+disk", after the picker), read only, with a 96 MiB read budget per disk.
+Host tests: `tools/zig/zig.exe test src/flow/minios_disk_identity.zig`
+(includes `minios_fs_probe.zig`). Only the X470 can show which identity
+protocols AMI installs for the AMD AHCI, the Micron 3400 and USB disks, and
+the real used/free values: read `minios-disks.txt` after the next run.
