@@ -49,6 +49,13 @@
 #if defined(USOSNVME_NT351) || defined(USOSNVME_W9X)
 #define USOSNVME_CF8
 #endif
+/* Every data address from ScsiPort is checked before it goes into a PRP
+   (NvmeBuildPrps): amd64, and NT 3.1, whose ScsiPort answers
+   ScsiPortGetPhysicalAddress with SP_UNINITIALIZED_VALUE (all ones, length
+   0) when the request has no scatter/gather list (2026-10-30). */
+#if (defined(_WIN64) && !defined(USOSNVME_W9X)) || defined(USOSNVME_NT31)
+#define USOSNVME_PRPCHECK
+#endif
 
 /* I/O queue id. Windows 9x: 2, so that a stray INT 13h from SeaBIOS (which
    created queue 1 before Windows started and still rings doorbell 1) hits a
@@ -105,7 +112,12 @@
 #define NVME_PG_IOCQ       3
 #define NVME_PG_IDENT      4
 #define NVME_PG_PRPLIST    5
+#ifdef USOSNVME_NT31
+#define NVME_PG_RING       6   /* NT 3.1 diagnostics: request ring copy for disk LBA 48-50 */
+#define NVME_PAGES         7
+#else
 #define NVME_PAGES         6
+#endif
 
 #define NVME_BAR_MAP_SIZE  0x2000
 #define NVME_MAX_TRANSFER  (128UL * 1024UL)
@@ -224,7 +236,13 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG IoQid;                 /* NVME_IO_QID, or 1 if fewer queues */
     ULONG Srbs;                  /* 9x debug: completed SRBs */
     ULONG DbgNonRw;              /* 9x debug: non read/write SRBs shown */
-#ifdef _WIN64
+#ifdef USOSNVME_NT31
+    ULONG IoSrbs;                /* NT 3.1 /SOS I/O row: SRBs seen by HwStartIo */
+    ULONG LastPrp1;              /* NT 3.1 /SOS I/O row: PRP1 of the last READ / WRITE */
+    PUCHAR Ring;                 /* NT 3.1 /SOS: 1.5 KiB ring block (page NVME_PG_RING) */
+    SCSI_PHYSICAL_ADDRESS RingPhys;
+#endif
+#ifdef USOSNVME_PRPCHECK
     BOOLEAN DmaHighLogged;       /* NVME_LOG_DMA_HIGH written for this start */
     ULONG BadPa;                 /* data addresses refused (NvmeBuildPrps) */
 #endif

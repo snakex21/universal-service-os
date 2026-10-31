@@ -175,6 +175,47 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$? nt4_sta
         self.assertEqual(tags - listed, set())
 
 
+class Nt4KeyGate(unittest.TestCase):
+    """The NT 4.0 key is optional (2026-10-28): nt4_key_gate passes an answer
+    with a ProductId or a Select / MSDN CD, and stops (before any disk write)
+    for a retail / OEM CD without a key, whose GUI Setup would wait in the VM."""
+
+    def gate(self, sif, setupp=None, name='SETUPP.INI'):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-key-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'I386').mkdir()
+        (tmp / 'WINNT.SIF').write_bytes(sif.encode('ascii'))
+        if setupp is not None:
+            (tmp / 'I386' / name).write_bytes(setupp.encode('ascii'))
+        fn = function_text(TARGET, 'nt4_key_gate')
+        rc, out, err = sh(f'{fn}\nnt4_key_gate "{(tmp / "WINNT.SIF").as_posix()}" "{(tmp / "I386").as_posix()}"')
+        return rc, out.strip()
+
+    NO_KEY = '[UserData]\r\nFullName = "USOS"\r\nComputerName = "USOS"\r\n'
+
+    def test_answer_with_a_key_passes_on_any_cd(self):
+        sif = '[UserData]\r\nFullName = "USOS"\r\nProductId = "123-4567890"\r\n'
+        self.assertEqual(self.gate(sif, '[Pid]\r\nPid=51222000\r\n'), (0, 'key'))
+        self.assertEqual(self.gate(sif), (0, 'key'))
+
+    def test_select_and_msdn_cds_need_no_key(self):
+        self.assertEqual(self.gate(self.NO_KEY, '[Pid]\r\nPid=51222270\r\n'), (0, 'select'))
+        self.assertEqual(self.gate(self.NO_KEY, '[pid]\npid = 51222335\n', 'setupp.ini'), (0, 'msdn'))
+
+    def test_retail_oem_or_unknown_cd_without_key_stops(self):
+        for setupp in ('[Pid]\r\nPid=51222000\r\n', '[Pid]\r\nPid=51222OEM\r\n', '[Other]\r\nPid=51222270\r\n', None):
+            self.assertEqual(self.gate(self.NO_KEY, setupp), (1, 'needed'), setupp)
+        # An empty ProductId, or one outside [UserData], is no key.
+        sif = '[UserData]\r\nProductId = ""\r\n[Other]\r\nProductId = "123-4567890"\r\n'
+        self.assertEqual(self.gate(sif, '[Pid]\r\nPid=51222000\r\n'), (1, 'needed'))
+
+    def test_target_gates_nt4_before_the_disk(self):
+        text = TARGET.read_text(encoding='utf-8')
+        gate = text.index('key_state=$(nt4_key_gate "$ANSWER_SIF" "$i386")')
+        self.assertLess(gate, text.index('dd if=/dev/zero of="$TARGET_DEVICE"'))
+        self.assertIn('No disk was changed', text[gate:gate + 400])
+
+
 class Nt4ServerAnswer(unittest.TestCase):
     """NT 4.0 Server / Enterprise Server GUI pages (nt4_server_answer)."""
 
@@ -211,7 +252,8 @@ class Nt4ServerAnswer(unittest.TestCase):
 
     def test_target_pipes_the_answer_through_it(self):
         text = TARGET.read_text(encoding='utf-8')
-        self.assertIn('| nt4_server_answer "${product:-0}" > "$work/WINNT.SIF"', text)
+        self.assertIn('| nt4_server_answer "$server_product" > "$work/WINNT.SIF"', text)
+        self.assertIn('server_product=${product:-0}', text)   # manual Setup: 0, the pages stay
 
 
 class Nt4Target(unittest.TestCase):

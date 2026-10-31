@@ -77,6 +77,12 @@ static void diag_add(const WCHAR *fmt, ULONG_PTR a, ULONG_PTR b, ULONG_PTR c, UL
             printf("%u", (unsigned)args[k++]);
         else if (*fmt == 's')
             wput((const WCHAR *)args[k++]);
+        else if (*fmt == 'x')
+            printf("%x", (unsigned)args[k++]);
+        else if (fmt[0] == '0' && fmt[1] == '2' && fmt[2] == 'x') {
+            printf("%02x", (unsigned)args[k++]);
+            fmt += 2;
+        }
     }
     putchar('\n');
 }

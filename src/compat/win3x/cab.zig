@@ -7,10 +7,18 @@
 //! decoded into one buffer and a distance may reach into earlier blocks).
 //! `build` writes the cabinet again: the original header bytes (set ID,
 //! cabinet index, flags, reserve fields and the previous/next cabinet names)
-//! are kept and only the sizes are updated; one MSZIP folder whose blocks are
-//! stored deflate blocks (BTYPE 00, every inflater reads them) of at most
-//! 32 KiB, each with the CFDATA checksum. Files keep their order, names,
-//! dates and attributes.
+//! are kept and only the sizes are updated; one MSZIP folder of 32 KiB
+//! blocks with the CFDATA checksum. Files keep their order, names, dates and
+//! attributes. `build`: stored deflate blocks (BTYPE 00; Windows 9x MINI.CAB,
+//! proven there). `buildFixed`: one fixed-Huffman block per CFDATA (BTYPE 01,
+//! LZ77 matches only inside the block), for NT 3.5x Setup:
+//!
+//! the NT 3.5x text-mode decoder (SETUPDD.SYS, 3.51 RVA 0x204B0; GUI Setup's
+//! SETUPDLL.DLL has the same code) reads a stored block's LEN but never NLEN,
+//! so it emits NLEN as two data bytes and drops the last two (X470
+//! 2026-10-28: system32 OEMNADLB.INF began 08 96 "[Identification]", GUI
+//! Setup: "non-existent section ... Identification"). Its fixed-Huffman path
+//! is the standard one (lengths 8/9/7/8).
 const std = @import("std");
 
 pub const Error = error{ NotCab, Corrupt, Unsupported, TooLarge, OutOfMemory };
@@ -193,6 +201,17 @@ fn put32(out: *std.ArrayList(u8), gpa: std.mem.Allocator, v: u32) Error!void {
 /// A new cabinet with `files` in one MSZIP folder of stored deflate blocks,
 /// header metadata taken from `like` (the parsed original).
 pub fn build(gpa: std.mem.Allocator, like: *const Cabinet, files: []const File) Error![]u8 {
+    return buildBlocks(gpa, like, files, false);
+}
+
+/// As `build`, but fixed-Huffman blocks: the form NT 3.5x Setup decodes
+/// (see the file comment). error.TooLarge when a block does not compress
+/// into 32 KiB + 12 bytes.
+pub fn buildFixed(gpa: std.mem.Allocator, like: *const Cabinet, files: []const File) Error![]u8 {
+    return buildBlocks(gpa, like, files, true);
+}
+
+fn buildBlocks(gpa: std.mem.Allocator, like: *const Cabinet, files: []const File, fixed: bool) Error![]u8 {
     var total: usize = 0;
     for (files) |f| total += f.data.len;
     if (total > max_folder or files.len > 0xffff) return error.TooLarge;
@@ -230,27 +249,33 @@ pub fn build(gpa: std.mem.Allocator, like: *const Cabinet, files: []const File) 
         w += f.data.len;
     }
     var i: usize = 0;
+    var payload: std.ArrayList(u8) = .empty;
+    defer payload.deinit(gpa);
     while (i < total) {
         const n = @min(block_size, total - i);
-        var payload: [7]u8 = undefined;
-        payload[0] = 'C';
-        payload[1] = 'K';
-        payload[2] = 0x01; // BFINAL = 1, BTYPE = 00 (stored), rest of the byte padding
-        std.mem.writeInt(u16, payload[3..5], @intCast(n), .little);
-        std.mem.writeInt(u16, payload[5..7], ~@as(u16, @intCast(n)), .little);
-        const cb_data: u16 = @intCast(n + payload.len);
+        payload.clearRetainingCapacity();
+        try payload.appendSlice(gpa, "CK");
+        if (fixed) {
+            try deflateFixed(gpa, &payload, stream[i .. i + n]);
+        } else {
+            var stored: [5]u8 = undefined;
+            stored[0] = 0x01; // BFINAL = 1, BTYPE = 00 (stored), rest of the byte padding
+            std.mem.writeInt(u16, stored[1..3], @intCast(n), .little);
+            std.mem.writeInt(u16, stored[3..5], ~@as(u16, @intCast(n)), .little);
+            try payload.appendSlice(gpa, &stored);
+            try payload.appendSlice(gpa, stream[i .. i + n]);
+        }
+        // MSZIP: at most 32 KiB + 12 compressed bytes per CFDATA block
+        if (payload.items.len > block_size + 12) return error.TooLarge;
+        const cb_data: u16 = @intCast(payload.items.len);
         var sizes: [4]u8 = undefined;
         std.mem.writeInt(u16, sizes[0..2], cb_data, .little);
         std.mem.writeInt(u16, sizes[2..4], @intCast(n), .little);
         // checksum over the compressed data, then over cbData/cbUncomp
-        const joined = try gpa.alloc(u8, cb_data);
-        defer gpa.free(joined);
-        @memcpy(joined[0..payload.len], &payload);
-        @memcpy(joined[payload.len..], stream[i .. i + n]);
-        try put32(&out, gpa, checksum(sizes[0..4], checksum(joined, 0)));
+        try put32(&out, gpa, checksum(sizes[0..4], checksum(payload.items, 0)));
         try out.appendSlice(gpa, &sizes);
         try out.appendNTimes(gpa, 0, like.data_reserve);
-        try out.appendSlice(gpa, joined);
+        try out.appendSlice(gpa, payload.items);
         i += n;
     }
     if (out.items.len > std.math.maxInt(u32)) return error.TooLarge;
@@ -259,6 +284,126 @@ pub fn build(gpa: std.mem.Allocator, like: *const Cabinet, files: []const File) 
     std.mem.writeInt(u16, out.items[28..30], @intCast(files.len), .little); // cFiles
     std.mem.writeInt(u32, out.items[folder_at..][0..4], @intCast(data_at), .little);
     return out.toOwnedSlice(gpa);
+}
+
+// ---------------------------------------------------------------- deflate
+
+const BitWriter = struct {
+    out: *std.ArrayList(u8),
+    gpa: std.mem.Allocator,
+    acc: u32 = 0,
+    n: u5 = 0,
+
+    /// `count` (<= 16) bits of `value`, least significant first.
+    fn put(self: *BitWriter, value: u32, count: u5) Error!void {
+        var v = value;
+        var c = count;
+        while (c > 0) : (c -= 1) {
+            self.acc |= (v & 1) << self.n;
+            v >>= 1;
+            self.n += 1;
+            if (self.n == 8) {
+                try self.out.append(self.gpa, @truncate(self.acc));
+                self.acc = 0;
+                self.n = 0;
+            }
+        }
+    }
+
+    /// A Huffman code (`len` bits, most significant bit first in the stream).
+    fn code(self: *BitWriter, value: u32, len: u5) Error!void {
+        var k: u5 = len;
+        while (k > 0) {
+            k -= 1;
+            try self.put((value >> k) & 1, 1);
+        }
+    }
+
+    fn flush(self: *BitWriter) Error!void {
+        if (self.n > 0) try self.out.append(self.gpa, @truncate(self.acc));
+        self.acc = 0;
+        self.n = 0;
+    }
+};
+
+/// The fixed literal/length code of `sym` (RFC 1951 3.2.6).
+fn fixedLit(w: *BitWriter, sym: u16) Error!void {
+    if (sym < 144) return w.code(0x30 + @as(u32, sym), 8);
+    if (sym < 256) return w.code(0x190 + @as(u32, sym - 144), 9);
+    if (sym < 280) return w.code(@as(u32, sym - 256), 7);
+    return w.code(0xc0 + @as(u32, sym - 280), 8);
+}
+
+
+/// Longest match: 257 (code 284 + 30), never code 285, whose meaning
+/// differs between deflate implementations of that time.
+const max_match: usize = 257;
+const hash_bits = 13;
+
+/// `data` (at most 32 KiB) as one final fixed-Huffman deflate block; greedy
+/// LZ77 with matches inside `data` only (no window from earlier blocks).
+fn deflateFixed(gpa: std.mem.Allocator, out: *std.ArrayList(u8), data: []const u8) Error!void {
+    var w = BitWriter{ .out = out, .gpa = gpa };
+    try w.put(1, 1); // BFINAL
+    try w.put(1, 2); // BTYPE 01
+    const none: u32 = std.math.maxInt(u32);
+    const head = try gpa.alloc(u32, 1 << hash_bits);
+    defer gpa.free(head);
+    @memset(head, none);
+    const prev = try gpa.alloc(u32, @max(data.len, 1));
+    defer gpa.free(prev);
+    var i: usize = 0;
+    while (i < data.len) {
+        var best_len: usize = 0;
+        var best_dist: usize = 0;
+        if (i + 3 <= data.len) {
+            const h = hash3(data[i..]);
+            var cand = head[h];
+            var chain: usize = 64;
+            while (cand != none and chain > 0) : (chain -= 1) {
+                const c: usize = cand;
+                const limit = @min(max_match, data.len - i);
+                var l: usize = 0;
+                while (l < limit and data[c + l] == data[i + l]) l += 1;
+                if (l > best_len) {
+                    best_len = l;
+                    best_dist = i - c;
+                    if (l == limit) break;
+                }
+                cand = prev[c];
+            }
+        }
+        const step: usize = if (best_len >= 3) best_len else 1;
+        if (best_len >= 3) {
+            var lc: usize = len_base.len - 2; // never 285
+            while (len_base[lc] > best_len) lc -= 1;
+            try fixedLit(&w, @intCast(257 + lc));
+            try w.put(@intCast(best_len - len_base[lc]), len_extra[lc]);
+            var dc: usize = dist_base.len - 1;
+            while (dist_base[dc] > best_dist) dc -= 1;
+            try w.code(@intCast(dc), 5);
+            try w.put(@intCast(best_dist - dist_base[dc]), dist_extra[dc]);
+        } else {
+            try fixedLit(&w, data[i]);
+        }
+        var k: usize = 0;
+        while (k < step) : (k += 1) {
+            const at = i + k;
+            if (at + 3 <= data.len) {
+                const h = hash3(data[at..]);
+                prev[at] = head[h];
+                head[h] = @intCast(at);
+            }
+        }
+        i += step;
+    }
+    try fixedLit(&w, 256);
+    try w.flush();
+}
+
+fn hash3(b: []const u8) usize {
+    const v = (@as(u32, b[0]) << 16) | (@as(u32, b[1]) << 8) | b[2];
+    return @intCast((v *% 2654435761) >> (32 - hash_bits));
 }
 
 // ---------------------------------------------------------------- inflate
@@ -475,12 +620,13 @@ test "cabinet build round-trips through parse with valid checksums" {
     };
     const big = try gpa.alloc(u8, 70000);
     defer gpa.free(big);
-    for (big, 0..) |*b, k| b.* = @truncate(k * 13 + k / 7);
+    const text = "[Identification]\r\n    OptionType = NetAdapter\r\n";
+    for (big, 0..) |*b, k| b.* = if (k % 97 == 0) @truncate(k / 97) else text[k % text.len];
     const files = [_]File{
         .{ .name = "A.TXT", .data = "hello", .date = 1, .time = 2, .attribs = 0x20 },
         .{ .name = "BIG.BIN", .data = big, .date = 3, .time = 4, .attribs = 0x21 },
     };
-    const cab_bytes = try build(gpa, &like, &files);
+    const cab_bytes = try buildFixed(gpa, &like, &files);
     defer gpa.free(cab_bytes);
     try std.testing.expectEqual(@as(u32, @intCast(cab_bytes.len)), std.mem.readInt(u32, cab_bytes[8..12], .little));
     try std.testing.expectEqual(@as(u16, 0x1234), std.mem.readInt(u16, cab_bytes[32..34], .little));
@@ -500,7 +646,47 @@ test "cabinet build round-trips through parse with valid checksums" {
         const stored_sum = std.mem.readInt(u32, cab_bytes[p..][0..4], .little);
         const cb = std.mem.readInt(u16, cab_bytes[p + 4 ..][0..2], .little);
         try std.testing.expectEqual(stored_sum, checksum(cab_bytes[p + 4 .. p + 8], checksum(cab_bytes[p + 8 .. p + 8 + cb], 0)));
+        // "CK" + BFINAL 1, BTYPE 01 (fixed Huffman), never a stored block
+        try std.testing.expectEqualStrings("CK", cab_bytes[p + 8 .. p + 10]);
+        try std.testing.expectEqual(@as(u8, 3), cab_bytes[p + 10] & 7);
+        try std.testing.expect(cb <= 32768 + 12);
         p += 8 + cb;
     }
     try std.testing.expectEqual(cab_bytes.len, p);
+}
+
+test "fixed-Huffman blocks: every byte value, long runs, incompressible refused" {
+    const gpa = std.testing.allocator;
+    var header: [36]u8 = @splat(0);
+    @memcpy(header[0..4], "MSCF");
+    header[24] = 3;
+    header[25] = 1;
+    header[26] = 1;
+    const like = Cabinet{ .header = &header, .folder_reserve = 0, .data_reserve = 0, .folder_extra = &.{}, .compress = 1, .files = &.{}, .body = &.{} };
+    var data: [3000]u8 = undefined;
+    for (data[0..256], 0..) |*b, k| b.* = @intCast(k);
+    @memset(data[256..1500], 'A'); // matches of 257 bytes back to back
+    for (data[1500..], 0..) |*b, k| b.* = @intCast(k % 251);
+    const out = try buildFixed(gpa, &like, &.{.{ .name = "x.inf", .data = &data, .date = 0, .time = 0, .attribs = 0 }});
+    defer gpa.free(out);
+    var back = try parse(gpa, out);
+    defer back.deinit(gpa);
+    try std.testing.expectEqualSlices(u8, &data, back.files[0].data);
+    // build (Windows 9x MINI.CAB) keeps stored blocks
+    const st = try build(gpa, &like, &.{.{ .name = "x.inf", .data = &data, .date = 0, .time = 0, .attribs = 0 }});
+    defer gpa.free(st);
+    const coff = std.mem.readInt(u32, st[36..40], .little);
+    try std.testing.expectEqual(@as(u8, 1), st[coff + 10] & 7);
+    var back_st = try parse(gpa, st);
+    defer back_st.deinit(gpa);
+    try std.testing.expectEqualSlices(u8, &data, back_st.files[0].data);
+    // 9-bit literals for 32 KiB of bytes >= 144 do not fit one MSZIP block
+    const noise = try gpa.alloc(u8, 32768);
+    defer gpa.free(noise);
+    var x: u32 = 1;
+    for (noise) |*b| {
+        x = x *% 1103515245 +% 12345;
+        b.* = @as(u8, @truncate(x >> 24)) | 0x90;
+    }
+    try std.testing.expectError(error.TooLarge, buildFixed(gpa, &like, &.{.{ .name = "n.bin", .data = noise, .date = 0, .time = 0, .attribs = 0 }}));
 }

@@ -45,10 +45,8 @@
 #include <ntddkbd.h>
 #include <ntddmou.h>
 #include <kbdmou.h>
-#ifndef USOSUSB_NT31
 #include <ntdddisk.h>
 #include <ntddstor.h>
-#endif
 #ifdef USOSUSB_NT6
 #include <mountdev.h>
 #include <mountmgr.h>
@@ -64,7 +62,23 @@
 __declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityBoost);
 __declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
 __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
-#define USOSUSB_VERSION L"usosusb 1.2-nt31"
+/* The mass-storage queue: spin locks and interlocked lists in their NT 3.1
+   stdcall forms too (HAL KeAcquireSpinLock / KeReleaseSpinLock, kernel
+   ExInterlockedInsertTailList / ExInterlockedRemoveHeadList; no Kf / Exf). */
+#undef KeAcquireSpinLock
+#undef KeReleaseSpinLock
+#undef ExInterlockedInsertTailList
+#undef ExInterlockedRemoveHeadList
+__declspec(dllimport) VOID __stdcall KeAcquireSpinLock(PKSPIN_LOCK SpinLock, PKIRQL OldIrql);
+__declspec(dllimport) VOID __stdcall KeReleaseSpinLock(PKSPIN_LOCK SpinLock, KIRQL NewIrql);
+__declspec(dllimport) PLIST_ENTRY __stdcall ExInterlockedInsertTailList(PLIST_ENTRY ListHead, PLIST_ENTRY ListEntry, PKSPIN_LOCK Lock);
+__declspec(dllimport) PLIST_ENTRY __stdcall ExInterlockedRemoveHeadList(PLIST_ENTRY ListHead, PKSPIN_LOCK Lock);
+#define USOSUSB_VERSION L"usosusb 1.4-nt31"
+/* USB sticks as on NT 3.5x / 4.0 (USOSUSB_NT4MSC: plain \DosDevices letters,
+   FAT12 / FAT16 / NTFS volumes, Parameters\Storage = 0 turns it off). The
+   1.2-nt31 build had no mass storage: a stick showed as "pN-nohid". */
+#define USOSUSB_MSC 1
+#define USOSUSB_NT4MSC 1
 #elif defined(USOSUSB_NT6)
 /* Vista / Server 2008 SP2 x86 (build-nt6.cmd): same legacy port devices;
    kbdclass / mouclass connect them as legacy ports (\Device\KeyboardClassLegacyN,
@@ -1870,6 +1884,17 @@ static const WCHAR *fs_name(UCHAR fs)
     return L"other";
 }
 
+#ifdef USOSUSB_NT31
+/* NT 3.1 Diag: the BPB of a FAT volume it gets (sectors per cluster,
+   reserved sectors, partition type, MiB); the NT 3.1 fastfat itself accepts
+   1..128 sectors per cluster (its FatIsBootSectorFat). */
+static void fat_note(const UCHAR *s, ULONG part, UCHAR ptype, ULONG count)
+{
+    diag_add(L" p%u:fat c%u r%u", part, s[13], s[14] | (s[15] << 8), 0);
+    diag_add(L" t%02x %uM", ptype, count >> 11, 0, 0);
+}
+#endif
+
 #ifdef USOSUSB_NT4MSC
 /* NT 4.0 / 3.5x read FAT12 / FAT16 and NTFS. A FAT32 or exFAT volume would
    mount as RAW, and Explorer would offer to format it: such a volume gets no
@@ -1968,8 +1993,13 @@ static void msc_attach(DEV *d)
         UCHAR fs = fs_kind(s);
         sig = RtlCompareMemory(s + 82, "FAT32", 5) == 5 ? le32(s + 67) : le32(s + 39);
 #ifdef USOSUSB_NT4MSC
-        if (nt4_fs_ok(fs, 0))
+        if (nt4_fs_ok(fs, 0)) {
+#ifdef USOSUSB_NT31
+            if (fs == FS_FAT)
+                fat_note(s, 0, 6, d->blocks);
+#endif
             vol_create(d, 0, d->blocks, (UCHAR)(fs == FS_NTFS ? 7 : 6), 0, sig, fs);
+        }
 #else
         vol_create(d, 0, d->blocks, (UCHAR)(RtlCompareMemory(s + 3, "NTFS", 4) == 4 ? 7 : 0x0C), 0, sig, fs);
 #endif
@@ -2000,6 +2030,14 @@ static void msc_attach(DEV *d)
                 fs = fs_kind(g_bva);
             if (!nt4_fs_ok(fs, i + 1))
                 continue;
+#ifdef USOSUSB_NT31
+            if (fs == FS_FAT)
+                fat_note(g_bva, i + 1, t, n);
+            /* 0x0E (FAT16 LBA, Windows 95) postdates NT 3.1: its disk
+               code knows 0x01 / 0x04 / 0x06; report the volume as 0x06 */
+            if (fs == FS_FAT && t == 0x0E)
+                t = 0x06;
+#endif
 #endif
             vol_create(d, st, n, t, e[0], sig, fs);
         }

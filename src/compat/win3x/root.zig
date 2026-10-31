@@ -5,6 +5,10 @@ pub const display_table = @import("display_table.zig");
 pub const display_run = @import("display_run.zig");
 pub const cab = @import("cab.zig");
 pub const w9x_mini = @import("w9x_mini.zig");
+pub const nt35_initial = @import("nt35_initial.zig");
+pub const nt4_kernel = @import("nt4_kernel.zig");
+pub const nt3_cab_file = @import("nt3_cab_file.zig");
+pub const nt31_hive = @import("nt31_hive.zig");
 
 test {
     _ = lz;
@@ -13,4 +17,8 @@ test {
     _ = display_run;
     _ = cab;
     _ = w9x_mini;
+    _ = nt35_initial;
+    _ = nt4_kernel;
+    _ = nt3_cab_file;
+    _ = nt31_hive;
 }

@@ -49,6 +49,16 @@
  *  - no /BASEVIDEO handling in the NT 3.x video port: with BASEVIDEO in
  *    SystemStartOptions the driver does not start, so the "[VGA mode]" boot
  *    entry gets the VGA driver (VgaSave on NT 3.5/3.51).
+ *
+ * USOSVBE_NT31 (build-nt31.cmd, with USOSVBE_NT3): the NT 3.1 build. NT 3.1
+ * has no ChangeDisplaySettings and no usosdisplay service, so the miniport
+ * itself chooses the start mode: after sorting, the first available mode of
+ * the preference list (Full HD first, then 1024x768 and 800x600, all 5:6:5)
+ * moves to index 0. USOS writes no DefaultSettings.* for usosvbe on NT 3.1,
+ * so winsrv hands framebuf.dll an all-zero DEVMODE, and NT 3.1's framebuf.dll
+ * then takes the first mode of the list (its match loop accepts any mode
+ * when width, height, bpp, flags and frequency are all 0). Values the
+ * Display applet writes later are matched exactly, as on NT 3.5x.
  */
 
 #include <dderror.h>
@@ -60,7 +70,11 @@
 #include "display_modes.h"
 #endif
 
-#ifdef USOSVBE_NT3
+#if defined(USOSVBE_NT31)
+#define USOSVBE_VERSION L"usosvbe 1.2-nt31"
+#define NT3_HW_INIT_DATA_SIZE 0x20
+#define NT3_CONFIG_INFO_SIZE 0x38
+#elif defined(USOSVBE_NT3)
 #define USOSVBE_VERSION L"usosvbe 1.1-nt3"
 #define NT3_HW_INIT_DATA_SIZE 0x20
 #define NT3_CONFIG_INFO_SIZE 0x38
@@ -296,6 +310,32 @@ static int mode_less(const VBEMODE *a, const VBEMODE *b)
     return a->Height < b->Height;
 }
 
+#ifdef USOSVBE_NT31
+/* NT 3.1 start mode (see the header): the first preference the BIOS lists
+ * goes to index 0 of the sorted list; otherwise the list stays as sorted. */
+static void prefer_first(PDEVEXT x)
+{
+    static const USHORT pref[][3] = {
+        { 1920, 1080, 16 }, { 1920, 1080, 32 }, { 1680, 1050, 16 }, { 1600, 900, 16 },
+        { 1280, 1024, 16 }, { 1024, 768, 16 }, { 800, 600, 16 },
+    };
+    ULONG p, i, j;
+    for (p = 0; p < sizeof(pref) / sizeof(pref[0]); p++) {
+        for (i = 0; i < x->NumModes; i++) {
+            if (x->Modes[i].Width == pref[p][0] && x->Modes[i].Height == pref[p][1] && x->Modes[i].Bpp == pref[p][2]) {
+                VBEMODE t = x->Modes[i];
+                for (j = i; j > 0; j--) x->Modes[j] = x->Modes[j - 1];
+                x->Modes[0] = t;
+                dcat(x, L" first="); dnum(x, t.Width, 10, 0); dcat(x, L"x");
+                dnum(x, t.Height, 10, 0); dcat(x, L"x"); dnum(x, t.Bpp, 10, 0);
+                return;
+            }
+        }
+    }
+    dcat(x, L" first=sorted");
+}
+#endif
+
 static void query(PDEVEXT x)
 {
     USHORT list[MAXLIST];
@@ -347,6 +387,9 @@ static void query(PDEVEXT x)
     dcat(x, L" list="); dnum(x, n, 10, 0);
     dcat(x, L" modes="); dnum(x, x->NumModes, 10, 0);
     x->QueryOk = x->NumModes != 0;
+#ifdef USOSVBE_NT31
+    if (x->QueryOk) prefer_first(x);
+#endif
 #ifdef USOSVBE_NT3
     /* NT 3.5 has no EnumDisplaySettings. Publish only modes validated by
        this miniport on this boot, using an already imported VideoPort API.
@@ -601,12 +644,41 @@ static BOOLEAN basevideo(void)
 }
 #endif
 
+#ifdef USOSVBE_NT31
+/* Silent boot trace (NT 3.1 X470 2026-10-30: no UsosVbeModes / UsosVbeDiag
+ * at all, so nothing showed whether DriverEntry ran): Services\usosvbe
+ * UsosVbeEntry (REG_SZ) = "usosvbe 1.2-nt31 entry" + the VideoPortInitialize
+ * status per bus type tried, written with the kernel's RtlWriteRegistryValue
+ * (no device extension yet). FindAdapter then writes Device0 UsosVbeModes,
+ * the first CSRSS open Device0 UsosVbeDiag. */
+__declspec(dllimport) LONG __stdcall RtlWriteRegistryValue(ULONG RelativeTo, PWSTR Path, PWSTR ValueName,
+                                                           ULONG ValueType, PVOID ValueData, ULONG ValueLength);
+static WCHAR g_entry[96];
+static void entry_cat(const WCHAR *t, ULONG v, BOOLEAN hex)
+{
+    ULONG n = 0, k;
+    WCHAR b[8];
+    while (g_entry[n]) n++;
+    while (*t && n < 86) g_entry[n++] = *t++;
+    if (hex) {
+        for (k = 0; k < 8; k++) { ULONG dg = (v >> (28 - 4 * k)) & 15; b[k] = (WCHAR)(dg < 10 ? L'0' + dg : L'A' + dg - 10); }
+        for (k = 0; k < 8 && n < 94; k++) g_entry[n++] = b[k];
+    }
+    g_entry[n] = 0;
+    RtlWriteRegistryValue(1 /* RTL_REGISTRY_SERVICES */, L"usosvbe", L"UsosVbeEntry", 1 /* REG_SZ */, g_entry,
+                          (n + 1) * sizeof(WCHAR));
+}
+#endif
+
 ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)
 {
     VIDEO_HW_INITIALIZATION_DATA d;
     ULONG st;
 
-#ifdef USOSVBE_NT3
+#ifdef USOSVBE_NT31
+    entry_cat(USOSVBE_VERSION L" entry", 0, FALSE);
+    if (basevideo()) { entry_cat(L" basevideo", 0, FALSE); return 0xC000000EUL; }
+#elif defined(USOSVBE_NT3)
     if (basevideo()) return 0xC000000EUL;   /* STATUS_NO_SUCH_DEVICE */
 #endif
     VideoPortZeroMemory(&d, sizeof(d));
@@ -619,11 +691,28 @@ ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)
     d.HwInitialize = Initialize;
     d.HwStartIO = StartIO;
     d.HwDeviceExtensionSize = sizeof(DEVEXT);
+#ifdef USOSVBE_NT31
+    /* NT 3.1 videoprt only knows the buses NTDETECT reported (IoQuery-
+     * DeviceDescription; 3.1 has no PCIBus type): Isa, Eisa, MCA as
+     * vga.sys tries them, the first that works. */
+    {
+        static const INTERFACE_TYPE buses[] = { Isa, Eisa, MicroChannel, PCIBus };
+        static const WCHAR *const names[] = { L" isa=", L" eisa=", L" mca=", L" pci=" };
+        ULONG i;
+        st = 0xC000000EUL;
+        for (i = 0; i < 4 && st != NO_ERROR; i++) {
+            d.AdapterInterfaceType = buses[i];
+            st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
+            entry_cat(names[i], st, TRUE);
+        }
+    }
+#else
     d.AdapterInterfaceType = Isa;
     st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
     if (st != NO_ERROR) {
         d.AdapterInterfaceType = PCIBus;
         st = VideoPortInitialize(ctx1, ctx2, &d, NULL);
     }
+#endif
     return st;
 }

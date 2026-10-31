@@ -27,8 +27,11 @@ usos_nt351_answer() {
 }
 
 usos_nt351_preflight() {
-    # ANSWER LIB PCI_ROOT. Must happen before target writes.
-    _u351_answer=$1 _u351_lib=$2 _u351_pci=$3
+    # ANSWER LIB PCI_ROOT [native]. Must happen before target writes.
+    # native (no install VM, docs/nt351-native-net-2026-10-28.md): the
+    # USOSNET351N.SYS build (CF8h/CFCh without a HAL PCI bus, 20 ms timer),
+    # staged under the same USOSNET351.SYS name usosnt3 takes over.
+    _u351_answer=$1 _u351_lib=$2 _u351_pci=$3 _u351_variant=${4:-}
     _u351_enabled=$(usos_nt351_requested "$_u351_answer") || return 1
     [ "$_u351_enabled" = on ] || return 0
     . "$_u351_lib/network_setup.sh" || return 1
@@ -40,6 +43,10 @@ usos_nt351_preflight() {
     printf '%s\n' "$_u351_config" | grep -qx 'dns=' || return 1
     _u351_sys=$_u351_lib/nt3/USOSNET351.SYS
     _u351_sha=$_u351_lib/nt3/USOSNET351.SHA256
+    if [ "$_u351_variant" = native ]; then
+        _u351_sys=$_u351_lib/nt3/USOSNET351N.SYS
+        _u351_sha=$_u351_lib/nt3/USOSNET351N.SHA256
+    fi
     [ -r "$_u351_sys" ] && [ -r "$_u351_sha" ] || return 1
     _u351_expected=$(awk 'NR==1{print $1}' "$_u351_sha")
     printf '%s\n' "$_u351_expected" | grep -Eq '^[0-9a-f]{64}$' || return 1
@@ -95,6 +102,43 @@ usos_nt351_loop_inf() {
           print "        goto skipoptions\r";print "    endif\r"}
        if($0=="skipoptions = +")skip++}
       END{if(n!=1||skip!=1)exit 1}'
+}
+
+usos_nt351_inf_pin() {
+    # original OEMNADLB.INF sha256 -> patched sha256 (WS / Server CD)
+    case "$1" in
+      5f64dac6ee633bf961b9d07e2907c63c962a8dc41186eb00a73836d4647bfa52) echo df77ec120ac57faa3bc5b8ba554d254a1c00be55bf56fdc930519c7b0aa16d33 ;;
+      bc73cc4ffc1677bda5cb536aca9d6dc584a7b2970eb93303e629710c91132946) echo 22e9fe3e67d6f097044de0b52e7918aec9e1e5bc10e6f3997c05766727dca125 ;;
+      *) return 1 ;;
+    esac
+}
+
+usos_nt351_source_patch() {
+    # LOCAL_SOURCE_DIR WORK_DIR. Native path: no VM start between text mode
+    # and GUI Setup, so the local source's OEMNADLB.IN_ (one-file MSZIP
+    # cabinet; usos-fb-ui --nt3-cab-get / --nt3-cab-put) gets the same
+    # pinned unattended-medium patch before text mode copies it.
+    [ "${_u351_enabled:-off}" = on ] || return 0
+    _u351_cab=''
+    for _u351_name in OEMNADLB.IN_ oemnadlb.in_; do
+        [ -f "$1/$_u351_name" ] && _u351_cab=$1/$_u351_name && break
+    done
+    [ -n "$_u351_cab" ] || return 1
+    _u351_inf=$2/nt351-loop.inf
+    _u351_fb=${USOS_FB_UI:-usos-fb-ui}
+    rm -f "$_u351_inf" "$_u351_inf.new" "$_u351_inf.cab" "$_u351_inf.back"
+    "$_u351_fb" --nt3-cab-get "$_u351_cab" "$_u351_inf" >/dev/null 2>&1 && [ -s "$_u351_inf" ] || return 1
+    _u351_original=$(sha256sum "$_u351_inf" | awk '{print $1}') || return 1
+    _u351_patched=$(usos_nt351_inf_pin "$_u351_original") || { rm -f "$_u351_inf"; return 1; }
+    usos_nt351_loop_inf < "$_u351_inf" > "$_u351_inf.new" &&
+      [ "$(sha256sum "$_u351_inf.new" | awk '{print $1}')" = "$_u351_patched" ] &&
+      "$_u351_fb" --nt3-cab-put "$_u351_cab" "$_u351_inf.new" "$_u351_inf.cab" >/dev/null 2>&1 &&
+      "$_u351_fb" --nt3-cab-get "$_u351_inf.cab" "$_u351_inf.back" >/dev/null 2>&1 &&
+      cmp -s "$_u351_inf.new" "$_u351_inf.back" &&
+      cat "$_u351_inf.cab" > "$_u351_cab" &&
+      cmp -s "$_u351_inf.cab" "$_u351_cab" || { rm -f "$_u351_inf" "$_u351_inf.new" "$_u351_inf.cab" "$_u351_inf.back"; return 1; }
+    rm -f "$_u351_inf" "$_u351_inf.new" "$_u351_inf.cab" "$_u351_inf.back"
+    printf '[NET351] local source OEMNADLB sha256=%s -> %s (unattended 802.3 medium), cabinet read back\n' "$_u351_original" "$_u351_patched"
 }
 
 usos_nt351_vm_patch() {

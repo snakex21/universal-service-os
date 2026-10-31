@@ -50,7 +50,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#ifndef DIR
 #define DIR "C:\\USOS\\NT3\\"
+#endif
 #define SVC_NAME "usosnt3"
 #define SVC_KEY "SYSTEM\\CurrentControlSet\\Services\\"
 
@@ -214,6 +216,13 @@ static void dump_value(char *out, const char *key, const char *name)
         lstrcpyA(p, "\r\n");
     } else if (type == REG_SZ || type == REG_EXPAND_SZ) {
         data[size] = 0;
+        lstrcpyA(p, (char *)data);
+        lstrcatA(p, "\r\n");
+    } else if (type == REG_MULTI_SZ) {
+        DWORD i;
+        data[size] = 0;
+        for (i = 0; i + 1 < size; i++)           /* "a\0b\0\0" -> "a,b" */
+            if (!data[i] && data[i + 1]) data[i] = ',';
         lstrcpyA(p, (char *)data);
         lstrcatA(p, "\r\n");
     } else {
@@ -431,7 +440,9 @@ static void account(void)
     const char *logon_user;
 
     if (size < 0) {
-        say("ACCOUNT.TXT: none (Administrator, blank password)\r\n");
+        say(GetFileAttributesA(DIR "ACCOUNT.SET") != 0xFFFFFFFF
+            ? "ACCOUNT.TXT: already applied during GUI Setup (SETUP.LOG)\r\n"
+            : "ACCOUNT.TXT: none (Administrator, blank password)\r\n");
         return;
     }
     text_value(text, "user", user, sizeof user);
@@ -983,12 +994,40 @@ static int net351_equal_files(const char *source, const char *target)
     return equal;
 }
 
+/* Does the HAL have a PCI bus? NTDETECT records the PCI BIOS as a
+   MultifunctionAdapter entry with Identifier "PCI"; the NT 3.x MBR hides
+   the PCI BIOS on machines with more than 8 buses (the X470), and then the
+   HAL has no PCI bus handler (docs/nt351-native-net-2026-10-28.md). */
+static int net351_hal_pci(void)
+{
+    HKEY root, sub;
+    char name[4], id[16];
+    DWORD i, type, size;
+    int found = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\MultifunctionAdapter", 0, KEY_READ, &root))
+        return 0;
+    /* subkeys 0, 1, ... (RegOpenKeyExA only: the NT 3.1 import set) */
+    for (i = 0; !found && i < 10; i++) {
+        name[0] = (char)('0' + i);
+        name[1] = 0;
+        if (RegOpenKeyExA(root, name, 0, KEY_READ, &sub)) continue;
+        size = sizeof id - 1;
+        if (!RegQueryValueExA(sub, "Identifier", NULL, &type, (BYTE *)id, &size) && type == REG_SZ) {
+            id[size < sizeof id ? size : sizeof id - 1] = 0;
+            if (!lstrcmpiA(id, "PCI")) found = 1;
+        }
+        RegCloseKey(sub);
+    }
+    RegCloseKey(root);
+    return found;
+}
+
 static int nt351_network(void)
 {
     static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet351.sys";
     HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
     char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
-    DWORD version, type, size, medium, enabled;
+    DWORD version, type, size, medium, enabled, bus_type;
     DWORD (WINAPI *get_version)(void);
     int ok = 0, meta_len;
     meta_len = read_text("NET351.ON", meta, sizeof meta);
@@ -1027,7 +1066,15 @@ static int nt351_network(void)
     if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
     lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet351.sys");
     if (!CopyFileA(DIR "USOSNET351.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET351.SYS",dst)) goto done;
-    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"PollMode",0) ||
+    /* BusType 5 (PCI) with a HAL PCI bus (VM, small machines); without one
+       NDIS can neither translate nor connect a PCI resource: BusType 1 (Isa,
+       bus 0) maps BAR0 and takes the 8259 line, usosnet351 reads the
+       configuration space through CF8h/CFCh and polls when the line is unset. */
+    bus_type = net351_hal_pci() ? 5 : 1;
+    say(bus_type == 5 ? "NET351: HAL PCI bus present, BusType 5\r\n" :
+        "NET351: no HAL PCI bus (PCI BIOS hidden), BusType 1 + CF8h/CFCh in usosnet351\r\n");
+    if (!net351_dword(params,"BusType",bus_type) || (bus_type == 1 && !net351_dword(params,"BusNumber",0)) ||
+        !net351_dword(params,"PollMode",0) ||
         !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
         !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
     /* Commit the new image only after byte-for-byte copy and configuration
@@ -1082,7 +1129,7 @@ static int nt35_network(void)
     static const char image[] = "\\SystemRoot\\System32\\drivers\\usosnet35.sys";
     HKEY svc = NULL, params = NULL, tcp = NULL, linkage = NULL, dhcp = NULL;
     char sys[MAX_PATH], dst[MAX_PATH], previous[MAX_PATH], got[MAX_PATH], meta[768];
-    DWORD version, type, size, medium, enabled, bus, slot;
+    DWORD version, type, size, medium, enabled, bus, slot, bus_type;
     DWORD (WINAPI *get_version)(void);
     int ok = 0, meta_len;
     meta_len=read_text("NET35.ON", meta, sizeof meta);
@@ -1122,7 +1169,19 @@ static int nt35_network(void)
     if (!GetSystemDirectoryA(sys,sizeof sys) || len(sys)>MAX_PATH-32) goto done;
     lstrcpyA(dst,sys);lstrcatA(dst,"\\drivers\\usosnet35.sys");
     if (!CopyFileA(DIR "USOSNET35.SYS",dst,FALSE) || !net351_equal_files(DIR "USOSNET35.SYS",dst)) goto done;
-    if (!net351_dword(params,"BusType",5) || !net351_dword(params,"BusNumber",bus) ||
+    /* Native NT 3.5 (2026-10-30, usosnet35n): without a HAL PCI bus (the
+       NT 3.x MBR hides the PCI BIOS on the X470) NDIS 3.5 can neither
+       translate nor connect a PCI resource: BusType 1 (Isa, bus 0) as on
+       native NT 3.51; usosnet35n finds the card through CF8h/CFCh and
+       polls. With a HAL PCI bus (install VM) the exact bus/slot as before. */
+    if (!net351_hal_pci()) {
+        say("NET35: no HAL PCI bus (PCI BIOS hidden), BusType 1 + CF8h/CFCh in usosnet35n\r\n");
+        bus = 0;
+        bus_type = 1;
+    } else {
+        bus_type = 5;
+    }
+    if (!net351_dword(params,"BusType",bus_type) || !net351_dword(params,"BusNumber",bus) ||
         !net351_dword(params,"UsosPciSlot",slot) || !net351_dword(params,"PollMode",0) ||
         !net351_dword(params,"SkipPhy",0) || !net351_dword(params,"DebugPort",0) ||
         !net351_dword(svc,"Type",1) || !net351_dword(svc,"Start",2)) goto done;
@@ -1163,6 +1222,9 @@ static void display_profile(void)
     set_dword("usosdisplay", NULL, "Start", 2);
     say("DISPLAY hardware service registered (VM defers)\r\n");
 }
+static void net351_native_post(void);
+static const char *usb_group(void);
+
 static int post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
@@ -1221,7 +1283,7 @@ static int post(void)
     set_dword("usosusb", NULL, "Type", 1);
     set_dword("usosusb", NULL, "Start", 1);
     set_dword("usosusb", NULL, "ErrorControl", 0);
-    set_sz("usosusb", "Group", REG_SZ, "Keyboard Port");
+    set_sz("usosusb", "Group", REG_SZ, usb_group());
     set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
     set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
     /* IDE: the VM's disk only; the real machine boots through AHCINT. */
@@ -1268,6 +1330,7 @@ static int post(void)
     }
     selected_state = g_client_config && g_client_config->minor == 51 ? network351_state : network35_state;
     if (!client_prepare(selected_state)) return 0;
+    if (network351_state == 2 || network35_state == 2) net351_native_post();
     vesa();
     display_profile();
     return 1;
@@ -1361,6 +1424,83 @@ static void vesa(void)
     say("vesa on\r\n");
 }
 
+/* VESA display on NT 3.1 (POST.CMD "/vesa31", end of GUI Setup; docs/
+   nt-native-plan.md section 8.7): usosvbe.sys (NT 3.1 build, which puts its
+   start mode first in the mode list) + the CD's framebuf.dll, expanded by
+   nt4_csmwrap_target.sh into \USOS\NT3\FRAMEBUF.DLL (NT 3.1 Setup installs
+   framebuf.dll only for Dell DGX and has no expand.exe). NT 3.1 winsrv walks
+   \\.\DISPLAY1.. (= \Device\Video0..) and uses the first device that has
+   InstalledDisplayDrivers. usosvbe is a boot-start driver (see below), so
+   it is \Device\Video0 and vga (kept, Start 1) is Video1: the VGA-
+   compatible device for full-screen consoles, and the display of the
+   [VGA mode] (/basevideo) entry, where usosvbe does not start. No
+   DefaultSettings.* for usosvbe: winsrv then passes an all-zero DEVMODE
+   and NT 3.1 framebuf.dll takes the first mode. */
+static void vesa31(void)
+{
+    static const WCHAR drivers[] = L"framebuf\0";
+    char sys[MAX_PATH], dst[MAX_PATH];
+    HKEY h;
+    LONG rc;
+
+    if (GetFileAttributesA(DIR "USOSVBE.SYS") == 0xFFFFFFFF) {
+        say("vesa off: no USOSVBE.SYS, VGA stays\r\n");
+        return;
+    }
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\framebuf.dll");
+    if (GetFileAttributesA(dst) == 0xFFFFFFFF) {
+        if (GetFileAttributesA(DIR "FRAMEBUF.DLL") == 0xFFFFFFFF || !CopyFileA(DIR "FRAMEBUF.DLL", dst, FALSE)) {
+            say("vesa off: no framebuf.dll, VGA stays\r\n");
+            return;
+        }
+        say("copied ");
+        say(dst);
+        say("\r\n");
+    }
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usosvbe.sys");
+    if (!CopyFileA(DIR "USOSVBE.SYS", dst, FALSE)) {
+        say("vesa off: COPY FAILED ");
+        say(dst);
+        say("\r\n");
+        return;
+    }
+    say("copied ");
+    say(dst);
+    say("\r\n");
+    set_dword("usosvbe", NULL, "Type", 1);
+    /* Boot start: as a system-start (Start 1) driver it never ran on NT 3.1
+       (X470 2026-10-30: no UsosVbeModes, VGA desktop), like usosusb before
+       (docs/nt31-2026-10-09.md). The loader brings videoprt.sys in as its
+       import; usosvbe then initialises with the boot drivers and is
+       \Device\Video0 ahead of vga (system start). */
+    set_dword("usosvbe", NULL, "Start", 0);
+    set_dword("usosvbe", NULL, "ErrorControl", 0);
+    set_dword("usosvbe", NULL, "Tag", 2);
+    set_sz("usosvbe", "Group", REG_SZ, "Video");
+    rc = open_service_key("usosvbe", "Device0", &h);
+    if (rc == ERROR_SUCCESS) {
+        rc = RegSetValueExW(h, L"InstalledDisplayDrivers", 0, REG_MULTI_SZ, (const BYTE *)drivers, sizeof drivers);
+        RegCloseKey(h);
+    }
+    say(rc == ERROR_SUCCESS ? "usosvbe\\Device0 InstalledDisplayDrivers = framebuf\r\n"
+                            : "usosvbe\\Device0 InstalledDisplayDrivers FAILED\r\n");
+    set_dword("usosvbe", "Device0", "VgaCompatible", 0);
+    say("vesa on (NT 3.1: usosvbe boot start, Video0 before vga; start mode = the miniport's first mode)\r\n");
+}
+
+static int native_install(void);
+static int net351_version(void);
+static void boot_ini_finish(void);
+static int pagefile_cap(void);
+static void logon_notice(int on);
+static void notice_start(void);
+static void notice_stop(void);
+static void notice_main(void);
+
 static void WINAPI handler(DWORD control)
 {
     (void)control;
@@ -1379,6 +1519,24 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     if (g_status_handle)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
+    notice_start();                 /* native: the desktop notice (until the restart) */
+    /* Native: before post(), so a refused post (e.g. NET351 after a GUI
+       Setup network failure) still leaves /MAXMEM in BOOT.INI and the
+       small pagefile (X470 2026-10-28: post refused, BOOT.INI kept Setup's
+       entry without options, the next start ran on 3 GB and stopped with
+       0x0A in the 3.51 system working-set list growth). */
+    if (native_install()) {
+        pagefile_cap();
+        boot_ini_finish();
+        /* Native NT 3.5 (2026-10-30): usosrst 1.7-nt35 takes the kernel's
+           HalReturnToFirmware(HalPowerDownRoutine) to ACPI S5, so the NT 3.5
+           Winlogon may offer "Shutdown and Power off" (its
+           PowerdownAfterShutdown value; NtShutdownSystem(ShutdownPowerOff)).
+           NT 3.51's usosrst has no S5 path yet: not set there. */
+        if (net351_version() == 50)
+            put_sz(HKEY_LOCAL_MACHINE, "HKLM", "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+                   "PowerdownAfterShutdown", "1", 0);
+    }
     if (!post()) goto failed;
     polish();
     /* Once only: the service turns itself off before DONE.TXT. */
@@ -1388,6 +1546,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
         set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
         write_file("DONE.TXT", "done\r\n");
     }
+    logon_notice(0);
     say("done\r\n");
     /* Let the other services finish starting (their failures reach the
        event log), then restart: the install VM ends there (-no-reboot). */
@@ -1396,6 +1555,8 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     goto stopped;
 failed:
     g_post_failed = 1;
+    logon_notice(0);
+    notice_stop();
     say("POST refused: no DONE/restart; inspect own local records\r\n");
     g_status.dwWin32ExitCode = ERROR_GEN_FAILURE;
 stopped:
@@ -1404,11 +1565,1591 @@ stopped:
         SetServiceStatus(g_status_handle, &g_status);
 }
 
+/* ------------------------------------------------------------------------
+ * Native install (docs/nt-native-plan.md, NATIVE.TXT written by
+ * nt4_csmwrap_target.sh only on the native path): no install VM, so the
+ * VM flow's finish step (nt4_qemu_install.sh nt4_vm_finish) never runs on
+ * this disk. usosnt3 does its two parts that matter on the PC:
+ *   - usb_early(): /setup (GUI Setup) already copies usosusb.sys and writes
+ *     its service, so the FIRST start of the installed system has the USB
+ *     keyboard and mouse (X470 2026-10-28: the first start only had PS/2,
+ *     usosusb came with post() and needed one more restart);
+ *   - boot_ini_finish(): BOOT.INI as nt4_boot_ini writes it (timeout=5, no
+ *     "C:\" entry for the saved syslinux boot sector, the boot options on
+ *     every entry, [USOS /SOS] / [VGA mode] after the default) and the
+ *     Setup leftovers on C:\ removed.
+ */
+static int native_install(void)
+{
+    return GetFileAttributesA(DIR "NATIVE.TXT") != 0xFFFFFFFF;
+}
+
+/* Reads at most size - 1 bytes of a file into buf (NUL-terminated); returns the length or -1. */
+static int read_small(const char *path, char *buf, int size)
+{
+    HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    DWORD n = 0;
+    if (h == INVALID_HANDLE_VALUE)
+        return -1;
+    if (!ReadFile(h, buf, (DWORD)size - 1, &n, NULL))
+        n = 0;
+    CloseHandle(h);
+    buf[n] = 0;
+    return (int)n;
+}
+
+/* No C runtime: an own byte copy (the compiler must not turn it into memcpy). */
+static void copy_bytes(char *d, const char *s, int n)
+{
+    volatile char *vd = d;
+    int i;
+    for (i = 0; i < n; i++)
+        vd[i] = s[i];
+}
+
+static char lower(char c)
+{
+    return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+}
+
+/* 1 when line (length n) contains the lower-case word w, case-insensitively. */
+static int has_ci(const char *line, int n, const char *w)
+{
+    int i, k, wl = len(w);
+    for (i = 0; i + wl <= n; i++) {
+        for (k = 0; k < wl && lower(line[i + k]) == w[k]; k++)
+            ;
+        if (k == wl)
+            return 1;
+    }
+    return 0;
+}
+
+/* usosusb's service group. Native NT 3.5 (X470 2026-10-30, B261030-125748):
+ * "Base", so it loads before i8042prt ("Pointer Port") and owns
+ * \Device\KeyboardPort0 / PointerPort0. The NT 3.5 kbdclass (3.50 build,
+ * own disassembly of the user's KBDCLASS.SYS) walks KeyboardPort0..N-1 (N =
+ * values in DEVICEMAP\KeyboardPort) and, after a port whose connect fails,
+ * does not strip the number it appended: the next name becomes
+ * "KeyboardPort01". i8042prt creates KeyboardPort0 without a PS/2 keyboard
+ * and refuses the connect (C000000E), so usosusb's KeyboardPort1 was never
+ * opened, no port connected, Kbdclass failed to load (event 7026, Kbdclass
+ * 7 + 8) and there was no keyboard at all. With usosusb first, a PS/2
+ * keyboard still connects as port 1. Everything else keeps "Keyboard Port". */
+static const char *usb_group(void)
+{
+    return (native_install() && net351_version() == 50) ? "Base" : "Keyboard Port";
+}
+
+static void usb_early(void)
+{
+    char sys[MAX_PATH], dst[MAX_PATH];
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usosusb.sys");
+    if (!CopyFileA(DIR "USOSUSB.SYS", dst, FALSE)) {
+        say_hex("usb early: COPY FAILED, error ", GetLastError());
+        return;
+    }
+    say("usb early: copied ");
+    say(dst);
+    say("\r\n");
+    set_dword("usosusb", NULL, "Type", 1);
+    set_dword("usosusb", NULL, "Start", 1);
+    set_dword("usosusb", NULL, "ErrorControl", 0);
+    set_sz("usosusb", "Group", REG_SZ, usb_group());
+    set_dword("Kbdclass", "Parameters", "ConnectMultiplePorts", 1);
+    set_dword("Mouclass", "Parameters", "ConnectMultiplePorts", 1);
+}
+
+/* Native install: a small fixed pagefile. GUI Setup's VIRTUAL.INF
+ * (DoVirtual / ConfigureVirtual -> REGISTRY.INF SetPagingFiles) sizes it
+ * RAM in MiB + 12, capped at the drive's free space, near the END of GUI
+ * Setup; on the X470 it saw the full RAM and filled the 2000 MiB FAT16 C:
+ * with an 1816 MiB pagefile.sys. Written at /setup it would be overwritten
+ * there, so the first-start service writes it: "C:\pagefile.sys 64 128"
+ * (MiB; SMSS parses "<path> <min> <max>"). On the next start SMSS creates
+ * the paging file again (NtCreatePagingFile opens it FILE_SUPERSEDE with the
+ * minimum as allocation size), so the large file shrinks to 64 MiB.
+ *
+ * Every control set (X470 2026-10-29, B261029-185936 hive: the service
+ * wrote 64 128 into CurrentControlSet = ControlSet001 = Select Default, the
+ * next normal start's set, while the LastKnownGood copy ControlSet002 kept
+ * GUI Setup's "C:\pagefile.sys 1031"; a Last Known Good start would bring
+ * the large file back). The return value reports a change in the current
+ * set only (setup_watch).
+ */
+static int pagefile_cap_at(const char *key, int current);
+
+static int pagefile_cap(void)
+{
+    static const char sets[][16] = { "ControlSet001", "ControlSet002", "ControlSet003", "ControlSet004" };
+    char key[128];
+    int i, changed;
+    changed = pagefile_cap_at("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", 1);
+    for (i = 0; i < (int)(sizeof sets / sizeof sets[0]); i++) {
+        lstrcpyA(key, "SYSTEM\\");
+        lstrcatA(key, sets[i]);
+        lstrcatA(key, "\\Control\\Session Manager\\Memory Management");
+        pagefile_cap_at(key, 0);
+    }
+    return changed;
+}
+
+static int pagefile_cap_at(const char *key, int current)
+{
+    char sys[MAX_PATH], value[64], old[300];
+    HKEY h;
+    DWORD type, size = sizeof old - 2;
+    LONG rc;
+    int n;
+    if (!GetSystemDirectoryA(sys, sizeof sys) || sys[1] != ':')
+        lstrcpyA(sys, "C:");
+    value[0] = sys[0];
+    value[1] = 0;
+    lstrcatA(value, ":\\pagefile.sys 64 128");
+    n = len(value);
+    value[n + 1] = 0;                   /* REG_MULTI_SZ: second NUL */
+    rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_ALL_ACCESS, &h);
+    if (rc != ERROR_SUCCESS) {
+        if (current)                    /* ControlSet00N: absent is normal */
+            say_hex("pagefile: cannot open Memory Management, rc ", (DWORD)rc);
+        return 0;
+    }
+    old[0] = 0;
+    if (RegQueryValueExA(h, "PagingFiles", NULL, &type, (BYTE *)old, &size) == ERROR_SUCCESS)
+        old[size < sizeof old - 1 ? size : sizeof old - 1] = 0;
+    else
+        old[0] = 0;
+    if (!lstrcmpiA(old, value)) {
+        if (current) {
+            say("pagefile: already ");
+            say(value);
+            say("\r\n");
+        }
+    } else {
+        rc = RegSetValueExA(h, "PagingFiles", 0, REG_MULTI_SZ, (const BYTE *)value, (DWORD)n + 2);
+        if (!current) {
+            say(key + 7);               /* "ControlSet00N\..." */
+            say(": ");
+        }
+        say("pagefile: was \"");
+        say(old);
+        say(rc == ERROR_SUCCESS ? "\", now " : "\", WRITE FAILED: ");
+        say(value);
+        say(rc == ERROR_SUCCESS ? " (MiB, applied at the next start)\r\n" : "\r\n");
+        if (rc == ERROR_SUCCESS) {
+            /* the hive must hold it even if GUI Setup ends right after */
+            typedef LONG (APIENTRY *REG_FLUSH_KEY)(HKEY);
+            HMODULE adv = GetModuleHandleA("advapi32.dll");
+            REG_FLUSH_KEY flush = adv ? (REG_FLUSH_KEY)GetProcAddress(adv, "RegFlushKey") : NULL;
+            if (flush)
+                flush(h);
+            RegCloseKey(h);
+            return 1;
+        }
+    }
+    RegCloseKey(h);
+    return 0;
+}
+
+/* Native install: a large topmost notice on the desktop while the service
+ * works (X470 2026-10-29: the first desktop sat there for 1-3 minutes, then
+ * the system restarted by itself). The service starts "usosnt3.exe /notice"
+ * on the interactive desktop (STARTUPINFO lpDesktop WinSta0\Default; a
+ * LocalSystem service may open it), detached (no console window), and
+ * does not wait for it. The notice is a full-screen WS_EX_TOPMOST popup:
+ * three lines of text and, below them, the last line of POST.LOG
+ * (refreshed every 2 s), no buttons, no input. It ends with the restart
+ * (WM_ENDSESSION) or, when post() gives up and no restart follows, by
+ * TerminateProcess from the service. ASCII only, as the logon notice: the
+ * first start still runs on the CD's code pages. user32 / gdi32 through
+ * GetProcAddress: the static imports stay the NT 3.1 kernel32/advapi32 set. */
+static struct {
+    ATOM (WINAPI *RegisterClassA)(const WNDCLASSA *);
+    HWND (WINAPI *CreateWindowExA)(DWORD, LPCSTR, LPCSTR, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, LPVOID);
+    BOOL (WINAPI *ShowWindow)(HWND, int);
+    BOOL (WINAPI *UpdateWindow)(HWND);
+    BOOL (WINAPI *GetMessageA)(LPMSG, HWND, UINT, UINT);
+    LRESULT (WINAPI *DispatchMessageA)(const MSG *);
+    LRESULT (WINAPI *DefWindowProcA)(HWND, UINT, WPARAM, LPARAM);
+    HDC (WINAPI *BeginPaint)(HWND, LPPAINTSTRUCT);
+    BOOL (WINAPI *EndPaint)(HWND, const PAINTSTRUCT *);
+    BOOL (WINAPI *GetClientRect)(HWND, LPRECT);
+    int (WINAPI *DrawTextA)(HDC, LPCSTR, int, LPRECT, UINT);
+    UINT_PTR (WINAPI *SetTimer)(HWND, UINT_PTR, UINT, TIMERPROC);
+    BOOL (WINAPI *InvalidateRect)(HWND, const RECT *, BOOL);
+    int (WINAPI *GetSystemMetrics)(int);
+    int (WINAPI *FillRect)(HDC, const RECT *, HBRUSH);
+    COLORREF (WINAPI *SetTextColor)(HDC, COLORREF);
+    int (WINAPI *SetBkMode)(HDC, int);
+    HFONT (WINAPI *CreateFontA)(int, int, int, int, int, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, LPCSTR);
+    HGDIOBJ (WINAPI *SelectObject)(HDC, HGDIOBJ);
+    HBRUSH (WINAPI *CreateSolidBrush)(COLORREF);
+} g_ui;
+
+static const char *const g_ui_names[] = {
+    "RegisterClassA", "CreateWindowExA", "ShowWindow", "UpdateWindow", "GetMessageA", "DispatchMessageA",
+    "DefWindowProcA", "BeginPaint", "EndPaint", "GetClientRect", "DrawTextA", "SetTimer", "InvalidateRect",
+    "GetSystemMetrics", "FillRect", "SetTextColor", "SetBkMode", "CreateFontA", "SelectObject", "CreateSolidBrush",
+};
+#define UI_USER32_COUNT 15          /* the first 15 names are user32, the rest gdi32 */
+
+static HANDLE g_notice_process;
+static int g_notice_pl;
+static char g_notice_step[160];
+static HFONT g_notice_big, g_notice_text, g_notice_small;
+static HBRUSH g_notice_brush;
+
+static int notice_load(void)
+{
+    HMODULE user32 = LoadLibraryA("user32.dll"), gdi32 = LoadLibraryA("gdi32.dll");
+    FARPROC *slot = (FARPROC *)&g_ui;
+    int i;
+    if (!user32 || !gdi32)
+        return 0;
+    for (i = 0; i < (int)(sizeof g_ui_names / sizeof g_ui_names[0]); i++) {
+        slot[i] = GetProcAddress(i < UI_USER32_COUNT ? user32 : gdi32, g_ui_names[i]);
+        if (!slot[i])
+            return 0;
+    }
+    return 1;
+}
+
+/* The last complete line of POST.LOG (what the service is doing now). */
+static void notice_read_step(void)
+{
+    static char tail[512];
+    DWORD size, got = 0;
+    HANDLE h;
+    int end, start, i;
+    h = CreateFileA(DIR "POST.LOG", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return;
+    size = SetFilePointer(h, 0, NULL, FILE_END);
+    if (size != 0xFFFFFFFF) {
+        SetFilePointer(h, size > sizeof tail ? (LONG)(size - sizeof tail) : 0, NULL, FILE_BEGIN);
+        if (!ReadFile(h, tail, sizeof tail, &got, NULL))
+            got = 0;
+    }
+    CloseHandle(h);
+    end = (int)got;
+    while (end > 0 && (tail[end - 1] == '\r' || tail[end - 1] == '\n'))
+        end--;
+    start = end;
+    while (start > 0 && tail[start - 1] != '\n')
+        start--;
+    if (end - start >= (int)sizeof g_notice_step)
+        start = end - (int)sizeof g_notice_step + 1;
+    for (i = 0; start + i < end; i++) {
+        char c = tail[start + i];
+        g_notice_step[i] = (char)(c >= 32 && c < 127 ? c : ' ');
+    }
+    g_notice_step[i] = 0;
+}
+
+static void notice_line(HDC dc, RECT *area, HFONT font, int height, const char *text)
+{
+    RECT r = *area;
+    r.bottom = r.top + height;
+    g_ui.SelectObject(dc, font);
+    g_ui.DrawTextA(dc, text, -1, &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    area->top += height;
+}
+
+static LRESULT CALLBACK notice_proc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
+{
+    PAINTSTRUCT ps;
+    RECT r;
+    HDC dc;
+    int h;
+    switch (msg) {
+    case WM_PAINT:
+        dc = g_ui.BeginPaint(w, &ps);
+        g_ui.GetClientRect(w, &r);
+        g_ui.FillRect(dc, &r, g_notice_brush);
+        g_ui.SetBkMode(dc, TRANSPARENT);
+        g_ui.SetTextColor(dc, RGB(255, 255, 255));
+        h = r.bottom / 8;
+        r.top = r.bottom / 4;
+        notice_line(dc, &r, g_notice_big, h, g_notice_pl ? "USOS konczy instalacje" : "USOS is finishing the installation");
+        notice_line(dc, &r, g_notice_text, h / 2, g_notice_pl
+                    ? "Trwa dogrywanie sterownikow i ustawien. Nie wylaczaj komputera."
+                    : "Drivers and settings are being installed. Do not turn off the computer.");
+        notice_line(dc, &r, g_notice_text, h / 2, g_notice_pl
+                    ? "Komputer uruchomi sie ponownie automatycznie."
+                    : "The computer will restart automatically.");
+        r.top += h / 2;
+        notice_line(dc, &r, g_notice_small, h / 3, g_notice_step);
+        g_ui.EndPaint(w, &ps);
+        return 0;
+    case WM_TIMER:
+        notice_read_step();
+        g_ui.InvalidateRect(w, NULL, FALSE);
+        return 0;
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_CLOSE:
+        return 0;                   /* no way to close it: it ends with the restart */
+    case WM_QUERYENDSESSION:
+        return TRUE;
+    case WM_ENDSESSION:
+        if (wp)
+            ExitProcess(0);
+        return 0;
+    }
+    return g_ui.DefWindowProcA(w, msg, wp, lp);
+}
+
+static int notice_language_pl(void)
+{
+    static char intl_txt[256];
+    int n = read_small(DIR "INTL.TXT", intl_txt, sizeof intl_txt);
+    return n > 0 && has_ci(intl_txt, n, "locale=00000415");
+}
+
+/* usosnt3.exe /notice. NOTICE.LOG records each stage (X470 2026-10-31:
+   no notice seen on native NT 3.5 although the service logged "notice: on
+   the desktop"). The service may start it before Winlogon has the
+   interactive window station ready, so user32 / the window are retried
+   every 3 s for up to 2 minutes instead of giving up at once. */
+static void notice_main(void)
+{
+    WNDCLASSA wc;
+    MSG m;
+    HWND w = NULL;
+    int cx, cy, tries, registered = 0;
+    open_log("NOTICE.LOG");
+    say("notice: start\r\n");
+    for (tries = 0; !notice_load(); tries++) {
+        if (tries == 40) {
+            say("notice: user32/gdi32 not usable after 2 minutes\r\n");
+            ExitProcess(2);
+        }
+        Sleep(3000);
+    }
+    say("notice: user32/gdi32 loaded\r\n");
+    g_notice_pl = notice_language_pl();
+    notice_read_step();
+    cx = g_ui.GetSystemMetrics(SM_CXSCREEN);
+    cy = g_ui.GetSystemMetrics(SM_CYSCREEN);
+    g_notice_brush = g_ui.CreateSolidBrush(RGB(0, 0, 128));
+    g_notice_big = g_ui.CreateFontA(-(cy / 12), 0, 0, 0, FW_BOLD, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                    VARIABLE_PITCH | FF_SWISS, "Arial");
+    g_notice_text = g_ui.CreateFontA(-(cy / 26), 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                     VARIABLE_PITCH | FF_SWISS, "Arial");
+    g_notice_small = g_ui.CreateFontA(-(cy / 40), 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET, 0, 0, 0,
+                                      FIXED_PITCH | FF_MODERN, "Courier New");
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = notice_proc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = GetModuleHandleA(NULL);
+    wc.hIcon = NULL;
+    wc.hCursor = NULL;
+    wc.hbrBackground = NULL;
+    wc.lpszMenuName = NULL;
+    wc.lpszClassName = "UsosNt3Notice";
+    for (tries = 0; tries < 40; tries++) {
+        if (!registered)
+            registered = g_ui.RegisterClassA(&wc) != 0;
+        if (registered)
+            w = g_ui.CreateWindowExA(WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy,
+                                     NULL, NULL, wc.hInstance, NULL);
+        if (w)
+            break;
+        say_hex("notice: no window yet, error ", GetLastError());
+        Sleep(3000);
+        cx = g_ui.GetSystemMetrics(SM_CXSCREEN);
+        cy = g_ui.GetSystemMetrics(SM_CYSCREEN);
+    }
+    if (!w) {
+        say("notice: no window after 2 minutes\r\n");
+        ExitProcess(4);
+    }
+    say("notice: window shown\r\n");
+    g_ui.ShowWindow(w, SW_SHOW);
+    g_ui.UpdateWindow(w);
+    g_ui.SetTimer(w, 1, 2000, NULL);
+    while (g_ui.GetMessageA(&m, NULL, 0, 0) > 0)
+        g_ui.DispatchMessageA(&m);
+    ExitProcess(0);
+}
+
+/* Service side: start the notice, never wait for it. */
+static void notice_start(void)
+{
+    typedef DWORD (WINAPI *GET_MODULE_FILE_NAME)(HMODULE, LPSTR, DWORD);
+    GET_MODULE_FILE_NAME get_name =
+        (GET_MODULE_FILE_NAME)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetModuleFileNameA");
+    static char exe[MAX_PATH], cmd[MAX_PATH + 16];
+    static char desktop[] = "WinSta0\\Default";
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    volatile char *p;   /* volatile: no memset call (no C runtime) */
+    if (!native_install() || !get_name || !get_name(NULL, exe, MAX_PATH))
+        return;
+    lstrcpyA(cmd, "\"");
+    lstrcatA(cmd, exe);
+    lstrcatA(cmd, "\" /notice");
+    for (p = (volatile char *)&si; p < (volatile char *)&si + sizeof si; p++)
+        *p = 0;
+    si.cb = sizeof si;
+    si.lpDesktop = desktop;
+    if (CreateProcessA(exe, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+        g_notice_process = pi.hProcess;
+        CloseHandle(pi.hThread);
+        say("notice: on the desktop\r\n");
+    } else {
+        say_hex("notice: CreateProcess failed, error ", GetLastError());
+    }
+}
+
+/* post() gave up: no restart follows, so the notice must not stay. */
+static void notice_stop(void)
+{
+    typedef BOOL (WINAPI *TERMINATE_PROCESS)(HANDLE, UINT);
+    TERMINATE_PROCESS terminate =
+        (TERMINATE_PROCESS)GetProcAddress(GetModuleHandleA("kernel32.dll"), "TerminateProcess");
+    if (g_notice_process && terminate)
+        terminate(g_notice_process, 0);
+    if (g_notice_process)
+        CloseHandle(g_notice_process);
+    g_notice_process = NULL;
+}
+
+/* Native install: a logon screen notice while the first-start service is
+ * still working (X470 2026-10-29: the logon screen refused the profile's
+ * user until post() had run, then the system restarted by itself).
+ * Winlogon shows LegalNoticeCaption / LegalNoticeText before the logon
+ * dialog (NT 3.5 WINLOGON\LOGON.C GetLegalNotices; both values exist,
+ * empty, in the installed 3.51 SOFTWARE hive). Set at /setup, emptied by
+ * the service when it finishes or gives up. ASCII only: the first start
+ * still runs on the CD's code pages (intl() switches them in post()). */
+static void logon_notice(int on)
+{
+    static const char winlogon[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon";
+    static char intl_txt[256];
+    int n, pl;
+    if (!native_install())
+        return;
+    n = read_small(DIR "INTL.TXT", intl_txt, sizeof intl_txt);
+    pl = n > 0 && has_ci(intl_txt, n, "locale=00000415");
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "LegalNoticeCaption",
+           !on ? "" : pl ? "USOS konczy instalacje" : "USOS is finishing the installation", 0);
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "LegalNoticeText",
+           !on ? "" : pl ? "Poczekaj na automatyczny restart (okolo 1-2 minuty). Po restarcie zaloguj sie."
+                       : "Wait for the automatic restart (about 1-2 minutes), then log on.", 0);
+}
+
+/* Native install, /setup: GUI Setup's virtual_config (INITIAL.INF ->
+ * VIRTUAL.INF ConfigureVirtual -> REGISTRY.INF SetPagingFiles) writes
+ * PagingFiles = "C:\pagefile.sys <RAM in MiB + 12>" near its end; SMSS then
+ * allocated an 1814 MiB file on the 2000 MiB FAT16 C: at the first start
+ * (X470 2026-10-28, prime suspect for the first-start STOP 0x0A). This
+ * process stays alive beside GUI Setup, watches the Memory Management key
+ * (RegNotifyChangeKeyValue, through GetProcAddress; 5 s polling without
+ * it) and puts "C:\pagefile.sys 64 128" back, flushed, every time someone
+ * else changes PagingFiles. The service's pagefile_cap() stays the
+ * fallback. The same INITIAL.INF runs SetAccountDomainSid and
+ * setuplocalaccount (WaitOnEvent SAM_SERVICE_STARTED,
+ * ChangeLocalUserPassword Administrator) before virtual_config, so once
+ * Setup's own PagingFiles write is seen the SAM is final: account() runs
+ * then, and the first logon screen already knows the profile's user and
+ * password. GUI Setup's restart ends this process. */
+static void setup_watch(void)
+{
+    static const char key[] = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management";
+    typedef LONG (APIENTRY *REG_NOTIFY)(HKEY, BOOL, DWORD, HANDLE, BOOL);
+    HMODULE adv = GetModuleHandleA("advapi32.dll");
+    REG_NOTIFY notify = adv ? (REG_NOTIFY)GetProcAddress(adv, "RegNotifyChangeKeyValue") : NULL;
+    HKEY h = NULL;
+    int first = 1, account_done = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &h) != ERROR_SUCCESS)
+        h = NULL;
+    say(notify && h ? "pagefile watch: RegNotifyChangeKeyValue\r\n" : "pagefile watch: polling every 5 s\r\n");
+    for (;;) {
+        if (pagefile_cap() && !first && !account_done) {
+            /* GUI Setup itself wrote PagingFiles: virtual_config ran */
+            say("pagefile watch: GUI Setup wrote PagingFiles, answer-profile account now\r\n");
+            account();
+            write_file("ACCOUNT.SET", "done\r\n");
+            account_done = 1;
+        }
+        first = 0;
+        if (notify && h) {
+            if (notify(h, FALSE, REG_NOTIFY_CHANGE_LAST_SET, NULL, FALSE) != ERROR_SUCCESS)
+                notify = NULL;
+        } else {
+            Sleep(5000);
+        }
+    }
+}
+
+/* X470 2026-10-29 (B261029-185936): GUI Setup wrote "C:\pagefile.sys 1031"
+ * and the first start's service still found it: the watch, started only
+ * after setup()'s 20 s BOOT.INI wait, did not run before GUI Setup's
+ * PagingFiles write (the service redid the BOOT.INI step too). The watch
+ * now runs in its own thread from the start of /setup; the BOOT.INI step
+ * keeps its wait on the main thread. CreateThread through GetProcAddress
+ * as dhcp_setup_hold_start. */
+static int g_watch_thread;
+
+static DWORD WINAPI setup_watch_main(LPVOID unused)
+{
+    (void)unused;
+    setup_watch();
+    return 0;
+}
+
+static void setup_watch_start(void)
+{
+    typedef HANDLE (WINAPI *WATCH_CREATE)(LPSECURITY_ATTRIBUTES, DWORD, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
+    WATCH_CREATE create = (WATCH_CREATE)GetProcAddress(GetModuleHandleA("kernel32.dll"), "CreateThread");
+    DWORD id;
+    HANDLE t = create ? create(NULL, 0, setup_watch_main, NULL, 0, &id) : NULL;
+    if (t) {
+        CloseHandle(t);
+        g_watch_thread = 1;
+        say("pagefile watch thread started\r\n");
+    } else {
+        say("pagefile watch: CreateThread failed, runs after the BOOT.INI step\r\n");
+    }
+}
+
+/* ------------------------------------------------------------------------
+ * Native NT 3.51 LAN (NET351.ON), GUI Setup: no DHCP wait.
+ * OEMNXPTC.INF sets EnableDHCPFlag = 1 whenever STF_GUI_UNATTENDED is YES
+ * and creates the DHCP client (services.exe share service, automatic,
+ * group "TDI"). NTLANMAN.INF then starts the network with NCPA STARTSVC
+ * LanmanWorkstation, which depends on the TDI group; the SCM starts every
+ * member of a group a service depends on (not only automatic ones) and
+ * treats the group as not started while a member is START_PENDING
+ * (NT 3.5 SC\SERVER\DEPEND.C ScGetCurrentGroupState). The DHCP client
+ * stays START_PENDING through its first lease attempt (CLIENT\NEWNT\DHCP.C:
+ * DhcpInitialize before SERVICE_RUNNING, wait hint 25 s), and the only
+ * adapter during GUI Setup is the MS Loopback adapter, which never gets an
+ * answer. A disabled member fails at once (ERROR_SERVICE_DISABLED) and the
+ * group counts as started through NetBT / Afd. So while GUI Setup runs,
+ * this thread waits for the DHCP service to exist and disables it through
+ * the SCM (its database record, not only the registry: the service was
+ * created in this boot); post() turns it back on for the boot that runs
+ * usosnet351 (EnableDHCP of the adapter is untouched). ChangeServiceConfigA
+ * has the NT 3.5 (11 argument) form: only called on 3.51. */
+typedef SC_HANDLE (WINAPI *SCM_OPEN)(LPCSTR, LPCSTR, DWORD);
+typedef SC_HANDLE (WINAPI *SVC_OPEN)(SC_HANDLE, LPCSTR, DWORD);
+typedef BOOL (WINAPI *SVC_CHANGE)(SC_HANDLE, DWORD, DWORD, DWORD, LPCSTR, LPCSTR, LPDWORD, LPCSTR, LPCSTR, LPCSTR, LPCSTR);
+typedef BOOL (WINAPI *SVC_CLOSE)(SC_HANDLE);
+typedef HANDLE (WINAPI *THREAD_CREATE)(LPSECURITY_ATTRIBUTES, DWORD, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
+
+/* The NT 3.x minor version (51, 50), 0 when not NT 3.x. */
+static int net351_version(void)
+{
+    DWORD (WINAPI *get_version)(void) =
+        (DWORD (WINAPI *)(void))GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetVersion");
+    DWORD v;
+    if (!get_version) return 0;
+    v = get_version();
+    return (!(v & 0x80000000) && (v & 0xff) == 3) ? (int)((v >> 8) & 0xff) : 0;
+}
+
+/* Native NT 3.51 (NET351.ON) or, since 2026-10-30, native NT 3.5
+   (NET35.ON, usosnet35n): the same GUI Setup DHCP behaviour (the comment
+   above is from the NT 3.5 sources). */
+static int net351_native_selected(void)
+{
+    int minor;
+    if (!native_install()) return 0;
+    minor = net351_version();
+    return (minor == 51 && GetFileAttributesA(DIR "NET351.ON") != 0xFFFFFFFF) ||
+           (minor == 50 && GetFileAttributesA(DIR "NET35.ON") != 0xFFFFFFFF);
+}
+
+static DWORD WINAPI dhcp_setup_hold(LPVOID unused)
+{
+    HMODULE adv = GetModuleHandleA("advapi32.dll");
+    SCM_OPEN scm_open = adv ? (SCM_OPEN)GetProcAddress(adv, "OpenSCManagerA") : NULL;
+    SVC_OPEN svc_open = adv ? (SVC_OPEN)GetProcAddress(adv, "OpenServiceA") : NULL;
+    SVC_CHANGE svc_change = adv ? (SVC_CHANGE)GetProcAddress(adv, "ChangeServiceConfigA") : NULL;
+    SVC_CLOSE svc_close = adv ? (SVC_CLOSE)GetProcAddress(adv, "CloseServiceHandle") : NULL;
+    DWORD i, error = 0, last = 0;
+    (void)unused;
+    if (!scm_open || !svc_open || !svc_change || !svc_close) {
+        say("dhcp hold: no SCM functions\r\n");
+        return 0;
+    }
+    /* 500 ms steps, at most 3 h; GUI Setup's restart ends the process. */
+    for (i = 0; i < 21600; i++) {
+        SC_HANDLE scm = scm_open(NULL, NULL, SC_MANAGER_CONNECT), svc = NULL;
+        int ok = 0;
+        if (scm) {
+            svc = svc_open(scm, "DHCP", SERVICE_CHANGE_CONFIG);
+            if (svc) {
+                ok = svc_change(svc, SERVICE_NO_CHANGE, SERVICE_DISABLED, SERVICE_NO_CHANGE,
+                                NULL, NULL, NULL, NULL, NULL, NULL, NULL) != 0;
+                if (!ok) error = GetLastError();
+                svc_close(svc);
+            } else {
+                error = GetLastError();
+            }
+            svc_close(scm);
+        } else {
+            error = GetLastError();
+        }
+        if (ok) {
+            say("dhcp hold: DHCP client disabled for GUI Setup (no lease wait on the Loopback adapter)\r\n");
+            write_file_checked("DHCP.OFF", "dhcp=disabled during GUI Setup\r\nrestore=post\r\n");
+            return 0;
+        }
+        if (error != last) {
+            say_hex("dhcp hold: waiting for the DHCP service, error ", error);
+            last = error;
+        }
+        Sleep(500);
+    }
+    return 0;
+}
+
+static void dhcp_setup_hold_start(void)
+{
+    THREAD_CREATE create = (THREAD_CREATE)GetProcAddress(GetModuleHandleA("kernel32.dll"), "CreateThread");
+    DWORD id;
+    HANDLE t;
+    if (!net351_native_selected()) return;
+    t = create ? create(NULL, 0, dhcp_setup_hold, NULL, 0, &id) : NULL;
+    if (t) {
+        CloseHandle(t);
+        say("dhcp hold: watching for the DHCP service\r\n");
+    } else {
+        say("dhcp hold: CreateThread failed\r\n");
+    }
+}
+
+/* post(), after a verified NET351 takeover on the native path: the DHCP
+ * client automatic again (the next boot runs usosnet351, lease in ~11 s
+ * on the X470 2026-10-29) and the one-shot connectivity check registered
+ * (usosnetc, USOSNT3.EXE /netcheck -> NETCHECK.TXT). Registry only: post()
+ * restarts the system right after. */
+static void net351_native_post(void)
+{
+    HKEY h;
+    DWORD start = 0, type, size = sizeof start;
+    if (!native_install()) return;
+    /* EnableDHCP 1 is required by the takeover: the client is automatic
+       (GUI Setup's own value) whether or not the hold above caught it. */
+    set_dword("DHCP", NULL, "Start", SERVICE_AUTO_START);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "DHCP", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+        if (RegQueryValueExA(h, "Start", NULL, &type, (BYTE *)&start, &size) || type != REG_DWORD) start = 0;
+        RegCloseKey(h);
+    }
+    say(start == SERVICE_AUTO_START ? "NET351: DHCP client automatic again (readback)\r\n"
+                                    : "NET351: DHCP client Start readback FAILED\r\n");
+    set_sz("usosnetc", "ImagePath", REG_EXPAND_SZ, DIR "USOSNT3.EXE /netcheck");
+    set_sz("usosnetc", "ObjectName", REG_SZ, "LocalSystem");
+    set_sz("usosnetc", "DisplayName", REG_SZ, "USOS network check");
+    set_dword("usosnetc", NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
+    set_dword("usosnetc", NULL, "ErrorControl", SERVICE_ERROR_IGNORE);
+    set_dword("usosnetc", NULL, "Start", SERVICE_AUTO_START);
+}
+
+/* ------------------------------------------------------------------------
+ * usosnetc (USOSNT3.EXE /netcheck): one silent record of the first boot
+ * with usosnet351. Waits up to 120 s for the DHCP lease of NDISLoop1
+ * (Parameters\Tcpip DhcpIPAddress, the NT 3.5 DHCP client's value names),
+ * writes the lease values and the usosnet351 alive record, then an ICMP
+ * echo to the DHCP gateway (icmp.dll IcmpSendEcho) and a TCP connect to
+ * 1.1.1.1:80 (wsock32), both through LoadLibrary / GetProcAddress, to
+ * C:\USOS\NT3\NETCHECK.TXT and turns itself off. */
+#define NC_TCP SVC_KEY "NDISLoop1\\Parameters\\Tcpip"
+typedef HANDLE (WINAPI *ICMP_CREATE)(void);
+typedef DWORD (WINAPI *ICMP_SEND)(HANDLE, DWORD, LPVOID, WORD, LPVOID, LPVOID, DWORD, DWORD);
+typedef BOOL (WINAPI *ICMP_CLOSE)(HANDLE);
+typedef int (WINAPI *WSA_STARTUP)(WORD, LPVOID);
+typedef int (WINAPI *WSA_CLEANUP)(void);
+typedef int (WINAPI *WSA_ERROR)(void);
+typedef UINT_PTR (WINAPI *WS_SOCKET)(int, int, int);
+typedef int (WINAPI *WS_CONNECT)(UINT_PTR, const void *, int);
+typedef int (WINAPI *WS_CLOSE)(UINT_PTR);
+
+static SERVICE_STATUS_HANDLE g_nc_handle;
+static SERVICE_STATUS g_nc_status;
+static BYTE g_nc_buf[1024];
+
+/* Dotted quad -> IPv4 in network byte order (in_addr layout); 0 if not one. */
+static DWORD nc_ipv4(const char *s)
+{
+    DWORD v = 0, part;
+    int i, digits;
+    for (i = 0; i < 4; i++) {
+        part = 0;
+        digits = 0;
+        while (*s >= '0' && *s <= '9' && digits < 3) {
+            part = part * 10 + (DWORD)(*s++ - '0');
+            digits++;
+        }
+        if (!digits || part > 255) return 0;
+        v |= part << (8 * i);
+        if (i < 3) {
+            if (*s != '.') return 0;
+            s++;
+        }
+    }
+    return (*s == 0 || *s == ',' || *s == '\r') ? v : 0;
+}
+
+/* HKLM\<key> <name> as text ("" when missing); REG_MULTI_SZ: first string. */
+static void nc_value(const char *key, const char *name, char *out, DWORD cap)
+{
+    HKEY h;
+    DWORD type, size = cap - 1;
+    out[0] = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &h) != ERROR_SUCCESS) return;
+    if (RegQueryValueExA(h, name, NULL, &type, (BYTE *)out, &size) != ERROR_SUCCESS ||
+        (type != REG_SZ && type != REG_MULTI_SZ && type != REG_EXPAND_SZ))
+        size = 0;
+    out[size < cap ? size : cap - 1] = 0;
+    RegCloseKey(h);
+}
+
+static void nc_line(const char *a, const char *b)
+{
+    if (len(g_text) + len(a) + len(b) + 3 >= (int)sizeof g_text) return;
+    lstrcatA(g_text, a);
+    lstrcatA(g_text, b);
+    lstrcatA(g_text, "\r\n");
+}
+
+static void nc_line_dec(const char *a, DWORD v)
+{
+    char b[12];
+    dec(b, v);
+    nc_line(a, b);
+}
+
+static void nc_ping(DWORD addr)
+{
+    HMODULE icmp = LoadLibraryA("icmp.dll");
+    ICMP_CREATE create = icmp ? (ICMP_CREATE)GetProcAddress(icmp, "IcmpCreateFile") : NULL;
+    ICMP_SEND echo = icmp ? (ICMP_SEND)GetProcAddress(icmp, "IcmpSendEcho") : NULL;
+    ICMP_CLOSE icmp_close = icmp ? (ICMP_CLOSE)GetProcAddress(icmp, "IcmpCloseHandle") : NULL;
+    static char data[32] = "USOS netcheck";
+    HANDLE h;
+    int i, ok = 0;
+    if (!create || !echo || !icmp_close) {
+        nc_line("gateway_ping=", "unavailable (icmp.dll)");
+        if (icmp) FreeLibrary(icmp);
+        return;
+    }
+    h = create();
+    if (h == INVALID_HANDLE_VALUE || !h) {
+        nc_line_dec("gateway_ping=failed IcmpCreateFile error ", GetLastError());
+        FreeLibrary(icmp);
+        return;
+    }
+    for (i = 0; i < 3 && !ok; i++) {
+        /* ICMP_ECHO_REPLY: Address, Status, RoundTripTime, ... */
+        DWORD n = echo(h, addr, data, sizeof data, NULL, g_nc_buf, sizeof g_nc_buf, 2000);
+        if (n && ((DWORD *)g_nc_buf)[1] == 0) {
+            ok = 1;
+            nc_line_dec("gateway_ping=ok rtt_ms=", ((DWORD *)g_nc_buf)[2]);
+        }
+    }
+    if (!ok) nc_line_dec("gateway_ping=failed status ", ((DWORD *)g_nc_buf)[1]);
+    icmp_close(h);
+    FreeLibrary(icmp);
+}
+
+static void nc_tcp(const char *label, DWORD addr, WORD port)
+{
+    HMODULE ws = LoadLibraryA("wsock32.dll");
+    WSA_STARTUP startup = ws ? (WSA_STARTUP)GetProcAddress(ws, "WSAStartup") : NULL;
+    WSA_CLEANUP cleanup = ws ? (WSA_CLEANUP)GetProcAddress(ws, "WSACleanup") : NULL;
+    WSA_ERROR error = ws ? (WSA_ERROR)GetProcAddress(ws, "WSAGetLastError") : NULL;
+    WS_SOCKET ws_socket = ws ? (WS_SOCKET)GetProcAddress(ws, "socket") : NULL;
+    WS_CONNECT ws_connect = ws ? (WS_CONNECT)GetProcAddress(ws, "connect") : NULL;
+    WS_CLOSE ws_close = ws ? (WS_CLOSE)GetProcAddress(ws, "closesocket") : NULL;
+    BYTE sa[16];
+    UINT_PTR s;
+    int i;
+    if (!startup || !cleanup || !error || !ws_socket || !ws_connect || !ws_close) {
+        nc_line(label, "unavailable (wsock32.dll)");
+        if (ws) FreeLibrary(ws);
+        return;
+    }
+    if (startup(0x0101, g_nc_buf)) {
+        nc_line(label, "failed WSAStartup");
+        FreeLibrary(ws);
+        return;
+    }
+    s = ws_socket(2, 1, 6);                  /* AF_INET, SOCK_STREAM, IPPROTO_TCP */
+    if (s == (UINT_PTR)~0) {
+        nc_line(label, "failed socket");
+    } else {
+        for (i = 0; i < (int)sizeof sa; i++) ((volatile BYTE *)sa)[i] = 0;
+        sa[0] = 2;                           /* sin_family AF_INET */
+        sa[2] = (BYTE)(port >> 8);           /* sin_port, network order */
+        sa[3] = (BYTE)port;
+        *(DWORD *)(sa + 4) = addr;
+        if (ws_connect(s, sa, sizeof sa) == 0) {
+            nc_line(label, "ok");
+        } else {
+            char b[48];
+            lstrcpyA(b, "failed WSA error ");
+            dec(b + len(b), (DWORD)error());
+            nc_line(label, b);
+        }
+        ws_close(s);
+    }
+    cleanup();
+    FreeLibrary(ws);
+}
+
+static void netcheck(void)
+{
+    static const char params[] = SVC_KEY "NDISLoop1\\Parameters";
+    static const char *const alive[] = { "UsosnetAliveSec", "UsosnetAliveRx", "UsosnetAliveTx",
+                                         "UsosnetAliveFlags", "UsosnetAliveRxErr", "UsosnetAliveTxErr",
+                                         "UsosnetBcPoint", "UsosnetBcError" };
+    char ip[64], gw[128];
+    DWORD waited = 0, gateway;
+    int i;
+    lstrcpyA(g_text, "USOS NT 3.51 network check\r\nstate=waiting for the DHCP lease\r\n");
+    write_file_checked("NETCHECK.TXT", g_text);
+    for (;;) {
+        nc_value(NC_TCP, "DhcpIPAddress", ip, sizeof ip);
+        if ((ip[0] && lstrcmpA(ip, "0.0.0.0")) || waited >= 120) break;
+        Sleep(2000);
+        waited += 2;
+    }
+    lstrcpyA(g_text, "USOS NT 3.51 network check\r\n");
+    nc_line("lease=", ip[0] && lstrcmpA(ip, "0.0.0.0") ? "yes" : "no");
+    nc_line_dec("waited_s=", waited);
+    dump_value(g_text, NC_TCP, "EnableDHCP");
+    dump_value(g_text, NC_TCP, "DhcpIPAddress");
+    dump_value(g_text, NC_TCP, "DhcpSubnetMask");
+    dump_value(g_text, NC_TCP, "DhcpDefaultGateway");
+    dump_value(g_text, NC_TCP, "DhcpServer");
+    dump_value(g_text, NC_TCP, "Lease");
+    dump_value(g_text, NC_TCP, "LeaseObtainedTime");
+    dump_value(g_text, NC_TCP, "LeaseTerminatesTime");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "DhcpNameServer");
+    dump_value(g_text, SVC_KEY "DHCP", "Start");
+    for (i = 0; i < (int)(sizeof alive / sizeof alive[0]); i++)
+        dump_value(g_text, params, alive[i]);
+    write_file_checked("NETCHECK.TXT", g_text);
+    if (ip[0] && lstrcmpA(ip, "0.0.0.0")) {
+        nc_value(NC_TCP, "DhcpDefaultGateway", gw, sizeof gw);
+        gateway = nc_ipv4(gw);
+        if (gateway) nc_ping(gateway);
+        else nc_line("gateway_ping=", "no gateway");
+        nc_tcp("tcp_1.1.1.1_80=", 0x01010101, 80);
+    } else {
+        nc_line("gateway_ping=", "skipped (no lease)");
+        nc_line("tcp_1.1.1.1_80=", "skipped (no lease)");
+    }
+    nc_line("done=", "1");
+    write_file_checked("NETCHECK.TXT", g_text);
+}
+
+static void WINAPI netcheck_handler(DWORD control)
+{
+    (void)control;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
+static void WINAPI netcheck_main(DWORD argc, LPSTR *argv)
+{
+    (void)argc;
+    (void)argv;
+    g_nc_handle = RegisterServiceCtrlHandlerA("usosnetc", netcheck_handler);
+    g_nc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_nc_status.dwCurrentState = SERVICE_RUNNING;
+    g_nc_status.dwControlsAccepted = 0;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+    netcheck();
+    /* one record only: the service turns itself off */
+    {
+        HKEY h;
+        DWORD off = SERVICE_DISABLED;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "usosnetc", 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+            RegSetValueExA(h, "Start", 0, REG_DWORD, (const BYTE *)&off, sizeof off);
+            RegCloseKey(h);
+        }
+    }
+    g_nc_status.dwCurrentState = SERVICE_STOPPED;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
+/* ------------------------------------------------------------------------
+ * Native NT 3.1 LAN (POST.CMD "/net31", end of GUI Setup, after /vesa31;
+ * docs/nt-native-plan.md section 8.10). GUI Setup installed the MS Loopback
+ * Adapter (service NDISLoop, adapter NDISLoop1) with NetBEUI and TCP/IP, and
+ * the patched OEMNXPTC.INF skipped the TCP/IP address dialog while
+ * HKLM\SOFTWARE\USOS\NT31NET existed. Here, from \USOS\NT3\NET31.ON
+ * (nt31_network_setup.sh: the profile address, else the prep Linux's DHCP
+ * lease for this PC's I211, else link-local):
+ *   - usnet31.sys (usosnet31, NDIS 3.1 full-MAC; file alignment 0x200, so
+ *     the 3.1 loader takes it with NDISLoop's own start mode) replaces
+ *     loop.sys as NDISLoop's ImagePath; NDISLoop1\Parameters gets the
+ *     card's PciBus / PciDevice / PciFunction;
+ *   - the static TCP/IP values, as the 3.1 INF / NCPA name them: adapter
+ *     NDISLoop1\Parameters\Tcpip IPAddress + SubnetMask (REG_SZ),
+ *     Tcpip\Parameters DefaultGateway, NameServer (space separated),
+ *     Domain, Hostname;
+ *   - Workstation: Server and Browser off (client without sharing);
+ *   - the marker key removed; usosnetc (/netcheck31) registered for one
+ *     silent NETCHECK.TXT at the first boot.
+ * NET31.STS (8.3) records each step. */
+/* The Loopback adapter instance: NT 3.1 NCPA names it NDISLoop01 (NT 3.5x:
+   NDISLoop1; X470 fresh install 2 2026-10-31: /net31 looked for NDISLoop1). */
+static char g_n31_ad[16] = "NDISLoop01";
+static char g_n31_tcp[96];
+static const char *n31_adapter(void)
+{
+    static const char *const names[] = { "NDISLoop01", "NDISLoop1" };
+    HKEY h;
+    int i;
+    for (i = 0; i < 2; i++) {
+        char key[96];
+        lstrcpyA(key, SVC_KEY);
+        lstrcatA(key, names[i]);
+        lstrcatA(key, "\\Parameters");
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            RegCloseKey(h);
+            lstrcpyA(g_n31_ad, names[i]);
+            break;
+        }
+    }
+    lstrcpyA(g_n31_tcp, SVC_KEY);
+    lstrcatA(g_n31_tcp, g_n31_ad);
+    lstrcatA(g_n31_tcp, "\\Parameters\\Tcpip");
+    return g_n31_ad;
+}
+#define N31_TCP g_n31_tcp
+
+/* "key=value" of a CR LF text (value up to CR / LF); "" when missing. */
+static void n31_value(const char *text, const char *key, char *out, int cap)
+{
+    int i = 0, k = len(key), o = 0;
+    out[0] = 0;
+    while (text[i]) {
+        if ((i == 0 || text[i - 1] == '\n') && has_ci(text + i, k, key) && text[i + k] == '=') {
+            i += k + 1;
+            while (text[i] && text[i] != '\r' && text[i] != '\n' && o < cap - 1)
+                out[o++] = text[i++];
+            out[o] = 0;
+            return;
+        }
+        i++;
+    }
+}
+
+static DWORD n31_decimal(const char *s)
+{
+    DWORD v = 0;
+    while (*s >= '0' && *s <= '9')
+        v = v * 10 + (DWORD)(*s++ - '0');
+    return v;
+}
+
+/* RegSetValueExA + read back (REG_SZ / REG_EXPAND_SZ / REG_DWORD). */
+static int n31_set(HKEY h, const char *name, DWORD type, const void *data, DWORD size)
+{
+    BYTE got[300];
+    DWORD t, n = sizeof got, i;
+    if (RegSetValueExA(h, name, 0, type, (const BYTE *)data, size) != ERROR_SUCCESS) return 0;
+    if (RegQueryValueExA(h, name, NULL, &t, got, &n) != ERROR_SUCCESS || t != type || n != size) return 0;
+    for (i = 0; i < size; i++)
+        if (got[i] != ((const BYTE *)data)[i]) return 0;
+    return 1;
+}
+
+static int n31_sz(HKEY h, const char *name, DWORD type, const char *v)
+{
+    int ok = n31_set(h, name, type, v, (DWORD)len(v) + 1);
+    say(ok ? "  " : "  FAILED ");
+    say(name);
+    say(" = ");
+    say(v);
+    say("\r\n");
+    return ok;
+}
+
+static int n31_dw(HKEY h, const char *name, DWORD v)
+{
+    int ok = n31_set(h, name, REG_DWORD, &v, sizeof v);
+    say(ok ? "  " : "  FAILED ");
+    say_hex(name, v);
+    return ok;
+}
+
+static int n31_contains(const char *data, DWORD size, const char *part)
+{
+    DWORD i;
+    int j;
+    for (i = 0; i < size; i++) {
+        for (j = 0; part[j] && i + j < size && (data[i + j] | 32) == (part[j] | 32); j++)
+            ;
+        if (!part[j]) return 1;
+    }
+    return 0;
+}
+
+static void n31_service_off(const char *svc)
+{
+    HKEY h;
+    char key[128];
+    lstrcpyA(key, SVC_KEY);
+    lstrcatA(key, svc);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE, &h) != ERROR_SUCCESS) {
+        say("  ");
+        say(svc);
+        say(": no service key (nothing to turn off)\r\n");
+        return;
+    }
+    say("  ");
+    say(svc);
+    say(":");
+    n31_dw(h, "Start", SERVICE_DISABLED);
+    RegCloseKey(h);
+}
+
+static const char *g_n31_tcp_params(void)
+{
+    static char key[96];
+    n31_adapter();
+    lstrcpyA(key, SVC_KEY);
+    lstrcatA(key, g_n31_ad);
+    lstrcatA(key, "\\Parameters");
+    return key;
+}
+static void net31(void)
+{
+    static char meta[2048];
+    char v[128], sys[MAX_PATH], dst[MAX_PATH], host[40];
+    HKEY svc = NULL, params = NULL, tcp = NULL, tparams = NULL, link = NULL;
+    DWORD type, size, n, disp;
+    BYTE data[1024];
+    int ok = 1, i;
+
+    say("USOS NT 3.1 LAN (/net31)\r\n");
+    if ((GetVersion() & 0xFFFFUL) != 0x0A03UL) {
+        say("net31 refused: not Windows NT 3.1\r\n");
+        return;
+    }
+    if (read_text("NET31.ON", meta, sizeof meta) <= 0) {
+        HKEY h;
+        say("net31 off: no NET31.ON (NET31.OFF has the prep reason)\r\n");
+        /* Without a network NT 3.1's NetDDE fails at every boot (event 13,
+           "NETBIOS"; the "service failed" box, X470 2026-10-30): demand
+           start then, as Network DDE needs NetBIOS. */
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NetBIOS", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            RegCloseKey(h);
+            say("NetBIOS present: NetDDE unchanged\r\n");
+        } else if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NetDDE", 0, KEY_READ | KEY_WRITE, &h) == ERROR_SUCCESS) {
+            say("no network:");
+            n31_dw(h, "Start", SERVICE_DEMAND_START);
+            RegCloseKey(h);
+        }
+        return;
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "NDISLoop", 0, KEY_READ | KEY_WRITE, &svc) != ERROR_SUCCESS ||
+        RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_n31_tcp_params(), 0, KEY_READ | KEY_WRITE, &params) != ERROR_SUCCESS) {
+        say("net31 FAILED: no NDISLoop / NDISLoop01 / NDISLoop1 (GUI Setup installed no Loopback adapter); network stays off\r\n");
+        ok = 0;
+        goto done;
+    }
+    /* TCP/IP's binding (3.1 STREAMS form \Device\Streams\NDISLoop1). */
+    size = sizeof data;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Tcpip\\Linkage", 0, KEY_READ, &link) == ERROR_SUCCESS &&
+        RegQueryValueExA(link, "Bind", NULL, &type, data, &size) == ERROR_SUCCESS && n31_contains((char *)data, size, g_n31_ad))
+        say("Tcpip\\Linkage Bind has the Loopback adapter\r\n");
+    else
+        say("WARNING: Tcpip\\Linkage Bind without the Loopback adapter (TCP/IP not bound to the adapter?)\r\n");
+    if (link) RegCloseKey(link);
+    size = sizeof data;
+    if (RegQueryValueExA(svc, "Start", NULL, &type, data, &size) == ERROR_SUCCESS && type == REG_DWORD)
+        say_hex("NDISLoop Start (kept) = ", *(DWORD *)data);
+
+    /* the driver */
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usnet31.sys");
+    if (!CopyFileA(DIR "USNET31.SYS", dst, FALSE) || !net351_equal_files(DIR "USNET31.SYS", dst)) {
+        say("net31 FAILED: copy of USNET31.SYS to ");
+        say(dst);
+        say("\r\n");
+        ok = 0;
+        goto done;
+    }
+    say("copied and compared ");
+    say(dst);
+    say("\r\n");
+    ok &= n31_sz(svc, "ImagePath", REG_EXPAND_SZ, "\\SystemRoot\\System32\\drivers\\usnet31.sys");
+    n31_value(meta, "bus", v, sizeof v);
+    ok &= n31_dw(params, "PciBus", n31_decimal(v));
+    n31_value(meta, "device", v, sizeof v);
+    ok &= n31_dw(params, "PciDevice", n31_decimal(v));
+    n31_value(meta, "function", v, sizeof v);
+    ok &= n31_dw(params, "PciFunction", n31_decimal(v));
+    ok &= n31_dw(params, "UsosBusType", 5);
+    ok &= n31_dw(params, "DebugPort", 0);
+
+    /* the static TCP/IP values */
+    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, N31_TCP, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &tcp, &disp) != ERROR_SUCCESS ||
+        RegCreateKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Tcpip\\Parameters", 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &tparams, &disp) != ERROR_SUCCESS) {
+        say("net31 FAILED: cannot open the TCP/IP keys\r\n");
+        ok = 0;
+        goto done;
+    }
+    n31_value(meta, "mode", v, sizeof v);
+    say("address source: ");
+    say(v);
+    say("\r\n");
+    n31_value(meta, "ip", v, sizeof v);
+    ok &= nc_ipv4(v) != 0 && n31_sz(tcp, "IPAddress", REG_SZ, v);
+    n31_value(meta, "mask", v, sizeof v);
+    ok &= n31_sz(tcp, "SubnetMask", REG_SZ, v);
+    /* Required by the NT 3.1 TCP/IP service (TCPIPSVC reads them as DWORDs
+       and does not start without them; the skipped NCPA dialog writes them). */
+    ok &= n31_dw(tcp, "ForwardBroadcasts", 0);
+    ok &= n31_dw(tcp, "KeepAlive", 0);
+    ok &= n31_dw(tcp, "BroadcastType", 1);
+    ok &= n31_dw(tcp, "Trailers", 0);
+    /* TCP/IP NetBIOS (NbtSvc) does not start without Nbt\Parameters ScopeID
+       (X470 2026-10-31: event 0x1132 NbtSvc ...Nbt\Parameters\ScopeID, then
+       NetDDE without NetBIOS = the "service or driver failed" box); the
+       skipped NCPA dialog writes it, empty = no scope. */
+    {
+        HKEY nbt;
+        DWORD disp2;
+        if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "Nbt\\Parameters", 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &nbt, &disp2) == ERROR_SUCCESS) {
+            ok &= n31_sz(nbt, "ScopeID", REG_SZ, "");
+            /* ...and PermanentName (X470 2026-10-31, the next event 0x1132):
+               NBTSVC copies it as a string into a 16-character NetBIOS name
+               buffer. The card's MAC in hex (12 characters, unique), from
+               NET31.ON; without one "USOS" + the IP address in hex. */
+            {
+                char pn[20];
+                n31_value(meta, "mac", pn, sizeof pn);
+                if (len(pn) != 12) {
+                    char ipv[32];
+                    DWORD a4;
+                    n31_value(meta, "ip", ipv, sizeof ipv);
+                    a4 = nc_ipv4(ipv);
+                    lstrcpyA(pn, "USOS");
+                    hex(pn + 4, ((a4 & 0xff) << 24) | ((a4 & 0xff00) << 8) | ((a4 >> 8) & 0xff00) | (a4 >> 24));
+                }
+                ok &= n31_sz(nbt, "PermanentName", REG_SZ, pn);
+            }
+            RegCloseKey(nbt);
+        } else {
+            say("FAILED: cannot open Nbt\\Parameters\r\n");
+            ok = 0;
+        }
+    }
+    n31_value(meta, "gateway", v, sizeof v);
+    if (v[0]) ok &= n31_sz(tparams, "DefaultGateway", REG_SZ, v);
+    n31_value(meta, "dns", v, sizeof v);
+    if (v[0]) {
+        ok &= n31_sz(tparams, "NameServer", REG_SZ, v);
+        /* OEMNXPTC.INF installs DNSLookupOrder 4 (the NCPA dialog's last
+           choice, hosts file only: X470 2026-10-31 "host not found" with
+           NameServer set); the skipped dialog would change it. 3 = the third
+           choice (hosts file first, then DNS); WSOCK32 maps 1..4 to its
+           lookup flags. */
+        ok &= n31_dw(tparams, "DNSLookupOrder", 3);
+    }
+    n31_value(meta, "domain", v, sizeof v);
+    if (v[0]) ok &= n31_sz(tparams, "Domain", REG_SZ, v);
+    n = sizeof host;
+    if (GetComputerNameA(host, &n) && host[0]) {
+        for (i = 0; host[i]; i++)
+            if (host[i] >= 'A' && host[i] <= 'Z') host[i] = (char)(host[i] + 32);
+        ok &= n31_sz(tparams, "Hostname", REG_SZ, host);
+    }
+
+    /* Workstation: client without sharing (memory: network defaults). */
+    n31_value(meta, "client", v, sizeof v);
+    if (!lstrcmpiA(v, "no-sharing")) {
+        say("client without sharing:\r\n");
+        n31_service_off("LanmanServer");
+        n31_service_off("Browser");
+    }
+
+    /* usosnetc: one silent NETCHECK.TXT at the first boot. */
+    set_sz("usosnetc", "ImagePath", REG_EXPAND_SZ, DIR "USOSNT3.EXE /netcheck31");
+    set_sz("usosnetc", "ObjectName", REG_SZ, "LocalSystem");
+    set_sz("usosnetc", "DisplayName", REG_SZ, "USOS network check");
+    set_dword("usosnetc", NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
+    set_dword("usosnetc", NULL, "ErrorControl", SERVICE_ERROR_IGNORE);
+    set_dword("usosnetc", NULL, "Start", SERVICE_AUTO_START);
+done:
+    if (tparams) RegCloseKey(tparams);
+    if (tcp) RegCloseKey(tcp);
+    if (params) RegCloseKey(params);
+    if (svc) RegCloseKey(svc);
+    /* The OEMNXPTC.INF marker: Control Panel runs get the dialog again. */
+    i = RegDeleteKeyA(HKEY_LOCAL_MACHINE, "SOFTWARE\\USOS\\NT31NET");
+    say(i == ERROR_SUCCESS ? "marker SOFTWARE\\USOS\\NT31NET removed\r\n" : "marker SOFTWARE\\USOS\\NT31NET not removed (missing?)\r\n");
+    say(ok ? "net31: usosnet31 + static TCP/IP registered (readback verified); active after the restart\r\n"
+           : "net31 FAILED (see above); network unproven\r\n");
+    lstrcpyA(g_text, ok ? "net31=ok\r\n" : "net31=FAILED\r\n");
+    write_file("NET31.STS", g_text);
+}
+
+/* ------------------------------------------------------------------------
+ * usosnetc on NT 3.1 (USOSNT3.EXE /netcheck31): one silent record of the
+ * first boot with usosnet31, C:\USOS\NT3\NETCHECK.TXT: the configured
+ * address, usosnet31's NativeDiag stage, the CD's PING.EXE to the gateway
+ * and to 1.1.1.1 (NT 3.1 ICMP.DLL has no IcmpSendEcho; PING prints "ICMP
+ * Echo Reply:TTL n" per answer), a name lookup and a TCP connect to
+ * 1.1.1.1:80 (wsock32). Then the service turns itself off. */
+typedef void *(WINAPI *WS_GETHOST)(const char *);
+
+static void nc31_ping(const char *label, const char *addr)
+{
+    static char out[2048];
+    char cmd[MAX_PATH + 64], file[MAX_PATH];
+    SECURITY_ATTRIBUTES sa;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    HANDLE h;
+    DWORD n = 0, i, replies = 0;
+    char *p;
+    lstrcpyA(file, DIR);
+    lstrcatA(file, "PING31.TMP");
+    sa.nLength = sizeof sa;
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+    h = CreateFileA(file, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+        nc_line(label, "failed (temp file)");
+        return;
+    }
+    for (i = 0; i < sizeof si; i++) ((volatile BYTE *)&si)[i] = 0;
+    si.cb = sizeof si;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = NULL;
+    si.hStdOutput = h;
+    si.hStdError = h;
+    if (!GetSystemDirectoryA(cmd, MAX_PATH)) lstrcpyA(cmd, "C:\\WINNT\\system32");
+    lstrcatA(cmd, "\\ping.exe -n 3 ");
+    lstrcatA(cmd, addr);
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+        CloseHandle(h);
+        DeleteFileA(file);
+        nc_line(label, "failed (CreateProcess ping.exe)");
+        return;
+    }
+    if (WaitForSingleObject(pi.hProcess, 30000) != WAIT_OBJECT_0)
+        TerminateProcess(pi.hProcess, 1);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    SetFilePointer(h, 0, NULL, FILE_BEGIN);
+    if (!ReadFile(h, out, sizeof out - 1, &n, NULL)) n = 0;
+    out[n] = 0;
+    CloseHandle(h);
+    DeleteFileA(file);
+    for (p = out; *p; p++)
+        /* has_ci wants the word in lower case (it was never matched) */
+        if (has_ci(p, 15, "echo reply:ttl ")) replies++;
+    {
+        char b[64];
+        lstrcpyA(b, replies ? "ok replies=" : "failed replies=");
+        dec(b + len(b), replies);
+        lstrcatA(b, "/3");
+        nc_line(label, b);
+    }
+    /* the PING output itself, one line per row, bounded */
+    for (p = out, i = 0; *p && i < 8; i++) {
+        char row[100];
+        int k = 0;
+        while (*p == '\r' || *p == '\n') p++;
+        while (*p && *p != '\r' && *p != '\n' && k < (int)sizeof row - 1) row[k++] = *p++;
+        while (*p && *p != '\r' && *p != '\n') p++;
+        row[k] = 0;
+        if (k) nc_line("  ping: ", row);
+    }
+}
+
+static void netcheck31(void)
+{
+    static char meta[2048];
+    char v[128], gw[64];
+    HMODULE ws;
+    int i;
+    static const char *const diag[] = { "Stage", "Status", "Value", "Sequence" };
+
+    n31_adapter();
+    lstrcpyA(g_text, "USOS NT 3.1 network check\r\nstate=waiting 45 s for TCP/IP\r\n");
+    write_file_checked("NETCHECK.TXT", g_text);
+    Sleep(45000);
+    lstrcpyA(g_text, "USOS NT 3.1 network check\r\n");
+    if (read_text("NET31.ON", meta, sizeof meta) > 0) {
+        static const char *const keys[] = { "mode", "ip", "mask", "gateway", "dns", "lease_s", "note", "bus", "device", "function" };
+        for (i = 0; i < (int)(sizeof keys / sizeof keys[0]); i++) {
+            char k[24];
+            n31_value(meta, keys[i], v, sizeof v);
+            lstrcpyA(k, "net31_");
+            lstrcatA(k, keys[i]);
+            lstrcatA(k, "=");
+            nc_line(k, v);
+        }
+    }
+    dump_value(g_text, N31_TCP, "IPAddress");
+    dump_value(g_text, N31_TCP, "SubnetMask");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "DefaultGateway");
+    dump_value(g_text, SVC_KEY "Tcpip\\Parameters", "NameServer");
+    dump_value(g_text, SVC_KEY "NDISLoop", "ImagePath");
+    dump_value(g_text, SVC_KEY "NDISLoop", "Start");
+    for (i = 0; i < 4; i++)
+        dump_value(g_text, SVC_KEY "NDISLoop\\Parameters\\NativeDiag", diag[i]);
+    write_file_checked("NETCHECK.TXT", g_text);
+    nc_value(SVC_KEY "Tcpip\\Parameters", "DefaultGateway", gw, sizeof gw);
+    if (nc_ipv4(gw)) nc31_ping("gateway_ping=", gw);
+    else nc_line("gateway_ping=", "no gateway");
+    write_file_checked("NETCHECK.TXT", g_text);
+    nc31_ping("ping_1.1.1.1=", "1.1.1.1");
+    write_file_checked("NETCHECK.TXT", g_text);
+    ws = LoadLibraryA("wsock32.dll");
+    if (ws) {
+        WSA_STARTUP startup = (WSA_STARTUP)GetProcAddress(ws, "WSAStartup");
+        WSA_CLEANUP cleanup = (WSA_CLEANUP)GetProcAddress(ws, "WSACleanup");
+        WS_GETHOST gethost = (WS_GETHOST)GetProcAddress(ws, "gethostbyname");
+        if (startup && cleanup && gethost && !startup(0x0101, g_nc_buf)) {
+            nc_line("dns_one.one.one.one=", gethost("one.one.one.one") ? "ok" : "failed");
+            cleanup();
+        } else nc_line("dns_one.one.one.one=", "unavailable (wsock32.dll)");
+        FreeLibrary(ws);
+    }
+    nc_tcp("tcp_1.1.1.1_80=", 0x01010101, 80);
+    nc_line("done=", "1");
+    write_file_checked("NETCHECK.TXT", g_text);
+}
+
+static void WINAPI netcheck31_main(DWORD argc, LPSTR *argv)
+{
+    (void)argc;
+    (void)argv;
+    g_nc_handle = RegisterServiceCtrlHandlerA("usosnetc", netcheck_handler);
+    g_nc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_nc_status.dwCurrentState = SERVICE_RUNNING;
+    g_nc_status.dwControlsAccepted = 0;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+    netcheck31();
+    {
+        HKEY h;
+        DWORD off = SERVICE_DISABLED;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "usosnetc", 0, KEY_WRITE, &h) == ERROR_SUCCESS) {
+            RegSetValueExA(h, "Start", 0, REG_DWORD, (const BYTE *)&off, sizeof off);
+            RegCloseKey(h);
+        }
+    }
+    g_nc_status.dwCurrentState = SERVICE_STOPPED;
+    if (g_nc_handle)
+        SetServiceStatus(g_nc_handle, &g_nc_status);
+}
+
+/* The boot options from NATIVE.TXT ("boot_options=/NUMPROC=2 /MAXMEM=1024"). */
+static void native_options(char *opts, int size)
+{
+    static char buf[512];
+    int i, n = read_small(DIR "NATIVE.TXT", buf, sizeof buf), o = 0;
+    opts[0] = 0;
+    for (i = 0; i < n; i++) {
+        if ((i == 0 || buf[i - 1] == '\n') && i + 13 <= n && has_ci(buf + i, 13, "boot_options=")) {
+            i += 13;
+            while (i < n && buf[i] != '\r' && buf[i] != '\n' && o < size - 1)
+                opts[o++] = buf[i++];
+            opts[o] = 0;
+            return;
+        }
+    }
+}
+
+static void out_add(char *out, int *o, int size, const char *s, int n)
+{
+    int i;
+    for (i = 0; i < n && *o < size - 1; i++)
+        out[(*o)++] = s[i];
+    out[*o] = 0;
+}
+
+/* Removes " /MAXMEM=<digits>" (any case) from line[0..*n). */
+static void drop_maxmem(char *line, int *n)
+{
+    int i, j;
+    for (i = 0; i + 8 <= *n; i++) {
+        if (line[i] == '/' && has_ci(line + i, 8, "/maxmem=")) {
+            int s = i, e = i + 8;
+            while (s > 0 && (line[s - 1] == ' ' || line[s - 1] == '\t'))
+                s--;
+            while (e < *n && line[e] >= '0' && line[e] <= '9')
+                e++;
+            for (j = 0; e + j < *n; j++)
+                line[s + j] = line[e + j];
+            *n -= e - s;
+            i = s - 1;
+        }
+    }
+}
+
+static void boot_ini_finish(void)
+{
+    static char in[8192], out[12288], line[600];
+    char opts[200];
+    int n, i = 0, o = 0, sos = 0, vga = 0, first_end = -1;
+    int arc_len = 0, desc_s = 0, desc_l = 0;
+    char arc_line[600];
+    const char *ini = "C:\\BOOT.INI";
+    static const char *const leftovers[] = {
+        "C:\\BOOTSECT.DOS", "C:\\LDLINUX.SYS", "C:\\LDLINUX.C32", "C:\\SYSLINUX.CFG", "C:\\CHAIN.C32",
+        "C:\\LIBCOM32.C32", "C:\\LIBUTIL.C32", "C:\\$LDR$", "C:\\TXTSETUP.SIF", "C:\\WINNT.SIF"
+    };
+    DWORD attr, w;
+    HANDLE h;
+
+    native_options(opts, sizeof opts);
+    n = read_small(ini, in, sizeof in);
+    if (n <= 0) {
+        say("boot.ini: cannot read C:\\BOOT.INI\r\n");
+        return;
+    }
+    if (has_ci(in, n, "[usos /sos]")) {
+        say("boot.ini: already finished\r\n");
+    } else {
+        while (i < n) {
+            int l = 0, t = 0;
+            while (i < n && in[i] != '\n') {
+                if (in[i] != '\r' && l < (int)sizeof line - 200)
+                    line[l++] = in[i];
+                i++;
+            }
+            if (i < n)
+                i++;
+            while (t < l && (line[t] == ' ' || line[t] == '\t'))
+                t++;
+            if (l - t >= 7 && has_ci(line + t, 7, "timeout") && has_ci(line + t, l - t, "=")) {
+                lstrcpyA(line, "timeout=5");
+                l = 9;
+            } else if (l - t >= 3 && lower(line[t]) == 'c' && line[t + 1] == ':' && line[t + 2] == '\\') {
+                int k = t + 3;
+                while (k < l && (line[k] == ' ' || line[k] == '\t'))
+                    k++;
+                if (k < l && line[k] == '=')
+                    continue;           /* the "C:\" entry: Setup's copy of the syslinux boot sector */
+            } else if (l - t >= 6 && has_ci(line + t, 6, "multi(")) {
+                if (has_ci(line, l, "/basevideo"))
+                    vga = 1;
+                else if (has_ci(line, l, "/sos"))
+                    sos = 1;
+                else if (first_end < 0) {
+                    int p, q;
+                    for (p = 0; p + 1 < l && !(line[p] == '=' && line[p + 1] == '"'); p++)
+                        ;
+                    for (q = p + 2; q < l && line[q] != '"'; q++)
+                        ;
+                    if (p + 1 < l && q < l) {
+                        arc_len = p;
+                        desc_s = p + 2;
+                        desc_l = q - desc_s;
+                        copy_bytes(arc_line, line, l);
+                        first_end = 1;
+                    }
+                }
+                if (!has_ci(line, l, "/numproc")) {
+                    drop_maxmem(line, &l);
+                    while (l > 0 && (line[l - 1] == ' ' || line[l - 1] == '\t'))
+                        l--;
+                    if (opts[0]) {
+                        line[l++] = ' ';
+                        copy_bytes(line + l, opts, len(opts));
+                        l += len(opts);
+                    }
+                }
+                out_add(out, &o, sizeof out, line, l);
+                out_add(out, &o, sizeof out, "\r\n", 2);
+                if (first_end == 1) {
+                    first_end = o;      /* the extra entries go right after this line */
+                }
+                continue;
+            }
+            out_add(out, &o, sizeof out, line, l);
+            out_add(out, &o, sizeof out, "\r\n", 2);
+        }
+        if (first_end > 0 && (!sos || !vga)) {
+            static char extra[1400], tail[12288];
+            int e = 0, tl = o - first_end;
+            copy_bytes(tail, out + first_end, tl);
+            if (!sos) {
+                out_add(extra, &e, sizeof extra, arc_line, arc_len);
+                out_add(extra, &e, sizeof extra, "=\"", 2);
+                out_add(extra, &e, sizeof extra, arc_line + desc_s, desc_l);
+                out_add(extra, &e, sizeof extra, " [USOS /SOS]\" /SOS", 18);
+                if (opts[0]) {
+                    out_add(extra, &e, sizeof extra, " ", 1);
+                    out_add(extra, &e, sizeof extra, opts, len(opts));
+                }
+                out_add(extra, &e, sizeof extra, "\r\n", 2);
+            }
+            if (!vga) {
+                out_add(extra, &e, sizeof extra, arc_line, arc_len);
+                out_add(extra, &e, sizeof extra, "=\"", 2);
+                out_add(extra, &e, sizeof extra, arc_line + desc_s, desc_l);
+                out_add(extra, &e, sizeof extra, " [VGA mode]\" /basevideo /sos", 28);
+                if (opts[0]) {
+                    out_add(extra, &e, sizeof extra, " ", 1);
+                    out_add(extra, &e, sizeof extra, opts, len(opts));
+                }
+                out_add(extra, &e, sizeof extra, "\r\n", 2);
+            }
+            o = first_end;
+            out_add(out, &o, sizeof out, extra, e);
+            out_add(out, &o, sizeof out, tail, tl);
+        }
+        attr = GetFileAttributesA(ini);
+        SetFileAttributesA(ini, FILE_ATTRIBUTE_NORMAL);
+        h = CreateFileA(ini, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h != INVALID_HANDLE_VALUE && WriteFile(h, out, (DWORD)o, &w, NULL) && w == (DWORD)o &&
+            FlushFileBuffers(h)) {
+            say("boot.ini: timeout=5, no C:\\ entry, options ");
+            say(opts[0] ? opts : "(none)");
+            say("\r\n");
+        } else {
+            say_hex("boot.ini: WRITE FAILED, error ", GetLastError());
+        }
+        if (h != INVALID_HANDLE_VALUE)
+            CloseHandle(h);
+        if (attr != 0xFFFFFFFF)
+            SetFileAttributesA(ini, attr);
+    }
+    for (i = 0; i < (int)(sizeof leftovers / sizeof leftovers[0]); i++) {
+        if (GetFileAttributesA(leftovers[i]) == 0xFFFFFFFF)
+            continue;
+        SetFileAttributesA(leftovers[i], FILE_ATTRIBUTE_NORMAL);
+        say(DeleteFileA(leftovers[i]) ? "removed " : "CANNOT REMOVE ");
+        say(leftovers[i]);
+        say("\r\n");
+    }
+}
+
 static void setup(void)
 {
     char image[MAX_PATH];
     open_log("SETUP.LOG");
     say("USOS NT 3.51 setup: registering the usosnt3 service\r\n");
+    if (native_install()) {
+        usb_early();
+        dhcp_setup_hold_start();
+    }
     lstrcpyA(image, DIR);
     lstrcatA(image, "USOSNT3.EXE /service");
     set_dword(SVC_NAME, NULL, "Type", SERVICE_WIN32_OWN_PROCESS);
@@ -1417,6 +3158,43 @@ static void setup(void)
     set_sz(SVC_NAME, "ImagePath", REG_EXPAND_SZ, image);
     set_sz(SVC_NAME, "ObjectName", REG_SZ, "LocalSystem");
     set_sz(SVC_NAME, "DisplayName", REG_SZ, "USOS post-install");
+    /* Native install (docs/nt-native-plan.md): the GUI Setup page recorder
+       (tools/nt3/usosans3) runs next to GUI Setup on its desktop and logs
+       every page to C:\USOS\NT3\USOSANS.TXT. Only when the target script
+       staged it (native NT 3.5x); the install VM never gets the file. */
+    if (GetFileAttributesA(DIR "USOSANS3.EXE") != 0xFFFFFFFF) {
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        char cmd[MAX_PATH];
+        int i;
+        lstrcpyA(cmd, DIR "USOSANS3.EXE");
+        for (i = 0; i < (int)sizeof si; i++)   /* volatile: no memset (no C runtime) */
+            ((volatile char *)&si)[i] = 0;
+        si.cb = sizeof si;
+        if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            say("page recorder USOSANS3.EXE started\r\n");
+        } else {
+            say_hex("page recorder: CreateProcess failed, error ", GetLastError());
+        }
+    }
+    /* Native: BOOT.INI with the boot options (/MAXMEM) from the first start
+       of the installed system on, not only after the service's post()
+       (X470 2026-10-28). INITIAL.INF runs "ChangeBootIniTimeout 30" right
+       after it starts this DetachedProgram, so wait for that rewrite first;
+       the service repeats the step if this one is lost ("[USOS /SOS]"). */
+    if (native_install()) {
+        logon_notice(1);
+        setup_watch_start();
+        Sleep(20000);
+        boot_ini_finish();
+        say("boot.ini step done\r\n");
+        if (!g_watch_thread)
+            setup_watch();
+        for (;;)                        /* the watch thread runs until GUI Setup restarts */
+            Sleep(60000);
+    }
 }
 
 /* The first argument without its leading / or -, lower case, at most 15
@@ -1448,6 +3226,8 @@ static void first_option(const char *p, char *out)
 void __stdcall entry(void)
 {
     static SERVICE_TABLE_ENTRYA table[] = { { SVC_NAME, service_main }, { NULL, NULL } };
+    static SERVICE_TABLE_ENTRYA netcheck_table[] = { { "usosnetc", netcheck_main }, { NULL, NULL } };
+    static SERVICE_TABLE_ENTRYA netcheck31_table[] = { { "usosnetc", netcheck31_main }, { NULL, NULL } };
     char opt[16];
 
     first_option(GetCommandLineA(), opt);
@@ -1459,9 +3239,99 @@ void __stdcall entry(void)
         }
         ExitProcess(g_post_failed ? 3 : 0);
     }
+    /* usosnetc: the first boot with usosnet351 (net351_native_post) */
+    if (lstrcmpA(opt, "netcheck") == 0) {
+        if (!StartServiceCtrlDispatcherA(netcheck_table))
+            netcheck();             /* by hand: the same record without the SCM */
+        ExitProcess(0);
+    }
+    /* usosnetc on native NT 3.1 (net31) */
+    if (lstrcmpA(opt, "netcheck31") == 0) {
+        if (!StartServiceCtrlDispatcherA(netcheck31_table))
+            netcheck31();           /* by hand: the same record without the SCM */
+        ExitProcess(0);
+    }
+    /* the desktop notice the service starts on a native install */
+    if (lstrcmpA(opt, "notice") == 0)
+        notice_main();
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
         ExitProcess(post() ? 0 : 3);
+    }
+    /* By hand on a native install that predates the early USB / BOOT.INI
+       steps: what /setup and the service add on the native path. */
+    if (lstrcmpA(opt, "finish") == 0) {
+        /* NT31 needs USB Start=0, not usb_early()'s Start=1. It also has
+         * no /NUMPROC, which the current BOOT.INI idempotence guard uses.
+         * /polish is compatible; this NT35x-specific finish is not.
+         * GetVersion exists on the original NT31 CD, GetVersionEx does not. */
+        if ((GetVersion() & 0xFFFFUL) == 0x0A03UL)
+            ExitProcess(3);
+        open_log("POST.LOG");
+        say("USOS native finish (by hand)\r\n");
+        if (!native_install()) {
+            say("no NATIVE.TXT: not a native install, nothing done\r\n");
+            ExitProcess(3);
+        }
+        usb_early();
+        pagefile_cap();
+        boot_ini_finish();
+        say("finish done\r\n");
+        ExitProcess(0);
+    }
+    /* Native NT 3.1 (docs/nt-native-plan.md section 8): POST.CMD at the end
+       of GUI Setup, after /polish. NT 3.1 runs no usosnt3 service and no
+       Linux finish step follows on the native path, so this does the VM
+       finish step's jobs: BOOT.INI (timeout=5, no C:\ entry, the NATIVE.TXT
+       options "/NODEBUG /MAXMEM=64" on every entry, [USOS /SOS] and [VGA
+       mode]) and the Setup leftovers on C:\, including the boot floppy
+       files nt4_csmwrap_target.sh listed in ROOTLIST.TXT and TXTSETUP.INF. */
+    if (lstrcmpA(opt, "finish31") == 0) {
+        static char list[4096];
+        char path[MAX_PATH];
+        int n, i, s;
+        open_log("POST.LOG");
+        say("USOS native NT 3.1 finish\r\n");
+        if (!native_install()) {
+            say("no NATIVE.TXT: not a native install, nothing done\r\n");
+            ExitProcess(3);
+        }
+        boot_ini_finish();
+        n = read_small(DIR "ROOTLIST.TXT", list, sizeof list);
+        for (i = 0, s = 0; n > 0 && i <= n; i++) {
+            if (i < n && list[i] != '\r' && list[i] != '\n')
+                continue;
+            if (i - s > 0 && i - s < 13) {
+                lstrcpyA(path, "C:\\");
+                copy_bytes(path + 3, list + s, i - s);
+                path[3 + i - s] = 0;
+                if (GetFileAttributesA(path) != 0xFFFFFFFF) {
+                    SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
+                    say(DeleteFileA(path) ? "removed " : "CANNOT REMOVE ");
+                    say(path);
+                    say("\r\n");
+                }
+            }
+            s = i + 1;
+        }
+        if (GetFileAttributesA("C:\\TXTSETUP.INF") != 0xFFFFFFFF) {
+            SetFileAttributesA("C:\\TXTSETUP.INF", FILE_ATTRIBUTE_NORMAL);
+            say(DeleteFileA("C:\\TXTSETUP.INF") ? "removed C:\\TXTSETUP.INF\r\n" : "CANNOT REMOVE C:\\TXTSETUP.INF\r\n");
+        }
+        say("finish31 done\r\n");
+        ExitProcess(0);
+    }
+    /* Native NT 3.1: POST.CMD at the end of GUI Setup, before /finish31. */
+    if (lstrcmpA(opt, "vesa31") == 0) {
+        open_log("POST.LOG");
+        vesa31();
+        ExitProcess(0);
+    }
+    /* Native NT 3.1 LAN: POST.CMD at the end of GUI Setup, before /finish31. */
+    if (lstrcmpA(opt, "net31") == 0) {
+        open_log("POST.LOG");
+        net31();
+        ExitProcess(0);
     }
     /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
     if (lstrcmpA(opt, "polish") == 0) {

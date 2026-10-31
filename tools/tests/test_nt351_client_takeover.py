@@ -42,6 +42,9 @@ static int len(const char *s){return (int)strlen(s);}
 #define lstrcatA strcat
 #define lstrcmpiA strcmp
 static void say(const char *s){(void)s;}
+/* the HAL PCI bus probe (BusType 5 / 1) has its own test below */
+static int hal_pci=1;
+static int net351_hal_pci(void){return hal_pci;}
 static DWORD GetLastError(void){return last_error;}
 static DWORD GetFileAttributesA(const char *p){(void)p;return present?0:0xffffffff;}
 static int read_text(const char *p,char *out,int cap){(void)p;(void)cap;reads++;if(meta_len>0)strcpy(out,"own351\r\n");return meta_len;}
@@ -84,6 +87,9 @@ int main(void){
  reset();version=0x3203;REQUIRE(nt351_network()==0 && !opens);
  reset();version=0x80003303;REQUIRE(nt351_network()==0 && !opens);
  reset();REQUIRE(nt351_network()==2 && copies==1 && sets==1);
+ /* native: no HAL PCI bus -> BusType 1 + BusNumber 0, same takeover */
+ reset();hal_pci=0;REQUIRE(nt351_network()==2 && copies==1 && sets==1);
+ reset();hal_pci=0;value_fail=1;REQUIRE(nt351_network()==0 && !sets);hal_pci=1;
  reset();binding=0;REQUIRE(nt351_network()==0 && !copies && !sets);
  reset();open_fail=5;REQUIRE(nt351_network()==0 && !copies && !sets);
  reset();copy_fail=1;REQUIRE(nt351_network()==0 && copies==1 && !sets);

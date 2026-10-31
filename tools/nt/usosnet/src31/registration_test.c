@@ -24,6 +24,8 @@ static int DriverToken,PathToken;
 static struct {void *DriverObject;} WrapperObject;
 static unsigned int KeGetCurrentIrql(void){return 0;}
 static void InitialTrace(const char *text,ULONG a,ULONG b){(void)text;(void)a;(void)b;}
+static void D31Init(PUNICODE_STRING path){(void)path;}
+static void D31Point(ULONG point,ULONG status,ULONG value){(void)point;(void)status;(void)value;}
 static void UsZero(void *buffer,ULONG length){volatile unsigned char *p=buffer;while(length--)*p++=0;}
 static void Open(void){}static void Close(void){}static void Send(void){}static void Transfer(void){}
 static void Reset(void){}static void Request(void){}static void GlobalQuery(void){}static void Unload(void){}

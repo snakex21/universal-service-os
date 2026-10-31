@@ -491,6 +491,13 @@ def main() -> int:
             "kernel/drivers/cdrom/cdrom.ko",
             # efivarfs: firmware boot entries (tools/uefi_boot_entry.sh).
             "kernel/fs/efivarfs/efivarfs.ko",
+            # Native NT 3.1 (no DHCP client in NT 3.1): one bounded busybox
+            # udhcpc run on the X470's Intel I211 gives the address that
+            # becomes the static TCP/IP setting (tools/nt31_network_setup.sh).
+            # Loaded only by that step (micro_linux_init.sh loads storage
+            # modaliases only); udhcpc needs AF_PACKET.
+            "kernel/drivers/net/ethernet/intel/igb/igb.ko",
+            "kernel/net/packet/af_packet.ko",
         ]
         selected_modules = module_dependency_closure(
             dependencies, runtime_roots + legacy_ata_roots
@@ -611,6 +618,7 @@ def main() -> int:
             ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/nt351_network_setup.sh", "usr/lib/usos/nt351_network_setup.sh"),
             ("tools/nt35_network_setup.sh", "usr/lib/usos/nt35_network_setup.sh"),
+            ("tools/nt31_network_setup.sh", "usr/lib/usos/nt31_network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -671,6 +679,10 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
             ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+            ("tools/nt4/usosfinish/bin/i386/USOSNT4.EXE", "usr/lib/usos/nt4/USOSNT4.EXE"),
+            ("tools/nt4/usosfinish/bin/i386/USOSANS4.EXE", "usr/lib/usos/nt4/USOSANS4.EXE"),
+            # Native NT 4.0 only: usosrst 1.11-nt4n (quiesce + CF9h full reset, ACPI S5 power-off).
+            ("tools/w2k/usosrst/bin/nt4n/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRSTN.SYS"),
             # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme): staged only
             # for an NVMe target (docs/nvme-nt-2026-10-11.md).
             ("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS"),
@@ -684,9 +696,16 @@ def main() -> int:
             ("tools/w2k/usosrst/bin/nt35/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST35.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
             ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
+            # Native NT 3.51 / 3.5: the pre-boot logger (own GPL UEFI app,
+            # tools/nt_bootlog, tools/build_nt_bootlog.py) before CSMWrap
+            # on the target ESP (xp_csmwrap_esp.sh USOS_NT_BOOTLOG=on).
+            ("tools/nt_bootlog/bin/ntbootlg.efi", "usr/lib/usos/nt3/NTBOOTLG.EFI"),
             # VESA miniport, NT 3.x build (build-nt3.cmd; with the CD's own
             # framebuf.dll, docs/nt3-vesa-2026-10-14.md).
             ("tools/nt4/usosvbe/bin/nt3/i386/usosvbe.sys", "usr/lib/usos/nt3/USOSVBE.SYS"),
+            # Native NT 3.1: its own build (build-nt31.cmd; start mode first
+            # in the mode list, docs/nt-native-plan.md section 8.7).
+            ("tools/nt4/usosvbe/bin/nt31/i386/usosvbe.sys", "usr/lib/usos/nt3/USOSVBE31.SYS"),
             # NT 3.1 (docs/nt31-2026-10-09.md): builds for the NT 3.1 kernel,
             # HAL and ScsiPort (build-nt31.cmd of each driver).
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT31.SYS"),
@@ -724,11 +743,15 @@ def main() -> int:
         nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
         # Its resident hooks (sector 1 of the NT 3.x disk).
         nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
+        # Its bus-master quiesce (sector 3 of the NT 3.x disk).
+        nt3_e820_quiesce = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-quiesce-512.bin"
+        # Its native NT 3.1 text-mode key answerer (sector 5 of the NT 3.1 disk).
+        nt3_e820_keys = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-keys-512.bin"
         # ReactOS / own BIOS images behind CSMWrap: ELCR MBR (elcr_mbr.S).
         elcr_mbr = root / "zig-out/xp-geometry-fix-mbr/elcr-mbr-440.bin"
         # Windows 2000 with ACPI: the USOS_W2K_ACPI build of the geometry MBR.
         w2k_acpi_mbr = root / "zig-out/xp-geometry-fix-mbr/w2k-acpi-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr, w2k_acpi_mbr):
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, nt3_e820_quiesce, nt3_e820_keys, elcr_mbr, w2k_acpi_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -799,6 +822,12 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
         nt3_post = build_nt3(root)
         put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
+        # Native NT 3.5x GUI-mode Setup page recorder (docs/nt-native-plan.md).
+        from build_windows_usos_res import build_nt3_answer
+        put(entries, Entry("usr/lib/usos/nt3/USOSANS3.EXE", stat.S_IFREG | 0o644, build_nt3_answer(root).read_bytes()))
+        # Native NT 3.1 GUI-mode Setup page answerer (tools/nt3/native31).
+        from build_windows_usos_res import build_nt31_answer
+        put(entries, Entry("usr/lib/usos/nt3/USOSANS31.EXE", stat.S_IFREG | 0o644, build_nt31_answer(root).read_bytes()))
         net35 = (root / 'tools/nt/usosnet/bin/i386/usosnet35.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SYS', stat.S_IFREG | 0o644, net35))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET35.SHA256', stat.S_IFREG | 0o644,
@@ -807,10 +836,31 @@ def main() -> int:
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.EXE', stat.S_IFREG | 0o644, logger35))
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG35.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(logger35).hexdigest()+'  USOSLOG35.EXE\n').encode('ascii')))
-        net351 = (root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
+        # Native NT 3.5 (no install VM, 2026-10-30): usosnet35n, the NT 3.51
+        # native code on NDIS 3.5 (CF8h/CFCh only); the VM path keeps the
+        # USOSNET35.SYS above.
+        net35n = (root / 'tools/nt/usosnet/bin/i386/usosnet35n.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SYS', stat.S_IFREG | 0o644, net35n))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET35N.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net35n).hexdigest()+'  USOSNET35N.SYS\n').encode('ascii')))
+        # Native NT 3.1: usosnet31, the NDIS 3.1 full-MAC build (polled,
+        # CF8h/CFCh, I211 + 82576; file alignment 0x200 so the NT 3.1 loader
+        # accepts it as a system / auto start driver; tools/nt31_network_setup.sh).
+        net31 = (root / 'tools/nt/usosnet/bin/nt31-native/i386/usosnet31.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET31.SYS', stat.S_IFREG | 0o644, net31))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET31.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net31).hexdigest()+'  USOSNET31.SYS\n').encode('ascii')))
+        net351 =(root / 'tools/nt/usosnet/bin/i386/usosnet351.sys').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SYS', stat.S_IFREG | 0o644, net351))
         put(entries, Entry('usr/lib/usos/nt3/USOSNET351.SHA256', stat.S_IFREG | 0o644,
             (hashlib.sha256(net351).hexdigest()+'  USOSNET351.SYS\n').encode('ascii')))
+        # Native NT 3.51 build (no HAL PCI bus: CF8h/CFCh, 20 ms timer;
+        # docs/nt351-native-net-2026-10-28.md). The VM path keeps the
+        # qualified USOSNET351.SYS above.
+        net351n = (root / 'tools/nt/usosnet/bin/i386/usosnet351n.sys').read_bytes()
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351N.SYS', stat.S_IFREG | 0o644, net351n))
+        put(entries, Entry('usr/lib/usos/nt3/USOSNET351N.SHA256', stat.S_IFREG | 0o644,
+            (hashlib.sha256(net351n).hexdigest()+'  USOSNET351N.SYS\n').encode('ascii')))
         logger351 = (root / 'tools/nt3/usoslog/bin/i386/usoslog.exe').read_bytes()
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.EXE', stat.S_IFREG | 0o644, logger351))
         put(entries, Entry('usr/lib/usos/nt3/USOSLOG351.SHA256', stat.S_IFREG | 0o644,
@@ -832,6 +882,7 @@ def main() -> int:
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
         for relative, source in (
+            ('nt4/usosnet4.sys', 'tools/nt/usosnet/bin/nt4/i386/usosnet4.sys'),
             ('win95-rtm/usosnet4.sys', 'tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys'),
             ('usosnet95rtm.inf', 'tools/nt/usosnet/inf/usosnet95rtm.inf'),
         ):
@@ -881,6 +932,14 @@ def main() -> int:
         if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
             raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")
         put(entries, Entry("usr/lib/usos/nt3-e820-hook-512.bin", stat.S_IFREG | 0o644, nt3_hook))
+        nt3_quiesce = nt3_e820_quiesce.read_bytes()
+        if len(nt3_quiesce) != 512 or nt3_quiesce[510:] != b"Q3":
+            raise RuntimeError(f"NT 3.x MBR quiesce sector must be 512 bytes ending in Q3: {nt3_e820_quiesce}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-quiesce-512.bin", stat.S_IFREG | 0o644, nt3_quiesce))
+        nt3_keys = nt3_e820_keys.read_bytes()
+        if len(nt3_keys) != 512 or nt3_keys[510:] != b"K3":
+            raise RuntimeError(f"NT 3.x MBR key answerer sector must be 512 bytes ending in K3: {nt3_e820_keys}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-keys-512.bin", stat.S_IFREG | 0o644, nt3_keys))
 
         module_root = modloop_out / "modules" / kernel_release
         qemu9x_module_set = set(qemu9x_modules)

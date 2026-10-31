@@ -45,6 +45,9 @@ pub fn needed(system_id: []const u8, profile: ?*const Profile, answer_file: bool
     if (!std.ascii.eqlIgnoreCase(system_id, "windows-95") and !nt4 and !posready) return false;
     if (answer_file) return false;
     const p = profile orelse return true;
+    // NT 4.0 manual Setup (win9x_setup=manual, native install): Setup's own
+    // page asks for the key when the profile has none.
+    if (nt4 and p.win9x_setup == .manual) return false;
     if (nt4) return !answer.nt4.validKey(p.keyFor(system_id));
     if (posready) return !answer.posready.validKey(p.keyFor(system_id));
     // Manual Setup (win9x_setup=manual): Setup's own page asks for the key.
@@ -77,13 +80,16 @@ pub fn withKey(base: ?*const Profile, ui_language: []const u8, system_id: []cons
 
 /// POSReady 2009 takes a 5x5 key; Windows 95 / NT 4.0 the 95 shapes.
 var want_five_by_five = false;
-/// Windows 95: an empty key goes on (Setup's own page asks).
+/// Windows 95 / NT 4.0: an empty key goes on.
 var may_be_empty = false;
 
 /// Windows 95 may start without a key: Setup asks on its own Product ID
-/// page. NT 4.0 (installed in the VM) and POSReady still need one.
+/// page. NT 4.0 too (2026-10-28): a Select / MSDN CD has no key page, and
+/// for any other CD micro-Linux stops before the disk is changed
+/// (nt4_key_gate in tools/nt4_csmwrap_target.sh) instead of letting the
+/// install VM wait on the page. POSReady still needs one.
 pub fn optional(system_id: []const u8) bool {
-    return std.ascii.eqlIgnoreCase(system_id, "windows-95");
+    return std.ascii.eqlIgnoreCase(system_id, "windows-95") or answer.nt4.isNt4(system_id);
 }
 
 fn validInput(value: []const u8) bool {
@@ -96,7 +102,7 @@ fn hookInvalid(_: *anyopaque, index: usize) bool {
 }
 
 /// Asks for the key; null on Back/Cancel, empty when an optional key
-/// (Windows 95) was left out. The returned slice lives until the next call.
+/// (Windows 95, NT 4.0) was left out. The returned slice lives until the next call.
 pub fn ask(system_name: []const u8, system_id: []const u8) ?[]const u8 {
     want_five_by_five = answer.posready.isPosReady(system_id);
     may_be_empty = optional(system_id);
@@ -149,9 +155,10 @@ test "a 95 key is asked only for Windows 95 without one" {
     var manual = Profile{ .win9x_setup = .manual };
     try std.testing.expect(!needed("windows-95", &manual, false));
     try std.testing.expect(needed("windows-95", null, false));
-    // Windows 95: the key may be left out (Setup's page asks); NT 4.0 and
-    // POSReady need theirs.
-    try std.testing.expect(optional("windows-95") and !optional("windows-nt-4") and !optional("windows-embedded-posready-2009") and !optional("windows-98-se"));
+    try std.testing.expect(!needed("windows-nt-4", &manual, false) and needed("windows-nt-4", null, false));
+    // Windows 95 and NT 4.0: the key may be left out; POSReady needs its key.
+    try std.testing.expect(optional("windows-95") and optional("windows-nt-4") and optional("windows-nt-4-server") and optional("windows-nt-4-tse"));
+    try std.testing.expect(!optional("windows-embedded-posready-2009") and !optional("windows-98-se") and !optional("windows-nt-3-51"));
     may_be_empty = true;
     want_five_by_five = false;
     try std.testing.expect(validInput("") and validInput("123-4567890") and validInput("12345-OEM-0000007-54321") and !validInput("123-45"));

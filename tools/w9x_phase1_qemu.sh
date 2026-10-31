@@ -82,7 +82,13 @@ w9x_vm_available() {
     # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
     # NT4 / NT4S (2026-10-07), NT4T (Terminal Server, 2026-10-10), NT351 / NT351S (2026-10-08), NT35 / NT35S, NT31 / NT31S (2026-10-09): the whole install runs in the VM (tools/nt4_qemu_install.sh).
     case "$1" in 98SE|98|ME|95|NT4|NT4S|NT4T|NT351|NT351S|NT35|NT35S|NT31|NT31S|POSR) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
-    if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
+    # phase1-native.flag (the native 9x DOS-stage Setup) is a 9x switch only:
+    # NT 3.x / NT4 / POSReady have no native path yet, so the flag must not
+    # turn their VM install into "VM unavailable" (X470 NT4 2026-10-27).
+    case "$1" in
+        98SE|98|ME|95)
+            if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi ;;
+    esac
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do
         [ -r "$W9X_VM_DATADIR/$firmware" ] || { echo "QEMU firmware missing: $firmware"; return 1; }

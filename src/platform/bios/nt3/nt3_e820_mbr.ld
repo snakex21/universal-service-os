@@ -6,5 +6,13 @@ SECTIONS
     /* Resident hooks (sector 1), run at offset 0 of their own segment. */
     .hook 0 : AT(0x10000) SUBALIGN(1) { *(.hook*) }
     ASSERT(hook_start == 0, "NT3 MBR hook sector must start at 0")
+    /* Bus-master quiesce (sector 3), called at 0000:7C00; position
+       independent, linked apart from .text and .hook. */
+    .quiesce 0x1000 : AT(0x20000) SUBALIGN(1) { *(.quiesce*) }
+    ASSERT(SIZEOF(.quiesce) == 512, "NT3 MBR quiesce sector must be 512 bytes")
+    /* NT 3.1 text-mode key answerer (sector 5), run at offset 200h of the
+       hook segment (the second half of the reserved 1 KiB). */
+    .keys 0x200 : AT(0x30000) SUBALIGN(1) { *(.keys*) }
+    ASSERT(SIZEOF(.keys) == 512, "NT3 MBR key answerer sector must be 512 bytes")
     /DISCARD/ : { *(.comment*) *(.note*) *(.eh_frame*) *(.data*) *(.bss*) }
 }

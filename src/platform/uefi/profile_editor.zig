@@ -705,15 +705,20 @@ fn buildFields() void {
         // Off by default; Windows 3.1 / 3.11 / WfW 3.11 only.
         if (answer.dos.winsockCapable(system_id)) addField(.dos_winsock, .{ .kind = .toggle, .label = t(.profile_field_dos_winsock), .flag = &dos_winsock });
     }
-    // Windows 95 / 98 / Me: automatic (default) or manual Setup, first of
-    // the Setup rows (manual: the key and owner rows only feed USOS itself).
-    if (answer.msbatch.releaseFor(system_id) != null)
+    // Windows 95 / 98 / Me and NT 4.0: automatic (default) or manual Setup,
+    // first of the Setup rows (manual: the key and owner rows only feed USOS
+    // itself; NT 4.0 manual is a native-install option).
+    if (answer.msbatch.releaseFor(system_id) != null or answer.nt4.isNt4(system_id))
         addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
-    if (!dos) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
+    // NT 3.1 / 3.1 Advanced Server: no product key at all (its INITIAL.INF
+    // has no PID page), so no key rows; a key line already in the profile
+    // is kept and ignored. NT 3.5 / 3.51 retail media ask for a CD key.
+    const keyed = !dos and !answer.nt3.isNt31(system_id);
+    if (keyed) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
+    if (keyed) addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
     if (!dos) {
-        addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
         addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
     }
     if (win11) {
@@ -866,8 +871,8 @@ test "every system's profile editor fits the form; labels and help titles are va
     try std.testing.expect(widest > 40);
 }
 
-test "Windows 9x Setup row: 95/98/Me only, auto by default, manual saved" {
-    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-xp", false }, .{ "windows-3-11", false } }) |case| {
+test "Windows 9x / NT 4.0 Setup row: 95/98/Me and NT 4.0 only, auto by default, manual saved" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-95", true }, .{ "windows-98-se", true }, .{ "windows-me", true }, .{ "windows-nt-4", true }, .{ "windows-nt-4-server", true }, .{ "windows-xp", false }, .{ "windows-3-11", false }, .{ "windows-nt-3-51", false } }) |case| {
         const id, const offered = case;
         system_id = id;
         system_name = id;
@@ -889,5 +894,32 @@ test "Windows 9x Setup row: 95/98/Me only, auto by default, manual saved" {
         build(&out);
         try std.testing.expectEqual(answer.profile.Win9xSetup.manual, out.win9x_setup);
         win9x_setup_index = 0;
+    }
+}
+
+test "NT 3.1: no product key rows (3.5 / 3.51 keep them); a key line still loads and is kept" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-nt-3-1", false }, .{ "windows-nt-3-1-server", false }, .{ "windows-nt-3-5", true }, .{ "windows-nt-3-5-server", true }, .{ "windows-nt-3-51", true }, .{ "windows-nt-3-51-server", true }, .{ "citrix-winframe-1-8", true }, .{ "windows-nt-3-beta", true }, .{ "windows-nt-4", true }, .{ "windows-2000", true } }) |case| {
+        const id, const offered = case;
+        system_id = id;
+        system_name = id;
+        edition_images = null;
+        previous_stem = null;
+        var p = defaults("pl");
+        try p.setSystemKey(id, "12345-67890-12345-67890-12345");
+        base = p;
+        load(&base);
+        setOptions();
+        buildFields();
+        var key_row = false;
+        var remember_row = false;
+        for (field_ids[0..field_count]) |fid| {
+            if (fid == .key) key_row = true;
+            if (fid == .remember_key) remember_row = true;
+        }
+        try std.testing.expectEqual(offered, key_row);
+        try std.testing.expectEqual(offered, remember_row);
+        var out: Profile = .{};
+        build(&out);
+        try std.testing.expect(out.keyFor(id).len > 0);
     }
 }

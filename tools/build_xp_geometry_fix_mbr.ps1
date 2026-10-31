@@ -78,21 +78,45 @@ Write-Host "[PASS] NT3 E820 MBR: $($code.Length)/440 bytes SHA256=$sha"
 Write-Host "OUTPUT=$nt3bin"
 
 # Its resident INT 15h / INT 1Ah hooks: sector 1 of the disk, "U3" (55 33)
-# in the last two bytes; the old vectors follow the code (8 bytes).
+# in the last two bytes; the old vectors follow the code (8 bytes), below the
+# RAM cap byte (508) and the options byte (509).
 $hookraw = Join-Path $out 'nt3-e820-hook.raw.bin'
 $hookbin = Join-Path $out 'nt3-e820-hook-512.bin'
 & $zig objcopy -O binary -j .hook $nt3elf $hookraw
 if ($LASTEXITCODE -ne 0) { throw "NT3 MBR hook objcopy failed: $LASTEXITCODE" }
 $code = [IO.File]::ReadAllBytes($hookraw)
-if ($code.Length -gt 502) { throw "NT3 MBR hook code is $($code.Length) bytes; max is 502" }
+if ($code.Length -gt 500) { throw "NT3 MBR hook code is $($code.Length) bytes; max is 500" }
 $padded = New-Object byte[] 512
 [Array]::Copy($code,$padded,$code.Length)
 $padded[510] = 0x55
 $padded[511] = 0x33
 [IO.File]::WriteAllBytes($hookbin,$padded)
 $sha = (Get-FileHash -LiteralPath $hookbin -Algorithm SHA256).Hash
-Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/502 bytes SHA256=$sha"
+Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/500 bytes SHA256=$sha"
 Write-Host "OUTPUT=$hookbin"
+
+# Its bus-master quiesce: sector 3 of the disk, "Q3" (51 33) in the last two
+# bytes (the .quiesce section is exactly 512 bytes), called at 0000:7C00.
+$quiescebin = Join-Path $out 'nt3-e820-quiesce-512.bin'
+& $zig objcopy -O binary -j .quiesce $nt3elf $quiescebin
+if ($LASTEXITCODE -ne 0) { throw "NT3 MBR quiesce objcopy failed: $LASTEXITCODE" }
+$code = [IO.File]::ReadAllBytes($quiescebin)
+if ($code.Length -ne 512 -or $code[510] -ne 0x51 -or $code[511] -ne 0x33) { throw "NT3 MBR quiesce sector is not 512 bytes ending in Q3" }
+$sha = (Get-FileHash -LiteralPath $quiescebin -Algorithm SHA256).Hash
+Write-Host "[PASS] NT3 MBR quiesce sector: 512 bytes SHA256=$sha"
+Write-Host "OUTPUT=$quiescebin"
+
+# The native NT 3.1 text-mode key answerer: sector 5 of the disk, "K3" (4B 33)
+# in the last two bytes (the .keys section is exactly 512 bytes), loaded by
+# the quiesce code to (INT 12h top):0200h.
+$keysbin = Join-Path $out 'nt3-e820-keys-512.bin'
+& $zig objcopy -O binary -j .keys $nt3elf $keysbin
+if ($LASTEXITCODE -ne 0) { throw "NT3 MBR keys objcopy failed: $LASTEXITCODE" }
+$code = [IO.File]::ReadAllBytes($keysbin)
+if ($code.Length -ne 512 -or $code[510] -ne 0x4B -or $code[511] -ne 0x33) { throw "NT3 MBR keys sector is not 512 bytes ending in K3" }
+$sha = (Get-FileHash -LiteralPath $keysbin -Algorithm SHA256).Hash
+Write-Host "[PASS] NT3 MBR key answerer sector: 512 bytes SHA256=$sha"
+Write-Host "OUTPUT=$keysbin"
 
 # ReactOS (and own BIOS images) behind CSMWrap: the ELCR MBR marks the PCI
 # IRQs level-triggered, then chains to the image's MBR kept at LBA 1

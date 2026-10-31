@@ -345,6 +345,15 @@ pub fn show(
 /// at start (win9x_key_prompt.zig); this start only.
 var keyed_95: ?answer_profiles.Profile = null;
 
+/// NT 4.0 started from the answer screen's "No answer file (manual
+/// installation)" row on the native path (\EFI\USOS\win9x\nt4-native.flag,
+/// the switch micro-Linux reads): manual Setup. The install VM path keeps
+/// the key prompt and the automatic default answer.
+fn nt4ManualRow(root: *std.os.uefi.protocol.File, system_id: []const u8, no_profile: bool, no_file: bool) bool {
+    if (!no_profile or !no_file or !usos.flow.answer.nt4.isNt4(system_id)) return false;
+    return @import("directory_scan.zig").exists(root, "\\EFI\\USOS\\win9x\\nt4-native.flag");
+}
+
 fn start(
     root: *std.os.uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
@@ -358,15 +367,24 @@ fn start(
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     // Windows 95 without a 95 key (profile or none): ask for it now, while
     // the gamepads still work (the on-screen keyboard). Windows 95 may go on
-    // without one (Setup's own page asks); NT 4.0 / POSReady need theirs.
+    // without one (Setup's own page asks), NT 4.0 too; POSReady needs its key.
     keyed_95 = null;
     if (usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) == .win9x_uefi) {
         const key_prompt = @import("win9x_key_prompt.zig");
         const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
-        if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
+        if (nt4ManualRow(root, system.id, chosen == null, unattended == null)) {
+            // NT 4.0, "No answer file (manual installation)" on the native
+            // path: the USOS default owner with manual Setup, no key asked
+            // (Setup's own page asks; X470 2026-10-30 a key had to be typed).
+            keyed_95 = key_prompt.withKey(null, view.languageCode(), system.id, "") catch |err| return showError(view.t(.error_preparation), err);
+            keyed_95.?.win9x_setup = .manual;
+        } else if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
             const key = key_prompt.ask(system.name, system.id) orelse return;
             // Windows 95 without a key: Setup's own Product ID page asks.
-            if (key.len > 0) keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
+            // NT 4.0 without a key: the profile (or the USOS default owner)
+            // is still staged, without ProductId; micro-Linux checks the CD
+            // (nt4_key_gate) before the disk is changed.
+            if (key.len > 0 or usos.flow.answer.nt4.isNt4(system.id)) keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
         }
     }
     // No USB gamepad transfer may outlive the menu into another loader;

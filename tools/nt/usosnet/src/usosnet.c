@@ -26,6 +26,9 @@
  */
 #include "usosnet.h"
 #include "usosnet_irq.h"
+#ifndef USOSNET_NATIVE4
+#define USOSNET_NATIVE4 0
+#endif
 #if USOSNET_NDIS3
 #include "usosnet351_policy.h"
 #endif
@@ -37,6 +40,79 @@ long __cdecl _InterlockedOr(long volatile *Target, long Value);
 unsigned char __inbyte(unsigned short Port);
 void __outbyte(unsigned short Port, unsigned char Data);
 #pragma intrinsic(_InterlockedExchange, _InterlockedOr, __inbyte, __outbyte)
+
+#if USOSNET_NT351
+/* Config space through ports CF8h / CFCh (usosnet.h, g_UsCf8Bus). Own code;
+ * the mechanism #1 address layout is the PCI Local Bus specification's.
+ * Each address + data pair runs with interrupts off on this CPU. */
+unsigned short __inword(unsigned short Port);
+void __outword(unsigned short Port, unsigned short Data);
+unsigned long __indword(unsigned short Port);
+void __outdword(unsigned short Port, unsigned long Data);
+#pragma intrinsic(__inword, __outword, __indword, __outdword)
+ULONG g_UsCf8Bus = 0xFFFFFFFFUL;
+
+static ULONG Cf8Address(ULONG Bus, ULONG Slot, ULONG Off)
+{
+    /* NDIS slot number = device | function << 5 */
+    return 0x80000000UL | ((Bus & 0xFF) << 16) | ((Slot & 0x1F) << 11) | (((Slot >> 5) & 7) << 8) | (Off & 0xFC);
+}
+
+static ULONG Cf8Read32(ULONG Bus, ULONG Slot, ULONG Off)
+{
+    ULONG v, a = Cf8Address(Bus, Slot, Off);
+    __asm { pushfd }
+    __asm { cli }
+    __outdword(0xCF8, a);
+    v = __indword(0xCFC);
+    __asm { popfd }
+    return v;
+}
+
+static void Cf8Write(ULONG Bus, ULONG Slot, ULONG Off, ULONG V, ULONG Width)
+{
+    ULONG a = Cf8Address(Bus, Slot, Off);
+    __asm { pushfd }
+    __asm { cli }
+    __outdword(0xCF8, a);
+    if (Width == 4) __outdword(0xCFC, V);
+    else if (Width == 2) __outword((USHORT)(0xCFC + (Off & 2)), (USHORT)V);
+    else __outbyte((USHORT)(0xCFC + (Off & 3)), (UCHAR)V);
+    __asm { popfd }
+}
+
+ULONG UsPciRead(NDIS_HANDLE H, ULONG Slot, ULONG Off, PVOID Buf, ULONG Len)
+{
+    ULONG i;
+    if (g_UsCf8Bus == 0xFFFFFFFFUL) return (NdisReadPciSlotInformation)(H, Slot, Off, Buf, Len);
+    if (Off >= 256 || Len > 256 - Off) return 0;
+    for (i = 0; i < Len; i++)
+        ((PUCHAR)Buf)[i] = (UCHAR)(Cf8Read32(g_UsCf8Bus, Slot, Off + i) >> (((Off + i) & 3) * 8));
+    return Len;
+}
+
+ULONG UsPciWrite(NDIS_HANDLE H, ULONG Slot, ULONG Off, PVOID Buf, ULONG Len)
+{
+    ULONG i = 0, o;
+    PUCHAR b = (PUCHAR)Buf;
+    if (g_UsCf8Bus == 0xFFFFFFFFUL) return (NdisWritePciSlotInformation)(H, Slot, Off, Buf, Len);
+    if (Off >= 256 || Len > 256 - Off) return 0;
+    while (i < Len) {
+        o = Off + i;
+        if (!(o & 3) && Len - i >= 4) {
+            Cf8Write(g_UsCf8Bus, Slot, o, b[i] | ((ULONG)b[i + 1] << 8) | ((ULONG)b[i + 2] << 16) | ((ULONG)b[i + 3] << 24), 4);
+            i += 4;
+        } else if (!(o & 1) && Len - i >= 2) {
+            Cf8Write(g_UsCf8Bus, Slot, o, b[i] | ((ULONG)b[i + 1] << 8), 2);
+            i += 2;
+        } else {
+            Cf8Write(g_UsCf8Bus, Slot, o, b[i], 1);
+            i++;
+        }
+    }
+    return Len;
+}
+#endif
 
 /* NdisQueryBuffer is a macro over the MDL on NT builds; 9x NDIS buffers are
  * no MDLs, so call the function NDIS.SYS / NDIS.VXD export. */
@@ -79,7 +155,7 @@ C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_CHARACTERISTICS, TransferDataHandler) == 0x3
 EXPORT VOID NdisMSetAttributes(IN NDIS_HANDLE MiniportAdapterHandle,
     IN NDIS_HANDLE MiniportAdapterContext, IN BOOLEAN BusMaster,
     IN NDIS_INTERFACE_TYPE AdapterType);
-#if USOSNET_W95RTM
+#if USOSNET_DRVTIMER
 /* The one-shot NdisSetTimer takes the NDIS_TIMER prefix of the miniport timer. */
 C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Timer) == 0);
 C_ASSERT(FIELD_OFFSET(NDIS_MINIPORT_TIMER, Dpc) == FIELD_OFFSET(NDIS_TIMER, Dpc));
@@ -250,13 +326,35 @@ static ULONG CfgHexString(NDIS_HANDLE Cfg, NDIS_STRING *Key)
 }
 #endif
 
-#if !USOSNET_NDIS3
+/* NT 3.51 (native CF8 build): NDIS.SYS 3.51 exports NdisWriteConfiguration;
+ * the X470 2026-10-29 run failed (SCM 7000 NDISLoop %%31) without a trace.
+ *
+ * NDIS.SYS 3.51 (SHA948d...ab1b, RVA 3B48, own disassembly; no bytes
+ * copied) does not take the NdisOpenConfiguration handle here: it reads
+ * the service key name (a PWSTR) at handle + 5Ch and writes to
+ * Services\<name>\Parameters with RtlWriteRegistryValue (RTL_REGISTRY_SERVICES).
+ * NdisReadConfiguration of the same NDIS reads that name at
+ * [handle] + 5Ch, [handle] = the WrapperConfigurationContext (its query
+ * table). The NdisOpenConfiguration handle is an 8-byte block, so + 5Ch
+ * was a read past it: X470 2026-10-29 STOP 0x1E C0000005 in wcslen(NULL)
+ * (ntoskrnl 8013665B) in the driver-load worker thread. NT 3.51 therefore
+ * passes the WrapperConfigurationContext (USOSNET_DIAG_HANDLE). Only
+ * NdisParameterInteger (REG_DWORD) and the two string types are written;
+ * NdisParameterHexInteger returns NDIS_STATUS_NOT_SUPPORTED. */
+#if USOSNET_NT351
+#define USOSNET_DIAG_HANDLE(Cfg, Wcc) (Wcc)
+#define USOSNET_DIAG_TYPE NdisParameterInteger
+#else
+#define USOSNET_DIAG_HANDLE(Cfg, Wcc) (Cfg)
+#define USOSNET_DIAG_TYPE NdisParameterHexInteger
+#endif
+#if !USOSNET_NDIS3 || USOSNET_NT351
 static void CfgPut(NDIS_HANDLE Cfg, NDIS_STRING *Key, ULONG V)
 {
     NDIS_STATUS st;
     NDIS_CONFIGURATION_PARAMETER p;
     UsZero(&p, sizeof(p));
-    p.ParameterType = NdisParameterHexInteger;
+    p.ParameterType = USOSNET_DIAG_TYPE;
     p.ParameterData.IntegerData = V;
     NdisWriteConfiguration(&st, Cfg, Key, &p);
 }
@@ -328,6 +426,192 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
 #define WriteDiag(A, Cfg) ((void)0)
 #endif
 
+#if USOSNET_NT351
+/* Durable breadcrumbs. X470 2026-10-29, second boot with NDISLoop Start=2
+ * and the fixed WriteDiag: blue screen again, and nothing of that boot
+ * reached the disk (hives, event logs, FAT times unchanged): registry
+ * writes made through NDIS stay in memory until the lazy hive flush.
+ * Here every point goes through ZwSetValueKey and is forced out with
+ * ZwFlushKey (NT 3.51 ntoskrnl exports, tools/tests/data/nt351_exports.txt)
+ * on Services\<adapter key>\Parameters. PASSIVE_LEVEL only: MpInitialize
+ * calls BcPoint directly; after it returns, the 20 ms timer (DISPATCH)
+ * queues AliveWorker as a work item at nominal 1, 2, 5 and 10 s. The last
+ * UsosnetBcPoint / UsosnetAliveSec on disk tells how far the boot got. */
+#pragma warning(push)
+#pragma warning(disable:4996)
+#define BC_VERSION 0x351B0001UL
+static WCHAR g_BcKey[192];
+static BOOLEAN g_BcReady;
+static ULONG g_BcSeq;
+static const ULONG g_AliveAt[] = { 1, 2, 5, 10 };
+
+static void BcUs(PUNICODE_STRING U, PCWSTR S)
+{
+    USHORT n = 0;
+    while (S[n]) n++;
+    U->Buffer = (PWSTR)S;
+    U->Length = (USHORT)(n * sizeof(WCHAR));
+    U->MaximumLength = (USHORT)(U->Length + sizeof(WCHAR));
+}
+
+/* the adapter key name is the query table's [3].Name (WCC + 5Ch), the
+ * same pointer NDIS.SYS 3.51 NdisWriteConfiguration uses */
+static void BcInit(NDIS_HANDLE Wcc)
+{
+    static const WCHAR pre[] = L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\";
+    static const WCHAR suf[] = L"\\Parameters";
+    PCWSTR name = Wcc ? *(PCWSTR *)((PUCHAR)Wcc + 0x5C) : NULL;
+    ULONG n = 0, i;
+    if (!name || !name[0]) name = L"NDISLoop1";
+    for (i = 0; pre[i]; i++) g_BcKey[n++] = pre[i];
+    for (i = 0; name[i] && i < 64; i++) g_BcKey[n++] = name[i];
+    for (i = 0; suf[i]; i++) g_BcKey[n++] = suf[i];
+    g_BcKey[n] = 0;
+    g_BcReady = TRUE;
+}
+
+static void BcWrite(const PCWSTR *Names, const ULONG *Vals, ULONG Count)
+{
+    UNICODE_STRING ks, vs;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE h;
+    ULONG i, v;
+    if (!g_BcReady) return;
+    BcUs(&ks, g_BcKey);
+    InitializeObjectAttributes(&oa, &ks, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (!NT_SUCCESS(ZwOpenKey(&h, KEY_SET_VALUE, &oa))) return;
+    for (i = 0; i < Count; i++) {
+        v = Vals[i];
+        BcUs(&vs, Names[i]);
+        ZwSetValueKey(h, &vs, 0, REG_DWORD, &v, sizeof(v));
+    }
+    ZwFlushKey(h);
+    ZwClose(h);
+}
+
+/* init points: 1 entry .. 0x12 about to return SUCCESS, 0x1F fail path */
+static void BcPoint(PADAPTER A, ULONG Point)
+{
+    static const PCWSTR n[] = { L"UsosnetBcSeq", L"UsosnetBcPoint", L"UsosnetBcStage",
+                                L"UsosnetBcError", L"UsosnetBcVersion" };
+    ULONG v[5];
+    v[0] = ++g_BcSeq; v[1] = Point; v[2] = A->Stage; v[3] = A->Error; v[4] = BC_VERSION;
+    BcWrite(n, v, 5);
+}
+
+static VOID AliveWorker(PVOID Ctx)
+{
+    static const PCWSTR n[] = { L"UsosnetAliveSeq", L"UsosnetAliveSec", L"UsosnetAliveRx",
+                                L"UsosnetAliveTx", L"UsosnetAliveOid", L"UsosnetAliveOidKind",
+                                L"UsosnetAliveOidCount", L"UsosnetAliveTicks", L"UsosnetAliveFlags",
+                                L"UsosnetAliveRxErr", L"UsosnetAliveTxErr" };
+    PADAPTER A = (PADAPTER)Ctx;
+    ULONG v[11];
+    v[0] = ++g_BcSeq; v[1] = A->AliveSec; v[2] = A->RxOk; v[3] = A->TxOk;
+    v[4] = A->LastOid; v[5] = A->LastOidKind; v[6] = A->OidCount; v[7] = A->TimerCount;
+    v[8] = (A->PollMode & 3) | (A->LinkUp ? 4UL : 0) | (A->PacketFilter << 8);
+    v[9] = A->RxErr; v[10] = A->TxErr;
+    BcWrite(n, v, 11);
+    _InterlockedExchange(&A->AlivePending, 0);
+}
+
+/* BAR0 mapping: NdisMMapIoSpace status as returned, how it was mapped */
+static void BcMap(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetMapStatus", L"UsosnetMapHow", L"UsosnetMapVa",
+                                L"UsosnetMapLen", L"UsosnetBar0Size", L"UsosnetMapPa" };
+    ULONG v[6];
+    v[0] = A->MapStatus; v[1] = A->MapHow; v[2] = (ULONG)(ULONG_PTR)A->Mmio;
+    v[3] = A->MmioLen; v[4] = A->Bar0Size; v[5] = NdisGetPhysicalAddressLow(A->MmioPa);
+    BcWrite(n, v, 6);
+}
+
+/* shared memory as NDIS / the HAL gave it (Standard HAL: an ISA-style
+ * adapter object, common buffers below 16 MiB); DmaAlloc refuses any
+ * address above 4 GiB, DmaEnd = highest Pa + length over every block */
+static void BcDma(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetRxRingPa", L"UsosnetTxRingPa", L"UsosnetRxBuf0Pa",
+                                L"UsosnetTxBuf0Pa", L"UsosnetDmaEnd", L"UsosnetStatsPa" };
+    ULONG v[6], i, end = 0, e;
+    const DMAMEM *m[2 + RX_COUNT / BUFS_PER_PAGE + TX_COUNT / BUFS_PER_PAGE + 1];
+    ULONG k = 0;
+    m[k++] = &A->RxRing; m[k++] = &A->TxRing;
+    for (i = 0; i < RX_COUNT / BUFS_PER_PAGE; i++) m[k++] = &A->RxPage[i];
+    for (i = 0; i < TX_COUNT / BUFS_PER_PAGE; i++) m[k++] = &A->TxPage[i];
+    m[k++] = &A->StatsMem;
+    for (i = 0; i < k; i++) {
+        if (!m[i]->AllocVa) continue;
+        e = NdisGetPhysicalAddressLow(m[i]->AllocPa) + m[i]->AllocLen;
+        if (e > end) end = e;
+    }
+    v[0] = A->RxRing.Pa; v[1] = A->TxRing.Pa; v[2] = A->RxBufPa[0]; v[3] = A->TxBufPa[0];
+    v[4] = end; v[5] = A->Stats ? A->StatsMem.Pa : 0;
+    BcWrite(n, v, 6);
+}
+
+/* after the chip start: ring registers as read back, RX descriptor 0 */
+static void BcRings(PADAPTER A)
+{
+    static const PCWSTR n[] = { L"UsosnetRdbal", L"UsosnetRdbah", L"UsosnetRdlen", L"UsosnetTdbal",
+                                L"UsosnetTdbah", L"UsosnetTdlen", L"UsosnetRxDesc0", L"UsosnetHwStatus",
+                                L"UsosnetHwCtrl", L"UsosnetHwRctl" };
+    ULONG r[DIAG_REGS], v[10];
+    UsZero(r, sizeof(r));
+    A->Chip->Ops->Diag(A, r);
+    v[0] = r[DR_RDBAL]; v[1] = r[DR_RDBAH]; v[2] = r[DR_RDLEN]; v[3] = r[DR_TDBAL];
+    v[4] = r[DR_TDBAH]; v[5] = r[DR_TDLEN];
+    v[6] = A->RxRing.Va ? *(volatile ULONG *)A->RxRing.Va : 0;
+    v[7] = r[DR_STATUS]; v[8] = r[DR_CTRL]; v[9] = r[DR_RCTL];
+    BcWrite(n, v, 10);
+}
+
+/* TimerFn, once a nominal second (DISPATCH_LEVEL): queue the next record */
+static void AliveTick(PADAPTER A)
+{
+    ULONG sec = A->TimerCount / TICKS_PER_SEC;
+    if (A->AliveIdx >= sizeof(g_AliveAt) / sizeof(g_AliveAt[0]) || sec < g_AliveAt[A->AliveIdx]) return;
+    if (A->AlivePending) return;
+    A->AliveIdx++;
+    A->AliveSec = sec;
+    A->AlivePending = 1;
+    ExInitializeWorkItem(&A->AliveWi, AliveWorker, A);
+    ExQueueWorkItem(&A->AliveWi, DelayedWorkQueue);
+}
+
+/* first receive indication returned (UsIndicateRx, DISPATCH_LEVEL): one
+ * record from a work item. FirstIndTicks = 20 ms ticks since the timer was
+ * armed, FirstIndDpc = MpHandleInterrupt runs so far (NdisMDpcTimer). */
+static VOID FirstIndWorker(PVOID Ctx)
+{
+    static const PCWSTR n[] = { L"UsosnetFirstIndSeq", L"UsosnetFirstIndTicks", L"UsosnetFirstIndLen",
+                                L"UsosnetFirstIndRx", L"UsosnetFirstIndDpc", L"UsosnetFirstIndFilter" };
+    PADAPTER A = (PADAPTER)Ctx;
+    ULONG v[6];
+    v[0] = ++g_BcSeq; v[1] = A->FirstIndTicks; v[2] = A->FirstIndLen;
+    v[3] = A->RxOk; v[4] = A->DpcCount; v[5] = A->PacketFilter;
+    BcWrite(n, v, 6);
+    _InterlockedExchange(&A->FirstIndPending, 0);
+}
+
+static void FirstIndTick(PADAPTER A, ULONG Len)
+{
+    if (A->FirstIndDone || A->Halted) return;
+    A->FirstIndDone = TRUE;
+    A->FirstIndTicks = A->TimerCount;
+    A->FirstIndLen = Len;
+    A->FirstIndPending = 1;
+    ExInitializeWorkItem(&A->FirstIndWi, FirstIndWorker, A);
+    ExQueueWorkItem(&A->FirstIndWi, DelayedWorkQueue);
+}
+#pragma warning(pop)
+#define BC(A, P) BcPoint((A), (P))
+#elif USOSNET_NATIVE4
+#include "usosnet_nt4_bc.h"
+#else
+#define BC(A, P) ((void)0)
+#endif
+
 static BOOLEAN DmaAlloc(PADAPTER A, DMAMEM *M, ULONG Len, ULONG Align)
 {
     ULONG pa, off, tries;
@@ -388,12 +672,12 @@ static VOID MpShutdown(PVOID Ctx)
 static void FreeAll(PADAPTER A)
 {
     ULONG i;
-#if !USOSNET_NDIS3
+#if USOSNET_DRVTIMER
     BOOLEAN cancelled;
 #endif
     if (A->Shutdown) NdisMDeregisterAdapterShutdownHandler(A->Handle);
     A->Shutdown = FALSE;
-#if !USOSNET_NDIS3
+#if USOSNET_DRVTIMER
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
 #endif
     A->TimerInit = FALSE;
@@ -408,8 +692,16 @@ static void FreeAll(PADAPTER A)
     for (i = 0; i < TX_COUNT / BUFS_PER_PAGE; i++) DmaFree(A, &A->TxPage[i]);
     if (A->MapRegs) NdisMFreeMapRegisters(A->Handle);
     A->MapRegs = FALSE;
+#if USOSNET_NT351
+    if (A->Mmio && A->MmDirect) MmUnmapIoSpace((PVOID)A->Mmio, A->MmioLen);
+    else
+#endif
     if (A->Mmio) NdisMUnmapIoSpace(A->Handle, (PVOID)A->Mmio, A->MmioLen);
     A->Mmio = NULL;
+#if USOSNET_NT351
+    A->MmDirect = FALSE;
+    if (A->Halted) return;
+#endif
     NdisFreeMemory(A, sizeof(ADAPTER), 0);
 }
 
@@ -599,7 +891,7 @@ static void TimerSecond(PADAPTER A)
         DiagLog(A, EV_IRQ_POLL, sec);
     }
     if (A->TxBusy && A->TxDone == A->TxLastClean) {
-#if USOSNET_NDIS3
+#if USOSNET_NDIS3 && !USOSNET_DRVTIMER
         ULONG previous = A->TxStallSec;
         A->TxStallSec = Usosnet351StallNext(previous);
         if (previous < 3 && A->TxStallSec >= 3) { A->TxStalls++; DiagLog(A, EV_TX_STALL, sec); }
@@ -625,21 +917,33 @@ static void TimerSecond(PADAPTER A)
         DiagLog(A, EV_PERIODIC, sec);
 }
 
-#if !USOSNET_NDIS3
+#if USOSNET_DRVTIMER
 static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 {
     PADAPTER A = (PADAPTER)Ctx;
-    ULONG rx = A->RxOk;
+    ULONG rx;
     UNREFERENCED_PARAMETER(S1); UNREFERENCED_PARAMETER(S2); UNREFERENCED_PARAMETER(S3);
+#if USOSNET_NT351
+    /* MpHalt keeps the adapter memory when NdisMCancelTimer missed a queued run */
+    if (A->Halted || !A->TimerInit) return;
+#endif
+    rx = A->RxOk;
     A->TimerCount++;
+#if USOSNET_NATIVE4
+    N4Tick(A);
+#endif
+#if USOSNET_NT351
+    if (A->TimerCount % TICKS_PER_SEC == 0) AliveTick(A);
+#endif
     /* serialized miniport: the timer never runs beside MpSend / the DPC */
     A->Chip->Ops->RxPoll(A);
     if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
     A->Chip->Ops->TxReclaim(A);
     if (A->TimerCount % TICKS_PER_SEC == 0) TimerSecond(A);
-#if USOSNET_W95RTM
+#if USOSNET_NDIS30
     /* Miniport timers are serialized with Halt. Only the one-shot export
-     * exists in 95 RTM; rearm after this callback's work has completed. */
+     * exists in 95 RTM and NT 3.51; rearm after this callback's work has
+     * completed. */
     if (A->TimerInit) NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
 #endif
 }
@@ -691,6 +995,9 @@ void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status)
     NdisMEthIndicateReceive(A->Handle, (NDIS_HANDLE)A, (PCHAR)Frame, ETH_HDR,
                             Frame + ETH_HDR, Len - ETH_HDR, Len - ETH_HDR);
 #endif
+#if USOSNET_NT351
+    FirstIndTick(A, Len);
+#endif
     A->CurRx = NULL;
     A->CurRxClasses = 0;
 }
@@ -712,7 +1019,7 @@ static const USOSNET_CHIP *FindChip(ULONG VenDev)
     return NULL;
 }
 
-#if USOSNET_NDIS4 && !USOSNET_NT35
+#if USOSNET_NDIS4 && !USOSNET_NT35 && !USOSNET_NT35N
 /* NT4 (no PnP): every PCI bus, device and function for the first supported
  * card. NT4's NdisReadPciSlotInformation reads HAL bus data of the bus in
  * the miniport block with the slot number as given; NdisOverrideBusNumber
@@ -748,6 +1055,56 @@ static BOOLEAN LegacyFind(PADAPTER A, NDIS_HANDLE Wcc)
     }
     NdisOverrideBusNumber(Wcc, A->Handle, 0);
     return FALSE;
+}
+#endif
+
+#if USOSNET_NT351
+/* No card through the HAL: every bus, device and function through CF8h/CFCh
+ * (usosnet.h). Found: g_UsCf8Bus / PciBus / PciSlot; the miniport block's
+ * bus stays 0 (LegacyFind put it back), the Isa bus of BusType 1. */
+static BOOLEAN Cf8Find(PADAPTER A)
+{
+    ULONG bus, dev, fn, id, hdr, slot;
+    for (bus = 0; bus < 256; bus++) {
+        for (dev = 0; dev < 32; dev++) {
+            for (fn = 0; fn < 8; fn++) {
+                slot = dev | (fn << 5);
+                id = Cf8Read32(bus, slot, 0);
+                if ((id & 0xFFFF) == 0 || (id & 0xFFFF) == 0xFFFF) {
+                    if (fn == 0) break;
+                    continue;
+                }
+                if (FindChip(id)) {
+                    g_UsCf8Bus = bus;
+                    A->PciBus = bus;
+                    A->PciSlot = slot;
+                    A->Cf8 = TRUE;
+                    return TRUE;
+                }
+                if (fn == 0) {
+                    hdr = Cf8Read32(bus, slot, 0x0C);
+                    if (!(hdr & 0x00800000UL)) break;   /* not multi-function */
+                }
+            }
+        }
+    }
+    return FALSE;
+}
+
+/* BAR0 size through CF8h/CFCh: memory decode off, all ones, read back,
+ * restore BAR0 and the command register. 0 = not a sizeable memory BAR. */
+static ULONG Cf8Bar0Size(PADAPTER A)
+{
+    ULONG cmd, orig, v;
+    cmd = Cf8Read32(A->PciBus, A->PciSlot, 4) & 0xFFFF;
+    Cf8Write(A->PciBus, A->PciSlot, 4, cmd & ~0x0002UL, 2);
+    orig = Cf8Read32(A->PciBus, A->PciSlot, 0x10);
+    Cf8Write(A->PciBus, A->PciSlot, 0x10, 0xFFFFFFFFUL, 4);
+    v = Cf8Read32(A->PciBus, A->PciSlot, 0x10);
+    Cf8Write(A->PciBus, A->PciSlot, 0x10, orig, 4);
+    Cf8Write(A->PciBus, A->PciSlot, 4, cmd, 2);
+    if ((v & 1) || !(v & ~0xFUL) || v == 0xFFFFFFFFUL) return 0;
+    return ~(v & ~0xFUL) + 1;
 }
 #endif
 
@@ -859,6 +1216,10 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_ENTRY;
     A->PacketFilter = 0;
     A->Lookahead = ETH_MAX_DATA;
+#if USOSNET_NT351
+    BcInit(WrapperConfigurationContext);
+#endif
+    BC(A, 0x01);
 
     NdisOpenConfiguration(&st, &cfg, WrapperConfigurationContext);
     if (st != NDIS_STATUS_SUCCESS) cfg = NULL;
@@ -866,12 +1227,19 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         A->PollMode = CfgInt(cfg, &kPoll, 0);
         A->DebugPort = CfgInt(cfg, &kDbg, 0) & 0xFFFF;
         A->SkipPhy = CfgInt(cfg, &kSkipPhy, 0);
+#if USOSNET_NT351
+        {
+            NDIS_STRING kBusType = NDIS_STRING_CONST("BusType");
+            A->BusType = CfgInt(cfg, &kBusType, 0xFFFFFFFF);
+        }
+#endif
 #if USOSNET_W95RTM
         A->BootBar0 = CfgHexString(cfg, &kBootBar) & ~0xFUL;
 #endif
     }
     A->Stage = ST_CONFIG;
     UsLog(A, "init v%x poll %x", (USOSNET_MAJOR << 16) | USOSNET_MINOR, A->PollMode);
+    BC(A, 0x02);
 
 #if USOSNET_NDIS30
     NdisMSetAttributes(MiniportAdapterHandle, (NDIS_HANDLE)A, TRUE, NdisInterfacePci);
@@ -879,8 +1247,20 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisMSetAttributesEx(MiniportAdapterHandle, (NDIS_HANDLE)A, 0,
                          NDIS_ATTRIBUTE_BUS_MASTER, NdisInterfacePci);
 #endif
+    BC(A, 0x03);
 
-#if USOSNET_NT35
+#if USOSNET_NT35N
+    /* native NT 3.5 (usosnet35n, 2026-10-30): the NT 3.51 native build
+     * without the NDIS 3.51 PCI services NDIS 3.5 lacks
+     * (NdisMQueryAdapterResources, NdisOverrideBusNumber,
+     * NdisMPciAssignResources): the NT 3.x MBR hides the PCI BIOS, so the
+     * HAL has no PCI bus and the card is found through CF8h/CFCh only. */
+    A->Legacy = TRUE;
+    if (!Cf8Find(A)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+    A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED;
+    UsLog(A, "cf8 scan: bus %x slot %x", A->PciBus, A->PciSlot);
+    UsLog(A, "cf8 bus type %x", A->BusType, 0);
+#elif USOSNET_NT35
     A->Legacy = TRUE;
     if (!ConfiguredFind35(A, cfg)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
     A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED; /* no full-MAC resources API */
@@ -907,16 +1287,30 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         rl = res;
     } else {
         A->Legacy = TRUE;
+#if USOSNET_NT351
+        if (!LegacyFind(A, WrapperConfigurationContext)) {
+            /* native NT 3.51: no HAL PCI bus (usosnet.h); config BAR0 and
+             * line below, mapped and connected through BusType 1 (Isa) */
+            if (!Cf8Find(A)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+            A->AssignStatus = NDIS_STATUS_NOT_SUPPORTED;
+            UsLog(A, "cf8 scan: bus %x slot %x", A->PciBus, A->PciSlot);
+            UsLog(A, "cf8 bus type %x", A->BusType, 0);
+        } else
+#else
         if (!LegacyFind(A, WrapperConfigurationContext)) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
+#endif
+        {
         A->AssignStatus = NdisMPciAssignResources(MiniportAdapterHandle, A->PciSlot, &rl);
         if (A->AssignStatus != NDIS_STATUS_SUCCESS) rl = NULL;  /* BAR0 / interrupt line below */
         UsLog(A, "nt4 assign %x list %x", A->AssignStatus, rl ? rl->Count : 0);
+        }
     }
 #endif
 
 #endif
 
     /* PCI identity; memory decode + bus master on, INTx not disabled */
+    BC(A, 0x04);
     cfg32 = 0;
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0, &cfg32, 4);
     A->VendorId = (USHORT)(cfg32 & 0xFFFF);
@@ -927,7 +1321,14 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UsLog(A, "pci %x rev %x", cfg32 = ((ULONG)A->VendorId << 16) | A->DeviceId, A->RevId);
     if (!A->Chip) { st = NDIS_STATUS_ADAPTER_NOT_FOUND; goto fail; }
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 4);
+#if USOSNET_NT351
+    /* native NT 3.51: memory decode only; bus master after the chip reset
+     * below, so queues the firmware (UEFI SNP / PXE) left programmed cannot
+     * DMA into its old ring addresses, now NT memory, in the meantime */
+    cfg32 = ((cfg32 & 0xFFFF) | 0x0002) & ~0x0004UL;
+#else
     cfg32 = (cfg32 & 0xFFFF) | 0x0006;
+#endif
     cfg32 &= ~0x0400UL;
     NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
     NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 0x10, &bar0, 4);
@@ -935,6 +1336,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Bar0Init = bar0;
 #endif
     A->Stage = ST_PCI;
+    BC(A, 0x05);
 
     /* BAR0 (CSR, 128 KiB) from config space; a 64-bit BAR has its high half at 0x14 */
     bar0hi = 0;
@@ -1013,18 +1415,47 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
         goto fail;
     }
     if (A->MmioLen > 0x20000) A->MmioLen = 0x20000;
+    BC(A, 0x06);
 
     st = NdisMMapIoSpace((PVOID *)&A->Mmio, MiniportAdapterHandle, A->MmioPa, A->MmioLen);
+#if USOSNET_NT351
+    /* X470 2026-10-29 (breadcrumbs, point 06 -> fail, 0xC000009A): on the
+     * Cf8 path NdisMMapIoSpace fails; it reports the range as a PCI-typed
+     * resource list on a HAL without a PCI bus. The CSR BAR is mapped
+     * directly then (non-cached, at most 128 KiB); FreeAll unmaps it with
+     * MmUnmapIoSpace. The NDIS status is kept as UsosnetMapStatus. */
+    A->MapStatus = st;
+    A->MapHow = (st == NDIS_STATUS_SUCCESS && A->Mmio) ? 1 : 0;
+    if (!A->MapHow && A->Cf8) {
+        PHYSICAL_ADDRESS pa;
+        A->Mmio = NULL;
+        A->Bar0Size = Cf8Bar0Size(A);
+        if (A->Bar0Size && A->Bar0Size < A->MmioLen) A->MmioLen = A->Bar0Size;
+        pa.LowPart = NdisGetPhysicalAddressLow(A->MmioPa);
+        pa.HighPart = 0;
+        A->Mmio = (volatile UCHAR *)MmMapIoSpace(pa, A->MmioLen, MmNonCached);
+        if (A->Mmio) { A->MmDirect = TRUE; A->MapHow = 2; st = NDIS_STATUS_SUCCESS; }
+    }
+    if (!A->MapHow) A->Mmio = NULL;
+    BcMap(A);
+#endif
     if (st != NDIS_STATUS_SUCCESS || !A->Mmio) { A->Mmio = NULL; st = NDIS_STATUS_RESOURCES; goto fail; }
 #if USOSNET_W95RTM
     A->ProbeMap = IgbMmioProbe(A);
     if (A->ProbeMap != 1 && A->BootBar0 && (bar0 & ~0xFUL) != A->BootBar0) MmioRemap(A, bar0);
 #endif
     A->Stage = ST_MMIO;
+    BC(A, 0x07);
 
     st = A->Chip->Ops->Reset(A);
     if (st != NDIS_STATUS_SUCCESS) goto fail;
+#if USOSNET_NT351
+    NdisReadPciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 4);
+    cfg32 = (cfg32 & 0xFFFF & ~0x0400UL) | 0x0006;
+    NdisWritePciSlotInformation(MiniportAdapterHandle, A->PciSlot, 4, &cfg32, 2);
+#endif
     A->Stage = ST_RESET;
+    BC(A, 0x08);
 
     if (!A->Chip->Ops->ReadMac(A, A->PermAddr)) { st = NDIS_STATUS_FAILURE; goto fail; }
     UsCopy(A->CurAddr, A->PermAddr, ETH_ALEN);
@@ -1039,17 +1470,37 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UsLog(A, "mac %x%x", ((ULONG)A->CurAddr[0] << 24) | ((ULONG)A->CurAddr[1] << 16) |
           ((ULONG)A->CurAddr[2] << 8) | A->CurAddr[3], ((ULONG)A->CurAddr[4] << 24) | ((ULONG)A->CurAddr[5] << 16));
     A->Stage = ST_MAC;
+    BC(A, 0x09);
 
     st = NdisMAllocateMapRegisters(MiniportAdapterHandle, 0, NDIS_DMA_32BITS, 1, BUF_SIZE);
     if (st != NDIS_STATUS_SUCCESS) goto fail;
     A->MapRegs = TRUE;
+    BC(A, 0x0A);
     if (!AllocRings(A)) { st = NDIS_STATUS_RESOURCES; goto fail; }
     StatsInit(A);                             /* optional: no page, no live statistics */
     A->Stage = ST_DMA;
+#if USOSNET_NT351
+    BcDma(A);
+#endif
+    BC(A, 0x0B);
 
     A->Chip->Ops->Start(A);
     A->Stage = ST_RINGS;
+#if USOSNET_NT351
+    BcRings(A);
+#endif
+    BC(A, 0x0C);
 
+#if USOSNET_NT351
+    /* Cf8: nobody routed the card's INTx (no PCI BIOS, no ACPI under the
+     * Standard PC HAL); the line register may name an 8259 IRQ another
+     * device asserts, and connecting there could unmask a level storm. The
+     * chip stays masked and the 20 ms timer polls (PollMode 2). */
+    if (A->Cf8 && !A->PollMode) {
+        UsLog(A, "cf8 line %x: poll", A->IrqVector, 0);
+        A->PollMode = 2;
+    }
+#endif
     if (!A->PollMode) {
         st = NdisMRegisterInterrupt(&A->Interrupt, MiniportAdapterHandle, A->IrqVector, A->IrqLevel,
                                     TRUE, TRUE, NdisInterruptLevelSensitive);
@@ -1070,9 +1521,11 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
 #endif
     }
     A->Stage = ST_IRQ;
+    BC(A, 0x0D);
 
     if (!A->SkipPhy) A->Chip->Ops->PhyInit(A);
     A->Stage = ST_PHY;
+    BC(A, 0x0E);
 
     A->Chip->Ops->SetFilter(A);
     /* initial link state: OID_GEN_MEDIA_CONNECT_STATUS answers from it, the
@@ -1080,28 +1533,34 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Chip->Ops->LinkState(A, &A->LinkUp, &A->LinkMbps, &A->FullDuplex);
     A->LinkReported = TRUE;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
-#if !USOSNET_NDIS3
+    BC(A, 0x0F);
+#if USOSNET_DRVTIMER
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
-#if USOSNET_W95RTM
+#if USOSNET_NDIS30
     NdisSetTimer((PNDIS_TIMER)&A->Timer, TICK_MS);
 #else
     NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
 #endif
 #endif
+    BC(A, 0x10);
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;
     A->Started = TRUE;
     A->Stage = ST_STARTED;
     UsLog(A, "started stage %x status %x", A->Stage, A->StatusAtInit);
-    if (cfg) { WriteDiag(A, cfg); NdisCloseConfiguration(cfg); }
+    BC(A, 0x11);
+    if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
+    BC(A, 0x12);
     return NDIS_STATUS_SUCCESS;
 
 fail:
     A->Error = st;
     UsLog(A, "init failed stage %x status %x", A->Stage, st);
+    BC(A, 0x1F);
     if (A->Mmio) A->Chip->Ops->Stop(A);
-    if (cfg) { WriteDiag(A, cfg); NdisCloseConfiguration(cfg); }
+    if (cfg) { WriteDiag(A, USOSNET_DIAG_HANDLE(cfg, WrapperConfigurationContext)); NdisCloseConfiguration(cfg); }
+    BC(A, 0x1E);
     FreeAll(A);
     return st;
 }
@@ -1109,8 +1568,8 @@ fail:
 static VOID MpHalt(NDIS_HANDLE Ctx)
 {
     PADAPTER A = (PADAPTER)Ctx;
-#if !USOSNET_NDIS3
-    BOOLEAN cancelled;
+#if USOSNET_DRVTIMER
+    BOOLEAN cancelled = TRUE;
 #endif
     UsLog(A, "halt rx %x tx %x", A->RxOk, A->TxOk);
     A->Chip->Ops->Stats(A);
@@ -1124,10 +1583,27 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
     g_Last[LS_HWTX] = A->HwGptc;
     g_Last[LS_FLAGS] = DiagFlags(A, 0) | (A->TxStalls << 4);
     g_LastValid = TRUE;
-#if !USOSNET_NDIS3
+#if USOSNET_DRVTIMER
+#if USOSNET_NT351
+    {
+        BOOLEAN armed = A->TimerInit;
+        A->TimerInit = FALSE;            /* a running callback does not re-arm */
+        if (armed) NdisMCancelTimer(&A->Timer, &cancelled);
+        /* a run NDIS already deferred may still come: keep the (small)
+         * adapter block so it finds Halted, free everything else */
+        if (armed && !cancelled) A->Halted = TRUE;
+        /* a queued alive record still reads the adapter block */
+        if (A->AlivePending) A->Halted = TRUE;
+        if (A->FirstIndPending) A->Halted = TRUE;
+    }
+#else
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
 #endif
+#endif
     A->TimerInit = FALSE;
+#if USOSNET_NATIVE4
+    N4Drain();
+#endif
     A->Chip->Ops->IrqDisable(A);
     A->Chip->Ops->Stop(A);
     FreeAll(A);
@@ -1155,6 +1631,9 @@ static BOOLEAN MpCheckForHang(NDIS_HANDLE Ctx)
     PADAPTER A = (PADAPTER)Ctx;
     ULONG rx;
     if (!A->Started) return FALSE;
+#if USOSNET_DRVTIMER
+    if (A->TimerInit) return FALSE;      /* NT 3.51: TimerFn does it every 20 ms */
+#endif
     rx = A->RxOk;
     /* Original NDIS351 RVA98E: lock+0x30 and busy+0x2E serialize this
      * callback with the miniport. NT35 SHAfa392...5543 confirms the same
@@ -1198,6 +1677,7 @@ static VOID MpHandleInterrupt(NDIS_HANDLE Ctx)
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
 }
 
+#if !USOSNET_NT351
 static VOID MpDisableInterrupt(NDIS_HANDLE Ctx)
 {
     PADAPTER A = (PADAPTER)Ctx;
@@ -1209,6 +1689,7 @@ static VOID MpEnableInterrupt(NDIS_HANDLE Ctx)
     PADAPTER A = (PADAPTER)Ctx;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
 }
+#endif
 
 static NDIS_STATUS MpSend(NDIS_HANDLE Ctx, PNDIS_PACKET Packet, UINT Flags)
 {
@@ -1308,6 +1789,9 @@ static NDIS_STATUS MpQuery(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLe
 
     *Written = 0;
     *Needed = 0;
+#if USOSNET_NT351
+    A->LastOid = Oid; A->LastOidKind = 1; A->OidCount++;
+#endif
     switch (Oid) {
     case OID_GEN_SUPPORTED_LIST: src = g_Oids; len = sizeof(g_Oids); break;
     case OID_GEN_HARDWARE_STATUS: src = &hw; len = sizeof(hw); break;
@@ -1368,6 +1852,9 @@ static NDIS_STATUS MpSet(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLen,
     ULONG v;
     *Read = 0;
     *Needed = 0;
+#if USOSNET_NT351
+    A->LastOid = Oid; A->LastOidKind = 2; A->OidCount++;
+#endif
     switch (Oid) {
     case OID_GEN_CURRENT_PACKET_FILTER:
         if (BufLen < 4) { *Needed = 4; return NDIS_STATUS_INVALID_LENGTH; }
@@ -1415,14 +1902,39 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     NDIS_STATUS st;
     NDIS_MINIPORT_CHARACTERISTICS mc;
 
+#if USOSNET_NATIVE4
+    N4Init(RegistryPath);
+#endif
     NdisMInitializeWrapper(&g_Wrapper, DriverObject, RegistryPath, NULL);
     if (!g_Wrapper) return NDIS_STATUS_FAILURE;
     UsZero(&mc, sizeof(mc));
     mc.MajorNdisVersion = USOSNET_NDIS_MAJOR;
     mc.MinorNdisVersion = 0;
     mc.CheckForHangHandler = MpCheckForHang;
+#if USOSNET_NT351 || USOSNET_NATIVE4
+    /* NT4 mini.h has the same unchecked Interrupt dereference. Both builds
+     * use RequestIsr=TRUE/shared IRQ, so enable/disable callbacks are unneeded.
+     * X470 2026-10-29 (fbd0fc8d): STOP 0xA (0, 2, 0, NDIS.SYS+7291) in a
+     * DPC, MpInitialize had returned SUCCESS (BcPoint 0x12), no alive
+     * record yet; MpHandleInterrupt and MpDisableInterrupt on the stack.
+     * The NT 3.5 wrapper fires Miniport->DpcTimer after OID queries during
+     * the adapter setup (WRAPPER.C) and later from deferred processing;
+     * NdisMDpcTimer then runs MINIPORT_SYNC_DISABLE_INTERRUPT, i.e.
+     * KeSynchronizeExecution(Miniport->Interrupt->InterruptObject, ...)
+     * whenever DisableInterruptHandler is not NULL, without checking
+     * Miniport->Interrupt. In PollMode 2 (Cf8 path) no interrupt is
+     * registered, Interrupt is NULL: read of address 0. Both SYNC macros
+     * skip NULL handlers. With RequestIsr = TRUE and a shared line (the
+     * only way this driver registers) NdisMIsr never calls
+     * DisableInterruptHandler (NormalInterrupts stays FALSE): MpIsr masks
+     * the chip through IrqRead and MpHandleInterrupt re-enables it, so the
+     * interrupt mode does not need the two handlers either. */
+    mc.DisableInterruptHandler = NULL;
+    mc.EnableInterruptHandler = NULL;
+#else
     mc.DisableInterruptHandler = MpDisableInterrupt;
     mc.EnableInterruptHandler = MpEnableInterrupt;
+#endif
     mc.HaltHandler = MpHalt;
     mc.HandleInterruptHandler = MpHandleInterrupt;
     mc.InitializeHandler = MpInitialize;

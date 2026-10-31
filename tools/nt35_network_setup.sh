@@ -38,8 +38,12 @@ usos_nt35_answer() {
 }
 
 usos_nt35_preflight() {
-    # ANSWER LIB PCI_ROOT. Must happen before target writes.
-    _u35_answer=$1 _u35_lib=$2 _u35_pci=$3
+    # ANSWER LIB PCI_ROOT [native]. Must happen before target writes.
+    # native (no install VM, 2026-10-30): the USOSNET35N.SYS build (the
+    # NT 3.51 native code: CF8h/CFCh without a HAL PCI bus, 20 ms timer, no
+    # interrupt enable/disable handlers, direct BAR0 map), staged under the
+    # same USOSNET35.SYS name usosnt3 takes over.
+    _u35_answer=$1 _u35_lib=$2 _u35_pci=$3 _u35_variant=${4:-}
     _u35_enabled=$(usos_nt35_requested "$_u35_answer") || return 1
     [ "$_u35_enabled" = on ] || return 0
     . "$_u35_lib/network_setup.sh" || return 1
@@ -51,6 +55,10 @@ usos_nt35_preflight() {
     printf '%s\n' "$_u35_config" | grep -qx 'dns=' || return 1
     _u35_sys=$_u35_lib/nt3/USOSNET35.SYS
     _u35_sha=$_u35_lib/nt3/USOSNET35.SHA256
+    if [ "$_u35_variant" = native ]; then
+        _u35_sys=$_u35_lib/nt3/USOSNET35N.SYS
+        _u35_sha=$_u35_lib/nt3/USOSNET35N.SHA256
+    fi
     [ -r "$_u35_sys" ] && [ -r "$_u35_sha" ] || return 1
     _u35_expected=$(awk 'NR==1{print $1}' "$_u35_sha")
     printf '%s\n' "$_u35_expected" | grep -Eq '^[0-9a-f]{64}$' || return 1
@@ -116,6 +124,43 @@ usos_nt35_loop_inf() {
           print "        goto skipoptions\r";print "    endif\r"}
        if($0=="skipoptions = +")skip++}
       END{if(n!=1||skip!=1)exit 1}'
+}
+
+usos_nt35_inf_pin() {
+    # original OEMNADLB.INF sha256 -> patched sha256 (NT 3.5 Workstation CD)
+    case "$1" in
+      37e16b22d26d7717a91c63cd1d26be4c7b4977d76214de63980831ae547c7cb0) echo fff3c06dad680983a3389d906c8d81daa918f0cf191ad2cdbb3fa3894fd327cf ;;
+      *) return 1 ;;
+    esac
+}
+
+usos_nt35_source_patch() {
+    # LOCAL_SOURCE_DIR WORK_DIR. Native path (no VM start between text mode
+    # and GUI Setup): the local source's OEMNADLB.IN_ (one-file MSZIP
+    # cabinet, usos-fb-ui --nt3-cab-get / --nt3-cab-put, fixed-Huffman
+    # blocks) gets the pinned unattended-medium patch before text mode
+    # copies it, as usos_nt351_source_patch does for NT 3.51.
+    [ "${_u35_enabled:-off}" = on ] || return 0
+    _u35_cab=''
+    for _u35_name in OEMNADLB.IN_ oemnadlb.in_; do
+        [ -f "$1/$_u35_name" ] && _u35_cab=$1/$_u35_name && break
+    done
+    [ -n "$_u35_cab" ] || return 1
+    _u35_inf=$2/nt35-loop.inf
+    _u35_fb=${USOS_FB_UI:-usos-fb-ui}
+    rm -f "$_u35_inf" "$_u35_inf.new" "$_u35_inf.cab" "$_u35_inf.back"
+    "$_u35_fb" --nt3-cab-get "$_u35_cab" "$_u35_inf" >/dev/null 2>&1 && [ -s "$_u35_inf" ] || return 1
+    _u35_original=$(sha256sum "$_u35_inf" | awk '{print $1}') || return 1
+    _u35_patched=$(usos_nt35_inf_pin "$_u35_original") || { rm -f "$_u35_inf"; return 1; }
+    usos_nt35_loop_inf < "$_u35_inf" > "$_u35_inf.new" &&
+      [ "$(sha256sum "$_u35_inf.new" | awk '{print $1}')" = "$_u35_patched" ] &&
+      "$_u35_fb" --nt3-cab-put "$_u35_cab" "$_u35_inf.new" "$_u35_inf.cab" >/dev/null 2>&1 &&
+      "$_u35_fb" --nt3-cab-get "$_u35_inf.cab" "$_u35_inf.back" >/dev/null 2>&1 &&
+      cmp -s "$_u35_inf.new" "$_u35_inf.back" &&
+      cat "$_u35_inf.cab" > "$_u35_cab" &&
+      cmp -s "$_u35_inf.cab" "$_u35_cab" || { rm -f "$_u35_inf" "$_u35_inf.new" "$_u35_inf.cab" "$_u35_inf.back"; return 1; }
+    rm -f "$_u35_inf" "$_u35_inf.new" "$_u35_inf.cab" "$_u35_inf.back"
+    printf '[NET35] local source OEMNADLB sha256=%s -> %s (unattended 802.3 medium), cabinet read back\n' "$_u35_original" "$_u35_patched"
 }
 
 usos_nt35_vm_patch() {

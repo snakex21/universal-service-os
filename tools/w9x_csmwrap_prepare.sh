@@ -91,6 +91,8 @@ w9x_nt3_default_sif() {
         printf ';USOS-NT351-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
       NT35|NT35S)
         printf ';USOS-NT35-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
+      NT31|NT31S)
+        printf ';USOS-NT31-NETWORK=on\r\n;USOS-NETWORK=on\r\n;USOS-IP=dhcp\r\n' ;;
     esac
 }
 
@@ -231,6 +233,18 @@ usos_w9x_csmwrap_prepare() {
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
         NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1' ;;
     esac
+    # Native NT 3.51 / 3.5 / 4.0 (no install VM, docs/nt-native-plan.md):
+    # opt-in while it is tested on hardware, EFI/USOS/win9x/nt3-native.flag
+    # for NT 3.51 / 3.5 / 3.1 and nt4-native.flag for NT 4.0 / Server / TSE (the
+    # RTM kernels with the raised CPUID leaf limit); the 9x
+    # phase1-native.flag never switches NT.
+    nt_native=no
+    nt_native_flag=''
+    case "$tag" in
+        NT351|NT351S|NT35|NT35S|NT31|NT31S) nt_native_flag=nt3-native.flag ;;
+        NT4|NT4S|NT4T) nt_native_flag=nt4-native.flag ;;
+    esac
+    [ -z "$nt_native_flag" ] || [ ! -e "/mnt/esp/EFI/USOS/win9x/$nt_native_flag" ] || nt_native=yes
     posr=''
     if [ "$tag" = POSR ]; then
         posr=yes nt_name='Windows Embedded POSReady 2009'
@@ -254,8 +268,10 @@ usos_w9x_csmwrap_prepare() {
         # Edition SP6 from the TSE folder, under the same file name.
         sp_dir="/mnt/data/Systems/Windows/$folder/ServicePack"
         [ ! -d "$sp_dir" ] || sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
-        [ -n "$sp_exe" ] || stop "Windows NT 4.0 Terminal Server needs the Terminal Server Edition Service Pack 6 (not the regular NT 4.0 SP6a, which refuses Terminal Server): put its SP6I386.EXE into Systems\\Windows\\$folder\\ServicePack on USOS_DATA"
-        w9x_csmwrap_log "NT4 TSE service pack: ${sp_exe#/mnt/data/}"
+        # Native (nt4-native.flag): the RTM TSE kernel with the raised CPUID
+        # leaf limit starts on this PC, so the TSE SP6 is used when present.
+        [ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop "Windows NT 4.0 Terminal Server needs the Terminal Server Edition Service Pack 6 (not the regular NT 4.0 SP6a, which refuses Terminal Server): put its SP6I386.EXE into Systems\\Windows\\$folder\\ServicePack on USOS_DATA"
+        w9x_csmwrap_log "NT4 TSE service pack: ${sp_exe:+${sp_exe#/mnt/data/}}${sp_exe:-none (native)}"
     elif [ "$nt_major" = 4 ]; then
         # SP6a (the user's SP6I386.EXE, a Microsoft file: never on the stick):
         # the X470 cannot start the RTM kernel, only an SP6a system.
@@ -264,8 +280,10 @@ usos_w9x_csmwrap_prepare() {
             sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
             [ -z "$sp_exe" ] || break
         done
-        [ -n "$sp_exe" ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
-        w9x_csmwrap_log "NT4 service pack: ${sp_exe#/mnt/data/}"
+        # Native: SP6a stays the default (POST.CMD), but the patched RTM
+        # kernel also runs without it.
+        [ -n "$sp_exe" ] || [ "$nt_native" = yes ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
+        w9x_csmwrap_log "NT4 service pack: ${sp_exe:+${sp_exe#/mnt/data/}}${sp_exe:-none (native)}"
     fi
     img=''
     [ "$tag" != IMG ] || img=yes
@@ -480,7 +498,7 @@ usos_w9x_csmwrap_prepare() {
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
             printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$layout" "$folder"
-            if [ -n "$nt4" ] || [ -n "$posr" ]; then
+            if { [ -n "$nt4" ] && [ "$nt_native" != yes ]; } || [ -n "$posr" ]; then
                 printf 'After the restart the disk starts by itself into the installed %s.\n' "$folder"
             else
                 printf 'After the restart the disk starts by itself and %s Setup continues on it.\n' "$folder"
@@ -501,6 +519,8 @@ usos_w9x_csmwrap_prepare() {
         . /usr/lib/usos/w9x_phase1_qemu.sh
         vm_reason=$(w9x_vm_available "$tag") || stop "$nt_name installs only in the VM on this PC, which is not available: $vm_reason"
         w9x_csmwrap_log "POSR vm ($vm_reason)"
+    elif [ -n "$nt4" ] && [ "$nt_native" = yes ]; then
+        w9x_csmwrap_log "NT native: $nt_name text mode, GUI mode and first start on this PC ($nt_native_flag)"
     elif [ -n "$nt4" ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         . /usr/lib/usos/nt4_qemu_install.sh
@@ -619,7 +639,7 @@ usos_w9x_csmwrap_prepare() {
             w9x_nt3_ui_locale "$answer_inf" "$ui_locale" "$ui_keyboard" || stop 'the locale could not be added to the answer'
             w9x_csmwrap_log "NT3 locale: $(grep -a '^;USOS-\(LOCALE\|KEYBOARD\)=' "$answer_inf" | tr -d '\r' | tr '\n' ' ')"
         fi
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT4_USB_STORAGE="$nt4usb" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT4_USB_STORAGE="$nt4usb" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_WIN_SYSTEM="$([ "$tag" = W3 ] && printf '%s' "$system")" DOS_REGIONAL="$dos_regional" \
@@ -664,7 +684,19 @@ usos_w9x_csmwrap_prepare() {
             stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
         fi
     fi
-    if [ -n "$nt4" ]; then
+    if [ -n "$nt4" ] && [ "$nt_native" = yes ]; then
+        # Native (docs/nt-native-plan.md): no VM and no finish step; the
+        # target disk boots CSMWrap -> our NT 3.x MBR -> syslinux -> $LDR$
+        # (SETUPLDR) and text mode runs on this PC. NT 3.51 / 3.5 / 4.0: the
+        # pre-boot logger runs before CSMWrap (USOS_NT_BOOTLOG, ESP
+        # \USOS\BOOTLOG.TXT, tools/nt_bootlog).
+        nt_bootlog=off
+        case "$nt_major" in 3|4) nt_bootlog=on ;; esac
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 USOS_NT_BOOTLOG=$nt_bootlog sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_LOG/prepare.log" 2>&1; then
+            stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
+        fi
+        w9x_csmwrap_log "NT native: disk ready, $nt_name Setup starts on this PC after the restart"
+    elif [ -n "$nt4" ]; then
         nt4_vm_progress() {
             usos_ui_stage 5 5 "$folder installation in the background (start $1)"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($2 / 60)) $(($2 % 60))), written to disk: $3 MB." || true
         }

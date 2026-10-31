@@ -34,6 +34,47 @@ pub fn main(init: std.process.Init) !u8 {
             const setup_dir = args.next() orelse return 2;
             return usos.win3x.w9x_mini.run(init.io, init.gpa, setup_dir, args.next() orelse return 2);
         }
+        // tools/nt4_csmwrap_target.sh, native NT 3.5: INITIAL.IN_ with the
+        // I586 processor line (src/compat/win3x/nt35_initial.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt35-initial")) {
+            const in_path = args.next() orelse return 2;
+            return usos.win3x.nt35_initial.run(init.io, init.gpa, in_path, args.next() orelse return 2);
+        }
+        // tools/nt4_csmwrap_target.sh, native NT 3.51 LAN: one-file cabinet
+        // (OEMNADLB.IN_) out / back in (src/compat/win3x/nt3_cab_file.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt3-cab-get")) {
+            const cab_path = args.next() orelse return 2;
+            return usos.win3x.nt3_cab_file.runGet(init.io, init.gpa, cab_path, args.next() orelse return 2);
+        }
+        if (std.mem.eql(u8, arg, "--nt3-cab-put")) {
+            const cab_path = args.next() orelse return 2;
+            const file_path = args.next() orelse return 2;
+            return usos.win3x.nt3_cab_file.runPut(init.io, init.gpa, cab_path, file_path, args.next() orelse return 2);
+        }
+        // tools/nt4_csmwrap_target.sh, native NT 4.0: the RTM kernel's CPUID
+        // leaf limit (src/compat/win3x/nt4_kernel.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt4-kernel")) {
+            const in_path = args.next() orelse return 2;
+            return usos.win3x.nt4_kernel.run(init.io, init.gpa, in_path, args.next() orelse return 2);
+        }
+        // tools/nt4_csmwrap_target.sh, native NT 3.1: the USOS boot drivers
+        // in the SYSTEM._ template and the SZDD INFs of the local source
+        // (src/compat/win3x/nt31_hive.zig; no UI).
+        if (std.mem.eql(u8, arg, "--nt31-hive")) {
+            const in_path = args.next() orelse return 2;
+            const out_path = args.next() orelse return 2;
+            const nvme = if (args.next()) |a| std.mem.eql(u8, a, "nvme") else false;
+            return usos.win3x.nt31_hive.run(init.io, init.gpa, in_path, out_path, nvme);
+        }
+        if (std.mem.eql(u8, arg, "--szdd-get")) {
+            const in_path = args.next() orelse return 2;
+            return usos.win3x.nt31_hive.runGet(init.io, init.gpa, in_path, args.next() orelse return 2);
+        }
+        if (std.mem.eql(u8, arg, "--szdd-put")) {
+            const orig = args.next() orelse return 2;
+            const body = args.next() orelse return 2;
+            return usos.win3x.nt31_hive.runPut(init.io, init.gpa, orig, body, args.next() orelse return 2);
+        }
         // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
         if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
             const bcd = @import("bcd_lowmem.zig");

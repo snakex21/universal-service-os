@@ -42,8 +42,16 @@ class Binary(unittest.TestCase):
             self.assertNotIn(name, data)
         self.assertNotIn('MountPointManager'.encode('utf-16-le'), data)
 
-    def test_nt31_build_has_no_storage(self):
-        self.assertNotIn('UsosUsbDisk'.encode('utf-16-le'), (DRV / 'bin/nt31/i386/usosusb.sys').read_bytes())
+    def test_nt31_build_has_storage(self):
+        # 1.4-nt31: the NT 3.5x / 4.0 stick path (no mount manager, plain
+        # \DosDevices letters); 1.2-nt31 had none (sticks showed as pN-nohid)
+        data = (DRV / 'bin/nt31/i386/usosusb.sys').read_bytes()
+        for text in ('usosusb 1.4-nt31', '\\Device\\UsosUsbDisk', '\\DosDevices\\X:', 'LogFile', 'Storage'):
+            self.assertIn(text.encode('utf-16-le'), data, text)
+        self.assertNotIn('MountPointManager'.encode('utf-16-le'), data)
+        for name in (b'KfAcquireSpinLock', b'KfReleaseSpinLock', b'ExfInterlockedInsertTailList',
+                     b'IofCompleteRequest', b'MmMapLockedPagesSpecifyCache'):
+            self.assertNotIn(name, data)
 
 
 class Source(unittest.TestCase):
@@ -54,7 +62,10 @@ class Source(unittest.TestCase):
         self.assertIn('#define USOSUSB_MSC 1', nt4blk)
         self.assertIn('#define USOSUSB_NT4MSC 1', nt4blk)
         nt31 = text[text.index('#ifdef USOSUSB_NT31\n/* NT 3.1'):text.index('#elif defined(USOSUSB_NT6)')]
-        self.assertNotIn('USOSUSB_MSC', nt31)
+        # NT 3.1 sticks since 1.4-nt31: the NT 3.5x / 4.0 path, stdcall locks
+        self.assertIn('#define USOSUSB_MSC 1', nt31)
+        self.assertIn('#define USOSUSB_NT4MSC 1', nt31)
+        self.assertIn('#undef KeAcquireSpinLock', nt31)
         # NT 4.0 rejects OBJ_KERNEL_HANDLE (Windows 2000 attribute)
         nt4mm = text[text.index('#else /* USOSUSB_NT4MSC'):text.index('#endif /* USOSUSB_NT6 */')]
         self.assertNotIn('OBJ_KERNEL_HANDLE', nt4mm)
@@ -115,9 +126,9 @@ def _bpb(oem: bytes, jmp: bytes = b'\xEB\x3C\x90') -> bytearray:
     return s
 
 
-def fat16_bs(total: int) -> bytes:
+def fat16_bs(total: int, spc: int = 4) -> bytes:
     s = _bpb(b'MSDOS5.0')
-    struct.pack_into('<HBHBHHBH', s, 11, 512, 4, 1, 2, 512, total if total < 65536 else 0, 0xF8, 16)
+    struct.pack_into('<HBHBHHBH', s, 11, 512, spc, 1, 2, 512, total if total < 65536 else 0, 0xF8, 16)
     struct.pack_into('<I', s, 32, total if total >= 65536 else 0)
     struct.pack_into('<I', s, 39, 0x1234ABCD)
     s[54:62] = b'FAT16   '
@@ -185,7 +196,7 @@ class VolumeHostSimulation(unittest.TestCase):
                                                         '#define FS_EXFAT 4', '#define FS_OTHER 5', le32, ibs, helpers]))
         Path(cls.tmp, 'block.h').write_text(block)
         cls.exe = {}
-        for mode, defs in (('nt4', ['-DUSOSUSB_NT4MSC']), ('nt6', [])):
+        for mode, defs in (('nt4', ['-DUSOSUSB_NT4MSC']), ('nt6', []), ('nt31', ['-DUSOSUSB_NT4MSC', '-DUSOSUSB_NT31'])):
             exe = str(Path(cls.tmp, f'vol_{mode}.exe'))
             r = subprocess.run([zig, 'cc', '-std=c99', '-O1', '-g', '-fsanitize=undefined', '-fno-sanitize-recover=all',
                                 '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-parameter',
@@ -232,6 +243,22 @@ class VolumeHostSimulation(unittest.TestCase):
         # NT6 unchanged: FAT32 superfloppy kept as type 0C
         self.assertEqual(self.run_img(image(lba0=fat32_bs(16384)), 'nt6'),
                          ['vol start=0 count=16384 type=0c boot=00 sig=0badf00d fs=3'])
+
+    def test_nt31_keeps_large_clusters_and_notes_the_bpb(self):
+        # X470 2026-10-30: the 1.4-nt31 32 KiB guard hid the user's stick
+        # ("p1:fat-32k-skip"); NT 3.1 fastfat accepts 1..128 sectors per
+        # cluster, so the volume is published and its BPB goes to Diag.
+        img = image([(0x06, 63, 8000, fat16_bs(8000, 64)), (0x0E, 8192, 8000, fat16_bs(8000, 128))])
+        out = self.run_img(img, 'nt31')
+        self.assertEqual([l for l in out if l.startswith('vol ')],
+                         ['vol start=63 count=8000 type=06 boot=80 sig=cafebabe fs=1',
+                          'vol start=8192 count=8000 type=06 boot=00 sig=cafebabe fs=1'])
+        self.assertIn('diag  p1:fat c64 r1', out)
+        self.assertIn('diag  t06 3M', out)
+        self.assertIn('diag  p2:fat c128 r1', out)
+        self.assertIn('diag  t0e 3M', out)
+        self.assertEqual([l for l in self.run_img(image(lba0=fat16_bs(16384, 64)), 'nt31') if l.startswith('vol ')],
+                         ['vol start=0 count=16384 type=06 boot=00 sig=1234abcd fs=1'])
 
     def test_gpt_skipped_on_nt4_only(self):
         img = image([(0xEE, 1, 16383, None)])

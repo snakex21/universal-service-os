@@ -57,6 +57,9 @@ static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN B
 static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext, ULONG Source);
 
 ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2);
+#ifdef USOSNVME_NT31
+static VOID NvmeRingInit(VOID);
+#endif
 static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID BusInformation,
                              IN PCHAR ArgumentString, IN OUT PPORT_CONFIGURATION_INFORMATION ConfigInfo,
                              OUT PBOOLEAN Again);
@@ -232,12 +235,64 @@ static VOID LineDec(NVME_LINE *l, ULONG v)
     while (n && l->Len < 80) l->Text[l->Len++] = tmp[--n];
 }
 
+#ifdef USOSNVME_NT4
+/* Boot-screen line (2026-10-30, NT 4.0 / 3.x builds): the white line only
+   when the boot's SystemStartOptions carry SOS (BOOT.INI "[USOS /SOS]");
+   error lines (red) always. The kernel writes the value before the boot
+   drivers start; read once in NvmeFindAdapter (PASSIVE_LEVEL). Own minimal
+   structures: miniport.h declares no registry services. */
+typedef struct { USHORT Length, MaximumLength; PWSTR Buffer; } NVME_USTR;
+typedef struct { ULONG Length; PVOID RootDirectory; NVME_USTR *ObjectName; ULONG Attributes;
+                 PVOID SecurityDescriptor, SecurityQualityOfService; } NVME_OATTR;
+__declspec(dllimport) LONG __stdcall ZwOpenKey(OUT PVOID *KeyHandle, IN ULONG DesiredAccess, IN NVME_OATTR *Attributes);
+__declspec(dllimport) LONG __stdcall ZwQueryValueKey(IN PVOID KeyHandle, IN NVME_USTR *ValueName, IN ULONG Class,
+                                                     OUT PVOID Info, IN ULONG Length, OUT PULONG ResultLength);
+__declspec(dllimport) LONG __stdcall ZwClose(IN PVOID Handle);
+static BOOLEAN g_NvmeSos, g_NvmeSosRead;
+
+static BOOLEAN NvmeBootSos(VOID)
+{
+    static WCHAR key[] = L"\\Registry\\Machine\\System\\CurrentControlSet\\Control";
+    static WCHAR name[] = L"SystemStartOptions";
+    NVME_USTR k, v;
+    NVME_OATTR oa;
+    PVOID h;
+    ULONG buf[130], got = 0, n, i;
+    PWCHAR s;
+    BOOLEAN sos = FALSE;
+
+    k.Buffer = key; k.Length = sizeof(key) - 2; k.MaximumLength = sizeof(key);
+    v.Buffer = name; v.Length = sizeof(name) - 2; v.MaximumLength = sizeof(name);
+    oa.Length = sizeof(oa); oa.RootDirectory = NULL; oa.ObjectName = &k; oa.Attributes = 0x40;
+    oa.SecurityDescriptor = NULL; oa.SecurityQualityOfService = NULL;
+    if (ZwOpenKey(&h, 0x20019, &oa) < 0) return FALSE;
+    if (ZwQueryValueKey(h, &v, 2, buf, sizeof(buf) - 4, &got) >= 0 && (buf[1] == 1 || buf[1] == 2)) {
+        s = (PWCHAR)&buf[3];
+        n = buf[2] / 2;
+        if (n > 250) n = 250;
+        for (i = 0; i + 3 <= n; i++) {
+            if ((s[i] | 0x20) == 's' && (s[i + 1] | 0x20) == 'o' && (s[i + 2] | 0x20) == 's' &&
+                (i == 0 || s[i - 1] == ' ' || s[i - 1] == '/') &&
+                (i + 3 == n || s[i + 3] == ' ' || s[i + 3] == '/' || s[i + 3] == 0)) {
+                sos = TRUE;
+                break;
+            }
+        }
+    }
+    ZwClose(h);
+    return sos;
+}
+#endif
+
 static VOID NvmeShowLine(PHW_DEVICE_EXTENSION Ext, NVME_LINE *l, BOOLEAN Error)
 {
     PHYSICAL_ADDRESS vga;
     ULONG i;
     USHORT attr = Error ? 0x4F00 : 0x1F00;
 
+#ifdef USOSNVME_NT4
+    if (!Error && !g_NvmeSos) return;
+#endif
 #ifdef USOSNVME_W9X
     l->Text[l->Len < 80 ? l->Len : 80] = 0;
     NvmeDbgStr(l->Text);
@@ -867,6 +922,12 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     (VOID)BusInformation;
     (VOID)ArgumentString;
     *Again = FALSE;
+#ifdef USOSNVME_NT4
+    if (!g_NvmeSosRead) { g_NvmeSos = NvmeBootSos(); g_NvmeSosRead = TRUE; }
+#endif
+#ifdef USOSNVME_NT31
+    NvmeRingInit();       /* once; silent request ring for the pre-boot logger */
+#endif
     if (ext->Regs != NULL) return SP_RETURN_FOUND;
 
     bus = ConfigInfo->SystemIoBusNumber;
@@ -1033,6 +1094,11 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     ext->IdentPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_IDENT * NVME_PAGE);
     ext->PrpList = (PULONG)(ext->Uncached + NVME_PG_PRPLIST * NVME_PAGE);
     ext->PrpListPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_PRPLIST * NVME_PAGE);
+#ifdef USOSNVME_NT31
+    ext->Ring = ext->Uncached + NVME_PG_RING * NVME_PAGE;
+    ext->RingPhys = NvmePhysAdd(ext->UncachedPhys, NVME_PG_RING * NVME_PAGE);
+    NvmeZero(ext->Ring, NVME_PAGE);
+#endif
 #ifdef USOSNVME_W9X
     /* the queues need physically contiguous pages */
     for (i = 1; i < NVME_PAGES; i++) {
@@ -1320,7 +1386,7 @@ static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUC
    in a form the PRPs can carry: nothing was sent to the controller. */
 #define NVME_BADPA_STATUS 0xFFFFFFFEUL
 
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
 /* amd64 (Vista / Server 2008 x64, RAM above 4 GiB). The miniport declares
    Dma64BitAddresses, so ScsiPort hands out full 64-bit data addresses; they
    go into the PRPs unmodified (both dwords). Before anything reaches the
@@ -1334,7 +1400,11 @@ static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUC
      - a contiguous run that ends inside a page while data continues there
        (the PRP model cannot express a break inside a page);
      - more entries than one PRP list page holds.
-   The x86 builds keep their unchanged, hardware-tested inline code below.
+   The x86 builds keep their unchanged, hardware-tested inline code below,
+   except NT 3.1 (USOSNVME_PRPCHECK, usosnvme.h): its ScsiPort returns
+   SP_UNINITIALIZED_VALUE with length 0 for a data address when the
+   request has no scatter/gather list; unchecked, that became PRP1 =
+   FFFFFFFFh.
    Returns 0, else the 1-based number of the refused entry. *Above4G is set
    when any entry lies above 4 GiB. */
 static BOOLEAN NvmePaUsable(SCSI_PHYSICAL_ADDRESS Pa, ULONG Len, ULONG Need, ULONG AlignMask)
@@ -1397,7 +1467,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
 {
     NVME_SQE c;
     ULONG status;
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
     ULONG bytes = Blocks << 9, refused;
     BOOLEAN above4g = FALSE;
 #else
@@ -1424,7 +1494,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
         c.Prp2Lo = Ext->PrpListPhys.LowPart;
         c.Prp2Hi = Ext->PrpListPhys.HighPart;
     }
-#elif defined(_WIN64)
+#elif defined(USOSNVME_PRPCHECK)
     refused = NvmeBuildPrps(Ext, Srb, Va, bytes, &c, &above4g);
     if (refused != 0) {
         Ext->LastStatus = refused;
@@ -1462,6 +1532,9 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
             c.Prp2Hi = Ext->PrpListPhys.HighPart;
         }
     }
+#endif
+#ifdef USOSNVME_NT31
+    Ext->LastPrp1 = c.Prp1Lo;
 #endif
     c.Cdw10 = LbaLo;
     c.Cdw11 = LbaHi;
@@ -1551,7 +1624,7 @@ static VOID NvmeIoFailed(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, ULON
     ULONG sct, sc;
 
     Ext->Errors++;
-#if defined(_WIN64) && !defined(USOSNVME_W9X)
+#ifdef USOSNVME_PRPCHECK
     if (Status == NVME_BADPA_STATUS) {
         /* nothing reached the controller; LastStatus = refused PRP entry */
         Ext->BadPa++;
@@ -1785,10 +1858,184 @@ static VOID NvmeIoControl(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb)
     Srb->SrbStatus = SRB_STATUS_SUCCESS;
 }
 
+#ifdef USOSNVME_NT31
+/* NT 3.1 /SOS diagnostics (2026-10-30, X470 first GUI-mode boot hung right
+   after the start line): row 10 shows every request on its way in (">")
+   and out ("<"), so a photo tells whether the disk class driver's requests
+   reach the miniport and which one does not return. Only on a /SOS boot,
+   only when the start line already mapped the VGA buffer. */
+#define NVME_IO_ROW 10
+static VOID NvmeIoRow(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Done)
+{
+    NVME_LINE l;
+    ULONG i;
+
+    if (!g_NvmeSos || Ext->Vga == NULL) return;
+    l.Len = 0;
+    LineStr(&l, "NVME io ");
+    LineDec(&l, Ext->IoSrbs);
+    LineStr(&l, Done ? " < fn " : " > fn ");
+    LineHex(&l, Srb->Function, 2);
+    LineStr(&l, " cdb ");
+    LineHex(&l, Srb->Cdb[0], 2);
+    LineStr(&l, " t");
+    LineDec(&l, Srb->TargetId);
+    LineStr(&l, " l");
+    LineDec(&l, Srb->Lun);
+    LineStr(&l, " len ");
+    LineHex(&l, Srb->DataTransferLength, 5);
+    LineStr(&l, " st ");
+    LineHex(&l, Done ? Srb->SrbStatus : 0, 2);
+    LineStr(&l, " R ");
+    LineDec(&l, Ext->Reads);
+    LineStr(&l, " E ");
+    LineDec(&l, Ext->Errors);
+    LineStr(&l, " prp ");
+    LineHex(&l, Ext->LastPrp1, 8);
+    for (i = 0; i < 80; i++) {
+        UCHAR ch = (UCHAR)(i < l.Len ? l.Text[i] : ' ');
+        Ext->Vga[NVME_IO_ROW * 80 + i] = (USHORT)(0x1F00 | ch);
+    }
+}
+
+/* NT 3.1 silent request ring (2026-10-30): the USOS NT pre-boot logger
+   (tools/nt_bootlog) prepares the page at physical 50000000h on every boot
+   ("USOSPRE1", boot number, complement) and decodes it into
+   \USOS\BOOTLOG.TXT on the next boot, so after a reset-button reset the
+   last requests of the hung boot are on the ESP without any photo. NT 3.1
+   runs with 64 MiB (MBR RAM cap), so NT never owns the page; it is written
+   only when the logger's header is valid, mapped non-cached. Layout
+   (decode.zig, nvme_ring_*): +100h "USOSNVR1", +108h boot (copied), +10Ch
+   requests seen, +200h 64 entries of 16 bytes, entry (seq - 1) % 64:
+   seq, LBA, blocks (u16), opcode (CDB byte 0, or F0h + SRB function for a
+   non-SCSI request), SRB status (FFh while inside HwStartIo), time in
+   2^20 TSC ticks since the first request. */
+#define NVME_RING_ADDRESS 0x50000000UL
+static volatile UCHAR *g_NvmeRing;
+static ULONG g_NvmeRingT0;
+
+static ULONG NvmeTsc20(VOID)
+{
+    ULONG lo, hi;
+    __asm {
+        rdtsc
+        mov lo, eax
+        mov hi, edx
+    }
+    return (hi << 12) | (lo >> 20);
+}
+
+static VOID NvmeRingInit(VOID)
+{
+    PHYSICAL_ADDRESS pa;
+    volatile UCHAR *page;
+    ULONG boot, i;
+
+    if (g_NvmeRing != NULL) return;
+    pa.LowPart = NVME_RING_ADDRESS;
+    pa.HighPart = 0;
+    page = (volatile UCHAR *)MmMapIoSpace(pa, 0x1000, 0 /* non-cached */);
+    if (page == NULL) return;
+    boot = *(volatile ULONG *)(page + 8);
+    if (*(volatile ULONG *)page != 0x534F5355UL || *(volatile ULONG *)(page + 4) != 0x31455250UL ||
+        *(volatile ULONG *)(page + 12) != ~boot)
+        return;                              /* no logger this boot: never write */
+    for (i = 0x100; i < 0x600; i++) page[i] = 0;
+    *(volatile ULONG *)(page + 0x108) = boot;
+    *(volatile ULONG *)(page + 0x100) = 0x534F5355UL;   /* "USOS" */
+    *(volatile ULONG *)(page + 0x104) = 0x3152564EUL;   /* "NVR1" */
+    g_NvmeRing = page;
+}
+
+/* The same 1.5 KiB block (offsets as in the RAM page) is kept in the
+   uncached page NVME_PG_RING and, on /SOS boots, written to disk LBA 48-50
+   after every completed request: the gap before partition 1 (the NT 3.x
+   MBR uses LBA 0-5, the partition starts at 63), so the ring also survives
+   a reset whose firmware clears RAM (X470 2026-10-30 boot 7: the marker
+   page did not survive a reset-button reset after a 30 min hang). */
+#define NVME_RING_DISK_LBA 48
+static VOID NvmeRingPut(PHW_DEVICE_EXTENSION Ext, ULONG Off, const UCHAR *Src, ULONG Len)
+{
+    ULONG i;
+    for (i = 0; i < Len; i++) {
+        if (g_NvmeRing != NULL) g_NvmeRing[Off + i] = Src[i];
+        if (Ext->Ring != NULL) Ext->Ring[Off + i] = Src[i];
+    }
+}
+
+static VOID NvmeRingDisk(PHW_DEVICE_EXTENSION Ext)
+{
+    NVME_SQE c;
+
+    if (!g_NvmeSos || Ext->Ring == NULL || !Ext->ControllerUp || !Ext->NamespaceReady || Ext->NeedRestart) return;
+    if (Ext->NsBlocksHi == 0 && Ext->NsBlocksLo <= NVME_RING_DISK_LBA + 3) return;
+    NvmeZero(&c, sizeof(c));
+    c.Cdw0 = NVME_NVM_WRITE;
+    c.Nsid = Ext->Nsid;
+    c.Prp1Lo = Ext->RingPhys.LowPart;
+    c.Prp1Hi = (ULONG)Ext->RingPhys.HighPart;
+    c.Cdw10 = NVME_RING_DISK_LBA;
+    c.Cdw12 = 3 - 1;                     /* 3 blocks = block bytes 0 - 5FFh */
+    Ext->Dirty = TRUE;
+    (VOID)NvmeExec(Ext, &Ext->Io, &c, NVME_IO_TIMEOUT_US, NULL);
+}
+
+static VOID NvmeRingNote(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Done)
+{
+    static ULONG seq;
+    UCHAR e[16];
+    PUCHAR cdb = Srb->Cdb;
+    ULONG lba = 0, blocks = 0, now;
+    UCHAR op;
+
+    if (g_NvmeRing == NULL && Ext->Ring == NULL) return;
+    if (!Done) {
+        seq++;
+        if (seq == 1 && Ext->Ring != NULL) {
+            static const UCHAR sig[8] = { 'U', 'S', 'O', 'S', 'N', 'V', 'R', '1' };
+            ULONG boot = g_NvmeRing != NULL ? *(volatile ULONG *)(g_NvmeRing + 8) : 0;
+            NvmeCopy(Ext->Ring + 0x100, sig, 8);
+            NvmeCopy(Ext->Ring + 0x108, &boot, 4);
+        }
+        NvmeRingPut(Ext, 0x10C, (PUCHAR)&seq, 4);
+    }
+    if (seq == 0) return;
+    if (Srb->Function != SRB_FUNCTION_EXECUTE_SCSI) {
+        op = (UCHAR)(0xF0 + (Srb->Function & 0x0F));
+    } else {
+        op = cdb[0];
+        if (op == SCSIOP_READ || op == SCSIOP_WRITE) {
+            lba = NvmeGetBe32(cdb + 2);
+            blocks = ((ULONG)cdb[7] << 8) | cdb[8];
+        } else if (op == SCSIOP_READ6 || op == SCSIOP_WRITE6) {
+            lba = ((ULONG)(cdb[1] & 0x1F) << 16) | ((ULONG)cdb[2] << 8) | cdb[3];
+            blocks = cdb[4] ? cdb[4] : 256;
+        }
+    }
+    now = NvmeTsc20();
+    if (g_NvmeRingT0 == 0) g_NvmeRingT0 = now ? now : 1;
+    now -= g_NvmeRingT0;
+    NvmeCopy(e + 0, &seq, 4);
+    NvmeCopy(e + 4, &lba, 4);
+    e[8] = (UCHAR)blocks;
+    e[9] = (UCHAR)(blocks >> 8);
+    e[10] = op;
+    e[11] = Done ? Srb->SrbStatus : 0xFF;
+    NvmeCopy(e + 12, &now, 4);
+    NvmeRingPut(Ext, 0x200 + ((seq - 1) & 63) * 16, e, 16);
+    if (Done) NvmeRingDisk(Ext);
+}
+#endif
+
 static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
 {
     PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
 
+#ifdef USOSNVME_NT31
+    ext->IoSrbs++;
+    NvmeRingNote(ext, Srb, FALSE);
+    NvmeIoRow(ext, Srb, FALSE);
+#endif
     switch (Srb->Function) {
     case SRB_FUNCTION_EXECUTE_SCSI:
         if (Srb->PathId != 0 || Srb->TargetId != 0 || Srb->Lun != 0) {
@@ -1874,6 +2121,10 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
         NvmeDbgCounters(ext, Srb->Function == SRB_FUNCTION_SHUTDOWN ? "shutdown" : "flush");
     }
     if ((ext->Srbs & 0x3FF) == 0) NvmeDbgCounters(ext, "io");
+#endif
+#ifdef USOSNVME_NT31
+    NvmeRingNote(ext, Srb, TRUE);
+    NvmeIoRow(ext, Srb, TRUE);
 #endif
     ScsiPortNotification(RequestComplete, ext, Srb);
     ScsiPortNotification(NextRequest, ext, NULL);

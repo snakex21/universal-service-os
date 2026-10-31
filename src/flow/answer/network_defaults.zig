@@ -80,7 +80,11 @@ pub fn nt4(p: *const Profile, workgroup: []const u8, w: *std.Io.Writer) !void {
     // Q197302: install TCP/IP using the inbox loopback, independent of the VM NIC.
     // Native TCPCFG's unattended parser rejects zero in every address octet.
     // POST replaces this unconnected address with the requested LAN policy.
-    try w.print("\r\n[Network]\r\nJoinWorkgroup={s}\r\nInstallAdapters=USOS.Adapters\r\nInstallProtocols=USOS.Protocols\r\nDoNotInstallInternetServer=Yes\r\n", .{workgroup});
+    // An empty workgroup (NT 4.0 manual Setup): no JoinWorkgroup, Setup's
+    // own workgroup / domain page asks.
+    try w.writeAll("\r\n[Network]\r\n");
+    if (workgroup.len > 0) try w.print("JoinWorkgroup={s}\r\n", .{workgroup});
+    try w.writeAll("InstallAdapters=USOS.Adapters\r\nInstallProtocols=USOS.Protocols\r\nDoNotInstallInternetServer=Yes\r\n");
     try w.writeAll("\r\n[USOS.Adapters]\r\nLOOP=USOS.Loop\r\n\r\n[USOS.Loop]\r\n\r\n[USOS.Protocols]\r\nTC=USOS.TCPIP\r\n\r\n[USOS.TCPIP]\r\nDHCP=No\r\nIPAddress=198.51.100.1\r\nSubnet=255.255.255.0\r\n");
     try metadata(p, false, w);
     try ntRegistry(p, ";USOS-REG=", w);

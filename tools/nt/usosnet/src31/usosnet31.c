@@ -1,4 +1,5 @@
-/* NT3.1 NDIS3 full-MAC for one explicitly staged QEMU 82576, UP only.
+/* NT3.1 NDIS3 full-MAC for one explicitly staged 82576 (QEMU) or I211
+ * (X470 onboard, 2026-10-30), UP only.
  * Copyright (C) 2026 Maksymilian and the USOS Authors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -7,6 +8,7 @@
  */
 #include "usosnet31.h"
 #include "u31_policy.h"
+#include "native_diag.h"
 #pragma warning(disable:4054 4055 4152 4201 4214)
 unsigned long __cdecl __indword(unsigned short);
 unsigned short __cdecl __inword(unsigned short);
@@ -29,7 +31,8 @@ typedef struct _U31_FULL {
     PVOID ThreadObject,Filter;
     volatile BOOLEAN Removing;
     BOOLEAN Registered,CommandChanged,HardwareTouched;
-    ULONG Bus,Device,Function,ConfigAddress;
+    ULONG Bus,Device,Function,ConfigAddress,PmCsr,BusType;
+    BOOLEAN MmDirect;
     USHORT OriginalCommand;
     ULONG CapabilityCount,CapabilityOffset[2];
     USHORT CapabilityOriginal[2];
@@ -52,6 +55,7 @@ struct _U31_BIND {
 static NDIS_HANDLE Wrapper,Mac;
 static U31_FULL *OnlyAdapter;
 static const USOSNET_CHIP Chip={0x8086,0x10c9,CHIP_IGB_82576,"82576 NT31 UP",&IgbOps};
+static const USOSNET_CHIP ChipI211={0x8086,0x1539,CHIP_IGB_I210|CHIP_IGB_I211,"I211 NT31 UP",&IgbOps};
 
 void UsZero(void *D,ULONG N) { UCHAR *p=D;while(N--)*p++=0; }
 void UsCopy(void *D,const void *S,ULONG N) { UCHAR *d=D;const UCHAR *s=S;while(N--)*d++=*s++; }
@@ -131,10 +135,15 @@ ULONG Us31PciRead(NDIS_HANDLE h,ULONG slot,ULONG offset,PVOID buffer,ULONG lengt
 }
 ULONG Us31PciWrite(NDIS_HANDLE h,ULONG slot,ULONG offset,PVOID buffer,ULONG length)
 {
-    U31_FULL *a=OnlyAdapter;USHORT value;
-    /* The only supported device is 82576; its path never needs PM/BAR writes. */
-    if(!a || h!=a->Hw.Handle || slot!=a->Hw.PciSlot || offset!=4 || length!=2)return 0;
-    UsCopy(&value,buffer,2);CommandWrite(a,value);return 2;
+    U31_FULL *a=OnlyAdapter;USHORT value;ULONG dword,flags,saved;
+    /* 82576: Command only. I211: also the PLL erratum's PMCSR and BAR restore. */
+    if(!a || h!=a->Hw.Handle || slot!=a->Hw.PciSlot ||
+       !U31PciWriteAllowed(a->Hw.Chip==&ChipI211,a->PmCsr,offset,length))return 0;
+    if(length==2){UsCopy(&value,buffer,2);ConfigWrite16(a,offset,value);return 2;}
+    UsCopy(&dword,buffer,4);
+    flags=__readeflags();_disable();saved=__indword(0xcf8);
+    __outdword(0xcf8,a->ConfigAddress|(offset&0xfc));__outdword(0xcfc,dword);
+    __outdword(0xcf8,saved);__writeeflags(flags);return 4;
 }
 static BOOLEAN ValidatePci(U31_FULL *a)
 {
@@ -145,7 +154,13 @@ static BOOLEAN ValidatePci(U31_FULL *a)
     if((bar&6)==4)high=ConfigRead(a,0x14);
     if(!U31PciValid(KeNumberProcessors,a->Bus,a->Device,a->Function,id,cls,ConfigRead(a,0xc),bar,high))return FALSE;
     bar&=~15UL;
-    a->Hw.VendorId=0x8086;a->Hw.DeviceId=0x10c9;a->Hw.RevId=(UCHAR)cls;
+    a->Hw.Chip=(id>>16)==0x1539?&ChipI211:&Chip;
+    a->Hw.VendorId=0x8086;a->Hw.DeviceId=a->Hw.Chip->Device;a->Hw.RevId=(UCHAR)cls;
+    a->PmCsr=0;
+    if(ConfigRead(a,4)&0x100000) {
+        ULONG p=ConfigRead(a,0x34)&0xfc,n,v;
+        for(n=0;p>=0x40 && n<48;n++){v=ConfigRead(a,p);if((v&0xff)==1){a->PmCsr=p+4;break;}p=(v>>8)&0xfc;}
+    }
     a->Hw.MmioPa.LowPart=bar;a->Hw.MmioPa.HighPart=0;a->Hw.MmioLen=U31_MMIO_LEN;
     a->Hw.PciBus=a->Bus;a->Hw.PciSlot=a->Device|(a->Function<<5);
     a->OriginalCommand=(USHORT)ConfigRead(a,4);return TRUE;
@@ -249,6 +264,9 @@ static VOID Worker(PVOID context)
         }
         if(a->QueueCount && !a->Removing)EthFilterIndicateReceiveComplete(a->Filter);
         CompleteCloses(a);KeLowerIrql(old);
+        a->Hw.TimerCount++;
+        if(a->Hw.TimerCount==50 || a->Hw.TimerCount==100 || a->Hw.TimerCount==250 || a->Hw.TimerCount==500)
+            D31Point(0x20,a->Hw.RxOk,a->Hw.TimerCount);
     }
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -277,23 +295,29 @@ static void JoinWorker(U31_FULL *a)
 }
 static void Cleanup(U31_FULL *a)
 {
-    ULONG i;NDIS_STATUS release;
+    ULONG i;NDIS_STATUS release;BOOLEAN dmaLive=FALSE;
     if(KeGetCurrentIrql()!=PASSIVE_LEVEL)KeBugCheckEx(U31_BUGCHECK,2,KeGetCurrentIrql(),0,0);
     JoinWorker(a);
     if(a->HardwareTouched)IgbOps.Stop(&a->Hw);
     if(a->CommandChanged) {
         CommandWrite(a,(USHORT)(a->OriginalCommand&~4));
-        if(ConfigRead(a,4)&4)KeBugCheckEx(U31_BUGCHECK,3,ConfigRead(a,4),0,0);
+        /* A failed adapter start must not stop the system (X470 2026-10-31:
+         * blue screen with usosnet31 on the I211, cause still open): if bus
+         * mastering cannot be shown off, keep the DMA memory (a leak, never
+         * reused) instead of KeBugCheckEx, and record it in NativeDiag. */
+        if(ConfigRead(a,4)&4){dmaLive=TRUE;D31Point(0x1d,ConfigRead(a,4),3);}
         if(a->HardwareTouched) {
             WR32(&a->Hw,0,RD32(&a->Hw,0)|4); /* GIO_MASTER_DISABLE after reset */
             for(i=0;i<1000 && (RD32(&a->Hw,8)&(1UL<<19));i++)UsStall(1000);
-            if(RD32(&a->Hw,8)&(1UL<<19))KeBugCheckEx(U31_BUGCHECK,4,RD32(&a->Hw,8),0,0);
+            if(RD32(&a->Hw,8)&(1UL<<19)){dmaLive=TRUE;D31Point(0x1d,RD32(&a->Hw,8),4);}
         }
         /* Bus master disabled before any backing DMA allocation is freed. */
     }
     CompleteCloses(a);
-    for(i=0;i<RX_COUNT/2;i++){DmaFree31(a,&a->Hw.RxPage[i]);DmaFree31(a,&a->Hw.TxPage[i]);}
-    DmaFree31(a,&a->Hw.RxRing);DmaFree31(a,&a->Hw.TxRing);
+    if(!dmaLive){
+        for(i=0;i<RX_COUNT/2;i++){DmaFree31(a,&a->Hw.RxPage[i]);DmaFree31(a,&a->Hw.TxPage[i]);}
+        DmaFree31(a,&a->Hw.RxRing);DmaFree31(a,&a->Hw.TxRing);
+    }
     if(a->Hw.Mmio){MmUnmapIoSpace((PVOID)a->Hw.Mmio,a->Hw.MmioLen);a->Hw.Mmio=NULL;}
     Capabilities(a,TRUE);
     if(a->CommandChanged){CommandWrite(a,a->OriginalCommand);a->CommandChanged=FALSE;}
@@ -394,7 +418,7 @@ static NDIS_STATUS Query(U31_FULL *a,U31_BIND *b,PNDIS_REQUEST r)
     case OID_GEN_TRANSMIT_BUFFER_SPACE:v=TX_COUNT*BUF_SIZE;break;
     case OID_GEN_RECEIVE_BUFFER_SPACE:v=RX_COUNT*BUF_SIZE;break;
     case OID_GEN_VENDOR_ID:v=a->Hw.PermAddr[0]|((ULONG)a->Hw.PermAddr[1]<<8)|((ULONG)a->Hw.PermAddr[2]<<16);break;
-    case OID_GEN_VENDOR_DESCRIPTION:src="USOS NT31 Intel82576 UP";n=23;break;
+    case OID_GEN_VENDOR_DESCRIPTION:src=a->Hw.Chip==&ChipI211?"USOS NT31 Intel I211 UP":"USOS NT31 Intel82576 UP";n=23;break;
     case OID_GEN_CURRENT_PACKET_FILTER:v=b?b->PacketFilter:0;break;
     case OID_GEN_PROTOCOL_OPTIONS:v=0;break;
     case OID_GEN_DRIVER_VERSION:src=&version;n=2;break;
@@ -461,6 +485,7 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
 {
     U31_FULL *a;NDIS_HANDLE cfg=NULL;NDIS_STATUS st;U31_INFO info;USHORT command;
     UNREFERENCED_PARAMETER(macContext);
+    D31Point(3,0,KeNumberProcessors);
     InitialTrace("US31 Add entry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1 || OnlyAdapter || KeGetCurrentIrql()!=PASSIVE_LEVEL)return NDIS_STATUS_NOT_SUPPORTED;
     a=Alloc(sizeof(*a));if(!a)return NDIS_STATUS_RESOURCES;
@@ -468,21 +493,47 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
     NdisAllocateSpinLock(&a->HardwareLock);NdisAllocateSpinLock(&a->FilterLock);KeInitializeEvent(&a->StopEvent,NotificationEvent,FALSE);
     NdisOpenConfiguration(&st,&cfg,configuration);if(st!=NDIS_STATUS_SUCCESS)goto failed;
     a->Bus=Cfg(cfg,L"PciBus",0xffffffff);a->Device=Cfg(cfg,L"PciDevice",0xffffffff);a->Function=Cfg(cfg,L"PciFunction",0xffffffff);
+    a->BusType=Cfg(cfg,L"UsosBusType",5);
     a->Hw.DebugPort=Cfg(cfg,L"DebugPort",0);NdisCloseConfiguration(cfg);cfg=NULL;
     if(a->Hw.DebugPort!=0 && a->Hw.DebugPort!=0xe9){st=NDIS_STATUS_NOT_SUPPORTED;goto failed;}
     if(!ValidatePci(a)){st=NDIS_STATUS_ADAPTER_NOT_FOUND;goto failed;}
+    D31Point(4,0,a->ConfigAddress);
     UsLog(&a->Hw,"US31 pci",a->ConfigAddress,a->Hw.MmioPa.LowPart);
-    UsZero(&info,sizeof(info));info.Master=TRUE;info.InterfaceType=5;info.MapRegisters=1;info.MaximumMapping=4096;
-    st=NdisRegisterAdapter(&a->Hw.Handle,Mac,a,configuration,name,&info);UsLog(&a->Hw,"US31 register",st,0);
+    /* PCIBus (5) first; on the X470 the NT 3.x MBR hides the PCI BIOS, so the
+     * HAL may refuse a PCI adapter: then Isa (1) and Eisa (2) masters, as the
+     * NT 3.1 AHCINT / usosvbe builds do. UsosBusType picks the first try. */
+    {
+        static const ULONG order[3]={5,1,2};ULONG i,tries=0,type=a->BusType;
+        st=NDIS_STATUS_FAILURE;
+        for(i=0;i<4 && st!=NDIS_STATUS_SUCCESS;i++) {
+            if(i)type=order[i-1];
+            if(i && type==a->BusType)continue;
+            if(type!=1 && type!=2 && type!=5)continue;
+            UsZero(&info,sizeof(info));info.Master=TRUE;info.Dma32=TRUE;info.InterfaceType=type;info.MapRegisters=1;info.MaximumMapping=4096;
+            st=NdisRegisterAdapter(&a->Hw.Handle,Mac,a,configuration,name,&info);UsLog(&a->Hw,"US31 register",st,type);
+            D31Point(0x10+tries++,st,type);
+            if(st==NDIS_STATUS_SUCCESS)a->BusType=type;
+        }
+    }
     if(st!=NDIS_STATUS_SUCCESS)goto failed;a->Registered=TRUE;OnlyAdapter=a;
     NdisMapIoSpace(&st,(PVOID *)&a->Hw.Mmio,a->Hw.Handle,a->Hw.MmioPa,a->Hw.MmioLen);UsLog(&a->Hw,"US31 map",st,(ULONG)a->Hw.Mmio);
-    if(st!=NDIS_STATUS_SUCCESS || !a->Hw.Mmio)goto failed;
+    D31Point(5,st,(ULONG)a->Hw.Mmio);
+    if(st!=NDIS_STATUS_SUCCESS || !a->Hw.Mmio) {
+        /* As usosnet351n on the X470: NDIS cannot translate a PCI range on a
+         * HAL without a PCI bus; map the BAR directly (Cleanup unmaps it). */
+        PHYSICAL_ADDRESS pa;pa.LowPart=a->Hw.MmioPa.LowPart;pa.HighPart=0;
+        a->Hw.Mmio=(volatile UCHAR *)MmMapIoSpace(pa,a->Hw.MmioLen,MmNonCached);
+        a->MmDirect=a->Hw.Mmio!=NULL;D31Point(0x18,st,(ULONG)a->Hw.Mmio);
+        if(!a->Hw.Mmio){st=NDIS_STATUS_RESOURCES;goto failed;}
+        st=NDIS_STATUS_SUCCESS;
+    }
     /* Enable MMIO with DMA still disabled, then reset before allocating or
      * handing any buffer to the controller. Writes preserve PCI Status. */
     if(!Capabilities(a,FALSE)){st=NDIS_STATUS_HARD_ERRORS;goto failed;}
     command=(USHORT)((a->OriginalCommand|2|0x400)&~4);CommandWrite(a,command);a->CommandChanged=TRUE;
     if(((USHORT)ConfigRead(a,4)&6)!=2){st=NDIS_STATUS_HARD_ERRORS;goto failed;}
     a->HardwareTouched=TRUE;st=IgbOps.Reset(&a->Hw);if(st!=NDIS_STATUS_SUCCESS)goto failed;
+    D31Point(6,st,0);
     if(!IgbOps.ReadMac(&a->Hw,a->Hw.PermAddr) || a->Hw.MacSource==6){st=NDIS_STATUS_INVALID_ADDRESS;goto failed;}
     UsCopy(a->Hw.CurAddr,a->Hw.PermAddr,6);IgbOps.SetMac(&a->Hw,a->Hw.CurAddr);
     if(!Rings(a)){st=NDIS_STATUS_RESOURCES;goto failed;}
@@ -492,8 +543,10 @@ static NDIS_STATUS __stdcall Add(NDIS_HANDLE macContext,NDIS_HANDLE configuratio
     IgbOps.PhyInit(&a->Hw);IgbOps.Start(&a->Hw);
     a->Hw.PacketFilter=NDIS_PACKET_TYPE_PROMISCUOUS|NDIS_PACKET_TYPE_BROADCAST|NDIS_PACKET_TYPE_ALL_MULTICAST;IgbOps.SetFilter(&a->Hw);IgbOps.IrqDisable(&a->Hw);a->Hw.Started=TRUE;
     st=StartWorker(a);if(!NT_SUCCESS(st))goto failed;
+    D31Point(7,st,a->Hw.RxRing.Pa);
     UsLog(&a->Hw,"US31 started20ms",a->Hw.RxRing.Pa,a->Hw.TxRing.Pa);return NDIS_STATUS_SUCCESS;
 failed:
+    D31Point(0x1f,st,0);
     if(cfg)NdisCloseConfiguration(cfg);UsLog(&a->Hw,"US31 init-failed",st,0);Cleanup(a);return st;
 }
 static VOID __stdcall Remove(NDIS_HANDLE context) { Cleanup(context); }
@@ -506,12 +559,14 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver,PUNICODE_STRING path)
     U31_MAC chars;NDIS_STATUS st;NDIS_STRING name=NDIS_STRING_CONST("USOSNET31");
     /* The explicitly owned UP/QEMU diagnostic candidate uses E9 before an
      * adapter configuration exists, separating loader/registration failures. */
+    D31Init(path);D31Point(1,0,KeNumberProcessors);
     InitialTrace("US31 DriverEntry",KeNumberProcessors,KeGetCurrentIrql());
     if(KeNumberProcessors!=1)return STATUS_NOT_SUPPORTED;
     UsZero(&chars,sizeof(chars));chars.Major=3;chars.Minor=0;chars.Open=Open;chars.Close=Close;chars.Send=Send;chars.Transfer=Transfer;
     chars.Reset=Reset;chars.Request=Request;chars.GlobalQuery=GlobalQuery;chars.Unload=Unload;chars.Add=Add;chars.Remove=Remove;chars.Name=name;
     NdisInitializeWrapper(&Wrapper,driver,path,NULL);InitialTrace("US31 wrapper",(ULONG)Wrapper,0);if(!Wrapper)return STATUS_INSUFFICIENT_RESOURCES;
     NdisRegisterMac(&st,&Mac,Wrapper,&Mac,&chars,sizeof(chars));
+    D31Point(2,st,(ULONG)Mac);
     InitialTrace("US31 RegisterMac",st,(ULONG)Mac);
     if(st!=NDIS_STATUS_SUCCESS)NdisTerminateWrapper(Wrapper,NULL);return st;
 }

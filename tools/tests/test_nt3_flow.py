@@ -71,7 +71,7 @@ class Nt3Target(unittest.TestCase):
     def test_target_handles_nt3(self):
         text = TARGET.read_text(encoding='utf-8')
         self.assertIn('[ -z "${NT_MAJOR:-}" ] || [ "$NT_MAJOR" = "$major" ]', text)
-        self.assertIn('[ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin', text)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin', text)
         # winnt.exe's ~BT\SYSTEM32 (0x6B C000003A without it).
         self.assertIn('cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE"', text)
         self.assertIn('cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL"', text)
@@ -175,6 +175,29 @@ class Nt3Target(unittest.TestCase):
                          b'ncr3x_mp    = halncr.dll  ,2,hal.dll\r\n')
         self.assertIn("grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\\.dll'", TARGET.read_text(encoding='utf-8'))
 
+    def test_uniprocessor_kernel_for_the_mp_machine_types(self):
+        # X470 2026-10-29: native text mode detected mps_mp ("_mp" ->
+        # SpInstallingMp) and installed ntkrnlmp.exe as ntoskrnl.exe next to
+        # the Standard PC hal.dll; the Multiprocessor row now names the UP one.
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-krnl-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sif = tmp / 'TXTSETUP.SIF'
+        sif.write_bytes(b'[SpecialFiles]\r\nMultiprocessor = ntkrnlmp.exe,2,ntoskrnl.exe\r\n'
+                        b'Uniprocessor   = ntoskrnl.exe,2\r\nAtdisk         = atdisk.sys,4\r\n'
+                        b'[Files]\r\nMultiprocessor = keep.exe\r\n'
+                        b'[hal]\r\nmps_mp      = halmps.dll  ,2,hal.dll\r\n')
+        script = tmp / 'run.sh'
+        script.write_bytes((function_text(TARGET, 'nt3_standard_hal') +
+                            f'\nnt3_standard_hal < "{sif.as_posix()}" > "{(tmp / "out.sif").as_posix()}"\n').encode('utf-8'))
+        rc, _, err = sh(f'. "{script.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual((tmp / 'out.sif').read_bytes(),
+                         b'[SpecialFiles]\r\nMultiprocessor = ntoskrnl.exe,2\r\n'
+                         b'Uniprocessor   = ntoskrnl.exe,2\r\nAtdisk         = atdisk.sys,4\r\n'
+                         b'[Files]\r\nMultiprocessor = keep.exe\r\n'
+                         b'[hal]\r\nmps_mp = hal.dll    ,2,hal.dll\r\n')
+        self.assertIn("grep -aiEq '^multiprocessor *= *ntoskrnl\\.exe' \"$work/c/TXTSETUP.SIF\"", TARGET.read_text(encoding='utf-8'))
+
     def test_install_vm_for_nt35(self):
         # NT 3.5 GUI Setup knows no CPU newer than a Pentium; its CD has no
         # amsint.sys, and its atdisk.sys works on QEMU IDE.
@@ -201,18 +224,19 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('windows-nt-3-51-server) tag=NT351S', text)
         self.assertIn("NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51'", text)
         self.assertIn("NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0'", text)
-        self.assertIn('NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
+        self.assertIn('NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" NT_NATIVE="$([ "$nt_native" = yes ] && echo 1 || echo 0)" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
         self.assertIn('windows-nt-3-5) tag=NT35', text)
         self.assertIn('windows-nt-3-5-server) tag=NT35S', text)
         self.assertIn("NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5'", text)
         self.assertIn('windows-nt-3-1) tag=NT31', text)
         self.assertIn('windows-nt-3-1-server) tag=NT31S', text)
         self.assertIn("NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1'", text)
-        # The staged profile files go in every profile arm (NT, 9x and, since
-        # the POSReady entry, POSR), and the SP6a lookup only for NT 4.0.
+        # The staged profile files go in every profile arm (NT, 9x, since
+        # the POSReady entry POSR, and since cd722449 the DOS regional arm),
+        # and the SP6a lookup only for NT 4.0.
         self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF'
                                     ' /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF'
-                                    ' /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF'), 3)
+                                    ' /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF'), 4)
         self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S|', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
         self.assertIn('if [ "$nt_major" = 4 ]; then', text)
         self.assertIn('3:none)', text)
@@ -295,7 +319,8 @@ class Nt3Mbr(unittest.TestCase):
             self.assertIn(want, hook)
         # The boot drive survives the PCI BIOS call (EDX = "PCI ") in BP.
         self.assertIn('    mov bp, dx\n', text)
-        self.assertEqual(text.count('    mov dx, bp\n'), 3)
+        # (4: + the quiesce sector's shutdown-log disk I/O)
+        self.assertEqual(text.count('    mov dx, bp\n'), 4)
 
 
     def test_hook_sector(self):
@@ -311,7 +336,7 @@ class Nt3Mbr(unittest.TestCase):
                      '$padded[510] = 0x55', '$padded[511] = 0x33'):
             self.assertIn(want, ps1)
         target = TARGET.read_text(encoding='utf-8')
-        self.assertIn('[ -z "$nt3" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', target)
+        self.assertIn('[ -z "$nt3$nt4_native_mbr" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', target)
         self.assertIn('dd if="$mbr_hook" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync', target)
         self.assertLess(target.index('cannot write the MBR\''), target.index('cannot write the MBR hook sector'))
         build = BUILD.read_text(encoding='utf-8')
@@ -360,12 +385,14 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
                 missing = [f'{m}!{n}' for m, n in imports if n not in view[m.lower()]]
                 self.assertEqual(missing, [], f'{rel} on {kernel}+{hal}')
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
-        self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt35"', src)
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.7-nt35"', src)
         self.assertIn('-DUSOSRST_NT35', (ROOT / 'tools/w2k/usosrst/build-nt35.cmd').read_text(encoding='utf-8'))
 
     def test_usosrst_nt351_direct_config(self):
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
-        self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt351"', src)
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.8-nt351"', src)
+        self.assertIn("#define USOSRST_RAMLOG 1", src)
+        self.assertIn("#define RM_ADDRESS      0x50000000UL", src)
         self.assertIn('got = PciCfgHeader351(bus, slot.u.AsULONG, &cfg);', src)
         self.assertIn('WRITE_PORT_ULONG((PULONG)0xCF8, base | (i * 4));', src)
 
@@ -593,16 +620,20 @@ class Nt3AnswerProfile(unittest.TestCase):
     def test_usosnt3_imports_exist_on_nt31(self):
         # Every static import of usosnt3.exe is exported by the kernel32 /
         # advapi32 of NT 3.1 (checked against the 3.1, 3.5 and 3.51 CDs'
-        # DLLs on 2026-10-14); newer calls go through GetProcAddress.
+        # DLLs on 2026-10-14; SetFileAttributesA, for BOOT.INI on the native
+        # path, checked in the installed NT 3.51 kernel32 2026-10-28); newer
+        # calls go through GetProcAddress.
         from check_nt52_driver_imports import pe
         nt31 = {
             'kernel32.dll': {'CloseHandle', 'CopyFileA', 'CreateFileA', 'DeleteFileA', 'ExitProcess', 'FlushFileBuffers',
                              'FindClose', 'FindFirstFileA', 'FindNextFileA', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess',
-                             'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError',
+                             'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError', 'GetVersion',
                              'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
-                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFilePointer', 'Sleep', 'WriteFile',
+                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFileAttributesA', 'SetFilePointer', 'Sleep', 'WriteFile',
                              'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
-                             'lstrcpyA'},
+                             'lstrcpyA',
+                             # native NT 3.1 LAN (/net31, /netcheck31), checked in the 3.1 CD KERNEL32.DLL 2026-10-30
+                             'GetComputerNameA', 'TerminateProcess'},
             'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',
                              'LookupPrivilegeValueA', 'OpenProcessToken', 'RegCloseKey', 'RegCreateKeyExA', 'RegDeleteKeyA',
                              'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegSetValueExW', 'RegUnLoadKeyA',
@@ -617,6 +648,32 @@ class Nt3AnswerProfile(unittest.TestCase):
         _, imports = pe(binary)
         missing = [f'{m}!{n}' for m, n in imports if n not in nt31.get(m.lower(), set())]
         self.assertEqual(missing, [])
+
+    def test_usosnt3_desktop_notice(self):
+        # Native install: the service starts "/notice" on WinSta0\Default
+        # (detached, never waited for); a full-screen topmost popup with the
+        # ASCII Polish / English text and the POST.LOG tail, no input, ends
+        # with WM_ENDSESSION or TerminateProcess when post() gives up.
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='latin-1')
+        main = src[src.index('static void WINAPI service_main'):src.index('/* ----', src.index('static void WINAPI service_main'))]
+        self.assertLess(main.index('notice_start();'), main.index('if (!post()) goto failed;'))
+        self.assertIn('    logon_notice(0);\n    notice_stop();\n', main)
+        self.assertNotIn('notice_stop', main[:main.index('failed:')])     # success: until the restart
+        start = src[src.index('static void notice_start(void)\n{'):src.index('static void notice_stop(void)\n{')]
+        self.assertIn('si.lpDesktop = desktop;', start)
+        self.assertIn('"WinSta0\\\\Default"', start)
+        self.assertIn('DETACHED_PROCESS', start)
+        self.assertNotIn('WaitForSingleObject', start)
+        proc = src[src.index('static LRESULT CALLBACK notice_proc'):src.index('static int notice_language_pl')]
+        self.assertIn('case WM_CLOSE:\n        return 0;', proc)
+        self.assertIn('case WM_ENDSESSION:', proc)
+        self.assertIn('WS_EX_TOPMOST, wc.lpszClassName, "USOS", WS_POPUP | WS_VISIBLE, 0, 0, cx, cy', src)
+        from build_windows_usos_res import build_nt3
+        data = build_nt3(ROOT).read_bytes()
+        for text in (b'USOS konczy instalacje', b'Trwa dogrywanie sterownikow i ustawien. Nie wylaczaj komputera.',
+                     b'Komputer uruchomi sie ponownie automatycznie.', b'notice', b'WinSta0\\Default',
+                     b'user32.dll', b'CreateWindowExA', b'gdi32.dll', b'TerminateProcess'):
+            self.assertIn(text, data)
 
 
 if __name__ == '__main__':
