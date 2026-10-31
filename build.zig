@@ -115,6 +115,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         .{ .name = "usosprep-wim-host", .source = "wim_apply_main.zig" },
         .{ .name = "usosprep-wim-features", .source = "wim_feature_main.zig" },
         .{ .name = "usosprep-wim-inspect", .source = "wim_inspect.zig" },
+        .{ .name = "usosprep-wim-update", .source = "wim_update_main.zig" },
         .{ .name = "usosprep-bcd", .source = "bcd_main.zig" },
         .{ .name = "usosprep-ntfs-probe", .source = "ntfs_probe.zig" },
         .{ .name = "usosprep-optical", .source = "optical_main.zig" },

@@ -30,6 +30,8 @@ test {
     _ = @import("wim.zig");
     _ = @import("wim_metadata.zig");
     _ = @import("wim_xml.zig");
+    _ = @import("wim_update.zig");
+    _ = @import("pe10_inject.zig");
     _ = @import("wim_app.zig");
     _ = @import("wim_reparse.zig");
     _ = @import("ea.zig");

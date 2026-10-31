@@ -316,6 +316,10 @@ pub const Archive = struct {
         return .{ .descriptor = try Descriptor.parse(raw[0..24], self.input.size), .part = get(u16, &raw, 24), .references = get(u32, &raw, 26), .sha1 = raw[30..50].* };
     }
     pub fn find(self: *Archive, hash: [20]u8) !Entry {
+        return self.entry(try self.findNumber(hash));
+    }
+    /// Lookup-table entry number of a data blob (metadata entries excluded).
+    pub fn findNumber(self: *Archive, hash: [20]u8) !u32 {
         var low: usize = 0;
         var high = self.index.len - self.metadata_count;
         while (low < high) {
@@ -323,7 +327,7 @@ pub const Archive = struct {
             switch (std.mem.order(u8, &hash, &self.index[middle].hash)) {
                 .lt => high = middle,
                 .gt => low = middle + 1,
-                .eq => return self.entry(self.index[middle].number),
+                .eq => return self.index[middle].number,
             }
         }
         return error.MissingWimResource;
