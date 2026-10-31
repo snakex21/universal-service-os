@@ -5,7 +5,8 @@
 //! Routes:
 //! * `.gpt_uefi`: Windows 10/11 x64 native UEFI (replaces the ISO's WinPE
 //!   and Windows Setup);
-//! * `.mbr_csmwrap`: 32-bit Windows 10 without CSM (win-x86-uefi-csmwrap):
+//! * `.mbr_csmwrap`: 32-bit Windows 10 without CSM (win-x86-uefi-csmwrap;
+//!   the default there, `x86CsmwrapPrep`):
 //!   a port of the Alpine micro-Linux step 610 (src/prep/csmwrap_target.zig):
 //!   the same MBR disk, staging WinPE and CSMWrap ESP; the ISO's own x86
 //!   WinPE and Windows Setup then install, exactly as after Alpine.
@@ -21,11 +22,25 @@ pub fn wanted(p: ?*const answer.Profile, system_id: []const u8) bool {
     return capability.nativeModernNt(system_id);
 }
 
-/// The 32-bit CSMWrap route: Windows 10 only for now (8.1 / Embedded 8.1 and
-/// the NT 6.0 / 6.1 PE10-donor route stay on Alpine).
-pub fn wantedX86Csmwrap(p: ?*const answer.Profile, system_id: []const u8) bool {
-    const profile = p orelse return false;
-    return profile.prep_env == .minios and std.mem.eql(u8, system_id, "windows-10");
+/// The preparation environment of a 32-bit CSMWrap route (route policy,
+/// user decision 2026-10-31, docs/minios-hardware-flow.md "Route policy"):
+/// * win-x86-uefi-csmwrap, Windows 10 (the ISO's own x86 WinPE): MiniOS by
+///   default, without a profile option or stick flag (X470 FULL PASS
+///   Windows 10 22H2 x86, B261031-210926-24A29689). No fallback to Alpine: a
+///   failure shows the MiniOS error page.
+/// * win-x86-uefi-csmwrap, Windows 8 / 8.1 / Embedded 8.1: Alpine. MiniOS's
+///   step 610 port refuses an external PE10 donor (csmwrap_target.parseRequest
+///   RequestExternalDonor), which 8.1 uses for NVMe targets, and was never
+///   run for 8 / 8.1; switch here once it is.
+/// * win-nt6-x86-uefi-csmwrap (Vista / 7 / Server 2008, x86 PE10 donor):
+///   Alpine micro-Linux, unchanged.
+/// Every other route keeps its preparation (Alpine where it had one); the
+/// profile option prep_env=minios only concerns the x64 GPT route (`wanted`).
+pub const X86CsmwrapPrep = enum { minios, alpine };
+
+pub fn x86CsmwrapPrep(system_id: []const u8, nt6_legacy: bool) X86CsmwrapPrep {
+    if (nt6_legacy) return .alpine;
+    return if (std.mem.eql(u8, system_id, "windows-10")) .minios else .alpine;
 }
 
 pub const Source = struct { disk_bytes: u64, start: u64, size: u64, serial: u64 };
@@ -189,17 +204,21 @@ test "MiniOS config matches the MiniOS hardware parser keys" {
     try std.testing.expectError(error.InvalidImageIndex, formatConfig(&buffer, token, 0, .{ .disk_bytes = 1, .start = 1, .size = 1, .serial = 1 }, "a.iso", "B", "en-US", false));
 }
 
+test "route policy: MiniOS for Windows 10 x86 CSMWrap, Alpine for 8 / 8.1 and NT 6.0 / 6.1" {
+    try std.testing.expectEqual(X86CsmwrapPrep.minios, x86CsmwrapPrep("windows-10", false));
+    try std.testing.expectEqual(X86CsmwrapPrep.alpine, x86CsmwrapPrep("windows-8-1", false));
+    try std.testing.expectEqual(X86CsmwrapPrep.alpine, x86CsmwrapPrep("windows-8", false));
+    try std.testing.expectEqual(X86CsmwrapPrep.alpine, x86CsmwrapPrep("windows-7", true));
+    try std.testing.expectEqual(X86CsmwrapPrep.alpine, x86CsmwrapPrep("windows-vista", true));
+}
+
 test "only Windows 10/11 profiles with prep_env=minios select MiniOS" {
     var p = answer.Profile{};
     try std.testing.expect(!wanted(&p, "windows-11"));
-    try std.testing.expect(!wantedX86Csmwrap(&p, "windows-10"));
     p.prep_env = .minios;
     try std.testing.expect(wanted(&p, "windows-11") and wanted(&p, "windows-10"));
     try std.testing.expect(!wanted(&p, "windows-7") and !wanted(&p, "windows-xp"));
     try std.testing.expect(!wanted(null, "windows-11"));
-    // 32-bit CSMWrap route: Windows 10 only.
-    try std.testing.expect(wantedX86Csmwrap(&p, "windows-10"));
-    try std.testing.expect(!wantedX86Csmwrap(&p, "windows-8-1") and !wantedX86Csmwrap(&p, "windows-7") and !wantedX86Csmwrap(null, "windows-10"));
     try std.testing.expectEqualStrings("en-US", localeTag(&p));
     // No edition in the profile and more than one image: no index (Setup).
     try std.testing.expect(imageIndex(&p, "windows-11", null) == null);

@@ -466,16 +466,17 @@ fn start(
         if (secure_boot.enforced()) return showSecureBootRequired(system);
         const nt6 = manual_images.nt6Legacy(system);
         vista_csmwrap_heading = if (nt6) windows_native_iso.legacyFolder(system) else windows_native_iso.systemFolder(system.image_directory) catch system.name;
-        // MiniOS (experimental, 32-bit Windows 10): the stick flag
-        // EFI\USOS\win9x\minios.flag (no profile needed) or a profile with
-        // prep_env=minios. MiniOS is the port of the Alpine step 610: the
-        // menu half below is the Alpine route's (answer plan, ISO checks,
-        // request.ini + usos-source.ini), then the one disk question and
-        // MiniOS instead of micro-Linux; Windows Setup does the rest. No
-        // fallback to the Alpine preparation (user decision 2026-10-31): a
-        // failure shows the MiniOS error page and returns to the menu.
+        // Route policy (user decision 2026-10-31, minios_plan.x86CsmwrapPrep):
+        // 32-bit Windows 10 goes through MiniOS by default (no profile option,
+        // no stick flag); Windows 8 / 8.1 and Windows 7 / Vista / Server 2008
+        // (nt6) stay on the Alpine micro-Linux below. MiniOS is the port of the Alpine step
+        // 610: the menu half below is the Alpine route's (answer plan, ISO
+        // checks, request.ini + usos-source.ini), then the one disk question
+        // and MiniOS instead of micro-Linux; Windows Setup does the rest. No
+        // fallback to the Alpine preparation: a failure shows the MiniOS error
+        // page ("MiniOS nie zakończył pracy") and returns to the menu.
         const minios = @import("minios_start.zig");
-        if (!nt6 and (minios.wantedX86Csmwrap(profile, system.id) or (std.mem.eql(u8, system.id, "windows-10") and minios.defaultFlag(root)))) {
+        if (minios.x86CsmwrapPrep(system.id, nt6) == .minios) {
             // The heading is the system, as on the Alpine route ("Windows 10";
             // X470 2026-10-31: "Windows 10 - MiniOS" was not 1:1).
             const system_heading = vista_csmwrap_heading;

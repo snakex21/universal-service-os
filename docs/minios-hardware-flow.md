@@ -164,15 +164,35 @@ plus one real Windows 10 22H2 x86 SYSTEM hive read locally, not stored);
 X470 is the acceptance gate. No Microsoft code or binaries in the repository; the
 BIOS boot files are copied at run time from the applied Windows image.
 
-## Stick switch and MiniOS-only test deploys (2026-10-31)
+## Route policy (user decision 2026-10-31, after the X470 PASS)
 
-- `EFI\USOS\win9x\minios.flag` on the USOS ESP (next to nt3-native /
-  nt4-native / phase1-native): Windows 10 x86 without CSM goes through
-  MiniOS by default, without a profile. No profile edition: the menu asks
+`src/flow/minios_plan.zig` `x86CsmwrapPrep`, used in
+`src/platform/uefi/manual_summary.zig`:
+
+| Route | Preparation |
+|---|---|
+| 32-bit Windows 10 without CSM (win-x86-uefi-csmwrap, the ISO's own WinPE) | **MiniOS** by default; no fallback to Alpine |
+| 32-bit Windows 8 / 8.1 / Embedded 8.1 without CSM (same route) | Alpine micro-Linux (unchanged): MiniOS refuses the external x86 PE10 donor 8.1 uses for NVMe targets (`RequestExternalDonor`) and was never run for 8 / 8.1 |
+| 32-bit Windows 7 / Vista / Server 2008 without CSM (win-nt6-x86-uefi-csmwrap, PE10 donor) | Alpine micro-Linux (unchanged) |
+| Windows 10/11 x64 native UEFI | the ISO's WinPE + Windows Setup (unchanged); MiniOS only with the experimental profile option `prep_env=minios` |
+| every other route (XP/2003/2000, Vista/7 x64 CSMWrap, NT 3.x/NT4 native, 9x, DOS/Win 3.x, Linux, Custom OS) | exactly as before the MiniOS work (Alpine where the route has a micro-Linux step) |
+
+- The payload carries both: `EFI\USOS\micro-linux\` (Alpine) and
+  `EFI\USOS\minios\` (MiniOS).
+- `EFI\USOS\win9x\minios.flag` is **no longer read** (it was the global
+  stick switch of the test deploys before the route policy); a leftover flag
+  on a stick has no effect. There is no stick switch back to Alpine on the
+  MiniOS route.
+- The deploy option `-MiniOsOnly` (below) stays a developer tool only.
+
+## Stick switch and MiniOS-only test deploys (2026-10-31, superseded by the route policy)
+
+- (Historical) `EFI\USOS\win9x\minios.flag` on the USOS ESP: Windows 10 x86
+  without CSM went through MiniOS without a profile. Now the default of the
+  route (above). No profile edition: the menu asks
   for the edition (USOS list "Edition", from the ISO's images; one image is
-  taken without asking), then the one disk question. Without the flag and
-  without `prep_env=minios`, nothing changes (Alpine).
-- With the flag or `prep_env=minios`, a MiniOS failure never starts Alpine:
+  taken without asking), then the one disk question.
+- On the MiniOS route a MiniOS failure never starts Alpine:
   MiniOS writes `EFI\USOS\Logs\minios-result.txt` (`stage=`, `reason=`;
   stages: CSMWrap check, target disk, ISO on DATA, image apply, NVMe
   driver, boot files, CSMWrap partition), the menu shows the translated

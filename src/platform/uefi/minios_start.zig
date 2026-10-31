@@ -1,10 +1,12 @@
-//! MiniOS starts from the USOS menu (profile option `prep_env=minios` or the
-//! stick flag EFI\USOS\win9x\minios.flag; experimental;
-//! docs/minios-hardware-flow.md).
+//! MiniOS starts from the USOS menu (route policy, minios_plan.x86CsmwrapPrep;
+//! docs/minios-hardware-flow.md "Route policy").
 //!
-//! * `run`: Windows 10/11 x64 through MiniOS instead of Windows Setup (the
-//!   profile's edition is applied; any failure falls back to Windows Setup).
-//! * `runCsmwrap`: 32-bit Windows 10 without CSM. MiniOS is the port of the
+//! * `run`: Windows 10/11 x64 through MiniOS instead of Windows Setup, only
+//!   with the profile option `prep_env=minios` (experimental; the profile's
+//!   edition is applied; any failure falls back to Windows Setup).
+//! * `runCsmwrap`: 32-bit Windows 10 without CSM, the default preparation of
+//!   that route (no profile option, no stick flag; 8 / 8.1 stay on Alpine; the old
+//!   EFI\USOS\win9x\minios.flag is no longer read). MiniOS is the port of the
 //!   Alpine micro-Linux step 610: the menu writes request.ini and
 //!   usos-source.ini (windows_native_iso.prepareX86Csmwrap) and the answer
 //!   plan exactly as for Alpine, asks the flow's one disk question, then
@@ -34,7 +36,7 @@ pub const record_path = "\\EFI\\USOS\\Logs\\minios-start.txt";
 
 const plan = usos.flow.minios_plan;
 pub const wanted = plan.wanted;
-pub const wantedX86Csmwrap = plan.wantedX86Csmwrap;
+pub const x86CsmwrapPrep = plan.x86CsmwrapPrep;
 pub const Route = plan.Route;
 
 /// The edition of a GPT start ("4 Windows 10 Pro (profile)"), in every
@@ -60,14 +62,6 @@ fn randomToken() ![64]u8 {
 fn deleteFile(root: *uefi.protocol.File, comptime path: []const u8) void {
     const file = root.open(std.unicode.utf8ToUtf16LeStringLiteral(path), .read_write, .{}) catch return;
     _ = file.delete() catch {};
-}
-
-/// \EFI\USOS\win9x\minios.flag (experimental stick switch, next to
-/// nt3-native / nt4-native / phase1-native): 32-bit Windows 10 without CSM
-/// goes through MiniOS by default, without a profile and without any
-/// fallback to the Alpine preparation.
-pub fn defaultFlag(root: *uefi.protocol.File) bool {
-    return @import("directory_scan.zig").exists(root, "\\EFI\\USOS\\win9x\\minios.flag");
 }
 
 /// The menu's error page after a failed MiniOS run (no other preparation
