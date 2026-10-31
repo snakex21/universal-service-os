@@ -26,6 +26,7 @@ const csm = @import("csmwrap_target.zig");
 const pe10 = @import("pe10_inject.zig");
 const wim_update = @import("wim_update.zig");
 const bcd_lowmem = @import("bcd_lowmem");
+const csmwrap_write = @import("csmwrap_write.zig");
 const W = std.unicode.utf8ToUtf16LeStringLiteral;
 // Separate root client opts into provisioning at compile time. The default
 // prep binary keeps its existing reachable code and config format.
@@ -1292,33 +1293,6 @@ fn isoStream(files: *IsoFiles, out: *optical.Stream, path: []const u8, log: app.
 fn streamSource(stream: *optical.Stream) ntfs.Source {
     return .{ .context = stream, .size = stream.node.size, .read_fn = optical.Stream.read };
 }
-fn sha256Of(source: ntfs.Source, buffer: []u8) ![32]u8 {
-    var hash = std.crypto.hash.sha2.Sha256.init(.{});
-    var at: u64 = 0;
-    while (at < source.size) {
-        const len: usize = @intCast(@min(buffer.len, source.size - at));
-        try source.read_fn(source.context, at, buffer[0..len]);
-        hash.update(buffer[0..len]);
-        at += len;
-    }
-    return hash.finalResult();
-}
-/// cp + cmp: the file on the new NTFS must hash like its source.
-fn copyChecked(fs: *ntfs.Ntfs, parent: u64, name: []const u16, source: ntfs.Source, timestamp: u64, buffer: []u8) !u64 {
-    const number = try fs.writeFile(parent, name, source, .{ .timestamp = timestamp });
-    const want = try sha256Of(source, buffer);
-    if (!std.mem.eql(u8, &want, &(try fs.hashFile(number)))) return error.CopyReadbackMismatch;
-    return number;
-}
-fn zeroSectors(disk: platform.Disk, first: u64, count: u64, buffer: []u8) !void {
-    @memset(buffer, 0);
-    var done: u64 = 0;
-    while (done < count) {
-        const n: u64 = @min(count - done, buffer.len / 512);
-        try disk.write((first + done) * 512, buffer[0..@intCast(n * 512)]);
-        done += n;
-    }
-}
 /// The PCI vendor/device of the controller in front of a disk handle.
 fn pciIds(handle: uefi.Handle) ![2]u16 {
     const bs = uefi.system_table.boot_services orelse return error.Io;
@@ -1524,101 +1498,36 @@ fn runCsmwrapSetup(cfg: Config, root: *uefi.protocol.File, boot_handle: uefi.Han
     const d = disk.disk();
     const zero = try allocator.alloc(u8, 64 * 1024);
     defer allocator.free(zero);
-
-    // ---- 1. Partition table: erase both GPT copies, then the new MBR.
-    hw_run.stage = "partition table";
+    var guid: [16]u8 = seed[32..48].*;
+    guid[6] = (guid[6] & 0x0f) | 0x40;
+    guid[8] = (guid[8] & 0x3f) | 0x80;
+    // ---- 1. - 4. + the NT60 boot code (csmwrap_write.zig, shared with the
+    // host harness csmwrap_disk_main.zig).
     hw_run.target_written = true;
-    try zeroSectors(d, 0, 2048, zero);
-    try zeroSectors(d, total - 2048, 2048, zero);
-    try d.flush();
-    const mbr = csm.buildMbr(mbr_code[0..440], signature, l);
-    try d.write(0, &mbr);
-    try d.flush();
-    var readback: [512]u8 = undefined;
-    try d.read(0, &readback);
-    if (!std.mem.eql(u8, &readback, &mbr)) return error.MbrReadbackMismatch;
+    try csmwrap_write.write(allocator, d, .{
+        .mbr_code = mbr_code[0..csm.mbr_code_bytes],
+        .nt60 = nt60[0..csm.nt60_bytes],
+        .signature = signature,
+        .layout = l,
+        .bootmgr = streamSource(&files.bootmgr),
+        .bcd = bcd[0..bcd_len],
+        .sdi = streamSource(&files.sdi),
+        .donor = &donor,
+        .boot_index = boot_index,
+        .injection = injection,
+        .display_exe = if (display_text != null) display_exe else null,
+        .display_text = display_text,
+        .nvme = nvme,
+        .timestamp = timestamp,
+        .windows_serial = std.mem.readInt(u64, seed[16..24], .little) | 1,
+        .staging_serial = std.mem.readInt(u64, seed[24..32], .little) | 1,
+        .wim_guid = guid,
+    }, &hw_run.stage, log);
     var sig_hex: [8]u8 = undefined;
-    log.say("[VISTA_CSMWRAP] MBR PASS signature={s}\n", .{csm.signatureHex(&sig_hex, signature)});
-
-    // ---- 2. NTFS: Windows (inactive), staging with the NT60 boot code.
-    hw_run.stage = "Windows partition";
-    const fs = try allocator.create(ntfs.Ntfs);
-    defer allocator.destroy(fs);
-    try ntfs.Ntfs.initInto(d, .{ .start_bytes = l.windows_start * 512, .size_bytes = l.windows_sectors * 512 }, allocator, std.mem.readInt(u64, seed[16..24], .little) | 1, fs);
-    fs.label = W(csm.windows_label);
-    errdefer if (hw_run.stage.ptr == "Windows partition".ptr) fs.deinit();
-    try fs.format();
-    // 2b. USOSRES.EXE + DISPLAY.TXT into \USOS\NT6 (optional).
-    if (display_exe) |exe| stage: {
-        const usos_dir = fs.mkdir(5, W("USOS"), .{ .attributes = 0x10, .timestamp = timestamp }) catch |err| {
-            log.say("[VISTA_CSMWRAP] DISPLAY staging failed ({s}); display unchanged\n", .{@errorName(err)});
-            break :stage;
-        };
-        const nt6 = fs.mkdir(usos_dir, W("NT6"), .{ .attributes = 0x10, .timestamp = timestamp }) catch |err| {
-            log.say("[VISTA_CSMWRAP] DISPLAY staging failed ({s}); display unchanged\n", .{@errorName(err)});
-            break :stage;
-        };
-        var exe_src: MemorySource = .{ .bytes = exe };
-        var txt_src: MemorySource = .{ .bytes = display_text.? };
-        const exe_number = fs.writeFile(nt6, W("USOSRES.EXE"), .{ .context = &exe_src, .size = exe.len, .read_fn = MemorySource.read }, .{ .timestamp = timestamp }) catch |err| {
-            log.say("[VISTA_CSMWRAP] DISPLAY staging failed ({s}); display unchanged\n", .{@errorName(err)});
-            break :stage;
-        };
-        _ = fs.writeFile(nt6, W("DISPLAY.TXT"), .{ .context = &txt_src, .size = display_text.?.len, .read_fn = MemorySource.read }, .{ .timestamp = timestamp }) catch |err| {
-            log.say("[VISTA_CSMWRAP] DISPLAY staging failed ({s}); display unchanged\n", .{@errorName(err)});
-            break :stage;
-        };
-        var want: [32]u8 = undefined;
-        std.crypto.hash.sha2.Sha256.hash(exe, &want, .{});
-        if (!std.mem.eql(u8, &want, &(try fs.hashFile(exe_number)))) return error.DisplayReadbackMismatch;
-        log.say("[VISTA_CSMWRAP] DISPLAY request={s} apply=first-sign-in vm=deferred\n", .{std.mem.trimEnd(u8, display_text.?[0 .. std.mem.indexOfScalar(u8, display_text.?, '\r') orelse display_text.?.len], "\r\n")});
-    }
-    try fs.finish();
-    fs.deinit();
-    log.say("[VISTA_CSMWRAP] Windows partition PASS start={d} sectors={d}\n", .{ l.windows_start, l.windows_sectors });
-
-    // ---- 3. + 4. Staging: bootmgr, boot\bcd, boot\boot.sdi, sources\boot.wim.
-    hw_run.stage = "staging partition";
-    try ntfs.Ntfs.initInto(d, .{ .start_bytes = l.staging_start * 512, .size_bytes = l.staging_sectors * 512 }, allocator, std.mem.readInt(u64, seed[24..32], .little) | 1, fs);
-    fs.label = W(csm.staging_label);
-    {
-        errdefer fs.deinit();
-        try fs.format();
-        const buffer = try allocator.alloc(u8, 64 * 1024);
-        defer allocator.free(buffer);
-        _ = try copyChecked(fs, 5, W("bootmgr"), streamSource(&files.bootmgr), timestamp, buffer);
-        const boot_dir = try fs.mkdir(5, W("boot"), .{ .attributes = 0x10, .timestamp = timestamp });
-        var bcd_src: MemorySource = .{ .bytes = bcd[0..bcd_len] };
-        _ = try copyChecked(fs, boot_dir, W("bcd"), .{ .context = &bcd_src, .size = bcd_len, .read_fn = MemorySource.read }, timestamp, buffer);
-        _ = try copyChecked(fs, boot_dir, W("boot.sdi"), streamSource(&files.sdi), timestamp, buffer);
-        log.say("[VISTA_CSMWRAP] PE10 boot files PASS boot_index={d}\n", .{boot_index});
-        const sources = try fs.mkdir(5, W("sources"), .{ .attributes = 0x10, .timestamp = timestamp });
-        hw_run.stage = "PE10 image";
-        var guid: [16]u8 = seed[32..48].*;
-        guid[6] = (guid[6] & 0x0f) | 0x40;
-        guid[8] = (guid[8] & 0x3f) | 0x80;
-        _ = try pe10.writeStagingBootWim(allocator, fs, sources, &donor, injection, .{ .guid = guid, .timestamp = timestamp });
-        if (nvme) log.say("[VISTA_CSMWRAP] PE10 NVMe: stornvme service runs usosnvme PASS\n", .{});
-        log.say("[VISTA_CSMWRAP] PE10 image PASS files={d}\n", .{injection.list().len});
-        try fs.finish();
-    }
-    fs.deinit();
-    // NT60 boot code over the formatter's boot code (BPB kept), + backup.
-    hw_run.stage = "NT60 boot code";
-    var boot: [csm.nt60_bytes]u8 = undefined;
-    try d.read(l.staging_start * 512, &boot);
-    csm.applyNt60(&boot, nt60[0..csm.nt60_bytes]);
-    try d.write(l.staging_start * 512, &boot);
-    try d.write((l.staging_start + l.staging_sectors - 1) * 512, boot[0..512]);
-    try d.flush();
-    var boot_check: [csm.nt60_bytes]u8 = undefined;
-    try d.read(l.staging_start * 512, &boot_check);
-    if (!std.mem.eql(u8, &boot, &boot_check)) return error.Nt60ReadbackMismatch;
-    log.say("[VISTA_CSMWRAP] NT60 NTFS boot code PASS\n", .{});
 
     // ---- 5. The CSMWrap ESP at the end (xp_csmwrap_esp.sh).
     hw_run.stage = "CSMWrap partition";
-    try zeroSectors(d, l.esp_start, 2048, zero);
+    try csmwrap_write.zeroSectors(d, l.esp_start, 2048, zero);
     try writeCsmwrapEsp(root, d, l.esp_start, nonZero32(seed[48..64]), allocator, log);
     var sector0: [512]u8 = undefined;
     try d.read(0, &sector0);

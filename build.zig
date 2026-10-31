@@ -121,6 +121,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         .{ .name = "usosprep-wim-inspect", .source = "wim_inspect.zig" },
         .{ .name = "usosprep-wim-update", .source = "wim_update_main.zig" },
         .{ .name = "usosprep-csmwrap-plan", .source = "csmwrap_plan_main.zig" },
+        .{ .name = "usosprep-csmwrap-disk", .source = "csmwrap_disk_main.zig" },
         .{ .name = "usosprep-bcd", .source = "bcd_main.zig" },
         .{ .name = "usosprep-ntfs-probe", .source = "ntfs_probe.zig" },
         .{ .name = "usosprep-optical", .source = "optical_main.zig" },
@@ -130,7 +131,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         const tool_optimize: std.builtin.OptimizeMode = if (comptime std.mem.eql(u8, tool.name, "usosprep-optical-fuzz")) .ReleaseSafe else .ReleaseSmall;
         const tool_module = b.createModule(.{ .root_source_file = b.path("src/prep/" ++ tool.source), .target = host_target, .optimize = tool_optimize });
         const tool_exe = b.addExecutable(.{ .name = tool.name, .root_module = tool_module });
-        if (comptime std.mem.eql(u8, tool.name, "usosprep-csmwrap-plan")) {
+        if (comptime std.mem.startsWith(u8, tool.name, "usosprep-csmwrap-")) {
             tool_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = host_target, .optimize = .ReleaseSmall }));
         }
         if (comptime std.mem.startsWith(u8, tool.name, "usosprep-optical")) {
