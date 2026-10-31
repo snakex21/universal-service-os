@@ -74,12 +74,49 @@ static void usos_fs_control_set(HKEY system, WCHAR out[15]) {
 }
 /* The whole edit on an open SYSTEM hive root key (the host test passes a
  * scratch key under HKCU). */
+/* DIAGNOSTIC (2026-10-31, X470 Windows 10 x86 first-boot reset after the
+ * WinPE restart, docs/nvme-nt6-2026-10-12.md section 21): the same hive load
+ * also sets <ControlSet>\Control\CrashControl AutoReboot = 0, so a bugcheck
+ * in the installed system's first boots stays on screen instead of a silent
+ * restart. CrashDumpEnabled is only read (logged), never changed.
+ * usos_fs_hiberboot = FALSE (fast-startup-on.txt on DATA) skips the
+ * HiberbootEnabled edit; the result is then USOS_FS_SKIPPED. */
+#define USOS_FS_SKIPPED 2
+static BOOL usos_fs_hiberboot = TRUE;
+static DWORD usos_fs_autoreboot = USOS_FS_ERR_KEY;  /* USOS_FS_* of the AutoReboot edit */
+static DWORD usos_fs_crashdump = 0xFFFFFFFF;        /* CrashDumpEnabled as found, or missing */
+static const WCHAR usos_fs_crash[] = L"Control\\CrashControl";
+/* FALSE: no AutoReboot edit in this load (Vista / 7: only the opt-in
+ * flight recorder registration, tools/windows_flight_register.h). */
+static BOOL usos_fs_autoreboot_edit = TRUE;
+#include "windows_flight_register.h"
+static DWORD usos_fs_autoreboot_in_key(HKEY crash) {
+    DWORD value = 1, type = 0, size = sizeof(value), zero = 0;
+    usos_fs_crashdump = 0xFFFFFFFF;
+    if (RegQueryValueExW(crash, L"CrashDumpEnabled", 0, &type, (BYTE *)&value, &size) == ERROR_SUCCESS && type == REG_DWORD && size == sizeof(value)) usos_fs_crashdump = value;
+    value = 1; type = 0; size = sizeof(value);
+    if (RegQueryValueExW(crash, L"AutoReboot", 0, &type, (BYTE *)&value, &size) == ERROR_SUCCESS && type == REG_DWORD && size == sizeof(value) && value == 0) return USOS_FS_PRESENT;
+    if (RegSetValueExW(crash, L"AutoReboot", 0, REG_DWORD, (const BYTE *)&zero, sizeof(zero)) != ERROR_SUCCESS) return USOS_FS_ERR_WRITE;
+    value = 1; type = 0; size = sizeof(value);
+    if (RegQueryValueExW(crash, L"AutoReboot", 0, &type, (BYTE *)&value, &size) != ERROR_SUCCESS || type != REG_DWORD || value != 0) return USOS_FS_ERR_READBACK;
+    RegFlushKey(crash);
+    return USOS_FS_WRITTEN;
+}
 static DWORD usos_fast_startup_in_system(HKEY system) {
-    WCHAR key[64];
-    HKEY power;
+    WCHAR key[64], set[15];
+    HKEY power, crash;
     DWORD result = USOS_FS_ERR_KEY;
-    usos_fs_control_set(system, key);
-    lstrcatW(key, L"\\"); lstrcatW(key, usos_fs_power);
+    usos_fs_control_set(system, set);
+    if (usos_fs_flight) usos_fs_flight_result = usos_flt_register_in_system(system, set);
+    if (!usos_fs_autoreboot_edit) return usos_fs_hiberboot ? USOS_FS_ERR_KEY : USOS_FS_SKIPPED;
+    lstrcpyW(key, set); lstrcatW(key, L"\\"); lstrcatW(key, usos_fs_crash);
+    usos_fs_autoreboot = USOS_FS_ERR_KEY;
+    if (RegCreateKeyExW(system, key, 0, 0, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, 0, &crash, 0) == ERROR_SUCCESS) {
+        usos_fs_autoreboot = usos_fs_autoreboot_in_key(crash);
+        RegCloseKey(crash);
+    }
+    if (!usos_fs_hiberboot) return USOS_FS_SKIPPED;
+    lstrcpyW(key, set); lstrcatW(key, L"\\"); lstrcatW(key, usos_fs_power);
     if (RegCreateKeyExW(system, key, 0, 0, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, 0, &power, 0) != ERROR_SUCCESS) return result;
     result = usos_fs_in_key(power);
     RegCloseKey(power);

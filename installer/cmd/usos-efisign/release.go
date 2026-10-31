@@ -92,6 +92,7 @@ var signedInPlace = []string{
 	"zig-out/micro-linux/systemd-bootx64.efi",
 	"zig-out/micro-linux/vmlinuz-virt",
 	"zig-out/test-assets/ntfs_x64.efi",
+	"zig-out/test-assets/usosprep-x86_64.efi",
 }
 
 var microsoftSigned = []string{"zig-out/windows-native/wimboot"}

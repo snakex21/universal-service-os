@@ -1,0 +1,679 @@
+{
+  "schema": "minios-integration-payload-audit-v2",
+  "branch_commit": "71fdb8bc4eba5b20f299f65c85d94a0ec678f5c3",
+  "master_commit": "0ba50f6ec7cc6256c2f43ace4d1bbae915952955",
+  "branch_count": 74,
+  "master_count": 34,
+  "branch_only": 40,
+  "inherited_media_absent_from_master": 1,
+  "rows": [
+    {
+      "path": "assets/secure-boot/usos-secure-boot.cer",
+      "blob": "12ce4ae359221426b5b1ebcea0af14b092411073",
+      "bytes": 851,
+      "sha256": "1039d6f0c8cddf1769f13766edaaac4a30daf55986654655f9d41d6ea517d230",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/NVMe/MS_StorNVMe/stornvme.sys",
+      "blob": "9e1f9bb805e4d3f9daf58a71b5d69324023627bf",
+      "bytes": 50616,
+      "sha256": "040289582e64d60907703f9d1d092441505dc4820299fa203c0710d8aa4f75cb",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/uaspstor.sys",
+      "blob": "a7f0f7b36e705f1a13f0adc4bafcf5563ad4a682",
+      "bytes": 79320,
+      "sha256": "0543fc06970c4f928c9b991dc42f3d82a4a161abf48e850d50d130e2550a40e6",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/ucx01000.sys",
+      "blob": "d447c08bc0ab885e4f5476fd49d2afffd33485cf",
+      "bytes": 211952,
+      "sha256": "ae910a5f24deeabf008a8b645a693f04ef4b9b3bf9d36b5100ecabc7a80538ca",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbd8.sys",
+      "blob": "027c90be08ec86e7f86364ee1ac460e59f0c55aa",
+      "bytes": 22000,
+      "sha256": "ae140ef9b0dfcd87a11ecf8316257fe223ae04ab90edcb442a047506e9e14a32",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbhub3.sys",
+      "blob": "1eaa565c987b9bbcadcf7bf24b1e2a386dc09565",
+      "bytes": 459376,
+      "sha256": "87212491d875cfa0034d441cec154720ce66cb654fd40ef292cf2f70afb5cbd5",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows 7/Drivers/x64/USB_Generic/usbxhci.sys",
+      "blob": "0e14cc1f69489964766624f7109fb33bc0aa5536",
+      "bytes": 337904,
+      "sha256": "d736a3a2386a1ae815fe7dd839884268b48bbc7b2468883bf9ec2c3b6202316d",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Host/x64/amdxhc31.sys",
+      "blob": "ee4aecb73c8dd81fd4049baf7857ccc654fdfef5",
+      "bytes": 465248,
+      "sha256": "cd4e891937f5d4386f11c91859503bd73dccbe7472138741b7431b8c2612a16e",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows Vista/Drivers/x64/AMD_USB31_PT/Hub/x64/amdhub31.sys",
+      "blob": "741499f18c7f65fa8ceee41a460e2f301aef3513",
+      "bytes": 154464,
+      "sha256": "bc51a36d3bbb3fd155b1738b59e901ecb03809aaf3098707f73100076f008f7a",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/acpi.sys",
+      "blob": "8419c703f13f5f03fb8783c1ae42e7d6ac6be147",
+      "bytes": 327680,
+      "sha256": "2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 5048 - 2020.10.24 - daniel_k, diderius6/acpi.sys",
+      "blob": "df25c1716774c37c6d165749934011fda85e8873",
+      "bytes": 239616,
+      "sha256": "b386ca0307942806fe2b18e9f2693e133d183faea13a349f1a06958027bc3057",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 6666 - 2021.8.28 - daniel_k, diderius6/acpi.sys",
+      "blob": "8764b5555dd5303c922debc8ffa62e6a485b6b61",
+      "bytes": 195968,
+      "sha256": "c5a2d5c9627cd30d86fdd579ee2c4cdb2e4ebdd3fe92b1261195053e254f45a3",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi 7777.8 - 2024.11.7 - Dietmar/acpi.sys",
+      "blob": "e2ba51e95aa1c4f3aeecb6b9c33e4f4aecbb32b8",
+      "bytes": 185472,
+      "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/ACPI/acpi.sys",
+      "blob": "e2ba51e95aa1c4f3aeecb6b9c33e4f4aecbb32b8",
+      "bytes": 185472,
+      "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB2862330/usbd.sys",
+      "blob": "a94bb9ac5b53fdab904a5d2a9e3fea8b2cc456c5",
+      "bytes": 5760,
+      "sha256": "62d2cd8fb4acd60c47f64b8b13e388aa8c5bfcd9290bb9b149d99484fd76e8df",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB2862330/usbport.sys",
+      "blob": "0c6eb8473afc72861ef97fccccebd2b632f46c5d",
+      "bytes": 146432,
+      "sha256": "d311eed36e89f6db1fbad3ebb427856ad4346356e942f7e4d5c3370456fe5f5d",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/Win2003/KB3139398/usbstor.sys",
+      "blob": "959575970f934c641de368f87298f71fee439402",
+      "bytes": 28160,
+      "sha256": "e4a6ccc986568dbd28638c1f8a54fb41d602c7fc655b57e3ffdaff452c9ef29d",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/ntoskrn8.sys",
+      "blob": "650885a31142034cea49387d5b2af402f1fac7fe",
+      "bytes": 141952,
+      "sha256": "1f603da5938fc8a80efde4e98293b4bd20dd6a4140f825a682611e6a490325b9",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/storpor8.sys",
+      "blob": "778198b002c766ba7705173f5831736d60291665",
+      "bytes": 19456,
+      "sha256": "06f407cb155ed16730c7788ea000e9c3d70a55b0046f5786a4d7e2a2daff283a",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/Dependencies/storport.sys",
+      "blob": "309bfb80b19b32cc35b0bc8c4a60aa5a90e6f8bb",
+      "bytes": 151808,
+      "sha256": "fc49d785021de49c3649c2d2e5adddd1867212121f14327d49ffa3bc75f8d442",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/wdf01000.sys",
+      "blob": "1bb520f6659d06fdb4a125fe083d625b67cba654",
+      "bytes": 527064,
+      "sha256": "b1c119f541c46100731b5781964f1c9bed9cdf316cd73e40a5c328eba3933000",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/KMDF/wdfldr.sys",
+      "blob": "2a59b465509f019d8a6a0002fce192055d19eee5",
+      "bytes": 47720,
+      "sha256": "149de723bf02d8449fb63b71406857db54decf2dae7be0d51d003fbcf5c2a39b",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/SATA/genahci.sys",
+      "blob": "deeffe11e540215e0c6d2af8f9e4e1b25aad8586",
+      "bytes": 60928,
+      "sha256": "de7e22d16bc4d94530789c2061900a0dd5178b2967b5c302c5fe1c9296fb3edd",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/ksecd8.sys",
+      "blob": "77984a3f4a9e11de58322ad7f3be60fe08706392",
+      "bytes": 392160,
+      "sha256": "2ba1f6e253dd9a252816d6dd4aa70604f62ca5ff5c8aa683fdf788aca5a3ca58",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/uaspstor.sys",
+      "blob": "61710826dc6ba85afdded35fac5201b524cac3c3",
+      "bytes": 66048,
+      "sha256": "c18eb77252f393d75a455ac203f1dc72e2f73685ea43423715c9d593b689f418",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/ucx01000.sys",
+      "blob": "1a45ee391843137319b6423e7cf1d9edea8c3a3d",
+      "bytes": 179032,
+      "sha256": "376cc4ac12e1b1241005ef5227f45057bc381cef286d66fc9b17a5b0f84a65aa",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbd8.sys",
+      "blob": "5258ba63995192514f35ece4e79e24cf65c2edb4",
+      "bytes": 18776,
+      "sha256": "33dfba5429864696c351beb76ac1a6b5141b61a8793ca6e416ec8d0278a7ca99",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbhub3.sys",
+      "blob": "68045a249c8547161d32f252345c7e30c13ca4fb",
+      "bytes": 363328,
+      "sha256": "7648152c456e48f38fdecad3d637e5b46d86c3a2d190612772f53f6c286de90d",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/usbxhci.sys",
+      "blob": "5b7fd63bd35c5e6206dcaba40593acff7650a555",
+      "bytes": 268128,
+      "sha256": "ce3c1c5aaabd91f20edc55697f4959e39a68b9c823f63cf8dcb433220d8b57af",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86/USB3/wpprecor.sys",
+      "blob": "94392fb1b9c97ce11003c33e6508c084d95dc02a",
+      "bytes": 21232,
+      "sha256": "a2636f0b9747c032bf3bda44c9c35783f0e11d2f2ede3b6c831f2b1f420436ef",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": true
+    },
+    {
+      "path": "src/platform/bios/freedos/fdconfig.sys",
+      "blob": "feff3648217998b4d4283dcdf21ef61d139bd2b9",
+      "bytes": 95,
+      "sha256": "36bf6df0d7e3396fe863743fa73ce465a79a8d00bbb11e1132d2a9459994b567",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "src/platform/bios/msdos/windows_config.sys",
+      "blob": "98a3c6153e382be6f8b5d4ec3c607658b547d9ee",
+      "bytes": 478,
+      "sha256": "c965504457d581089d43992890120a78d48c68481cb6a4dfbefcc7ca16a8960e",
+      "present_in_master": true,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "src/platform/bios/msdos/windows_early_config.sys",
+      "blob": "e2bd5b346207ccbe8da99fa0808f595ae99a6576",
+      "bytes": 1634,
+      "sha256": "a9e369d5eff22dbe9878e2cd2d0b88f63a91bb91e94073875dfaaf101c1045ea",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/NT6/amd64/usosmpart.sys",
+      "blob": "96ed2b1c1d2894d370b16141ab4095e490d8a31e",
+      "bytes": 15360,
+      "sha256": "f5ced797ae86ad34b7e72619fe836dc8fae71db75b73e91146fa18b4e4274a7e",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/amd64/usosmpart.sys",
+      "blob": "31e976bf1600f4efdafb3c933fc9aa383afaee1d",
+      "bytes": 15360,
+      "sha256": "0998443aa1341992035f531064858280c59f8b82b4f7a3303736a5690da6429d",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosmpart/bin/i386/usosmpart.sys",
+      "blob": "19ddeadec4dc29637ec3ebf456cc57c21106a423",
+      "bytes": 10752,
+      "sha256": "3824353d5b13430e3d3a5145eb43b3c5c4c227808eebddca0a33f1b7b8bce1b4",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet.sys",
+      "blob": "2ff771a5dc1a37767a48a26ee00b180023e03bfb",
+      "bytes": 20096,
+      "sha256": "8eac15b474b23fb4e7ac2c2431a4b17e6666cc2d03788b78ec2d8e19eeef89f9",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet35.sys",
+      "blob": "34ff2559b30c527817b61155b3c20f74d3110654",
+      "bytes": 16384,
+      "sha256": "d94ec3e28014a98b6eacdcb75c5b6bc4324a68af814dc00ec8fb574f99fe4c85",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet351.sys",
+      "blob": "e345d52f69a7d0adf7f7a620b221cba3cfe9431c",
+      "bytes": 17024,
+      "sha256": "f579ef120d296eb5d19c9092f3bd87d7d97866ea2798479d5129a61b758f55cf",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/usosnet4.sys",
+      "blob": "4660784524c06c9efe734a065599813990d14c83",
+      "bytes": 21248,
+      "sha256": "89b7337c294ca0c56415cdc4e7023615a628ae8158a5a7ab80dcf6f35ca02233",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnet/bin/i386/win95-rtm/usosnet4.sys",
+      "blob": "dbe789b60151d0ffb328440c72d096394027bcfa",
+      "bytes": 20096,
+      "sha256": "e075652b41413504654eb471b6a40d5f4c4b981f23d39dfea9bba117cac1fb3e",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys",
+      "blob": "e33211e6fcb14fc2f90304f3ff84e98120b1beb0",
+      "bytes": 11776,
+      "sha256": "2b67abe8c75ac0ee40bbd4dff905d711b22b8776e4c06f0ea67852acbe65d5c4",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT31/i386/usosnvme.sys",
+      "blob": "b9183112db1324ad1c6548bfe3e61899e2494ee2",
+      "bytes": 12032,
+      "sha256": "6b8ad4a7c04ba9d3d8f0f1630ee3f971dcb6cf9c773bf987af8eb71bc8dbdab4",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT351/i386/usosnvme.sys",
+      "blob": "c85a575f069c2fd0fc73f90e32b03d6fc82f115f",
+      "bytes": 12032,
+      "sha256": "9c754f11cb8a130314236e68dfc30971d205b9e2ee664bedb911606d5aa04e5b",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys",
+      "blob": "c32a348ccb693c103921ae74f1ad1b6d085ac157",
+      "bytes": 11648,
+      "sha256": "46d6dba9e3b8b62e3b7cb6851fbc8f21bde71c51e5d605b535ed66e171b6a54b",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT6/amd64/usosnvme.sys",
+      "blob": "787d3c8278d548410236a51d9a94aa61142a3d0d",
+      "bytes": 16896,
+      "sha256": "9d4125b73c2fcaffb6f479fce3092eef2ea4d266a1b8fbbcea5650a45878cdff",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys",
+      "blob": "7a5de022df5a2bc99a2d4b404a7bcb57191fb9f8",
+      "bytes": 12288,
+      "sha256": "78cfe4da722b979bda04d0d3301aa558e9153ba3f550adc96024b4ae085a836e",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/i386/usosusb.sys",
+      "blob": "d223508f928794813dc7e1973e1bf6d9376ca302",
+      "bytes": 53504,
+      "sha256": "f4c6a0f00a36d7755892df8a7a62bc468e3bf7aae623c790289644403df1df69",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/nt31/i386/usosusb.sys",
+      "blob": "f0126a9a4880eb440f2ed3ae7a622e1d2afabab1",
+      "bytes": 32256,
+      "sha256": "f5373eb3bf829d585651bc0da7ea5b1ca9b0cf2b20a1fe74ccb5054955f3ef05",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt4/usosusb/bin/nt6/i386/usosusb.sys",
+      "blob": "01317a128b144188293fd444f9811c60b9e23bce",
+      "bytes": 56576,
+      "sha256": "754fcee0c939b4c997283a5b20c7260a90a74f5637b9eb8a7f8f91d5724be8e9",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt4/usosvbe/bin/i386/usosvbe.sys",
+      "blob": "be12233038adf2e489565a9dbdbd714abae37fce",
+      "bytes": 14208,
+      "sha256": "35bcafe45c8cb8629a3b66923ffedf66ff75ab2ea1df8b42cb0bbfb192eb90bb",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/nt4/usosvbe/bin/nt3/i386/usosvbe.sys",
+      "blob": "9fc29410f287012e916202c4fadb55cdbe476b44",
+      "bytes": 15232,
+      "sha256": "a931282919e0dda8a9f9f659462e78ef628cf815907adee6003f6c3242158366",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/2KXP/i386/ahcint.sys",
+      "blob": "9b669700c8dc04698820b8ca4939312bbaf51fab",
+      "bytes": 21504,
+      "sha256": "f5f0a8112f941f3833ac43c8104b4d169d2b6831d4ec224f9560ea10e3234f07",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys",
+      "blob": "60262634dc42b0d95b33e8973d83513b5177d392",
+      "bytes": 19712,
+      "sha256": "962db3d8b1d4882fbe6d287fc30abca3335c59fcad1d55fcffd2c47af803b53c",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys",
+      "blob": "1987cef040297d04551d3d10be1d59ded7fac42c",
+      "bytes": 19968,
+      "sha256": "40ba39c123e98ae5129751e7691a8ca5c41b9e88c269daabf3f288b90fdb6ed9",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys",
+      "blob": "bd375c5dce9c623a455ab546fa95c2f96be849cf",
+      "bytes": 19840,
+      "sha256": "f2b90a21b4889229b758dec8478254c1fa5880c30c04831a9244a6c94ea71208",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/ahcint/1.3.0.0/bin/2KXP/i386/ahcint.sys",
+      "blob": "daecc1f6fe30e72cf41e8f9329e9cbaceb3748db",
+      "bytes": 19456,
+      "sha256": "94ef734c4ba942debe990958917880f1995c08266600dc2014392bdaa22fac25",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/cregfix/f0693437/cregfix.sys",
+      "blob": "4246c67837544ea01f9e2eaf378e06b0a34d3168",
+      "bytes": 115,
+      "sha256": "fa87a564d824969ab59db9831d32c2b8c1d662574ed9f798ebfc44c8436e2314",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/freedos/1.4/KERNEL.SYS",
+      "blob": "bfe7cdfe616dc71ded366bc57fa8c370a548faa6",
+      "bytes": 46256,
+      "sha256": "932c0c155701eddb7b902f7269a1b2ce31f5c82a6dc195172f2336d18a74e1fb",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/imdisk/2.1.2/imdisk-x86.sys",
+      "blob": "bfa820e973cd14363ee40d309f9c64cc344c1a55",
+      "bytes": 45312,
+      "sha256": "87233eb7f1e417245accbce9d8e8ebbb0cff2034aa05aad1941d555b3bb7b2ac",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/imdisk/2.1.2/imdisk-x86_64.sys",
+      "blob": "46359c2344f108eaac5b25989ee5b9254c30eef4",
+      "bytes": 54016,
+      "sha256": "72873d35ee3a9d9ef1311bbb6fdefd2dfea47b4752a6f1904bbdc6dc51afd820",
+      "present_in_master": true,
+      "same_master_blob": true,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/uniata/0.47b/uniata.sys",
+      "blob": "514ea642f96298ce7bf9d0aacd668c366a96e95a",
+      "bytes": 140867,
+      "sha256": "f496db42afc5d44723be43d7731e2e220745d82af23ab30dcd3dc6d05f761679",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos2/release-x64/xhci98.sys",
+      "blob": "5e70a92cf898c3b18638c9b22c5c4a543fb5a7c0",
+      "bytes": 103936,
+      "sha256": "aedc688ed29f8a6bbc3906fb9ba204e44c8010d8fe9bd0261fd63d0e6e8843e3",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos2/release-x86/xhci98.sys",
+      "blob": "63f25b8ff88c6f163433468ced990470f78e60f1",
+      "bytes": 83968,
+      "sha256": "01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3-w9x/release-x86/xhci98.sys",
+      "blob": "a84464a9038131e02653b6898ca0b28d446bb2cf",
+      "bytes": 81920,
+      "sha256": "8e0165982e6c4059f60034bd958914ee1a3a0616af043b6272c8f0a374c4edee",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3/release-x64/xhci98.sys",
+      "blob": "81c2eca62e8c99aefe6c72d0c143319374561ad4",
+      "bytes": 105984,
+      "sha256": "c1a851087e4dac088017f71df27a85faa53565501ed74c39ca72bc0402b1f9bb",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0-usos3/release-x86/xhci98.sys",
+      "blob": "85ab7a206ec1ae062ca264de15bf3f3ef16ba9f9",
+      "bytes": 85504,
+      "sha256": "5c3f1a7adb5903b5e3e26fda8a9c5624e50217f08689b83212cfec300184e944",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0/release-x64/xhci98.sys",
+      "blob": "f0cc86f3c6565349ab875f135b2951e0cc2b61cf",
+      "bytes": 97280,
+      "sha256": "4d8a1a57b8244428c1cb427b397d36541fb2c74bbdd86f5924cd6b7184233adb",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/vendor/xhci98/1.1.1.0/release-x86/xhci98.sys",
+      "blob": "59cd53848739931750fd7235bfe5353ee09a5317",
+      "bytes": 86059,
+      "sha256": "90dd7823c0c60ebe612f56421b26c73f7f7f9a7f86ed0c96cd42bed82cc27847",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/i386/usosrst.sys",
+      "blob": "8a3411c15fda23da9482b61842a90565ad0d4d98",
+      "bytes": 16128,
+      "sha256": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt31/i386/usosrst.sys",
+      "blob": "cf150586b6d476185944b17295d7392095e38033",
+      "bytes": 19072,
+      "sha256": "98b0bd71adee35db2586f5176a5049d95a5cf0e470c16be6631d0531a6c344a9",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt35/i386/usosrst.sys",
+      "blob": "d9a617cab632ee5d523ead03cd91b81c4ea9a3e5",
+      "bytes": 19968,
+      "sha256": "f52d33255efa90172769b37a0828baaf0bd9dc896213ddd688855bdbc5b61938",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt351/i386/usosrst.sys",
+      "blob": "4f8f7ead4ed75a6aa47a3733e951594a977b7b8a",
+      "bytes": 20224,
+      "sha256": "2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    },
+    {
+      "path": "tools/w2k/usosrst/bin/nt4/i386/usosrst.sys",
+      "blob": "6c7538cea5e4f4b12d69c8683b068c65c76ebc87",
+      "bytes": 20096,
+      "sha256": "d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b",
+      "present_in_master": false,
+      "same_master_blob": false,
+      "inherited_media_payload": false
+    }
+  ],
+  "payload_copies_created": false,
+  "git_mutated": false
+}

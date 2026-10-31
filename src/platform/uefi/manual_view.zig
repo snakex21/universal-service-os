@@ -909,6 +909,26 @@ fn drawNotice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, headin
     presentFullFrame(interactive);
 }
 
+/// A full interactive frame drawn by `draw` under the menu's header (the
+/// MiniOS disk question uses the micro-Linux picker renderer). False: no
+/// graphics (console), nothing drawn.
+pub fn customFrame(context: *const anyopaque, draw: *const fn (*const anyopaque, *const Ui, gui.ui.HeaderInfo) void) bool {
+    active = .none;
+    header_clock_active = true;
+    setFooter(&.{}, "");
+    beginFullFrame();
+    var u = ui() orelse return false;
+    var clock: [48]u8 = undefined;
+    draw(context, &u, headerInfo(&clock, &u));
+    presentFullFrame(true);
+    return true;
+}
+
+/// The Ui of the visible screen (layout and hit tests of a customFrame).
+pub fn screenUi() ?Ui {
+    return ui();
+}
+
 /// Blocks until Enter, Esc or a mouse click.
 /// Like waitForDismiss, but any key or button closes the notice (the
 /// "Secure Boot must be off" notices: nothing else happens on that screen).
@@ -1046,6 +1066,61 @@ pub fn vistaCsmwrapStatus(stage: usos.flow.preparation_boot_progress.VistaCsmwra
         .title = Stage.labels[stage.number() - 1],
         .detail = detail,
     });
+}
+
+/// MiniOS is writing the disk (it draws nothing itself, ui=quiet): the
+/// preparation page at "Preparing the disk" (CSMWrap route) or the direct
+/// ISO page, the heading naming the environment ("Windows 10 - MiniOS").
+pub fn miniosStatus(route: usos.flow.minios_plan.Route, detail: []const u8, system_name: []const u8) void {
+    if (route == .gpt_uefi) {
+        windowsIsoStatus(.loading, detail);
+        return;
+    }
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    miniosStage(4, Stage.labels[3], detail, system_name);
+}
+
+/// The CSMWrap route's five-stage page at `current` with the micro-Linux
+/// step's own title (vista_csmwrap_prepare.sh usos_ui_stage: "Detecting
+/// disks", "Inspecting disk", "Preparing the disk"), headed by the system
+/// as on Alpine (USOS_UI_HEADING=$NT5_NAME, e.g. "Windows 10").
+pub fn miniosStage(current: u8, title: []const u8, detail: []const u8, system_name: []const u8) void {
+    progress(miniosStageState(current, title, detail, system_name));
+}
+
+pub fn miniosStageState(current: u8, title: []const u8, detail: []const u8, system_name: []const u8) gui.preparation_screen.State {
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    return .{
+        .mode = .stage,
+        .current = current,
+        .total = @intCast(Stage.labels.len),
+        .labels = &Stage.labels,
+        .heading = system_name,
+        .title = title,
+        .detail = detail,
+    };
+}
+
+/// vista_csmwrap_prepare.sh stage 5 (usos_ui_notice_continue): the
+/// preparation page in done mode, every stage done, the notice and the
+/// logon line under the card, the Enter action ("Restart").
+pub fn miniosDoneState(title: []const u8, notice_text: []const u8, action: []const u8, logon: []const u8, system_name: []const u8) gui.preparation_screen.State {
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    return .{
+        .mode = .done,
+        .current = @intCast(Stage.labels.len),
+        .total = @intCast(Stage.labels.len),
+        .labels = &Stage.labels,
+        .heading = system_name,
+        .title = title,
+        .percent = 100,
+        .notice = notice_text,
+        .action = action,
+        .logon = logon,
+    };
+}
+pub fn miniosDone(title: []const u8, notice_text: []const u8, action: []const u8, logon: []const u8, system_name: []const u8) void {
+    progress(miniosDoneState(title, notice_text, action, logon, system_name));
 }
 
 fn progress(state: gui.preparation_screen.State) void {

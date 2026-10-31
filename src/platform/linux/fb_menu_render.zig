@@ -9,6 +9,10 @@ const fb_i18n = @import("fb_i18n.zig");
 const disk_badge = @import("fb_disk_badge.zig");
 const Ui = usos.gui.ui.Ui;
 const Rect = usos.gui.ui.Rect;
+/// The menu state and the disk chips, for the UEFI menu's import of this
+/// file (build.zig module "fb_menu").
+pub const menu_model = model;
+pub const disk_badges = disk_badge;
 
 pub const Layout = struct {
     list: Ui.List,
@@ -94,11 +98,18 @@ pub fn render(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32, mou
 }
 
 pub fn renderWith(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32, mouse_visible: bool, gamepad: bool) void {
+    var clock_buffer: [48]u8 = undefined;
+    renderPage(ui, fb_i18n.header(ui, &clock_buffer), state, mouse_x, mouse_y, mouse_visible, gamepad);
+}
+
+/// The whole page under a given header. The USOS UEFI menu draws the MiniOS
+/// disk question with it (src/platform/uefi/minios_disk.zig), so that
+/// question looks exactly like this micro-Linux picker.
+pub fn renderPage(ui: *const Ui, header: usos.gui.ui.HeaderInfo, state: model.State, mouse_x: i32, mouse_y: i32, mouse_visible: bool, gamepad: bool) void {
     const theme = ui.theme;
     const layout = Layout.init(ui, state);
-    var clock_buffer: [48]u8 = undefined;
     ui.clear();
-    ui.header(fb_i18n.header(ui, &clock_buffer));
+    ui.header(header);
     var title_buffer: [192]u8 = undefined;
     var subtitle_buffer: [256]u8 = undefined;
     ui.pageTitle(ui.tr(&title_buffer, state.title), ui.tr(&subtitle_buffer, state.subtitle));

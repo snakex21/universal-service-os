@@ -32,13 +32,13 @@ def reg(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     return r
 
 
-def value(key: str) -> int | None:
-    r = reg("query", key, "/v", "HiberbootEnabled", check=False)
+def value(key: str, name: str = "HiberbootEnabled") -> int | None:
+    r = reg("query", key, "/v", name, check=False)
     if r.returncode:
         return None
     for line in r.stdout.splitlines():
         parts = line.split(None, 2)
-        if len(parts) == 3 and parts[0] == "HiberbootEnabled":
+        if len(parts) == 3 and parts[0] == name:
             return int(parts[2], 16) if parts[2].lower().startswith("0x") else int(parts[2])
     return None
 
@@ -48,6 +48,9 @@ def setup() -> None:
     reg("add", "HKCU\\" + KEY + r"\Select", "/v", "Current", "/t", "REG_DWORD", "/d", "1", "/f")
     reg("add", "HKCU\\" + KEY + r"\ControlSet001\Control\Session Manager\Power", "/f")
     reg("add", "HKCU\\" + KEY + r"\ControlSet002\Control\Session Manager\Power", "/f")
+    # The diagnostic AutoReboot edit (2026-10-31); CrashDumpEnabled is only read.
+    reg("add", "HKCU\\" + KEY + r"\ControlSet001\Control\CrashControl", "/v", "CrashDumpEnabled", "/t", "REG_DWORD", "/d", "7", "/f")
+    reg("add", "HKCU\\" + KEY + r"\ControlSet001\Control\CrashControl", "/v", "AutoReboot", "/t", "REG_DWORD", "/d", "1", "/f")
 
 
 def helper() -> None:
@@ -58,14 +61,21 @@ def helper() -> None:
     try:
         p1 = "HKCU\\" + KEY + r"\ControlSet001\Control\Session Manager\Power"
         p2 = "HKCU\\" + KEY + r"\ControlSet002\Control\Session Manager\Power"
+        c1 = "HKCU\\" + KEY + r"\ControlSet001\Control\CrashControl"
+        c2 = "HKCU\\" + KEY + r"\ControlSet002\Control\CrashControl"
         assert subprocess.run([str(EXE), "faststartup-test", KEY]).returncode == 0
         assert value(p1) == 0 and value(p2) is None
+        # Diagnostic: AutoReboot 1 -> 0 in the same control set, CrashDumpEnabled kept.
+        assert value(c1, "AutoReboot") == 0 and value(c1, "CrashDumpEnabled") == 7
+        assert value(c2, "AutoReboot") is None
         # Idempotent: the second run reports "already 0".
         assert subprocess.run([str(EXE), "faststartup-test", KEY]).returncode == 1
         # The next boot's control set is the one edited (Select\Current=2).
         reg("add", "HKCU\\" + KEY + r"\Select", "/v", "Current", "/t", "REG_DWORD", "/d", "2", "/f")
         assert subprocess.run([str(EXE), "faststartup-test", KEY]).returncode == 0
         assert value(p2) == 0
+        # No CrashControl key yet in ControlSet002: created with AutoReboot=0.
+        assert value(c2, "AutoReboot") == 0 and value(c2, "CrashDumpEnabled") is None
         # A value that is not 0 is replaced.
         reg("add", p2, "/v", "HiberbootEnabled", "/t", "REG_DWORD", "/d", "1", "/f")
         assert subprocess.run([str(EXE), "faststartup-test", KEY]).returncode == 0
@@ -77,7 +87,7 @@ def helper() -> None:
         assert value(p1) == 0
         # A missing SYSTEM root (no ControlSet at all) is an error, never a crash.
         assert subprocess.run([str(EXE), "faststartup-test", KEY + r"\Nope"]).returncode == 99
-        print("[helper] ControlSet00N from Select\\Current, 0 written, idempotent, non-zero replaced")
+        print("[helper] ControlSet00N from Select\\Current, 0 written, idempotent, non-zero replaced; diagnostic AutoReboot=0, CrashDumpEnabled kept")
     finally:
         reg("delete", "HKCU\\" + KEY, "/f", check=False)
 
@@ -95,6 +105,10 @@ def wiring() -> None:
     header = (ROOT / "tools/windows_fast_startup.h").read_text(encoding="utf-8")
     assert r"C:\Session Manager\Power" not in header and "Session Manager\\\\Power" in header
     assert "HiberbootEnabled" in header and "USOS_FASTSTARTUP" in header
+    # Diagnostic 2026-10-31: AutoReboot=0 in the same hive load, also with
+    # fast-startup-on.txt (HiberbootEnabled then skipped); CrashDumpEnabled read only.
+    assert 'L"AutoReboot", 0, REG_DWORD' in header and 'RegSetValueExW(crash, L"CrashDumpEnabled"' not in header
+    assert "usos_fs_hiberboot = FALSE;" in c and "DIAGNOSTIC CrashControl AutoReboot=0 written" in c
     answer = (ROOT / "src/flow/answer/autounattend.zig").read_text(encoding="utf-8")
     assert "/v HiberbootEnabled /t REG_DWORD /d 0 /f" in answer
     assert ".windows_8, .windows_8_1, .windows_10, .windows_11 => true" in answer

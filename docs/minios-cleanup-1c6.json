@@ -1,0 +1,225 @@
+{
+  "schema": "minios-1c6-approved-cleanup-v1",
+  "head": "112af328507521af9b278405beed2aaceab300e9",
+  "dirty": 0,
+  "authorization": "Explicit user instruction MiniOS1c6, 2026-10-26",
+  "authorization_date": "2026-10-26",
+  "proposal_sha256": "468d0ae88b61f1d980e8618aeaff9f8c275b78b26c6985c378ba070e5653f90b",
+  "files": [
+    {
+      "path": "1c1/e2e-win11-01/target.raw",
+      "bytes": 17179869184,
+      "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c1/e2e-win11-01/result.json",
+      "passed": true,
+      "diagnostic_completed": null,
+      "timed_out": null
+    },
+    {
+      "path": "1c1/e2e-win7-01/target.raw",
+      "bytes": 6442450944,
+      "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c1/e2e-win7-01/result.json",
+      "passed": true,
+      "diagnostic_completed": null,
+      "timed_out": null
+    },
+    {
+      "path": "1c4/win11-final/whpx128-01/target.qcow2",
+      "bytes": 3465150464,
+      "sha256": "f88d2fb86cc2939dc14ccd8824a3ac281bdc296cddff74285ca783a5df35507e",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c4/win11-final/whpx128-01/result.json",
+      "passed": false,
+      "diagnostic_completed": null,
+      "timed_out": true
+    },
+    {
+      "path": "1c5/pm-probes/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "23d27ab268b0e10ef9c167cb80a3b8f8667135fcc2f583812a1e144bc2a7612b",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/pm-probes/off/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/pm-probes/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "18a783f65e8ea02962c890723f7d17c7aad55d52806ae9ded59198b1d2b6558a",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/pm-probes/on/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/tsc-probes/off/target.qcow2",
+      "bytes": 197120,
+      "sha256": "5e81d1eed9c30e0af81c97defb17264e54cf80ab0639d41a28cce180bb6f63bd",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/tsc-probes/off/result.json",
+      "passed": false,
+      "diagnostic_completed": false,
+      "timed_out": true
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "f9823ab3db107ad230f72b23832a6bb0a9aaf090041c3ce49a1fc12f66bc743c",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/isolated-probes/pm-off/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "c9fad76c422fe9d4a9464c8420a1118ddb86288c5718109fc3597c31d4f3e2a0",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/isolated-probes/pm-on/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "3a6874e23c36c3806b2cdcdba344b3610231c1bb64d139acfac3f20a82cde5fd",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/isolated-probes/tsc-off/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "cab286b662bc0ec440ea6ea11dafe701b88debb866da2f9f90cb8993949ec525",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/isolated-probes/tsc-on/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "9a06080f39681c73b02534d8b81e5392fe8292817be3368b304ebe32c2ce5dab",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/isolated-probes/no-combine/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/buffer-reverse/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "1af08d11e41f111907e7cc7d9286da703dd0d8a2b1a2cce36a49f36efa078787",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/buffer-reverse/off/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/buffer-reverse/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "dccc94164994bb381fa47f90f5af1d3d43490f8018d324b70d23b26a029ee2ee",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/buffer-reverse/on/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "907c85ecf9a4cef8723df10615d9727dd14f533c06bf7f1252ff5f7e9a81fc17",
+      "hash_basis": "completed receipt; rehash required before deletion",
+      "receipt": "1c5/buffer-reverse/production-off/result.json",
+      "passed": false,
+      "diagnostic_completed": true,
+      "timed_out": false
+    }
+  ],
+  "all_verified_before_delete": true,
+  "deleted": [
+    {
+      "path": "1c1/e2e-win11-01/target.raw",
+      "bytes": 17179869184,
+      "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080"
+    },
+    {
+      "path": "1c1/e2e-win7-01/target.raw",
+      "bytes": 6442450944,
+      "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57"
+    },
+    {
+      "path": "1c4/win11-final/whpx128-01/target.qcow2",
+      "bytes": 3465150464,
+      "sha256": "f88d2fb86cc2939dc14ccd8824a3ac281bdc296cddff74285ca783a5df35507e"
+    },
+    {
+      "path": "1c5/pm-probes/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "23d27ab268b0e10ef9c167cb80a3b8f8667135fcc2f583812a1e144bc2a7612b"
+    },
+    {
+      "path": "1c5/pm-probes/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "18a783f65e8ea02962c890723f7d17c7aad55d52806ae9ded59198b1d2b6558a"
+    },
+    {
+      "path": "1c5/tsc-probes/off/target.qcow2",
+      "bytes": 197120,
+      "sha256": "5e81d1eed9c30e0af81c97defb17264e54cf80ab0639d41a28cce180bb6f63bd"
+    },
+    {
+      "path": "1c5/isolated-probes/pm-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "f9823ab3db107ad230f72b23832a6bb0a9aaf090041c3ce49a1fc12f66bc743c"
+    },
+    {
+      "path": "1c5/isolated-probes/pm-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "c9fad76c422fe9d4a9464c8420a1118ddb86288c5718109fc3597c31d4f3e2a0"
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "3a6874e23c36c3806b2cdcdba344b3610231c1bb64d139acfac3f20a82cde5fd"
+    },
+    {
+      "path": "1c5/isolated-probes/tsc-on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "cab286b662bc0ec440ea6ea11dafe701b88debb866da2f9f90cb8993949ec525"
+    },
+    {
+      "path": "1c5/isolated-probes/no-combine/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "9a06080f39681c73b02534d8b81e5392fe8292817be3368b304ebe32c2ce5dab"
+    },
+    {
+      "path": "1c5/buffer-reverse/off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "1af08d11e41f111907e7cc7d9286da703dd0d8a2b1a2cce36a49f36efa078787"
+    },
+    {
+      "path": "1c5/buffer-reverse/on/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "dccc94164994bb381fa47f90f5af1d3d43490f8018d324b70d23b26a029ee2ee"
+    },
+    {
+      "path": "1c5/buffer-reverse/production-off/target.qcow2",
+      "bytes": 1055916032,
+      "sha256": "907c85ecf9a4cef8723df10615d9727dd14f533c06bf7f1252ff5f7e9a81fc17"
+    }
+  ],
+  "small_evidence_preserved": true,
+  "complete": true
+}

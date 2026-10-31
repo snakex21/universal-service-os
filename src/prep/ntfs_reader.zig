@@ -1,0 +1,1715 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// MiniOS-specific fork of our src/storage/ntfs.zig at21113b5b. The normal
+// USOS reader is unchanged. New MFT resolution is our implementation after
+// examining local NT5 base/fs/ntfs/{ntfs.h,attrsup.c,mftsup.c}; no NT5 code copied.
+const random_reader = @import("ntfs_read_io.zig");
+pub const Reader = random_reader.Reader;
+const libstd = @import("std");
+
+pub const Error = random_reader.Error || error{
+    InvalidBPB,
+    UnsupportedSectorSize,
+    UnsupportedClusterSize,
+    UnsupportedRecordSize,
+    PartitionBounds,
+    InvalidMftSignature,
+    InvalidIndexSignature,
+    InvalidFixup,
+    InvalidAttribute,
+    MissingMftData,
+    MissingIndexRoot,
+    MissingIndexAllocation,
+    RunlistBounds,
+    RunlistLoop,
+    RunlistTooFragmented,
+    SparseMetadata,
+    InvalidIndex,
+    IndexLoop,
+    IndexTooDeep,
+    NotFound,
+    NotDirectory,
+    DirectoryTooLarge,
+    UnsupportedName,
+    NotFile,
+    UnsupportedFileData,
+    UnsupportedReparsePoint,
+    UnsupportedCompression,
+    AttributeListBounds,
+    AttributeListMismatch,
+    UnsupportedMftAttributeList,
+    UnsupportedVolumeState,
+    UnsupportedNtfsVersion,
+    InvalidVolumeInformation,
+    UnsupportedUpcase,
+};
+
+pub const Partition = struct {
+    start_bytes: u64,
+    size_bytes: u64,
+};
+
+pub const DirectoryItem = struct {
+    name: [260]u16 = [_]u16{0} ** 260,
+    name_len: u16 = 0,
+    file_reference: u64 = 0,
+    attributes: u32 = 0,
+    size: u64 = 0,
+    namespace: u8 = 0,
+
+    pub fn isDirectory(self: DirectoryItem) bool {
+        return (self.attributes & 0x10000000) != 0;
+    }
+
+    pub fn copyNameAscii(self: DirectoryItem, output: []u8) usize {
+        const wanted: usize = @intCast(self.name_len);
+        const count = @min(wanted, output.len);
+        for (0..count) |index| {
+            const unit = self.name[index];
+            output[index] = if (unit <= 0x7f) @intCast(unit) else '?';
+        }
+        return count;
+    }
+};
+
+pub const DirectoryInfo = struct {
+    record_number: u64,
+    uses_index_allocation: bool,
+    index_run_count: usize = 0,
+    first_index_lcn: ?u64 = null,
+};
+
+pub const BootSectorProbe = struct {
+    oem_ntfs: bool,
+    boot_signature_valid: bool,
+    bytes_per_sector: u16,
+    sectors_per_cluster: u8,
+    total_sectors: u64,
+    mft_lcn: u64,
+    mft_mirror_lcn: u64,
+    file_record_code: i8,
+    index_record_code: i8,
+};
+
+pub const DirectoryPage = struct {
+    count: usize,
+    has_more: bool,
+};
+
+const max_runs: usize = 128;
+const max_file_record_bytes: usize = 4096;
+const max_index_record_bytes: usize = 16384;
+const max_index_children: usize = 256;
+
+const Run = struct {
+    vcn: u64,
+    lcn: i64,
+    clusters: u64,
+    sparse: bool,
+};
+
+const Stream = struct {
+    /// Only runs[0..len] are valid. No default contents: a zero-filled
+    /// default is a 3.5 KiB constant copied into every Stream{} (Legacy Core).
+    runs: [max_runs]Run = undefined,
+    len: usize = 0,
+    data_size: u64 = 0,
+
+    fn append(self: *Stream, run: Run) Error!void {
+        if (self.len >= self.runs.len) return error.RunlistTooFragmented;
+        if (!run.sparse) {
+            const new_start: u64 = @intCast(run.lcn);
+            const new_end = addU64(new_start, run.clusters) orelse return error.RunlistBounds;
+            for (self.runs[0..self.len]) |existing| {
+                if (existing.sparse) continue;
+                const old_start: u64 = @intCast(existing.lcn);
+                const old_end = addU64(old_start, existing.clusters) orelse return error.RunlistBounds;
+                if (new_start < old_end and old_start < new_end) return error.RunlistLoop;
+            }
+        }
+        self.runs[self.len] = run;
+        self.len += 1;
+    }
+};
+
+pub const FileSystem = struct {
+    partition: Partition,
+    bytes_per_sector: u16,
+    sectors_per_cluster: u8,
+    cluster_bytes: u32,
+    cluster_shift: u8,
+    total_sectors: u64,
+    total_clusters: u64,
+    mft_lcn: u64,
+    mft_mirror_lcn: u64,
+    file_record_bytes: u32,
+    index_record_bytes: u32,
+    mft_stream: Stream,
+    mft_heap: ?*LargeFile = null,
+    upcase: []u16 = &.{},
+
+    pub fn deinit(self: *FileSystem) void {
+        if (self.mft_heap) |stream| {
+            const a = stream.allocator;
+            if (self.upcase.len != 0) a.free(self.upcase);
+            self.upcase = &.{};
+            stream.deinit();
+            a.destroy(stream);
+            self.mft_heap = null;
+        }
+    }
+
+    pub fn mftRunCount(self: FileSystem) usize {
+        return if (self.mft_heap) |stream| stream.runCount() else self.mft_stream.len;
+    }
+};
+
+pub fn probeBootSector(reader: random_reader.Reader, partition: Partition) Error!BootSectorProbe {
+    if (partition.size_bytes < 512) return error.PartitionBounds;
+    var boot: [512]u8 = undefined;
+    try readPartition(reader, partition, 0, &boot);
+    return .{
+        .oem_ntfs = bytesEqual(boot[3..11], "NTFS    "),
+        .boot_signature_valid = boot[510] == 0x55 and boot[511] == 0xaa,
+        .bytes_per_sector = le16(boot[11..13]),
+        .sectors_per_cluster = boot[13],
+        .total_sectors = le64(boot[40..48]),
+        .mft_lcn = le64(boot[48..56]),
+        .mft_mirror_lcn = le64(boot[56..64]),
+        .file_record_code = @bitCast(boot[64]),
+        .index_record_code = @bitCast(boot[68]),
+    };
+}
+
+pub fn mount(reader: random_reader.Reader, partition: Partition) Error!FileSystem {
+    // Errors are returned through a small error union: returning a comptime
+    // error from a function whose payload is the 3.6 KiB FileSystem makes the
+    // compiler emit one zero-filled 3.6 KiB constant per error (Legacy Core).
+    var fs: FileSystem = undefined;
+    try mountInto(reader, partition, &fs, false);
+    return fs;
+}
+
+/// Local NT5 references: ntfs.h ATTRIBUTE_LIST_ENTRY; attrsup.c
+/// NtfsLookupExternalAttribute/NtfsMapAttributeValue; mftsup.c NtfsReadMftRecord.
+/// Resolve the MFT's own runlist progressively. Only records already covered by
+/// the known prefix are readable; no physical-contiguity guess or recursive IO.
+pub fn mountAllocated(reader: random_reader.Reader, partition: Partition, allocator: libstd.mem.Allocator) !FileSystem {
+    var fs: FileSystem = undefined;
+    try mountInto(reader, partition, &fs, true);
+    const stream = try allocator.create(LargeFile);
+    stream.* = .{ .allocator = allocator, .strict_metadata = true };
+    fs.mft_heap = stream;
+    errdefer fs.deinit();
+    var storage: [max_file_record_bytes]u8 = undefined;
+    const base = storage[0..fs.file_record_bytes];
+    try readPartition(reader, partition, try checkedMul(fs.mft_lcn, fs.cluster_bytes), base);
+    try validateAndFixRecord(base, fs.bytes_per_sector, "FILE", error.InvalidMftSignature);
+    if ((le16(base[22..24]) & 3) != 1 or le64(base[32..40]) != 0) return error.AttributeListMismatch;
+    const base_sequence = le16(base[16..18]);
+    if (base_sequence == 0) return error.AttributeListMismatch;
+    const data = (try findAttribute(base, 0x80, null)) orelse return error.MissingMftData;
+    const base_instance = le16(data[14..16]);
+    var next = try stream.dataAttribute(&fs, data, 0);
+    if (stream.resident.len != 0 or stream.runs.items.len == 0 or stream.data_size < fs.file_record_bytes or
+        stream.runs.items[0].lcn != @as(i64, @intCast(fs.mft_lcn))) return error.MissingMftData;
+    if (try findAttribute(base, 0x20, null)) |list_attr| {
+        const list = try readAttributeList(&fs, reader, base, list_attr, allocator);
+        defer allocator.free(list);
+        var cursor: usize = 0;
+        var count: usize = 0;
+        while (cursor < list.len) {
+            const entry = try listEntry(list, cursor);
+            cursor += entry.len;
+            if (entry.kind != 0x80 or entry.name_len != 0) continue;
+            if (count >= LargeFile.run_limit) return error.AttributeListBounds;
+            const number = entry.reference & 0x0000ffffffffffff;
+            const seq: u16 = @intCast(entry.reference >> 48);
+            if (count == 0) {
+                if (number != 0 or seq != base_sequence or entry.lowest != 0 or entry.instance != base_instance)
+                    return error.AttributeListMismatch;
+            } else {
+                if (entry.lowest != next or number == 0) return error.AttributeListMismatch;
+                const record = try readMftRecord(fs, reader, number, &storage);
+                if ((le16(record[22..24]) & 3) != 1 or seq != le16(record[16..18]) or
+                    le64(record[32..40]) != @as(u64, base_sequence) << 48) return error.AttributeListMismatch;
+                const segment = (try findAttribute(record, 0x80, entry.instance)) orelse return error.AttributeListMismatch;
+                next = try stream.dataAttribute(&fs, segment, next);
+            }
+            count += 1;
+        }
+        if (count == 0) return error.AttributeListMismatch;
+    }
+    if (stream.data_size > try checkedMul(next, fs.cluster_bytes)) return error.AttributeListMismatch;
+    try checkCleanVolume(&fs,reader);
+    // NT5 colatsup.c/namesup.c use the volume's Unicode table, not the host
+    // locale. Read it through the resolved MFT and keep its bounded table.
+    var table_file: LargeFile=undefined;
+    try largeFileFromReference(&fs,reader,10,allocator,&table_file);
+    defer table_file.deinit();
+    if (table_file.size()<256 or table_file.size()>131072 or table_file.size()%2!=0) return error.UnsupportedUpcase;
+    fs.upcase=try allocator.alloc(u16,@intCast(table_file.size()/2));
+    const table_bytes=libstd.mem.sliceAsBytes(fs.upcase);
+    var table_at: usize=0;
+    while(table_at<table_bytes.len) {
+        const n=@min(@as(usize,65536),table_bytes.len-table_at);
+        try table_file.readAt(&fs,reader,table_at,table_bytes[table_at..][0..n]);
+        table_at+=n;
+    }
+    for(fs.upcase) |*unit| unit.*=libstd.mem.littleToNative(u16,unit.*);
+    if(fs.upcase[0]!=0 or fs.upcase['a']!='A' or fs.upcase['Z']!='Z') return error.UnsupportedUpcase;
+    for(fs.upcase) |unit| {
+        if(unit<fs.upcase.len and fs.upcase[unit]!=unit) return error.UnsupportedUpcase;
+    }
+    return fs;
+}
+
+/// NT5 ntfs.h VOLUME_INFORMATION and VOLUME_* flags. No repair, upgrade or
+/// journal replay is attempted against a read-only installation source.
+pub fn checkCleanVolume(fs: *const FileSystem,reader: Reader) Error!void {
+    var storage: [max_file_record_bytes]u8=undefined;
+    const record=try readMftRecord(fs.*,reader,3,&storage);
+    if((le16(record[22..24])&3)!=1) return error.InvalidVolumeInformation;
+    const attr=(try findAttribute(record,0x70,null)) orelse return error.InvalidVolumeInformation;
+    if(attr[8]!=0) return error.InvalidVolumeInformation;
+    const at: usize=le16(attr[20..22]);const n: usize=le32(attr[16..20]);
+    if(at<24 or at>attr.len or n>attr.len-at or n<12) return error.InvalidVolumeInformation;
+    const info=attr[at..][0..n];
+    if(info[8]!=3 or info[9]>1) return error.UnsupportedNtfsVersion;
+    // NT4-mounted and historical chkdsk bits do not request replay/repair.
+    // 0x0080: set by Windows 10 on a volume it has mounted read-write and that
+    // was removed without a dismount (the Kingston DATA, X470 2026-10-31,
+    // "fsutil dirty" not dirty); no replay or repair is requested, and this
+    // reader never writes. Dirty, resize-log, upgrade, delete-USN, object-ID
+    // repair or unknown state is refused rather than silently clearing it.
+    if(le16(info[10..12])&~@as(u16,0xc088)!=0) return error.UnsupportedVolumeState;
+}
+
+pub fn namesEqual(fs: *const FileSystem,left: []const u16,right: []const u16) bool {
+    return namesEqualTable(fs.upcase,left,right);
+}
+fn namesEqualTable(table: []const u16,left: []const u16,right: []const u16) bool {
+    if(left.len!=right.len) return false;
+    for(left,right) |a,b| {
+        const x=if(a<table.len) table[a] else if(a>='a' and a<='z') a-32 else a;
+        const y=if(b<table.len) table[b] else if(b>='a' and b<='z') b-32 else b;
+        if(x!=y) return false;
+    }
+    return true;
+}
+
+const ListEntry = struct { len: usize, kind: u32, name_len: usize, lowest: u64, reference: u64, instance: u16 };
+fn listEntry(list: []const u8, at: usize) Error!ListEntry {
+    if (at > list.len or list.len - at < 26) return error.AttributeListBounds;
+    const item = list[at..];
+    const n: usize = le16(item[4..6]);
+    const names: usize = item[6];
+    const name_at: usize = item[7];
+    if (n < 26 or n % 8 != 0 or n > item.len or
+        (names != 0 and (name_at < 26 or name_at > n or names * 2 > n - name_at))) return error.AttributeListBounds;
+    return .{ .len = n, .kind = le32(item[0..4]), .name_len = names, .lowest = le64(item[8..16]),
+        .reference = le64(item[16..24]), .instance = le16(item[24..26]) };
+}
+
+fn mountInto(reader: random_reader.Reader, partition: Partition, out: *FileSystem, heap_bootstrap: bool) Error!void {
+    const probe = try probeBootSector(reader, partition);
+    if (!probe.oem_ntfs or !probe.boot_signature_valid) return error.InvalidBPB;
+
+    const bytes_per_sector = probe.bytes_per_sector;
+    if (bytes_per_sector < 512 or bytes_per_sector > 4096 or !isPowerOfTwo(bytes_per_sector)) return error.UnsupportedSectorSize;
+    const sectors_per_cluster = probe.sectors_per_cluster;
+    if (sectors_per_cluster == 0 or sectors_per_cluster > 128 or !isPowerOfTwo(sectors_per_cluster)) return error.UnsupportedClusterSize;
+    const cluster_bytes_u64 = mulU64(bytes_per_sector, sectors_per_cluster) orelse return error.PartitionBounds;
+    if (cluster_bytes_u64 > 65536) return error.UnsupportedClusterSize;
+    const cluster_bytes: u32 = @intCast(cluster_bytes_u64);
+    const cluster_shift = powerOfTwoShift(cluster_bytes) orelse return error.UnsupportedClusterSize;
+
+    const total_sectors = probe.total_sectors;
+    if (total_sectors == 0) return error.InvalidBPB;
+    const total_bytes = mulU64(total_sectors, bytes_per_sector) orelse return error.PartitionBounds;
+    if (total_bytes > partition.size_bytes) return error.PartitionBounds;
+    const sectors_per_cluster_shift = powerOfTwoShift(sectors_per_cluster) orelse return error.UnsupportedClusterSize;
+    const total_clusters = shiftRightU64(total_sectors, sectors_per_cluster_shift);
+    if (total_clusters == 0) return error.InvalidBPB;
+
+    const mft_lcn = probe.mft_lcn;
+    const mft_mirror_lcn = probe.mft_mirror_lcn;
+    if (mft_lcn >= total_clusters or mft_mirror_lcn >= total_clusters) return error.InvalidBPB;
+
+    const file_record_bytes = try encodedRecordBytes(probe.file_record_code, cluster_bytes);
+    const index_record_bytes = try encodedRecordBytes(probe.index_record_code, cluster_bytes);
+    if (file_record_bytes > max_file_record_bytes or index_record_bytes > max_index_record_bytes) return error.UnsupportedRecordSize;
+    if (file_record_bytes < bytes_per_sector or index_record_bytes < bytes_per_sector) return error.UnsupportedRecordSize;
+    if (file_record_bytes % bytes_per_sector != 0 or index_record_bytes % bytes_per_sector != 0) return error.UnsupportedRecordSize;
+
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = record_storage[0..file_record_bytes];
+    const mft_byte = mulU64(mft_lcn, cluster_bytes) orelse return error.PartitionBounds;
+    try readPartition(reader, partition, mft_byte, record);
+    try validateAndFixRecord(record, bytes_per_sector, "FILE", error.InvalidMftSignature);
+
+    // Bootstrapping a fragmented MFT through its own extension records needs
+    // a separate resolver. Never silently use only its first DATA extent.
+    if (!heap_bootstrap) if (try findAttribute(record,0x20,null)) |_| return error.UnsupportedMftAttributeList;
+
+    const mft_stream = if (heap_bootstrap) Stream{} else try collectStream(record, 0x80, null, cluster_bytes, total_clusters);
+    if (!heap_bootstrap) {
+        if (mft_stream.len == 0 or mft_stream.data_size < file_record_bytes) return error.MissingMftData;
+        if (mft_stream.runs[0].sparse or mft_stream.runs[0].vcn != 0 or mft_stream.runs[0].lcn != @as(i64, @intCast(mft_lcn))) return error.InvalidAttribute;
+    }
+
+    out.* = .{
+        .partition = partition,
+        .bytes_per_sector = bytes_per_sector,
+        .sectors_per_cluster = sectors_per_cluster,
+        .cluster_bytes = cluster_bytes,
+        .cluster_shift = cluster_shift,
+        .total_sectors = total_sectors,
+        .total_clusters = total_clusters,
+        .mft_lcn = mft_lcn,
+        .mft_mirror_lcn = mft_mirror_lcn,
+        .file_record_bytes = file_record_bytes,
+        .index_record_bytes = index_record_bytes,
+        .mft_stream = mft_stream,
+    };
+}
+
+pub fn listDirectory(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16, output: []DirectoryItem) Error!usize {
+    const page = try listDirectoryPage(fs, reader, components, 0, output);
+    if (page.has_more) return error.DirectoryTooLarge;
+    return page.count;
+}
+
+pub fn listDirectoryPage(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16, skip: usize, output: []DirectoryItem) Error!DirectoryPage {
+    const record_number = try resolveDirectory(fs, reader, components);
+    var scan = DirectoryScan{ .output = output, .skip = skip };
+    try scanDirectory(fs, reader, record_number, &scan);
+    return .{ .count = scan.count, .has_more = scan.truncated };
+}
+
+pub fn directoryInfo(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16) Error!DirectoryInfo {
+    const record_number = try resolveDirectory(fs, reader, components);
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs, reader, record_number, &record_storage);
+    if ((le16(record[22..24]) & 0x0002) == 0) return error.NotDirectory;
+    const root = try findIndexRoot(record);
+    if (!root.large) return .{ .record_number = record_number, .uses_index_allocation = false };
+    const allocation = try collectStream(record, 0xa0, "$I30", fs.cluster_bytes, fs.total_clusters);
+    if (allocation.len == 0) return error.MissingIndexAllocation;
+    const first = allocation.runs[0];
+    return .{
+        .record_number = record_number,
+        .uses_index_allocation = true,
+        .index_run_count = allocation.len,
+        .first_index_lcn = if (first.sparse) null else @as(u64, @intCast(first.lcn)),
+    };
+}
+
+/// A read-only unnamed DATA stream. Resolve the runlist once, then reuse it
+/// for large ISO reads instead of rescanning the directory/MFT for each block.
+pub const File = struct {
+    stream: Stream = .{},
+    resident: [max_file_record_bytes]u8 = undefined,
+    resident_len: ?usize = null,
+
+    pub fn size(self: *const File) u64 {
+        return if (self.resident_len) |n| n else self.stream.data_size;
+    }
+
+    pub fn readAt(self: *const File, fs: FileSystem, reader: random_reader.Reader, offset: u64, output: []u8) Error!void {
+        if (offset > self.size() or output.len > self.size() - offset) return error.OutOfBounds;
+        if (self.resident_len != null) {
+            const start: usize = @intCast(offset);
+            @memcpy(output, self.resident[start..][0..output.len]);
+        } else {
+            try readStream(fs, reader, self.stream, offset, output);
+        }
+    }
+};
+
+pub fn openFile(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16, output: *File) Error!void {
+    const reference = try resolveFileReference(fs,reader,components);
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs, reader, reference, &record_storage);
+    if ((le16(record[22..24]) & 3) != 1) return error.NotFile;
+    try rejectReparse(record);
+    try fileFromRecord(record, fs.cluster_bytes, fs.total_clusters, output);
+}
+
+fn resolveFileReference(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16) Error!u64 {
+    if (components.len == 0) return error.NotFile;
+    const parent = try resolveDirectory(fs, reader, components[0 .. components.len - 1]);
+    const name = components[components.len - 1];
+    var scan = DirectoryScan{ .wanted = name };
+    try scanDirectory(fs, reader, parent, &scan);
+    var reference: ?u64 = if (scan.found) |found| found.file_reference else null;
+    if (reference == null) {
+        for (scan.alias_refs[0..scan.alias_len]) |candidate| {
+            if (try recordHasMatchingFileName(fs, reader, candidate, name)) {
+                reference = candidate;
+                break;
+            }
+        }
+    }
+    return reference orelse return error.NotFound;
+}
+
+// NT5 ntfs.h STANDARD_INFORMATION flags and reparsup.c: a reparse point is
+// not ordinary data. Source traversal deliberately never follows its target.
+fn rejectReparse(record: []const u8) Error!void {
+    if (try findAttribute(record,0xc0,null) != null) return error.UnsupportedReparsePoint;
+    if (try findAttribute(record,0x10,null)) |si| {
+        if (si[8] != 0) return error.InvalidAttribute;
+        const at: usize = le16(si[20..22]);
+        const n: usize = le32(si[16..20]);
+        if (at < 24 or at > si.len or n > si.len-at or n < 36) return error.InvalidAttribute;
+        if (le32(si[at+32..][0..4]) & 0x400 != 0) return error.UnsupportedReparsePoint;
+    }
+}
+
+fn findAttribute(record: []const u8, wanted_type: u32, wanted_instance: ?u16) Error!?[]const u8 {
+    var offset: usize = le16(record[20..22]);
+    const used: usize = le32(record[24..28]);
+    if (offset < 24 or used > record.len) return error.InvalidAttribute;
+    while (offset + 16 <= used) {
+        const kind = le32(record[offset..][0..4]);
+        if (kind == 0xffffffff) return null;
+        const length: usize = le32(record[offset+4..][0..4]);
+        if (length < 24 or length % 8 != 0 or length > used-offset) return error.InvalidAttribute;
+        const attr = record[offset..][0..length];
+        if (kind == wanted_type and (wanted_instance == null or le16(attr[14..16]) == wanted_instance.?)) return attr;
+        offset += length;
+    }
+    return null;
+}
+
+/// Heap-backed read-only DATA resolver for large, Windows-copied ISO files.
+/// Bounds are explicit; the legacy File/MFT structs retain their small fixed
+/// runlists. No write/flush callback is accepted anywhere in this API.
+pub const LargeFile = struct {
+    pub const run_limit = 8192;
+    pub const attribute_list_limit = 256 * 1024;
+    allocator: libstd.mem.Allocator,
+    runs: libstd.ArrayList(Run) = .empty,
+    resident: []u8 = &.{},
+    data_size: u64 = 0,
+    attribute_extents: usize = 0,
+    initialized_size: u64 = 0,
+    data_flags: u16 = 0,
+    strict_metadata: bool = false,
+
+    pub fn deinit(self: *LargeFile) void {
+        self.runs.deinit(self.allocator);
+        if (self.resident.len != 0) self.allocator.free(self.resident);
+    }
+    pub fn size(self: *const LargeFile) u64 { return self.data_size; }
+    pub fn runCount(self: *const LargeFile) usize { return self.runs.items.len; }
+    pub fn readAt(self: *const LargeFile, fs: *const FileSystem, reader: random_reader.Reader, offset: u64, output: []u8) Error!void {
+        if (offset > self.data_size or output.len > self.data_size-offset) return error.OutOfBounds;
+        if (self.resident.len != 0) {
+            @memcpy(output,self.resident[@intCast(offset)..][0..output.len]);
+            return;
+        }
+        var logical = offset;
+        var remaining = output;
+        while (remaining.len != 0) {
+            // NT5 read.c (VDL tail) and allocsup.c (unallocated VCN): neither
+            // range may expose bytes from clusters that belong to another file.
+            if (logical >= self.initialized_size) {
+                @memset(remaining, 0);
+                return;
+            }
+            const vcn = shiftRightU64(logical,fs.cluster_shift);
+            // Runs are contiguous in VCN order; binary search is independent
+            // of the number of fragments elsewhere in the source ISO.
+            var low: usize = 0;
+            var high = self.runs.items.len;
+            while (low < high) {
+                const middle = low + (high-low)/2;
+                if (self.runs.items[middle].vcn <= vcn) low = middle+1 else high = middle;
+            }
+            if (low == 0) return error.RunlistBounds;
+            const run = self.runs.items[low-1];
+            const within = logical-try checkedMul(run.vcn,fs.cluster_bytes);
+            const available = try checkedMul(run.clusters,fs.cluster_bytes);
+            if (within >= available) return error.RunlistBounds;
+            const n: usize = @intCast(@min(@min(remaining.len,available-within),self.initialized_size-logical));
+            if (run.sparse) {
+                @memset(remaining[0..n], 0);
+            } else {
+                const physical = try checkedAdd(try checkedMul(@intCast(run.lcn),fs.cluster_bytes),within);
+                try readPartition(reader,fs.partition,physical,remaining[0..n]);
+            }
+            logical += n; remaining = remaining[n..];
+        }
+    }
+    fn append(self: *LargeFile, run: Run) !void {
+        if (self.runs.items.len == run_limit) return error.RunlistTooFragmented;
+        if (!run.sparse) {
+            const start: u64 = @intCast(run.lcn);
+            const end = try checkedAdd(start,run.clusters);
+            for (self.runs.items) |old| {
+                if (old.sparse) continue;
+                const old_start: u64 = @intCast(old.lcn);
+                if (start < try checkedAdd(old_start,old.clusters) and old_start < end) return error.RunlistLoop;
+            }
+        }
+        if (self.runs.items.len == self.runs.capacity) {
+            const wanted = @min(run_limit,@max(16,self.runs.items.len+self.runs.items.len/2));
+            try self.runs.ensureTotalCapacityPrecise(self.allocator,wanted);
+        }
+        self.runs.appendAssumeCapacity(run);
+    }
+    fn dataAttribute(self: *LargeFile, fs: *const FileSystem, attr: []const u8, expected_vcn: u64) !u64 {
+        const flags = le16(attr[12..14]);
+        if (attr[9] != 0 or flags & ~@as(u16,0x8001) != 0 or (self.strict_metadata and flags != 0)) return error.UnsupportedFileData;
+        if (attr[8] == 0) {
+            if (flags != 0) return error.UnsupportedFileData;
+            if (self.attribute_extents != 0 or expected_vcn != 0) return error.AttributeListMismatch;
+            const n: usize = le32(attr[16..20]);
+            const at: usize = le16(attr[20..22]);
+            if (at < 24 or at > attr.len or n > attr.len-at) return error.InvalidAttribute;
+            self.resident = try self.allocator.dupe(u8,attr[at..][0..n]);
+            self.data_size = n; self.initialized_size = n; self.attribute_extents += 1;
+            return 0;
+        }
+        if (attr.len < 64 or self.resident.len != 0 or attr[8] != 1) return error.UnsupportedFileData;
+        const unit = le16(attr[34..36]);
+        if ((flags & 1 != 0 and unit != 4) or (flags == 0 and unit != 0) or (flags == 0x8000 and unit != 0 and unit != 4)) return error.UnsupportedCompression;
+        const first = le64(attr[16..24]);
+        const last = le64(attr[24..32]);
+        const at: usize = le16(attr[32..34]);
+        if (first != expected_vcn or last < first or at < 64 or at >= attr.len) return error.AttributeListMismatch;
+        if (flags != 0 and (attr.len < 72 or at < 72)) return error.InvalidAttribute;
+        if (first == 0) {
+            if (self.attribute_extents != 0 or le64(attr[56..64]) > le64(attr[48..56])) return error.UnsupportedFileData;
+            self.data_size = le64(attr[48..56]);
+            self.initialized_size = le64(attr[56..64]);
+            self.data_flags = flags;
+            if (self.strict_metadata and self.initialized_size != self.data_size) return error.UnsupportedFileData;
+        } else if (flags != self.data_flags) return error.AttributeListMismatch;
+        var pos = at;
+        var vcn = first;
+        var lcn: i64 = 0;
+        const before = self.runs.items.len;
+        while (true) {
+            if (pos == attr.len) return error.InvalidAttribute;
+            const code = attr[pos]; pos += 1;
+            if (code == 0) break;
+            const n: usize = code & 15;
+            const d: usize = code >> 4;
+            if (n == 0 or n > 8 or d > 8 or n+d > attr.len-pos) return error.UnsupportedFileData;
+            const clusters = readUnsigned(attr[pos..][0..n]); pos += n;
+            if (clusters == 0 or clusters > libstd.math.maxInt(i64)) return error.RunlistLoop;
+            if (d == 0) {
+                // Fully allocated compression units are ordinary bytes (NT5
+                // rwcmpsup.c). A short physical prefix plus hole needs LZNT1;
+                // reject it instead of mistaking its compressed bytes for data.
+                if (flags & 1 != 0) return error.UnsupportedCompression;
+                if (flags & 0x8000 == 0 or self.strict_metadata) return error.SparseMetadata;
+                try self.append(.{.vcn=vcn,.lcn=0,.clusters=clusters,.sparse=true});
+            } else {
+                lcn = addI64(lcn,readSigned(attr[pos..][0..d])) orelse return error.RunlistBounds; pos += d;
+                if (lcn < 0 or try checkedAdd(@intCast(lcn),clusters) > fs.total_clusters) return error.RunlistBounds;
+                try self.append(.{.vcn=vcn,.lcn=lcn,.clusters=clusters,.sparse=false});
+            }
+            vcn = try checkedAdd(vcn,clusters);
+        }
+        if (before == self.runs.items.len or vcn != try checkedAdd(last,1)) return error.AttributeListMismatch;
+        self.attribute_extents += 1;
+        return vcn;
+    }
+};
+
+fn checkedAdd(a: u64,b: u64) Error!u64 { return addU64(a,b) orelse error.RunlistBounds; }
+fn checkedMul(a: u64,b: u64) Error!u64 { return mulU64(a,b) orelse error.RunlistBounds; }
+
+pub fn openLargeFile(fs: *const FileSystem, reader: random_reader.Reader, components: []const []const u16, allocator: libstd.mem.Allocator, output: *LargeFile) !void {
+    const reference = try resolveFileReference(fs.*,reader,components);
+    try largeFileFromReference(fs,reader,reference,allocator,output);
+}
+fn largeFileFromReference(fs: *const FileSystem, reader: random_reader.Reader, reference: u64, allocator: libstd.mem.Allocator, output: *LargeFile) !void {
+    var storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs.*,reader,reference,&storage);
+    if ((le16(record[22..24]) & 3) != 1 or le64(record[32..40]) != 0) return error.NotFile;
+    try rejectReparse(record);
+    output.* = .{.allocator=allocator};
+    errdefer output.deinit();
+    var next_vcn: u64 = 0;
+    if (try findAttribute(record,0x20,null)) |list_attr| {
+        const list = try readAttributeList(fs,reader,record,list_attr,allocator);
+        defer allocator.free(list);
+        const base_sequence = le16(record[16..18]);
+        var at: usize = 0;
+        var count: usize = 0;
+        while (at < list.len) {
+            if (list.len-at < 26) return error.AttributeListBounds;
+            const item = list[at..];
+            const n: usize = le16(item[4..6]);
+            const name_len: usize = item[6];
+            const name_at: usize = item[7];
+            if (n < 26 or n % 8 != 0 or n > item.len or (name_len != 0 and (name_at < 26 or name_at > n or name_len*2 > n-name_at))) return error.AttributeListBounds;
+            if (le32(item[0..4]) == 0x80 and name_len == 0) {
+                if (count == LargeFile.run_limit) return error.AttributeListBounds;
+                count += 1;
+                const lowest = le64(item[8..16]);
+                const ref = le64(item[16..24]);
+                const number = ref & 0x0000ffffffffffff;
+                const sequence: u16 = @intCast(ref>>48);
+                const instance = le16(item[24..26]);
+                if (lowest != next_vcn) return error.AttributeListMismatch;
+                const current = try readMftRecord(fs.*,reader,number,&storage);
+                if ((le16(current[22..24]) & 3) != 1 or sequence != le16(current[16..18])) return error.AttributeListMismatch;
+                const expected_base = reference | (@as(u64,base_sequence)<<48);
+                if (number == reference) {
+                    if (le64(current[32..40]) != 0 or sequence != base_sequence) return error.AttributeListMismatch;
+                } else if (le64(current[32..40]) != expected_base) return error.AttributeListMismatch;
+                const data = (try findAttribute(current,0x80,instance)) orelse return error.AttributeListMismatch;
+                if (data[8] != 0 and (data.len < 64 or le64(data[16..24]) != lowest)) return error.AttributeListMismatch;
+                next_vcn = try output.dataAttribute(fs,data,next_vcn);
+            }
+            at += n;
+        }
+        if (count == 0) return error.AttributeListMismatch;
+    } else {
+        var at: usize = le16(record[20..22]);
+        const used: usize = le32(record[24..28]);
+        while (at+16 <= used) {
+            const kind = le32(record[at..][0..4]); if (kind == 0xffffffff) break;
+            const n: usize = le32(record[at+4..][0..4]);
+            if (n < 24 or n > used-at) return error.InvalidAttribute;
+            const attr = record[at..][0..n];
+            if (kind == 0x80 and attr[9] == 0) next_vcn = try output.dataAttribute(fs,attr,next_vcn);
+            at += n;
+        }
+    }
+    if (output.attribute_extents == 0) return error.NotFile;
+    if (output.resident.len == 0 and output.data_size > try checkedMul(next_vcn,fs.cluster_bytes)) return error.RunlistBounds;
+    if (output.data_flags & 1 != 0 and next_vcn % 16 != 0) return error.UnsupportedCompression;
+}
+
+fn readAttributeList(fs: *const FileSystem, reader: random_reader.Reader, record: []const u8, attr: []const u8, allocator: libstd.mem.Allocator) ![]u8 {
+    _ = record;
+    if (attr[9] != 0 or le16(attr[12..14]) != 0) return error.AttributeListMismatch;
+    if (attr[8] == 0) {
+        const n: usize = le32(attr[16..20]); const at: usize = le16(attr[20..22]);
+        if (at < 24 or at > attr.len or n > attr.len-at or n > LargeFile.attribute_list_limit) return error.AttributeListBounds;
+        return allocator.dupe(u8,attr[at..][0..n]);
+    }
+    var stream: LargeFile = .{ .allocator = allocator, .strict_metadata = true };
+    defer stream.deinit();
+    const end = try stream.dataAttribute(fs, attr, 0);
+    if (stream.data_size == 0 or stream.data_size > LargeFile.attribute_list_limit or
+        stream.data_size > try checkedMul(end, fs.cluster_bytes)) return error.AttributeListBounds;
+    const bytes = try allocator.alloc(u8,@intCast(stream.data_size));
+    errdefer allocator.free(bytes);
+    try stream.readAt(fs, reader, 0, bytes);
+    return bytes;
+}
+
+fn fileFromRecord(record: []const u8, cluster_bytes: u32, total_clusters: u64, result: *File) Error!void {
+    try rejectReparse(record);
+    result.* = .{};
+    var offset: usize = le16(record[20..22]);
+    const used: usize = le32(record[24..28]);
+    if (offset < 24 or used > record.len) return error.InvalidAttribute;
+    var found = false;
+    while (offset + 16 <= used) {
+        const kind = le32(record[offset..][0..4]);
+        if (kind == 0xffffffff) break;
+        const length: usize = le32(record[offset + 4..][0..4]);
+        if (length < 24 or length > used - offset) return error.InvalidAttribute;
+        const attr = record[offset..][0..length];
+        // Attribute-list extensions, encryption, compression and sparse files
+        // need different readers. Reject them rather than booting partial data.
+        if (kind == 0x20) return error.UnsupportedFileData;
+        if (kind == 0x80 and attr[9] == 0) {
+            if (found or le16(attr[12..14]) != 0) return error.UnsupportedFileData;
+            found = true;
+            if (attr[8] == 0) {
+                const n: usize = le32(attr[16..20]);
+                const at: usize = le16(attr[20..22]);
+                if (at < 24 or at > length or n > length - at or n > result.resident.len) return error.InvalidAttribute;
+                @memcpy(result.resident[0..n], attr[at..][0..n]);
+                result.resident_len = n;
+            } else {
+                if (length < 64 or le16(attr[34..36]) != 0 or le64(attr[56..64]) < le64(attr[48..56])) return error.UnsupportedFileData;
+            }
+        }
+        offset += length;
+    }
+    if (!found) return error.NotFile;
+    if (result.resident_len == null) {
+        result.stream = try collectStream(record, 0x80, null, cluster_bytes, total_clusters);
+        var capacity: u64 = 0;
+        for (result.stream.runs[0..result.stream.len]) |run| {
+            if (run.sparse) return error.UnsupportedFileData;
+            capacity = addU64(capacity, mulU64(run.clusters, cluster_bytes) orelse return error.RunlistBounds) orelse return error.RunlistBounds;
+        }
+        if (result.stream.data_size == 0 or result.stream.data_size > capacity) return error.RunlistBounds;
+    }
+}
+
+test "file reader handles fragmented extents and bounds without reading gaps" {
+    const std = @import("std");
+    const Fixture = struct {
+        bytes: [4096]u8 = [_]u8{0xcc} ** 4096,
+        reads: usize = 0,
+        fn read(ctx: *anyopaque, at: u64, out: []u8) random_reader.Error!void {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            if (at > self.bytes.len or out.len > self.bytes.len - at) return error.OutOfBounds;
+            self.reads += 1;
+            @memcpy(out, self.bytes[@intCast(at)..][0..out.len]);
+        }
+    };
+    var fixture = Fixture{};
+    @memset(fixture.bytes[512..1024], 0x11);
+    @memset(fixture.bytes[2048..2560], 0x22);
+    const reader = random_reader.Reader{ .context = &fixture, .read_fn = Fixture.read };
+    var fs: FileSystem = undefined;
+    fs.partition = .{ .start_bytes = 0, .size_bytes = fixture.bytes.len };
+    fs.cluster_bytes = 512;
+    fs.cluster_shift = 9;
+    var file = File{};
+    file.stream.data_size = 1024;
+    try file.stream.append(.{ .vcn = 0, .lcn = 1, .clusters = 1, .sparse = false });
+    try file.stream.append(.{ .vcn = 1, .lcn = 4, .clusters = 1, .sparse = false });
+    var bytes: [4]u8 = undefined;
+    try file.readAt(fs, reader, 510, &bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0x11, 0x11, 0x22, 0x22 }, &bytes);
+    try std.testing.expectEqual(@as(usize, 2), fixture.reads);
+    try std.testing.expectError(error.OutOfBounds, file.readAt(fs, reader, 1022, &bytes));
+    try std.testing.expectError(error.OutOfBounds, file.readAt(fs, reader, std.math.maxInt(u64), &bytes));
+    try std.testing.expectEqual(@as(usize, 2), fixture.reads);
+}
+
+test "file record rejects compressed, sparse, encrypted, uninitialized and extended data" {
+    const std = @import("std");
+    var record = [_]u8{0} ** 128;
+    std.mem.writeInt(u16, record[20..22], 24, .little);
+    std.mem.writeInt(u32, record[24..28], 104, .little);
+    // The attribute begins at 32, clear of the MFT used-size field.
+    std.mem.writeInt(u16, record[20..22], 32, .little);
+    const attr = record[32..104];
+    std.mem.writeInt(u32, attr[0..4], 0x80, .little);
+    std.mem.writeInt(u32, attr[4..8], 72, .little);
+    attr[8] = 1;
+    std.mem.writeInt(u64, attr[24..32], 1, .little);
+    std.mem.writeInt(u16, attr[32..34], 64, .little);
+    std.mem.writeInt(u64, attr[48..56], 1024, .little);
+    std.mem.writeInt(u64, attr[56..64], 1024, .little);
+    @memcpy(attr[64..68], &[_]u8{ 0x11, 2, 1, 0 });
+    var file: File = undefined;
+    try fileFromRecord(&record, 512, 16, &file);
+    try std.testing.expectEqual(@as(u64, 1024), file.size());
+    for ([_]u16{ 1, 0x4000, 0x8000 }) |flag| {
+        std.mem.writeInt(u16, attr[12..14], flag, .little);
+        try std.testing.expectError(error.UnsupportedFileData, fileFromRecord(&record, 512, 16, &file));
+    }
+    std.mem.writeInt(u16, attr[12..14], 0, .little);
+    std.mem.writeInt(u64, attr[56..64], 1023, .little);
+    try std.testing.expectError(error.UnsupportedFileData, fileFromRecord(&record, 512, 16, &file));
+    std.mem.writeInt(u64, attr[56..64], 1024, .little);
+    std.mem.writeInt(u32, attr[0..4], 0x20, .little);
+    try std.testing.expectError(error.UnsupportedFileData, fileFromRecord(&record, 512, 16, &file));
+}
+
+test "resident answer files are copied and validated without disk I/O" {
+    const std = @import("std");
+    var record = [_]u8{0} ** 128;
+    std.mem.writeInt(u16, record[20..22], 32, .little);
+    std.mem.writeInt(u32, record[24..28], 64, .little);
+    const attr = record[32..64];
+    std.mem.writeInt(u32, attr[0..4], 0x80, .little);
+    std.mem.writeInt(u32, attr[4..8], 32, .little);
+    std.mem.writeInt(u32, attr[16..20], 6, .little);
+    std.mem.writeInt(u16, attr[20..22], 24, .little);
+    @memcpy(attr[24..30], "<xml/>");
+    var file: File = undefined;
+    try fileFromRecord(&record, 512, 16, &file);
+    try std.testing.expectEqual(@as(u64, 6), file.size());
+    try std.testing.expectEqualStrings("<xml/>", file.resident[0..6]);
+    std.mem.writeInt(u16, attr[20..22], 31, .little);
+    try std.testing.expectError(error.InvalidAttribute, fileFromRecord(&record, 512, 16, &file));
+}
+
+test "heap-backed DATA reader supports 300 fragments without enlarging legacy runlists" {
+    var attr = [_]u8{0} ** (64+300*3+1);
+    libstd.mem.writeInt(u32,attr[0..4],0x80,.little);
+    libstd.mem.writeInt(u32,attr[4..8],attr.len,.little);
+    attr[8]=1;
+    libstd.mem.writeInt(u64,attr[24..32],299,.little);
+    libstd.mem.writeInt(u16,attr[32..34],64,.little);
+    libstd.mem.writeInt(u64,attr[48..56],300*512,.little);
+    libstd.mem.writeInt(u64,attr[56..64],300*512,.little);
+    for (0..300) |i| @memcpy(attr[64+i*3..][0..3],&[_]u8{0x11,1,2});
+    var fs: FileSystem=undefined;fs.mft_heap=null;fs.upcase=&.{};
+    fs.cluster_bytes=512; fs.cluster_shift=9; fs.total_clusters=1024;
+    fs.partition=.{.start_bytes=0,.size_bytes=1024*512};
+    var file: LargeFile=.{.allocator=libstd.testing.allocator}; defer file.deinit();
+    try libstd.testing.expectEqual(@as(u64,300),try file.dataAttribute(&fs,&attr,0));
+    try libstd.testing.expectEqual(@as(usize,300),file.runCount());
+    try libstd.testing.expectEqual(@as(usize,128),max_runs);
+    const Memory=struct {
+        fn read(_: *anyopaque,offset: u64,out: []u8) random_reader.Error!void {
+            for (out,0..) |*byte,i| byte.*=@truncate((offset+i)/512);
+        }
+    };
+    var context: u8=0;
+    const reader: random_reader.Reader=.{.context=&context,.read_fn=Memory.read};
+    var bytes: [4]u8=undefined;
+    try file.readAt(&fs,reader,129*512-2,&bytes);
+    try libstd.testing.expectEqualSlices(u8,&.{2,2,4,4},&bytes);
+    try libstd.testing.expectError(error.OutOfBounds,file.readAt(&fs,reader,300*512-2,&bytes));
+    try libstd.testing.expectError(error.AttributeListMismatch,file.dataAttribute(&fs,&attr,300));
+}
+
+test "sparse holes and uninitialized tail return zero without reading backing clusters" {
+    var attr: [88]u8 = @splat(0);
+    libstd.mem.writeInt(u32,attr[0..4],0x80,.little);
+    attr[8]=1; libstd.mem.writeInt(u16,attr[12..14],0x8000,.little);
+    libstd.mem.writeInt(u64,attr[24..32],5,.little);
+    libstd.mem.writeInt(u16,attr[32..34],72,.little);
+    libstd.mem.writeInt(u64,attr[48..56],6*512,.little);
+    libstd.mem.writeInt(u64,attr[56..64],5*512-13,.little);
+    @memcpy(attr[72..81],&[_]u8{0x11,2,2,0x01,2,0x11,2,4,0});
+    var fs: FileSystem=undefined;fs.mft_heap=null;fs.upcase=&.{};fs.cluster_bytes=512;fs.cluster_shift=9;
+    fs.total_clusters=32;fs.partition=.{.start_bytes=0,.size_bytes=32*512};
+    var file: LargeFile=.{.allocator=libstd.testing.allocator};defer file.deinit();
+    _=try file.dataAttribute(&fs,&attr,0);
+    const Spy=struct {
+        calls: usize=0,
+        fn read(ctx: *anyopaque,at: u64,out: []u8) random_reader.Error!void {
+            const self: *@This()=@ptrCast(@alignCast(ctx));self.calls+=1;
+            for(out,0..) |*b,i| b.*=@truncate((at+i)/512+1);
+        }
+    };
+    var spy: Spy=.{};var out: [6*512]u8=undefined;
+    try file.readAt(&fs,.{.context=&spy,.read_fn=Spy.read},0,&out);
+    try libstd.testing.expect(libstd.mem.allEqual(u8,out[0..512],3));
+    try libstd.testing.expect(libstd.mem.allEqual(u8,out[512..1024],4));
+    try libstd.testing.expect(libstd.mem.allEqual(u8,out[1024..2048],0));
+    try libstd.testing.expect(libstd.mem.allEqual(u8,out[2048..5*512-13],7));
+    try libstd.testing.expect(libstd.mem.allEqual(u8,out[5*512-13..],0));
+    try libstd.testing.expectEqual(@as(usize,2),spy.calls);
+    var strict: LargeFile=.{.allocator=libstd.testing.allocator,.strict_metadata=true};defer strict.deinit();
+    try libstd.testing.expectError(error.UnsupportedFileData,strict.dataAttribute(&fs,&attr,0));
+}
+
+test "fully allocated compressed units are raw but short compressed units refuse" {
+    var attr: [88]u8=@splat(0);attr[8]=1;
+    libstd.mem.writeInt(u16,attr[12..14],1,.little);
+    libstd.mem.writeInt(u16,attr[34..36],4,.little);
+    libstd.mem.writeInt(u64,attr[24..32],15,.little);
+    libstd.mem.writeInt(u16,attr[32..34],72,.little);
+    libstd.mem.writeInt(u64,attr[48..56],6000,.little);
+    libstd.mem.writeInt(u64,attr[56..64],6000,.little);
+    @memcpy(attr[72..76],&[_]u8{0x11,16,2,0});
+    var fs: FileSystem=undefined;fs.mft_heap=null;fs.upcase=&.{};fs.cluster_bytes=512;fs.cluster_shift=9;
+    fs.total_clusters=32;fs.partition=.{.start_bytes=0,.size_bytes=32*512};
+    var raw: LargeFile=.{.allocator=libstd.testing.allocator};defer raw.deinit();
+    _=try raw.dataAttribute(&fs,&attr,0);
+    const Mem=struct { fn read(_: *anyopaque,at: u64,out: []u8) random_reader.Error!void {
+        for(out,0..) |*b,i| b.*=@truncate(at+i);
+    }};
+    var ctx: u8=0;var data: [7]u8=undefined;
+    try raw.readAt(&fs,.{.context=&ctx,.read_fn=Mem.read},4093,&data);
+    try libstd.testing.expectEqualSlices(u8,&.{253,254,255,0,1,2,3},&data);
+    @memcpy(attr[72..78],&[_]u8{0x11,2,2,0x01,14,0});
+    var compressed: LargeFile=.{.allocator=libstd.testing.allocator};defer compressed.deinit();
+    try libstd.testing.expectError(error.UnsupportedCompression,compressed.dataAttribute(&fs,&attr,0));
+    libstd.mem.writeInt(u16,attr[12..14],0x4000,.little);
+    try libstd.testing.expectError(error.UnsupportedFileData,compressed.dataAttribute(&fs,&attr,0));
+}
+
+test "reparse marker in standard information or attribute is never ordinary data" {
+    var record: [1024]u8=@splat(0);testLargeRecord(&record,1,0,152);
+    const si=record[56..144];
+    libstd.mem.writeInt(u32,si[0..4],0x10,.little);
+    libstd.mem.writeInt(u32,si[4..8],88,.little);
+    libstd.mem.writeInt(u32,si[16..20],64,.little);
+    libstd.mem.writeInt(u16,si[20..22],24,.little);
+    libstd.mem.writeInt(u32,record[144..148],0xffffffff,.little);
+    try rejectReparse(&record);
+    libstd.mem.writeInt(u32,si[56..60],0x400,.little);
+    try libstd.testing.expectError(error.UnsupportedReparsePoint,rejectReparse(&record));
+    libstd.mem.writeInt(u32,si[56..60],0,.little);
+    libstd.mem.writeInt(u32,si[0..4],0xc0,.little);
+    try libstd.testing.expectError(error.UnsupportedReparsePoint,rejectReparse(&record));
+}
+
+fn testLargeRecord(out: []u8,sequence: u16,base: u64,used: u32) void {
+    @memcpy(out[0..4],"FILE");
+    libstd.mem.writeInt(u16,out[4..6],48,.little);
+    libstd.mem.writeInt(u16,out[6..8],3,.little);
+    libstd.mem.writeInt(u16,out[16..18],sequence,.little);
+    libstd.mem.writeInt(u16,out[20..22],56,.little);
+    libstd.mem.writeInt(u16,out[22..24],1,.little);
+    libstd.mem.writeInt(u32,out[24..28],used,.little);
+    libstd.mem.writeInt(u64,out[32..40],base,.little);
+    libstd.mem.writeInt(u16,out[48..50],0xaaaa,.little);
+    libstd.mem.writeInt(u16,out[510..512],0xaaaa,.little);
+    libstd.mem.writeInt(u16,out[1022..1024],0xaaaa,.little);
+}
+fn testLargeData(out: []u8,instance: u16,vcn: u64,lcn: u8) void {
+    libstd.mem.writeInt(u32,out[0..4],0x80,.little);
+    libstd.mem.writeInt(u32,out[4..8],72,.little); out[8]=1;
+    libstd.mem.writeInt(u16,out[14..16],instance,.little);
+    libstd.mem.writeInt(u64,out[16..24],vcn,.little);
+    libstd.mem.writeInt(u64,out[24..32],vcn,.little);
+    libstd.mem.writeInt(u16,out[32..34],64,.little);
+    libstd.mem.writeInt(u64,out[48..56],1024,.little);
+    libstd.mem.writeInt(u64,out[56..64],1024,.little);
+    @memcpy(out[64..68],&[_]u8{0x11,1,lcn,0});
+}
+fn testLargeListItem(out: []u8,vcn: u64,reference: u64,instance: u16) void {
+    libstd.mem.writeInt(u32,out[0..4],0x80,.little);
+    libstd.mem.writeInt(u16,out[4..6],32,.little);
+    libstd.mem.writeInt(u64,out[8..16],vcn,.little);
+    libstd.mem.writeInt(u64,out[16..24],reference,.little);
+    libstd.mem.writeInt(u16,out[24..26],instance,.little);
+}
+test "ATTRIBUTE_LIST validates sequence base reference VCN and instance before reading extensions" {
+    const Memory=struct {
+        bytes: [8192]u8=[_]u8{0} ** 8192,
+        fn read(ctx: *anyopaque,at: u64,out: []u8) random_reader.Error!void {
+            const self: *@This()=@ptrCast(@alignCast(ctx));
+            if (at>self.bytes.len or out.len>self.bytes.len-at) return error.OutOfBounds;
+            @memcpy(out,self.bytes[@intCast(at)..][0..out.len]);
+        }
+    };
+    var m: Memory=.{};
+    var fs: FileSystem=undefined;fs.mft_heap=null;fs.upcase=&.{};
+    fs.partition=.{.start_bytes=0,.size_bytes=m.bytes.len};
+    fs.cluster_bytes=512; fs.cluster_shift=9; fs.total_clusters=16;
+    fs.file_record_bytes=1024; fs.bytes_per_sector=512;
+    fs.mft_stream=.{.data_size=4*1024};
+    try fs.mft_stream.append(.{.vcn=0,.lcn=1,.clusters=8,.sparse=false});
+    const base=m.bytes[512+2*1024..][0..1024];
+    const extension=m.bytes[512+3*1024..][0..1024];
+    testLargeRecord(base,7,0,224);
+    testLargeData(base[56..128],4,0,10);
+    const list=base[128..216];
+    libstd.mem.writeInt(u32,list[0..4],0x20,.little);
+    libstd.mem.writeInt(u32,list[4..8],88,.little);
+    libstd.mem.writeInt(u32,list[16..20],64,.little);
+    libstd.mem.writeInt(u16,list[20..22],24,.little);
+    testLargeListItem(list[24..56],0,(@as(u64,7)<<48)|2,4);
+    testLargeListItem(list[56..88],1,(@as(u64,9)<<48)|3,6);
+    libstd.mem.writeInt(u32,base[216..220],0xffffffff,.little);
+    testLargeRecord(extension,9,(@as(u64,7)<<48)|2,136);
+    testLargeData(extension[56..128],6,1,12);
+    libstd.mem.writeInt(u32,extension[128..132],0xffffffff,.little);
+    @memset(m.bytes[10*512..11*512],0x31);
+    @memset(m.bytes[12*512..13*512],0x42);
+    const reader: random_reader.Reader=.{.context=&m,.read_fn=Memory.read};
+    var file: LargeFile=undefined;
+    try largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&file);
+    defer file.deinit();
+    try libstd.testing.expectEqual(@as(usize,2),file.attribute_extents);
+    var bytes: [4]u8=undefined; try file.readAt(&fs,reader,510,&bytes);
+    try libstd.testing.expectEqualSlices(u8,&.{0x31,0x31,0x42,0x42},&bytes);
+    var bad: LargeFile=undefined;
+    libstd.mem.writeInt(u16,extension[16..18],10,.little);
+    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
+    libstd.mem.writeInt(u16,extension[16..18],9,.little);
+    libstd.mem.writeInt(u64,extension[32..40],(@as(u64,7)<<48)|4,.little);
+    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
+    libstd.mem.writeInt(u64,extension[32..40],(@as(u64,7)<<48)|2,.little);
+    libstd.mem.writeInt(u64,list[64..72],0,.little);
+    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
+    libstd.mem.writeInt(u64,list[64..72],1,.little);
+    libstd.mem.writeInt(u16,list[80..82],7,.little);
+    try libstd.testing.expectError(error.AttributeListMismatch,largeFileFromReference(&fs,reader,2,libstd.testing.allocator,&bad));
+}
+
+fn resolveDirectory(fs: FileSystem, reader: random_reader.Reader, components: []const []const u16) Error!u64 {
+    var current: u64 = 5;
+    for (components) |component| {
+        var scan = DirectoryScan{ .wanted = component };
+        try scanDirectory(fs, reader, current, &scan);
+        if (scan.found) |found| {
+            if (!found.isDirectory()) return error.NotDirectory;
+            current = found.file_reference;
+            continue;
+        }
+
+        // NTFS may keep a DOS 8.3 alias as a separate namespace-2 index key.
+        // Normal menu listings suppress those aliases to avoid duplicate rows,
+        // but path lookup must still be able to recover the long Win32 name
+        // from the referenced MFT record when an index exposes only the alias.
+        var alias_index: usize = 0;
+        var recovered: ?u64 = null;
+        while (alias_index < scan.alias_len) : (alias_index += 1) {
+            const reference = scan.alias_refs[alias_index];
+            if (try recordHasMatchingFileName(fs, reader, reference, component)) {
+                recovered = reference;
+                break;
+            }
+        }
+        const reference = recovered orelse return error.NotFound;
+        var record_storage: [max_file_record_bytes]u8 = undefined;
+        const record = try readMftRecord(fs, reader, reference, &record_storage);
+        if ((le16(record[22..24]) & 0x0002) == 0) return error.NotDirectory;
+        current = reference;
+    }
+    return current;
+}
+
+const DirectoryScan = struct {
+    upcase: []const u16 = &.{},
+    wanted: ?[]const u16 = null,
+    output: ?[]DirectoryItem = null,
+    found: ?DirectoryItem = null,
+    count: usize = 0,
+    skip: usize = 0,
+    logical_count: usize = 0,
+    truncated: bool = false,
+    stop: bool = false,
+    children: [max_index_children]u64 = [_]u64{0} ** max_index_children,
+    child_len: usize = 0,
+    child_cursor: usize = 0,
+    visited_children: [max_index_children]u64 = [_]u64{0} ** max_index_children,
+    visited_len: usize = 0,
+    alias_refs: [64]u64 = [_]u64{0} ** 64,
+    alias_len: usize = 0,
+
+    fn accept(self: *DirectoryScan, item: DirectoryItem) Error!void {
+        if (self.wanted) |wanted| {
+            if (namesEqualTable(self.upcase,item.name[0..item.name_len], wanted)) {
+                self.found = item;
+                return;
+            }
+            if (item.namespace == 2) try self.rememberAlias(item.file_reference);
+            return;
+        }
+        // Namespace 2 is the DOS 8.3 alias of a Win32 name. It is valid for
+        // lookup but must not appear as a second menu entry for the same file.
+        if (item.namespace == 2) return;
+        if (self.logical_count < self.skip) {
+            self.logical_count += 1;
+            return;
+        }
+        const output = self.output orelse return error.DirectoryTooLarge;
+        if (self.count >= output.len) {
+            self.truncated = true;
+            self.stop = true;
+            return;
+        }
+        output[self.count] = item;
+        self.count += 1;
+        self.logical_count += 1;
+    }
+
+    fn rememberAlias(self: *DirectoryScan, reference: u64) Error!void {
+        for (self.alias_refs[0..self.alias_len]) |existing| if (existing == reference) return;
+        if (self.alias_len >= self.alias_refs.len) return error.DirectoryTooLarge;
+        self.alias_refs[self.alias_len] = reference;
+        self.alias_len += 1;
+    }
+
+    fn addChild(self: *DirectoryScan, vcn: u64) Error!void {
+        for (self.children[0..self.child_len]) |existing| if (existing == vcn) return error.IndexLoop;
+        for (self.visited_children[0..self.visited_len]) |existing| if (existing == vcn) return error.IndexLoop;
+        if (self.child_len >= self.children.len) return error.IndexTooDeep;
+        self.children[self.child_len] = vcn;
+        self.child_len += 1;
+    }
+};
+
+test "directory listing retains distinct hardlink names and omits DOS alias only" {
+    var out: [3]DirectoryItem=undefined;
+    var scan=DirectoryScan{.output=&out};
+    var first=DirectoryItem{.file_reference=42,.namespace=1,.name_len=1};first.name[0]='a';
+    var second=first;second.name[0]='b';
+    var alias=first;alias.namespace=2;alias.name[0]='A';
+    try scan.accept(first);try scan.accept(second);try scan.accept(alias);
+    try libstd.testing.expectEqual(@as(usize,2),scan.count);
+    try libstd.testing.expectEqual(@as(u16,'a'),out[0].name[0]);
+    try libstd.testing.expectEqual(@as(u16,'b'),out[1].name[0]);
+}
+
+fn scanDirectory(fs: FileSystem, reader: random_reader.Reader, record_number: u64, scan: *DirectoryScan) Error!void {
+    scan.upcase=fs.upcase;
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs, reader, record_number, &record_storage);
+    if ((le16(record[22..24]) & 3) != 3) return error.NotDirectory;
+    try rejectReparse(record);
+
+    const root = try findIndexRoot(record);
+    try consumeIndexEntries(root.value, 16, scan);
+    if (scan.found != null or scan.stop) return;
+    if (!root.large) return;
+
+    const allocation = try collectStream(record, 0xa0, "$I30", fs.cluster_bytes, fs.total_clusters);
+    if (allocation.len == 0) return error.MissingIndexAllocation;
+
+    while (scan.child_cursor < scan.child_len) {
+        const vcn = scan.children[scan.child_cursor];
+        scan.child_cursor += 1;
+        for (scan.visited_children[0..scan.visited_len]) |existing| if (existing == vcn) return error.IndexLoop;
+        if (scan.visited_len >= scan.visited_children.len) return error.IndexTooDeep;
+        scan.visited_children[scan.visited_len] = vcn;
+        scan.visited_len += 1;
+
+        var index_storage: [max_index_record_bytes]u8 = undefined;
+        const index_bytes: usize = @intCast(root.index_record_bytes);
+        const index = index_storage[0..index_bytes];
+        const stream_offset = mulU64(vcn, fs.cluster_bytes) orelse return error.InvalidIndex;
+        try readStream(fs, reader, allocation, stream_offset, index);
+        try validateAndFixRecord(index, fs.bytes_per_sector, "INDX", error.InvalidIndexSignature);
+        if (le64(index[16..24]) != vcn) return error.InvalidIndex;
+        try consumeIndexEntries(index, 24, scan);
+        if (scan.found != null or scan.stop) return;
+    }
+}
+
+const IndexRoot = struct {
+    value: []const u8,
+    index_record_bytes: u32,
+    large: bool,
+};
+
+fn findIndexRoot(record: []const u8) Error!IndexRoot {
+    var offset: usize = le16(record[20..22]);
+    const used: usize = le32(record[24..28]);
+    if (offset < 24 or used > record.len) return error.InvalidAttribute;
+    while (offset + 16 <= used) {
+        const attr_type = le32(record[offset .. offset + 4]);
+        if (attr_type == 0xffffffff) break;
+        const length: usize = le32(record[offset + 4 .. offset + 8]);
+        if (length < 24 or offset + length > used) return error.InvalidAttribute;
+        if (attr_type == 0x90 and attributeNameEquals(record[offset .. offset + length], "$I30")) {
+            if (record[offset + 8] != 0) return error.InvalidAttribute;
+            const value_length: usize = le32(record[offset + 16 .. offset + 20]);
+            const value_offset: usize = le16(record[offset + 20 .. offset + 22]);
+            if (value_offset + value_length > length or value_length < 32) return error.InvalidIndex;
+            const value = record[offset + value_offset .. offset + value_offset + value_length];
+            const index_record_bytes = le32(value[8..12]);
+            if (index_record_bytes == 0 or index_record_bytes > max_index_record_bytes) return error.UnsupportedRecordSize;
+            const entries_offset: usize = le32(value[16..20]);
+            const total_size: usize = le32(value[20..24]);
+            if (entries_offset < 16 or total_size < entries_offset or 16 + total_size > value.len) return error.InvalidIndex;
+            return .{
+                .value = value,
+                .index_record_bytes = index_record_bytes,
+                .large = (value[28] & 1) != 0,
+            };
+        }
+        offset += length;
+    }
+    return error.MissingIndexRoot;
+}
+
+fn consumeIndexEntries(buffer: []const u8, header_offset: usize, scan: *DirectoryScan) Error!void {
+    if (header_offset + 16 > buffer.len) return error.InvalidIndex;
+    const entries_rel: usize = le32(buffer[header_offset .. header_offset + 4]);
+    const total_size: usize = le32(buffer[header_offset + 4 .. header_offset + 8]);
+    const allocated_size: usize = le32(buffer[header_offset + 8 .. header_offset + 12]);
+    if (entries_rel < 16 or total_size < entries_rel or total_size > allocated_size) return error.InvalidIndex;
+    const start = addUsize(header_offset, entries_rel) orelse return error.InvalidIndex;
+    const end = addUsize(header_offset, total_size) orelse return error.InvalidIndex;
+    if (start > end or end > buffer.len) return error.InvalidIndex;
+
+    var offset = start;
+    while (offset + 16 <= end) {
+        const entry_length: usize = le16(buffer[offset + 8 .. offset + 10]);
+        const key_length: usize = le16(buffer[offset + 10 .. offset + 12]);
+        const flags = le16(buffer[offset + 12 .. offset + 14]);
+        if (entry_length < 16 or offset + entry_length > end) return error.InvalidIndex;
+        const has_child = (flags & 0x0001) != 0;
+        const is_last = (flags & 0x0002) != 0;
+        const child_bytes: usize = if (has_child) 8 else 0;
+        if (entry_length < 16 + child_bytes) return error.InvalidIndex;
+
+        if (!is_last) {
+            if (key_length < 66 or 16 + key_length + child_bytes > entry_length) return error.InvalidIndex;
+            const key = buffer[offset + 16 .. offset + 16 + key_length];
+            const name_units: usize = key[64];
+            const namespace = key[65];
+            const name_bytes = mulUsize(name_units, 2) orelse return error.InvalidIndex;
+            if (66 + name_bytes > key.len or name_units > 260) return error.InvalidIndex;
+            var item = DirectoryItem{};
+            item.file_reference = le64(buffer[offset .. offset + 8]) & 0x0000ffffffffffff;
+            item.attributes = le32(key[56..60]);
+            item.size = le64(key[48..56]);
+            item.name_len = @intCast(name_units);
+            item.namespace = namespace;
+            for (0..name_units) |index| item.name[index] = le16(key[66 + index * 2 .. 68 + index * 2]);
+            try scan.accept(item);
+            if (scan.found != null or scan.stop) return;
+        }
+
+        if (has_child) {
+            const child_offset = offset + entry_length - 8;
+            try scan.addChild(le64(buffer[child_offset .. child_offset + 8]));
+        }
+        offset += entry_length;
+        if (is_last) return;
+    }
+    return error.InvalidIndex;
+}
+
+fn recordHasMatchingFileName(fs: FileSystem, reader: random_reader.Reader, record_number: u64, wanted: []const u16) Error!bool {
+    var record_storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs, reader, record_number, &record_storage);
+    var offset: usize = le16(record[20..22]);
+    const used: usize = le32(record[24..28]);
+    if (offset < 24 or used > record.len) return error.InvalidAttribute;
+
+    while (offset + 16 <= used) {
+        const attr_type = le32(record[offset .. offset + 4]);
+        if (attr_type == 0xffffffff) return false;
+        const length: usize = le32(record[offset + 4 .. offset + 8]);
+        if (length < 24 or offset + length > used) return error.InvalidAttribute;
+        if (attr_type == 0x30) {
+            if (record[offset + 8] != 0) return error.InvalidAttribute;
+            const value_length: usize = le32(record[offset + 16 .. offset + 20]);
+            const value_offset: usize = le16(record[offset + 20 .. offset + 22]);
+            if (value_offset + value_length > length or value_length < 66) return error.InvalidAttribute;
+            const value = record[offset + value_offset .. offset + value_offset + value_length];
+            const name_units: usize = value[64];
+            const name_bytes = mulUsize(name_units, 2) orelse return error.InvalidAttribute;
+            if (66 + name_bytes > value.len or name_units > 260) return error.InvalidAttribute;
+            if (name_units == wanted.len) {
+                var matches = true;
+                for (0..name_units) |index| {
+                    const unit = le16(value[66 + index * 2 .. 68 + index * 2]);
+                    if (!namesEqualTable(fs.upcase,&.{unit},wanted[index..][0..1])) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) return true;
+            }
+        }
+        offset += length;
+    }
+    return false;
+}
+
+fn readMftRecord(fs: FileSystem, reader: random_reader.Reader, record_number: u64, storage: *[max_file_record_bytes]u8) Error![]u8 {
+    const record_offset = mulU64(record_number, fs.file_record_bytes) orelse return error.RunlistBounds;
+    const record = storage[0..fs.file_record_bytes];
+    if (fs.mft_heap) |stream| {
+        try stream.readAt(&fs, reader, record_offset, record);
+    } else try readStream(fs, reader, fs.mft_stream, record_offset, record);
+    try validateAndFixRecord(record, fs.bytes_per_sector, "FILE", error.InvalidMftSignature);
+    return record;
+}
+
+/// Bounded, USA-verified raw record for metadata inspection; no write API.
+pub fn readRecord(fs: *const FileSystem, reader: Reader, number: u64, output: []u8) Error!usize {
+    if (output.len < fs.file_record_bytes) return error.RunlistBounds;
+    var storage: [max_file_record_bytes]u8 = undefined;
+    const record = try readMftRecord(fs.*, reader, number, &storage);
+    @memcpy(output[0..record.len], record);
+    return record.len;
+}
+
+
+fn collectStream(record: []const u8, wanted_type: u32, wanted_name: ?[]const u8, cluster_bytes: u32, total_clusters: u64) Error!Stream {
+    // Same small-error-union pattern as mount: no 3.5 KiB constant per error.
+    var result = Stream{};
+    try collectStreamInto(record, wanted_type, wanted_name, cluster_bytes, total_clusters, &result);
+    return result;
+}
+
+fn collectStreamInto(record: []const u8, wanted_type: u32, wanted_name: ?[]const u8, cluster_bytes: u32, total_clusters: u64, result: *Stream) Error!void {
+    var offset: usize = le16(record[20..22]);
+    const used: usize = le32(record[24..28]);
+    if (offset < 24 or used > record.len) return error.InvalidAttribute;
+    var expected_vcn: u64 = 0;
+    var saw_extent = false;
+    var allocated_size: u64 = 0;
+
+    while (offset + 16 <= used) {
+        const attr_type = le32(record[offset .. offset + 4]);
+        if (attr_type == 0xffffffff) break;
+        const length: usize = le32(record[offset + 4 .. offset + 8]);
+        if (length < 24 or offset + length > used) return error.InvalidAttribute;
+        const attr = record[offset .. offset + length];
+        if (attr_type == wanted_type and attributeNameMatches(attr, wanted_name)) {
+            if (attr[8] == 0) return error.InvalidAttribute;
+            if (length < 64) return error.InvalidAttribute;
+            const low_vcn = le64(attr[16..24]);
+            const high_vcn = le64(attr[24..32]);
+            const mapping_offset: usize = le16(attr[32..34]);
+            if (high_vcn < low_vcn or mapping_offset >= attr.len) return error.InvalidAttribute;
+            if (!saw_extent) {
+                if (low_vcn != 0) return error.InvalidAttribute;
+                allocated_size = le64(attr[40..48]);
+                result.data_size = le64(attr[48..56]);
+                expected_vcn = 0;
+            }
+            if (low_vcn != expected_vcn) return error.InvalidAttribute;
+            const before = result.len;
+            const next_vcn = try decodeRunlist(attr[mapping_offset..], low_vcn, cluster_bytes, total_clusters, result);
+            if (result.len == before or next_vcn != (addU64(high_vcn, 1) orelse return error.InvalidAttribute)) return error.InvalidAttribute;
+            expected_vcn = next_vcn;
+            saw_extent = true;
+        }
+        offset += length;
+    }
+    if (saw_extent) {
+        if (cluster_bytes == 0) return error.InvalidAttribute;
+        const covered = mulU64(expected_vcn, cluster_bytes) orelse return error.InvalidAttribute;
+        if (covered < allocated_size) return error.InvalidAttribute;
+    }
+}
+
+fn decodeRunlist(bytes: []const u8, base_vcn: u64, cluster_bytes: u32, total_clusters: u64, stream: *Stream) Error!u64 {
+    _ = cluster_bytes;
+    var pos: usize = 0;
+    var vcn = base_vcn;
+    var current_lcn: i64 = 0;
+    while (true) {
+        if (pos >= bytes.len) return error.InvalidAttribute;
+        const header = bytes[pos];
+        pos += 1;
+        if (header == 0) return vcn;
+        const length_bytes: usize = header & 0x0f;
+        const offset_bytes: usize = header >> 4;
+        if (length_bytes == 0 or length_bytes > 8 or offset_bytes > 8) return error.InvalidAttribute;
+        if (pos + length_bytes + offset_bytes > bytes.len) return error.InvalidAttribute;
+        const clusters = readUnsigned(bytes[pos .. pos + length_bytes]);
+        pos += length_bytes;
+        if (clusters == 0) return error.RunlistLoop;
+        const sparse = offset_bytes == 0;
+        var lcn: i64 = 0;
+        if (!sparse) {
+            const delta = readSigned(bytes[pos .. pos + offset_bytes]);
+            pos += offset_bytes;
+            current_lcn = addI64(current_lcn, delta) orelse return error.RunlistBounds;
+            if (current_lcn < 0) return error.RunlistBounds;
+            const start: u64 = @intCast(current_lcn);
+            const end = addU64(start, clusters) orelse return error.RunlistBounds;
+            if (end > total_clusters) return error.RunlistBounds;
+            lcn = current_lcn;
+        }
+        try stream.append(.{ .vcn = vcn, .lcn = lcn, .clusters = clusters, .sparse = sparse });
+        vcn = addU64(vcn, clusters) orelse return error.RunlistBounds;
+    }
+}
+
+fn readStream(fs: FileSystem, reader: random_reader.Reader, stream: Stream, file_offset: u64, output: []u8) Error!void {
+    const end = addU64(file_offset, output.len) orelse return error.RunlistBounds;
+    if (end > stream.data_size) return error.RunlistBounds;
+    var remaining = output;
+    var logical = file_offset;
+    while (remaining.len > 0) {
+        const vcn = shiftRightU64(logical, fs.cluster_shift);
+        const within_cluster = logical & (@as(u64, fs.cluster_bytes) - 1);
+        const run = findRun(stream, vcn) orelse return error.RunlistBounds;
+        if (run.sparse) return error.SparseMetadata;
+        const run_cluster_offset = vcn - run.vcn;
+        const physical_cluster = addU64(@as(u64, @intCast(run.lcn)), run_cluster_offset) orelse return error.RunlistBounds;
+        const physical_base = mulU64(physical_cluster, fs.cluster_bytes) orelse return error.RunlistBounds;
+        const physical = addU64(physical_base, within_cluster) orelse return error.RunlistBounds;
+        const run_remaining_clusters = run.clusters - run_cluster_offset;
+        const run_remaining_bytes = mulU64(run_remaining_clusters, fs.cluster_bytes) orelse return error.RunlistBounds;
+        const available = run_remaining_bytes - within_cluster;
+        const chunk: usize = @intCast(@min(@as(u64, remaining.len), available));
+        try readPartition(reader, fs.partition, physical, remaining[0..chunk]);
+        remaining = remaining[chunk..];
+        logical += chunk;
+    }
+}
+
+fn findRun(stream: Stream, vcn: u64) ?Run {
+    for (stream.runs[0..stream.len]) |run| {
+        const end = addU64(run.vcn, run.clusters) orelse continue;
+        if (vcn >= run.vcn and vcn < end) return run;
+    }
+    return null;
+}
+
+fn validateAndFixRecord(record: []u8, bytes_per_sector: u16, signature: []const u8, signature_error: Error) Error!void {
+    if (record.len < 24 or signature.len != 4 or !bytesEqual(record[0..4], signature)) return signature_error;
+    if (record.len % bytes_per_sector != 0) return error.InvalidFixup;
+    const usa_offset: usize = le16(record[4..6]);
+    const usa_count: usize = le16(record[6..8]);
+    const sectors = record.len / bytes_per_sector;
+    if (usa_count != sectors + 1 or usa_offset < 8 or usa_offset + usa_count * 2 > record.len) return error.InvalidFixup;
+    const update_sequence = le16(record[usa_offset .. usa_offset + 2]);
+    for (0..sectors) |index| {
+        const trailer = (index + 1) * bytes_per_sector - 2;
+        if (le16(record[trailer .. trailer + 2]) != update_sequence) return error.InvalidFixup;
+        const replacement = le16(record[usa_offset + 2 + index * 2 .. usa_offset + 4 + index * 2]);
+        writeLe16(record[trailer .. trailer + 2], replacement);
+    }
+}
+
+fn attributeNameMatches(attr: []const u8, wanted: ?[]const u8) bool {
+    const name_length: usize = attr[9];
+    if (wanted == null) return name_length == 0;
+    return attributeNameEquals(attr, wanted.?);
+}
+
+fn attributeNameEquals(attr: []const u8, wanted: []const u8) bool {
+    const name_length: usize = attr[9];
+    const name_offset: usize = le16(attr[10..12]);
+    if (name_length != wanted.len or name_offset + name_length * 2 > attr.len) return false;
+    for (wanted, 0..) |byte, index| {
+        if (le16(attr[name_offset + index * 2 .. name_offset + index * 2 + 2]) != byte) return false;
+    }
+    return true;
+}
+
+fn readPartition(reader: random_reader.Reader, partition: Partition, relative: u64, output: []u8) Error!void {
+    const end = addU64(relative, output.len) orelse return error.PartitionBounds;
+    if (end > partition.size_bytes) return error.PartitionBounds;
+    const absolute = addU64(partition.start_bytes, relative) orelse return error.PartitionBounds;
+    try reader.readAt(absolute, output);
+}
+
+fn encodedRecordBytes(code: i8, cluster_bytes: u32) Error!u32 {
+    if (code == 0) return error.UnsupportedRecordSize;
+    if (code > 0) {
+        const bytes = mulU64(@as(u64, @intCast(code)), cluster_bytes) orelse return error.UnsupportedRecordSize;
+        if (bytes == 0 or bytes > 0xffffffff) return error.UnsupportedRecordSize;
+        return @intCast(bytes);
+    }
+    const exponent: u8 = @intCast(-@as(i16, code));
+    if (exponent > 31) return error.UnsupportedRecordSize;
+    return @as(u32, 1) << @intCast(exponent);
+}
+
+fn nameEqualsAsciiIgnoreCase(actual: []const u16, wanted: []const u16) bool {
+    if (actual.len != wanted.len) return false;
+    for (actual, wanted) |a, b| {
+        // Non-ASCII units (e.g. "Zażółć" folder names) compare exactly: the
+        // wanted name comes from a directory listing or the user's own
+        // spelling; only ASCII is folded (no $UpCase table here).
+        if (a > 0x7f or b > 0x7f) {
+            if (a != b) return false;
+            continue;
+        }
+        if (asciiLower(@intCast(a)) != asciiLower(@intCast(b))) return false;
+    }
+    return true;
+}
+
+fn asciiLower(byte: u8) u8 {
+    return if (byte >= 'A' and byte <= 'Z') byte + ('a' - 'A') else byte;
+}
+
+fn readUnsigned(bytes: []const u8) u64 {
+    var value: u64 = 0;
+    if (bytes.len > 0) value |= @as(u64, bytes[0]);
+    if (bytes.len > 1) value |= @as(u64, bytes[1]) << 8;
+    if (bytes.len > 2) value |= @as(u64, bytes[2]) << 16;
+    if (bytes.len > 3) value |= @as(u64, bytes[3]) << 24;
+    if (bytes.len > 4) value |= @as(u64, bytes[4]) << 32;
+    if (bytes.len > 5) value |= @as(u64, bytes[5]) << 40;
+    if (bytes.len > 6) value |= @as(u64, bytes[6]) << 48;
+    if (bytes.len > 7) value |= @as(u64, bytes[7]) << 56;
+    return value;
+}
+
+fn readSigned(bytes: []const u8) i64 {
+    var value = readUnsigned(bytes);
+    if ((bytes[bytes.len - 1] & 0x80) != 0) {
+        value |= switch (bytes.len) {
+            1 => 0xffffffffffffff00,
+            2 => 0xffffffffffff0000,
+            3 => 0xffffffffff000000,
+            4 => 0xffffffff00000000,
+            5 => 0xffffff0000000000,
+            6 => 0xffff000000000000,
+            7 => 0xff00000000000000,
+            8 => 0,
+            else => 0,
+        };
+    }
+    return @bitCast(value);
+}
+
+fn le16(bytes: []const u8) u16 {
+    return @as(u16, bytes[0]) | (@as(u16, bytes[1]) << 8);
+}
+
+fn le32(bytes: []const u8) u32 {
+    return @as(u32, bytes[0]) |
+        (@as(u32, bytes[1]) << 8) |
+        (@as(u32, bytes[2]) << 16) |
+        (@as(u32, bytes[3]) << 24);
+}
+
+fn le64(bytes: []const u8) u64 {
+    return @as(u64, le32(bytes[0..4])) | (@as(u64, le32(bytes[4..8])) << 32);
+}
+
+fn writeLe16(bytes: []u8, value: u16) void {
+    bytes[0] = @intCast(value & 0xff);
+    bytes[1] = @intCast(value >> 8);
+}
+
+fn bytesEqual(left: []const u8, right: []const u8) bool {
+    if (left.len != right.len) return false;
+    for (left, right) |a, b| if (a != b) return false;
+    return true;
+}
+
+fn powerOfTwoShift(value: anytype) ?u8 {
+    if (!isPowerOfTwo(value)) return null;
+    var current = value;
+    var shift: u8 = 0;
+    while (current > 1) : (shift += 1) current >>= 1;
+    return shift;
+}
+
+fn shiftRightU64(value: u64, shift: u8) u64 {
+    return switch (shift) {
+        0 => value,
+        1 => value >> 1,
+        2 => value >> 2,
+        3 => value >> 3,
+        4 => value >> 4,
+        5 => value >> 5,
+        6 => value >> 6,
+        7 => value >> 7,
+        8 => value >> 8,
+        9 => value >> 9,
+        10 => value >> 10,
+        11 => value >> 11,
+        12 => value >> 12,
+        13 => value >> 13,
+        14 => value >> 14,
+        15 => value >> 15,
+        16 => value >> 16,
+        else => 0,
+    };
+}
+
+fn isPowerOfTwo(value: anytype) bool {
+    return value != 0 and (value & (value - 1)) == 0;
+}
+
+fn addU64(a: anytype, b: anytype) ?u64 {
+    const aa: u64 = @intCast(a);
+    const bb: u64 = @intCast(b);
+    const result = @addWithOverflow(aa, bb);
+    return if (result[1] == 0) result[0] else null;
+}
+
+fn mulU64(a: anytype, b: anytype) ?u64 {
+    const aa: u64 = @intCast(a);
+    const bb: u64 = @intCast(b);
+    const result = @mulWithOverflow(aa, bb);
+    return if (result[1] == 0) result[0] else null;
+}
+
+fn addI64(a: i64, b: i64) ?i64 {
+    const result = @addWithOverflow(a, b);
+    return if (result[1] == 0) result[0] else null;
+}
+
+fn addUsize(a: usize, b: usize) ?usize {
+    const result = @addWithOverflow(a, b);
+    return if (result[1] == 0) result[0] else null;
+}
+
+fn mulUsize(a: usize, b: usize) ?usize {
+    const result = @mulWithOverflow(a, b);
+    return if (result[1] == 0) result[0] else null;
+}
+
+test "collected stream must cover allocated size" {
+    const std = @import("std");
+    var record = [_]u8{0} ** 128;
+    std.mem.writeInt(u16, record[20..22], 32, .little);
+    std.mem.writeInt(u32, record[24..28], 104, .little);
+    const attr = record[32..104];
+    std.mem.writeInt(u32, attr[0..4], 0x80, .little);
+    std.mem.writeInt(u32, attr[4..8], 72, .little);
+    attr[8] = 1;
+    std.mem.writeInt(u64, attr[24..32], 1, .little);
+    std.mem.writeInt(u16, attr[32..34], 64, .little);
+    std.mem.writeInt(u64, attr[40..48], 1024, .little);
+    std.mem.writeInt(u64, attr[48..56], 1024, .little);
+    @memcpy(attr[64..68], &[_]u8{ 0x11, 2, 1, 0 });
+    const complete = try collectStream(&record, 0x80, null, 512, 16);
+    try std.testing.expectEqual(@as(usize, 1), complete.len);
+    std.mem.writeInt(u64, attr[40..48], 1536, .little);
+    try std.testing.expectError(error.InvalidAttribute, collectStream(&record, 0x80, null, 512, 16));
+}
+
+test "runlist decoder accepts fragmentation and rejects overlapping physical runs" {
+    var stream = Stream{};
+    const fragmented = [_]u8{
+        0x11, 0x02, 0x10,
+        0x11, 0x02, 0x10,
+        0x00,
+    };
+    const next = try decodeRunlist(&fragmented, 0, 4096, 128, &stream);
+    try @import("std").testing.expectEqual(@as(u64, 4), next);
+    try @import("std").testing.expectEqual(@as(usize, 2), stream.len);
+    try @import("std").testing.expectEqual(@as(i64, 16), stream.runs[0].lcn);
+    try @import("std").testing.expectEqual(@as(i64, 32), stream.runs[1].lcn);
+
+    var looped = Stream{};
+    const overlapping = [_]u8{
+        0x11, 0x02, 0x10,
+        0x11, 0x02, 0xff,
+        0x00,
+    };
+    try @import("std").testing.expectError(error.RunlistLoop, decodeRunlist(&overlapping, 0, 4096, 128, &looped));
+}
+
+test "signed mapping-pair deltas sign extend" {
+    try @import("std").testing.expectEqual(@as(i64, -1), readSigned(&[_]u8{0xff}));
+    try @import("std").testing.expectEqual(@as(i64, -256), readSigned(&[_]u8{ 0x00, 0xff }));
+    try @import("std").testing.expectEqual(@as(i64, 0x1234), readSigned(&[_]u8{ 0x34, 0x12 }));
+}
+
+fn testIndexEntry(out: []u8, reference: u64, namespace: u8, name: []const u8) usize {
+    const key_len = 66 + name.len * 2;
+    const entry_len = @import("std").mem.alignForward(usize, 16 + key_len, 8);
+    @memset(out[0..entry_len], 0);
+    @import("std").mem.writeInt(u64, out[0..8], reference, .little);
+    @import("std").mem.writeInt(u16, out[8..10], @intCast(entry_len), .little);
+    @import("std").mem.writeInt(u16, out[10..12], @intCast(key_len), .little);
+    const key = out[16..][0..key_len];
+    @import("std").mem.writeInt(u64, key[48..56], 1234, .little);
+    key[64] = @intCast(name.len);
+    key[65] = namespace;
+    for (name, 0..) |c, i| @import("std").mem.writeInt(u16, key[66 + i * 2 ..][0..2], c, .little);
+    return entry_len;
+}
+
+test "long Win32 names decode completely and DOS 8.3 aliases stay hidden (BIOS menu names, 2026-09-28)" {
+    const names = [_][]const u8{
+        "linuxmint-22.3-xfce-64bit.iso",
+        "ubuntu-24.04.5-live-server-amd64.iso",
+        "Fedora-Everything-netinst-x86_64-44-1.7.iso",
+        "pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso",
+        "debian-live-13.7.0-amd64-standard.iso",
+    };
+    var buffer: [4096]u8 = [_]u8{0} ** 4096;
+    const header_offset: usize = 0;
+    var at: usize = 16;
+    for (names, 0..) |name, i| {
+        // Windows with 8.3 creation on: a namespace-2 alias next to the
+        // namespace-1 Win32 name, both pointing at the same MFT record.
+        at += testIndexEntry(buffer[at..], 40 + i, 2, "LINUXM~1.ISO");
+        at += testIndexEntry(buffer[at..], 40 + i, 1, name);
+    }
+    // last entry
+    @import("std").mem.writeInt(u16, buffer[at + 8 ..][0..2], 16, .little);
+    @import("std").mem.writeInt(u16, buffer[at + 12 ..][0..2], 2, .little);
+    at += 16;
+    @import("std").mem.writeInt(u32, buffer[0..4], 16, .little);
+    @import("std").mem.writeInt(u32, buffer[4..8], @intCast(at), .little);
+    @import("std").mem.writeInt(u32, buffer[8..12], @intCast(buffer.len), .little);
+
+    var items: [8]DirectoryItem = undefined;
+    var scan = DirectoryScan{ .output = &items };
+    try consumeIndexEntries(&buffer, header_offset, &scan);
+    try @import("std").testing.expectEqual(names.len, scan.count);
+    for (names, 0..) |name, i| {
+        var ascii: [260]u8 = undefined;
+        const n = items[i].copyNameAscii(&ascii);
+        try @import("std").testing.expectEqualStrings(name, ascii[0..n]);
+        for (items[i].name[0..items[i].name_len]) |unit| try @import("std").testing.expect(unit <= 0x7f);
+    }
+}

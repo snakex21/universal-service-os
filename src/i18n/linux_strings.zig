@@ -93,6 +93,12 @@ pub const hashes = [_]u32{
     0x3753f2a9, // lx.logon_setup_asks
     0x65fc5619, // lx.measured_byte_progress_transfer_speed_and_eta
     0xe0764ec1, // lx.measured_byte_progress_transfer_speed_and_eta_ar
+    0x4a64036d, // lx.minios_failed_heading
+    0x0fd20ed9, // lx.minios_failed_log
+    0x2e9699d1, // lx.minios_failed_reason
+    0x94e828f5, // lx.minios_failed_stage
+    0xa06a3271, // lx.minios_failed_title
+    0x3c802938, // lx.minios_no_alpine
     0xd738a5be, // lx.models_serial_numbers_capacity_and_health_report
     0x4bcbac7d, // lx.mounting_boot_iso
     0x488a7c63, // lx.mounting_the_verified_efi_system_partition
@@ -323,6 +329,12 @@ pub const english = [_][]const u8{
     "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
     "Measured byte progress, transfer speed and ETA.",
     "Measured byte progress, transfer speed and ETA are now available.",
+    "Windows was not installed",
+    "No other preparation was started. Log on the USB drive: {0}",
+    "Reason: {0}",
+    "Stage: {0}",
+    "MiniOS did not finish",
+    "This USB drive has no micro-Linux preparation environment (MiniOS-only test). A normal USOS update restores it.",
     "Models, serial numbers, capacity and health reports",
     "Mounting boot ISO",
     "Mounting the verified EFI System Partition.",

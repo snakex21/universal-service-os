@@ -8,13 +8,17 @@
 // folder, so CSMWrap still finds csmwrap.ini next to itself). No screen
 // output, no key presses; every logging error is ignored, the chainload is
 // always attempted. Read-only MMIO except the PMxC0 write-1-to-clear.
+// Version 2 (2026-10-31, Win10 x86 CSMWrap first-boot reset study): also the
+// bus-0 PCI-to-PCI bridges (bus numbers, VGA enable, PCIe link state), the
+// display controllers and a function count, so a GPU port the firmware hid
+// or left without a link shows in the record of that boot.
 // Own code, GPL-3.0-or-later (repository LICENSE).
 const std = @import("std");
 const uefi = std.os.uefi;
 const d = @import("decode.zig");
 const wide = std.unicode.utf8ToUtf16LeStringLiteral;
 
-pub const version = "nt-bootlog 1";
+pub const version = "nt-bootlog 2";
 
 fn rdtsc() u64 {
     var lo: u32 = undefined;
@@ -170,6 +174,9 @@ fn logMarker(out: *d.Out, bs: *uefi.tables.BootServices, boot: u32, tsc: u64) vo
 }
 
 fn logDevices(out: *d.Out) void {
+    var functions: u32 = 0;
+    var bridges: u32 = 0;
+    var displays: u32 = 0;
     var bus: u32 = 0;
     while (bus < 256) : (bus += 1) {
         var dev: u32 = 0;
@@ -181,15 +188,42 @@ fn logDevices(out: *d.Out) void {
                     if (func == 0) break;
                     continue;
                 }
+                functions += 1;
                 const header = (cfg(bus, dev, func, 0x0C) >> 16) & 0xFF;
                 const class = cfg(bus, dev, func, 8) >> 8;
                 const kind = d.className(class);
                 if (header & 0x7F == 0 and kind.len != 0) logDevice(out, bus, dev, func, id, class, kind);
+                if (header & 0x7F == 0 and class >> 16 == 0x03) displays += 1;
+                if (header & 0x7F == 1 and bus == 0) {
+                    logBridge(out, dev, func, id);
+                    bridges += 1;
+                }
                 if (func == 0 and header & 0x80 == 0) break;
             }
         }
     }
     outl(0xCF8, 0);
+    d.formatSummary(out, functions, bridges, displays);
+}
+
+/// Link Capabilities / Link Status of the function's PCI Express
+/// capability, null without one (bounded walk of the capability list).
+fn pcieLink(bus: u32, dev: u32, func: u32) ?d.Link {
+    if ((cfg(bus, dev, func, 4) >> 16) & 0x10 == 0) return null;
+    var ptr = cfg(bus, dev, func, 0x34) & 0xFC;
+    var hops: u32 = 0;
+    while (ptr >= 0x40 and hops < 48) : (hops += 1) {
+        const head = cfg(bus, dev, func, ptr);
+        if (head & 0xFF == 0x10) return .{ .cap = cfg(bus, dev, func, ptr + 0x0C), .status = @truncate(cfg(bus, dev, func, ptr + 0x10) >> 16) };
+        ptr = (head >> 8) & 0xFC;
+    }
+    return null;
+}
+
+fn logBridge(out: *d.Out, dev: u32, func: u32, id: u32) void {
+    const cmdsts = cfg(0, dev, func, 4);
+    const bctl: u16 = @truncate(cfg(0, dev, func, 0x3C) >> 16);
+    d.formatBridge(out, dev, func, id, cfg(0, dev, func, 0x18), @truncate(cmdsts), @truncate(cmdsts >> 16), bctl, pcieLink(0, dev, func));
 }
 
 fn logDevice(out: *d.Out, bus: u32, dev: u32, func: u32, id: u32, class: u32, kind: []const u8) void {

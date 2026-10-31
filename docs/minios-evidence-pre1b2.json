@@ -1,0 +1,426 @@
+{
+  "schema": 1,
+  "stage": "pre1b2",
+  "complete": true,
+  "qemu_only": true,
+  "wim_started": false,
+  "cases": [
+    {
+      "name": "bios-2m-01",
+      "arch": "bios",
+      "cpu": "486",
+      "ram_mib": 2,
+      "files": 10257,
+      "directories": 104,
+      "data_bytes": 34194432,
+      "memory": {
+        "allocator_peak": 410740,
+        "physical_heap": {
+          "current": 0,
+          "peak": 411108,
+          "extent_peak": 411200,
+          "reserved": 917504
+        },
+        "conservative_own_bytes": 1463008,
+        "firmware_excluded": true
+      },
+      "entropy": [
+        "ENTROPY source=fw_cfg_host_csprng bytes=64 qemu_detected=true no-weak-fallback"
+      ],
+      "tested_program_sha256": {
+        "bios_build": "02fe75912ec077e0f6d89ce6618a733a2ecd4cbda1fbd3aff591a14d5a5bc7ab"
+      },
+      "image_sha256": "e6a6603de7ad9f397a3b8d2c7661edde6758b0e94fd89479e67cfeac02d22d1b",
+      "windows_file_sha_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "mft_records": 16384,
+      "mft_physical_extents": 9,
+      "mft_mirror_equal": true,
+      "receipt": {
+        "path": "cases/bios-2m-01/preflight-completed.json",
+        "bytes": 1082,
+        "sha256": "a4d484104b6ed43220b08515953e4aca25ecdb5d43ec882912cca342e11092ff"
+      },
+      "qemu_receipt": {
+        "path": "cases/bios-2m-01/run-2m/completed.json",
+        "bytes": 2029,
+        "sha256": "952acdc2bea96599303ab9001962dec88b8101e6bb692d3aaaae213c6c1ba55f"
+      },
+      "application_log": {
+        "path": "cases/bios-2m-01/run-2m/USOSPREP.LOG",
+        "bytes": 1086,
+        "sha256": "d6b51d8f796f89c3613e8a298568c5ad8b63ed0b89898c94fb25b33909145e84"
+      },
+      "windows_receipt": {
+        "path": "oracle/bios-2m-01-windows01/result.json",
+        "bytes": 1748377,
+        "sha256": "b70f9becfb79c9040de3fc476203f8988dd005ab495ff79dc50d4e0018ab1064"
+      },
+      "windows_invocation": {
+        "path": "oracle/inputs/bios-2m-01/windows-invocation.json",
+        "bytes": 1230,
+        "sha256": "734854fd510a80a909c5ca2f993a19ba92aba94e9e5b3051b613b616338504f4"
+      },
+      "structure_receipt": {
+        "path": "oracle/inputs/bios-2m-01/metadata-inspection.json",
+        "bytes": 1948,
+        "sha256": "3e5f8e6271a32a7cb977c9c5290ce94f59d8cf73116e27c34a99abe60b364bc6"
+      },
+      "export_receipt": {
+        "path": "oracle/inputs/bios-2m-01/export.json",
+        "bytes": 978,
+        "sha256": "1a46953602a85278d08c8c9ac6cfd5afe7a342f0b7a79411980baa8b0d74b7b9"
+      },
+      "manifest": {
+        "path": "oracle/inputs/bios-2m-01/manifest.json",
+        "bytes": 1448077,
+        "sha256": "d7ab470b878d78cf227214cc0ca83f017c445b36b4182c49aa72b7e8e8f3124b"
+      }
+    },
+    {
+      "name": "bios-tree150k-01",
+      "arch": "bios",
+      "cpu": "486",
+      "ram_mib": 64,
+      "files": 150000,
+      "directories": 301,
+      "data_bytes": 9830400000,
+      "memory": {
+        "allocator_peak": 397540,
+        "physical_heap": {
+          "current": 0,
+          "peak": 397960,
+          "extent_peak": 398180,
+          "reserved": 8388608
+        },
+        "conservative_own_bytes": 8934112,
+        "firmware_excluded": true
+      },
+      "entropy": [
+        "ENTROPY source=fw_cfg_host_csprng bytes=64 qemu_detected=true no-weak-fallback"
+      ],
+      "tested_program_sha256": {
+        "bios_build": "02fe75912ec077e0f6d89ce6618a733a2ecd4cbda1fbd3aff591a14d5a5bc7ab"
+      },
+      "image_sha256": "f39afa68166d9801fb674978b8c7144049c7bbdc347170c9bc228d2f75e18457",
+      "windows_file_sha_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "mft_records": 262144,
+      "mft_physical_extents": 13,
+      "mft_mirror_equal": true,
+      "receipt": {
+        "path": "cases/bios-tree150k-01/preflight-completed.json",
+        "bytes": 1262,
+        "sha256": "14432ea5f775debdeafba264c20b3a96a0c4f24103e34f258364f292be154caf"
+      },
+      "qemu_receipt": {
+        "path": "cases/bios-tree150k-01/run-64m/completed.json",
+        "bytes": 2072,
+        "sha256": "38ff21b3615e864ec1365af4bfac214b5dc73d49311ba793238932faf4560ece"
+      },
+      "application_log": {
+        "path": "cases/bios-tree150k-01/run-64m/USOSPREP.LOG",
+        "bytes": 832,
+        "sha256": "dcb05a9a6a09b28bb434d418f3f196ace07e9ad5e2391cedfe57589a5d7ac03d"
+      },
+      "windows_receipt": {
+        "path": "oracle/bios-tree150k-01-windows02/result.json",
+        "bytes": 26559516,
+        "sha256": "602bfef078b41a586b95c2ad1dc8e20d56bcf5335825dab9439d744df9d44996"
+      },
+      "windows_invocation": {
+        "path": "oracle/inputs/bios-tree150k-01/windows-invocation02.json",
+        "bytes": 1255,
+        "sha256": "21b9bbf4552444bb57551dae8a71974e693efb26717e9f2615b351eeb0afd9c2"
+      },
+      "structure_receipt": {
+        "path": "oracle/inputs/bios-tree150k-01/metadata-inspection.json",
+        "bytes": 669,
+        "sha256": "45234b1a2660975fb89978f98b93467b9d4e86cc1598141ead56ff46353b613c"
+      },
+      "export_receipt": {
+        "path": "oracle/inputs/bios-tree150k-01/export.json",
+        "bytes": 1011,
+        "sha256": "22190d4f3b90faafd9330e857d42857e2dbae10178be32a345abc6466af0ad76"
+      },
+      "manifest": {
+        "path": "oracle/inputs/bios-tree150k-01/manifest.json",
+        "bytes": 22206055,
+        "sha256": "f8bee724a1a4d48fbd79e14ed9097ed20a501ead96cb7fdaf90acd6846781022"
+      }
+    },
+    {
+      "name": "uefi-tree150k-01",
+      "arch": "x86_64",
+      "cpu": "max",
+      "ram_mib": 64,
+      "files": 150000,
+      "directories": 301,
+      "data_bytes": 9830400000,
+      "memory": {
+        "allocator_peak": 1446888,
+        "physical_heap": null,
+        "conservative_own_bytes": 1680360,
+        "firmware_excluded": true
+      },
+      "entropy": [
+        "ENTROPY source=efi_rng bytes=64 qemu_detected=true no-weak-fallback"
+      ],
+      "tested_program_sha256": {
+        "efi": "6d510e3c7521e0347921800547e3207e026c88431ebd752d7786391fc40c67f8"
+      },
+      "image_sha256": "0b1836ddbbbaa13c049ed67da7ee47714a7e788326f7a38ae510b9fcf760395f",
+      "windows_file_sha_pass": true,
+      "readonly_chkdsk_exit": 0,
+      "mft_records": 262144,
+      "mft_physical_extents": 13,
+      "mft_mirror_equal": true,
+      "receipt": {
+        "path": "cases/uefi-tree150k-01/preflight-completed.json",
+        "bytes": 994,
+        "sha256": "eb15e4f3f12133175903bf02bae99d8259d3ce4fa08c283939eeddc2b887955f"
+      },
+      "qemu_receipt": {
+        "path": "cases/uefi-tree150k-01/run-64m/completed.json",
+        "bytes": 2299,
+        "sha256": "6341c1ac581b8986aa0bc3e09c20a6af252b153fcd49269fded0814f7ce51af1"
+      },
+      "application_log": {
+        "path": "cases/uefi-tree150k-01/run-64m/USOSPREP.LOG",
+        "bytes": 1513,
+        "sha256": "ae6e8b25e0cd8282f65ac7b4e2bb965ebba8fd3e14ca81e6f67c13224791e353"
+      },
+      "windows_receipt": {
+        "path": "oracle/uefi-tree150k-01-windows01/result.json",
+        "bytes": 26559516,
+        "sha256": "b9923a1c8865673b331679d93f842309f3995859eec36d9c540cf4bfd78f7b4f"
+      },
+      "windows_invocation": {
+        "path": "oracle/inputs/uefi-tree150k-01/windows-invocation.json",
+        "bytes": 1255,
+        "sha256": "a952b9b41650f6d7491ad022489983034b48e682e8736f5c299fcb82a7504c6d"
+      },
+      "structure_receipt": {
+        "path": "oracle/inputs/uefi-tree150k-01/metadata-inspection.json",
+        "bytes": 669,
+        "sha256": "45234b1a2660975fb89978f98b93467b9d4e86cc1598141ead56ff46353b613c"
+      },
+      "export_receipt": {
+        "path": "oracle/inputs/uefi-tree150k-01/export.json",
+        "bytes": 1011,
+        "sha256": "05dcb9760e11abccf6944088b91beddb902eb521cd3dd4c92c182c6e408a6cee"
+      },
+      "manifest": {
+        "path": "oracle/inputs/uefi-tree150k-01/manifest.json",
+        "bytes": 22206055,
+        "sha256": "f8bee724a1a4d48fbd79e14ed9097ed20a501ead96cb7fdaf90acd6846781022"
+      }
+    }
+  ],
+  "entropy_refusal": {
+    "path": "cases/entropy-refusal-01/preflight-completed.json",
+    "bytes": 723,
+    "sha256": "5ac3a29909f4c710e2188ea2053a444ebfe58ec33b9c9d102259d9331f62c69a"
+  },
+  "builds": [
+    {
+      "returncode": 0,
+      "tests": 661,
+      "build_steps": 78,
+      "transcript": {
+        "path": "validation/build-preflight01.log",
+        "bytes": 4095,
+        "sha256": "6f8a26e11c3302e963afa16809fc3a4b4c7887c146b5e09be3256534f60978e3"
+      },
+      "command": "zig build usosprep-app usosprep-scale-host test -j1 -Doptimize=ReleaseSafe --prefix zig-out/preflight-install --summary all",
+      "artifacts": {
+        "prep.audit.s": {
+          "path": "artifacts/prep.audit.s",
+          "bytes": 2091767,
+          "sha256": "3320b7dd9e8da8dee49ce8bd470ab44b7a118be15f1e5479c15f44b321a05d17"
+        },
+        "prep.elf": {
+          "path": "artifacts/prep.elf",
+          "bytes": 171944,
+          "sha256": "042af6880a5e774e50c721ed9fdd53fb2f2cfb16cb68a2a05c4544fdf94c5bbd"
+        },
+        "usosprep-bios.img": {
+          "path": "artifacts/usosprep-bios.img",
+          "bytes": 1048576,
+          "sha256": "02fe75912ec077e0f6d89ce6618a733a2ecd4cbda1fbd3aff591a14d5a5bc7ab"
+        },
+        "usosprep-ia32.audit.s": {
+          "path": "artifacts/usosprep-ia32.audit.s",
+          "bytes": 747467,
+          "sha256": "ff170a85e482f4da4717b354f77b020687ce223d6bbc09668c116afeae3f9534"
+        },
+        "usosprep-ia32.efi": {
+          "path": "artifacts/usosprep-ia32.efi",
+          "bytes": 223744,
+          "sha256": "99998d03d8e087f9ff846410502502e036da02074c815f9a2bf4032d5f517d56"
+        },
+        "usosprep-x86_64.efi": {
+          "path": "artifacts/usosprep-x86_64.efi",
+          "bytes": 219648,
+          "sha256": "6d510e3c7521e0347921800547e3207e026c88431ebd752d7786391fc40c67f8"
+        }
+      },
+      "executed_firmware_matrix": true,
+      "late_change": "none"
+    },
+    {
+      "returncode": 0,
+      "tests": 662,
+      "build_steps": 78,
+      "transcript": {
+        "path": "validation/build-preflight02.log",
+        "bytes": 4067,
+        "sha256": "a2ba7bd984171d674e563b76811872794215b9d6b1299866b9f3727e61210949"
+      },
+      "command": "zig build usosprep-app usosprep-scale-host test -j1 -Doptimize=ReleaseSafe --prefix zig-out/preflight-final --summary all",
+      "artifacts": {
+        "prep.audit.s": {
+          "path": "artifacts-final/prep.audit.s",
+          "bytes": 2091790,
+          "sha256": "38675973581636a5c1deb97e70688ff84ab17d5ea8f5e08a6745534b9d38c0c9"
+        },
+        "prep.elf": {
+          "path": "artifacts-final/prep.elf",
+          "bytes": 171944,
+          "sha256": "fad6d7c57b6c6a28b7eede2cb9fbf846e19e48dc8b2f0a26c8967c83177349e9"
+        },
+        "usosprep-bios.img": {
+          "path": "artifacts-final/usosprep-bios.img",
+          "bytes": 1048576,
+          "sha256": "e50b6e34d429067b065ab7cf7540805aa19943111d37724cfdb387c1c51d418f"
+        },
+        "usosprep-ia32.audit.s": {
+          "path": "artifacts-final/usosprep-ia32.audit.s",
+          "bytes": 747467,
+          "sha256": "ff170a85e482f4da4717b354f77b020687ce223d6bbc09668c116afeae3f9534"
+        },
+        "usosprep-ia32.efi": {
+          "path": "artifacts-final/usosprep-ia32.efi",
+          "bytes": 223744,
+          "sha256": "99998d03d8e087f9ff846410502502e036da02074c815f9a2bf4032d5f517d56"
+        },
+        "usosprep-x86_64.efi": {
+          "path": "artifacts-final/usosprep-x86_64.efi",
+          "bytes": 219648,
+          "sha256": "6d510e3c7521e0347921800547e3207e026c88431ebd752d7786391fc40c67f8"
+        }
+      },
+      "executed_firmware_matrix": false,
+      "late_change": "Subtraction-based malformed SMBIOS3 address bound and focused regression only; valid-firmware control flow unchanged; no claim that build02 bytes were executed in the build01 firmware matrix."
+    }
+  ],
+  "test_suites": {
+    "summary": {
+      "path": "validation/acceptance-tests.json",
+      "bytes": 1334,
+      "sha256": "6031dd6de32797913c8b529430a94667032ec3419079b27249e607d81388e5da"
+    },
+    "suites": [
+      {
+        "kind": "zig-build",
+        "tests": 662,
+        "returncode": 0,
+        "scope": "Final app/host build plus all tests; late malformed-SMBIOS bounds regression included",
+        "transcript": {
+          "path": "validation/build-preflight02.log",
+          "bytes": 4067,
+          "sha256": "a2ba7bd984171d674e563b76811872794215b9d6b1299866b9f3727e61210949"
+        }
+      },
+      {
+        "kind": "python-unittest",
+        "tests": 71,
+        "returncode": 0,
+        "scope": "All MiniOS Python tests, including explicit oracle-only resume after a storage guard refusal",
+        "transcript": {
+          "path": "validation/python-preflight04.log",
+          "bytes": 12509,
+          "sha256": "85f55ad8e1f6284b4696a8e1428828db6b91e645429174e2a47e921a21aa1e73"
+        }
+      },
+      {
+        "kind": "zig-standalone",
+        "tests": 7,
+        "returncode": 0,
+        "scope": "Source selection, CPU instruction guards, fw_cfg refusal and malformed SMBIOS",
+        "transcript": {
+          "path": "validation/entropy-test05.log",
+          "bytes": 698,
+          "sha256": "45ae52a74859778ead11f063c78e98f6216c58ad63f7b885c9a67d199436a93c"
+        }
+      },
+      {
+        "kind": "zig-standalone",
+        "tests": 23,
+        "returncode": 0,
+        "scope": "Fragmented MFT bootstrap/list/three bitmap kinds, isolated clusters, NoSpace and deletion/reuse",
+        "transcript": {
+          "path": "validation/core-review/preflight-final.log",
+          "bytes": 2174,
+          "sha256": "99d8001b36f66e24da10c5101848688f21a3fd4ee5e4f4e61dbde401847f78e9"
+        }
+      },
+      {
+        "kind": "zig-standalone",
+        "tests": 23,
+        "returncode": 0,
+        "scope": "Previous real NTFS scaling regressions after metadata stream changes",
+        "transcript": {
+          "path": "validation/core-review/scale-regression.log",
+          "bytes": 2201,
+          "sha256": "dcd78f55968275c66374fefa5428545cd5623115ee732ca78f970ff5c682afd0"
+        }
+      }
+    ]
+  },
+  "limits": {
+    "physical_boards_tested": false,
+    "mft_continuation_records": [
+      16,
+      23
+    ],
+    "mft_continuation_slots": 8,
+    "attribute_list_max_bytes": 262144,
+    "journal_or_crash_recovery": false,
+    "reuse_accounting_max_ranges": 4096
+  },
+  "cleanup": {
+    "receipt": {
+      "path": "cleanup-preflight-completed.json",
+      "bytes": 2106,
+      "sha256": "60ce7edd2a414dd48198616a1a6414a24407c2b8a50ae34313d8fb488b475771"
+    },
+    "deleted_files": 34,
+    "plan": {
+      "path": "cleanup-preflight-plan.json",
+      "bytes": 6424,
+      "sha256": "56693ea80a414f62d0fe523e02cc8b4286dab3472fa071e84c7bcaeb2927fc08"
+    },
+    "logical_bytes": 172829855936,
+    "report_before_cleanup": {
+      "path": "validation/final-report-pre-cleanup.md",
+      "bytes": 9991,
+      "sha256": "1c4cc3071aeb9e0c51915537339fe810e450911e69209f8f01da09a0474cadf1"
+    }
+  },
+  "storage_compression": {
+    "path": "validation/storage-compression01.json",
+    "bytes": 1894,
+    "sha256": "a657083c3a5e39e725a769bbd95647c524eb0542e4d6e35b879e2fad58b7a8c5"
+  },
+  "earlier_windows_storage_refusal": {
+    "path": "oracle/inputs/bios-tree150k-01/windows-invocation.json",
+    "bytes": 1388,
+    "sha256": "545d0112a8dc97ac207dbf8301be6340a39b1269a4bd733f1c8cdbc4f5e7348a"
+  },
+  "preserved_evidence": {
+    "path": "validation/preserved-evidence.json",
+    "bytes": 18829,
+    "sha256": "94537468618a3bdf0675dd438f7a2128ee5f17ca1d47718edca4387ad7e56e66"
+  }
+}

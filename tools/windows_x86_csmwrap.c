@@ -56,6 +56,10 @@
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
  *                            remove the stick (closes itself after 2 minutes).
+ *   after poweroff           the same checks; the notice (Polish) says the
+ *                            computer powers off and is to be started with the
+ *                            power button (closes itself after 15 seconds); the
+ *                            .cmd then runs wpeutil shutdown (8 / 8.1 / 10).
  * Disk and partition identities come from IOCTLs and the MBR, never letters.
  */
 #define WIN32_LEAN_AND_MEAN
@@ -607,6 +611,36 @@ static DWORD display_register(void) {
  * USOS-installed 8 / 8.1 / 10 starts with a full boot. The opt-out file is
  * the one documented for DATA (Systems\Windows\<version>\Unattended). */
 #include "windows_fast_startup.h"
+/* OPT-IN diagnostic flight recorder (tools/windows_flight_recorder.c,
+ * docs/nvme-nt6-2026-10-12.md section 21.2), every x86 NT6 install through
+ * this helper: an empty flight-recorder.txt on DATA, in
+ * Systems\Windows\<version>\Unattended\ (8 / 8.1 / 10: FOLDER, FOLDER2) or
+ * in Systems\Windows\ (any version), on any volume but the installed one.
+ * Then usos-flight.exe -> <target>\Windows\System32\USOSFLT.EXE, \USOS is
+ * created, and the hive load registers the USOSFLT service. Off by default. */
+static void flight_recorder(const WCHAR *folder, const WCHAR *folder2) {
+    WCHAR file[MAX_PATH], to[MAX_PATH];
+    BOOL wanted = FALSE;
+    for (WCHAR letter = L'C'; letter <= L'Z' && !wanted; letter++) {
+        if (letter == target_root[0]) continue;
+        for (int i = 0; i < 3 && !wanted; i++) {
+            const WCHAR *name = i == 0 ? 0 : i == 1 ? folder : folder2;
+            if (i && !name) continue;
+            file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
+            if (name) { lstrcatW(file, name); lstrcatW(file, L"\\Unattended\\"); }
+            lstrcatW(file, L"flight-recorder.txt");
+            wanted = GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES;
+        }
+    }
+    if (!wanted) { say("[X86_CSMWRAP] faststartup: flight recorder off (no flight-recorder.txt on DATA)\r\n"); return; }
+    say("[X86_CSMWRAP] faststartup: flight-recorder.txt on DATA; installing USOSFLT\r\n");
+    path(file, L"usos-flight.exe");
+    lstrcpyW(to, target_root); lstrcatW(to, L"Windows\\System32\\USOSFLT.EXE");
+    if (!CopyFileW(file, to, FALSE)) { logn("faststartup: flight recorder copy failed, error=", GetLastError()); return; }
+    lstrcpyW(to, target_root); lstrcatW(to, L"USOS");
+    CreateDirectoryW(to, 0);
+    usos_fs_flight = TRUE;
+}
 static DWORD fast_startup(void) {
     WCHAR kernel[MAX_PATH], file[MAX_PATH];
     DWORD major = 0, minor = 0, r;
@@ -615,13 +649,21 @@ static DWORD fast_startup(void) {
     lstrcpyW(kernel, target_root); lstrcatW(kernel, L"Windows\\System32\\ntoskrnl.exe");
     if (!file_version(kernel, &major, &minor)) { say("[X86_CSMWRAP] faststartup: cannot read the installed kernel version; skipped\r\n"); return 11; }
     logn("faststartup: installed NT version major=", major); logn("faststartup: minor=", minor);
-    if (major < 6 || (major == 6 && minor < 2)) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
+    BOOL modern = major > 6 || (major == 6 && minor >= 2);
     folder = L"Windows 10";
     folder2 = 0;
     if (major == 6 && minor == 2) folder = L"Windows 8";
     /* 6.3: Windows 8.1, or Embedded 8.1 Industry with its own DATA folder
      * (the WinPE cannot tell them apart; either folder's file counts). */
     else if (major == 6 && minor == 3) { folder = L"Windows 8.1"; folder2 = L"Windows Embedded 8.1 Industry"; }
+    flight_recorder(modern ? folder : 0, modern ? folder2 : 0);
+    if (!modern) {
+        if (!usos_fs_flight) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
+        usos_fs_hiberboot = FALSE; usos_fs_autoreboot_edit = FALSE;
+        r = usos_fast_startup(target_root);
+        logn(usos_fs_flight_result <= USOS_FS_PRESENT ? "faststartup: flight recorder USOSFLT registered (Vista / 7, no other edit), code=" : "faststartup: flight recorder NOT registered, code=", usos_fs_flight_result);
+        return 0;
+    }
     /* The documented opt-out: DATA\Systems\Windows\<version>\Unattended\
      * fast-startup-on.txt on any volume but the installed one. */
     for (WCHAR letter = L'C'; letter <= L'Z'; letter++) {
@@ -631,19 +673,48 @@ static DWORD fast_startup(void) {
             if (!name) continue;
             file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
             lstrcatW(file, name); lstrcatW(file, L"\\Unattended\\fast-startup-on.txt");
-            if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES) {
+            if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES && usos_fs_hiberboot) {
                 say("[X86_CSMWRAP] faststartup: fast-startup-on.txt on DATA; Windows keeps its own setting\r\n");
-                return 0;
+                usos_fs_hiberboot = FALSE;
             }
         }
     }
     r = usos_fast_startup(target_root);
     logn(r == USOS_FS_WRITTEN ? "faststartup: HiberbootEnabled=0 written in the installed SYSTEM hive, code=" :
-         r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" : "faststartup: FAILED, hive code=", r);
+         r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" :
+         r == USOS_FS_SKIPPED ? "faststartup: HiberbootEnabled not changed (fast-startup-on.txt), code=" : "faststartup: FAILED, hive code=", r);
+    /* DIAGNOSTIC (windows_fast_startup.h): AutoReboot=0 in the same load. */
+    if (r != USOS_FS_ERR_LOAD && r != USOS_FS_ERR_UNLOAD) {
+        logn(usos_fs_autoreboot == USOS_FS_WRITTEN ? "faststartup: DIAGNOSTIC CrashControl AutoReboot=0 written (a bugcheck stays on screen), code=" :
+             usos_fs_autoreboot == USOS_FS_PRESENT ? "faststartup: DIAGNOSTIC CrashControl AutoReboot was already 0, code=" : "faststartup: DIAGNOSTIC CrashControl AutoReboot NOT written, code=", usos_fs_autoreboot);
+        logn("faststartup: CrashControl CrashDumpEnabled as found, unchanged (4294967295 = missing)=", usos_fs_crashdump);
+    }
+    if (usos_fs_flight && r != USOS_FS_ERR_LOAD && r != USOS_FS_ERR_UNLOAD)
+        logn(usos_fs_flight_result <= USOS_FS_PRESENT ? "faststartup: flight recorder USOSFLT registered (auto start, \\USOS\\FLIGHT.LOG), code=" : "faststartup: flight recorder NOT registered, code=", usos_fs_flight_result);
     /* Not fatal: the hive unload writes the value as well (logged for the
      * X470 report; see windows_fast_startup.h). */
     if (r == USOS_FS_WRITTEN && usos_fs_flush_error != ERROR_SUCCESS) logn("faststartup: RegFlushKey failed (unload still commits), Win32 code=", (DWORD)usos_fs_flush_error);
     return r >= USOS_FS_ERR_LOAD ? 11 : 0;
+}
+
+/* "after poweroff" (Windows 8 / 8.1 / 10 x86; the .cmd reads the installed
+ * version with "target"): the WinPE powers the computer off (wpeutil
+ * shutdown) instead of a warm restart. X470 2026-10-31 (B261031-195000):
+ * after "wpeutil reboot" the installed Windows 10 x86 reset itself ~30 s
+ * into its first boot, with the GPU PCIe port 00:03.1 missing; the interim
+ * image route ended with a power-off and a cold boot and reached the desktop
+ * (docs/nvme-nt6-2026-10-12.md section 21). Polish text (user request for
+ * this diagnostic round), ASCII source with \u escapes; closes itself after
+ * 15 seconds. */
+#define USOS_POWEROFF_NOTICE_MS 15000
+static DWORD WINAPI notice_poweroff(LPVOID unused) {
+    (void)unused;
+    MessageBoxW(0, L"Pierwsza cz\u0119\u015b\u0107 instalacji Windows zosta\u0142a zako\u0144czona.\n\n"
+                   L"Komputer zostanie teraz wy\u0142\u0105czony. Wyjmij pendrive USOS, a nast\u0119pnie w\u0142\u0105cz komputer przyciskiem zasilania, aby kontynuowa\u0107 instalacj\u0119 Windows z dysku (przez CSMWrap). "
+                   L"Je\u015bli pendrive zostanie pod\u0142\u0105czony, wybierz wpis UEFI tego dysku w menu rozruchowym firmware.\n\n"
+                   L"Komputer wy\u0142\u0105czy si\u0119 sam za 15 sekund.",
+                L"USOS - Windows bez CSM", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST | MB_SYSTEMMODAL);
+    return 0;
 }
 
 static DWORD WINAPI notice(LPVOID unused) {
@@ -651,6 +722,90 @@ static DWORD WINAPI notice(LPVOID unused) {
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
                 L"USOS - Windows without CSM", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST | MB_SYSTEMMODAL);
     return 0;
+}
+
+/* ---- coldreset: full CF9h reset instead of the power-off (8 / 8.1 / 10) ----
+ * docs/nvme-nt6-2026-10-12.md section 21.3. "coldreset check" loads
+ * usos-cf9.sys (tools/nt/usoscf9, demand-start kernel service USOSCF9) and
+ * asks whether the host bridge is AMD / Intel (exit 0 = the full reset is
+ * available, else 1: the .cmd keeps the power-off). "coldreset go" flushes
+ * every volume, locks + dismounts the prepared disk's volumes (the handles
+ * stay open, so nothing writes to them any more), flushes every physical
+ * disk's write cache, then asks the driver for CF9h 02h, 0Eh; it returns
+ * (exit 1) only when the machine did not reset. */
+#define USOSCF9_TYPE 0x8F39
+#define IOCTL_USOSCF9_QUERY CTL_CODE(USOSCF9_TYPE, 0x900, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_USOSCF9_RESET CTL_CODE(USOSCF9_TYPE, 0x901, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+static HANDLE cf9_open(void) {
+    return CreateFileW(L"\\\\.\\USOSCF9", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+}
+static DWORD coldreset_check(void) {
+    WCHAR sys[MAX_PATH];
+    path(sys, L"usos-cf9.sys");
+    if (GetFileAttributesW(sys) == INVALID_FILE_ATTRIBUTES) { say("[X86_CSMWRAP] coldreset: usos-cf9.sys missing; power-off fallback\r\n"); return 1; }
+    SC_HANDLE m = OpenSCManagerW(0, 0, SC_MANAGER_ALL_ACCESS);
+    if (!m) { logn("coldreset: no service manager; power-off fallback, error=", GetLastError()); return 1; }
+    SC_HANDLE s = CreateServiceW(m, L"USOSCF9", L"USOS CF9 full reset", SERVICE_ALL_ACCESS, SERVICE_KERNEL_DRIVER, SERVICE_DEMAND_START,
+                                 SERVICE_ERROR_IGNORE, sys, 0, 0, 0, 0, 0);
+    if (!s) s = OpenServiceW(m, L"USOSCF9", SERVICE_ALL_ACCESS);
+    if (!s) { logn("coldreset: driver service not created; power-off fallback, error=", GetLastError()); CloseServiceHandle(m); return 1; }
+    if (!StartServiceW(s, 0, 0) && GetLastError() != ERROR_SERVICE_ALREADY_RUNNING) {
+        logn("coldreset: usos-cf9.sys did not start; power-off fallback, error=", GetLastError());
+        CloseServiceHandle(s); CloseServiceHandle(m); return 1;
+    }
+    CloseServiceHandle(s); CloseServiceHandle(m);
+    HANDLE h = cf9_open();
+    if (h == INVALID_HANDLE_VALUE) { logn("coldreset: \\\\.\\USOSCF9 not opened; power-off fallback, error=", GetLastError()); return 1; }
+    DWORD q[2] = {0, 0}, got = 0;
+    BOOL ok = DeviceIoControl(h, IOCTL_USOSCF9_QUERY, 0, 0, q, sizeof(q), &got, 0) && got == sizeof(q);
+    CloseHandle(h);
+    if (!ok) { logn("coldreset: query failed; power-off fallback, error=", GetLastError()); return 1; }
+    logn("coldreset: host bridge vendor id (decimal)=", q[0] & 0xFFFF);
+    logn("coldreset: host bridge device id (decimal)=", q[0] >> 16);
+    if (!q[1]) { say("[X86_CSMWRAP] coldreset: not an AMD / Intel host bridge; power-off fallback\r\n"); return 1; }
+    say("[X86_CSMWRAP] coldreset: CF9h full reset available (AMD / Intel host bridge)\r\n");
+    return 0;
+}
+static DWORD coldreset_go(void) {
+    WCHAR volume[64]; DWORD got = 0, flushed = 0, dismounted = 0, disks = 0;
+    static HANDLE held[16]; int nheld = 0;
+    HANDLE f = FindFirstVolumeW(volume, 64);
+    if (f != INVALID_HANDLE_VALUE) {
+        do {
+            int len = lstrlenW(volume);
+            if (len < 2 || volume[len - 1] != L'\\') continue;
+            volume[len - 1] = 0;
+            HANDLE h = CreateFileW(volume, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+            if (h == INVALID_HANDLE_VALUE) continue;
+            if (FlushFileBuffers(h)) flushed++;
+            VOLUME_DISK_EXTENTS e;
+            BOOL on_target = DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &e, sizeof(e), &got, 0) && e.NumberOfDiskExtents >= 1 && e.Extents[0].DiskNumber == disk;
+            if (on_target && nheld < 16) {
+                BOOL locked = DeviceIoControl(h, FSCTL_LOCK_VOLUME, 0, 0, 0, 0, &got, 0);
+                if (DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, 0, 0, 0, 0, &got, 0)) dismounted++;
+                if (!locked) say("[X86_CSMWRAP] coldreset: a target volume could not be locked (flushed and dismounted anyway)\r\n");
+                held[nheld++] = h;
+            } else CloseHandle(h);
+        } while (FindNextVolumeW(f, volume, 64));
+        FindVolumeClose(f);
+    }
+    for (DWORD n = 0; n < 32; n++) {
+        WCHAR name[40] = L"\\\\.\\PhysicalDrive"; wdecimal(name + lstrlenW(name), n);
+        HANDLE h = CreateFileW(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        if (h == INVALID_HANDLE_VALUE) continue;
+        if (FlushFileBuffers(h)) disks++;
+        CloseHandle(h);
+    }
+    logn("coldreset: volumes flushed=", flushed); logn("coldreset: target volumes dismounted=", dismounted); logn("coldreset: disk caches flushed=", disks);
+    HANDLE h = cf9_open();
+    if (h == INVALID_HANDLE_VALUE) { logn("coldreset: \\\\.\\USOSCF9 not opened, error=", GetLastError()); return 1; }
+    static const char magic[16] = { 'U','S','O','S','C','F','9','F','U','L','L','R','E','S','E','T' };
+    say("[X86_CSMWRAP] coldreset: CF9h 02h, 0Eh now\r\n");
+    DeviceIoControl(h, IOCTL_USOSCF9_RESET, (LPVOID)magic, sizeof(magic), 0, 0, &got, 0);
+    logn("coldreset: still running after the CF9h write, error=", GetLastError());
+    CloseHandle(h);
+    for (int i = 0; i < nheld; i++) CloseHandle(held[i]);
+    return 1;
 }
 
 static int arg_count;
@@ -691,6 +846,14 @@ void entry(void) {
         RegCloseKey(k);
         ExitProcess(staged * 1000 + acl * 100 + (r > 99 ? 99 : r));
     }
+    /* notice poweroff: the Polish power-off notice alone (15 s), for the
+     * cold-reset fallback after "after quiet" (section 21.3). */
+    if (lstrcmpiW(args[1], L"notice") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0) {
+        say("[X86_CSMWRAP] notice: power-off notice (15 s), then wpeutil shutdown\r\n");
+        HANDLE t = CreateThread(0, 0, notice_poweroff, 0, 0, 0);
+        if (t) { WaitForSingleObject(t, USOS_POWEROFF_NOTICE_MS); CloseHandle(t); }
+        ExitProcess(0);
+    }
     if (lstrcmpiW(args[1], L"samefile") == 0 && arg_count == 4) ExitProcess(same_file(args[2], args[3]) ? 0 : 1);
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
     if (lstrcmpiW(args[1], L"nodump") == 0) ExitProcess(no_dump_stack());
@@ -704,10 +867,24 @@ void entry(void) {
     if (lstrcmpiW(args[1], L"faststartup-test") == 0 && arg_count == 3) {
         HKEY k;
         DWORD r;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE, &k) != ERROR_SUCCESS) ExitProcess(99);
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE | KEY_CREATE_SUB_KEY, &k) != ERROR_SUCCESS) ExitProcess(99);
         r = usos_fast_startup_in_system(k);
         RegCloseKey(k);
         ExitProcess(r > 99 ? 99 : r);
+    }
+    /* Host test of the opt-in flight recorder registration only
+     * (tools/tests/test_windows_flight_recorder.py): flight-test <key under
+     * HKCU standing for a SYSTEM hive root> [vista]; exit = the USOSFLT
+     * registration result * 10 + the hive edit result (capped). */
+    if (lstrcmpiW(args[1], L"flight-test") == 0 && (arg_count == 3 || arg_count == 4)) {
+        HKEY k;
+        DWORD r;
+        if (arg_count == 4) { usos_fs_hiberboot = FALSE; usos_fs_autoreboot_edit = FALSE; }
+        usos_fs_flight = TRUE;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE | KEY_CREATE_SUB_KEY, &k) != ERROR_SUCCESS) ExitProcess(9990);
+        r = usos_fast_startup_in_system(k);
+        RegCloseKey(k);
+        ExitProcess((usos_fs_flight_result > 99 ? 99 : usos_fs_flight_result) * 10 + (r > 9 ? 9 : r));
     }
     /* setupver <setup.exe>: exit code = major * 10 + minor of the file version
      * (60 Vista / 2008, 61 Windows 7, 62 / 63 8.x, 100 Windows 10), 0 unknown.
@@ -731,6 +908,10 @@ void entry(void) {
      * error 433, docs/nvme-nt6-2026-10-12.md section 15). */
     if (lstrcmpiW(args[1], L"lowmem") == 0) { logn("lowmem: WinPE RAM top before any disk access (MiB)=", (DWORD)(ram_top() >> 20)); verbose = TRUE; }
     if (!find_disk(verbose) && (verbose || !find_disk(TRUE))) { say("[X86_CSMWRAP] STOP: the prepared disk was not found exactly once\r\n"); ExitProcess(4); }
+    /* After "after" the staging entry is gone, so these run before the MBR
+     * slot lookup; they only need the prepared disk's number. */
+    if (lstrcmpiW(args[1], L"coldreset") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"check") == 0) ExitProcess(coldreset_check());
+    if (lstrcmpiW(args[1], L"coldreset") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"go") == 0) ExitProcess(coldreset_go());
     BYTE s[512];
     if (!mbr_io(s, FALSE)) { logn("cannot read the target MBR, error=", GetLastError()); ExitProcess(5); }
     int staging = slot_of(s, staging_start, staging_sectors, TRUE), windows = slot_of(s, windows_start, windows_sectors, FALSE);
@@ -772,8 +953,14 @@ void entry(void) {
         if (!bootmgr || !winload || we[0] != 0x80 || active != 1) { say("[X86_CSMWRAP] STOP: the installed Windows partition is not ready to boot; staging kept\r\n"); ExitProcess(8); }
         memset(se, 0, 16);
         if (!write_mbr(s, "staging partition entry removed")) ExitProcess(6);
-        HANDLE t = CreateThread(0, 0, notice, 0, 0, 0);
-        if (t) { WaitForSingleObject(t, 120000); CloseHandle(t); }
+        BOOL poweroff = arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0;
+        /* "after quiet" (8 / 8.1 / 10, section 21.3): no notice; the .cmd
+         * then tries the CF9h full reset, the power-off notice only as the
+         * fallback ("notice poweroff"). */
+        if (arg_count == 3 && lstrcmpiW(args[2], L"quiet") == 0) { say("[X86_CSMWRAP] after: no notice (cold reset next)\r\n"); ExitProcess(0); }
+        say(poweroff ? "[X86_CSMWRAP] after: power-off notice (15 s), then wpeutil shutdown\r\n" : "[X86_CSMWRAP] after: remove-the-stick notice (2 min), then wpeutil reboot\r\n");
+        HANDLE t = CreateThread(0, 0, poweroff ? notice_poweroff : notice, 0, 0, 0);
+        if (t) { WaitForSingleObject(t, poweroff ? USOS_POWEROFF_NOTICE_MS : 120000); CloseHandle(t); }
         ExitProcess(0);
     }
     ExitProcess(2);

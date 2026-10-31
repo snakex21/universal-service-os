@@ -1,0 +1,66 @@
+{
+  "schema": "minios-1c5-bios-closed-v1",
+  "qemu_only": true,
+  "own_generated_data": true,
+  "contains_windows_payload": false,
+  "all_guests_finished": true,
+  "rows": [
+    {
+      "cpu": "486",
+      "memory_mib": 32,
+      "passed": true,
+      "timed_out": false,
+      "guest_seconds": 890.1152447999993,
+      "head": "ffe7620e4e812672ab752b6593baa8428cd33dba",
+      "dirty": 0,
+      "program_sha256": "60111b65f563f3d73481ed52b21eee440fac6ba89cacfd5493707d86e1c6d1a7",
+      "target_sha256": "e3b5886be01f14837b527bac02b274480a3d0c691d57ac0ab1fee02d60d5341b",
+      "source_and_base_unchanged": true,
+      "receipt": "1c23/qemu-bios/tcg486-1c5-01/result.json",
+      "receipt_sha256": "4df8a0cdf12b72cd5000e10f1ee2d58ba3f62ae98dd1acf914f3d8e93f033ca4",
+      "final_scan": {
+        "seconds": 885,
+        "current": 8589934592,
+        "total": 8589934592
+      },
+      "memory": {
+        "stack_reserved": 253952,
+        "stack_high_water": 217072,
+        "allocator_peak": 3949526,
+        "physical_heap_peak": 3954224,
+        "physical_extent_peak": 3959056,
+        "heap_reserved": 14680064,
+        "firmware_excluded": true
+      },
+      "independent_native_gate_performed": false
+    },
+    {
+      "cpu": "pentium",
+      "memory_mib": 32,
+      "passed": false,
+      "timed_out": true,
+      "guest_seconds": 900.0137680999997,
+      "head": "ffe7620e4e812672ab752b6593baa8428cd33dba",
+      "dirty": 0,
+      "program_sha256": "60111b65f563f3d73481ed52b21eee440fac6ba89cacfd5493707d86e1c6d1a7",
+      "target_sha256": "2070baf14db84f85bccb1ea4a05997873da3d433d70f950465442f7658424907",
+      "source_and_base_unchanged": true,
+      "receipt": "1c23/qemu-bios/tcgpentium-1c5-01/result.json",
+      "receipt_sha256": "b4cc45b03d9a7d11dfa99b5aff837ca5fc62f3fcc78313f48073dc9c1134740e",
+      "final_scan": {
+        "seconds": 874,
+        "current": 8321499136,
+        "total": 8589934592
+      },
+      "memory": null,
+      "independent_native_gate_performed": false
+    }
+  ],
+  "pentium_virtual_target_equals_blank_checkpoint": true,
+  "compare_log": "1c5/logs/pentium-closed-compare01.log",
+  "compare_sha256": "ddf3fc743811b34327873810a6ca960c0d8dcc6b90f446a37025be8ed3bb9079",
+  "rerun_performed": false,
+  "native_bios_not_started_after_failed_trial": true,
+  "windows7_bios_gate_passed": false,
+  "all_cpu_gates_passed": false
+}

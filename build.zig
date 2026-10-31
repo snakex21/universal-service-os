@@ -25,6 +25,7 @@ pub fn build(b: *std.Build) void {
     _ = addGptNoBlockIoProbeApp(b, optimize);
     _ = addSecureBootProbeApp(b, optimize);
     _ = addUefiNtfsCatalogProbeApp(b, optimize);
+    addUsosPrep(b, target, optimize);
     addBootNextCompileCheck(b, optimize);
     const handoff_base = addPrepareNtfsHandoffImage(b, ntfs_driver, handoff_app);
     const handoff_overlay = addPrepareNtfsHandoffOverlay(b, handoff_base);
@@ -35,6 +36,129 @@ pub fn build(b: *std.Build) void {
     addUefiDriverFixtures(b, optimize);
     addQemuX86TestImage(b, optimize);
     addQemuAarch64TestImage(b, optimize);
+}
+
+/// Standalone proof of concept; deliberately no dependency from the existing
+/// menu, release-media, or Windows preparation steps.
+fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const install_step = b.step("usosprep-install-app", "Build isolated UEFI ISO-on-NTFS Windows preparation apps");
+    const step = b.step("usosprep-app", "Build isolated usosprep UEFI x64/IA32 and BIOS proof of concept");
+    const variants = .{
+        .{ .arch = std.Target.Cpu.Arch.x86_64, .name = "x86_64" },
+        .{ .arch = std.Target.Cpu.Arch.x86, .name = "ia32" },
+    };
+    // Own MBR / NTFS PBR templates (tools/minios/bootcode/*.S, no Microsoft
+    // bytes) for the hardware MBR route (Windows 10 x86 through CSMWrap).
+    const bootcode_dir = b.getInstallPath(.prefix, "minios-bootcode");
+    const bootcode = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/build_bios_bootcode.py", "--zig", b.graph.zig_exe, "--out", bootcode_dir });
+    inline for (variants) |variant| {
+        const target = b.resolveTargetQuery(.{ .cpu_arch = variant.arch, .os_tag = .uefi, .cpu_model = if (variant.arch == .x86) .{ .explicit = &std.Target.x86.cpu.i486 } else .baseline });
+        const module = b.createModule(.{ .root_source_file = b.path("src/prep/uefi_main.zig"), .target = target, .optimize = .ReleaseSmall });
+        module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = target, .optimize = .ReleaseSmall }));
+        module.addImport("bios_boot_code", b.createModule(.{ .root_source_file = .{ .cwd_relative = b.pathJoin(&.{ bootcode_dir, "boot_code.zig" }) }, .target = target, .optimize = .ReleaseSmall }));
+        // The usos-fb-ui staging-BCD edit (truncatememory), shared with the
+        // Alpine route's tools/vista_csmwrap_target.sh.
+        module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = target, .optimize = .ReleaseSmall }));
+        const exe = b.addExecutable(.{ .name = "usosprep-" ++ variant.name, .root_module = module });
+        exe.step.dependOn(&bootcode.step);
+        const install = b.addInstallFile(exe.getEmittedBin(), "test-assets/usosprep-" ++ variant.name ++ ".efi");
+        step.dependOn(&install.step);
+        install_step.dependOn(&install.step);
+        if (variant.arch == .x86) {
+            const assembly = exe.getEmittedAsm();
+            const asm_install = b.addInstallFile(assembly, "test-assets/usosprep-ia32.audit.s");
+            step.dependOn(&asm_install.step);
+            install_step.dependOn(&asm_install.step);
+            const audit = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/audit_ia32.py" });
+            audit.addFileArg(assembly);
+            step.dependOn(&audit.step);
+            install_step.dependOn(&audit.step);
+        }
+    }
+    const boot_step = b.step("usosprep-boot-app", "Build separately gated UEFI boot provisioning clients");
+    inline for (variants) |variant| {
+        const boot_target = b.resolveTargetQuery(.{ .cpu_arch = variant.arch, .os_tag = .uefi, .cpu_model = if (variant.arch == .x86) .{ .explicit = &std.Target.x86.cpu.i486 } else .baseline });
+        const boot_module = b.createModule(.{ .root_source_file = b.path("src/prep/uefi_boot_main.zig"), .target = boot_target, .optimize = .ReleaseSmall });
+        boot_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = boot_target, .optimize = .ReleaseSmall }));
+        boot_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = boot_target, .optimize = .ReleaseSmall }));
+        const boot_exe = b.addExecutable(.{ .name = "usosprep-boot-" ++ variant.name, .root_module = boot_module });
+        const boot_install = b.addInstallFile(boot_exe.getEmittedBin(), "test-assets/usosprep-boot-" ++ variant.name ++ ".efi");
+        boot_step.dependOn(&boot_install.step);
+        if (variant.arch == .x86) {
+            const audit = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/audit_ia32.py" });
+            audit.addFileArg(boot_exe.getEmittedAsm());
+            boot_step.dependOn(&audit.step);
+        }
+    }
+    const bios = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/build_bios.py", "--cpu", "i486", "--zig", b.graph.zig_exe, "--output", b.getInstallPath(.prefix, "test-assets/usosprep-bios.img"), "--work-dir", b.getInstallPath(.prefix, "minios-bios") });
+    const bios_step = b.step("usosprep-bios", "Build the separate PM32 prep client of unchanged Legacy Core thunks");
+    bios_step.dependOn(&bios.step);
+    step.dependOn(&bios.step);
+    const wim_bios = b.addSystemCommand(&.{ "python", "-I", "-B", "tools/minios/build_bios.py", "--wim", "--cpu", "i486", "--zig", b.graph.zig_exe, "--output", b.getInstallPath(.prefix, "test-assets/usosprep-wim-bios.img"), "--work-dir", b.getInstallPath(.prefix, "minios-wim-bios") });
+    const wim_step = b.step("usosprep-wim-app", "Build isolated WIM UEFI apps and separate BIOS WIM-only client");
+    wim_step.dependOn(&wim_bios.step);
+    // UEFI selects WIM only through an explicit profile; the existing menu
+    // and installation flow have no dependency on either experimental step.
+    for (step.dependencies.items) |dependency| {
+        if (dependency != &bios.step) wim_step.dependOn(dependency);
+    }
+    const module = b.createModule(.{ .root_source_file = b.path("src/prep/host_main.zig"), .target = host_target, .optimize = optimize });
+    const host = b.addExecutable(.{ .name = "usosprep-host", .root_module = module });
+    const host_install = b.addInstallArtifact(host, .{});
+    const host_step = b.step("usosprep-host", "Build the file-backed usosprep host test tool");
+    host_step.dependOn(&host_install.step);
+    const scale_module = b.createModule(.{ .root_source_file = b.path("src/prep/scale_main.zig"), .target = host_target, .optimize = optimize });
+    const scale_host = b.addExecutable(.{ .name = "usosprep-scale-host", .root_module = scale_module });
+    // Bound the test client's own stack as on UEFI; a default16MiB reserve
+    // would obscure the stage1b-1 program RAM budget in the PE evidence.
+    scale_host.stack_size = 1024 * 1024;
+    const scale_install = b.addInstallArtifact(scale_host, .{});
+    const scale_step = b.step("usosprep-scale-host", "Build the file-only NTFS scaling workload tool (no WIM)");
+    scale_step.dependOn(&scale_install.step);
+    const wim_tools = .{
+        .{ .name = "usosprep-wim-host", .source = "wim_apply_main.zig" },
+        .{ .name = "usosprep-wim-features", .source = "wim_feature_main.zig" },
+        .{ .name = "usosprep-wim-inspect", .source = "wim_inspect.zig" },
+        .{ .name = "usosprep-wim-update", .source = "wim_update_main.zig" },
+        .{ .name = "usosprep-csmwrap-plan", .source = "csmwrap_plan_main.zig" },
+        .{ .name = "usosprep-csmwrap-disk", .source = "csmwrap_disk_main.zig" },
+        .{ .name = "usosprep-bcd", .source = "bcd_main.zig" },
+        .{ .name = "usosprep-ntfs-probe", .source = "ntfs_probe.zig" },
+        .{ .name = "usosprep-optical", .source = "optical_main.zig" },
+        .{ .name = "usosprep-optical-fuzz", .source = "optical_main.zig" },
+    };
+    inline for (wim_tools) |tool| {
+        const tool_optimize: std.builtin.OptimizeMode = if (comptime std.mem.eql(u8, tool.name, "usosprep-optical-fuzz")) .ReleaseSafe else .ReleaseSmall;
+        const tool_module = b.createModule(.{ .root_source_file = b.path("src/prep/" ++ tool.source), .target = host_target, .optimize = tool_optimize });
+        const tool_exe = b.addExecutable(.{ .name = tool.name, .root_module = tool_module });
+        if (comptime std.mem.startsWith(u8, tool.name, "usosprep-csmwrap-")) {
+            tool_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = host_target, .optimize = .ReleaseSmall }));
+        }
+        if (comptime std.mem.startsWith(u8, tool.name, "usosprep-optical")) {
+            tool_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = host_target, .optimize = .ReleaseSmall }));
+        }
+        tool_exe.stack_size = 1024 * 1024;
+        const install_tool = b.addInstallArtifact(tool_exe, .{});
+        const tool_step = b.step(tool.name, "Build isolated image-only WIM validation tool");
+        tool_step.dependOn(&install_tool.step);
+    }
+    const tests_module = b.createModule(.{ .root_source_file = b.path("src/prep/tests.zig"), .target = host_target, .optimize = optimize });
+    tests_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = host_target, .optimize = optimize }));
+    tests_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = host_target, .optimize = optimize }));
+    const test_run = b.addRunArtifact(b.addTest(.{ .root_module = tests_module }));
+    const tests_step = b.step("usosprep-test", "Run platform-independent prep core tests");
+    tests_step.dependOn(&test_run.step);
+    // Tests in a separately imported module are not root tests. Execute the
+    // private NTFS reader itself, including sparse/VDL/reparse regressions.
+    const reader_tests_module = b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = host_target, .optimize = optimize });
+    const reader_test_run = b.addRunArtifact(b.addTest(.{ .root_module = reader_tests_module }));
+    tests_step.dependOn(&reader_test_run.step);
+    b.top_level_steps.get("test").?.step.dependOn(&reader_test_run.step);
+    const fat_tests_module = b.createModule(.{ .root_source_file = b.path("src/prep/fat32_tests.zig"), .target = host_target, .optimize = optimize });
+    fat_tests_module.addImport("fat32_ro", b.createModule(.{ .root_source_file = b.path("src/storage/fat32.zig"), .target = host_target, .optimize = optimize }));
+    const fat_test_run = b.addRunArtifact(b.addTest(.{ .root_module = fat_tests_module }));
+    tests_step.dependOn(&fat_test_run.step);
+    b.top_level_steps.get("test").?.step.dependOn(&test_run.step);
 }
 
 fn addFetchNtfsDriver(b: *std.Build) *std.Build.Step {
@@ -377,6 +501,15 @@ fn addInteractiveX86UefiApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *
     });
     app_module.addImport("usos", usos_module);
     app_module.addImport("ps2_mouse", ps2_mouse_module);
+    // The micro-Linux choice-menu renderer (pure gui code): the MiniOS disk
+    // question in the menu draws exactly the Alpine route's disk picker.
+    const fb_menu_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux/fb_menu_render.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    fb_menu_module.addImport("usos", usos_module);
+    app_module.addImport("fb_menu", fb_menu_module);
 
     const app = b.addExecutable(.{
         .name = "usos-x86_64",

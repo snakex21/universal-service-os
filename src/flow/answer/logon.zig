@@ -249,7 +249,36 @@ pub fn writeIni(l: Logon, system_id: []const u8, english: []const u8, local: []c
     return w.buffered();
 }
 
+/// `line=` of the [logon] section (usos_logon_value line in
+/// tools/micro_linux_ui.sh): the English sentence the micro-Linux pages and
+/// MiniOS's restart notice show. Null when absent or empty.
+pub fn iniLine(text: []const u8) ?[]const u8 {
+    var in_logon = false;
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trimEnd(u8, raw, "\r");
+        if (line.len > 0 and line[0] == '[') {
+            in_logon = std.ascii.eqlIgnoreCase(line, "[logon]");
+            continue;
+        }
+        if (!in_logon) continue;
+        const eq = std.mem.indexOfScalar(u8, line, '=') orelse continue;
+        if (!std.ascii.eqlIgnoreCase(line[0..eq], "line")) continue;
+        const value = line[eq + 1 ..];
+        return if (value.len > 0) value else null;
+    }
+    return null;
+}
+
 // ------------------------------------------------------------------ tests
+
+test "iniLine reads the [logon] line= as micro_linux_ui.sh does" {
+    var buffer: [512]u8 = undefined;
+    const ini = try writeIni(.{ .kind = .no_logon }, "windows-10", "Log on as Admin.", "Zaloguj jako Admin.", &buffer);
+    try std.testing.expectEqualStrings("Log on as Admin.", iniLine(ini).?);
+    try std.testing.expect(iniLine("[other]\r\nline=x\r\n") == null);
+    try std.testing.expect(iniLine("[logon]\r\nline=\r\n") == null);
+}
 
 fn testProfile(user: []const u8, password: []const u8, auto: bool) !Profile {
     var p = Profile{};

@@ -1,0 +1,1458 @@
+{
+  "schema": "minios-evidence-1c6-v1",
+  "code_head": "e309eeeb6d2c4cf873a78e46fc6fda16df239be3",
+  "start_head": "112af328507521af9b278405beed2aaceab300e9",
+  "status": "STOP_FIRST_MINIOS_BOOT_GATE",
+  "failed_gate": "UnsupportedMftAttributeList in boot-source mount",
+  "first_windows_boot_attempted": false,
+  "runner_native_pass": true,
+  "windows_gate_pass": false,
+  "full_python_previous": {
+    "head": "12c81f2bd452e78898ec30ca4075033f035c9bab",
+    "count": 347,
+    "passed": true,
+    "skipped": 0
+  },
+  "full_python_final": {
+    "log": "1c6/logs/python-final-continued-head.log",
+    "policy": "Run after final report commit; append result to external report without changing HEAD."
+  },
+  "runtime_documents": {
+    "1c6/stop-diagnosis.json": {
+      "sha256": "cc174ab23bdce474a093ada7c17bd133d935a9cee22b22fa332607d8a49001a5",
+      "data": {
+        "schema": "minios-1c6-stop-diagnosis-v1",
+        "head": "4412f4a822f81bfa85ff6f518ca1ae44a28147dc",
+        "dirty": 0,
+        "status": "STOP_FIRST_FAILED_GATE",
+        "failed_gate": "real_bcdboot_reference_win11",
+        "bcdboot_exit": 183,
+        "ntstatus": "c0000035",
+        "status_name": "STATUS_OBJECT_NAME_COLLISION",
+        "failed_operation": "load hive BCD00000000",
+        "own_bcd_independent_read": true,
+        "own_bcd_route_matches_native_gpt": true,
+        "ours_sha256": "3e2afc3f1c1323b8ee7de460405ec770a94640e962b0f24d4ff04ad2465cd04f",
+        "route": {
+          "system": {
+            "style": "GPT",
+            "disk_guid_le": "885c754ff80da348a7acb814c1fb99de",
+            "partition_guid_le": "edf3c3f85a86f54b82bfa2ffa60ff8c5"
+          },
+          "manager_path": "\\efi\\microsoft\\boot\\bootmgfw.efi",
+          "manager_locale": "pl-pl",
+          "windows": {
+            "style": "GPT",
+            "disk_guid_le": "885c754ff80da348a7acb814c1fb99de",
+            "partition_guid_le": "e442d7f873708d47907a270bfdf80442"
+          },
+          "osdevice": {
+            "style": "GPT",
+            "disk_guid_le": "885c754ff80da348a7acb814c1fb99de",
+            "partition_guid_le": "e442d7f873708d47907a270bfdf80442"
+          },
+          "loader_path": "\\windows\\system32\\winload.efi",
+          "loader_locale": "pl-pl",
+          "systemroot": "\\windows",
+          "winpe": false
+        },
+        "real_reference_bcd_created": false,
+        "comparison_completed": false,
+        "host_hivelist_read_only": true,
+        "host_bcd_hive_already_loaded": "\\Device\\HarddiskVolume1\\EFI\\Microsoft\\Boot\\BCD",
+        "host_bcd_hive_modified_by_diagnosis": false,
+        "inference": "Host/session hive-name collision is a lead; causality not independently proven. No host hive unload or retry.",
+        "base_sha256_before": "7ff67181a910ee9461211ea5fe9b2e34958be41a30c102cd9356a40560848907",
+        "base_sha256_after": "7ff67181a910ee9461211ea5fe9b2e34958be41a30c102cd9356a40560848907",
+        "virtual_child_dismounted": true,
+        "aliases_removed": true,
+        "first_windows_boot_attempted": false,
+        "panther_obtained": false,
+        "f5_type4_firstboot_confirmed": false,
+        "later_architectures_attempted": false,
+        "physical_disks_opened": false,
+        "host_firmware_entries_changed": false,
+        "sources": [
+          {
+            "path": "1c23\\oracle-diff\\win11-1c6-02\\result.json",
+            "sha256": "211bd288e2c04a63a9ac3f6604665c90ed1f01b742feae292439cb814e284e36"
+          },
+          {
+            "path": "1c23\\oracle-diff\\win11-1c6-02\\reference-native.log",
+            "sha256": "3453ef0ed71b7c764335ce2f43cb6f7ea0a45307fef1c6cee1b1bb0528010f48"
+          },
+          {
+            "path": "1c23\\oracle-diff\\win11-1c6-02\\bcdboot-stdout.txt",
+            "sha256": "55c722e5742050fb3c8b807f4d247538728bf8bcfea642a63747b138f278282d"
+          },
+          {
+            "path": "1c23\\oracle-diff\\win11-1c6-02\\bcdboot-stderr.txt",
+            "sha256": "e8c080927b48b297ce666a33c019efd5c49aad4a74c98402f93662dba3733f6b"
+          }
+        ]
+      }
+    },
+    "1c6/closed-capacity.json": {
+      "sha256": "777acc0225d5395857e87c59e3c9e341d1cb9176a4d5b599456a0d66e566322c",
+      "data": {
+        "schema": "usos-wim-pool-v1",
+        "root": "<runtime>",
+        "cap_bytes": 161061273600,
+        "closed_file_count": 5839,
+        "closed_logical_bytes": 68050962018,
+        "closed_top_level_bytes": {
+          "1c0-win7-extras01.jsonl": 10051906,
+          "build-all05.log": 1529,
+          "build-final07.log": 4372,
+          "build-firmware01.log": 2396,
+          "build-host03.log": 653,
+          "build-host04.log": 336,
+          "build-host06.log": 335,
+          "capacity-audit01.json": 3143,
+          "capacity-audit02.json": 4070,
+          "capacity-audit03.json": 4294,
+          "capacity-audit06.json": 4981,
+          "capacity-audit07.json": 5207,
+          "capacity-audit08.json": 5556,
+          "capacity-audit09.json": 5625,
+          "capacity-audit11.json": 5450,
+          "capacity-audit12.json": 5128,
+          "capacity-diagnostic14.json": 5461,
+          "capacity-enforce14.json": 5591,
+          "capacity-final-after-cleanup.json": 4666,
+          "capacity-plan-final-closed.json": 398,
+          "capacity-plan01.json": 1597,
+          "capacity-plan02.json": 2547,
+          "capacity-plan03.json": 2710,
+          "capacity-plan04.json": 3054,
+          "capacity-plan05.json": 3147,
+          "capacity-plan06.json": 3238,
+          "capacity-plan07.json": 3434,
+          "capacity-plan08.json": 3646,
+          "capacity-plan09.json": 3669,
+          "capacity-plan10.json": 4167,
+          "capacity-plan11.json": 4643,
+          "capacity-plan12.json": 5302,
+          "capacity-plan13.json": 5382,
+          "capacity-plan14.json": 5094,
+          "cleanup-authorization01.json": 529,
+          "cleanup-candidates01.json": 38076,
+          "cleanup-plan01.json": 105582,
+          "cleanup-result01.json": 105672,
+          "closure-receipt01.json": 666,
+          "final07-artifacts.json": 8901,
+          "firmware-closed-summary01.json": 5292,
+          "firmware-final07-application-summary.json": 7564,
+          "firmware-final07-windows-queue.json": 284,
+          "firmware-final07-windows-queue02.json": 2336,
+          "KOTWICA-before-1b2-close.md": 6803,
+          "ntfs-attribute-order.json": 882,
+          "python-final-build05.log": 21752,
+          "python-final07-abi.log": 250,
+          "python-final07.log": 28088,
+          "python-final08-helper-closure.log": 28370,
+          "report-results.md": 11628,
+          "report-static.md": 7770,
+          "retained-sentinels-after-cleanup01.json": 599,
+          "retained-sentinels01.json": 255459,
+          "root-closed-firmware-verification01.json": 17432,
+          "root-closed-real-host-verification01.json": 8849,
+          "root5-diagnostic01.json": 7731,
+          "test-final-build05.log": 3070,
+          "win7-final07": 80706186,
+          "win7-diagnostic02": 2312,
+          "win7-apply02": 61680247,
+          "win7-apply01": 1915,
+          "win10-final07": 141673954,
+          "win10-apply02": 191544569,
+          "win10-apply01": 1822,
+          "synthetic": 197974990,
+          "root-si6-diagnostic07": 669234,
+          "root-metadata06-smoke": 501680,
+          "root-cache": 159314075,
+          "ram-windows-final07": 3538856,
+          "ram-final07": 162177,
+          "oracle-ps-guard03": 19821,
+          "oracle-ps-guard02": 11166,
+          "oracle-ps-guard01": 9402,
+          "oracle": 300394817,
+          "legacy-ms-audit01": 224159,
+          "inputs": 16157334568,
+          "host-synthetic-large-final01": 14380,
+          "host-synthetic-final01": 3640443,
+          "host-synthetic-ads-final01": 6051,
+          "host-final07": 21713658,
+          "firmware-tests": 14242949,
+          "firmware-cache": 27902952,
+          "feature-expected01": 4390159,
+          "feature-case03": 1650,
+          "feature-case02": 5608058,
+          "feature-case01": 6998947,
+          "1c6": 168628,
+          "1c5": 31155421609,
+          "1c4": 141373249,
+          "1c23": 19050,
+          "1c1": 17579222590,
+          "1c0": 1783625383
+        },
+        "reservations": [
+          {
+            "path": "oracle-native-mini01",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini02",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini03",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini04",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini05",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini06",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini07",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini08",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini09",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini10",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini11",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-1c0-01",
+            "bytes": 67108864
+          },
+          {
+            "path": "1c23/qemu-x64",
+            "bytes": 26843545600
+          },
+          {
+            "path": "1c23/qemu-ia32",
+            "bytes": 19327352832
+          },
+          {
+            "path": "1c23/qemu-bios",
+            "bytes": 11811160064
+          },
+          {
+            "path": "1c23/source-ntfs",
+            "bytes": 8589934592
+          },
+          {
+            "path": "1c23/fat32-small",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/ntfs-fragmented",
+            "bytes": 2147483648
+          },
+          {
+            "path": "1c23/hive-bcd",
+            "bytes": 67108864
+          },
+          {
+            "path": "1c23/final-logs",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/oracle-diff",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/fixtures",
+            "bytes": 536870912
+          }
+        ],
+        "reserved_bytes": 73349988352,
+        "projected_total_bytes": 141400950370,
+        "headroom_bytes": 19660323230,
+        "passed": true,
+        "reserved_paths_not_traversed": true,
+        "unreserved_files_declared_closed": true,
+        "opaque_reparse_leaves_not_followed": [],
+        "logical_not_sparse_allocated_accounting": true,
+        "cleanup_performed": false,
+        "actual_free_bytes": 136822112256,
+        "recorded_utc": "2026-10-26T15:14:01.756746+00:00"
+      }
+    },
+    "1c6/retained-images.json": {
+      "sha256": "a4087ef9c4de93288c164f04c48d36971cdd78535c851b3d2ce2295be0377b40",
+      "data": {
+        "schema": "minios-1c6-retained-v1",
+        "head": "4412f4a822f81bfa85ff6f518ca1ae44a28147dc",
+        "dirty": 0,
+        "files": [
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "b881125c96577040b2f216c2fbe906cd10f7f62d3be41a7a09ebc3858bb1e443",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "32302df08bd774f00793fe9214c52f29a8e1dd586fdce108736ca18473d22131",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "1412d495d7ebed88278096b9c047b45d74a349a923a6e4047aca143b7630f4cc",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "6bb9f06eaac3facd6ef18795f608d79f27fe4353c123b3263d0322e5c246044f",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "e77096fedf6d96f6e9d1459d7e3a26a07c08af4cbac034ba1d677ad7b5f68adc",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "2dab813ee57059f24a355e592d12671349fdc7450156848498b03ace5126e687",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "d6bf4f5bfb3c8b39ca4647cbd8f0491903e2062f8ee80a5e64c596a38f9a7d07",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "3960a24725b58ca48c5b7268086ab94574d8abbba4d63085246a49e68ed705b3",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/oracle-diff/win11-1c6-02/bcdboot-child.vhd",
+            "bytes": 79990784,
+            "sha256": "560d18a37e6325f4b322769e5bc546811affb56cb58c2d53b9ebb7c79b994da0",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          }
+        ],
+        "logical_bytes": 7632689152,
+        "deleted_new_images": [],
+        "approved_deleted14_receipt": "1c6/accepted-cleanup-14.json"
+      }
+    },
+    "1c6/accepted-cleanup-14.json": {
+      "sha256": "540d3b0da688924c9497a17b31982471a9d821f2e44c36cc2d756ec40691485a",
+      "data": {
+        "schema": "minios-1c6-approved-cleanup-v1",
+        "head": "112af328507521af9b278405beed2aaceab300e9",
+        "dirty": 0,
+        "authorization": "Explicit user instruction MiniOS1c6, 2026-10-26",
+        "authorization_date": "2026-10-26",
+        "proposal_sha256": "468d0ae88b61f1d980e8618aeaff9f8c275b78b26c6985c378ba070e5653f90b",
+        "files": [
+          {
+            "path": "1c1/e2e-win11-01/target.raw",
+            "bytes": 17179869184,
+            "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c1/e2e-win11-01/result.json",
+            "passed": true,
+            "diagnostic_completed": null,
+            "timed_out": null
+          },
+          {
+            "path": "1c1/e2e-win7-01/target.raw",
+            "bytes": 6442450944,
+            "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c1/e2e-win7-01/result.json",
+            "passed": true,
+            "diagnostic_completed": null,
+            "timed_out": null
+          },
+          {
+            "path": "1c4/win11-final/whpx128-01/target.qcow2",
+            "bytes": 3465150464,
+            "sha256": "f88d2fb86cc2939dc14ccd8824a3ac281bdc296cddff74285ca783a5df35507e",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c4/win11-final/whpx128-01/result.json",
+            "passed": false,
+            "diagnostic_completed": null,
+            "timed_out": true
+          },
+          {
+            "path": "1c5/pm-probes/off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "23d27ab268b0e10ef9c167cb80a3b8f8667135fcc2f583812a1e144bc2a7612b",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/pm-probes/off/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/pm-probes/on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "18a783f65e8ea02962c890723f7d17c7aad55d52806ae9ded59198b1d2b6558a",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/pm-probes/on/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/tsc-probes/off/target.qcow2",
+            "bytes": 197120,
+            "sha256": "5e81d1eed9c30e0af81c97defb17264e54cf80ab0639d41a28cce180bb6f63bd",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/tsc-probes/off/result.json",
+            "passed": false,
+            "diagnostic_completed": false,
+            "timed_out": true
+          },
+          {
+            "path": "1c5/isolated-probes/pm-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "f9823ab3db107ad230f72b23832a6bb0a9aaf090041c3ce49a1fc12f66bc743c",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/isolated-probes/pm-off/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/isolated-probes/pm-on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "c9fad76c422fe9d4a9464c8420a1118ddb86288c5718109fc3597c31d4f3e2a0",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/isolated-probes/pm-on/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/isolated-probes/tsc-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "3a6874e23c36c3806b2cdcdba344b3610231c1bb64d139acfac3f20a82cde5fd",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/isolated-probes/tsc-off/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/isolated-probes/tsc-on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "cab286b662bc0ec440ea6ea11dafe701b88debb866da2f9f90cb8993949ec525",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/isolated-probes/tsc-on/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/isolated-probes/no-combine/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "9a06080f39681c73b02534d8b81e5392fe8292817be3368b304ebe32c2ce5dab",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/isolated-probes/no-combine/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/buffer-reverse/off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "1af08d11e41f111907e7cc7d9286da703dd0d8a2b1a2cce36a49f36efa078787",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/buffer-reverse/off/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/buffer-reverse/on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "dccc94164994bb381fa47f90f5af1d3d43490f8018d324b70d23b26a029ee2ee",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/buffer-reverse/on/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          },
+          {
+            "path": "1c5/buffer-reverse/production-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "907c85ecf9a4cef8723df10615d9727dd14f533c06bf7f1252ff5f7e9a81fc17",
+            "hash_basis": "completed receipt; rehash required before deletion",
+            "receipt": "1c5/buffer-reverse/production-off/result.json",
+            "passed": false,
+            "diagnostic_completed": true,
+            "timed_out": false
+          }
+        ],
+        "all_verified_before_delete": true,
+        "deleted": [
+          {
+            "path": "1c1/e2e-win11-01/target.raw",
+            "bytes": 17179869184,
+            "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080"
+          },
+          {
+            "path": "1c1/e2e-win7-01/target.raw",
+            "bytes": 6442450944,
+            "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57"
+          },
+          {
+            "path": "1c4/win11-final/whpx128-01/target.qcow2",
+            "bytes": 3465150464,
+            "sha256": "f88d2fb86cc2939dc14ccd8824a3ac281bdc296cddff74285ca783a5df35507e"
+          },
+          {
+            "path": "1c5/pm-probes/off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "23d27ab268b0e10ef9c167cb80a3b8f8667135fcc2f583812a1e144bc2a7612b"
+          },
+          {
+            "path": "1c5/pm-probes/on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "18a783f65e8ea02962c890723f7d17c7aad55d52806ae9ded59198b1d2b6558a"
+          },
+          {
+            "path": "1c5/tsc-probes/off/target.qcow2",
+            "bytes": 197120,
+            "sha256": "5e81d1eed9c30e0af81c97defb17264e54cf80ab0639d41a28cce180bb6f63bd"
+          },
+          {
+            "path": "1c5/isolated-probes/pm-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "f9823ab3db107ad230f72b23832a6bb0a9aaf090041c3ce49a1fc12f66bc743c"
+          },
+          {
+            "path": "1c5/isolated-probes/pm-on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "c9fad76c422fe9d4a9464c8420a1118ddb86288c5718109fc3597c31d4f3e2a0"
+          },
+          {
+            "path": "1c5/isolated-probes/tsc-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "3a6874e23c36c3806b2cdcdba344b3610231c1bb64d139acfac3f20a82cde5fd"
+          },
+          {
+            "path": "1c5/isolated-probes/tsc-on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "cab286b662bc0ec440ea6ea11dafe701b88debb866da2f9f90cb8993949ec525"
+          },
+          {
+            "path": "1c5/isolated-probes/no-combine/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "9a06080f39681c73b02534d8b81e5392fe8292817be3368b304ebe32c2ce5dab"
+          },
+          {
+            "path": "1c5/buffer-reverse/off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "1af08d11e41f111907e7cc7d9286da703dd0d8a2b1a2cce36a49f36efa078787"
+          },
+          {
+            "path": "1c5/buffer-reverse/on/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "dccc94164994bb381fa47f90f5af1d3d43490f8018d324b70d23b26a029ee2ee"
+          },
+          {
+            "path": "1c5/buffer-reverse/production-off/target.qcow2",
+            "bytes": 1055916032,
+            "sha256": "907c85ecf9a4cef8723df10615d9727dd14f533c06bf7f1252ff5f7e9a81fc17"
+          }
+        ],
+        "small_evidence_preserved": true,
+        "complete": true
+      }
+    },
+    "1c23/qemu-x64/firstboot-runner-fixture04/result.json": {
+      "sha256": "3f6207c321a264ddfeb396598f415c047d8c44f9148b4a731003fca755e75ffc",
+      "data": {
+        "schema": "minios-firstboot-native-fixture-v1",
+        "head": "4412f4a822f81bfa85ff6f518ca1ae44a28147dc",
+        "dirty": 0,
+        "passed": true,
+        "windows_booted": false,
+        "physical_disks_opened": false,
+        "envelope": {
+          "schema": "minios-firstboot-envelope-v1",
+          "container": "<runtime>\\1c23\\qemu-x64\\firstboot-runner-fixture04\\limited.qcow2",
+          "container_bytes": 8388608,
+          "original_bytes": 328192,
+          "original_sha256": "c113e6832cb52496b790d4d0667ef462614a440878dfabfadc2397bbead3df6a",
+          "cluster_bytes": 65536,
+          "virtual_bytes": 67108864,
+          "sparse": true,
+          "container_hard_bound": true,
+          "auxiliary_reservation_bytes": 268435456,
+          "scope_hard_bound_proven": true,
+          "snapshot_precedes_padding": true,
+          "physical_devices_opened": false,
+          "deleted": []
+        },
+        "valid_write": {
+          "command": [
+            "<qemu>\\qemu-io.exe",
+            "-c",
+            "write -P 0x51 0 1M",
+            "json:{\"driver\": \"qcow2\", \"file\": {\"driver\": \"raw\", \"offset\": 0, \"size\": 8388608, \"file\": {\"driver\": \"file\", \"filename\": \"K:\\\\USOS-VM\\\\minios-wim-1b2-20261024\\\\1c23\\\\qemu-x64\\\\firstboot-runner-fixture04\\\\limited.qcow2\"}}}"
+          ],
+          "exit": 0,
+          "output": "wrote 1048576/1048576 bytes at offset 0\r\n1 MiB, 1 ops; 00.01 sec (78.573 MiB/sec and 78.5731 ops/sec)\r\n"
+        },
+        "full_refusal": {
+          "command": [
+            "<qemu>\\qemu-io.exe",
+            "-c",
+            "write -P 0x52 1M 31M",
+            "json:{\"driver\": \"qcow2\", \"file\": {\"driver\": \"raw\", \"offset\": 0, \"size\": 8388608, \"file\": {\"driver\": \"file\", \"filename\": \"K:\\\\USOS-VM\\\\minios-wim-1b2-20261024\\\\1c23\\\\qemu-x64\\\\firstboot-runner-fixture04\\\\limited.qcow2\"}}}"
+          ],
+          "exit": 1,
+          "output": "write failed: No space left on device\r\n"
+        },
+        "base_unchanged": true,
+        "qemu": {
+          "endpoint_seconds": 2,
+          "progress_polling": false,
+          "windows_gate_passed": false,
+          "review_required": true,
+          "screenshot_created": true,
+          "command": [
+            "<qemu>\\qemu-system-x86_64.exe",
+            "-machine",
+            "q35",
+            "-accel",
+            "tcg,thread=multi",
+            "-cpu",
+            "max",
+            "-m",
+            "4096",
+            "-smp",
+            "2",
+            "-nodefaults",
+            "-display",
+            "none",
+            "-nic",
+            "none",
+            "-monitor",
+            "none",
+            "-device",
+            "ich9-ahci,id=win-ahci",
+            "-blockdev",
+            "{\"driver\":\"file\",\"node-name\":\"firstboot-file\",\"filename\":\"K:\\\\USOS-VM\\\\minios-wim-1b2-20261024\\\\1c23\\\\qemu-x64\\\\firstboot-runner-fixture04\\\\qemu\\\\windows.qcow2\"}",
+            "-blockdev",
+            "{\"driver\":\"raw\",\"node-name\":\"firstboot-limit\",\"file\":\"firstboot-file\",\"offset\":0,\"size\":1879048192}",
+            "-blockdev",
+            "{\"driver\":\"qcow2\",\"node-name\":\"windows\",\"file\":\"firstboot-limit\"}",
+            "-device",
+            "ide-hd,drive=windows,bus=win-ahci.0,bootindex=1,werror=stop,rerror=stop",
+            "-device",
+            "VGA",
+            "-device",
+            "usb-ehci,id=ehci",
+            "-device",
+            "usb-kbd,bus=ehci.0",
+            "-device",
+            "usb-tablet,bus=ehci.0",
+            "-serial",
+            "stdio",
+            "-drive",
+            "if=pflash,format=raw,readonly=on,file=<qemu>\\share\\edk2-x86_64-code.fd",
+            "-blockdev",
+            "{\"driver\": \"file\", \"node-name\": \"vars-file\", \"filename\": \"K:\\\\USOS-VM\\\\minios-wim-1b2-20261024\\\\1c23\\\\qemu-x64\\\\firstboot-runner-fixture04\\\\qemu\\\\vars.fd\"}",
+            "-blockdev",
+            "{\"driver\": \"raw\", \"node-name\": \"vars-limit\", \"file\": \"vars-file\", \"offset\": 0, \"size\": 540672}",
+            "-machine",
+            "pflash1=vars-limit",
+            "-S",
+            "-qmp",
+            "tcp:127.0.0.1:60579",
+            "-no-shutdown"
+          ],
+          "endpoint_reason": "fixed_deadline",
+          "screenshot": {
+            "bytes": 921615,
+            "transport": "bounded-private-named-pipe"
+          },
+          "returncode": 0,
+          "acknowledged_quit_tcp_reset": 64,
+          "events": [
+            {
+              "timestamp": {
+                "seconds": 1793027560,
+                "microseconds": 502969
+              },
+              "event": "SHUTDOWN",
+              "data": {
+                "guest": false,
+                "reason": "host-qmp-quit"
+              }
+            }
+          ],
+          "event_bytes": 136
+        },
+        "qemu_elapsed": 2.550317500001256,
+        "scope_retained_bytes": 1880510935,
+        "whole_operation_job_deadline_exit": 124,
+        "capacity_preflight": {
+          "schema": "usos-wim-pool-v1",
+          "root": "<runtime>",
+          "cap_bytes": 161061273600,
+          "closed_file_count": 5837,
+          "closed_logical_bytes": 68050948904,
+          "closed_top_level_bytes": {
+            "1c0-win7-extras01.jsonl": 10051906,
+            "build-all05.log": 1529,
+            "build-final07.log": 4372,
+            "build-firmware01.log": 2396,
+            "build-host03.log": 653,
+            "build-host04.log": 336,
+            "build-host06.log": 335,
+            "capacity-audit01.json": 3143,
+            "capacity-audit02.json": 4070,
+            "capacity-audit03.json": 4294,
+            "capacity-audit06.json": 4981,
+            "capacity-audit07.json": 5207,
+            "capacity-audit08.json": 5556,
+            "capacity-audit09.json": 5625,
+            "capacity-audit11.json": 5450,
+            "capacity-audit12.json": 5128,
+            "capacity-diagnostic14.json": 5461,
+            "capacity-enforce14.json": 5591,
+            "capacity-final-after-cleanup.json": 4666,
+            "capacity-plan-final-closed.json": 398,
+            "capacity-plan01.json": 1597,
+            "capacity-plan02.json": 2547,
+            "capacity-plan03.json": 2710,
+            "capacity-plan04.json": 3054,
+            "capacity-plan05.json": 3147,
+            "capacity-plan06.json": 3238,
+            "capacity-plan07.json": 3434,
+            "capacity-plan08.json": 3646,
+            "capacity-plan09.json": 3669,
+            "capacity-plan10.json": 4167,
+            "capacity-plan11.json": 4643,
+            "capacity-plan12.json": 5302,
+            "capacity-plan13.json": 5382,
+            "capacity-plan14.json": 5094,
+            "cleanup-authorization01.json": 529,
+            "cleanup-candidates01.json": 38076,
+            "cleanup-plan01.json": 105582,
+            "cleanup-result01.json": 105672,
+            "closure-receipt01.json": 666,
+            "final07-artifacts.json": 8901,
+            "firmware-closed-summary01.json": 5292,
+            "firmware-final07-application-summary.json": 7564,
+            "firmware-final07-windows-queue.json": 284,
+            "firmware-final07-windows-queue02.json": 2336,
+            "KOTWICA-before-1b2-close.md": 6803,
+            "ntfs-attribute-order.json": 882,
+            "python-final-build05.log": 21752,
+            "python-final07-abi.log": 250,
+            "python-final07.log": 28088,
+            "python-final08-helper-closure.log": 28370,
+            "report-results.md": 11628,
+            "report-static.md": 7770,
+            "retained-sentinels-after-cleanup01.json": 599,
+            "retained-sentinels01.json": 255459,
+            "root-closed-firmware-verification01.json": 17432,
+            "root-closed-real-host-verification01.json": 8849,
+            "root5-diagnostic01.json": 7731,
+            "test-final-build05.log": 3070,
+            "win7-final07": 80706186,
+            "win7-diagnostic02": 2312,
+            "win7-apply02": 61680247,
+            "win7-apply01": 1915,
+            "win10-final07": 141673954,
+            "win10-apply02": 191544569,
+            "win10-apply01": 1822,
+            "synthetic": 197974990,
+            "root-si6-diagnostic07": 669234,
+            "root-metadata06-smoke": 501680,
+            "root-cache": 159314075,
+            "ram-windows-final07": 3538856,
+            "ram-final07": 162177,
+            "oracle-ps-guard03": 19821,
+            "oracle-ps-guard02": 11166,
+            "oracle-ps-guard01": 9402,
+            "oracle": 300394817,
+            "legacy-ms-audit01": 224159,
+            "inputs": 16157334568,
+            "host-synthetic-large-final01": 14380,
+            "host-synthetic-final01": 3640443,
+            "host-synthetic-ads-final01": 6051,
+            "host-final07": 21713658,
+            "firmware-tests": 14242949,
+            "firmware-cache": 27902952,
+            "feature-expected01": 4390159,
+            "feature-case03": 1650,
+            "feature-case02": 5608058,
+            "feature-case01": 6998947,
+            "1c6": 155514,
+            "1c5": 31155421609,
+            "1c4": 141373249,
+            "1c23": 19050,
+            "1c1": 17579222590,
+            "1c0": 1783625383
+          },
+          "reservations": [
+            {
+              "path": "oracle-native-mini01",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini02",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini03",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini04",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini05",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini06",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini07",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini08",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini09",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini10",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-mini11",
+              "bytes": 67108864
+            },
+            {
+              "path": "oracle-native-1c0-01",
+              "bytes": 67108864
+            },
+            {
+              "path": "1c23/qemu-x64",
+              "bytes": 26843545600
+            },
+            {
+              "path": "1c23/qemu-ia32",
+              "bytes": 19327352832
+            },
+            {
+              "path": "1c23/qemu-bios",
+              "bytes": 11811160064
+            },
+            {
+              "path": "1c23/source-ntfs",
+              "bytes": 8589934592
+            },
+            {
+              "path": "1c23/fat32-small",
+              "bytes": 1073741824
+            },
+            {
+              "path": "1c23/ntfs-fragmented",
+              "bytes": 2147483648
+            },
+            {
+              "path": "1c23/hive-bcd",
+              "bytes": 67108864
+            },
+            {
+              "path": "1c23/final-logs",
+              "bytes": 1073741824
+            },
+            {
+              "path": "1c23/oracle-diff",
+              "bytes": 1073741824
+            },
+            {
+              "path": "1c23/fixtures",
+              "bytes": 536870912
+            }
+          ],
+          "reserved_bytes": 73349988352,
+          "projected_total_bytes": 141400937256,
+          "headroom_bytes": 19660336344,
+          "passed": true,
+          "reserved_paths_not_traversed": true,
+          "unreserved_files_declared_closed": true,
+          "opaque_reparse_leaves_not_followed": [],
+          "logical_not_sparse_allocated_accounting": true,
+          "cleanup_performed": false,
+          "incremental_scope": "1c23/qemu-x64",
+          "incremental_scope_explicitly_closed": true,
+          "incremental_existing_bytes": 5876759898,
+          "incremental_file_count": 66,
+          "incremental_growth_bytes": 2147483648,
+          "incremental_scope_limit": 26843545600,
+          "only_selected_closed_scope_traversed": true
+        },
+        "deleted": []
+      }
+    },
+    "1c6/stop-diagnosis-boot.json": {
+      "sha256": "b157f50013349d4885e13c40c005ea929310b80e83d6fabf5c55cacb9e91f63c",
+      "data": {
+        "schema": "minios-1c6-boot-stop-v1",
+        "head": "e309eeeb6d2c4cf873a78e46fc6fda16df239be3",
+        "dirty": 0,
+        "status": "STOP_FIRST_MINIOS_BOOT_GATE",
+        "error": "UnsupportedMftAttributeList",
+        "source_code": "src/storage/ntfs.zig:208",
+        "called_from": "src/prep/boot_files.zig:134 (nt.mount) via ntfs_ro",
+        "independent_mft_record0_attributes": [
+          {
+            "type": 16,
+            "name": "",
+            "id": 0,
+            "nonresident": false,
+            "lowest_vcn": 0
+          },
+          {
+            "type": 32,
+            "name": "",
+            "id": 1,
+            "nonresident": true,
+            "lowest_vcn": 0
+          },
+          {
+            "type": 48,
+            "name": "",
+            "id": 2,
+            "nonresident": false,
+            "lowest_vcn": 0
+          },
+          {
+            "type": 128,
+            "name": "",
+            "id": 3,
+            "nonresident": true,
+            "lowest_vcn": 0
+          },
+          {
+            "type": 176,
+            "name": "",
+            "id": 4,
+            "nonresident": true,
+            "lowest_vcn": 0
+          }
+        ],
+        "mft_record_bytes": 1024,
+        "mft_lcn": 4,
+        "cluster_bytes": 4096,
+        "existing_1c5_target_mft_attribute_list_confirmed": true,
+        "ordinary_file_attribute_list_support_is_distinct": true,
+        "qemu_returncode": 35,
+        "timed_out": false,
+        "boot_elapsed_seconds": 38.00614979999955,
+        "source_base_unchanged": true,
+        "target_logically_unchanged": true,
+        "compare_exit": 0,
+        "compare_stdout": "Images are identical.\r\n",
+        "compare_stderr": "",
+        "first_windows_boot_attempted": false,
+        "boot_files_copied": 0,
+        "nmi_or_panther_obtained": false,
+        "f5_type4_confirmed": false,
+        "bcd_reference_deferral_authorized": true,
+        "reference_comparison_pass": false,
+        "evidence": [
+          {
+            "path": "1c23\\qemu-x64\\boot-win11-1c6-01\\result.json",
+            "sha256": "03566d20d510fbb53639de663840bac9b9369390eabd0be1121c7012f3242f6f"
+          },
+          {
+            "path": "1c23\\qemu-x64\\boot-win11-1c6-01\\debug.log",
+            "sha256": "bb420737ece99bd38c3eb05f9222346fc6bde7ff80e8cb33aea2602d3f8480ca"
+          },
+          {
+            "path": "1c23\\qemu-x64\\boot-win11-1c6-01\\serial.log",
+            "sha256": "081e56e0c8d87226d39bc17156641ffba4e9df53099e21e18b5fd7864195ab85"
+          },
+          {
+            "path": "1c23\\qemu-x64\\boot-win11-1c6-01\\boot-files.json",
+            "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+          }
+        ],
+        "later_cases_attempted": false,
+        "physical_disks_opened": false
+      }
+    },
+    "1c6/closed-capacity02.json": {
+      "sha256": "c49688278996517854cf43fcbd3abe0fa35134633dfc42dd4bded64de0fe68cc",
+      "data": {
+        "schema": "usos-wim-pool-v1",
+        "root": "<runtime>",
+        "cap_bytes": 161061273600,
+        "closed_file_count": 5851,
+        "closed_logical_bytes": 68051079620,
+        "closed_top_level_bytes": {
+          "1c0-win7-extras01.jsonl": 10051906,
+          "build-all05.log": 1529,
+          "build-final07.log": 4372,
+          "build-firmware01.log": 2396,
+          "build-host03.log": 653,
+          "build-host04.log": 336,
+          "build-host06.log": 335,
+          "capacity-audit01.json": 3143,
+          "capacity-audit02.json": 4070,
+          "capacity-audit03.json": 4294,
+          "capacity-audit06.json": 4981,
+          "capacity-audit07.json": 5207,
+          "capacity-audit08.json": 5556,
+          "capacity-audit09.json": 5625,
+          "capacity-audit11.json": 5450,
+          "capacity-audit12.json": 5128,
+          "capacity-diagnostic14.json": 5461,
+          "capacity-enforce14.json": 5591,
+          "capacity-final-after-cleanup.json": 4666,
+          "capacity-plan-final-closed.json": 398,
+          "capacity-plan01.json": 1597,
+          "capacity-plan02.json": 2547,
+          "capacity-plan03.json": 2710,
+          "capacity-plan04.json": 3054,
+          "capacity-plan05.json": 3147,
+          "capacity-plan06.json": 3238,
+          "capacity-plan07.json": 3434,
+          "capacity-plan08.json": 3646,
+          "capacity-plan09.json": 3669,
+          "capacity-plan10.json": 4167,
+          "capacity-plan11.json": 4643,
+          "capacity-plan12.json": 5302,
+          "capacity-plan13.json": 5382,
+          "capacity-plan14.json": 5094,
+          "cleanup-authorization01.json": 529,
+          "cleanup-candidates01.json": 38076,
+          "cleanup-plan01.json": 105582,
+          "cleanup-result01.json": 105672,
+          "closure-receipt01.json": 666,
+          "final07-artifacts.json": 8901,
+          "firmware-closed-summary01.json": 5292,
+          "firmware-final07-application-summary.json": 7564,
+          "firmware-final07-windows-queue.json": 284,
+          "firmware-final07-windows-queue02.json": 2336,
+          "KOTWICA-before-1b2-close.md": 6803,
+          "ntfs-attribute-order.json": 882,
+          "python-final-build05.log": 21752,
+          "python-final07-abi.log": 250,
+          "python-final07.log": 28088,
+          "python-final08-helper-closure.log": 28370,
+          "report-results.md": 11628,
+          "report-static.md": 7770,
+          "retained-sentinels-after-cleanup01.json": 599,
+          "retained-sentinels01.json": 255459,
+          "root-closed-firmware-verification01.json": 17432,
+          "root-closed-real-host-verification01.json": 8849,
+          "root5-diagnostic01.json": 7731,
+          "test-final-build05.log": 3070,
+          "win7-final07": 80706186,
+          "win7-diagnostic02": 2312,
+          "win7-apply02": 61680247,
+          "win7-apply01": 1915,
+          "win10-final07": 141673954,
+          "win10-apply02": 191544569,
+          "win10-apply01": 1822,
+          "synthetic": 197974990,
+          "root-si6-diagnostic07": 669234,
+          "root-metadata06-smoke": 501680,
+          "root-cache": 159314075,
+          "ram-windows-final07": 3538856,
+          "ram-final07": 162177,
+          "oracle-ps-guard03": 19821,
+          "oracle-ps-guard02": 11166,
+          "oracle-ps-guard01": 9402,
+          "oracle": 300394817,
+          "legacy-ms-audit01": 224159,
+          "inputs": 16157334568,
+          "host-synthetic-large-final01": 14380,
+          "host-synthetic-final01": 3640443,
+          "host-synthetic-ads-final01": 6051,
+          "host-final07": 21713658,
+          "firmware-tests": 14242949,
+          "firmware-cache": 27902952,
+          "feature-expected01": 4390159,
+          "feature-case03": 1650,
+          "feature-case02": 5608058,
+          "feature-case01": 6998947,
+          "1c6": 286230,
+          "1c5": 31155421609,
+          "1c4": 141373249,
+          "1c23": 19050,
+          "1c1": 17579222590,
+          "1c0": 1783625383
+        },
+        "reservations": [
+          {
+            "path": "oracle-native-mini01",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini02",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini03",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini04",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini05",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini06",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini07",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini08",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini09",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini10",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-mini11",
+            "bytes": 67108864
+          },
+          {
+            "path": "oracle-native-1c0-01",
+            "bytes": 67108864
+          },
+          {
+            "path": "1c23/qemu-x64",
+            "bytes": 26843545600
+          },
+          {
+            "path": "1c23/qemu-ia32",
+            "bytes": 19327352832
+          },
+          {
+            "path": "1c23/qemu-bios",
+            "bytes": 11811160064
+          },
+          {
+            "path": "1c23/source-ntfs",
+            "bytes": 8589934592
+          },
+          {
+            "path": "1c23/fat32-small",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/ntfs-fragmented",
+            "bytes": 2147483648
+          },
+          {
+            "path": "1c23/hive-bcd",
+            "bytes": 67108864
+          },
+          {
+            "path": "1c23/final-logs",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/oracle-diff",
+            "bytes": 1073741824
+          },
+          {
+            "path": "1c23/fixtures",
+            "bytes": 536870912
+          }
+        ],
+        "reserved_bytes": 73349988352,
+        "projected_total_bytes": 141401067972,
+        "headroom_bytes": 19660205628,
+        "passed": true,
+        "reserved_paths_not_traversed": true,
+        "unreserved_files_declared_closed": true,
+        "opaque_reparse_leaves_not_followed": [],
+        "logical_not_sparse_allocated_accounting": true,
+        "cleanup_performed": false,
+        "actual_free_bytes": 136512106496,
+        "recorded_utc": "2026-10-26T15:34:18.869562+00:00"
+      }
+    },
+    "1c6/retained-images02.json": {
+      "sha256": "888931dfa9b7818a60085ad9c1dc4276a8b11d33b4faf119c83757d857f94d60",
+      "data": {
+        "schema": "minios-1c6-retained-v2",
+        "head": "e309eeeb6d2c4cf873a78e46fc6fda16df239be3",
+        "dirty": 0,
+        "files": [
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "b881125c96577040b2f216c2fbe906cd10f7f62d3be41a7a09ebc3858bb1e443",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture01/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "32302df08bd774f00793fe9214c52f29a8e1dd586fdce108736ca18473d22131",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "1412d495d7ebed88278096b9c047b45d74a349a923a6e4047aca143b7630f4cc",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture02/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "6bb9f06eaac3facd6ef18795f608d79f27fe4353c123b3263d0322e5c246044f",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "e77096fedf6d96f6e9d1459d7e3a26a07c08af4cbac034ba1d677ad7b5f68adc",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture03/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "2dab813ee57059f24a355e592d12671349fdc7450156848498b03ace5126e687",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/empty-base.qcow2",
+            "bytes": 197120,
+            "sha256": "68b2538c0be9b17a4a5250ac3704811c943a17e3f9315bd2c750b1833be3986d",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/limited.qcow2",
+            "bytes": 8388608,
+            "sha256": "d6bf4f5bfb3c8b39ca4647cbd8f0491903e2062f8ee80a5e64c596a38f9a7d07",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/qemu/vars.fd",
+            "bytes": 540672,
+            "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/firstboot-runner-fixture04/qemu/windows.qcow2",
+            "bytes": 1879048192,
+            "sha256": "3960a24725b58ca48c5b7268086ab94574d8abbba4d63085246a49e68ed705b3",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/oracle-diff/win11-1c6-02/bcdboot-child.vhd",
+            "bytes": 79990784,
+            "sha256": "560d18a37e6325f4b322769e5bc546811affb56cb58c2d53b9ebb7c79b994da0",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/boot-win11-1c6-01/boot-base.raw",
+            "bytes": 68157440,
+            "sha256": "763ab7c8fdb8d45146116d2a3504b140c781d79445177de986be4d5d4215ab55",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/boot-win11-1c6-01/boot.qcow2",
+            "bytes": 720896,
+            "sha256": "fa05adf8f4d90eedd86ec8fc7a46817bab497766472b4ae4b234d1aec61f65aa",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/boot-win11-1c6-01/target.qcow2",
+            "bytes": 197120,
+            "sha256": "569b6dda385124eb9119987680262d2eed6ab15e2f8fd339e94fcf3ecec496d7",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          },
+          {
+            "path": "1c23/qemu-x64/boot-win11-1c6-01/vars.fd",
+            "bytes": 540672,
+            "sha256": "3db43c97376d2313971186cb66254d79705d846df550f73a286511b7ccae26ae",
+            "status": "RETAINED_PENDING_USER_ACCEPTANCE"
+          }
+        ],
+        "logical_bytes": 7702305280,
+        "deleted_new_images": []
+      }
+    }
+  },
+  "closed_logs": {
+    "1c6/logs/runner-native01.log": {
+      "sha256": "d7272f28a3eb8a9c8b731a48933e1f2d3e13937904c1fee198b872c669ee4a9e"
+    },
+    "1c6/logs/runner-native02.log": {
+      "sha256": "f0d2244bc1279d8ed5bf7cc450ad971b97fe30fb3011526404e112a55cc73647"
+    },
+    "1c6/logs/runner-native03.log": {
+      "sha256": "ad6c9accfa90daf2e681a28d70d38604244e274b1364f4deb17113229a1e8bd6"
+    },
+    "1c6/logs/runner-native04.log": {
+      "sha256": "ffea8a1437ecbcd1265d28f55f98f7015c1ac58e45a5575a1a3b3582cecc830d"
+    },
+    "1c6/logs/boot-tools-build01.log": {
+      "sha256": "e80517948e1e2969371f85ab8e7b907e7db068e85018f10ded5d69a11acd58be"
+    },
+    "1c6/logs/python-clean01.log": {
+      "sha256": "817e30b10e7ef215ed0846390252e29b0bf9b03df92e2d4ad81e48f8969321cc"
+    },
+    "1c6/logs/python-clean02.log": {
+      "sha256": "a266994adc26e101f74a93e39863d1b00428268671944433aa09b5f8c31da268"
+    },
+    "1c6/logs/bcd-win11-01.log": {
+      "sha256": "0517af5ec5fc33485b61fd9a9dcaacbb7c01d32fbf7f389f2fb685c8d66ae15e"
+    },
+    "1c6/logs/bcd-win11-02.log": {
+      "sha256": "5b95fd9e8210b786993b990bcd3842ef0a9f008b9b0475af9f641e13c86a5f83"
+    },
+    "1c6/logs/closed-evidence01.log": {
+      "sha256": "49bcdb92d3799e07a96f63e3e47d80a5215ca7afc0b171a1881353eff04f9eb1"
+    }
+  },
+  "changed_sys_cer": false,
+  "physical_disks": false,
+  "merge": false,
+  "push": false,
+  "deploy": false,
+  "deleted_new_images": [],
+  "stop_without_auto_continue": true,
+  "previous_bcdboot_stop_superseded_by_user": true,
+  "external_bcd_comparison": "SKIPPED_BY_EXPLICIT_USER"
+}

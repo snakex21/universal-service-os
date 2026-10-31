@@ -1,0 +1,83 @@
+{
+  "schema": "minios-1c5-win11-128-closed-v1",
+  "passed": true,
+  "qemu_only": true,
+  "head": "4431f6e66839d05062c74adefcdbaea210342314",
+  "dirty": 0,
+  "guest_seconds": 559.3557379999993,
+  "runner_seconds": 629.2544406999996,
+  "memory": {
+    "stack_reserved": 1048576,
+    "stack_high_water": 417768,
+    "allocator_peak_including_stack": 12044492,
+    "firmware_excluded": true
+  },
+  "profile_enabled": false,
+  "combine_enabled": true,
+  "guest": {
+    "path": "1c5/win11-final/whpx128-01/result.json",
+    "sha256": "111df73bed14229093fc8ecf296a68a88b51eed43436bab72d3817bc360965e5"
+  },
+  "native": {
+    "path": "1c5/native-win11-128/result.json",
+    "sha256": "17103ec6471f3f2743ea8e629013a37cbd69c3feb98c8467eded6182623ed408"
+  },
+  "program_sha256": "058b08519d5a338f05104c51fd9eafbdc0bd12d9607c18cf8a4d85f29b30a196",
+  "target_sha256": "8677e5452ba4d749a8f7873fc7da4855625bed819d5678e0524a6c3a50a47142",
+  "readonly_vhd_sha256": "7ff67181a910ee9461211ea5fe9b2e34958be41a30c102cd9356a40560848907",
+  "readonly_vhd_bytes": 15027732480,
+  "source_and_bases_unchanged": true,
+  "native_results": [
+    {
+      "path": "1c5/native-win11-128/native-partition-1/result.json",
+      "sha256": "45a5c9bf6ee9940a38630c60a133f0425ae336c1f793af565a85ebbc2fe68848",
+      "filesystem": "FAT32",
+      "passed": true,
+      "chkdsk_exit": 0,
+      "access": "ReadOnly",
+      "wim_tree": null
+    },
+    {
+      "path": "1c5/native-win11-128/native-partition-3/result.json",
+      "sha256": "397445968181f8a2246f91d560c11bfd37f4a8eaa5548f328837a99222b2150f",
+      "filesystem": "NTFS",
+      "passed": true,
+      "chkdsk_exit": 0,
+      "access": "ReadOnly",
+      "wim_tree": {
+        "api_synthesized_normal_paths": [],
+        "attribute_comparison": "root path empty/MFT5 only: source attrs OR reserved6 under exact raw SI/FN proof; other paths exact, with independently raw-proven regular0/API128 NORMAL separately logged",
+        "root_reserved_metadata_applied": true,
+        "checked_entries": 168751,
+        "api_reordered_sd_count": 0,
+        "short_8_3_secondary_absences_checked": 0,
+        "read_error_count": 0,
+        "root_reserved_metadata_flags": 6,
+        "actual_entries": 168751,
+        "passed": true,
+        "changed_time_policy": "explicit fixture changedTime if present; otherwise WIM modifiedTime",
+        "writes_to_volume": false,
+        "api_synthesized_normal_count": 0,
+        "reparse_comparison": "independent expected post-RP_FIX data SHA1/tag; no target traversal",
+        "security_comparison": "validated revision/control/RMcontrol and exact SID/ACL sections; raw on-disk SD gate required separately",
+        "different_count": 0,
+        "extra_count": 0,
+        "missing_count": 0,
+        "short_8_3_creation_claim": true,
+        "expected_entries": 168751,
+        "difference_samples": [],
+        "short_8_3_names_checked": 82533
+      }
+    }
+  ],
+  "raw_security": {
+    "path": "1c5/native-win11-128/raw-security.json",
+    "sha256": "9f5758bb1ade5ecce6250fd3557723171adde6e3ca328e6d0ffdad4aa133982a",
+    "passed": true,
+    "descriptors": 377,
+    "references": 168751
+  },
+  "windows_firstboot_attempted": false,
+  "win11_type4_firstboot_confirmed": false,
+  "cleanup_performed": false
+}

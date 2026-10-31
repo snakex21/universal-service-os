@@ -1,0 +1,643 @@
+{
+  "schema": "minios-wim-host-final07-metrics-v1",
+  "source_seal_commit": "836e5ae9",
+  "scope": "Closed HOST apply/feature/refusal receipts only; no VM, oracle or image rerun for this report.",
+  "paths": {
+    "evidence_base": "WIM-1B2-RUNTIME",
+    "artifacts_base": "REPOSITORY",
+    "absolute_paths_included": false
+  },
+  "measurement": {
+    "formula": "tracked_allocator_peak_bytes + actual_PE_SizeOfImage_bytes + actual_PE_SizeOfStackReserve_bytes",
+    "stack_counted_as": "full 1MiB reserved stack, not only4KiB initial commit",
+    "heap_counted_as": "peak requested live bytes observed by the core TrackedAllocator, not the allocator limit",
+    "not_rss": true,
+    "excluded": [
+      "OS/runtime DLLs",
+      "allocator bookkeeping/rounding outside requested-byte counter",
+      "untracked host-process startup allocations",
+      "Windows filesystem cache",
+      "Python/QEMU/oracle processes"
+    ],
+    "timing": "Host harness wall time around invocation and source revalidation; excludes target creation, later Windows SHA/chkdsk and VM time."
+  },
+  "artifacts": {
+    "host": {
+      "path": "zig-out/final07/bin/usosprep-wim-host.exe",
+      "sha256": "d0ad2608603f47e87388867741ffaadf831e7100ca419125a00b6475990c802b",
+      "pe_size_of_image_bytes": 749568,
+      "stack_reserve_bytes": 1048576,
+      "stack_commit_bytes": 4096,
+      "file_bytes": 700416
+    },
+    "features": {
+      "path": "zig-out/final07/bin/usosprep-wim-features.exe",
+      "sha256": "8295b23411ea1fedb043a738134ef953c027686f9d9acf6c8633861f2a1a3faa",
+      "pe_size_of_image_bytes": 688128,
+      "stack_reserve_bytes": 1048576,
+      "stack_commit_bytes": 4096,
+      "file_bytes": 637952
+    }
+  },
+  "synthetic_codec_maxima": [
+    {
+      "codec": "XPRESS",
+      "case": "large/xpress",
+      "allocator_peak_bytes": 663212,
+      "own_budget_bytes": 2461356,
+      "mib": 2.347332,
+      "seconds": 2.379046100002597
+    },
+    {
+      "codec": "LZX",
+      "case": "large/lzx",
+      "allocator_peak_bytes": 674840,
+      "own_budget_bytes": 2472984,
+      "mib": 2.358421,
+      "seconds": 2.3071567000006326
+    },
+    {
+      "codec": "LZMS non-solid",
+      "case": "large/lzms-nonsolid",
+      "allocator_peak_bytes": 1314272,
+      "own_budget_bytes": 3112416,
+      "mib": 2.968231,
+      "seconds": 2.5448011999978917
+    }
+  ],
+  "all_wim_codec_maxima": [
+    {
+      "codec": "XPRESS",
+      "case": "large/xpress",
+      "allocator_peak_bytes": 663212,
+      "own_budget_bytes": 2461356,
+      "mib": 2.347332,
+      "seconds": 2.379046100002597
+    },
+    {
+      "codec": "LZX",
+      "case": "win10-final07",
+      "allocator_peak_bytes": 4644728,
+      "own_budget_bytes": 6442872,
+      "mib": 6.144402,
+      "seconds": 204.41708939999808
+    },
+    {
+      "codec": "LZMS non-solid",
+      "case": "large/lzms-nonsolid",
+      "allocator_peak_bytes": 1314272,
+      "own_budget_bytes": 3112416,
+      "mib": 2.968231,
+      "seconds": 2.5448011999978917
+    }
+  ],
+  "synthetic_positive_cases": [
+    {
+      "name": "smoke/xpress",
+      "seconds": 0.22493039999972098,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/xpress/result.json",
+        "sha256": "69328680a9973989ddd52d6bd592ca648e516d7d2283460dd3919484513b1c8a"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/xpress/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/xpress/stderr.txt",
+          "sha256": "253803f7123eb99ffb5d8b7ea0d117b5d1a3b857c7d7f335f0ce6fa1deba64ef"
+        }
+      ],
+      "allocator_peak_bytes": 643604,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/xpress/target.raw",
+        "bytes": 268435456,
+        "sha256": "de7020130e11e5850939167d69dbf93272298492003e2e1faa0fdfec74d50762"
+      },
+      "workload": "synthetic-smoke",
+      "codec": "XPRESS",
+      "artifact": "host",
+      "own_budget_bytes": 2441748,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "smoke/lzx",
+      "seconds": 0.32201920000079554,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/lzx/result.json",
+        "sha256": "8e29594954c06e657decf3922850ebd8226a8738e22d9e8de73405c99da6c27c"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/lzx/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/lzx/stderr.txt",
+          "sha256": "e9c7b4fc655bf29a38c70f55d7e3fd3b1a3547a27d3f08fa58e66c228a3927e6"
+        }
+      ],
+      "allocator_peak_bytes": 655232,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/lzx/target.raw",
+        "bytes": 268435456,
+        "sha256": "0849e3cd4f0221660f7b4a1874c841316b518af1a8afc49766bde058a9fabb81"
+      },
+      "workload": "synthetic-smoke",
+      "codec": "LZX",
+      "artifact": "host",
+      "own_budget_bytes": 2453376,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "smoke/lzms-nonsolid",
+      "seconds": 0.313702799998282,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/lzms-nonsolid/result.json",
+        "sha256": "712e85b91381e27a7e2e5faf95edce25939669ebe73ca0102770fd52dad81538"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/lzms-nonsolid/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/lzms-nonsolid/stderr.txt",
+          "sha256": "a5127700bd6e66e66479687d5f9e7b3e308f413d0758a4f52d99ce3b822f5409"
+        }
+      ],
+      "allocator_peak_bytes": 1294664,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/lzms-nonsolid/target.raw",
+        "bytes": 268435456,
+        "sha256": "222a32275ea7f4a7a9bfcde99fa1b0a2d32f374b6a67ba32d919df921c5f6268"
+      },
+      "workload": "synthetic-smoke",
+      "codec": "LZMS non-solid",
+      "artifact": "host",
+      "own_budget_bytes": 3092808,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "smoke/multi-index2",
+      "seconds": 0.3066515999962576,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/multi-index2/result.json",
+        "sha256": "2bea4dac368ff67995ff993d0d43a419da89f95dda0d26c8e7bc6dcf48a8c126"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/multi-index2/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/multi-index2/stderr.txt",
+          "sha256": "c0a66b92b6ebc6f049695058359857d51a2667557dc10ba975c5c8843039bae4"
+        }
+      ],
+      "allocator_peak_bytes": 643652,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/multi-index2/target.raw",
+        "bytes": 268435456,
+        "sha256": "7ae572d09910d2e4c4c24abb042c5d127fffea04c3475d859a0ec4e648210c23"
+      },
+      "workload": "synthetic-smoke",
+      "codec": "XPRESS",
+      "artifact": "host",
+      "own_budget_bytes": 2441796,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "large/xpress",
+      "seconds": 2.379046100002597,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/large/xpress/result.json",
+        "sha256": "61fbb675f5247083df40c2b4c4c52c133a1f34949591404899467b7a23348ae7"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/large/xpress/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/large/xpress/stderr.txt",
+          "sha256": "6326e712c2edbf82ba63993928442e81f082212948db6c8f574d0588eb8659b5"
+        }
+      ],
+      "allocator_peak_bytes": 663212,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/large/xpress/target.raw",
+        "bytes": 268435456,
+        "sha256": "2c0d9074ff12e716605098e366e78d588ec471af83966bee34f9f210d4b3dee2"
+      },
+      "workload": "synthetic-large",
+      "codec": "XPRESS",
+      "artifact": "host",
+      "own_budget_bytes": 2461356,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "large/lzx",
+      "seconds": 2.3071567000006326,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/large/lzx/result.json",
+        "sha256": "f9a937c7bf2b25531d12b6c0bbecb9d709a694425d9698dbab212d17bfc1df39"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/large/lzx/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/large/lzx/stderr.txt",
+          "sha256": "37207c7c76077954cb9d7b9d1badc7d05d3846166747171ff05a49a617620530"
+        }
+      ],
+      "allocator_peak_bytes": 674840,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/large/lzx/target.raw",
+        "bytes": 268435456,
+        "sha256": "763e6376084d19704a20a6ce44ab26f1a10e2131aa3440ac86ca59cb1101f3aa"
+      },
+      "workload": "synthetic-large",
+      "codec": "LZX",
+      "artifact": "host",
+      "own_budget_bytes": 2472984,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "large/lzms-nonsolid",
+      "seconds": 2.5448011999978917,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/large/lzms-nonsolid/result.json",
+        "sha256": "4644318da4a2132fa3098d20f311263ce73263a694653bef9e72d45fd782a9ea"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/large/lzms-nonsolid/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/large/lzms-nonsolid/stderr.txt",
+          "sha256": "09a29ff0e826382e819443d1a2b55037d001938c3cf8265f8b703caef2d51d30"
+        }
+      ],
+      "allocator_peak_bytes": 1314272,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/large/lzms-nonsolid/target.raw",
+        "bytes": 268435456,
+        "sha256": "012ce421eaed43a48812a455213ea75acd4744ce1b32efcba8efcf1c19027583"
+      },
+      "workload": "synthetic-large",
+      "codec": "LZMS non-solid",
+      "artifact": "host",
+      "own_budget_bytes": 3112416,
+      "stack_reserve_bytes": 1048576
+    },
+    {
+      "name": "ads/xpress",
+      "seconds": 0.09918350000225473,
+      "returncode": 0,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/ads/xpress/result.json",
+        "sha256": "308a051dc51c2fb175aeb2fda8b398487a080f08520c93b609f0ba49f5382217"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/ads/xpress/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/ads/xpress/stderr.txt",
+          "sha256": "4f7a3f7cd4d07ca93534443bbd7fb91182f0aa82f0a0fc797046c0af90ab4496"
+        }
+      ],
+      "allocator_peak_bytes": 634908,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/ads/xpress/target.raw",
+        "bytes": 268435456,
+        "sha256": "6436c38769f534df5788f06a4787f73557068b281a28d254147182bec138c3f5"
+      },
+      "workload": "synthetic-ads",
+      "codec": "XPRESS",
+      "artifact": "host",
+      "own_budget_bytes": 2433052,
+      "stack_reserve_bytes": 1048576
+    }
+  ],
+  "real_wim_cases": [
+    {
+      "name": "win10-final07",
+      "label": "Windows 10 22H2 x86, WIM image2",
+      "workload": "real-wim",
+      "codec": "LZX",
+      "artifact": "host",
+      "seconds": 204.41708939999808,
+      "returncode": 0,
+      "passed_core": true,
+      "allocator_peak_bytes": 4644728,
+      "allocator_peak_reported": true,
+      "own_budget_bytes": 6442872,
+      "stack_reserve_bytes": 1048576,
+      "evidence": {
+        "path": "win10-final07/core-result.json",
+        "sha256": "cc7f1bd1d80fa34e37e0ef2f0dbb1774392be705533cab794b645cc11235c998"
+      },
+      "log_evidence": {
+        "path": "win10-final07/program.log",
+        "sha256": "d35a66c5aea214fc1ff5fc1d3eb09ede2ef800c47ae3a9cb624a69c05cccadf4"
+      },
+      "source_header_evidence": {
+        "path": "inputs/win10-x86/input.json",
+        "sha256": "a4db02989e594de740621a69f989b69bc8ec69318a00efa0946785273c83d01b"
+      },
+      "source_sha256": "dd42df5a5d6b09529602b21f7095c0810ffdd6ff2ef3ca15f30d4ffa91164b38",
+      "image_index": 2,
+      "image": {
+        "path": "win10-final07/target.raw",
+        "bytes": 8589934592,
+        "sha256": "2314f056b91d73e234c9833d969cf80836c19239688b76ebb48e196a0b2b8a3a"
+      }
+    },
+    {
+      "name": "win7-final07",
+      "label": "Windows 7 SP1 x86, WIM image1",
+      "workload": "real-wim",
+      "codec": "LZX",
+      "artifact": "host",
+      "seconds": 106.915694599993,
+      "returncode": 0,
+      "passed_core": true,
+      "allocator_peak_bytes": 3996056,
+      "allocator_peak_reported": true,
+      "own_budget_bytes": 5794200,
+      "stack_reserve_bytes": 1048576,
+      "evidence": {
+        "path": "win7-final07/core-result.json",
+        "sha256": "46fbb83ac792b749daeae1dd203fa835dc20995c1f14de38c329614ccac5b74e"
+      },
+      "log_evidence": {
+        "path": "win7-final07/program.log",
+        "sha256": "2d1f56280ed3c0dd2b60c92554839638468e3fa37dd75a75a4008d0a4787ca4b"
+      },
+      "source_header_evidence": {
+        "path": "inputs/win7-x86/input.json",
+        "sha256": "16f0339c72691b9556e43e2abb6b9df2e3830a9a3f41b15068e08eca7419acd4"
+      },
+      "source_sha256": "edc80120ba3b6325141a3fa1fb9087c7bfd9ccfa6040c7676e0ef26f78d72128",
+      "image_index": 1,
+      "image": {
+        "path": "win7-final07/target.raw",
+        "bytes": 6442450944,
+        "sha256": "f6e553eb650a36216c924bf2a211b14cc9bd96324e3a1d28777ebb598e9813f6"
+      }
+    }
+  ],
+  "ntfs_feature_case": {
+    "name": "features",
+    "artifact": "features",
+    "seconds": 0.3061740000048303,
+    "allocator_peak_bytes": 609480,
+    "own_budget_bytes": 2346184,
+    "passed_core": true,
+    "evidence": {
+      "path": "host-final07/features/core-result.json",
+      "sha256": "a2593b6594343c92dee50468c32a042d12fb60ea25589d9081f916d1c1934a09"
+    },
+    "log_evidence": {
+      "path": "host-final07/features/program.log",
+      "sha256": "8abb716a97d830db44cd2a987959e6360376ee72b8725132b7fff3e96eb07d5a"
+    }
+  },
+  "worst_counted_own_budget": {
+    "case": "win10-final07",
+    "bytes": 6442872,
+    "mib": 6.144402
+  },
+  "negative_refusals": [
+    {
+      "name": "smoke/refuse-solid-lzms",
+      "seconds": 0.023796599998604506,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-solid-lzms/result.json",
+        "sha256": "a92c5908548914b936521e6eb1b13d556310ca0cedb26fe5bc20da11a14fe6ac"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-solid-lzms/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-solid-lzms/stderr.txt",
+          "sha256": "101e9bb647df225fcc28e7482112204c0aaa11bc06a032506750c5613e338037"
+        }
+      ],
+      "allocator_peak_bytes": 42176,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/refuse-solid-lzms/target.raw",
+        "bytes": 268435456,
+        "sha256": "1405b30670964b785f5e58bd9a299e4091d122ff9d383f9ec6fd54f9a1cdb344"
+      },
+      "expected_error": "UnsupportedSolid",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "1405b30670964b785f5e58bd9a299e4091d122ff9d383f9ec6fd54f9a1cdb344",
+      "target_sha256_after": "1405b30670964b785f5e58bd9a299e4091d122ff9d383f9ec6fd54f9a1cdb344",
+      "format_pass_marker": false
+    },
+    {
+      "name": "smoke/refuse-split-part1",
+      "seconds": 0.01193319999583764,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-split-part1/result.json",
+        "sha256": "7962fb8b99a2084f7e95fbcad3802f8dfafd50029693b60849be5533ae3bd466"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-split-part1/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-split-part1/stderr.txt",
+          "sha256": "fcf09a67744e281505b9dc2ad738f6687d35d4b0078e3934ee0e1e4229b1bb11"
+        }
+      ],
+      "allocator_peak_bytes": null,
+      "allocator_peak_reported": false,
+      "image": {
+        "path": "host-final07/smoke/refuse-split-part1/target.raw",
+        "bytes": 268435456,
+        "sha256": "ceb0507650bdfbb18075a04a08c673ed82ee39a75bc9c09be39472514d2f4cdc"
+      },
+      "expected_error": "UnsupportedSplitWim",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "ceb0507650bdfbb18075a04a08c673ed82ee39a75bc9c09be39472514d2f4cdc",
+      "target_sha256_after": "ceb0507650bdfbb18075a04a08c673ed82ee39a75bc9c09be39472514d2f4cdc",
+      "format_pass_marker": false
+    },
+    {
+      "name": "smoke/refuse-split-part2",
+      "seconds": 0.023955700002261437,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-split-part2/result.json",
+        "sha256": "ffac00ee99366c1e0b93225d4b3108969a1fdd4aed634ac7056aaea866a0fbde"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-split-part2/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-split-part2/stderr.txt",
+          "sha256": "fcf09a67744e281505b9dc2ad738f6687d35d4b0078e3934ee0e1e4229b1bb11"
+        }
+      ],
+      "allocator_peak_bytes": null,
+      "allocator_peak_reported": false,
+      "image": {
+        "path": "host-final07/smoke/refuse-split-part2/target.raw",
+        "bytes": 268435456,
+        "sha256": "c262574bd0b79df71ee948a0a7a5b3c3680520212772ad8e7588fbf0ae6f307e"
+      },
+      "expected_error": "UnsupportedSplitWim",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "c262574bd0b79df71ee948a0a7a5b3c3680520212772ad8e7588fbf0ae6f307e",
+      "target_sha256_after": "c262574bd0b79df71ee948a0a7a5b3c3680520212772ad8e7588fbf0ae6f307e",
+      "format_pass_marker": false
+    },
+    {
+      "name": "smoke/refuse-index0",
+      "seconds": 0.024496199999703094,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-index0/result.json",
+        "sha256": "a103d85f72dd085b43ea4800901fc380bde5239e1f1473e8633f663a8d71536a"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-index0/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-index0/stderr.txt",
+          "sha256": "26547fb8a5db29c523e29798570d147eeeafd5765bea2429b22ab0a6a55d7a2f"
+        }
+      ],
+      "allocator_peak_bytes": 0,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/refuse-index0/target.raw",
+        "bytes": 268435456,
+        "sha256": "ead6018fef6cbf064af0811593851697fbbbecab4b114666184b2191774762d7"
+      },
+      "expected_error": "InvalidImageIndex",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "ead6018fef6cbf064af0811593851697fbbbecab4b114666184b2191774762d7",
+      "target_sha256_after": "ead6018fef6cbf064af0811593851697fbbbecab4b114666184b2191774762d7",
+      "format_pass_marker": false
+    },
+    {
+      "name": "smoke/refuse-index3",
+      "seconds": 0.015471799997612834,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-index3/result.json",
+        "sha256": "f1c6f2ddeb9ce407e7ca7c706fae011c8873b5bd45e0a4590094abd53933713d"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-index3/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-index3/stderr.txt",
+          "sha256": "26547fb8a5db29c523e29798570d147eeeafd5765bea2429b22ab0a6a55d7a2f"
+        }
+      ],
+      "allocator_peak_bytes": 0,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/refuse-index3/target.raw",
+        "bytes": 268435456,
+        "sha256": "2a36b50c3dbf7b9cbfa5f90f1290a445d87b9f936fa445ef3b3373299f2f04fb"
+      },
+      "expected_error": "InvalidImageIndex",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "2a36b50c3dbf7b9cbfa5f90f1290a445d87b9f936fa445ef3b3373299f2f04fb",
+      "target_sha256_after": "2a36b50c3dbf7b9cbfa5f90f1290a445d87b9f936fa445ef3b3373299f2f04fb",
+      "format_pass_marker": false
+    },
+    {
+      "name": "smoke/refuse-resource-sha1",
+      "seconds": 0.025215099994966295,
+      "returncode": 1,
+      "passed": true,
+      "evidence": {
+        "path": "host-final07/smoke/refuse-resource-sha1/result.json",
+        "sha256": "6257c948de4a4beeb18fe6f51a4f3459f8079f22b96dddef1844dd79f779e38c"
+      },
+      "log_evidence": [
+        {
+          "path": "host-final07/smoke/refuse-resource-sha1/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "host-final07/smoke/refuse-resource-sha1/stderr.txt",
+          "sha256": "42724000b33c2c0f61ff3e438846b1d7374d5b0b3b5c5f5eaffba5c7f20563f7"
+        }
+      ],
+      "allocator_peak_bytes": 111988,
+      "allocator_peak_reported": true,
+      "image": {
+        "path": "host-final07/smoke/refuse-resource-sha1/target.raw",
+        "bytes": 268435456,
+        "sha256": "d566524fd59a9c1a83a4c0ac7de746094b2ec366a2d70bb262afe1b10b9fe643"
+      },
+      "expected_error": "WimHashMismatch",
+      "entire_target_unchanged": true,
+      "target_sha256_before": "d566524fd59a9c1a83a4c0ac7de746094b2ec366a2d70bb262afe1b10b9fe643",
+      "target_sha256_after": "d566524fd59a9c1a83a4c0ac7de746094b2ec366a2d70bb262afe1b10b9fe643",
+      "format_pass_marker": false
+    }
+  ],
+  "counts": {
+    "synthetic_wim_positive": 8,
+    "ntfs_feature_positive": 1,
+    "real_wim_core_positive": 2,
+    "negative_refusals": 6
+  },
+  "independent_windows_results_not_claimed_here": true,
+  "cleanup_performed": false
+}

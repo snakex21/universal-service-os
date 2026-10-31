@@ -1,0 +1,1018 @@
+{
+  "schema": "minios-retained-images-1c1-v1",
+  "head": "240d6a07c3ae827414036a9fb1a68dea782c638a",
+  "all_listed_files_closed": true,
+  "cleanup_performed": false,
+  "delete_only_after_user_acceptance": true,
+  "files": [
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final03/original.wim",
+      "bytes": 2948,
+      "sha256": "3780d027e82d134a589ee3f211c03bc1b60a87bf3cd82156e69f08497732d05e",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final03"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/conflicting-duplicate.wim",
+      "bytes": 4276,
+      "sha256": "b397233573b5c57f5378a455ac014f6cd20ecfa04fbd2aab51902adfe4e94744",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final04"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/identical-duplicate.wim",
+      "bytes": 3098,
+      "sha256": "7c7f6d6dd76be7b65e3be46a18fbbcf22796b858635141754405e42a3fcdb6bc",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final04"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/original.wim",
+      "bytes": 2948,
+      "sha256": "9f3298196ed3bd47652e0317ebc0f985296ce7bb2fd35742e168480b20d0107a",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final04"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/relocated-identical-duplicate.wim",
+      "bytes": 4276,
+      "sha256": "7e3a4e674710a1c96d5fbda9adf516940af728f36cce22b3b6f33fcad8667e42",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final04"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/duplicate-final04/size-conflicting-duplicate.wim",
+      "bytes": 4275,
+      "sha256": "013ab2262c7913a753d6448b8662f562aa87eedfd8751096f4d07edb1a4e86f5",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/duplicate-final04"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/blank-base.qcow2",
+      "bytes": 328192,
+      "sha256": "1bf265ccdca26a8326c102ea40e3da1e7596dc497b6b754a03e0f3d479b1de63",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/target.raw",
+      "bytes": 17179869184,
+      "sha256": "5edeae2d34845e85ac55060d7c9faf1d151a190c4bfa382589bd1c39c6aeb080",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/test-cow.qcow2",
+      "bytes": 197120,
+      "sha256": "256819a93cf0407e921f633b1e1eeef7562cce0c9340b8d193355e78e6e2b068",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/native/converted-fixed.vhd",
+      "bytes": 17179869696,
+      "sha256": "2d021d863c239f8c77731ae2048e8021049c458d2ba859dd170f14212f52ee4e",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win11-01/native/readonly-copy.vhd",
+      "bytes": 17179869696,
+      "sha256": "2d021d863c239f8c77731ae2048e8021049c458d2ba859dd170f14212f52ee4e",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win11-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/blank-base.qcow2",
+      "bytes": 328192,
+      "sha256": "2c3e2be3b74a95a546d68896793d43179842a88e3bf006809cefe5a2f57473a6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/target.raw",
+      "bytes": 6442450944,
+      "sha256": "a48421534303d458d285e3867508fad02bf2cd0025469cf58fbe48af56791d57",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/test-cow.qcow2",
+      "bytes": 197120,
+      "sha256": "c07327961c471fa9894e308065002d34770e0ee2579633c231ef8d2275b9788c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/native/converted-fixed.vhd",
+      "bytes": 6442451456,
+      "sha256": "170d49174333d6f562d6777b016e92bb75b54b73cee4cd3fb7fd746a8e460894",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/e2e-win7-01/native/readonly-copy.vhd",
+      "bytes": 6442451456,
+      "sha256": "170d49174333d6f562d6777b016e92bb75b54b73cee4cd3fb7fd746a8e460894",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/e2e-win7-01/native"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/iso/own.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/iso"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "4b0a0d63e56894408fa6830ad01c8b037bc5ec2bad052133a445bc2dd30d66ee",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/multi/own.iso",
+      "bytes": 655360,
+      "sha256": "9dec39357368952e060527e64ce613e86a5416d03c7eeea200c93b98e5464ef7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/multi-joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "cafbc21954e75e8dfc2444ada7a67e2d631d569fd399ee32ebb7ad9d1b0d98f6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/multi-joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf102/own.iso",
+      "bytes": 655360,
+      "sha256": "fedbfce3a5e5377f3c78a85065ca66f6caf1c7bcada5eaf740fa0308b5ce61f0",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf102"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf102-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "3519552aefa16683d198489514fd1f746bb07e2a05bb7876d2c6ea4ce697d5c8",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf102-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf201/own.iso",
+      "bytes": 655360,
+      "sha256": "3d195579602e11a58d74589b24df3f671a354b3a1a4ff6473ee9ac7c00237948",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf201"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf201-continuation/own.iso",
+      "bytes": 655360,
+      "sha256": "48d9c7dd05ea32041be1e860403f6ccab344d4515f73fdbd129753858498495c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf201-continuation"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf201-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "131c365bcc7a57e2aa65e4e34324ee1703d54e9ee8e5b98fc88e94195023d079",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf201-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf250/own.iso",
+      "bytes": 655360,
+      "sha256": "759748671f480fdeeb92d811957b8c07eb243c9da251b0e93cc93903753e4ae7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf250"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf250-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "2b7887c50816c8cda32498fb5f471ddf1e1d629aa1e73ee29df6ce43eb764378",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf250-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf260/own.iso",
+      "bytes": 655360,
+      "sha256": "e6fd57d5c68e2dae1f4ada6890a472ac37b708340a31b569e3a64cbdedc934a1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf260"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf260-efe-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "f8682ea13ce927b070f240adeac7f2504f921cf8554596f3b74b3c038267e132",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf260-efe-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev01/udf260-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "c3b92ea71bf1909a1c6629e48572157676bcbd0c6648316e143e97352f2a0f29",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev01/udf260-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/iso/own.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/iso"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "4b0a0d63e56894408fa6830ad01c8b037bc5ec2bad052133a445bc2dd30d66ee",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/multi/own.iso",
+      "bytes": 655360,
+      "sha256": "9dec39357368952e060527e64ce613e86a5416d03c7eeea200c93b98e5464ef7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/multi-joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "cafbc21954e75e8dfc2444ada7a67e2d631d569fd399ee32ebb7ad9d1b0d98f6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/multi-joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf102/own.iso",
+      "bytes": 655360,
+      "sha256": "fedbfce3a5e5377f3c78a85065ca66f6caf1c7bcada5eaf740fa0308b5ce61f0",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf102"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf102-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "3519552aefa16683d198489514fd1f746bb07e2a05bb7876d2c6ea4ce697d5c8",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf102-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf201/own.iso",
+      "bytes": 655360,
+      "sha256": "3d195579602e11a58d74589b24df3f671a354b3a1a4ff6473ee9ac7c00237948",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf201"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf201-continuation/own.iso",
+      "bytes": 655360,
+      "sha256": "48d9c7dd05ea32041be1e860403f6ccab344d4515f73fdbd129753858498495c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf201-continuation"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf201-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "131c365bcc7a57e2aa65e4e34324ee1703d54e9ee8e5b98fc88e94195023d079",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf201-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf250/own.iso",
+      "bytes": 655360,
+      "sha256": "759748671f480fdeeb92d811957b8c07eb243c9da251b0e93cc93903753e4ae7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf250"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf250-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "2b7887c50816c8cda32498fb5f471ddf1e1d629aa1e73ee29df6ce43eb764378",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf250-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf260/own.iso",
+      "bytes": 655360,
+      "sha256": "e6fd57d5c68e2dae1f4ada6890a472ac37b708340a31b569e3a64cbdedc934a1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf260"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf260-efe-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "f8682ea13ce927b070f240adeac7f2504f921cf8554596f3b74b3c038267e132",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf260-efe-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev02/udf260-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "c3b92ea71bf1909a1c6629e48572157676bcbd0c6648316e143e97352f2a0f29",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev02/udf260-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/iso/own.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/iso"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/iso-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "a18c9f7a904d0494a843b03b3f76563c97bf2a0a57699cd7393b6388ece42a14",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/iso-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/iso-endian-mismatch/own.iso",
+      "bytes": 655360,
+      "sha256": "ceae6307d6ccb2ed2b622735add869c70de8d7db39ae1b05989d177446a5f197",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/iso-endian-mismatch"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/iso-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "013223dd54cf9134b9c4875798640f2c43d8fbb4c89df9683d483f6eaae57b25",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/iso-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "4b0a0d63e56894408fa6830ad01c8b037bc5ec2bad052133a445bc2dd30d66ee",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/multi/own.iso",
+      "bytes": 655360,
+      "sha256": "9dec39357368952e060527e64ce613e86a5416d03c7eeea200c93b98e5464ef7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/multi-joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "cafbc21954e75e8dfc2444ada7a67e2d631d569fd399ee32ebb7ad9d1b0d98f6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/multi-joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-allocation-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "6013a9618eb4e18f29737966f28390dc96e9cec7641442535332d842113ae049",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-allocation-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-bad-crc/own.iso",
+      "bytes": 655360,
+      "sha256": "a3dd8b5ca60f343b1f6881f7a901620cdb0894c11f4c4fb9660426032e003c47",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-bad-crc"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-bad-tag/own.iso",
+      "bytes": 655360,
+      "sha256": "5a5b72f09eb183f8bbdb5275cf324b214fbbabb6927c8e2f394b2f7607d979ae",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-bad-tag"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "57f4e8dbbca1c49521d9c4bd2eef45c7715ffc27052fecbdc20a6bddf7bd32bc",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-invalid-partition/own.iso",
+      "bytes": 655360,
+      "sha256": "abb04a48e5f121cdccd04888f4047fb75dc9780a6baf372b6ae65a60a2963a88",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-invalid-partition"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "d817fc08937ce88b9313d323781cfab06f1b893f1906ed50cc824cb41d65455f",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf102/own.iso",
+      "bytes": 655360,
+      "sha256": "fedbfce3a5e5377f3c78a85065ca66f6caf1c7bcada5eaf740fa0308b5ce61f0",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf102"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf102-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "3519552aefa16683d198489514fd1f746bb07e2a05bb7876d2c6ea4ce697d5c8",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf102-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf201/own.iso",
+      "bytes": 655360,
+      "sha256": "3d195579602e11a58d74589b24df3f671a354b3a1a4ff6473ee9ac7c00237948",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf201"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf201-continuation/own.iso",
+      "bytes": 655360,
+      "sha256": "48d9c7dd05ea32041be1e860403f6ccab344d4515f73fdbd129753858498495c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf201-continuation"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf201-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "131c365bcc7a57e2aa65e4e34324ee1703d54e9ee8e5b98fc88e94195023d079",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf201-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf250/own.iso",
+      "bytes": 655360,
+      "sha256": "759748671f480fdeeb92d811957b8c07eb243c9da251b0e93cc93903753e4ae7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf250"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf250-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "2b7887c50816c8cda32498fb5f471ddf1e1d629aa1e73ee29df6ce43eb764378",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf250-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf260/own.iso",
+      "bytes": 655360,
+      "sha256": "e6fd57d5c68e2dae1f4ada6890a472ac37b708340a31b569e3a64cbdedc934a1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf260"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf260-efe-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "f8682ea13ce927b070f240adeac7f2504f921cf8554596f3b74b3c038267e132",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf260-efe-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf260-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "c3b92ea71bf1909a1c6629e48572157676bcbd0c6648316e143e97352f2a0f29",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf260-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/dev03/udf260-metadata-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "e7a69c22c6bc6dc7e7be99dbdcf95cd1c9771d9a940d65b540bcb528ca624c68",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/dev03/udf260-metadata-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/iso/own.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/iso"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/iso-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "a18c9f7a904d0494a843b03b3f76563c97bf2a0a57699cd7393b6388ece42a14",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/iso-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/iso-endian-mismatch/own.iso",
+      "bytes": 655360,
+      "sha256": "ceae6307d6ccb2ed2b622735add869c70de8d7db39ae1b05989d177446a5f197",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/iso-endian-mismatch"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/iso-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "013223dd54cf9134b9c4875798640f2c43d8fbb4c89df9683d483f6eaae57b25",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/iso-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "4b0a0d63e56894408fa6830ad01c8b037bc5ec2bad052133a445bc2dd30d66ee",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/multi/own.iso",
+      "bytes": 655360,
+      "sha256": "9dec39357368952e060527e64ce613e86a5416d03c7eeea200c93b98e5464ef7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/multi-joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "cafbc21954e75e8dfc2444ada7a67e2d631d569fd399ee32ebb7ad9d1b0d98f6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/multi-joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/sparse-multi/own.iso",
+      "bytes": 4295047168,
+      "sha256": "51c2864b7ac0a58a642aa512fadefe9a250e4815f34e74186a3e13d9339be9ea",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/sparse-multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-allocation-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "6013a9618eb4e18f29737966f28390dc96e9cec7641442535332d842113ae049",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-allocation-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-bad-crc/own.iso",
+      "bytes": 655360,
+      "sha256": "a3dd8b5ca60f343b1f6881f7a901620cdb0894c11f4c4fb9660426032e003c47",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-bad-crc"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-bad-tag/own.iso",
+      "bytes": 655360,
+      "sha256": "5a5b72f09eb183f8bbdb5275cf324b214fbbabb6927c8e2f394b2f7607d979ae",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-bad-tag"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "57f4e8dbbca1c49521d9c4bd2eef45c7715ffc27052fecbdc20a6bddf7bd32bc",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-invalid-partition/own.iso",
+      "bytes": 655360,
+      "sha256": "abb04a48e5f121cdccd04888f4047fb75dc9780a6baf372b6ae65a60a2963a88",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-invalid-partition"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "d817fc08937ce88b9313d323781cfab06f1b893f1906ed50cc824cb41d65455f",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf102/own.iso",
+      "bytes": 655360,
+      "sha256": "fedbfce3a5e5377f3c78a85065ca66f6caf1c7bcada5eaf740fa0308b5ce61f0",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf102"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf102-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "3519552aefa16683d198489514fd1f746bb07e2a05bb7876d2c6ea4ce697d5c8",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf102-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf201/own.iso",
+      "bytes": 655360,
+      "sha256": "3d195579602e11a58d74589b24df3f671a354b3a1a4ff6473ee9ac7c00237948",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf201"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf201-continuation/own.iso",
+      "bytes": 655360,
+      "sha256": "48d9c7dd05ea32041be1e860403f6ccab344d4515f73fdbd129753858498495c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf201-continuation"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf201-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "131c365bcc7a57e2aa65e4e34324ee1703d54e9ee8e5b98fc88e94195023d079",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf201-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf250/own.iso",
+      "bytes": 655360,
+      "sha256": "759748671f480fdeeb92d811957b8c07eb243c9da251b0e93cc93903753e4ae7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf250"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf250-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "2b7887c50816c8cda32498fb5f471ddf1e1d629aa1e73ee29df6ce43eb764378",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf250-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf260/own.iso",
+      "bytes": 655360,
+      "sha256": "e6fd57d5c68e2dae1f4ada6890a472ac37b708340a31b569e3a64cbdedc934a1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf260"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf260-efe-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "f8682ea13ce927b070f240adeac7f2504f921cf8554596f3b74b3c038267e132",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf260-efe-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf260-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "c3b92ea71bf1909a1c6629e48572157676bcbd0c6648316e143e97352f2a0f29",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf260-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final01/udf260-metadata-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "e7a69c22c6bc6dc7e7be99dbdcf95cd1c9771d9a940d65b540bcb528ca624c68",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final01/udf260-metadata-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/iso/own.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/iso"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/iso-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "a18c9f7a904d0494a843b03b3f76563c97bf2a0a57699cd7393b6388ece42a14",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/iso-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/iso-endian-mismatch/own.iso",
+      "bytes": 655360,
+      "sha256": "ceae6307d6ccb2ed2b622735add869c70de8d7db39ae1b05989d177446a5f197",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/iso-endian-mismatch"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/iso-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "013223dd54cf9134b9c4875798640f2c43d8fbb4c89df9683d483f6eaae57b25",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/iso-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "4b0a0d63e56894408fa6830ad01c8b037bc5ec2bad052133a445bc2dd30d66ee",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/multi/own.iso",
+      "bytes": 655360,
+      "sha256": "9dec39357368952e060527e64ce613e86a5416d03c7eeea200c93b98e5464ef7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/multi"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/multi-joliet/own.iso",
+      "bytes": 655360,
+      "sha256": "cafbc21954e75e8dfc2444ada7a67e2d631d569fd399ee32ebb7ad9d1b0d98f6",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/multi-joliet"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-allocation-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "6013a9618eb4e18f29737966f28390dc96e9cec7641442535332d842113ae049",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-allocation-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-bad-crc/own.iso",
+      "bytes": 655360,
+      "sha256": "a3dd8b5ca60f343b1f6881f7a901620cdb0894c11f4c4fb9660426032e003c47",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-bad-crc"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-bad-tag/own.iso",
+      "bytes": 655360,
+      "sha256": "5a5b72f09eb183f8bbdb5275cf324b214fbbabb6927c8e2f394b2f7607d979ae",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-bad-tag"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-directory-loop/own.iso",
+      "bytes": 655360,
+      "sha256": "57f4e8dbbca1c49521d9c4bd2eef45c7715ffc27052fecbdc20a6bddf7bd32bc",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-directory-loop"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-invalid-partition/own.iso",
+      "bytes": 655360,
+      "sha256": "abb04a48e5f121cdccd04888f4047fb75dc9780a6baf372b6ae65a60a2963a88",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-invalid-partition"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf-out-of-bounds/own.iso",
+      "bytes": 655360,
+      "sha256": "d817fc08937ce88b9313d323781cfab06f1b893f1906ed50cc824cb41d65455f",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf-out-of-bounds"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf102/own.iso",
+      "bytes": 655360,
+      "sha256": "fedbfce3a5e5377f3c78a85065ca66f6caf1c7bcada5eaf740fa0308b5ce61f0",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf102"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf102-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "3519552aefa16683d198489514fd1f746bb07e2a05bb7876d2c6ea4ce697d5c8",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf102-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf201/own.iso",
+      "bytes": 655360,
+      "sha256": "3d195579602e11a58d74589b24df3f671a354b3a1a4ff6473ee9ac7c00237948",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf201"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf201-continuation/own.iso",
+      "bytes": 655360,
+      "sha256": "48d9c7dd05ea32041be1e860403f6ccab344d4515f73fdbd129753858498495c",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf201-continuation"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf201-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "131c365bcc7a57e2aa65e4e34324ee1703d54e9ee8e5b98fc88e94195023d079",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf201-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf250/own.iso",
+      "bytes": 655360,
+      "sha256": "759748671f480fdeeb92d811957b8c07eb243c9da251b0e93cc93903753e4ae7",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf250"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf250-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "2b7887c50816c8cda32498fb5f471ddf1e1d629aa1e73ee29df6ce43eb764378",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf250-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf260/own.iso",
+      "bytes": 655360,
+      "sha256": "e6fd57d5c68e2dae1f4ada6890a472ac37b708340a31b569e3a64cbdedc934a1",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf260"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf260-efe-embedded/own.iso",
+      "bytes": 655360,
+      "sha256": "f8682ea13ce927b070f240adeac7f2504f921cf8554596f3b74b3c038267e132",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf260-efe-embedded"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf260-metadata/own.iso",
+      "bytes": 655360,
+      "sha256": "c3b92ea71bf1909a1c6629e48572157676bcbd0c6648316e143e97352f2a0f29",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf260-metadata"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/oracle-small/final02/udf260-metadata-efe/own.iso",
+      "bytes": 655360,
+      "sha256": "e7a69c22c6bc6dc7e7be99dbdcf95cd1c9771d9a940d65b540bcb528ca624c68",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/oracle-small/final02/udf260-metadata-efe"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/source-ntfs-win11-01/blank-base.qcow2",
+      "bytes": 328192,
+      "sha256": "361fc269cc8ac5093d6db6550e4d743a637bd410f66ff13f46a6ce3f191f3ad4",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/source-ntfs-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/source-ntfs-win11-01/target.raw",
+      "bytes": 12884901888,
+      "sha256": "ff5c405bef7ea35e390ec15c26884995f06a590ff94d6ef20bfb8c97781e94a4",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/source-ntfs-win11-01"
+    },
+    {
+      "scope": "runtime",
+      "path": "1c1/source-ntfs-win11-01/test-cow.qcow2",
+      "bytes": 197120,
+      "sha256": "078712854e2c5597b086daa95c6a9feb72641695af6bc99a6c3f214cf80acb39",
+      "state": "retained until user acceptance",
+      "evidence": "1c1/source-ntfs-win11-01"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60/own-source.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60/alias.raw",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60/separate.raw",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-66196a91-a04b-447a-ae35-1983ac8e4a60"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0/own-source.iso",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0/alias.raw",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0"
+    },
+    {
+      "scope": "repo",
+      "path": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0/separate.raw",
+      "bytes": 655360,
+      "sha256": "c23c0b6d5c1c8b473eebb08fe2de1bceb480f7169b34e47cbeb479bf30a375e1",
+      "state": "retained until user acceptance",
+      "evidence": "runtime/optical-target-guard-ed8c7b82-54b6-49c6-b558-7b9573efc6e0"
+    }
+  ],
+  "logical_bytes": 88117977405
+}

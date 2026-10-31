@@ -52,7 +52,7 @@ def run() -> int:
 def wiring() -> None:
     cmd = (ROOT / "tools/windows_x86_csmwrap.cmd").read_text(encoding="utf-8")
     assert '"%~dp0usos-x86-csmwrap.exe" hideesp\n' in cmd
-    assert cmd.index('"%~dp0usos-x86-csmwrap.exe" hideesp\n') < cmd.index('"%~dp0usos-x86-csmwrap.exe" after\n')
+    assert cmd.index('"%~dp0usos-x86-csmwrap.exe" hideesp\n') < cmd.index('"%~dp0usos-x86-csmwrap.exe" after')
     vista = (ROOT / "tools/windows_vista_install.c").read_text(encoding="utf-8")
     assert '#include "windows_csmwrap_hide.h"' in vista and "usos_hide_esp_letter(hive,csm_signature,csm_esp_start" in vista
     target = (ROOT / "tools/vista_csmwrap_target.sh").read_text(encoding="utf-8")

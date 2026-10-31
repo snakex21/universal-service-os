@@ -23,14 +23,16 @@ PINNED=0188057913ee7b4680027e45c53c45048deb8583c599c3c0672d98748704e0a4
 # tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
 DIAG_DIR=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}/csmwrap-diag
 PINNED_DIAG=a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
-# Native NT 3.51 / 3.5 (USOS_NT_BOOTLOG=on, exported by w9x_csmwrap_prepare.sh
-# only for a native NT 3.x target): the USOS pre-boot logger (own GPL,
+# Native NT 3.x / 4.0 (USOS_NT_BOOTLOG=on, exported by w9x_csmwrap_prepare.sh
+# only for a native NT target) and, as a diagnostic since 2026-10-31, the
+# 32-bit 8 / 8.1 / 10 CSMWrap route (vista_csmwrap_target.sh X86_SELF=1):
+# the USOS pre-boot logger (own GPL,
 # tools/nt_bootlog, diagnostic) becomes \EFI\BOOT\BOOTX64.EFI, CSMWrap moves
 # to \EFI\BOOT\CSMWRAPX.EFI next to csmwrap.ini (the logger chainloads it),
 # and \USOS\BOOTLOG.TXT starts empty (the logger sizes its ring on the
 # first boot). Every other flow keeps CSMWrap as BOOTX64.EFI.
 BOOTLOG_EFI=${USOS_NT_BOOTLOG_EFI:-${USOS_LIB_DIR:-/usr/lib/usos}/nt3/NTBOOTLG.EFI}
-PINNED_BOOTLOG=48ef72c8e02c2a960276871d042f2d27c15c7baeefc69422bba1be4626039a7c
+PINNED_BOOTLOG=c792d6c21c82c2b2d785915bcb047040525cf0bbc24600bdcc89e1895eb1c029
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
@@ -62,7 +64,7 @@ if [ "${USOS_NT_BOOTLOG:-off}" = on ]; then
     [ -r "$BOOTLOG_EFI" ] || fail 'the NT pre-boot logger is missing (usr/lib/usos/nt3/NTBOOTLG.EFI)'
     [ "$(sha256sum "$BOOTLOG_EFI" | awk '{print $1}')" = "$PINNED_BOOTLOG" ] || fail 'the NT pre-boot logger does not match its pinned hash'
     CSMWRAP_NAME=CSMWRAPX.EFI
-    log 'NT native: pre-boot logger as BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, empty USOS/BOOTLOG.TXT'
+    log 'pre-boot logger (diagnostic) as BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, empty USOS/BOOTLOG.TXT'
 fi
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'

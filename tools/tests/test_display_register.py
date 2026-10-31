@@ -98,7 +98,7 @@ def wiring() -> None:
     cmd = (ROOT / "tools/windows_x86_csmwrap.cmd").read_text(encoding="utf-8")
     call = '"%~dp0usos-x86-csmwrap.exe" display\n'
     assert call in cmd
-    assert cmd.index('call :mpart\n') < cmd.index(call) < cmd.index('"%~dp0usos-x86-csmwrap.exe" after\n')
+    assert cmd.index('call :mpart\n') < cmd.index(call) < cmd.index('"%~dp0usos-x86-csmwrap.exe" after')
     assert "if errorlevel 1 echo [USOS] display: not registered" in cmd  # never fatal
     c = (ROOT / "tools/windows_x86_csmwrap.c").read_text(encoding="utf-8")
     assert '#include "windows_display_register.h"' in c and 'L"display") == 0) ExitProcess(display_register())' in c
