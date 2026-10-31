@@ -73,6 +73,21 @@ pub fn appendDisk(buffer: []u8, config: []const u8, disk: *const Disk) ![]const 
     return buffer[0 .. config.len + tail.len];
 }
 
+/// Appends rtc_shift= (the RTC's local time minus UTC, seconds; see
+/// src/flow/rtc_zone.zig) to a config text in `buffer`.
+pub fn appendClock(buffer: []u8, config: []const u8, shift: i32) ![]const u8 {
+    if (config.ptr != buffer.ptr) return error.InvalidArgument;
+    const tail = try std.fmt.bufPrint(buffer[config.len..], "rtc_shift={d}\r\n", .{shift});
+    return buffer[0 .. config.len + tail.len];
+}
+
+test "appendClock adds one rtc_shift line" {
+    var buffer: [64]u8 = undefined;
+    @memcpy(buffer[0..5], "a=1\r\n");
+    const out = try appendClock(&buffer, buffer[0..5], -3600);
+    try std.testing.expectEqualStrings("a=1\r\nrtc_shift=-3600\r\n", out);
+}
+
 /// The bus of a whole-disk device path (the last messaging node), as the
 /// MiniOS log names it.
 pub fn busName(body: []const u8) []const u8 {

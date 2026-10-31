@@ -493,7 +493,7 @@ fn start(
                 minios.showFailure(root, err);
                 return;
             };
-            minios.runCsmwrap(root, system_heading) catch |err| {
+            minios.runCsmwrap(root, system_heading, minios.profileZone(profile)) catch |err| {
                 // A rendered answer may hold a key or a password (MiniOS
                 // deletes it when it takes it): never left behind.
                 answer_profiles.clearRendered(root);

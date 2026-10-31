@@ -189,3 +189,29 @@ BIOS boot files are copied at run time from the applied Windows image.
   (`UnsupportedVolumeState`): its `$Volume` flags were 0x0080, which
   Windows 10 leaves on a volume removed without a dismount (`fsutil dirty`:
   not dirty). The read-only NTFS reader now accepts 0x0080.
+
+## 2026-10-31: RTC local time -> UTC file times (rtc_shift)
+
+X470 B261031-200222: files MiniOS wrote were one hour ahead. The RTC holds
+local time (Windows' convention); `usosprep` took `GetTime()` as UTC for every
+NTFS timestamp (`src/prep/uefi_main.zig` `Output.checkedClock`).
+
+- The USOS menu now computes local minus UTC for "now" from the flow's time
+  zone (`src/flow/rtc_zone.zig`): the profile's `timezone`, else the media
+  language's default zone (`tables.timeZoneForLanguage`), standard offset from
+  the zone label, DST by rule (EU: last Sunday of March / October 01:00 UTC;
+  US / Canada: second Sunday of March 02:00 local to first Sunday of November
+  02:00 daylight; other zones: standard offset only). Without a zone (a user
+  answer file and no profile): `EFI_TIME.TimeZone` when not 2047 (UEFI 2.7+
+  Localtime = UTC + TimeZone, +1 h with EFI_TIME_IN_DAYLIGHT); else 0 (as
+  before). The menu logs one `clock:` line in `minios-start.txt`.
+- It hands it to MiniOS as `rtc_shift=<seconds>` (`minios_plan.appendClock`,
+  both routes); `usosprep` subtracts it (`HW ... rtc_shift=` in the MiniOS
+  log).
+- Tests: zig tests in `src/flow/rtc_zone.zig` (labels, Warsaw winter /
+  summer and both change days, US change days, Tokyo, Moscow no DST, EFI
+  fallback, civil-day math) and `minios_plan.appendClock`.
+- Alpine: by code reading it has the same offset. The micro-Linux sets no
+  time zone and runs no `hwclock --localtime`; the kernel reads the RTC as UTC,
+  so ntfs-3g stamps local time as UTC there too. Not changed (Alpine is the
+  fallback being replaced).

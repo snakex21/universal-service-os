@@ -156,6 +156,9 @@ pub const Hardware = struct {
     /// mode=mbr: BIOS-boot Windows (32-bit Windows 10) started through a
     /// CSMWrap ESP at the end of the disk (csmwrap=on, required with mbr).
     csmwrap: bool = false,
+    /// rtc_shift=: the RTC's local time minus UTC in seconds, from the USOS
+    /// menu's time zone (src/flow/rtc_zone.zig); 0 = the RTC is taken as UTC.
+    rtc_shift: i32 = 0,
 
     pub fn buildId(self: *const Hardware) []const u8 {
         return self.build[0..self.build_len];

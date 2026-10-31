@@ -132,6 +132,10 @@ fn config(text: []const u8) !Config {
             if (seen_csmwrap) return error.InvalidArgument;
             seen_csmwrap = true;
             hw_cfg.csmwrap = try switchValue(line[8..]);
+        } else if (hardware and std.mem.startsWith(u8, line, "rtc_shift=")) {
+            const v = std.fmt.parseInt(i32, line[10..], 10) catch return error.InvalidArgument;
+            if (v < -26 * 3600 or v > 26 * 3600) return error.InvalidArgument;
+            hw_cfg.rtc_shift = v;
         } else if (hardware and std.mem.startsWith(u8, line, "disk_path=")) {
             if (hw_cfg.disk_path_len != 0) return error.InvalidArgument;
             hw_cfg.disk_path_len = try hw.parseDiskPath(&hw_cfg.disk_path, line[10..]);
@@ -276,6 +280,8 @@ const Output = struct {
         }
     }
     fn clock(_: *anyopaque) u64 { return checkedClock() orelse 0; }
+    /// Local minus UTC of the RTC (rtc_shift=, src/flow/rtc_zone.zig).
+    var rtc_shift: i64 = 0;
     fn checkedClock() ?u64 {
         const t = (uefi.system_table.runtime_services.getTime() catch return null)[0];
         if (t.year < 1970 or t.month < 1 or t.month > 12 or t.day < 1 or t.day > 31 or t.hour > 23 or t.minute > 59 or t.second > 60) return null;
@@ -286,7 +292,9 @@ const Output = struct {
         var month: usize = 1;
         while (month < t.month and month <= 12) : (month += 1) days += month_days[month - 1] + @as(u64, if (month == 2 and leap(t.year)) 1 else 0);
         days += @as(u64, t.day) -| 1;
-        return days * 86400 + @as(u64, t.hour) * 3600 + @as(u64, t.minute) * 60 + t.second;
+        const local: i64 = @intCast(days * 86400 + @as(u64, t.hour) * 3600 + @as(u64, t.minute) * 60 + t.second);
+        const utc = local - rtc_shift;
+        return if (utc < 0) null else @intCast(utc);
     }
     fn leap(year: u32) bool {
         return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0);
@@ -1651,7 +1659,8 @@ fn run(output: *Output) anyerror!void {
         hw_run.build = cfg.hw.build;
         hw_run.build_len = cfg.hw.build_len;
         output.quiet = cfg.hw.quiet;
-        log.say("HW build={s} locale={s} unattend={any} boot_entry={any} qemu_detected={any}\n", .{ cfg.hw.buildId(), cfg.hw.localeText(), cfg.hw.unattend, cfg.hw.boot_entry, output.qemu });
+        Output.rtc_shift = cfg.hw.rtc_shift;
+        log.say("HW build={s} locale={s} unattend={any} boot_entry={any} qemu_detected={any} rtc_shift={d}\n", .{ cfg.hw.buildId(), cfg.hw.localeText(), cfg.hw.unattend, cfg.hw.boot_entry, output.qemu, cfg.hw.rtc_shift });
     }
     try connectStorage(log);
     // 32-bit Windows 10 without CSM: the port of the Alpine step 610 (no

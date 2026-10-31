@@ -125,6 +125,35 @@ fn dataSource(root: *uefi.protocol.File) !plan.Source {
 
 const Started = enum { success, cancelled };
 
+/// The flow's time zone for the RTC conversion (src/flow/rtc_zone.zig): the
+/// profile's zone, else the media language's default zone.
+pub fn profileZone(profile: ?*const answer.Profile) ?*const answer.tables.TimeZone {
+    const p = profile orelse return null;
+    return p.timeZone() orelse answer.tables.timeZone(answer.tables.timeZoneForLanguage(plan.localeTag(p)));
+}
+
+/// rtc_shift for MiniOS: local minus UTC now. The RTC holds local time (the
+/// X470 does; Windows' convention); MiniOS stamps NTFS times in UTC.
+fn rtcShift(root: *uefi.protocol.File, zone: ?*const answer.tables.TimeZone) i32 {
+    const got = uefi.system_table.runtime_services.getTime() catch {
+        record(root, "clock: GetTime failed; RTC taken as UTC (rtc_shift=0)", .{});
+        return 0;
+    };
+    const t = got[0];
+    if (zone) |z| {
+        if (usos.flow.rtc_zone.shiftSeconds(z, .{ .year = t.year, .month = t.month, .day = t.day, .hour = t.hour, .minute = t.minute, .second = t.second })) |s| {
+            record(root, "clock: RTC local time in {s} ({s}), rtc_shift={d}", .{ z.id, z.windows, s });
+            return s;
+        }
+    }
+    if (usos.flow.rtc_zone.efiShiftSeconds(t.timezone, @bitCast(t.daylight))) |s| {
+        record(root, "clock: no flow time zone; EFI_TIME.TimeZone={d}, rtc_shift={d}", .{ t.timezone, s });
+        return s;
+    }
+    record(root, "clock: no flow time zone and EFI_TIME.TimeZone unspecified; RTC taken as UTC (rtc_shift=0)", .{});
+    return 0;
+}
+
 /// Loads and starts MiniOS with the config already on the ESP.
 fn start(root: *uefi.protocol.File, route: Route) !Started {
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
@@ -187,7 +216,8 @@ pub fn run(root: *uefi.protocol.File, system: *const usos.catalog.SystemEntry, s
     };
     var text: [2560]u8 = undefined;
     const base_cfg = try plan.formatConfig(&text, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
-    const cfg = try plan.appendDisk(&text, base_cfg, &disk);
+    const disk_cfg = try plan.appendDisk(&text, base_cfg, &disk);
+    const cfg = try plan.appendClock(&text, disk_cfg, rtcShift(root, profileZone(profile)));
     try settings_store.replaceFile(root, config_path, cfg);
     if (xml) |bytes| try settings_store.replaceFile(root, answer_path, bytes) else deleteFile(root, answer_path);
     // A rendered answer may hold a key or password: never left behind.
@@ -217,7 +247,7 @@ fn logonLine(root: *uefi.protocol.File, buffer: []u8) []const u8 {
 /// ran the Alpine route's menu half). The one disk question, MiniOS, then
 /// the Alpine route's restart notice and the restart. Returns only on
 /// failure (error page by the caller) or error.MiniosDiskCancelled.
-pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
+pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8, zone: ?*const answer.tables.TimeZone) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
     edition_len = if (std.fmt.bufPrint(&edition_text, "Windows Setup", .{})) |t| t.len else |_| 0;
     // Stage 2 "Loading the preparation environment", as the Alpine route's
@@ -244,7 +274,8 @@ pub fn runCsmwrap(root: *uefi.protocol.File, system_name: []const u8) !void {
     };
     var text: [2048]u8 = undefined;
     const base_cfg = try plan.formatCsmwrapConfig(&text, token, source, usos.build_info.id);
-    const cfg = try plan.appendDisk(&text, base_cfg, &disk);
+    const disk_cfg = try plan.appendDisk(&text, base_cfg, &disk);
+    const cfg = try plan.appendClock(&text, disk_cfg, rtcShift(root, zone));
     try settings_store.replaceFile(root, config_path, cfg);
     deleteFile(root, answer_path);
     serial.writeAscii("[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1 mode=mbr profile=csmwrap-setup)\r\n");
