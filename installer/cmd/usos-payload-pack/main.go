@@ -39,6 +39,10 @@ var payloadFiles = []payloadFile{
 	{`zig-out/xp-geometry-fix-mbr/xp-geometry-fix-mbr-440.bin`, `EFI/USOS/minios/xp-geometry-fix-mbr-440.bin`},
 	{`zig-out/xp-bios/vista-nt60-ntfs.bin`, `EFI/USOS/minios/vista-nt60-ntfs.bin`},
 	{`zig-out/windows-usos-res/USOSRES.EXE`, `EFI/USOS/minios/USOSRES.EXE`},
+	// The USOS pre-boot logger (own GPL, tools/nt_bootlog, diagnostic) that
+	// MiniOS puts before CSMWrap on the target's CSMWrap ESP, as
+	// tools/xp_csmwrap_esp.sh USOS_NT_BOOTLOG=on does on the Alpine route.
+	{`tools/nt_bootlog/bin/ntbootlg.efi`, `EFI/USOS/minios/ntbootlg.efi`},
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},
 	{`zig-out/micro-linux/initramfs-usos`, `EFI/USOS/micro-linux/initramfs-usos`},

@@ -225,7 +225,33 @@ pub fn className(class: u32) []const u8 {
     if (class == 0x010802) return "NVMe";
     if (class == 0x0C0330) return "xHCI";
     if (class >> 16 == 0x02) return "NIC";
+    // Display controllers (VGA 0300, 3D 0302, other 0380): whether the GPU
+    // is visible at the handover and decodes memory (Win10 x86 CSMWrap
+    // first-boot reset study 2026-10-31: Windows' first boot after the WinPE
+    // restart never enumerated the GPU branch).
+    if (class >> 16 == 0x03) return "Display";
     return "";
+}
+
+/// PCIe link registers of a function's PCI Express capability (ID 10h):
+/// Link Capabilities (cap + 0Ch) and Link Status (cap + 12h).
+pub const Link = struct { cap: u32, status: u16 };
+
+/// A PCI-to-PCI bridge on bus 0 (the CPU's GPP ports, the chipset uplink):
+/// its bus numbers, bridge control (VGA enable) and PCIe link state, so a
+/// GPU port that the firmware hid or whose link is down shows in the record.
+pub fn formatBridge(out: *Out, dev: u32, func: u32, id: u32, buses: u32, command: u16, status: u16, bctl: u16, link: ?Link) void {
+    out.print("bridge 00:{x:0>2}.{d} {x:0>4}:{x:0>4} bus {x:0>2}>{x:0>2}-{x:0>2}", .{ dev, func, id & 0xFFFF, id >> 16, buses & 0xFF, (buses >> 8) & 0xFF, (buses >> 16) & 0xFF });
+    formatCommand(out, command, status);
+    out.print(" bctl={x:0>4}(VGA{d})", .{ bctl, (bctl >> 3) & 1 });
+    if (link) |l| {
+        out.print(" link G{d}x{d} max G{d}x{d} DLLLA{d} LT{d}", .{ l.status & 0xF, (l.status >> 4) & 0x3F, l.cap & 0xF, (l.cap >> 4) & 0x3F, (l.status >> 13) & 1, (l.status >> 11) & 1 });
+    } else out.put(" link ?(no PCIe capability)");
+    out.put("\r\n");
+}
+
+pub fn formatSummary(out: *Out, functions: u32, bridges: u32, displays: u32) void {
+    out.print("pci functions {d}, bus-0 bridges {d}, display controllers {d}\r\n", .{ functions, bridges, displays });
 }
 
 pub fn formatCommand(out: *Out, command: u16, status: u16) void {
@@ -397,6 +423,18 @@ test "device formatting" {
     try std.testing.expect(std.mem.indexOf(u8, out.slice(), "RCTL.EN=1") != null);
     try std.testing.expectEqualStrings("NVMe", className(0x010802));
     try std.testing.expectEqualStrings("NIC", className(0x020000));
+    try std.testing.expectEqualStrings("Display", className(0x030000));
+    try std.testing.expectEqualStrings("", className(0x040300));
+    out = Out{ .buf = &storage };
+    // X470 GPP bridge 00:03.1 -> bus 0a, VGA enable, Gen3 x16 link up.
+    formatBridge(&out, 3, 1, 0x14831022, 0x000a0a00, 0x0407, 0x0010, 0x0018, .{ .cap = 0x0070_a103, .status = 0x3103 });
+    try std.testing.expectEqualStrings("bridge 00:03.1 1022:1483 bus 00>0a-0a cmd=0407(IO1 MEM1 BME1) sts=0010 bctl=0018(VGA1) link G3x16 max G3x16 DLLLA1 LT0\r\n", out.slice());
+    out = Out{ .buf = &storage };
+    formatBridge(&out, 1, 3, 0x14831022, 0x00020100, 0, 0, 0, null);
+    try std.testing.expect(std.mem.indexOf(u8, out.slice(), "link ?(no PCIe capability)") != null);
+    out = Out{ .buf = &storage };
+    formatSummary(&out, 41, 5, 1);
+    try std.testing.expectEqualStrings("pci functions 41, bus-0 bridges 5, display controllers 1\r\n", out.slice());
     try std.testing.expectEqualStrings("conventional", memoryTypeName(7));
     var small: [4]u8 = undefined;
     out = Out{ .buf = &small };

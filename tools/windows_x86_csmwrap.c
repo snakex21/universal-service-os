@@ -631,15 +631,22 @@ static DWORD fast_startup(void) {
             if (!name) continue;
             file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
             lstrcatW(file, name); lstrcatW(file, L"\\Unattended\\fast-startup-on.txt");
-            if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES) {
+            if (GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES && usos_fs_hiberboot) {
                 say("[X86_CSMWRAP] faststartup: fast-startup-on.txt on DATA; Windows keeps its own setting\r\n");
-                return 0;
+                usos_fs_hiberboot = FALSE;
             }
         }
     }
     r = usos_fast_startup(target_root);
     logn(r == USOS_FS_WRITTEN ? "faststartup: HiberbootEnabled=0 written in the installed SYSTEM hive, code=" :
-         r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" : "faststartup: FAILED, hive code=", r);
+         r == USOS_FS_PRESENT ? "faststartup: HiberbootEnabled was already 0, code=" :
+         r == USOS_FS_SKIPPED ? "faststartup: HiberbootEnabled not changed (fast-startup-on.txt), code=" : "faststartup: FAILED, hive code=", r);
+    /* DIAGNOSTIC (windows_fast_startup.h): AutoReboot=0 in the same load. */
+    if (r != USOS_FS_ERR_LOAD && r != USOS_FS_ERR_UNLOAD) {
+        logn(usos_fs_autoreboot == USOS_FS_WRITTEN ? "faststartup: DIAGNOSTIC CrashControl AutoReboot=0 written (a bugcheck stays on screen), code=" :
+             usos_fs_autoreboot == USOS_FS_PRESENT ? "faststartup: DIAGNOSTIC CrashControl AutoReboot was already 0, code=" : "faststartup: DIAGNOSTIC CrashControl AutoReboot NOT written, code=", usos_fs_autoreboot);
+        logn("faststartup: CrashControl CrashDumpEnabled as found, unchanged (4294967295 = missing)=", usos_fs_crashdump);
+    }
     /* Not fatal: the hive unload writes the value as well (logged for the
      * X470 report; see windows_fast_startup.h). */
     if (r == USOS_FS_WRITTEN && usos_fs_flush_error != ERROR_SUCCESS) logn("faststartup: RegFlushKey failed (unload still commits), Win32 code=", (DWORD)usos_fs_flush_error);
@@ -704,7 +711,7 @@ void entry(void) {
     if (lstrcmpiW(args[1], L"faststartup-test") == 0 && arg_count == 3) {
         HKEY k;
         DWORD r;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE, &k) != ERROR_SUCCESS) ExitProcess(99);
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE | KEY_CREATE_SUB_KEY, &k) != ERROR_SUCCESS) ExitProcess(99);
         r = usos_fast_startup_in_system(k);
         RegCloseKey(k);
         ExitProcess(r > 99 ? 99 : r);

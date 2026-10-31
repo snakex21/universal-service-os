@@ -346,7 +346,16 @@ umount "$work/staging"
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 
 # 5. The CSMWrap ESP at the end (the XP script, unchanged: slot 2, 64 MiB).
-TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be created'
+# 32-bit 8 / 8.1 / 10 (X86_SELF=1), DIAGNOSTIC since 2026-10-31: the USOS
+# pre-boot logger (tools/nt_bootlog) runs before CSMWrap on every boot and
+# writes \USOS\BOOTLOG.TXT on this ESP (AMD FCH reset cause of the previous
+# boot, the bus-0 bridges / GPU, NVMe / xHCI / NIC state), as on the native
+# NT 3.x / 4.0 routes; the X470 first-boot reset of Windows 10 x86 after the
+# WinPE restart (docs/nvme-nt6-2026-10-12.md section 21). MiniOS
+# writes the same layout (src/prep/uefi_main.zig writeCsmwrapEsp).
+nt_bootlog=off
+[ "$X86_SELF" != 1 ] || nt_bootlog=on
+TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_NT_BOOTLOG=$nt_bootlog sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be created'
 
 # 6. Read back the final table: Windows slot 1 (inactive), the active NTFS
 # staging slot 2, the CSMWrap ESP slot 3.

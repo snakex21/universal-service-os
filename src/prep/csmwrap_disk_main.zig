@@ -243,9 +243,15 @@ fn writeEsp(io: std.Io, gpa: std.mem.Allocator, d: platform.Disk, esp_start: u64
     var zero: [65536]u8 = undefined;
     try writer.zeroSectors(d, esp_start, 2048, &zero);
     var volume = try fat32.format(d, .{ .start_bytes = esp_start * 512, .size_bytes = hw.csmwrap_esp_sectors * 512 }, .{ .serial = 0x1234abcd, .label = "CSMWRAP    ".* });
-    for ([_][]const u8{ "EFI", "EFI/BOOT", "CSMWRAP", "CSMWRAP/patches", "CSMWRAP/licenses" }) |sub| _ = try volume.mkdir(sub);
+    for ([_][]const u8{ "EFI", "EFI/BOOT", "CSMWRAP", "CSMWRAP/patches", "CSMWRAP/licenses", "USOS" }) |sub| _ = try volume.mkdir(sub);
     var path: [1024]u8 = undefined;
-    try copyHost(io, gpa, &volume, try std.fmt.bufPrint(&path, "{s}/csmwrapx64.efi", .{dir}), "EFI/BOOT/BOOTX64.EFI");
+    // The same diagnostic layout as uefi_main.writeCsmwrapEsp: the pre-boot
+    // logger (EFI/USOS/minios/ntbootlg.efi of the built stick) as
+    // BOOTX64.EFI, CSMWrap as CSMWRAPX.EFI, an empty USOS/BOOTLOG.TXT.
+    try copyHost(io, gpa, &volume, try std.fmt.bufPrint(&path, "{s}/csmwrapx64.efi", .{dir}), "EFI/BOOT/CSMWRAPX.EFI");
+    try copyHost(io, gpa, &volume, try std.fmt.bufPrint(&path, "{s}/../minios/ntbootlg.efi", .{dir}), "EFI/BOOT/BOOTX64.EFI");
+    var ring = try volume.createFile("USOS/BOOTLOG.TXT", 0);
+    try ring.finish();
     const ini = csm.csmwrapIni(false);
     var out = try volume.createFile("EFI/BOOT/csmwrap.ini", ini.len);
     try out.write(ini);
@@ -255,5 +261,5 @@ fn writeEsp(io: std.Io, gpa: std.mem.Allocator, d: platform.Disk, esp_start: u64
         try copyHost(io, gpa, &volume, try std.fmt.bufPrint(&path, "{s}/{s}", .{ dir, name }), try std.fmt.bufPrint(&dst, "CSMWRAP/{s}", .{name}));
     }
     try volume.flush();
-    std.debug.print("CSMWRAP_ESP PASS start={d} (host: BOOTX64.EFI, csmwrap.ini, licences; source and patches not copied)\n", .{esp_start});
+    std.debug.print("CSMWRAP_ESP PASS start={d} (host: BOOTX64.EFI = pre-boot logger, CSMWRAPX.EFI, csmwrap.ini, USOS/BOOTLOG.TXT, licences; source and patches not copied)\n", .{esp_start});
 }

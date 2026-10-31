@@ -234,6 +234,10 @@ pub const csmwrap_tail_sectors: u64 = 133120;
 pub const mbr_max_sectors: u64 = 0xffffffff;
 /// Pinned like tools/xp_csmwrap_esp.sh (CSMWrap 3.1.2-usos18).
 pub const csmwrap_sha256 = "0188057913ee7b4680027e45c53c45048deb8583c599c3c0672d98748704e0a4";
+/// The USOS pre-boot logger (tools/nt_bootlog, nt-bootlog 2), pinned like
+/// PINNED_BOOTLOG in tools/xp_csmwrap_esp.sh; on the stick as
+/// \EFI\USOS\minios\ntbootlg.efi (usos-payload-pack).
+pub const bootlog_sha256 = "c792d6c21c82c2b2d785915bcb047040525cf0bbc24600bdcc89e1895eb1c029";
 
 pub fn csmwrapEspStart(total_sectors: u64) !u64 {
     if (total_sectors < 32 * 1024 * 1024 or total_sectors > mbr_max_sectors) return error.Unsupported;

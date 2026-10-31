@@ -1088,13 +1088,27 @@ fn copyFolderToFat(volume: *fat32.Volume, root: *uefi.protocol.File, from: []con
 /// 512-byte clusters here, FAT16 on the Alpine route) holding CSMWrap as
 /// \EFI\BOOT\BOOTX64.EFI, csmwrap.ini, licences, source and patches.
 /// Written before its MBR entry is published.
+/// DIAGNOSTIC since 2026-10-31 (as vista_csmwrap_target.sh X86_SELF=1 with
+/// USOS_NT_BOOTLOG=on): the USOS pre-boot logger (\EFI\USOS\minios\
+/// ntbootlg.efi on the stick, pinned hw.bootlog_sha256) is BOOTX64.EFI,
+/// CSMWrap is \EFI\BOOT\CSMWRAPX.EFI next to csmwrap.ini (the logger
+/// chainloads it) and \USOS\BOOTLOG.TXT starts empty; the logger records the
+/// previous reset's cause and the PCI state on every boot (Win10 x86 X470
+/// first-boot reset, docs/nvme-nt6-2026-10-12.md section 21).
+const bootlog_stick = "\\EFI\\USOS\\minios\\ntbootlg.efi";
 fn writeCsmwrapEsp(root: *uefi.protocol.File, disk: platform.Disk, esp_start: u64, serial: u32, allocator: std.mem.Allocator, log: app.Logger) !void {
     const part: partitions.Partition = .{ .start_bytes = esp_start * 512, .size_bytes = hw.csmwrap_esp_sectors * 512 };
     var volume = try fat32.format(disk, part, .{ .serial = serial, .label = "CSMWRAP    ".* });
-    for ([_][]const u8{ "EFI", "EFI/BOOT", "CSMWRAP", "CSMWRAP/patches", "CSMWRAP/licenses" }) |dir| _ = try volume.mkdir(dir);
+    for ([_][]const u8{ "EFI", "EFI/BOOT", "CSMWRAP", "CSMWRAP/patches", "CSMWRAP/licenses", "USOS" }) |dir| _ = try volume.mkdir(dir);
     const buffer = try allocator.alloc(u8, 65536);
     defer allocator.free(buffer);
-    const efi_bytes = try copyToFat(&volume, root, csmwrap_dir ++ "\\csmwrapx64.efi", "EFI/BOOT/BOOTX64.EFI", buffer, hw.csmwrap_sha256);
+    const efi_bytes = try copyToFat(&volume, root, csmwrap_dir ++ "\\csmwrapx64.efi", "EFI/BOOT/CSMWRAPX.EFI", buffer, hw.csmwrap_sha256);
+    const logger_bytes = copyToFat(&volume, root, bootlog_stick, "EFI/BOOT/BOOTX64.EFI", buffer, hw.bootlog_sha256) catch |err| {
+        log.say("CSMWRAP_ESP the pre-boot logger {s} is missing or not the pinned nt-bootlog 2 ({s})\n", .{ bootlog_stick, @errorName(err) });
+        return error.CsmwrapIncomplete;
+    };
+    var ring = try volume.createFile("USOS/BOOTLOG.TXT", 0);
+    try ring.finish();
     // Quiet unless the stick has EFI\USOS\csmwrap-verbose.flag (as Alpine).
     const verbose = if (openStick(root, "\\EFI\\USOS\\csmwrap-verbose.flag")) |flag| blk: {
         flag.close() catch {};
@@ -1114,7 +1128,7 @@ fn writeCsmwrapEsp(root: *uefi.protocol.File, disk: platform.Disk, esp_start: u6
     const licences = try copyFolderToFat(&volume, root, csmwrap_dir ++ "\\licenses", "CSMWRAP/licenses", ".txt", buffer);
     if (patches == 0 or licences == 0) return error.CsmwrapIncomplete;
     try volume.flush();
-    log.say("CSMWRAP_ESP PASS start={d} sectors={d} BOOTX64.EFI bytes={d} verbose={any} licence_bytes={d} patches={d} licences={d}\n", .{ esp_start, hw.csmwrap_esp_sectors, efi_bytes, verbose, extra, patches, licences });
+    log.say("CSMWRAP_ESP PASS start={d} sectors={d} CSMWRAPX.EFI bytes={d} BOOTX64.EFI=pre-boot logger bytes={d} USOS/BOOTLOG.TXT empty verbose={any} licence_bytes={d} patches={d} licences={d}\n", .{ esp_start, hw.csmwrap_esp_sectors, efi_bytes, logger_bytes, verbose, extra, patches, licences });
 }
 
 /// Hardware install: the QEMU install pipeline over the user's disk, made

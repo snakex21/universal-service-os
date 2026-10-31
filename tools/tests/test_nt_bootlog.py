@@ -89,10 +89,38 @@ class NtBootlog(unittest.TestCase):
         # nt3-native.flag covers 3.51 / 3.5 and (since 975f731f) NT 3.1.
         self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S) nt_native_flag=nt3-native.flag ;;', prepare)
         for path in (ROOT / 'tools').glob('*.sh'):
-            if path.name not in ('w9x_csmwrap_prepare.sh', 'xp_csmwrap_esp.sh'):
+            if path.name not in ('w9x_csmwrap_prepare.sh', 'xp_csmwrap_esp.sh', 'vista_csmwrap_target.sh'):
                 self.assertNotIn('USOS_NT_BOOTLOG', path.read_text(encoding='utf-8', errors='replace'), path.name)
         micro = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
         self.assertIn('("tools/nt_bootlog/bin/ntbootlg.efi", "usr/lib/usos/nt3/NTBOOTLG.EFI"),', micro)
+
+    def test_x86_csmwrap_route_requests_the_logger_on_both_prep_envs(self):
+        # Diagnostic 2026-10-31 (Win10 x86 X470 first-boot reset): 32-bit
+        # 8 / 8.1 / 10 (X86_SELF=1) only; Vista / 7 / 2008 keep plain CSMWrap.
+        target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertEqual(target.count('USOS_NT_BOOTLOG='), 1)
+        self.assertIn('nt_bootlog=off\n[ "$X86_SELF" != 1 ] || nt_bootlog=on\n', target)
+        self.assertIn('USOS_NT_BOOTLOG=$nt_bootlog sh "$LIB/xp_csmwrap_esp.sh"', target)
+        # MiniOS: the same layout from the stick copy, pinned to the same hash.
+        esp = (ROOT / 'tools/xp_csmwrap_esp.sh').read_text(encoding='utf-8')
+        pin = re.search(r'^PINNED_BOOTLOG=([0-9a-f]{64})$', esp, re.M).group(1)
+        hw = (ROOT / 'src/prep/hw_target.zig').read_text(encoding='utf-8')
+        self.assertIn('pub const bootlog_sha256 = "%s";' % pin, hw)
+        uefi = (ROOT / 'src/prep/uefi_main.zig').read_text(encoding='utf-8')
+        body = uefi[uefi.index('fn writeCsmwrapEsp('):]
+        body = body[:body.index('\n}\n')]
+        self.assertIn('"EFI/BOOT/CSMWRAPX.EFI", buffer, hw.csmwrap_sha256)', body)
+        self.assertIn('copyToFat(&volume, root, bootlog_stick, "EFI/BOOT/BOOTX64.EFI", buffer, hw.bootlog_sha256)', body)
+        self.assertIn('volume.createFile("USOS/BOOTLOG.TXT", 0)', body)
+        self.assertIn('const bootlog_stick = "\\\\EFI\\\\USOS\\\\minios\\\\ntbootlg.efi";', uefi)
+        pack = (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text(encoding='utf-8')
+        self.assertIn('{`tools/nt_bootlog/bin/ntbootlg.efi`, `EFI/USOS/minios/ntbootlg.efi`},', pack)
+
+    def test_logger_v2_records_bridges_and_display(self):
+        main = (ROOT / 'tools/nt_bootlog/main.zig').read_text(encoding='utf-8')
+        self.assertIn('pub const version = "nt-bootlog 2";', main)
+        self.assertIn('if (header & 0x7F == 1 and bus == 0) {', main)
+        self.assertIn('d.formatSummary(out, functions, bridges, displays);', main)
 
 
 if __name__ == '__main__':
