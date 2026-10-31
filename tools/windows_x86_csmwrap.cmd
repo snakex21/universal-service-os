@@ -58,7 +58,11 @@ rem   3g. every version, every answer: usos-x86-csmwrap display, the Default
 rem      user's Run value for \USOS\NT6\USOSRES.EXE when the micro-Linux
 rem      staged it (tools/windows_display_register.h); never fatal;
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
-rem      staging entry removed, "remove the stick" notice, restart.
+rem      staging entry removed, "remove the stick" notice, restart; Windows
+rem      8 / 8.1 / 10 (NT 6.2+): "after poweroff", a Polish notice (15 s) that
+rem      the computer powers off and is started with the power button, then
+rem      wpeutil shutdown instead of the warm restart (section 21 of
+rem      docs/nvme-nt6-2026-10-12.md).
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
 if not exist "%USOS_SETUP%" exit /b 1
 set "USOS_ANSWER=-"
@@ -126,12 +130,33 @@ echo [USOS] phase=hide-csmwrap-esp
 if errorlevel 1 echo [USOS] hideesp: not done; the CSMWrap ESP may show a drive letter (boot unaffected).
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" stick
-"%~dp0usos-x86-csmwrap.exe" after
+rem Windows 8 / 8.1 / 10 x86 (NT 6.2, 6.3, 10.0): power-off instead of the
+rem warm restart. X470 2026-10-31 (B261031-195000): after "wpeutil reboot"
+rem the installed Windows 10 x86 reset itself ~30 s into its first boot and
+rem the GPU PCIe port 00:03.1 was missing; the interim image route ended with
+rem a power-off and a cold boot and reached the desktop
+rem (docs/nvme-nt6-2026-10-12.md section 21). Vista / 7 / 2008 x86 and an
+rem unreadable version keep the restart.
+set "USOS_POWEROFF="
+set "USOS_FINAL_NT="
+"%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt" >nul
+if not errorlevel 1 for /f "usebackq tokens=2" %%A in ("%TEMP%\usos-target.txt") do set "USOS_FINAL_NT=%%A"
+if "%USOS_FINAL_NT%"=="6.2" set "USOS_POWEROFF=1"
+if "%USOS_FINAL_NT%"=="6.3" set "USOS_POWEROFF=1"
+if "%USOS_FINAL_NT%"=="10.0" set "USOS_POWEROFF=1"
+if defined USOS_POWEROFF (echo [USOS] final step: NT %USOS_FINAL_NT%, power-off notice, then wpeutil shutdown.) else (echo [USOS] final step: NT %USOS_FINAL_NT%, restart notice, then wpeutil reboot.)
+if defined USOS_POWEROFF ("%~dp0usos-x86-csmwrap.exe" after poweroff) else ("%~dp0usos-x86-csmwrap.exe" after)
 set "USOS_FINALIZE_RESULT=%errorlevel%"
+rem The phase line goes before the last log copy, so the stick log shows it.
+if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF echo [USOS] phase=poweroff-after-success
+if "%USOS_FINALIZE_RESULT%"=="0" if not defined USOS_POWEROFF echo [USOS] phase=reboot-after-success
 "%~dp0usos-log-x86.exe"
 if not "%USOS_FINALIZE_RESULT%"=="0" exit /b %USOS_FINALIZE_RESULT%
-echo [USOS] phase=reboot-after-success
+if defined USOS_POWEROFF goto poweroff_after_success
 wpeutil reboot
+exit /b 0
+:poweroff_after_success
+wpeutil shutdown
 exit /b 0
 
 rem ---- the prepared disk was not found ("before" exit 4) -------------------

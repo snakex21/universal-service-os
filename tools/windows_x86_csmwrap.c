@@ -56,6 +56,10 @@
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
  *                            remove the stick (closes itself after 2 minutes).
+ *   after poweroff           the same checks; the notice (Polish) says the
+ *                            computer powers off and is to be started with the
+ *                            power button (closes itself after 15 seconds); the
+ *                            .cmd then runs wpeutil shutdown (8 / 8.1 / 10).
  * Disk and partition identities come from IOCTLs and the MBR, never letters.
  */
 #define WIN32_LEAN_AND_MEAN
@@ -653,6 +657,26 @@ static DWORD fast_startup(void) {
     return r >= USOS_FS_ERR_LOAD ? 11 : 0;
 }
 
+/* "after poweroff" (Windows 8 / 8.1 / 10 x86; the .cmd reads the installed
+ * version with "target"): the WinPE powers the computer off (wpeutil
+ * shutdown) instead of a warm restart. X470 2026-10-31 (B261031-195000):
+ * after "wpeutil reboot" the installed Windows 10 x86 reset itself ~30 s
+ * into its first boot, with the GPU PCIe port 00:03.1 missing; the interim
+ * image route ended with a power-off and a cold boot and reached the desktop
+ * (docs/nvme-nt6-2026-10-12.md section 21). Polish text (user request for
+ * this diagnostic round), ASCII source with \u escapes; closes itself after
+ * 15 seconds. */
+#define USOS_POWEROFF_NOTICE_MS 15000
+static DWORD WINAPI notice_poweroff(LPVOID unused) {
+    (void)unused;
+    MessageBoxW(0, L"Pierwsza część instalacji Windows została zakończona.\n\n"
+                   L"Komputer zostanie teraz wyłączony. Wyjmij pendrive USOS, a następnie włącz komputer przyciskiem zasilania, aby kontynuować instalację Windows z dysku (przez CSMWrap). "
+                   L"Jeśli pendrive zostanie podłączony, wybierz wpis UEFI tego dysku w menu rozruchowym firmware.\n\n"
+                   L"Komputer wyłączy się sam za 15 sekund.",
+                L"USOS - Windows bez CSM", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST | MB_SYSTEMMODAL);
+    return 0;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -779,8 +803,10 @@ void entry(void) {
         if (!bootmgr || !winload || we[0] != 0x80 || active != 1) { say("[X86_CSMWRAP] STOP: the installed Windows partition is not ready to boot; staging kept\r\n"); ExitProcess(8); }
         memset(se, 0, 16);
         if (!write_mbr(s, "staging partition entry removed")) ExitProcess(6);
-        HANDLE t = CreateThread(0, 0, notice, 0, 0, 0);
-        if (t) { WaitForSingleObject(t, 120000); CloseHandle(t); }
+        BOOL poweroff = arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0;
+        say(poweroff ? "[X86_CSMWRAP] after: power-off notice (15 s), then wpeutil shutdown\r\n" : "[X86_CSMWRAP] after: remove-the-stick notice (2 min), then wpeutil reboot\r\n");
+        HANDLE t = CreateThread(0, 0, poweroff ? notice_poweroff : notice, 0, 0, 0);
+        if (t) { WaitForSingleObject(t, poweroff ? USOS_POWEROFF_NOTICE_MS : 120000); CloseHandle(t); }
         ExitProcess(0);
     }
     ExitProcess(2);

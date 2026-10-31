@@ -223,8 +223,49 @@ def main() -> int:
         assert same(a, Path(tmp) / "missing.sys") == 1 and same(Path(tmp) / "missing.sys", a) == 1
         e = Path(tmp) / "e.sys"; e.write_bytes(b""); f = Path(tmp) / "f.sys"; f.write_bytes(b"")
         assert same(e, f) == 0 and same(e, a) == 1
-    print("PASS windows_x86_csmwrap answer edit (arch + product key) + usb3 step + mpart readback (no fc/findstr)")
+    poweroff_regressions(script)
+    print("PASS windows_x86_csmwrap answer edit (arch + product key) + usb3 step + mpart readback (no fc/findstr) + 8/10 power-off")
     return 0
+
+
+def poweroff_regressions(script: str) -> None:
+    """X470 2026-10-31 (B261031-195000, docs/nvme-nt6-2026-10-12.md section 21):
+    Windows 8 / 8.1 / 10 x86 end the WinPE with a power-off (cold boot next),
+    Vista / 7 / 2008 x86 and an unreadable version keep the warm restart."""
+    final = script[script.index("echo [USOS] phase=finalize-target-boot"):script.index("\n:disk_report\n")]
+    # Version from the helper's target record, read after "stick".
+    assert final.index('csmwrap.exe" stick') < final.index('csmwrap.exe" target "%TEMP%\\usos-target.txt" >nul')
+    assert 'if not errorlevel 1 for /f "usebackq tokens=2" %%A in ("%TEMP%\\usos-target.txt") do set "USOS_FINAL_NT=%%A"' in final
+    on = [line for line in final.splitlines() if line.endswith('set "USOS_POWEROFF=1"')]
+    assert on == ['if "%USOS_FINAL_NT%"=="6.2" set "USOS_POWEROFF=1"', 'if "%USOS_FINAL_NT%"=="6.3" set "USOS_POWEROFF=1"',
+                  'if "%USOS_FINAL_NT%"=="10.0" set "USOS_POWEROFF=1"'], on
+    assert final.index('set "USOS_POWEROFF="') < final.index('set "USOS_POWEROFF=1"')
+    assert 'if defined USOS_POWEROFF ("%~dp0usos-x86-csmwrap.exe" after poweroff) else ("%~dp0usos-x86-csmwrap.exe" after)' in final
+    code = [line for line in final.splitlines() if line and not line.startswith("rem ")]
+    assert code.count("wpeutil shutdown") == 1 and code.count("wpeutil reboot") == 1, code
+    # A failed "after" stops before either; the power-off path jumps past the reboot.
+    fail = code.index('if not "%USOS_FINALIZE_RESULT%"=="0" exit /b %USOS_FINALIZE_RESULT%')
+    assert fail < code.index("if defined USOS_POWEROFF goto poweroff_after_success") < code.index("wpeutil reboot")
+    assert code.index("wpeutil reboot") < code.index(":poweroff_after_success") < code.index("wpeutil shutdown")
+    # Phase lines before the last log copy (the stick log shows them).
+    log = code.index('"%~dp0usos-log-x86.exe"')
+    assert code.index('if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF echo [USOS] phase=poweroff-after-success') < log
+    assert code.index('if "%USOS_FINALIZE_RESULT%"=="0" if not defined USOS_POWEROFF echo [USOS] phase=reboot-after-success') < log < fail
+    # Only the end of the flow changed: the NVMe lowmem WinPE restart stays a reboot.
+    assert script.count("wpeutil shutdown") == 1 and script.count("wpeutil reboot") == 2
+    # The helper: "after poweroff" shows the Polish notice for 15 s; plain "after" is unchanged.
+    src = (ROOT / "tools" / "windows_x86_csmwrap.c").read_text(encoding="ascii")
+    notice = src[src.index("static DWORD WINAPI notice_poweroff"):src.index("static DWORD WINAPI notice(")]
+    text = notice.encode("ascii").decode("unicode_escape")
+    for want in ("Komputer zostanie teraz wyłączony", "przyciskiem zasilania", "kontynuować instalację",
+                 "Wyjmij pendrive USOS", "wyłączy się sam za 15 sekund", "USOS - Windows bez CSM"):
+        assert want in text, want
+    assert "#define USOS_POWEROFF_NOTICE_MS 15000" in src
+    after = src[src.index('lstrcmpiW(args[1], L"after") == 0'):]
+    assert 'BOOL poweroff = arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0;' in after
+    assert "CreateThread(0, 0, poweroff ? notice_poweroff : notice, 0, 0, 0)" in after
+    assert "WaitForSingleObject(t, poweroff ? USOS_POWEROFF_NOTICE_MS : 120000)" in after
+    assert after.index('write_mbr(s, "staging partition entry removed")') < after.index("CreateThread")
 
 
 if __name__ == "__main__":
