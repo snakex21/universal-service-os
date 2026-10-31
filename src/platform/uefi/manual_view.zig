@@ -1048,6 +1048,28 @@ pub fn vistaCsmwrapStatus(stage: usos.flow.preparation_boot_progress.VistaCsmwra
     });
 }
 
+/// MiniOS is writing the disk (it draws nothing itself, ui=quiet): the
+/// preparation page at "Preparing the disk" (CSMWrap route) or the direct
+/// ISO page, the heading naming the environment ("Windows 10 - MiniOS").
+pub fn miniosStatus(route: usos.flow.minios_plan.Route, detail: []const u8, system_name: []const u8) void {
+    var heading: [96]u8 = undefined;
+    const title = std.fmt.bufPrint(&heading, "{s} - MiniOS", .{system_name}) catch system_name;
+    if (route == .gpt_uefi) {
+        windowsIsoStatus(.loading, detail);
+        return;
+    }
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    progress(.{
+        .mode = .stage,
+        .current = 4,
+        .total = @intCast(Stage.labels.len),
+        .labels = &Stage.labels,
+        .heading = title,
+        .title = Stage.labels[3],
+        .detail = detail,
+    });
+}
+
 fn progress(state: gui.preparation_screen.State) void {
     active = .none;
     setFooter(&.{}, "");

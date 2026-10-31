@@ -129,6 +129,16 @@ fn config(text: []const u8) !Config {
             if (seen_csmwrap) return error.InvalidArgument;
             seen_csmwrap = true;
             hw_cfg.csmwrap = try switchValue(line[8..]);
+        } else if (hardware and std.mem.startsWith(u8, line, "disk_path=")) {
+            if (hw_cfg.disk_path_len != 0) return error.InvalidArgument;
+            hw_cfg.disk_path_len = try hw.parseDiskPath(&hw_cfg.disk_path, line[10..]);
+        } else if (hardware and std.mem.startsWith(u8, line, "disk_sectors=")) {
+            if (hw_cfg.disk_sectors != 0) return error.InvalidArgument;
+            hw_cfg.disk_sectors = std.fmt.parseInt(u64, line[13..], 10) catch return error.InvalidArgument;
+            if (hw_cfg.disk_sectors == 0) return error.InvalidArgument;
+        } else if (hardware and std.mem.eql(u8, line, "ui=quiet")) {
+            if (hw_cfg.quiet) return error.InvalidArgument;
+            hw_cfg.quiet = true;
         } else if (hardware and std.mem.startsWith(u8, line, "boot_entry=")) {
             if (seen_entry) return error.InvalidArgument;
             seen_entry = true;
@@ -139,6 +149,8 @@ fn config(text: []const u8) !Config {
         // The disk question supplies the size; diagnostics that stop QEMU
         // through its exit port have no meaning on a real machine.
         if (sectors != null or probe_items != null or !seen_build or (workload orelse .stage1a) != .install) return error.InvalidArgument;
+        // The menu's disk comes as both its device path and its size.
+        if ((hw_cfg.disk_path_len == 0) != (hw_cfg.disk_sectors == 0)) return error.InvalidArgument;
         // mode=mbr only as the CSMWrap route (32-bit Windows 10 in BIOS mode
         // through a CSMWrap ESP on the same disk); csmwrap=on never with GPT.
         if (kind != null and (kind.? == .mbr) != hw_cfg.csmwrap) return error.InvalidArgument;
@@ -170,6 +182,8 @@ fn switchValue(value: []const u8) !bool {
 
 const Output = struct {
     qemu: bool = false,
+    /// ui=quiet (hardware, from the menu): no text console output.
+    quiet: bool = false,
     file: ?*uefi.protocol.File = null,
     serial: ?*uefi.protocol.SerialIo = null,
     failed: bool = false,
@@ -224,7 +238,7 @@ const Output = struct {
               [port] "{dx}" (@as(u16, 0xe9)),
         );
         if (self.serial) |serial| _ = serial.write(text) catch 0;
-        if (uefi.system_table.con_out) |console| {
+        if (!self.quiet) if (uefi.system_table.con_out) |console| {
             var utf16: [2050:0]u16 = undefined;
             var n: usize = 0;
             for (text) |c| {
@@ -238,7 +252,7 @@ const Output = struct {
             }
             utf16[n] = 0;
             _ = console.outputString(@ptrCast(&utf16)) catch false;
-        }
+        };
         if (self.file) |file| {
             const n = file.write(text) catch {
                 self.failed = true;
@@ -772,6 +786,77 @@ fn pickTarget(token: [64]u8, boot_handle: uefi.Handle, mbr: bool, log: app.Logge
     chosen.io.flushBlocks() catch {};
     log.say("HW_DISK confirmed bus={s} sectors={d} previous_table={s}; marker written to sector 0 of this disk only\n", .{ chosen.bus, chosen.sectors, chosen.table });
     return chosen.sectors;
+}
+
+/// The disk the user chose and confirmed in the USOS menu (the flow's one
+/// disk question): the whole-disk handle with exactly this device path and
+/// size. Every check of pickTarget applies; a refusal writes nothing and
+/// fails the run (the menu logs it and starts its default path). No prompt.
+fn takeMenuTarget(token: [64]u8, boot_handle: uefi.Handle, mbr: bool, wanted: []const u8, wanted_sectors: u64, log: app.Logger) !u64 {
+    const bs = uefi.system_table.boot_services orelse return error.Io;
+    const boot_path = (try bs.handleProtocol(uefi.protocol.DevicePath, boot_handle)) orelse return error.Unsupported;
+    const boot_body = try pathBody(boot_path);
+    if (std.mem.startsWith(u8, boot_body, wanted)) {
+        log.say("HW_DISK refused: the menu's disk is the USOS stick; nothing written\n", .{});
+        return error.TargetIsBootDevice;
+    }
+    const handles = (try bs.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.BlockIo.guid })) orelse return error.Io;
+    defer bs.freePool(@ptrCast(@alignCast(handles.ptr))) catch {};
+    if (handles.len > 128) return error.TooManyEntries;
+    var found: ?*uefi.protocol.BlockIo = null;
+    for (handles) |handle| {
+        if (handle == boot_handle) continue;
+        const path = (bs.handleProtocol(uefi.protocol.DevicePath, handle) catch continue) orelse continue;
+        const body = pathBody(path) catch continue;
+        if (!std.mem.eql(u8, body, wanted)) continue;
+        const io = (bs.handleProtocol(uefi.protocol.BlockIo, handle) catch continue) orelse continue;
+        if (io.media.logical_partition) continue;
+        if (found != null) {
+            log.say("HW_DISK refused: two disks answer to the menu's device path; nothing written\n", .{});
+            return error.TargetAmbiguous;
+        }
+        found = io;
+    }
+    const io = found orelse {
+        log.say("HW_DISK refused: the disk chosen in the menu is not present (device path bytes={d}); nothing written\n", .{wanted.len});
+        return error.NoTargetDisk;
+    };
+    const media = io.media;
+    const sectors = media.last_block +% 1;
+    const bus = busName(wanted);
+    const refusal: ?[]const u8 = if (!media.media_present or media.read_only)
+        "not present or read-only"
+    else if (media.block_size != 512 or media.io_align > 4096)
+        "not 512-byte sectors"
+    else if (sectors != wanted_sectors)
+        "size differs from the menu's disk"
+    else if (sectors < 64 * 1024 * 1024 / 512 * 256)
+        "smaller than 16 GiB"
+    else if (mbr and sectors > hw.mbr_max_sectors)
+        "larger than 2 TiB (MBR)"
+    else if (mbr and std.mem.eql(u8, bus, "NVMe") and !hw_run.nvme_ready)
+        "NVMe without the usosnvme package on the stick"
+    else
+        null;
+    if (refusal) |why| {
+        log.say("HW_DISK refused bus={s} sectors={d} menu_sectors={d}: {s}; nothing written\n", .{ bus, sectors, wanted_sectors, why });
+        return error.TargetRefused;
+    }
+    var sector: [4096]u8 align(4096) = @splat(0);
+    var table: []const u8 = "no partition table";
+    if (blockRead(io, 1, sector[0..512], .source_io)) |_| {
+        if (std.mem.eql(u8, sector[0..8], "EFI PART")) table = "GPT" else if (blockRead(io, 0, sector[0..512], .source_io)) |_| {
+            if (sector[510] == 0x55 and sector[511] == 0xaa) table = "MBR";
+        } else |_| {}
+    } else |err| return err;
+    @memset(&sector, 0);
+    _ = try std.fmt.bufPrint(sector[0..512], "USOSPREP TARGET v1\n{s}\n", .{token});
+    hw_run.target_written = true;
+    hw_run.target_nvme = std.mem.eql(u8, bus, "NVMe");
+    try blockWrite(io, 0, sector[0..512], .target_io);
+    io.flushBlocks() catch {};
+    log.say("HW_DISK menu choice bus={s} sectors={d} previous_table={s}; no MiniOS prompt; marker written to sector 0 of this disk only\n", .{ bus, sectors, table });
+    return sectors;
 }
 
 const MemorySource = struct {
@@ -1424,6 +1509,7 @@ fn run(output: *Output) anyerror!void {
         hw_run.active = true;
         hw_run.build = cfg.hw.build;
         hw_run.build_len = cfg.hw.build_len;
+        output.quiet = cfg.hw.quiet;
         log.say("HW build={s} locale={s} unattend={any} boot_entry={any} qemu_detected={any}\n", .{ cfg.hw.buildId(), cfg.hw.localeText(), cfg.hw.unattend, cfg.hw.boot_entry, output.qemu });
     }
     // CSMWrap route: CSMWrap and its licences are checked before the disk
@@ -1434,7 +1520,10 @@ fn run(output: *Output) anyerror!void {
     // Hardware: the flow's one disk question. Only the chosen disk receives
     // this run's token; choose() below then requires exactly one disk with
     // that size and token, as in the QEMU gate.
-    if (cfg.hardware) cfg.sectors = try pickTarget(cfg.token, boot_handle, cfg.kind == .mbr, log);
+    if (cfg.hardware) cfg.sectors = if (cfg.hw.disk_path_len != 0)
+        try takeMenuTarget(cfg.token, boot_handle, cfg.kind == .mbr, cfg.hw.disk_path[0..cfg.hw.disk_path_len], cfg.hw.disk_sectors, log)
+    else
+        try pickTarget(cfg.token, boot_handle, cfg.kind == .mbr, log);
     var device: Device = .{ .io = try choose(cfg, boot_handle, log) };
     const tracker = output.tracker orelse return error.InvalidArgument;
     errdefer log.say("MEM failure alloc_current={d} alloc_peak={d}\n", .{ tracker.current, tracker.peak });

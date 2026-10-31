@@ -138,7 +138,15 @@ pub fn rotationName(buffer: []u8, generation: usize) ![]const u8 {
 
 /// Hardware configuration (USOSPREP_HW_V1), written by the USOS menu.
 pub const Hardware = struct {
-    /// Disk question in MiniOS itself (the only one in this flow).
+    /// The disk the user chose in the USOS menu (disk_path= hex device path
+    /// body + disk_sectors=); MiniOS then asks no disk question of its own.
+    /// Empty: the old MiniOS text disk question (kept for direct starts).
+    disk_path: [max_disk_path]u8 = @splat(0),
+    disk_path_len: usize = 0,
+    disk_sectors: u64 = 0,
+    /// ui=quiet: nothing on the text console (the menu's own status screen
+    /// stays visible); the log file is unchanged.
+    quiet: bool = false,
     build: [32]u8 = @splat(0),
     build_len: usize = 0,
     locale: [32]u8 = @splat(0),
@@ -156,6 +164,33 @@ pub const Hardware = struct {
         return if (self.locale_len == 0) "en-US" else self.locale[0..self.locale_len];
     }
 };
+
+pub const max_disk_path = 256;
+
+/// disk_path=: lowercase/uppercase hex of a device path body (no End node),
+/// 4..max_disk_path bytes, whole nodes.
+pub fn parseDiskPath(out: *[max_disk_path]u8, hex: []const u8) !usize {
+    if (hex.len < 8 or hex.len % 2 != 0 or hex.len / 2 > max_disk_path) return error.InvalidArgument;
+    const bytes = std.fmt.hexToBytes(out, hex) catch return error.InvalidArgument;
+    var at: usize = 0;
+    while (at < bytes.len) {
+        if (bytes.len - at < 4) return error.InvalidArgument;
+        const len = std.mem.readInt(u16, bytes[at + 2 ..][0..2], .little);
+        if (len < 4 or len > bytes.len - at or bytes[at] == 0x7f) return error.InvalidArgument;
+        at += len;
+    }
+    return bytes.len;
+}
+
+test "disk_path parses whole device path nodes only" {
+    var out: [max_disk_path]u8 = undefined;
+    // PciRoot-like ACPI node (12 bytes) + NVMe node (16 bytes).
+    const hex = "02010c00d041030a00000000" ++ "03171000010000000000000000000000";
+    try std.testing.expectEqual(@as(usize, 28), try parseDiskPath(&out, hex));
+    try std.testing.expectError(error.InvalidArgument, parseDiskPath(&out, hex[0 .. hex.len - 2]));
+    try std.testing.expectError(error.InvalidArgument, parseDiskPath(&out, "7fff0400"));
+    try std.testing.expectError(error.InvalidArgument, parseDiskPath(&out, "zz010c00"));
+}
 
 pub fn validBuildId(value: []const u8) bool {
     if (value.len == 0 or value.len > 32) return false;

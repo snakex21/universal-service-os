@@ -21,6 +21,8 @@ const data_volume = @import("data_volume.zig");
 const settings_store = @import("settings_store.zig");
 const esp_image = @import("esp_image_start.zig");
 const serial = @import("serial.zig");
+const minios_disk = @import("minios_disk.zig");
+const view = @import("manual_view.zig");
 
 pub const app_path = "\\EFI\\USOS\\minios\\usosprep-x64.efi";
 pub const config_path = "\\USOSPREP.CFG";
@@ -56,8 +58,21 @@ fn deleteFile(root: *uefi.protocol.File, comptime path: []const u8) void {
     _ = file.delete() catch {};
 }
 
-/// Returns only when MiniOS did not finish (the caller falls back to Setup).
-pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, image_directory: []const u8, name: []const u8, profile: *const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
+/// The usosnvme package MiniOS stages for an NVMe target on the CSMWrap
+/// route (src/prep/hw_nvme.zig): without it NVMe disks are not offered.
+fn nvmePackage(root: *uefi.protocol.File) bool {
+    inline for (.{ "usosnvme.sys", "usosnvme.inf", "usosnvme.cat", "usosnvme.cer" }) |file| {
+        const handle = root.open(std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\USOS\\minios\\nvme\\" ++ file), .read, .{}) catch return false;
+        handle.close() catch {};
+    }
+    return true;
+}
+
+/// Returns only when MiniOS did not finish (the caller falls back to Setup),
+/// or with error.MiniosDiskCancelled when the user left the disk question
+/// (the caller then returns to the menu: no second disk question).
+/// `system_name` names the system on the USOS screens ("Windows 10").
+pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, system_name: []const u8, image_directory: []const u8, name: []const u8, profile: *const answer.Profile, xml: ?[]const u8, images: ?*const answer.editions.List) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.MiniosRequiresX64;
     const index = plan.imageIndex(profile, system_id, images) orelse {
         record(root, "not started ({s}): the profile names no edition found on this ISO (MiniOS has no edition list); {s} instead", .{ @tagName(route), fallbackName(route) });
@@ -82,13 +97,33 @@ pub fn run(root: *uefi.protocol.File, route: Route, system_id: []const u8, image
         record(root, "not started: no firmware RNG ({s})", .{@errorName(err)});
         return err;
     };
-    var text: [1536]u8 = undefined;
-    const cfg = try plan.formatConfig(&text, route, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
+    // The flow's one disk question, in the USOS menu; MiniOS asks nothing.
+    var shown: [96]u8 = undefined;
+    const shown_name = std.fmt.bufPrint(&shown, "{s} (MiniOS)", .{system_name}) catch system_name;
+    const nvme_package = nvmePackage(root);
+    const disk = switch (minios_disk.ask(route, shown_name, nvme_package)) {
+        .disk => |d| d,
+        .cancelled => {
+            record(root, "disk question cancelled in the menu, nothing written; back to the menu", .{});
+            return error.MiniosDiskCancelled;
+        },
+        .none => {
+            record(root, "not started ({s}): no disk MiniOS can install to (usosnvme package {s}); {s} instead", .{ @tagName(route), if (nvme_package) "present" else "missing", fallbackName(route) });
+            return error.MiniosNoDisk;
+        },
+    };
+    var text: [2560]u8 = undefined;
+    const base_cfg = try plan.formatConfig(&text, route, token, index, source, iso_path, usos.build_info.id, plan.localeTag(profile), xml != null);
+    const cfg = try plan.appendDisk(&text, base_cfg, &disk);
     try settings_store.replaceFile(root, config_path, cfg);
     if (xml) |bytes| try settings_store.replaceFile(root, answer_path, bytes) else deleteFile(root, answer_path);
     // A rendered answer may hold a key or password: never left behind.
     defer deleteFile(root, answer_path);
     serial.writeAscii(if (route == .mbr_csmwrap) "[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1 mode=mbr csmwrap=on)\r\n" else "[MINIOS] menu -> usosprep-x64.efi (USOSPREP_HW_V1)\r\n");
+    // MiniOS runs quietly (ui=quiet): this USOS screen stays until the
+    // restart and names the environment.
+    var detail_en: [160]u8 = undefined;
+    view.miniosStatus(route, std.fmt.bufPrint(&detail_en, "Writing the {s} image to the selected disk.", .{shown_name}) catch "Preparing the disk", system_name);
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const image = esp_image.load(root, app_path) catch |err| {
         record(root, "not started: {s} not loadable ({s})", .{ app_path, @errorName(err) });

@@ -472,20 +472,31 @@ fn start(
         // question is logged and falls through to the Alpine preparation.
         const minios = @import("minios_start.zig");
         if (!nt6 and minios.wantedX86Csmwrap(profile, system.id)) {
-            view.vistaCsmwrapStatus(.validating, "Starting MiniOS (disk question follows)", vista_csmwrap_heading);
+            // The environment is named in the heading ("Windows 10 - MiniOS",
+            // after a fallback "Windows 10 - Alpine", also on the micro-Linux
+            // pages, which take this heading).
+            const system_heading = vista_csmwrap_heading;
+            view.vistaCsmwrapStatus(.validating, "Starting preparation environment", std.fmt.bufPrint(&env_heading, "{s} - MiniOS", .{system_heading}) catch system_heading);
             minios_x86: {
                 const rendered = answer_profiles.render(profile.?, system.id, .x86) catch |err| {
                     var line: [96]u8 = undefined;
                     @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] x86 answer not rendered ({s}); Alpine\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
                     break :minios_x86;
                 };
-                minios.run(root, .mbr_csmwrap, system.id, system.image_directory, image.name.slice(), profile.?, rendered.bytes, answer_profiles.images()) catch |err| {
+                minios.run(root, .mbr_csmwrap, system.id, system_heading, system.image_directory, image.name.slice(), profile.?, rendered.bytes, answer_profiles.images()) catch |err| {
+                    // Cancelled in the menu's disk question: back to the
+                    // menu, never a second disk question in Alpine.
+                    if (err == error.MiniosDiskCancelled) {
+                        view.refreshFramebuffer();
+                        return;
+                    }
                     var line: [96]u8 = undefined;
                     @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to the Alpine preparation: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
                 };
             }
             view.refreshFramebuffer();
-            view.vistaCsmwrapStatus(.validating, "MiniOS did not finish; Alpine preparation instead (EFI\\USOS\\Logs\\minios-start.txt)", vista_csmwrap_heading);
+            vista_csmwrap_heading = std.fmt.bufPrint(&env_heading, "{s} - Alpine", .{system_heading}) catch system_heading;
+            view.vistaCsmwrapStatus(.validating, "Starting preparation environment", vista_csmwrap_heading);
         }
         view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
         var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
@@ -516,8 +527,12 @@ fn start(
         // disk question is logged and falls through to Windows Setup.
         const minios = @import("minios_start.zig");
         if (minios.wanted(profile, system.id)) {
-            view.windowsIsoStatus(.starting, "Starting MiniOS (disk question follows)");
-            minios.run(root, .gpt_uefi, system.id, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+            view.windowsIsoStatus(.starting, "Starting preparation environment");
+            minios.run(root, .gpt_uefi, system.id, system.name, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+                if (err == error.MiniosDiskCancelled) {
+                    view.refreshFramebuffer();
+                    return;
+                }
                 var line: [96]u8 = undefined;
                 @import("serial.zig").writeAscii(std.fmt.bufPrint(&line, "[MINIOS] fallback to Windows Setup: {s}\r\n", .{@errorName(err)}) catch "[MINIOS] fallback\r\n");
             };
@@ -778,6 +793,8 @@ fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
 /// Vista" or "Windows Server 2008"; tools/vista_csmwrap_prepare.sh uses the
 /// request's folder the same way).
 var vista_csmwrap_heading: []const u8 = "Windows Vista";
+/// "<system> - MiniOS" / "<system> - Alpine" (prep_env=minios starts).
+var env_heading: [128]u8 = undefined;
 
 /// Every ISO / PE10 donor check of prepareCsmwrap is stage 1 of the flow.
 fn showVistaCsmwrapIso(_: usos.flow.preparation_boot_progress.DirectIsoStage, detail: []const u8) void {

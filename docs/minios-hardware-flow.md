@@ -25,12 +25,24 @@ X470; an x64 MiniOS writes a 32-bit Windows disk).
    must match the pinned 3.1.2-usos18 SHA-256 and its licence files must be
    there (same check as tools/xp_csmwrap_esp.sh); otherwise nothing is
    written.
-3. MiniOS asks the one disk question (text console): internal disks of at
-   least 16 GiB with 512-byte sectors, the USOS stick excluded; CSMWrap
-   route: at most 2 TiB (MBR); NVMe disks only when the usosnvme modern
-   package is on the stick (`EFI\USOS\minios\nvme\`, step 6a). 3 s delay, then
-   Space confirms, Esc cancels with nothing written. The run's token goes to
-   sector 0 of the chosen disk only; the strict size + token match follows.
+3. The flow's one disk question is in the USOS menu
+   (src/platform/uefi/minios_disk.zig: the menu's form style and language;
+   the texts are the translated micro-Linux disk-picker strings): internal
+   non-USB disks of at least 16 GiB with 512-byte sectors, the USOS stick
+   excluded; CSMWrap route: at most 2 TiB (MBR), NVMe only when the usosnvme
+   modern package is on the stick (`EFI\USOS\minios\nvme\`, step 6a). Then
+   the erase confirmation. Cancel returns to the menu (no Alpine start, no
+   second question). The disk goes to MiniOS by identity in USOSPREP.CFG
+   (`disk_path=` hex device-path body, `disk_sectors=`, `ui=quiet`); MiniOS
+   (takeMenuTarget) finds exactly that whole disk, repeats every check and
+   asks nothing. A refusal writes nothing and fails the run; the menu logs
+   it (minios-start.txt, MiniOS log) and starts its default path. With
+   ui=quiet MiniOS prints nothing on the text console: the menu's page
+   (heading "Windows 10 - MiniOS", stage "Preparing the disk") stays until
+   the restart; after a fallback the heading reads "Windows 10 - Alpine",
+   also on the micro-Linux pages. Without disk_path (a direct start) MiniOS
+   keeps its own text question. The run's token goes to sector 0 of the
+   chosen disk only; the strict size + token match follows.
 4. The disk is wrapped in `hw_target.VirtualBlank` (chunks never written read
    as zeros, partial first writes zero the chunk, metadata regions are
    zero-filled), so the unchanged fresh-image writer runs without a
