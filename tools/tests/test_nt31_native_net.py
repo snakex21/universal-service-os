@@ -292,5 +292,19 @@ class FullMacFailurePath(unittest.TestCase):
         self.assertLess(cleanup.index('if(!dmaLive){'), cleanup.index('DmaFree31(a,&a->Hw.RxRing)'))
 
 
+    def test_no_kernel_mutex_on_nt31(self):
+        # X470 2026-10-31: STOP 0x0D MUTEX_LEVEL_NUMBER_VIOLATION from the
+        # level-0 NativeDiag mutex taken in DriverEntry during the load.
+        d = (ROOT / 'tools/nt/usosnet/src31/native_diag.h').read_text(encoding='utf-8')
+        code = chr(10).join(l for l in d.splitlines() if not l.lstrip().startswith(('*', '/*')))
+        for name in ('KMUTEX', 'KeInitializeMutex', 'KeReleaseMutex', 'KeWaitForSingleObject'):
+            self.assertNotIn(name, code)
+        import pefile
+        pe = pefile.PE(str(ROOT / 'tools/nt/usosnet/bin/nt31-native/i386/usosnet31.sys'))
+        names = [i.name.decode() for e in pe.DIRECTORY_ENTRY_IMPORT for i in e.imports]
+        self.assertFalse([n for n in names if 'Mutex' in n], names)
+        self.assertEqual(pe.OPTIONAL_HEADER.FileAlignment, 0x200)
+
+
 if __name__ == '__main__':
     unittest.main()
