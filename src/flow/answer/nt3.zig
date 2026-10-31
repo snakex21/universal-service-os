@@ -42,6 +42,13 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     .{ .system_id = "windows-nt-3-beta", .file = "NT3B.SIF" },
 };
 
+/// NT 3.1 Workstation / Advanced Server: no product key anywhere in Setup
+/// (its INITIAL.INF has no PID page). NT 3.5 / 3.51 retail media do ask.
+pub fn isNt31(system_id: []const u8) bool {
+    return std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-1") or
+        std.ascii.eqlIgnoreCase(system_id, "windows-nt-3-1-server");
+}
+
 pub fn isNt3(system_id: []const u8) bool {
     for (staged) |entry| {
         if (std.ascii.eqlIgnoreCase(entry.system_id, system_id)) return true;

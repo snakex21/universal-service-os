@@ -710,10 +710,10 @@ fn buildFields() void {
     // itself; NT 4.0 manual is a native-install option).
     if (answer.msbatch.releaseFor(system_id) != null or answer.nt4.isNt4(system_id))
         addField(.win9x_setup, .{ .kind = .choice, .label = t(.profile_field_win9x_setup), .options = &dos_regional_options, .index = &win9x_setup_index });
-    // NT 3.1 / 3.5 / 3.51 (WinFrame 1.8 too): Setup never asks for a key
-    // (3.5 / 3.51 INITIAL.INF DisplayPidDlg = NO, 3.1 has no PID page), so
-    // no key rows; a key line already in the profile is kept and ignored.
-    const keyed = !dos and !answer.nt3.isNt3(system_id);
+    // NT 3.1 / 3.1 Advanced Server: no product key at all (its INITIAL.INF
+    // has no PID page), so no key rows; a key line already in the profile
+    // is kept and ignored. NT 3.5 / 3.51 retail media ask for a CD key.
+    const keyed = !dos and !answer.nt3.isNt31(system_id);
     if (keyed) addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .key_style = keyStyle(), .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
@@ -897,8 +897,8 @@ test "Windows 9x / NT 4.0 Setup row: 95/98/Me and NT 4.0 only, auto by default, 
     }
 }
 
-test "NT 3.x: no product key rows; a key line in the profile still loads and is kept" {
-    for ([_]struct { []const u8, bool }{ .{ "windows-nt-3-1", false }, .{ "windows-nt-3-1-server", false }, .{ "windows-nt-3-5", false }, .{ "windows-nt-3-5-server", false }, .{ "windows-nt-3-51", false }, .{ "windows-nt-3-51-server", false }, .{ "windows-nt-4", true }, .{ "windows-2000", true } }) |case| {
+test "NT 3.1: no product key rows (3.5 / 3.51 keep them); a key line still loads and is kept" {
+    for ([_]struct { []const u8, bool }{ .{ "windows-nt-3-1", false }, .{ "windows-nt-3-1-server", false }, .{ "windows-nt-3-5", true }, .{ "windows-nt-3-5-server", true }, .{ "windows-nt-3-51", true }, .{ "windows-nt-3-51-server", true }, .{ "citrix-winframe-1-8", true }, .{ "windows-nt-3-beta", true }, .{ "windows-nt-4", true }, .{ "windows-2000", true } }) |case| {
         const id, const offered = case;
         system_id = id;
         system_name = id;
