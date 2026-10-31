@@ -5,7 +5,7 @@ test {
     _ = @import("perf_clock.zig");
     _ = @import("writecombine.zig");
     _ = @import("hw_target.zig");
-    _ = @import("hw_nvme.zig");
+    _ = @import("csmwrap_target.zig");
     _ = @import("windows_layout.zig");
     _ = @import("install_app_tests.zig");
     _ = @import("bcd_tests.zig");

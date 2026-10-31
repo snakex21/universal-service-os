@@ -117,6 +117,8 @@ pub const Ntfs = struct {
     next_lcn: u64 = 4096,
     mft_records: u64 = 64,
     next_record: u64 = 27,
+    /// $Volume name (mkntfs -L); set before format(). Null: "USOSPREP".
+    label: ?[]const u16 = null,
 
     pub fn init(disk: p.Disk, partition: partitions.Partition, allocator: std.mem.Allocator, serial: u64) !Ntfs {
         var result: Ntfs = undefined;
@@ -973,9 +975,11 @@ pub const Ntfs = struct {
                     try b.resident(0x80, u("$Info"), &info, false);
                 },
                 3 => {
-                    var label: [16]u8 = undefined;
-                    r.utf16(&label, u("USOSPREP"));
-                    try b.resident(0x60, &.{}, &label, false);
+                    var label: [64]u8 = undefined;
+                    const name_units = self.label orelse u("USOSPREP");
+                    if (name_units.len == 0 or name_units.len > 32) return error.InvalidArgument;
+                    r.utf16(&label, name_units);
+                    try b.resident(0x60, &.{}, label[0 .. name_units.len * 2], false);
                     var info: [12]u8 = @splat(0);
                     info[8] = 3;
                     info[9] = 1;

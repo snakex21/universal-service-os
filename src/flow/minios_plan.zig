@@ -5,9 +5,10 @@
 //! Routes:
 //! * `.gpt_uefi`: Windows 10/11 x64 native UEFI (replaces the ISO's WinPE
 //!   and Windows Setup);
-//! * `.mbr_csmwrap`: 32-bit Windows 10 without CSM (win-x86-uefi-csmwrap;
-//!   replaces the Alpine micro-Linux step 610 and the ISO's x86 WinPE +
-//!   Setup): MBR disk, BIOS boot files, CSMWrap ESP at the end.
+//! * `.mbr_csmwrap`: 32-bit Windows 10 without CSM (win-x86-uefi-csmwrap):
+//!   a port of the Alpine micro-Linux step 610 (src/prep/csmwrap_target.zig):
+//!   the same MBR disk, staging WinPE and CSMWrap ESP; the ISO's own x86
+//!   WinPE and Windows Setup then install, exactly as after Alpine.
 const std = @import("std");
 const answer = @import("answer/root.zig");
 const capability = @import("preparation_capability.zig");
@@ -29,14 +30,23 @@ pub fn wantedX86Csmwrap(p: ?*const answer.Profile, system_id: []const u8) bool {
 
 pub const Source = struct { disk_bytes: u64, start: u64, size: u64, serial: u64 };
 
-/// USOSPREP_HW_V1 text, parsed by src/prep/uefi_main.zig config().
-pub fn formatConfig(buffer: []u8, route: Route, token: [64]u8, index: u16, source: Source, iso_path: []const u8, build: []const u8, locale: []const u8, unattend: bool) ![]const u8 {
+/// USOSPREP_HW_V1 text of the GPT route (image apply), parsed by
+/// src/prep/uefi_main.zig config().
+pub fn formatConfig(buffer: []u8, token: [64]u8, index: u16, source: Source, iso_path: []const u8, build: []const u8, locale: []const u8, unattend: bool) ![]const u8 {
     for (iso_path) |c| if (c == '\r' or c == '\n' or c == 0) return error.InvalidImageName;
     if (index == 0) return error.InvalidImageIndex;
-    const mode = if (route == .mbr_csmwrap) "mbr" else "gpt";
-    const csmwrap = if (route == .mbr_csmwrap) "csmwrap=on\r\n" else "";
-    return std.fmt.bufPrint(buffer, "USOSPREP_HW_V1\r\nmode={s}\r\ntoken={s}\r\nprofile=install\r\nwim_index={d}\r\nsource_bytes={d}\r\nsource_start={d}\r\nsource_size={d}\r\nsource_serial={x}\r\nsource_iso={s}\r\nbuild={s}\r\nlocale={s}\r\nunattend={s}\r\nboot_entry=on\r\n{s}", .{
-        mode, token, index, source.disk_bytes, source.start, source.size, source.serial, iso_path, build, locale, if (unattend) "on" else "off", csmwrap,
+    return std.fmt.bufPrint(buffer, "USOSPREP_HW_V1\r\nmode=gpt\r\ntoken={s}\r\nprofile=install\r\nwim_index={d}\r\nsource_bytes={d}\r\nsource_start={d}\r\nsource_size={d}\r\nsource_serial={x}\r\nsource_iso={s}\r\nbuild={s}\r\nlocale={s}\r\nunattend={s}\r\nboot_entry=on\r\n", .{
+        token, index, source.disk_bytes, source.start, source.size, source.serial, iso_path, build, locale, if (unattend) "on" else "off",
+    });
+}
+
+/// USOSPREP_HW_V1 text of the CSMWrap route (the Alpine step 610 port):
+/// DATA's identity only; the ISO, the answer and the rest come from
+/// EFI\USOS\vista-csmwrap\request.ini as for Alpine. No boot entry (Alpine
+/// leaves the disk to the firmware's removable-path scan).
+pub fn formatCsmwrapConfig(buffer: []u8, token: [64]u8, source: Source, build: []const u8) ![]const u8 {
+    return std.fmt.bufPrint(buffer, "USOSPREP_HW_V1\r\nmode=mbr\r\ntoken={s}\r\nprofile=csmwrap-setup\r\nsource_bytes={d}\r\nsource_start={d}\r\nsource_size={d}\r\nsource_serial={x}\r\nbuild={s}\r\nboot_entry=off\r\ncsmwrap=on\r\n", .{
+        token, source.disk_bytes, source.start, source.size, source.serial, build,
     });
 }
 
@@ -90,14 +100,15 @@ pub const mbr_max_sectors: u64 = 0xffffffff;
 pub const min_sectors: u64 = 16 * 1024 * 1024 * 1024 / 512;
 
 /// Why the menu does not offer a disk to MiniOS (null: offered); the same
-/// rules as MiniOS's own checks (src/prep/uefi_main.zig takeMenuTarget).
-pub fn refusal(route: Route, d: DiskInfo, nvme_package: bool) ?[]const u8 {
+/// rules as MiniOS's own checks (src/prep/uefi_main.zig findMenuDisk).
+/// NVMe on the CSMWrap route is offered as on Alpine; MiniOS checks the
+/// controller, nvme-off.txt and the modern package before any write.
+pub fn refusal(route: Route, d: DiskInfo) ?[]const u8 {
     if (d.boot) return "the USOS stick";
     if (!d.present or d.read_only) return "not present or read-only";
     if (d.block_size != 512) return "not 512-byte sectors";
     if (d.sectors < min_sectors) return "smaller than 16 GiB";
     if (route == .mbr_csmwrap and d.sectors > mbr_max_sectors) return "larger than 2 TiB (MBR)";
-    if (route == .mbr_csmwrap and std.mem.eql(u8, d.bus, "NVMe") and !nvme_package) return "NVMe without the usosnvme package";
     if (std.mem.eql(u8, d.bus, "USB")) return "USB disk";
     return null;
 }
@@ -105,70 +116,37 @@ pub fn refusal(route: Route, d: DiskInfo, nvme_package: bool) ?[]const u8 {
 test "menu disk handoff: config lines, bus names and the MiniOS rules" {
     var buffer: [2048]u8 = undefined;
     const token: [64]u8 = @splat('a');
-    const base = try formatConfig(&buffer, .mbr_csmwrap, token, 4, .{ .disk_bytes = 1 << 40, .start = 1 << 20, .size = 1 << 30, .serial = 7 }, "Systems/Windows/Windows 10/Images/w.iso", "B1", "pl-PL", true);
+    const base = try formatCsmwrapConfig(&buffer, token, .{ .disk_bytes = 1 << 40, .start = 1 << 20, .size = 1 << 30, .serial = 7 }, "B1");
     var disk: Disk = .{ .sectors = 1000215216 };
     const nvme = [_]u8{ 2, 1, 12, 0, 0xd0, 0x41, 3, 0x0a, 0, 0, 0, 0, 1, 1, 6, 0, 0, 1, 3, 0x17, 16, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     @memcpy(disk.path[0..nvme.len], &nvme);
     disk.path_len = nvme.len;
     const text = try appendDisk(&buffer, base, &disk);
-    try std.testing.expect(std.mem.endsWith(u8, text, "csmwrap=on\r\ndisk_path=02010c00d041030a0000000001010600000103171000010000000000000000000000\r\ndisk_sectors=1000215216\r\nui=quiet\r\n"));
+    try std.testing.expect(std.mem.startsWith(u8, text, "USOSPREP_HW_V1\r\nmode=mbr\r\ntoken="));
+    try std.testing.expect(std.mem.indexOf(u8, text, "profile=csmwrap-setup\r\nsource_bytes=1099511627776\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "wim_index") == null and std.mem.indexOf(u8, text, "source_iso") == null and std.mem.indexOf(u8, text, "unattend") == null);
+    try std.testing.expect(std.mem.endsWith(u8, text, "boot_entry=off\r\ncsmwrap=on\r\ndisk_path=02010c00d041030a0000000001010600000103171000010000000000000000000000\r\ndisk_sectors=1000215216\r\nui=quiet\r\n"));
     try std.testing.expectEqualStrings("NVMe", busName(&nvme));
     try std.testing.expectEqualStrings("disk", busName(nvme[0..12]));
     const ok: DiskInfo = .{ .block_size = 512, .sectors = 1000215216, .read_only = false, .present = true, .bus = "NVMe", .boot = false };
-    try std.testing.expect(refusal(.mbr_csmwrap, ok, true) == null);
-    try std.testing.expect(refusal(.mbr_csmwrap, ok, false) != null);
-    try std.testing.expect(refusal(.gpt_uefi, ok, false) == null);
+    try std.testing.expect(refusal(.mbr_csmwrap, ok) == null);
+    try std.testing.expect(refusal(.gpt_uefi, ok) == null);
     var big = ok;
     big.sectors = mbr_max_sectors + 1;
     big.bus = "SATA";
-    try std.testing.expect(refusal(.mbr_csmwrap, big, true) != null and refusal(.gpt_uefi, big, true) == null);
+    try std.testing.expect(refusal(.mbr_csmwrap, big) != null and refusal(.gpt_uefi, big) == null);
     var stick = ok;
     stick.boot = true;
-    try std.testing.expect(refusal(.gpt_uefi, stick, true) != null);
+    try std.testing.expect(refusal(.gpt_uefi, stick) != null);
     var four_k = ok;
     four_k.block_size = 4096;
-    try std.testing.expect(refusal(.gpt_uefi, four_k, true) != null);
+    try std.testing.expect(refusal(.gpt_uefi, four_k) != null);
     var empty: Disk = .{};
     try std.testing.expectError(error.InvalidDisk, appendDisk(&buffer, base, &empty));
 }
 
-/// MiniOS skips Windows Setup's edition page, so without a profile edition
-/// it decides itself: the only image; else the Pro edition (EditionID
-/// "Professional", else a name ending in " Pro"); else the first image.
-pub fn defaultImage(list: ?*const answer.editions.List) ?*const answer.editions.Image {
-    const images = (list orelse return null).slice();
-    if (images.len == 0) return null;
-    if (images.len == 1) return &images[0];
-    for (images) |*image| if (std.ascii.eqlIgnoreCase(image.edition_id.slice(), "Professional")) return image;
-    for (images) |*image| {
-        const name = image.name.slice();
-        if (name.len >= 4 and std.ascii.eqlIgnoreCase(name[name.len - 4 ..], " Pro")) return image;
-    }
-    return &images[0];
-}
-
-test "MiniOS default edition: one image, else Pro, else the first" {
-    var list: answer.editions.List = .{};
-    try std.testing.expect(defaultImage(&list) == null and defaultImage(null) == null);
-    const Entry = struct { name: []const u8, id: []const u8 };
-    const entries = [_]Entry{ .{ .name = "Windows 10 Home", .id = "Core" }, .{ .name = "Windows 10 Pro N", .id = "ProfessionalN" }, .{ .name = "Windows 10 Pro", .id = "Professional" }, .{ .name = "Windows 10 Education", .id = "Education" } };
-    for (entries, 1..) |e, i| {
-        list.items[i - 1] = .{ .index = @intCast(i) };
-        list.items[i - 1].name.set(e.name);
-        list.items[i - 1].edition_id.set(e.id);
-    }
-    list.len = 1;
-    try std.testing.expectEqual(@as(u16, 1), defaultImage(&list).?.index);
-    list.len = 4;
-    try std.testing.expectEqual(@as(u16, 3), defaultImage(&list).?.index);
-    list.items[2].edition_id.set("");
-    try std.testing.expectEqual(@as(u16, 3), defaultImage(&list).?.index);
-    list.items[2].name.set("Windows 10 Something");
-    try std.testing.expectEqual(@as(u16, 1), defaultImage(&list).?.index);
-}
-
-/// The install image MiniOS applies: the profile's edition on this ISO
-/// (MiniOS has no edition list of its own).
+/// The install image MiniOS applies on the GPT route: the profile's edition
+/// on this ISO (MiniOS has no edition list or default of its own).
 pub fn imageIndex(p: *const answer.Profile, system_id: []const u8, images: ?*const answer.editions.List) ?u16 {
     return switch (answer.matchEdition(p, system_id, images)) {
         .found => |image| image.index,
@@ -185,18 +163,15 @@ pub fn localeTag(p: *const answer.Profile) []const u8 {
 test "MiniOS config matches the MiniOS hardware parser keys" {
     var buffer: [1024]u8 = undefined;
     const token: [64]u8 = @splat('a');
-    const text = try formatConfig(&buffer, .gpt_uefi, token, 6, .{ .disk_bytes = 128043712512, .start = 17179869184, .size = 110863843328, .serial = 0x12345678abcdef01 }, "Systems/Windows/Windows 11/Images/Win11.iso", "B261028-200000-ABCDEF01", "pl-PL", true);
+    const text = try formatConfig(&buffer, token, 6, .{ .disk_bytes = 128043712512, .start = 17179869184, .size = 110863843328, .serial = 0x12345678abcdef01 }, "Systems/Windows/Windows 11/Images/Win11.iso", "B261028-200000-ABCDEF01", "pl-PL", true);
     try std.testing.expect(std.mem.startsWith(u8, text, "USOSPREP_HW_V1\r\nmode=gpt\r\n"));
     try std.testing.expect(std.mem.indexOf(u8, text, "wim_index=6\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "source_serial=12345678abcdef01\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "unattend=on\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "target_sectors") == null);
     try std.testing.expect(std.mem.indexOf(u8, text, "csmwrap") == null);
-    const mbr = try formatConfig(&buffer, .mbr_csmwrap, token, 2, .{ .disk_bytes = 1 << 40, .start = 1 << 20, .size = 1 << 30, .serial = 7 }, "Systems/Windows/Windows 10/Images/Win10 x86.iso", "B1", "pl-PL", true);
-    try std.testing.expect(std.mem.startsWith(u8, mbr, "USOSPREP_HW_V1\r\nmode=mbr\r\n"));
-    try std.testing.expect(std.mem.endsWith(u8, mbr, "boot_entry=on\r\ncsmwrap=on\r\n"));
-    try std.testing.expectError(error.InvalidImageName, formatConfig(&buffer, .gpt_uefi, token, 6, .{ .disk_bytes = 1, .start = 1, .size = 1, .serial = 1 }, "a\r\nmode=mbr", "B", "en-US", false));
-    try std.testing.expectError(error.InvalidImageIndex, formatConfig(&buffer, .gpt_uefi, token, 0, .{ .disk_bytes = 1, .start = 1, .size = 1, .serial = 1 }, "a.iso", "B", "en-US", false));
+    try std.testing.expectError(error.InvalidImageName, formatConfig(&buffer, token, 6, .{ .disk_bytes = 1, .start = 1, .size = 1, .serial = 1 }, "a\r\nmode=mbr", "B", "en-US", false));
+    try std.testing.expectError(error.InvalidImageIndex, formatConfig(&buffer, token, 0, .{ .disk_bytes = 1, .start = 1, .size = 1, .serial = 1 }, "a.iso", "B", "en-US", false));
 }
 
 test "only Windows 10/11 profiles with prep_env=minios select MiniOS" {

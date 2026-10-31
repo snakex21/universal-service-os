@@ -56,6 +56,9 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         const module = b.createModule(.{ .root_source_file = b.path("src/prep/uefi_main.zig"), .target = target, .optimize = .ReleaseSmall });
         module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = target, .optimize = .ReleaseSmall }));
         module.addImport("bios_boot_code", b.createModule(.{ .root_source_file = .{ .cwd_relative = b.pathJoin(&.{ bootcode_dir, "boot_code.zig" }) }, .target = target, .optimize = .ReleaseSmall }));
+        // The usos-fb-ui staging-BCD edit (truncatememory), shared with the
+        // Alpine route's tools/vista_csmwrap_target.sh.
+        module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = target, .optimize = .ReleaseSmall }));
         const exe = b.addExecutable(.{ .name = "usosprep-" ++ variant.name, .root_module = module });
         exe.step.dependOn(&bootcode.step);
         const install = b.addInstallFile(exe.getEmittedBin(), "test-assets/usosprep-" ++ variant.name ++ ".efi");
@@ -77,6 +80,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         const boot_target = b.resolveTargetQuery(.{ .cpu_arch = variant.arch, .os_tag = .uefi, .cpu_model = if (variant.arch == .x86) .{ .explicit = &std.Target.x86.cpu.i486 } else .baseline });
         const boot_module = b.createModule(.{ .root_source_file = b.path("src/prep/uefi_boot_main.zig"), .target = boot_target, .optimize = .ReleaseSmall });
         boot_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = boot_target, .optimize = .ReleaseSmall }));
+        boot_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = boot_target, .optimize = .ReleaseSmall }));
         const boot_exe = b.addExecutable(.{ .name = "usosprep-boot-" ++ variant.name, .root_module = boot_module });
         const boot_install = b.addInstallFile(boot_exe.getEmittedBin(), "test-assets/usosprep-boot-" ++ variant.name ++ ".efi");
         boot_step.dependOn(&boot_install.step);
@@ -116,6 +120,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         .{ .name = "usosprep-wim-features", .source = "wim_feature_main.zig" },
         .{ .name = "usosprep-wim-inspect", .source = "wim_inspect.zig" },
         .{ .name = "usosprep-wim-update", .source = "wim_update_main.zig" },
+        .{ .name = "usosprep-csmwrap-plan", .source = "csmwrap_plan_main.zig" },
         .{ .name = "usosprep-bcd", .source = "bcd_main.zig" },
         .{ .name = "usosprep-ntfs-probe", .source = "ntfs_probe.zig" },
         .{ .name = "usosprep-optical", .source = "optical_main.zig" },
@@ -125,6 +130,9 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
         const tool_optimize: std.builtin.OptimizeMode = if (comptime std.mem.eql(u8, tool.name, "usosprep-optical-fuzz")) .ReleaseSafe else .ReleaseSmall;
         const tool_module = b.createModule(.{ .root_source_file = b.path("src/prep/" ++ tool.source), .target = host_target, .optimize = tool_optimize });
         const tool_exe = b.addExecutable(.{ .name = tool.name, .root_module = tool_module });
+        if (comptime std.mem.eql(u8, tool.name, "usosprep-csmwrap-plan")) {
+            tool_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = host_target, .optimize = .ReleaseSmall }));
+        }
         if (comptime std.mem.startsWith(u8, tool.name, "usosprep-optical")) {
             tool_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = host_target, .optimize = .ReleaseSmall }));
         }
@@ -135,6 +143,7 @@ fn addUsosPrep(b: *std.Build, host_target: std.Build.ResolvedTarget, optimize: s
     }
     const tests_module = b.createModule(.{ .root_source_file = b.path("src/prep/tests.zig"), .target = host_target, .optimize = optimize });
     tests_module.addImport("ntfs_ro", b.createModule(.{ .root_source_file = b.path("src/prep/ntfs_reader.zig"), .target = host_target, .optimize = optimize }));
+    tests_module.addImport("bcd_lowmem", b.createModule(.{ .root_source_file = b.path("src/platform/linux/bcd_lowmem.zig"), .target = host_target, .optimize = optimize }));
     const test_run = b.addRunArtifact(b.addTest(.{ .root_module = tests_module }));
     const tests_step = b.step("usosprep-test", "Run platform-independent prep core tests");
     tests_step.dependOn(&test_run.step);

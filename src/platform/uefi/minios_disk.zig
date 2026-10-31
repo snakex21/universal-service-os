@@ -52,7 +52,7 @@ fn tableName(io: *uefi.protocol.BlockIo) []const u8 {
 
 /// Lists the disks MiniOS accepts for this route (logged with the reason
 /// for every refused one). Returns the number of rows.
-fn collect(route: plan.Route, nvme_package: bool) usize {
+fn collect(route: plan.Route) usize {
     const bs = uefi.system_table.boot_services orelse return 0;
     const boot = bootBody() orelse return 0;
     const handles = (bs.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.BlockIo.guid }) catch return 0) orelse return 0;
@@ -69,7 +69,7 @@ fn collect(route: plan.Route, nvme_package: bool) usize {
         const bus = plan.busName(b);
         const info: plan.DiskInfo = .{ .block_size = media.block_size, .sectors = sectors, .read_only = media.read_only, .present = media.media_present, .bus = bus, .boot = std.mem.startsWith(u8, boot, b) };
         var line: [160]u8 = undefined;
-        if (plan.refusal(route, info, nvme_package)) |why| {
+        if (plan.refusal(route, info)) |why| {
             serial.writeAscii(std.fmt.bufPrint(&line, "[MINIOS] disk not offered bus={s} sectors={d}: {s}\r\n", .{ bus, sectors, why }) catch "[MINIOS] disk not offered\r\n");
             continue;
         }
@@ -91,8 +91,8 @@ pub const Outcome = union(enum) { disk: plan.Disk, cancelled, none };
 
 /// The flow's only disk question: a list, then the erase confirmation.
 /// `name` is the system and environment, e.g. "Windows 10 (MiniOS)".
-pub fn ask(route: plan.Route, name: []const u8, nvme_package: bool) Outcome {
-    const count = collect(route, nvme_package);
+pub fn ask(route: plan.Route, name: []const u8) Outcome {
+    const count = collect(route);
     if (count == 0) return .none;
     var title_buf: [160]u8 = undefined;
     var subtitle_buf: [256]u8 = undefined;

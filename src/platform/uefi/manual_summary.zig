@@ -466,29 +466,38 @@ fn start(
         if (secure_boot.enforced()) return showSecureBootRequired(system);
         const nt6 = manual_images.nt6Legacy(system);
         vista_csmwrap_heading = if (nt6) windows_native_iso.legacyFolder(system) else windows_native_iso.systemFolder(system.image_directory) catch system.name;
-        // Profile option prep_env=minios (experimental, 32-bit Windows 10):
-        // MiniOS prepares the MBR disk itself (image, BIOS boot files, CSMWrap
-        // ESP) and restarts on success; any failure or a cancelled disk
-        // question is logged and falls through to the Alpine preparation.
+        // MiniOS (experimental, 32-bit Windows 10): the stick flag
+        // EFI\USOS\win9x\minios.flag (no profile needed) or a profile with
+        // prep_env=minios. MiniOS is the port of the Alpine step 610: the
+        // menu half below is the Alpine route's (answer plan, ISO checks,
+        // request.ini + usos-source.ini), then the one disk question and
+        // MiniOS instead of micro-Linux; Windows Setup does the rest. No
+        // fallback to the Alpine preparation (user decision 2026-10-31): a
+        // failure shows the MiniOS error page and returns to the menu.
         const minios = @import("minios_start.zig");
-        // MiniOS: the stick flag EFI\USOS\win9x\minios.flag (Windows 10, no
-        // profile needed) or a profile with prep_env=minios. No fallback to
-        // the Alpine preparation (user decision 2026-10-31): a failure shows
-        // the MiniOS error page and returns to the menu.
         if (!nt6 and (minios.wantedX86Csmwrap(profile, system.id) or (std.mem.eql(u8, system.id, "windows-10") and minios.defaultFlag(root)))) {
             // The environment is named in the heading ("Windows 10 - MiniOS").
             const system_heading = vista_csmwrap_heading;
-            view.vistaCsmwrapStatus(.validating, "Starting preparation environment", std.fmt.bufPrint(&env_heading, "{s} - MiniOS", .{system_heading}) catch system_heading);
-            var xml: ?[]const u8 = null;
+            vista_csmwrap_heading = std.fmt.bufPrint(&env_heading, "{s} - MiniOS", .{system_heading}) catch system_heading;
+            view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
+            var minios_answer: windows_native_iso.CsmwrapAnswer = .none;
             if (profile) |p| {
-                const rendered = answer_profiles.render(p, system.id, .x86) catch |err| {
+                _ = answer_profiles.stage(root, p, system.id, .x86, windows_native_iso.x86_csmwrap_profile) catch |err| {
                     minios.showFailure(root, err);
                     return;
                 };
-                xml = rendered.bytes;
-            }
-            minios.run(root, .mbr_csmwrap, system, system_heading, system.image_directory, image.name.slice(), profile, xml, if (profile != null) answer_profiles.images() else null) catch |err| {
-                // Cancelled in the menu (edition or disk): back to the menu.
+                minios_answer = .profile;
+            } else if (unattended) |name| minios_answer = .{ .file = name };
+            windows_native_iso.prepareX86Csmwrap(root, system.image_directory, image.name.slice(), minios_answer, showVistaCsmwrapIso) catch |err| {
+                answer_profiles.clearRendered(root);
+                minios.showFailure(root, err);
+                return;
+            };
+            minios.runCsmwrap(root, system_heading) catch |err| {
+                // A rendered answer may hold a key or a password (MiniOS
+                // deletes it when it takes it): never left behind.
+                answer_profiles.clearRendered(root);
+                // Cancelled in the menu's disk question: back to the menu.
                 if (err != error.MiniosDiskCancelled) minios.showFailure(root, err);
             };
             view.refreshFramebuffer();
@@ -524,7 +533,7 @@ fn start(
         const minios = @import("minios_start.zig");
         if (minios.wanted(profile, system.id)) {
             view.windowsIsoStatus(.starting, "Starting preparation environment");
-            minios.run(root, .gpt_uefi, system, system.name, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
+            minios.run(root, system, system.name, system.image_directory, image.name.slice(), profile.?, if (rendered) |r| r.xml else null, answer_profiles.images()) catch |err| {
                 if (err == error.MiniosDiskCancelled) {
                     view.refreshFramebuffer();
                     return;

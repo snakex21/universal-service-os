@@ -30,16 +30,15 @@ var payloadFiles = []payloadFile{
 	// MiniOS (src/prep): Windows 10/11 x64 without Windows Setup, profile
 	// option prep_env=minios (src/platform/uefi/minios_start.zig).
 	{`zig-out/test-assets/usosprep-x86_64.efi`, `EFI/USOS/minios/usosprep-x64.efi`},
-	// 32-bit Windows 10 through MiniOS (CSMWrap route): MiniOS stages the
-	// display helper into \USOS\NT6 like vista_csmwrap_target.sh step 2b.
+	// 32-bit Windows 10 through MiniOS (CSMWrap route, the port of the
+	// Alpine step 610, src/prep/csmwrap_target.zig): the same USOS MBR code
+	// and NT60 NTFS boot code the micro-Linux initramfs carries
+	// (tools/build_micro_linux.py, /usr/lib/usos), and the display helper of
+	// vista_csmwrap_target.sh step 2b. The WinPE helpers come from
+	// EFI/USOS/windows-native (support.cpio, modern-support.cpio) as for Alpine.
+	{`zig-out/xp-geometry-fix-mbr/xp-geometry-fix-mbr-440.bin`, `EFI/USOS/minios/xp-geometry-fix-mbr-440.bin`},
+	{`zig-out/xp-bios/vista-nt60-ntfs.bin`, `EFI/USOS/minios/vista-nt60-ntfs.bin`},
 	{`zig-out/windows-usos-res/USOSRES.EXE`, `EFI/USOS/minios/USOSRES.EXE`},
-	// NVMe target on that route: the signed usosnvme modern package of the
-	// Alpine route (tools/build_windows_native_support.py), staged by MiniOS
-	// into the new Windows (src/prep/hw_nvme.zig).
-	{`zig-out/windows-modern/usosnvme-modern/usosnvme.sys`, `EFI/USOS/minios/nvme/usosnvme.sys`},
-	{`zig-out/windows-modern/usosnvme-modern/usosnvme.inf`, `EFI/USOS/minios/nvme/usosnvme.inf`},
-	{`zig-out/windows-modern/usosnvme-modern/usosnvme.cat`, `EFI/USOS/minios/nvme/usosnvme.cat`},
-	{`zig-out/windows-modern/usosnvme-modern/usosnvme.cer`, `EFI/USOS/minios/nvme/usosnvme.cer`},
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},
 	{`zig-out/micro-linux/initramfs-usos`, `EFI/USOS/micro-linux/initramfs-usos`},
