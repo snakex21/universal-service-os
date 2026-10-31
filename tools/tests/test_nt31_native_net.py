@@ -278,5 +278,19 @@ class FreshInstall1(unittest.TestCase):
         self.assertIn('if(i==2)return 1;', g)
 
 
+
+class FullMacFailurePath(unittest.TestCase):
+    def test_failed_start_does_not_bugcheck(self):
+        # X470 2026-10-31 blue screen (cause open): a failed adapter start
+        # keeps its DMA memory instead of KeBugCheckEx(0xE0553101, 3/4).
+        c = (ROOT / 'tools/nt/usosnet/src31/usosnet31.c').read_text(encoding='utf-8')
+        cleanup = c[c.index('static void Cleanup('):c.index('static int __cdecl NoteBinding')]
+        self.assertNotIn('KeBugCheckEx(U31_BUGCHECK,3', cleanup)
+        self.assertNotIn('KeBugCheckEx(U31_BUGCHECK,4', cleanup)
+        self.assertIn('D31Point(0x1d,', cleanup)
+        self.assertIn('if(!dmaLive){', cleanup)
+        self.assertLess(cleanup.index('if(!dmaLive){'), cleanup.index('DmaFree31(a,&a->Hw.RxRing)'))
+
+
 if __name__ == '__main__':
     unittest.main()

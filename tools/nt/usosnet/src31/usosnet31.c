@@ -295,23 +295,29 @@ static void JoinWorker(U31_FULL *a)
 }
 static void Cleanup(U31_FULL *a)
 {
-    ULONG i;NDIS_STATUS release;
+    ULONG i;NDIS_STATUS release;BOOLEAN dmaLive=FALSE;
     if(KeGetCurrentIrql()!=PASSIVE_LEVEL)KeBugCheckEx(U31_BUGCHECK,2,KeGetCurrentIrql(),0,0);
     JoinWorker(a);
     if(a->HardwareTouched)IgbOps.Stop(&a->Hw);
     if(a->CommandChanged) {
         CommandWrite(a,(USHORT)(a->OriginalCommand&~4));
-        if(ConfigRead(a,4)&4)KeBugCheckEx(U31_BUGCHECK,3,ConfigRead(a,4),0,0);
+        /* A failed adapter start must not stop the system (X470 2026-10-31:
+         * blue screen with usosnet31 on the I211, cause still open): if bus
+         * mastering cannot be shown off, keep the DMA memory (a leak, never
+         * reused) instead of KeBugCheckEx, and record it in NativeDiag. */
+        if(ConfigRead(a,4)&4){dmaLive=TRUE;D31Point(0x1d,ConfigRead(a,4),3);}
         if(a->HardwareTouched) {
             WR32(&a->Hw,0,RD32(&a->Hw,0)|4); /* GIO_MASTER_DISABLE after reset */
             for(i=0;i<1000 && (RD32(&a->Hw,8)&(1UL<<19));i++)UsStall(1000);
-            if(RD32(&a->Hw,8)&(1UL<<19))KeBugCheckEx(U31_BUGCHECK,4,RD32(&a->Hw,8),0,0);
+            if(RD32(&a->Hw,8)&(1UL<<19)){dmaLive=TRUE;D31Point(0x1d,RD32(&a->Hw,8),4);}
         }
         /* Bus master disabled before any backing DMA allocation is freed. */
     }
     CompleteCloses(a);
-    for(i=0;i<RX_COUNT/2;i++){DmaFree31(a,&a->Hw.RxPage[i]);DmaFree31(a,&a->Hw.TxPage[i]);}
-    DmaFree31(a,&a->Hw.RxRing);DmaFree31(a,&a->Hw.TxRing);
+    if(!dmaLive){
+        for(i=0;i<RX_COUNT/2;i++){DmaFree31(a,&a->Hw.RxPage[i]);DmaFree31(a,&a->Hw.TxPage[i]);}
+        DmaFree31(a,&a->Hw.RxRing);DmaFree31(a,&a->Hw.TxRing);
+    }
     if(a->Hw.Mmio){MmUnmapIoSpace((PVOID)a->Hw.Mmio,a->Hw.MmioLen);a->Hw.Mmio=NULL;}
     Capabilities(a,TRUE);
     if(a->CommandChanged){CommandWrite(a,a->OriginalCommand);a->CommandChanged=FALSE;}

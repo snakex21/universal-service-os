@@ -1049,3 +1049,76 @@ prep DHCP lease (192.168.0.215/24, gw 192.168.0.1, lease 7200 s). Three bugs:
 The installed Micron is not patched: completing it offline means adding
 values in both REGF 1.1 hives plus the driver swap, which the own hive
 writer (template keys only) does not do safely; a fresh install is the test.
+
+### 8.10.3 X470 fresh install 3 (B261030-231755): blue screen, usosnet31 suspected
+
+Reported by the user: a blue screen after the install, now that `/net31`
+finds NDISLoop01 and usosnet31 really drives the I211. No STOP code, no
+photo, the Micron not read yet (planned for the next session).
+
+**Code review of usosnet31 against the NT 3.5x native BSOD fixes:**
+- (a) interrupt handlers with a NULL interrupt object (3.51 STOP 0x0A in
+  NdisMDpcTimer): not applicable. The NT 3.1 full-MAC model has no miniport
+  Disable/EnableInterrupt handlers; usosnet31 connects no interrupt
+  (NdisInitializeInterrupt is never called) and polls from its own system
+  thread every 20 ms.
+- (b) direct map: present (NdisMapIoSpace, else MmMapIoSpace of BAR0; stage
+  0x18). RD32/WR32 only run after a successful map (HardwareTouched).
+- (c) WriteDiag handle misuse (3.51 STOP 0x1E): not applicable; NativeDiag
+  is written with ZwCreateKey/ZwSetValueKey on the driver's own registry
+  path at PASSIVE_LEVEL only (no NdisWriteConfiguration).
+- (d) timer/DPC: no NDIS timer and no DPC; the worker raises to
+  DISPATCH_LEVEL for the poll and the indications and lowers again. The
+  same code passed QEMU R24c/R24d (82576, ping, DNS, HTTP) and cold
+  shutdown; the X470 differences are the I211 path (iNVM MAC, PLL erratum
+  D3hot -> D0 with BAR restore), the Isa/Eisa master registration retry on
+  a HAL without PCI bus, the direct map and DMA below 4 GiB (with
+  /MAXMEM=64 all memory is below 64 MiB anyway).
+- (e) indications before a binding: EthFilterIndicateReceive with no open
+  is the filter library's business (R24c started the same way).
+- **Own bugchecks on the failure path (fixed in source):** `Cleanup` (used
+  when `Add` fails after touching the card) called
+  `KeBugCheckEx(0xE0553101, 3 | 4, ...)` when bus mastering or the I211's
+  GIO master status did not turn off, so a failed adapter start was a blue
+  screen. Now it keeps the DMA memory (leak, never reused), records
+  NativeDiag stage 0x1D (Status = Command register or STATUS, Value = 3 / 4)
+  and returns the failure; NT then boots without the card. The remaining
+  bugchecks are 1 (worker thread cannot be referenced and does not end)
+  and 2 (Cleanup above PASSIVE_LEVEL). **Not rebuilt yet**: the driver
+  binary (bin/nt31-native/i386/usosnet31.sys) and the payload still have the
+  old code until the STOP code is known (rebuild with tools/nt/usosnet
+  build31.py, then build.bat).
+
+**Read the STOP line first:** `0xE0553101` = usosnet31's own check (param 1
+= 1..4 as above); 0x0A / 0x1E / 0x50 with an address inside usnet31.sys =
+a driver bug at that offset (map with the .map / cod of the build); another
+driver named = not usosnet31.
+
+**Read-only checklist for the Micron (USB enclosure, by model + size):**
+1. C: partition image (MBR partition 1) and the target ESP, never write.
+2. `\USOS\NT3`: POST.LOG (the `/net31` lines: NDISLoop01, ImagePath,
+   PciBus/Device/Function, readbacks), NET31.STS, NET31.ON, NETCHECK.TXT
+   (exists = one boot ran 45 s+ with the service), USOSANS.TXT (Date/Time
+   action line), USOSUSB.LOG.
+3. SYSTEM and SYSTEM.ALT (REGF 1.1, scratchpad h31.py reader):
+   `Services\NDISLoop` ImagePath / Start, `Services\NDISLoop\Parameters\
+   NativeDiag` Stage / Status / Value / Sequence (the last usosnet31 point:
+   1 DriverEntry, 2 RegisterMac, 3 Add entry, 4 PCI ok, 0x10.. register
+   tries, 5 map, 0x18 direct map, 6 reset, 7 started, 0x20 alive, 0x1D the
+   new bus-master check, 0x1F init failed), `NDISLoop01\Parameters` (PciBus
+   etc.), `NDISLoop01\Parameters\Tcpip` (the four DWORDs), `Select`
+   (Current / LastKnownGood), and whether ControlSet002 has the takeover.
+4. SYSEVENT.EVT: boots after Setup, TcpipSvc / NDIS errors.
+5. ESP `\USOS\BOOTLOG.TXT`: reset causes of the last boots (the NT 3.1
+   usosrst has no bugcheck callback, so no STOP code in the RAM marker; a
+   crash shows as a reset without a usosrst shutdown stage).
+6. Every boot or once: NETCHECK.TXT / event log timestamps / BOOTLOG boot
+   count.
+
+**Getting the installed system up again (only after the read, with
+backup, readback and flush):** the smallest change is `Services\NDISLoop
+Start` 3 -> 4 (an inline REG_DWORD in its value cell, a 4-byte in-place
+write), then the same image to SYSTEM and SYSTEM.ALT. TCP/IP then starts
+without an adapter (no network, but the desktop). Alternatives: copy the
+CD's LOOP.SYS over `drivers\usnet31.sys` (same name, so no registry change),
+or at the boot menu "Last Known Good" if ControlSet002 predates `/net31`.
