@@ -171,6 +171,9 @@ def build_modern_support(root: Path, out: Path):
         writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
         writer.add_file('usos-flight.exe', helpers / 'usos-flight.exe')
+        # 8 / 8.1 / 10 x86: CF9h full cold reset at the end of the WinPE
+        # (committed WDK 7.1 build of tools/nt/usoscf9; section 21.3).
+        writer.add_file('usos-cf9.sys', root / 'tools/nt/usoscf9/bin/i386/usoscf9.sys')
         writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
         # Vista / Server 2008 SP2 and Windows 7 SP1 x86: own xHCI driver
         # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered

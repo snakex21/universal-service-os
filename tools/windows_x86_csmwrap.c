@@ -724,6 +724,90 @@ static DWORD WINAPI notice(LPVOID unused) {
     return 0;
 }
 
+/* ---- coldreset: full CF9h reset instead of the power-off (8 / 8.1 / 10) ----
+ * docs/nvme-nt6-2026-10-12.md section 21.3. "coldreset check" loads
+ * usos-cf9.sys (tools/nt/usoscf9, demand-start kernel service USOSCF9) and
+ * asks whether the host bridge is AMD / Intel (exit 0 = the full reset is
+ * available, else 1: the .cmd keeps the power-off). "coldreset go" flushes
+ * every volume, locks + dismounts the prepared disk's volumes (the handles
+ * stay open, so nothing writes to them any more), flushes every physical
+ * disk's write cache, then asks the driver for CF9h 02h, 0Eh; it returns
+ * (exit 1) only when the machine did not reset. */
+#define USOSCF9_TYPE 0x8F39
+#define IOCTL_USOSCF9_QUERY CTL_CODE(USOSCF9_TYPE, 0x900, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_USOSCF9_RESET CTL_CODE(USOSCF9_TYPE, 0x901, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+static HANDLE cf9_open(void) {
+    return CreateFileW(L"\\\\.\\USOSCF9", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+}
+static DWORD coldreset_check(void) {
+    WCHAR sys[MAX_PATH];
+    path(sys, L"usos-cf9.sys");
+    if (GetFileAttributesW(sys) == INVALID_FILE_ATTRIBUTES) { say("[X86_CSMWRAP] coldreset: usos-cf9.sys missing; power-off fallback\r\n"); return 1; }
+    SC_HANDLE m = OpenSCManagerW(0, 0, SC_MANAGER_ALL_ACCESS);
+    if (!m) { logn("coldreset: no service manager; power-off fallback, error=", GetLastError()); return 1; }
+    SC_HANDLE s = CreateServiceW(m, L"USOSCF9", L"USOS CF9 full reset", SERVICE_ALL_ACCESS, SERVICE_KERNEL_DRIVER, SERVICE_DEMAND_START,
+                                 SERVICE_ERROR_IGNORE, sys, 0, 0, 0, 0, 0);
+    if (!s) s = OpenServiceW(m, L"USOSCF9", SERVICE_ALL_ACCESS);
+    if (!s) { logn("coldreset: driver service not created; power-off fallback, error=", GetLastError()); CloseServiceHandle(m); return 1; }
+    if (!StartServiceW(s, 0, 0) && GetLastError() != ERROR_SERVICE_ALREADY_RUNNING) {
+        logn("coldreset: usos-cf9.sys did not start; power-off fallback, error=", GetLastError());
+        CloseServiceHandle(s); CloseServiceHandle(m); return 1;
+    }
+    CloseServiceHandle(s); CloseServiceHandle(m);
+    HANDLE h = cf9_open();
+    if (h == INVALID_HANDLE_VALUE) { logn("coldreset: \\\\.\\USOSCF9 not opened; power-off fallback, error=", GetLastError()); return 1; }
+    DWORD q[2] = {0, 0}, got = 0;
+    BOOL ok = DeviceIoControl(h, IOCTL_USOSCF9_QUERY, 0, 0, q, sizeof(q), &got, 0) && got == sizeof(q);
+    CloseHandle(h);
+    if (!ok) { logn("coldreset: query failed; power-off fallback, error=", GetLastError()); return 1; }
+    logn("coldreset: host bridge vendor id (decimal)=", q[0] & 0xFFFF);
+    logn("coldreset: host bridge device id (decimal)=", q[0] >> 16);
+    if (!q[1]) { say("[X86_CSMWRAP] coldreset: not an AMD / Intel host bridge; power-off fallback\r\n"); return 1; }
+    say("[X86_CSMWRAP] coldreset: CF9h full reset available (AMD / Intel host bridge)\r\n");
+    return 0;
+}
+static DWORD coldreset_go(void) {
+    WCHAR volume[64]; DWORD got = 0, flushed = 0, dismounted = 0, disks = 0;
+    static HANDLE held[16]; int nheld = 0;
+    HANDLE f = FindFirstVolumeW(volume, 64);
+    if (f != INVALID_HANDLE_VALUE) {
+        do {
+            int len = lstrlenW(volume);
+            if (len < 2 || volume[len - 1] != L'\\') continue;
+            volume[len - 1] = 0;
+            HANDLE h = CreateFileW(volume, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+            if (h == INVALID_HANDLE_VALUE) continue;
+            if (FlushFileBuffers(h)) flushed++;
+            VOLUME_DISK_EXTENTS e;
+            BOOL on_target = DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &e, sizeof(e), &got, 0) && e.NumberOfDiskExtents >= 1 && e.Extents[0].DiskNumber == disk;
+            if (on_target && nheld < 16) {
+                BOOL locked = DeviceIoControl(h, FSCTL_LOCK_VOLUME, 0, 0, 0, 0, &got, 0);
+                if (DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, 0, 0, 0, 0, &got, 0)) dismounted++;
+                if (!locked) say("[X86_CSMWRAP] coldreset: a target volume could not be locked (flushed and dismounted anyway)\r\n");
+                held[nheld++] = h;
+            } else CloseHandle(h);
+        } while (FindNextVolumeW(f, volume, 64));
+        FindVolumeClose(f);
+    }
+    for (DWORD n = 0; n < 32; n++) {
+        WCHAR name[40] = L"\\\\.\\PhysicalDrive"; wdecimal(name + lstrlenW(name), n);
+        HANDLE h = CreateFileW(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        if (h == INVALID_HANDLE_VALUE) continue;
+        if (FlushFileBuffers(h)) disks++;
+        CloseHandle(h);
+    }
+    logn("coldreset: volumes flushed=", flushed); logn("coldreset: target volumes dismounted=", dismounted); logn("coldreset: disk caches flushed=", disks);
+    HANDLE h = cf9_open();
+    if (h == INVALID_HANDLE_VALUE) { logn("coldreset: \\\\.\\USOSCF9 not opened, error=", GetLastError()); return 1; }
+    static const char magic[16] = { 'U','S','O','S','C','F','9','F','U','L','L','R','E','S','E','T' };
+    say("[X86_CSMWRAP] coldreset: CF9h 02h, 0Eh now\r\n");
+    DeviceIoControl(h, IOCTL_USOSCF9_RESET, (LPVOID)magic, sizeof(magic), 0, 0, &got, 0);
+    logn("coldreset: still running after the CF9h write, error=", GetLastError());
+    CloseHandle(h);
+    for (int i = 0; i < nheld; i++) CloseHandle(held[i]);
+    return 1;
+}
+
 static int arg_count;
 static WCHAR **args;
 void entry(void) {
@@ -761,6 +845,14 @@ void entry(void) {
         if (staged) r = usos_display_register_in_key(k);
         RegCloseKey(k);
         ExitProcess(staged * 1000 + acl * 100 + (r > 99 ? 99 : r));
+    }
+    /* notice poweroff: the Polish power-off notice alone (15 s), for the
+     * cold-reset fallback after "after quiet" (section 21.3). */
+    if (lstrcmpiW(args[1], L"notice") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0) {
+        say("[X86_CSMWRAP] notice: power-off notice (15 s), then wpeutil shutdown\r\n");
+        HANDLE t = CreateThread(0, 0, notice_poweroff, 0, 0, 0);
+        if (t) { WaitForSingleObject(t, USOS_POWEROFF_NOTICE_MS); CloseHandle(t); }
+        ExitProcess(0);
     }
     if (lstrcmpiW(args[1], L"samefile") == 0 && arg_count == 4) ExitProcess(same_file(args[2], args[3]) ? 0 : 1);
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
@@ -816,6 +908,10 @@ void entry(void) {
      * error 433, docs/nvme-nt6-2026-10-12.md section 15). */
     if (lstrcmpiW(args[1], L"lowmem") == 0) { logn("lowmem: WinPE RAM top before any disk access (MiB)=", (DWORD)(ram_top() >> 20)); verbose = TRUE; }
     if (!find_disk(verbose) && (verbose || !find_disk(TRUE))) { say("[X86_CSMWRAP] STOP: the prepared disk was not found exactly once\r\n"); ExitProcess(4); }
+    /* After "after" the staging entry is gone, so these run before the MBR
+     * slot lookup; they only need the prepared disk's number. */
+    if (lstrcmpiW(args[1], L"coldreset") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"check") == 0) ExitProcess(coldreset_check());
+    if (lstrcmpiW(args[1], L"coldreset") == 0 && arg_count == 3 && lstrcmpiW(args[2], L"go") == 0) ExitProcess(coldreset_go());
     BYTE s[512];
     if (!mbr_io(s, FALSE)) { logn("cannot read the target MBR, error=", GetLastError()); ExitProcess(5); }
     int staging = slot_of(s, staging_start, staging_sectors, TRUE), windows = slot_of(s, windows_start, windows_sectors, FALSE);
@@ -858,6 +954,10 @@ void entry(void) {
         memset(se, 0, 16);
         if (!write_mbr(s, "staging partition entry removed")) ExitProcess(6);
         BOOL poweroff = arg_count == 3 && lstrcmpiW(args[2], L"poweroff") == 0;
+        /* "after quiet" (8 / 8.1 / 10, section 21.3): no notice; the .cmd
+         * then tries the CF9h full reset, the power-off notice only as the
+         * fallback ("notice poweroff"). */
+        if (arg_count == 3 && lstrcmpiW(args[2], L"quiet") == 0) { say("[X86_CSMWRAP] after: no notice (cold reset next)\r\n"); ExitProcess(0); }
         say(poweroff ? "[X86_CSMWRAP] after: power-off notice (15 s), then wpeutil shutdown\r\n" : "[X86_CSMWRAP] after: remove-the-stick notice (2 min), then wpeutil reboot\r\n");
         HANDLE t = CreateThread(0, 0, poweroff ? notice_poweroff : notice, 0, 0, 0);
         if (t) { WaitForSingleObject(t, poweroff ? USOS_POWEROFF_NOTICE_MS : 120000); CloseHandle(t); }

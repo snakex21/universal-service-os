@@ -59,9 +59,10 @@ rem      user's Run value for \USOS\NT6\USOSRES.EXE when the micro-Linux
 rem      staged it (tools/windows_display_register.h); never fatal;
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart; Windows
-rem      8 / 8.1 / 10 (NT 6.2+): "after poweroff", a Polish notice (15 s) that
-rem      the computer powers off and is started with the power button, then
-rem      wpeutil shutdown instead of the warm restart (section 21 of
+rem      8 / 8.1 / 10 (NT 6.2+): "after quiet", then the CF9h full cold reset
+rem      ("coldreset check" / "coldreset go", usos-cf9.sys) instead of the
+rem      warm restart; fallback: the Polish power-off notice ("notice
+rem      poweroff", 15 s) and wpeutil shutdown (sections 21.1 and 21.3 of
 rem      docs/nvme-nt6-2026-10-12.md).
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
 if not exist "%USOS_SETUP%" exit /b 1
@@ -144,11 +145,24 @@ if not errorlevel 1 for /f "usebackq tokens=2" %%A in ("%TEMP%\usos-target.txt")
 if "%USOS_FINAL_NT%"=="6.2" set "USOS_POWEROFF=1"
 if "%USOS_FINAL_NT%"=="6.3" set "USOS_POWEROFF=1"
 if "%USOS_FINAL_NT%"=="10.0" set "USOS_POWEROFF=1"
-if defined USOS_POWEROFF (echo [USOS] final step: NT %USOS_FINAL_NT%, power-off notice, then wpeutil shutdown.) else (echo [USOS] final step: NT %USOS_FINAL_NT%, restart notice, then wpeutil reboot.)
-if defined USOS_POWEROFF ("%~dp0usos-x86-csmwrap.exe" after poweroff) else ("%~dp0usos-x86-csmwrap.exe" after)
+rem 2026-10-31 (section 21.3, after the power-off PASS B261031-200222): the
+rem 8 / 8.1 / 10 x86 end is now fully automatic again: "after quiet" (no
+rem notice), then "coldreset check" loads usos-cf9.sys (tools/nt/usoscf9) and
+rem "coldreset go" flushes every volume, dismounts the target's, flushes the
+rem disk caches and writes CF9h 02h, 0Eh (AMD / Intel full reset: PCIe reset
+rem like a power cycle; wpeutil reboot = FADT reset register = CF9h 06h, the
+rem warm reset that lost the GPU port). When the driver is unavailable, the
+rem chipset is not AMD / Intel, or the machine is still running, the Polish
+rem power-off notice and wpeutil shutdown follow as before.
+if defined USOS_POWEROFF (echo [USOS] final step: NT %USOS_FINAL_NT%, CF9h full cold reset, power-off as the fallback.) else (echo [USOS] final step: NT %USOS_FINAL_NT%, restart notice, then wpeutil reboot.)
+if defined USOS_POWEROFF ("%~dp0usos-x86-csmwrap.exe" after quiet) else ("%~dp0usos-x86-csmwrap.exe" after)
 set "USOS_FINALIZE_RESULT=%errorlevel%"
+set "USOS_COLDRESET="
+if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF "%~dp0usos-x86-csmwrap.exe" coldreset check
+if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF if not errorlevel 1 set "USOS_COLDRESET=1"
 rem The phase line goes before the last log copy, so the stick log shows it.
-if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF echo [USOS] phase=poweroff-after-success
+if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_COLDRESET echo [USOS] phase=coldreset-after-success path=cf9-full-reset
+if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF if not defined USOS_COLDRESET echo [USOS] phase=poweroff-after-success path=fallback
 if "%USOS_FINALIZE_RESULT%"=="0" if not defined USOS_POWEROFF echo [USOS] phase=reboot-after-success
 "%~dp0usos-log-x86.exe"
 if not "%USOS_FINALIZE_RESULT%"=="0" exit /b %USOS_FINALIZE_RESULT%
@@ -156,6 +170,10 @@ if defined USOS_POWEROFF goto poweroff_after_success
 wpeutil reboot
 exit /b 0
 :poweroff_after_success
+if defined USOS_COLDRESET "%~dp0usos-x86-csmwrap.exe" coldreset go
+if defined USOS_COLDRESET echo [USOS] phase=poweroff-after-success path=fallback-after-cf9 (the CF9h reset did not happen)
+if defined USOS_COLDRESET "%~dp0usos-log-x86.exe"
+"%~dp0usos-x86-csmwrap.exe" notice poweroff
 wpeutil shutdown
 exit /b 0
 
