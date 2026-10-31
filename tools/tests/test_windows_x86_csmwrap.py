@@ -252,13 +252,14 @@ def poweroff_regressions(script: str) -> None:
     assert code.index('if "%USOS_FINALIZE_RESULT%"=="0" if defined USOS_POWEROFF echo [USOS] phase=poweroff-after-success') < log
     assert code.index('if "%USOS_FINALIZE_RESULT%"=="0" if not defined USOS_POWEROFF echo [USOS] phase=reboot-after-success') < log < fail
     # Only the end of the flow changed: the NVMe lowmem WinPE restart stays a reboot.
-    assert script.count("wpeutil shutdown") == 1 and script.count("wpeutil reboot") == 2
+    lines = [line.strip() for line in script.splitlines() if not line.lstrip().lower().startswith("rem ")]
+    assert lines.count("wpeutil shutdown") == 1 and lines.count("wpeutil reboot") == 2, lines
     # The helper: "after poweroff" shows the Polish notice for 15 s; plain "after" is unchanged.
-    src = (ROOT / "tools" / "windows_x86_csmwrap.c").read_text(encoding="ascii")
+    src = (ROOT / "tools" / "windows_x86_csmwrap.c").read_text(encoding="utf-8")
     notice = src[src.index("static DWORD WINAPI notice_poweroff"):src.index("static DWORD WINAPI notice(")]
     text = notice.encode("ascii").decode("unicode_escape")
-    for want in ("Komputer zostanie teraz wyłączony", "przyciskiem zasilania", "kontynuować instalację",
-                 "Wyjmij pendrive USOS", "wyłączy się sam za 15 sekund", "USOS - Windows bez CSM"):
+    for want in ("Komputer zostanie teraz wy\u0142\u0105czony", "przyciskiem zasilania", "kontynuowa\u0107 instalacj\u0119",
+                 "Wyjmij pendrive USOS", "wy\u0142\u0105czy si\u0119 sam za 15 sekund", "USOS - Windows bez CSM"):
         assert want in text, want
     assert "#define USOS_POWEROFF_NOTICE_MS 15000" in src
     after = src[src.index('lstrcmpiW(args[1], L"after") == 0'):]

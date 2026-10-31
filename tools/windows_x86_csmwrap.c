@@ -669,10 +669,10 @@ static DWORD fast_startup(void) {
 #define USOS_POWEROFF_NOTICE_MS 15000
 static DWORD WINAPI notice_poweroff(LPVOID unused) {
     (void)unused;
-    MessageBoxW(0, L"Pierwsza część instalacji Windows została zakończona.\n\n"
-                   L"Komputer zostanie teraz wyłączony. Wyjmij pendrive USOS, a następnie włącz komputer przyciskiem zasilania, aby kontynuować instalację Windows z dysku (przez CSMWrap). "
-                   L"Jeśli pendrive zostanie podłączony, wybierz wpis UEFI tego dysku w menu rozruchowym firmware.\n\n"
-                   L"Komputer wyłączy się sam za 15 sekund.",
+    MessageBoxW(0, L"Pierwsza cz\u0119\u015b\u0107 instalacji Windows zosta\u0142a zako\u0144czona.\n\n"
+                   L"Komputer zostanie teraz wy\u0142\u0105czony. Wyjmij pendrive USOS, a nast\u0119pnie w\u0142\u0105cz komputer przyciskiem zasilania, aby kontynuowa\u0107 instalacj\u0119 Windows z dysku (przez CSMWrap). "
+                   L"Je\u015bli pendrive zostanie pod\u0142\u0105czony, wybierz wpis UEFI tego dysku w menu rozruchowym firmware.\n\n"
+                   L"Komputer wy\u0142\u0105czy si\u0119 sam za 15 sekund.",
                 L"USOS - Windows bez CSM", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST | MB_SYSTEMMODAL);
     return 0;
 }
