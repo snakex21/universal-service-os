@@ -611,6 +611,36 @@ static DWORD display_register(void) {
  * USOS-installed 8 / 8.1 / 10 starts with a full boot. The opt-out file is
  * the one documented for DATA (Systems\Windows\<version>\Unattended). */
 #include "windows_fast_startup.h"
+/* OPT-IN diagnostic flight recorder (tools/windows_flight_recorder.c,
+ * docs/nvme-nt6-2026-10-12.md section 21.2), every x86 NT6 install through
+ * this helper: an empty flight-recorder.txt on DATA, in
+ * Systems\Windows\<version>\Unattended\ (8 / 8.1 / 10: FOLDER, FOLDER2) or
+ * in Systems\Windows\ (any version), on any volume but the installed one.
+ * Then usos-flight.exe -> <target>\Windows\System32\USOSFLT.EXE, \USOS is
+ * created, and the hive load registers the USOSFLT service. Off by default. */
+static void flight_recorder(const WCHAR *folder, const WCHAR *folder2) {
+    WCHAR file[MAX_PATH], to[MAX_PATH];
+    BOOL wanted = FALSE;
+    for (WCHAR letter = L'C'; letter <= L'Z' && !wanted; letter++) {
+        if (letter == target_root[0]) continue;
+        for (int i = 0; i < 3 && !wanted; i++) {
+            const WCHAR *name = i == 0 ? 0 : i == 1 ? folder : folder2;
+            if (i && !name) continue;
+            file[0] = letter; lstrcpyW(file + 1, L":\\Systems\\Windows\\");
+            if (name) { lstrcatW(file, name); lstrcatW(file, L"\\Unattended\\"); }
+            lstrcatW(file, L"flight-recorder.txt");
+            wanted = GetFileAttributesW(file) != INVALID_FILE_ATTRIBUTES;
+        }
+    }
+    if (!wanted) { say("[X86_CSMWRAP] faststartup: flight recorder off (no flight-recorder.txt on DATA)\r\n"); return; }
+    say("[X86_CSMWRAP] faststartup: flight-recorder.txt on DATA; installing USOSFLT\r\n");
+    path(file, L"usos-flight.exe");
+    lstrcpyW(to, target_root); lstrcatW(to, L"Windows\\System32\\USOSFLT.EXE");
+    if (!CopyFileW(file, to, FALSE)) { logn("faststartup: flight recorder copy failed, error=", GetLastError()); return; }
+    lstrcpyW(to, target_root); lstrcatW(to, L"USOS");
+    CreateDirectoryW(to, 0);
+    usos_fs_flight = TRUE;
+}
 static DWORD fast_startup(void) {
     WCHAR kernel[MAX_PATH], file[MAX_PATH];
     DWORD major = 0, minor = 0, r;
@@ -619,13 +649,21 @@ static DWORD fast_startup(void) {
     lstrcpyW(kernel, target_root); lstrcatW(kernel, L"Windows\\System32\\ntoskrnl.exe");
     if (!file_version(kernel, &major, &minor)) { say("[X86_CSMWRAP] faststartup: cannot read the installed kernel version; skipped\r\n"); return 11; }
     logn("faststartup: installed NT version major=", major); logn("faststartup: minor=", minor);
-    if (major < 6 || (major == 6 && minor < 2)) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
+    BOOL modern = major > 6 || (major == 6 && minor >= 2);
     folder = L"Windows 10";
     folder2 = 0;
     if (major == 6 && minor == 2) folder = L"Windows 8";
     /* 6.3: Windows 8.1, or Embedded 8.1 Industry with its own DATA folder
      * (the WinPE cannot tell them apart; either folder's file counts). */
     else if (major == 6 && minor == 3) { folder = L"Windows 8.1"; folder2 = L"Windows Embedded 8.1 Industry"; }
+    flight_recorder(modern ? folder : 0, modern ? folder2 : 0);
+    if (!modern) {
+        if (!usos_fs_flight) { say("[X86_CSMWRAP] faststartup: Vista / 7 have no Fast Startup; nothing to do\r\n"); return 0; }
+        usos_fs_hiberboot = FALSE; usos_fs_autoreboot_edit = FALSE;
+        r = usos_fast_startup(target_root);
+        logn(usos_fs_flight_result <= USOS_FS_PRESENT ? "faststartup: flight recorder USOSFLT registered (Vista / 7, no other edit), code=" : "faststartup: flight recorder NOT registered, code=", usos_fs_flight_result);
+        return 0;
+    }
     /* The documented opt-out: DATA\Systems\Windows\<version>\Unattended\
      * fast-startup-on.txt on any volume but the installed one. */
     for (WCHAR letter = L'C'; letter <= L'Z'; letter++) {
@@ -651,6 +689,8 @@ static DWORD fast_startup(void) {
              usos_fs_autoreboot == USOS_FS_PRESENT ? "faststartup: DIAGNOSTIC CrashControl AutoReboot was already 0, code=" : "faststartup: DIAGNOSTIC CrashControl AutoReboot NOT written, code=", usos_fs_autoreboot);
         logn("faststartup: CrashControl CrashDumpEnabled as found, unchanged (4294967295 = missing)=", usos_fs_crashdump);
     }
+    if (usos_fs_flight && r != USOS_FS_ERR_LOAD && r != USOS_FS_ERR_UNLOAD)
+        logn(usos_fs_flight_result <= USOS_FS_PRESENT ? "faststartup: flight recorder USOSFLT registered (auto start, \\USOS\\FLIGHT.LOG), code=" : "faststartup: flight recorder NOT registered, code=", usos_fs_flight_result);
     /* Not fatal: the hive unload writes the value as well (logged for the
      * X470 report; see windows_fast_startup.h). */
     if (r == USOS_FS_WRITTEN && usos_fs_flush_error != ERROR_SUCCESS) logn("faststartup: RegFlushKey failed (unload still commits), Win32 code=", (DWORD)usos_fs_flush_error);
@@ -739,6 +779,20 @@ void entry(void) {
         r = usos_fast_startup_in_system(k);
         RegCloseKey(k);
         ExitProcess(r > 99 ? 99 : r);
+    }
+    /* Host test of the opt-in flight recorder registration only
+     * (tools/tests/test_windows_flight_recorder.py): flight-test <key under
+     * HKCU standing for a SYSTEM hive root> [vista]; exit = the USOSFLT
+     * registration result * 10 + the hive edit result (capped). */
+    if (lstrcmpiW(args[1], L"flight-test") == 0 && (arg_count == 3 || arg_count == 4)) {
+        HKEY k;
+        DWORD r;
+        if (arg_count == 4) { usos_fs_hiberboot = FALSE; usos_fs_autoreboot_edit = FALSE; }
+        usos_fs_flight = TRUE;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, args[2], 0, KEY_QUERY_VALUE | KEY_CREATE_SUB_KEY, &k) != ERROR_SUCCESS) ExitProcess(9990);
+        r = usos_fast_startup_in_system(k);
+        RegCloseKey(k);
+        ExitProcess((usos_fs_flight_result > 99 ? 99 : usos_fs_flight_result) * 10 + (r > 9 ? 9 : r));
     }
     /* setupver <setup.exe>: exit code = major * 10 + minor of the file version
      * (60 Vista / 2008, 61 Windows 7, 62 / 63 8.x, 100 Windows 10), 0 unknown.

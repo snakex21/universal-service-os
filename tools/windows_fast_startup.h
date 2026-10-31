@@ -86,6 +86,10 @@ static BOOL usos_fs_hiberboot = TRUE;
 static DWORD usos_fs_autoreboot = USOS_FS_ERR_KEY;  /* USOS_FS_* of the AutoReboot edit */
 static DWORD usos_fs_crashdump = 0xFFFFFFFF;        /* CrashDumpEnabled as found, or missing */
 static const WCHAR usos_fs_crash[] = L"Control\\CrashControl";
+/* FALSE: no AutoReboot edit in this load (Vista / 7: only the opt-in
+ * flight recorder registration, tools/windows_flight_register.h). */
+static BOOL usos_fs_autoreboot_edit = TRUE;
+#include "windows_flight_register.h"
 static DWORD usos_fs_autoreboot_in_key(HKEY crash) {
     DWORD value = 1, type = 0, size = sizeof(value), zero = 0;
     usos_fs_crashdump = 0xFFFFFFFF;
@@ -103,6 +107,8 @@ static DWORD usos_fast_startup_in_system(HKEY system) {
     HKEY power, crash;
     DWORD result = USOS_FS_ERR_KEY;
     usos_fs_control_set(system, set);
+    if (usos_fs_flight) usos_fs_flight_result = usos_flt_register_in_system(system, set);
+    if (!usos_fs_autoreboot_edit) return usos_fs_hiberboot ? USOS_FS_ERR_KEY : USOS_FS_SKIPPED;
     lstrcpyW(key, set); lstrcatW(key, L"\\"); lstrcatW(key, usos_fs_crash);
     usos_fs_autoreboot = USOS_FS_ERR_KEY;
     if (RegCreateKeyExW(system, key, 0, 0, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, 0, &crash, 0) == ERROR_SUCCESS) {

@@ -152,6 +152,14 @@ def build_modern_support(root: Path, out: Path):
                     '-Wno-missing-declarations', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_drive_notify.c'),
                     '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-luser32', '-lshell32', '-ladvapi32',
                     '-o', str(helpers / 'usos-drivenotify.exe')], env=env, check=True)
+    # Opt-in diagnostic flight recorder for the installed x86 NT6 system
+    # (USOSFLT service, \USOS\FLIGHT.LOG; installed by "usos-x86-csmwrap
+    # faststartup" only with flight-recorder.txt on DATA;
+    # docs/nvme-nt6-2026-10-12.md section 21.2).
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_flight_recorder.c'),
+                    '-Wl,--entry,entry', '-Wl,--subsystem,console', '-lkernel32', '-luser32', '-lshell32', '-ladvapi32', '-lcfgmgr32', '-lpsapi',
+                    '-o', str(helpers / 'usos-flight.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_nvme_modern.c'), '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lcrypt32', '-lshell32',
@@ -162,6 +170,7 @@ def build_modern_support(root: Path, out: Path):
         writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
         writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
+        writer.add_file('usos-flight.exe', helpers / 'usos-flight.exe')
         writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
         # Vista / Server 2008 SP2 and Windows 7 SP1 x86: own xHCI driver
         # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
